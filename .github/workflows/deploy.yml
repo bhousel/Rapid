@@ -30,18 +30,15 @@ jobs:
     - name: 📥  Checkout
       uses: actions/checkout@v4
 
-    - name: ⚙️  Use Node.js 18
+    - name: ⚙️  Use Node.js 20
       uses: actions/setup-node@v4
       with:
-        node-version: 18
+        node-version: '20'
 
     - name: 🏗️  Install
       run: |
         npm install
         npm run all
-
-#    - name: 🧪  Test
-#      run: npm run test
 
     - name: 🔐  Setup AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
