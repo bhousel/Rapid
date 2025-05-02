@@ -259,7 +259,7 @@ describe('actionMergePolygon', () => {
 
     const action = Rapid.actionMergePolygon(['w1', 'r1']);
     const disabled = action.disabled(graph);
-    assert.strictEqual(disabled, 'not_eligible');
+    assert.equal(disabled, 'not_eligible');
   });
 
 
@@ -272,7 +272,7 @@ describe('actionMergePolygon', () => {
 
     const action = Rapid.actionMergePolygon(['w1']);
     const disabled = action.disabled(graph);
-    assert.strictEqual(disabled, 'not_eligible');
+    assert.equal(disabled, 'not_eligible');
   });
 
 
@@ -286,7 +286,7 @@ describe('actionMergePolygon', () => {
 
     const action = Rapid.actionMergePolygon(['w1', 'r1']);
     const disabled = action.disabled(graph);
-    assert.strictEqual(disabled, 'not_eligible');
+    assert.equal(disabled, 'not_eligible');
   });
 
 
@@ -300,6 +300,6 @@ describe('actionMergePolygon', () => {
 
     const action = Rapid.actionMergePolygon(['w1', 'r1']);
     const disabled = action.disabled(graph);
-    assert.strictEqual(disabled, 'not_eligible');
+    assert.equal(disabled, 'not_eligible');
   });
 });

@@ -100,7 +100,7 @@ describe('ImagerySource', () => {
         template: '{u}'
       });
       const coord = [1, 1, 1];  // Choose coordinates that will result in a non-empty 'u' string
-      assert.strictEqual(source.url(coord), '3');
+      assert.equal(source.url(coord), '3');
     });
 
     it('supports bing replacement tokens', () => {
@@ -159,17 +159,17 @@ describe('ImagerySource', () => {
   describe('_localeDateString', () => {
     it('returns null if the input is not provided', () => {
       const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.strictEqual(source._localeDateString(), null);
+      assert.equal(source._localeDateString(), null);
     });
 
     it('returns null if the input is not a valid date', () => {
       const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.strictEqual(source._localeDateString('not a date'), null);
+      assert.equal(source._localeDateString('not a date'), null);
     });
 
     it('returns a formatted date string if the input is a valid date', () => {
       const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.strictEqual(source._localeDateString('2020-01-01'), '2020-01-01');
+      assert.equal(source._localeDateString('2020-01-01'), '2020-01-01');
     });
   });
 
@@ -177,22 +177,22 @@ describe('ImagerySource', () => {
   describe('_vintageRange', () => {
     it('returns undefined if the input does not have a start or end', () => {
       const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.strictEqual(source._vintageRange({}), undefined);
+      assert.equal(source._vintageRange({}), undefined);
     });
 
     it('returns a string with the start date if only the start is provided', () => {
       const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.strictEqual(source._vintageRange({ start: 'Jan 1, 2020' }), 'Jan 1, 2020 - ?');
+      assert.equal(source._vintageRange({ start: 'Jan 1, 2020' }), 'Jan 1, 2020 - ?');
     });
 
     it('returns a string with the end date if only the end is provided', () => {
       const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.strictEqual(source._vintageRange({ end: 'Dec 31, 2020' }), '? - Dec 31, 2020');
+      assert.equal(source._vintageRange({ end: 'Dec 31, 2020' }), '? - Dec 31, 2020');
     });
 
     it('returns a range string if both the start and end are provided', () => {
       const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.strictEqual(source._vintageRange({ start: 'Jan 1, 2020', end: 'Dec 31, 2020' }), 'Jan 1, 2020 - Dec 31, 2020');
+      assert.equal(source._vintageRange({ start: 'Jan 1, 2020', end: 'Dec 31, 2020' }), 'Jan 1, 2020 - Dec 31, 2020');
     });
   });
 
@@ -216,7 +216,7 @@ describe('ImagerySource', () => {
       });
       await source.fetchTilemap([0, 0]);
       // Check that the zoom extent was updated to 22
-      assert.strictEqual(source.zoomExtent[1], 22);
+      assert.equal(source.zoomExtent[1], 22);
     });
   });
 
@@ -243,44 +243,44 @@ describe('ImagerySource', () => {
     };
     const source = new Rapid.ImagerySource(context, src);
     it('sets properties based on the src object', () => {
-      assert.strictEqual(source._id, src.id);
-      assert.strictEqual(source._idtx, src.id.replace(/\./g, '<TX_DOT>'));
-      assert.strictEqual(source._name, src.name);
-      assert.strictEqual(source._description, src.description);
-      assert.strictEqual(source._template, src.template);
-      assert.strictEqual(source.best, src.best);
-      assert.strictEqual(source.endDate, src.endDate);
-      assert.strictEqual(source.icon, src.icon);
-      assert.strictEqual(source.overlay, src.overlay);
+      assert.equal(source._id, src.id);
+      assert.equal(source._idtx, src.id.replace(/\./g, '<TX_DOT>'));
+      assert.equal(source._name, src.name);
+      assert.equal(source._description, src.description);
+      assert.equal(source._template, src.template);
+      assert.equal(source.best, src.best);
+      assert.equal(source.endDate, src.endDate);
+      assert.equal(source.icon, src.icon);
+      assert.equal(source.overlay, src.overlay);
       assert.deepStrictEqual(source.polygon, src.polygon);
-      assert.strictEqual(source.projection, src.projection);
-      assert.strictEqual(source.startDate, src.startDate);
-      assert.strictEqual(source.terms_html, src.terms_html);
-      assert.strictEqual(source.terms_text, src.terms_text);
-      assert.strictEqual(source.terms_url, src.terms_url);
-      assert.strictEqual(source.tileSize, src.tileSize);
-      assert.strictEqual(source.type, src.type);
+      assert.equal(source.projection, src.projection);
+      assert.equal(source.startDate, src.startDate);
+      assert.equal(source.terms_html, src.terms_html);
+      assert.equal(source.terms_text, src.terms_text);
+      assert.equal(source.terms_url, src.terms_url);
+      assert.equal(source.tileSize, src.tileSize);
+      assert.equal(source.type, src.type);
       assert.deepStrictEqual(source.zoomExtent, src.zoomExtent);
-      assert.strictEqual(source.isBlocked, false);
+      assert.equal(source.isBlocked, false);
       assert.deepStrictEqual(source.offset, [0, 0]);
     });
     it('returns the correct id', () => {
-      assert.strictEqual(source.id, src.id);
+      assert.equal(source.id, src.id);
     });
     it('returns the correct idtx', () => {
-      assert.strictEqual(source.idtx, src.id.replace(/\./g, '<TX_DOT>'));
+      assert.equal(source.idtx, src.id.replace(/\./g, '<TX_DOT>'));
     });
     it('returns the correct name', () => {
-      assert.strictEqual(source.name, src.name);
+      assert.equal(source.name, src.name);
     });
     it('returns the correct description', () => {
-      assert.strictEqual(source.description, src.description);
+      assert.equal(source.description, src.description);
     });
     it('returns the correct imageryUsed', () => {
-      assert.strictEqual(source.imageryUsed, src.name);
+      assert.equal(source.imageryUsed, src.name);
     });
     it('returns the correct template', () => {
-      assert.strictEqual(source.template, src.template);
+      assert.equal(source.template, src.template);
     });
     it('returns the correct area', () => {
       const expectedArea = d3_geoArea({ type: 'Polygon', coordinates: [src.polygon] });
@@ -307,7 +307,7 @@ describe('ImagerySource', () => {
         endDate: '2020-12-31'
       });
       source.getMetadata([0, 0], [0, 0, 0], (err, metadata) => {
-        assert.strictEqual(err, null);
+        assert.equal(err, null);
         assert.deepStrictEqual(metadata.vintage, {
           start: '2020-01-01',
           end: '2020-12-31',
@@ -341,7 +341,7 @@ describe('ImagerySource', () => {
     //   await source.fetchTilemap([0, 0]);
 
     //   // Check that the zoom extent was updated to 19
-    //   assert.strictEqual(source.zoomExtent[1], 19);
+    //   assert.equal(source.zoomExtent[1], 19);
     // });
 
     it('does not update the zoom extent when the fetch request fails', async () => {
@@ -353,7 +353,7 @@ describe('ImagerySource', () => {
       global.fetch = () => Promise.reject(new Error('Network error'));
       await source.fetchTilemap([0, 0]);
       // Check that the zoom extent was not updated
-      assert.strictEqual(source.zoomExtent[1], 22);
+      assert.equal(source.zoomExtent[1], 22);
     });
   });
 });

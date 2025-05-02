@@ -5,12 +5,12 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('actionCopyEntities', () => {
   it('copies a node', () => {
-    const a = Rapid.osmNode({id: 'a'});
-    const base = new Rapid.Graph([a]);
+    const n1 = Rapid.osmNode({id: 'n1'});
+    const base = new Rapid.Graph([n1]);
 
-    const head = Rapid.actionCopyEntities(['a'], base)(base);
+    const head = Rapid.actionCopyEntities(['n1'], base)(base);
     assert.ok(head instanceof Rapid.Graph);
-    assert.ok(head.hasEntity('a'));
+    assert.ok(head.hasEntity('n1'));
 
     const diff = new Rapid.Difference(base, head);
     const created = diff.created();
@@ -19,14 +19,14 @@ describe('actionCopyEntities', () => {
 
 
   it('copies a way', () => {
-    const a = Rapid.osmNode({id: 'a'});
-    const b = Rapid.osmNode({id: 'b'});
-    const w = Rapid.osmWay({id: 'w', nodes: ['a', 'b']});
-    const base = new Rapid.Graph([a, b, w]);
+    const n1 = Rapid.osmNode({id: 'n1'});
+    const n2 = Rapid.osmNode({id: 'n2'});
+    const w1 = Rapid.osmWay({id: 'w1', nodes: ['n1', 'n2']});
+    const base = new Rapid.Graph([n1, n2, w1]);
 
-    const head = Rapid.actionCopyEntities(['w'], base)(base);
+    const head = Rapid.actionCopyEntities(['w1'], base)(base);
     assert.ok(head instanceof Rapid.Graph);
-    assert.ok(head.hasEntity('w'));
+    assert.ok(head.hasEntity('w1'));
 
     const diff = new Rapid.Difference(base, head);
     const created = diff.created();
@@ -36,13 +36,13 @@ describe('actionCopyEntities', () => {
 
   it('copies multiple nodes', () => {
     const base = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b'})
+      Rapid.osmNode({id: 'n1'}),
+      Rapid.osmNode({id: 'n2'})
     ]);
-    const head = Rapid.actionCopyEntities(['a', 'b'], base)(base);
+    const head = Rapid.actionCopyEntities(['n1', 'n2'], base)(base);
     assert.ok(head instanceof Rapid.Graph);
-    assert.ok(head.hasEntity('a'));
-    assert.ok(head.hasEntity('b'));
+    assert.ok(head.hasEntity('n1'));
+    assert.ok(head.hasEntity('n2'));
 
     const diff = new Rapid.Difference(base, head);
     const created = diff.created();
@@ -52,11 +52,11 @@ describe('actionCopyEntities', () => {
 
   it('copies multiple ways, keeping the same connections', () => {
     const base = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b'}),
-      Rapid.osmNode({id: 'c'}),
-      Rapid.osmWay({id: 'w1', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: 'w2', nodes: ['b', 'c']})
+      Rapid.osmNode({id: 'n1'}),
+      Rapid.osmNode({id: 'n2'}),
+      Rapid.osmNode({id: 'n3'}),
+      Rapid.osmWay({id: 'w1', nodes: ['n1', 'n2']}),
+      Rapid.osmWay({id: 'w2', nodes: ['n2', 'n3']})
     ]);
     const action = Rapid.actionCopyEntities(['w1', 'w2'], base);
     const head = action(base);
@@ -67,7 +67,7 @@ describe('actionCopyEntities', () => {
     assert.equal(created.length, 5);
 
     // "copies" is a map of oldID -> newEntity
-    // The new entities will not have the same ids, but the copy of 'b'
+    // The new entities will not have the same ids, but the copy of 'n2'
     // should appear in the same spot in the nodelists of the new ways.
     const copies = action.copies();
     assert.ok(copies instanceof Object);
@@ -76,14 +76,14 @@ describe('actionCopyEntities', () => {
 
 
   it('obtains source entities from an alternate graph', () => {
-    const a = Rapid.osmNode({id: 'a'});
-    const old = new Rapid.Graph([a]);
+    const n1 = Rapid.osmNode({id: 'n1'});
+    const old = new Rapid.Graph([n1]);
     const base = new Rapid.Graph();
-    const action = Rapid.actionCopyEntities(['a'], old);
+    const action = Rapid.actionCopyEntities(['n1'], old);
     const head = action(base);
 
     assert.ok(head instanceof Rapid.Graph);
-    assert.ok(!head.hasEntity('a'));
+    assert.ok(!head.hasEntity('n1'));
 
     const copies = action.copies();
     assert.ok(copies instanceof Object);

@@ -2,9 +2,16 @@ import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
-describe('actionStraightenWay', () => {
-  const viewport = new Rapid.sdk.Viewport();
+function closeTo(a, b, epsilon = 1e-9) {
+  return Math.abs(a - b) < epsilon;
+}
 
+const viewport = {
+  project:   val => val,
+  unproject: val => val
+};
+
+describe('actionStraightenWay', () => {
   describe('#disabled', () => {
     it('returns falsy for ways with internal nodes near centerline', () => {
       const graph = new Rapid.Graph([
@@ -50,6 +57,7 @@ describe('actionStraightenWay', () => {
     ]);
 
     const result = Rapid.actionStraightenWay(['-'], viewport)(graph);
+    assert.ok(result instanceof Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', 'c']);
     assert.equal(result.hasEntity('b'), undefined);
   });
@@ -64,9 +72,10 @@ describe('actionStraightenWay', () => {
     ]);
 
     const result = Rapid.actionStraightenWay(['-'], viewport)(graph);
+    assert.ok(result instanceof Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c']);
-    assert.equal(result.entity('b').loc[0], 1);
-    assert.equal(result.entity('b').loc[1], 0);
+    assert.ok(closeTo(result.entity('b').loc[0], 1));
+    assert.ok(closeTo(result.entity('b').loc[1], 0));
   });
 
 
@@ -80,9 +89,10 @@ describe('actionStraightenWay', () => {
     ]);
 
     const result = Rapid.actionStraightenWay(['-'], viewport)(graph);
+    assert.ok(result instanceof Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c']);
-    assert.equal(result.entity('b').loc[0], 1);
-    assert.equal(result.entity('b').loc[1], 0);
+    assert.ok(closeTo(result.entity('b').loc[0], 1));
+    assert.ok(closeTo(result.entity('b').loc[1], 0));
   });
 
 
@@ -102,10 +112,11 @@ describe('actionStraightenWay', () => {
     ]);
 
     const result = Rapid.actionStraightenWay(['-', '--'], viewport)(graph);
+    assert.ok(result instanceof Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'd']);
     assert.deepEqual(result.entity('--').nodes, ['d', 'f', 'h']);
-    assert.equal(result.entity('f').loc[0], 5);
-    assert.equal(result.entity('f').loc[1], 0);
+    assert.ok(closeTo(result.entity('f').loc[0], 5));
+    assert.ok(closeTo(result.entity('f').loc[1], 0));
     assert.equal(result.hasEntity('g'), undefined);
   });
 
@@ -126,10 +137,11 @@ describe('actionStraightenWay', () => {
     ]);
 
     const result = Rapid.actionStraightenWay(['-', '--'], viewport)(graph);
+    assert.ok(result instanceof Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'd']);
     assert.deepEqual(result.entity('--').nodes, ['h', 'f', 'd']);
-    assert.equal(result.entity('f').loc[0], 5);
-    assert.equal(result.entity('f').loc[1], 0);
+    assert.ok(closeTo(result.entity('f').loc[0], 5));
+    assert.ok(closeTo(result.entity('f').loc[1], 0));
     assert.equal(result.hasEntity('g'), undefined);
   });
 
@@ -151,11 +163,12 @@ describe('actionStraightenWay', () => {
       ]);
 
       const result = Rapid.actionStraightenWay(['-'], viewport)(graph, 0);
+      assert.ok(result instanceof Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c', 'd']);
-      assert.equal(result.entity('b').loc[0], 1);
-      assert.equal(result.entity('b').loc[1], 0.01);
-      assert.equal(result.entity('c').loc[0], 2);
-      assert.equal(result.entity('c').loc[1], -0.01);
+      assert.ok(closeTo(result.entity('b').loc[0], 1));
+      assert.ok(closeTo(result.entity('b').loc[1], 0.01));
+      assert.ok(closeTo(result.entity('c').loc[0], 2));
+      assert.ok(closeTo(result.entity('c').loc[1], -0.01));
     });
 
 
@@ -169,11 +182,12 @@ describe('actionStraightenWay', () => {
       ]);
 
       const result = Rapid.actionStraightenWay(['-'], viewport)(graph, 0.5);
+      assert.ok(result instanceof Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c', 'd']);
-      assert.equal(result.entity('b').loc[0], 1);
-      assert.equal(result.entity('b').loc[1], 0.005);
-      assert.equal(result.entity('c').loc[0], 2);
-      assert.equal(result.entity('c').loc[1], -0.005);
+      assert.ok(closeTo(result.entity('b').loc[0], 1));
+      assert.ok(closeTo(result.entity('b').loc[1], 0.005));
+      assert.ok(closeTo(result.entity('c').loc[0], 2));
+      assert.ok(closeTo(result.entity('c').loc[1], -0.005));
     });
 
 
@@ -187,9 +201,10 @@ describe('actionStraightenWay', () => {
       ]);
 
       const result = Rapid.actionStraightenWay(['-'], viewport)(graph, 1);
+      assert.ok(result instanceof Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'd']);
-      assert.equal(result.entity('b').loc[0], 1);
-      assert.equal(result.entity('b').loc[1], 0);
+      assert.ok(closeTo(result.entity('b').loc[0], 1));
+      assert.ok(closeTo(result.entity('b').loc[1], 0));
       assert.equal(result.hasEntity('c'), undefined);
     });
   });

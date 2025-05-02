@@ -3,10 +3,9 @@ import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
 
-// Mock viewport
 const viewport = {
-  project: (loc) => loc,
-  unproject: (loc) => loc
+  project:   val => val,
+  unproject: val => val
 };
 
 describe('actionScale', () => {
@@ -18,11 +17,11 @@ describe('actionScale', () => {
     // Pivot point and scale factor
     const pivot = [0, 0];
     const scaleFactor = 2;
-    const newGraph = Rapid.actionScale([nodeA.id, nodeB.id], pivot, scaleFactor, viewport)(graph);
-
-    assert.ok(newGraph.hasEntity(nodeA.id));
-    assert.ok(newGraph.hasEntity(nodeB.id));
-    assert.deepStrictEqual(newGraph.entity(nodeA.id).loc, [0, 0]);
-    assert.deepStrictEqual(newGraph.entity(nodeB.id).loc, [2, 0]);
+    const result = Rapid.actionScale([nodeA.id, nodeB.id], pivot, scaleFactor, viewport)(graph);
+    assert.ok(result instanceof Rapid.Graph);
+    assert.ok(result.hasEntity(nodeA.id));
+    assert.ok(result.hasEntity(nodeB.id));
+    assert.deepEqual(result.entity(nodeA.id).loc, [0, 0]);
+    assert.deepEqual(result.entity(nodeB.id).loc, [2, 0]);
   });
 });

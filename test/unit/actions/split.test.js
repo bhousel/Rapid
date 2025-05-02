@@ -17,7 +17,7 @@ describe('actionSplit', () => {
         Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c'] })
       ]);
 
-      assert.strictEqual(!Rapid.actionSplit('b').disabled(graph), true);
+      assert.equal(!Rapid.actionSplit('b').disabled(graph), true);
     });
 
     it('returns falsy for an intersection of two ways', () => {
@@ -38,7 +38,7 @@ describe('actionSplit', () => {
         Rapid.osmWay({ id: '|', nodes: ['c', '*', 'd'] })
       ]);
 
-      assert.strictEqual(!Rapid.actionSplit('*').disabled(graph), true);
+      assert.equal(!Rapid.actionSplit('*').disabled(graph), true);
     });
 
     it('returns falsy for an intersection of two ways with parent way specified', () => {
@@ -59,7 +59,7 @@ describe('actionSplit', () => {
         Rapid.osmWay({ id: '|', nodes: ['c', '*', 'd'] })
       ]);
 
-      assert.strictEqual(!Rapid.actionSplit('*').limitWays(['-']).disabled(graph), true);
+      assert.equal(!Rapid.actionSplit('*').limitWays(['-']).disabled(graph), true);
     });
 
     it('returns falsy for a self-intersection', () => {
@@ -78,7 +78,7 @@ describe('actionSplit', () => {
         Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'a', 'd'] })
       ]);
 
-      assert.strictEqual(!Rapid.actionSplit('a').disabled(graph), true);
+      assert.equal(!Rapid.actionSplit('a').disabled(graph), true);
     });
 
     it('returns \'not_eligible\' for the first node of a single way', () => {
@@ -90,7 +90,7 @@ describe('actionSplit', () => {
         Rapid.osmNode({ id: 'b', loc: [1, 0] }),
         Rapid.osmWay({ id: '-', nodes: ['a', 'b'] })
       ]);
-      assert.strictEqual(Rapid.actionSplit('a').disabled(graph), 'not_eligible');
+      assert.equal(Rapid.actionSplit('a').disabled(graph), 'not_eligible');
     });
 
     it('returns \'not_eligible\' for the last node of a single way', () => {
@@ -102,7 +102,7 @@ describe('actionSplit', () => {
         Rapid.osmNode({ id: 'b', loc: [1, 0] }),
         Rapid.osmWay({ id: '-', nodes: ['a', 'b'] })
       ]);
-      assert.strictEqual(Rapid.actionSplit('b').disabled(graph), 'not_eligible');
+      assert.equal(Rapid.actionSplit('b').disabled(graph), 'not_eligible');
     });
 
     it('returns \'not_eligible\' for an intersection of two ways with non-parent way specified', () => {
@@ -123,7 +123,7 @@ describe('actionSplit', () => {
         Rapid.osmWay({ id: '|', nodes: ['c', '*', 'd'] })
       ]);
 
-      assert.strictEqual(Rapid.actionSplit('*').limitWays(['-', '=']).disabled(graph), 'not_eligible');
+      assert.equal(Rapid.actionSplit('*').limitWays(['-', '=']).disabled(graph), 'not_eligible');
     });
   });
 
@@ -1111,13 +1111,13 @@ describe('actionSplit', () => {
         ]);
 
         graph = Rapid.actionSplit('a', ['='])(graph);
-        assert.deepStrictEqual(graph.entity('-').tags, {});
-        assert.deepStrictEqual(graph.entity('=').tags, {});
-        assert.strictEqual(graph.parentRelations(graph.entity('-')).length, 1, 'graph.entity("-") has one parent relation');
+        assert.deepEqual(graph.entity('-').tags, {});
+        assert.deepEqual(graph.entity('=').tags, {});
+        assert.equal(graph.parentRelations(graph.entity('-')).length, 1, 'graph.entity("-") has one parent relation');
 
         const relation = graph.parentRelations(graph.entity('-'))[0];
-        assert.deepStrictEqual(relation.tags, { type: 'multipolygon', area: 'yes' });
-        assert.deepStrictEqual(relation.members, [
+        assert.deepEqual(relation.tags, { type: 'multipolygon', area: 'yes' });
+        assert.deepEqual(relation.members, [
           { id: '-', role: 'outer', type: 'way' },
           { id: '=', role: 'outer', type: 'way' }
         ]);
@@ -1137,10 +1137,10 @@ describe('actionSplit', () => {
 // todo bhousel 4/17/24 - I commented these out in 7c737eec but can't remember why
 // Need to look into it and find out what this part was supposed to test.
 // (The area `=` does not split, which is what we want)
-//        assert.deepStrictEqual(graph.entity('-').nodes, ['b', 'c'], 'graph.entity("-").nodes should be ["b", "c"]');
-//        assert.deepStrictEqual(graph.entity('~').nodes, ['a', 'b'], 'graph.entity("~").nodes should be ["a", "b"]');
-        assert.deepStrictEqual(graph.entity('=').nodes, ['a', 'b', 'c', 'a'], 'graph.entity("=").nodes should be ["a", "b", "c", "a"]');
-        assert.strictEqual(graph.parentRelations(graph.entity('=')).length, 0, 'graph.entity("=") should have no parent relations');
+//        assert.deepEqual(graph.entity('-').nodes, ['b', 'c'], 'graph.entity("-").nodes should be ["b", "c"]');
+//        assert.deepEqual(graph.entity('~').nodes, ['a', 'b'], 'graph.entity("~").nodes should be ["a", "b"]');
+        assert.deepEqual(graph.entity('=').nodes, ['a', 'b', 'c', 'a'], 'graph.entity("=").nodes should be ["a", "b", "c", "a"]');
+        assert.equal(graph.parentRelations(graph.entity('=')).length, 0, 'graph.entity("=") should have no parent relations');
       });
 
       it('converts simple multipolygon to a proper multipolygon', () => {
