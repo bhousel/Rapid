@@ -1,4 +1,11 @@
-describe('svgTagClasses', function () {
+
+//
+// This code is no longer used in Rapid, and we should remove it eventually.
+// It is still useful to use as a reference for tag and style matching
+// Some of this should move into the osm or the style code maybe.
+//
+
+describe.skip('svgTagClasses', function () {
     var selection;
 
     beforeEach(function () {

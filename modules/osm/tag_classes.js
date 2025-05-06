@@ -2,6 +2,11 @@ import { select as d3_select } from 'd3-selection';
 
 import { osmPathHighwayTagValues, osmPavedTags, osmSemipavedTags, osmLifecyclePrefixes } from '../osm/tags.js';
 
+//
+// This code is no longer used in Rapid, and we should remove it eventually.
+// It is still useful to use as a reference for tag and style matching
+// Some of this should move into the osm or the style code maybe.
+//
 
 export function svgTagClasses() {
     var primaries = [

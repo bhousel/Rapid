@@ -6,7 +6,6 @@ export * from './modes/index.js';
 export * from './operations/index.js';
 export * from './osm/index.js';
 export * from './services/index.js';
-export * from './svg/index.js';
 export * from './ui/cards/index.js';
 export * from './ui/controls/index.js';
 export * from './ui/fields/index.js';
