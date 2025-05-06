@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeatureLine } from './PixiFeatureLine.js';
 import { PixiFeaturePoint } from './PixiFeaturePoint.js';
 
@@ -14,7 +14,7 @@ const CUSTOM_COLOR = 0x2eff2e;
  * This data comes from API at https://geoscribble.osmz.ru/docs#/default/scribbles_scribbles_get.
  * @class
  */
-export class PixiLayerGeoScribble extends AbstractLayer {
+export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
   /**
    * @constructor

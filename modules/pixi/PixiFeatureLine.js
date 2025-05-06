@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
 
-import { AbstractFeature } from './AbstractFeature.js';
+import { AbstractPixiFeature } from './AbstractPixiFeature.js';
 import { DashLine } from './lib/DashLine.js';
 import { getLineSegments, lineToPoly } from './helpers.js';
 
@@ -20,9 +20,9 @@ const SIDED_SPACING = 30;
  *   `casing`     PIXI.Graphic for the casing (below)
  *   `stroke`     PIXI.Graphic for the stroke (above)
  *
- *   (also all properties inherited from `AbstractFeature`)
+ *   (also all properties inherited from `AbstractPixiFeature`)
  */
-export class PixiFeatureLine extends AbstractFeature {
+export class PixiFeatureLine extends AbstractPixiFeature {
 
   /**
    * @constructor

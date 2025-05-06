@@ -1,4 +1,4 @@
-import { AbstractLayer } from './AbstractLayer';
+import { AbstractPixiLayer } from './AbstractPixiLayer';
 import { PixiFeaturePoint } from './PixiFeaturePoint';
 
 const MINZOOM = 12;
@@ -8,7 +8,7 @@ const MINZOOM = 12;
  * PixiLayerOsmose
  * @class
  */
-export class PixiLayerMapRoulette extends AbstractLayer {
+export class PixiLayerMapRoulette extends AbstractPixiLayer {
 
   /**
    * @constructor

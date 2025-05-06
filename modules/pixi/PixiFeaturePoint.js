@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
 
-import { AbstractFeature } from './AbstractFeature.js';
+import { AbstractPixiFeature } from './AbstractPixiFeature.js';
 import { DashLine } from './lib/DashLine.js';
 
 
@@ -16,9 +16,9 @@ import { DashLine } from './lib/DashLine.js';
  *   `icon`        PIXI.Sprite for the icon
  *   `viewfields`  PIXI.Container containing the viewfields (or null if none)
  *
- *   (also all properties inherited from `AbstractFeature`)
+ *   (also all properties inherited from `AbstractPixiFeature`)
  */
-export class PixiFeaturePoint extends AbstractFeature {
+export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * @constructor

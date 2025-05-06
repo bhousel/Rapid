@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 import RBush from 'rbush';
 import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotatePoints } from '@rapid-sdk/math';
 
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { getLineSegments, /*getDebugBBox,*/ lineToPoly } from './helpers.js';
 
 
@@ -46,7 +46,7 @@ class Label {
  * PixiLayerLabels
  * @class
  */
-export class PixiLayerLabels extends AbstractLayer {
+export class PixiLayerLabels extends AbstractPixiLayer {
 
   /**
    * @constructor

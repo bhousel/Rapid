@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { geoMetersToLon, vecEqual } from '@rapid-sdk/math';
 
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { DashLine } from './lib/DashLine.js';
 
 
@@ -18,7 +18,7 @@ import { DashLine } from './lib/DashLine.js';
  *
  * @class
  */
-export class PixiLayerMapUI extends AbstractLayer {
+export class PixiLayerMapUI extends AbstractPixiLayer {
 
   /**
    * @constructor

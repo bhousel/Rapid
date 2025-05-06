@@ -1,6 +1,6 @@
 import { scaleLinear } from 'd3-scale';
 
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeatureLine } from './PixiFeatureLine.js';
 import { PixiFeaturePoint } from './PixiFeaturePoint.js';
 
@@ -34,7 +34,7 @@ const fovLengthInterp = scaleLinear([90, 10], [0.7, 1.5]);
  * PixiLayerMapillaryPhotos
  * @class
  */
-export class PixiLayerMapillaryPhotos extends AbstractLayer {
+export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
   /**
    * @constructor

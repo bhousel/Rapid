@@ -1,4 +1,4 @@
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeaturePoint } from './PixiFeaturePoint.js';
 
 const MINZOOM = 12;
@@ -10,7 +10,7 @@ const SELECTED = 0xffee00;
  * PixiLayerMapillaryDetections
  * @class
  */
-export class PixiLayerMapillaryDetections extends AbstractLayer {
+export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
   /**
    * @constructor

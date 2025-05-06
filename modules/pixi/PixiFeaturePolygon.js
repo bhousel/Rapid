@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
 import { vecEqual, vecLength } from '@rapid-sdk/math';
 
-import { AbstractFeature } from './AbstractFeature.js';
+import { AbstractPixiFeature } from './AbstractPixiFeature.js';
 import { DashLine } from './lib/DashLine.js';
 import { lineToPoly } from './helpers.js';
 
@@ -21,9 +21,9 @@ const PARTIALFILLWIDTH = 32;
  *   `stroke`     PIXI.Graphic for the stroke (above)
  *   `mask`       PIXI.Mesh for the mask (applied to fill)
  *
- *   (also all properties inherited from `AbstractFeature`)
+ *   (also all properties inherited from `AbstractPixiFeature`)
  */
-export class PixiFeaturePolygon extends AbstractFeature {
+export class PixiFeaturePolygon extends AbstractPixiFeature {
 
   /**
    * @constructor

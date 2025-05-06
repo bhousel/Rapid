@@ -1,4 +1,4 @@
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeatureLine } from './PixiFeatureLine.js';
 import { PixiFeaturePoint } from './PixiFeaturePoint.js';
 
@@ -28,7 +28,7 @@ const MARKERSTYLE = {
  * PixiLayerKartaPhotos
  * @class
  */
-export class PixiLayerKartaPhotos extends AbstractLayer {
+export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
   /**
    * @constructor

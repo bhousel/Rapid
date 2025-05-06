@@ -1,4 +1,4 @@
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeaturePoint } from './PixiFeaturePoint.js';
 
 const MINZOOM = 12;
@@ -8,7 +8,7 @@ const MINZOOM = 12;
  * PixiLayerMapillarySigns
  * @class
  */
-export class PixiLayerMapillarySigns extends AbstractLayer {
+export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
   /**
    * @constructor

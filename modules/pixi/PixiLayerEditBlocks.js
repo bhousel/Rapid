@@ -1,4 +1,4 @@
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.js';
 
 const MINZOOM = 4;
@@ -8,7 +8,7 @@ const MINZOOM = 4;
  * PixiLayerEditBlocks
  * @class
  */
-export class PixiLayerEditBlocks extends AbstractLayer {
+export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
   /**
    * @constructor

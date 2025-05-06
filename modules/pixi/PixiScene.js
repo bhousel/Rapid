@@ -232,7 +232,7 @@ export class PixiScene extends EventEmitter {
   /**
    * addFeature
    * Add a feature to the scene feature cache.
-   * @param  feature  A Feature derived from `AbstractFeature` (point, line, multipolygon)
+   * @param  feature  A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
    */
   addFeature(feature) {
     this.features.set(feature.id, feature);
@@ -242,7 +242,7 @@ export class PixiScene extends EventEmitter {
   /**
    * removeFeature
    * Remove a Feature from the scene feature cache.
-   * @param  feature  A Feature derived from `AbstractFeature` (point, line, multipolygon)
+   * @param  feature  A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
    */
   removeFeature(feature) {
     this.features.delete(feature.id);

@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 
 
 /**
@@ -9,7 +9,7 @@ import { AbstractLayer } from './AbstractLayer.js';
  * The data for these are scraped from the RapidSystem's datasets, specifically the 'overlay' field.
  * @class
  */
-export class PixiLayerRapidOverlay extends AbstractLayer {
+export class PixiLayerRapidOverlay extends AbstractPixiLayer {
 
   /**
    * @constructor

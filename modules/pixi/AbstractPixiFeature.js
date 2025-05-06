@@ -3,7 +3,7 @@ import { PixiGeometry } from './PixiGeometry.js';
 
 
 /**
- * AbstractFeature is the base class from which all Features inherit.
+ * AbstractPixiFeature is the base class from which all rendered Pixi Features inherit.
  * It contains properties that used to manage the Feature in the scene graph
  *
  * Properties you can access:
@@ -24,7 +24,7 @@ import { PixiGeometry } from './PixiGeometry.js';
  *   `halo`              A PIXI.DisplayObject() that contains the graphics for the Feature's halo (if it has one)
  *   `sceneBounds`       PIXI.Rectangle() where 0,0 is the origin of the scene
  */
-export class AbstractFeature {
+export class AbstractPixiFeature {
 
   /**
    * @constructor
@@ -64,7 +64,7 @@ export class AbstractFeature {
     this._dataID = null;
     this._data = null;
 
-    // pseudoclasses, @see `AbstractLayer.syncFeatureClasses()`
+    // pseudoclasses, @see `AbstractPixiLayer.syncFeatureClasses()`
     this._classes = new Set();
 
     // We will manage our own bounds for now because we can probably do this
@@ -218,7 +218,7 @@ export class AbstractFeature {
    * style
    * @param {Object} obj - Style `Object` (contents depends on the Feature type)
    *
-   * 'point' - @see AbstractFeaturePoint.js
+   * 'point' - @see PixiFeaturePoint.js
    * 'line'/'polygon' - @see styles.js
    */
   get style() {

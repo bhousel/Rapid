@@ -3,7 +3,7 @@ import geojsonRewind from '@mapbox/geojson-rewind';
 import { parse as wktParse } from 'wkt';
 
 import { geojsonExtent, geojsonFeatures } from '../util/util.js';
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeatureLine } from './PixiFeatureLine.js';
 import { PixiFeaturePoint } from './PixiFeaturePoint.js';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.js';
@@ -18,7 +18,7 @@ const CUSTOM_COLOR = 0x00ffff;
  * This data only comes from the 'load custom data' option in the map data sidebar.
  * @class
  */
-export class PixiLayerCustomData extends AbstractLayer {
+export class PixiLayerCustomData extends AbstractPixiLayer {
 
   /**
    * @constructor

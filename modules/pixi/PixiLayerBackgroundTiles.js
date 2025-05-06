@@ -3,7 +3,7 @@ import { interpolateNumber } from 'd3-interpolate';
 import { AdjustmentFilter, ConvolutionFilter } from 'pixi-filters';
 import { Tiler, vecScale } from '@rapid-sdk/math';
 
-import { AbstractLayer } from './AbstractLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 
 const DEBUGCOLOR = 0xffff00;
 
@@ -19,7 +19,7 @@ const sharpenMatrix = [
  * PixiLayerBackgroundTiles
  * @class
  */
-export class PixiLayerBackgroundTiles extends AbstractLayer {
+export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
   /**
    * @constructor

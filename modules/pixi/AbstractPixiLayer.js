@@ -7,7 +7,7 @@ function asSet(vals) {
 
 
 /**
- * AbstractLayer is the base class from which all Layers inherit.
+ * AbstractPixiLayer is the base class from which all rendering Layers inherit.
  * It creates a container to hold the Layer data.
  *
  * Notes on identifiers:
@@ -25,7 +25,7 @@ function asSet(vals) {
  *   `features`    `Map<featureID, Feature>` of all features on this Layer
  *   `retained`    `Map<featureID, Integer frame>` last seen
  */
-export class AbstractLayer {
+export class AbstractPixiLayer {
 
   /**
    * @constructor
@@ -124,7 +124,7 @@ export class AbstractLayer {
   /**
    * addFeature
    * Add a feature to the layer cache.
-   * @param  {Feature} feature - A Feature derived from `AbstractFeature` (point, line, multipolygon)
+   * @param  {Feature} feature - A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
    */
   addFeature(feature) {
     this.features.set(feature.id, feature);
@@ -134,7 +134,7 @@ export class AbstractLayer {
   /**
    * removeFeature
    * Remove a Feature from the layer cache.
-   * @param  {Feature} feature - A Feature derived from `AbstractFeature` (point, line, multipolygon)
+   * @param  {Feature} feature - A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
    */
   removeFeature(feature) {
     this.unbindData(feature.id);
@@ -147,7 +147,7 @@ export class AbstractLayer {
    * retainFeature
    * Retain the feature for the given frame.
    * Features that are not retained may be automatically culled (made invisible) or removed.
-   * @param  {Feature}  feature - A Feature derived from `AbstractFeature` (point, line, multipolygon)
+   * @param  {Feature}  feature - A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
    * @param  {number}   frame   - Integer frame being rendered
    */
   retainFeature(feature, frame) {
@@ -431,7 +431,7 @@ export class AbstractLayer {
    * Syncing these classes will dirty the feature if the it causes a change.
    * Therefore this should be called after the Feature has been created, but before any updates happen.
    *
-   * @param  {Feature} feature - A Feature derived from `AbstractFeature` (point, line, multipolygon)
+   * @param  {Feature} feature - A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
    */
   syncFeatureClasses(feature) {
     const featureID = feature.id;
