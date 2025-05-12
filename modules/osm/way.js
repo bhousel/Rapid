@@ -5,7 +5,7 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 import { osmEntity } from './entity.js';
 import { osmLanes } from './lanes.js';
 import { osmTagSuggestingArea, osmOneWayTags, osmRightSideIsInsideTags, osmRemoveLifecyclePrefix } from './tags.js';
-import { utilTotalExtent } from '../util/index.js';
+import { utilTotalExtent, utilTotalWorldExtent } from '../util/index.js';
 
 
 export function osmWay() {
@@ -46,6 +46,11 @@ Object.assign(osmWay.prototype, {
     extent: function(resolver) {
         return resolver.transient(this, 'extent', function() {
             return utilTotalExtent(this.nodes, resolver);
+        });
+    },
+    worldExtent: function(resolver) {
+        return resolver.transient(this, 'worldExtent', function() {
+            return utilTotalWorldExtent(this.nodes, resolver);
         });
     },
 

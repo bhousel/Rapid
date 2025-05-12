@@ -12,4 +12,5 @@ export { utilRebind } from './rebind.js';
 export { utilSetDimensions } from './dimensions.js';
 export { utilSetTransform } from './util.js';
 export { utilTotalExtent } from './util.js';
+export { utilTotalWorldExtent } from './util.js';
 export { utilTriggerEvent } from './trigger_event.js';

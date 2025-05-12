@@ -65,6 +65,22 @@ Object.assign(osmRelation.prototype, {
             return extent;
         });
     },
+    worldExtent: function(resolver, memo) {
+        return resolver.transient(this, 'worldExtent', function() {
+            if (memo && memo[this.id]) return new Extent();
+            memo = memo || {};
+            memo[this.id] = true;
+
+            var extent = new Extent();
+            for (var i = 0; i < this.members.length; i++) {
+                var member = resolver.hasEntity(this.members[i].id);
+                if (member) {
+                    extent = extent.extend(member.worldExtent(resolver, memo));
+                }
+            }
+            return extent;
+        });
+    },
 
 
     geometry: function(graph) {
