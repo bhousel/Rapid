@@ -1,7 +1,7 @@
 import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetPointTags, osmSetVertexTags } from '../osm/tags.js';
+import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetPointTags, osmSetVertexTags } from '../models/tags.js';
 import { Category, Collection, Field, Preset } from './lib/index.js';
 import { uiFields } from '../ui/fields/index.js';
 

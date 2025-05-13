@@ -2,7 +2,7 @@ import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '
 
 import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
 import { actionAddMidpoint, actionChangeTags, actionSplit} from '../actions/index.js';
-import { osmNode } from '../osm/node.js';
+import { osmNode } from '../models/node.js';
 import { uiIcon } from '../ui/icon.js';
 
 

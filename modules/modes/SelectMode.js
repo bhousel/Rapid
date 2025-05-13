@@ -2,7 +2,7 @@ import { geoBounds } from 'd3-geo';
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractMode } from './AbstractMode.js';
-import { QAItem } from '../osm/index.js';
+import { QAItem } from '../models/index.js';
 import { uiOsmoseEditor } from '../ui/osmose_editor.js';
 import { uiDataEditor } from '../ui/data_editor.js';
 import { uiDetectionInspector } from '../ui/detection_inspector.js';

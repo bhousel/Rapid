@@ -2,7 +2,7 @@ import { geomPathIntersections, geomPathLength, vecAdd, vecAngle, vecEqual, vecI
 import { utilArrayIntersection } from '@rapid-sdk/util';
 
 import { geoChooseEdge } from '../geo/index.js';
-import { osmNode } from '../osm/node.js';
+import { osmNode } from '../models/node.js';
 
 
 // https://github.com/openstreetmap/josm/blob/mirror/src/org/openstreetmap/josm/command/MoveCommand.java

@@ -4,7 +4,7 @@ import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilGetAllNodes } from '@rapid-sdk/util';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
-import { QAItem } from '../../osm/index.js';
+import { QAItem } from '../../models/index.js';
 import { uiIcon } from '../icon.js';
 import { utilCmd } from '../../util/cmd.js';
 

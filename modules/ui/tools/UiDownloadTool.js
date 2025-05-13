@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 
 import { JXON } from '../../util/jxon.js';
-import { osmChangeset } from '../../osm/index.js';
+import { osmChangeset } from '../../models/index.js';
 import { actionDiscardTags } from '../../actions/index.js';
 import { uiIcon } from '../icon.js';
 import { uiTooltip } from '../tooltip.js';

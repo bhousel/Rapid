@@ -1,7 +1,7 @@
 import { Extent } from '@rapid-sdk/math';
 
 import { operationDelete } from '../operations/delete.js';
-import { osmRoutableHighwayTagValues } from '../osm/tags.js';
+import { osmRoutableHighwayTagValues } from '../models/tags.js';
 import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
 
 

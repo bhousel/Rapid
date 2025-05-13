@@ -1,6 +1,6 @@
 import { vecInterp } from '@rapid-sdk/math';
 
-import { osmNode, osmRelation, osmWay } from '../osm/index.js';
+import { osmNode, osmRelation, osmWay } from '../models/index.js';
 
 
 function findConnectionPoint(graph, newNode, targetWay, nodeA, nodeB) {

@@ -1,7 +1,7 @@
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
-import { osmEntity, osmNode, osmWay, QAItem } from '../osm/index.js';
+import { osmEntity, osmNode, osmWay, QAItem } from '../models/index.js';
 import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { geoChooseEdge } from '../geo/index.js';
 import { utilDetect } from '../util/detect.js';

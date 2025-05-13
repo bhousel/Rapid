@@ -1,7 +1,7 @@
 import { polygonCentroid as d3_polygonCentroid } from 'd3-polygon';
 import { vecInterp } from '@rapid-sdk/math';
 
-import { osmNode } from '../osm/node.js';
+import { osmNode } from '../models/node.js';
 
 
 export function actionExtract(entityID, viewport) {

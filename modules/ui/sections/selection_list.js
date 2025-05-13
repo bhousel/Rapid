@@ -1,6 +1,6 @@
 import { select as d3_select } from 'd3-selection';
 
-import { osmEntity } from '../../osm/entity.js';
+import { osmEntity } from '../../models/entity.js';
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
 import { utilHighlightEntities } from '../../util/index.js';

@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import { Extent, numWrap } from '@rapid-sdk/math';
 
 import { JXON } from '../util/jxon.js';
-import { osmChangeset } from '../osm/index.js';
+import { osmChangeset } from '../models/index.js';
 import { uiIcon } from './icon.js';
 import { utilDetect, utilKeybinding, utilRebind } from '../util/index.js';
 

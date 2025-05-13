@@ -2,7 +2,7 @@ import { Tiler, vecSubtract } from '@rapid-sdk/math';
 import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem';
-import { QAItem } from '../osm/qa_item.js';
+import { QAItem } from '../models/qa_item.js';
 import { utilFetchResponse } from '../util';
 
 const TILEZOOM = 14;

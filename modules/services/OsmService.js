@@ -6,7 +6,7 @@ import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { JXON } from '../util/jxon.js';
-import { osmEntity, osmNode, osmRelation, osmWay, QAItem } from '../osm/index.js';
+import { osmEntity, osmNode, osmRelation, osmWay, QAItem } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 

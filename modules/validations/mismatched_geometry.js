@@ -6,8 +6,8 @@ import { actionAddVertex } from '../actions/add_vertex.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionMergeNodes } from '../actions/merge_nodes.js';
 import { actionExtract } from '../actions/extract.js';
-import { osmJoinWays } from '../osm/multipolygon.js';
-import { osmNodeGeometriesForTags, osmTagSuggestingArea } from '../osm/tags.js';
+import { osmJoinWays } from '../models/multipolygon.js';
+import { osmNodeGeometriesForTags, osmTagSuggestingArea } from '../models/tags.js';
 import { geoHasSelfIntersections } from '../geo/index.js';
 import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
 

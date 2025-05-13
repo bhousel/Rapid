@@ -1,6 +1,6 @@
 import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 
-import { osmAreaKeys } from '../../osm/tags.js';
+import { osmAreaKeys } from '../../models/tags.js';
 
 
 /**

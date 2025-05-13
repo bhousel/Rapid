@@ -1,6 +1,6 @@
 import { operationDelete } from '../operations/delete.js';
-import { osmIsInterestingTag } from '../osm/tags.js';
-import { osmOldMultipolygonOuterMemberOfRelation } from '../osm/multipolygon.js';
+import { osmIsInterestingTag } from '../models/tags.js';
+import { osmOldMultipolygonOuterMemberOfRelation } from '../models/multipolygon.js';
 import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
 
 

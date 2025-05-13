@@ -6,7 +6,7 @@ import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from './AbstractSystem.js';
 import { Difference, Edit, Graph, Tree } from './lib/index.js';
-import { osmEntity } from '../osm/entity.js';
+import { osmEntity } from '../models/entity.js';
 import { uiLoading } from '../ui/loading.js';
 
 

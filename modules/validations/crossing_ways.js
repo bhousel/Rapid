@@ -5,11 +5,11 @@ import {
 } from '@rapid-sdk/math';
 
 import { actionAddMidpoint, actionChangeTags, actionMergeNodes, actionSplit, actionSyncCrossingTags } from '../actions/index.js';
-import { osmNode } from '../osm/node.js';
+import { osmNode } from '../models/node.js';
 import {
   osmFlowingWaterwayTagValues, osmPathHighwayTagValues, osmRailwayTrackTagValues,
   osmRoutableAerowayTags, osmRoutableHighwayTagValues
-} from '../osm/tags.js';
+} from '../models/tags.js';
 import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
 
 

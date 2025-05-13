@@ -4,7 +4,7 @@
 export * from './actions/index.js';
 export * from './core/lib/index.js';
 export * from './geo/index.js';
-export * from './osm/index.js';
+export * from './models/index.js';
 export * from './util/index.js';
 
 // Reexport only what our tests use, see iD#4379

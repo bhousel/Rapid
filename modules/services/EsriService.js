@@ -4,7 +4,7 @@ import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Graph, Tree, RapidDataset } from '../core/lib/index.js';
-import { osmNode, osmRelation, osmWay } from '../osm/index.js';
+import { osmNode, osmRelation, osmWay } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 

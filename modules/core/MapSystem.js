@@ -5,7 +5,7 @@ import {
 } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { QAItem } from '../osm/index.js';
+import { QAItem } from '../models/index.js';
 import { utilTotalExtent } from '../util/index.js';
 
 const TILESIZE = 256;
