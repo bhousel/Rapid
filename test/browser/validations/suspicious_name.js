@@ -22,6 +22,7 @@ describe('validationSuspiciousName', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.services = {
         nsi: new MockNsi()
       };
@@ -32,40 +33,41 @@ describe('validationSuspiciousName', () => {
   }
 
 
-  const validator = Rapid.validationSuspiciousName(new MockContext());
+  const context = new MockContext();
+  const validator = Rapid.validationSuspiciousName(context);
 
   it('ignores feature with no tags', () => {
-    const n = Rapid.osmNode();
+    const n = new Rapid.OsmNode(context);
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores feature with no name', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'supermarket' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores feature with a specific name', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'supermarket', name: 'Lou\'s' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lou\'s' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores feature with a specific name that includes a generic name', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'supermarket', name: 'Lou\'s Store' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lou\'s Store' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores feature matching excludeNamed pattern in name-suggestion-index', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'supermarket', name: 'famiglia cooperativa' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'famiglia cooperativa' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('flags feature matching a excludeGeneric pattern in name-suggestion-index', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'supermarket', name: 'super mercado' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'super mercado' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -76,7 +78,7 @@ describe('validationSuspiciousName', () => {
   });
 
   it('flags feature matching a global exclude pattern in name-suggestion-index', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'supermarket', name: 'store' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'store' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -87,7 +89,7 @@ describe('validationSuspiciousName', () => {
   });
 
   it('flags feature with a name that is just a defining tag key', () => {
-    const n = Rapid.osmNode({ tags: { amenity: 'drinking_water', name: 'Amenity' }});
+    const n = new Rapid.OsmNode(context, { tags: { amenity: 'drinking_water', name: 'Amenity' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -98,7 +100,7 @@ describe('validationSuspiciousName', () => {
   });
 
   it('flags feature with a name that is just a defining tag value', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'red_bicycle_emporium', name: 'Red Bicycle Emporium' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'red_bicycle_emporium', name: 'Red Bicycle Emporium' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -109,13 +111,13 @@ describe('validationSuspiciousName', () => {
   });
 
   it('ignores feature with a non-matching `not:name` tag', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'supermarket', name: 'Lou\'s', 'not:name': 'Lous' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lou\'s', 'not:name': 'Lous' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('flags feature with a matching `not:name` tag', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'supermarket', name: 'Lous', 'not:name': 'Lous' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lous', 'not:name': 'Lous' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -126,7 +128,7 @@ describe('validationSuspiciousName', () => {
   });
 
   it('flags feature with a matching a semicolon-separated `not:name` tag', () => {
-    const n = Rapid.osmNode({ tags: { shop: 'supermarket', name: 'Lous', 'not:name': 'Louis\';Lous;Louis\'s' }});
+    const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lous', 'not:name': 'Louis\';Lous;Louis\'s' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];

@@ -4,7 +4,7 @@ import deepEqual from 'fast-deep-equal';
 import { diff3Merge } from 'node-diff3';
 
 import { actionDeleteMultiple } from './delete_multiple.js';
-import { osmEntity } from '../models/entity.js';
+import { createOsmFeature } from '../models/index.js';
 
 
 export function actionMergeRemoteChanges(id, options = {}) {
@@ -101,14 +101,14 @@ export function actionMergeRemoteChanges(id, options = {}) {
         updates.replacements.push(remote);
 
       } else if (strategy === 'force_local' && local) {
-        target = osmEntity(local);
+        target = createOsmFeature(local);
         if (remote) {
           target = target.update({ version: remote.version });
         }
         updates.replacements.push(target);
 
       } else if (strategy === 'safe' && local && remote && local.version !== remote.version) {
-        target = osmEntity(local, { version: remote.version });
+        target = createOsmFeature(local, { version: remote.version });
         if (remote.visible) {
           target = mergeLocation(remote, target);
         } else {
@@ -210,7 +210,7 @@ export function actionMergeRemoteChanges(id, options = {}) {
     const base = graph.base.entities.get(id);
     const local = localGraph.entity(id);
     const remote = remoteGraph.entity(id);
-    let target = osmEntity(local, { version: remote.version });
+    let target = createOsmFeature(local, { version: remote.version });
 
     // delete/undelete
     if (!remote.visible) {

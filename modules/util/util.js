@@ -20,25 +20,6 @@ export function utilTotalExtent(vals, graph) {
   return extent;
 }
 
-/**
- * utilTotalWorldExtent
- * "World coordinates" version of `utilTotalExtent`
- * @param   {Array|Set}  vals - Entities -or- EntityIDs
- * @return  {Extent}     Total Extent that contains the given Entities
- */
-export function utilTotalWorldExtent(vals, graph) {
-  const extent = new Extent();
-
-  for (const val of vals) {
-    const entity = (typeof val === 'string' ? graph.hasEntity(val) : val);
-    if (entity) {
-      extent.extendSelf(entity.worldExtent(graph));
-    }
-  }
-
-  return extent;
-}
-
 
 /**
  * geojsonFeatures

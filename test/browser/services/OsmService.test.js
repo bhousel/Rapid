@@ -1,5 +1,4 @@
 describe('OsmService', () => {
-  let _osm, spy;
 
   class MockGfxSystem {
     constructor()     {}
@@ -19,6 +18,8 @@ describe('OsmService', () => {
     }
   }
 
+  const context = new MockContext();
+  let _osm, spy;
 
   beforeEach(() => {
     spy = sinon.spy();
@@ -181,7 +182,7 @@ describe('OsmService', () => {
       .route(/changesets\.json/, { status: 200, body: changesetJSON, headers: { 'Content-Type': 'application/json' } });
 
 
-    _osm = new Rapid.OsmService(new MockContext());
+    _osm = new Rapid.OsmService(context);
     return _osm.initAsync();
 //why?
 //      .then(() => _osm.switchAsync({ url: 'https://www.openstreetmap.org' }));
@@ -238,34 +239,34 @@ describe('OsmService', () => {
 
   describe('#entityURL', () => {
     it('provides an entity url for a node based on wwwroot', () => {
-      const e = Rapid.osmNode({ id: 'n1' });
+      const e = new Rapid.OsmNode(context, { id: 'n1' });
       expect(_osm.entityURL(e)).to.eql('https://www.openstreetmap.org/node/1');
     });
 
     it('provides an entity url for a way based on wwwroot', () => {
-      const e = Rapid.osmWay({ id: 'w1' });
+      const e = new Rapid.OsmWay(context, { id: 'w1' });
       expect(_osm.entityURL(e)).to.eql('https://www.openstreetmap.org/way/1');
     });
 
     it('provides an entity url for a relation based on wwwroot', () => {
-      const e = Rapid.osmRelation({ id: 'r1' });
+      const e = new Rapid.OsmRelation(context, { id: 'r1' });
       expect(_osm.entityURL(e)).to.eql('https://www.openstreetmap.org/relation/1');
     });
   });
 
   describe('#historyURL', () => {
     it('provides a history url for a node based on wwwroot', () => {
-      const e = Rapid.osmNode({ id: 'n1' });
+      const e = new Rapid.OsmNode(context, { id: 'n1' });
       expect(_osm.historyURL(e)).to.eql('https://www.openstreetmap.org/node/1/history');
     });
 
     it('provides a history url for a way based on wwwroot', () => {
-      const e = Rapid.osmWay({ id: 'w1' });
+      const e = new Rapid.OsmWay(context, { id: 'w1' });
       expect(_osm.historyURL(e)).to.eql('https://www.openstreetmap.org/way/1/history');
     });
 
     it('provides a history url for a relation based on wwwroot', () => {
-      const e = Rapid.osmRelation({ id: 'r1' });
+      const e = new Rapid.OsmRelation(context, { id: 'r1' });
       expect(_osm.historyURL(e)).to.eql('https://www.openstreetmap.org/relation/1/history');
     });
   });
@@ -506,7 +507,7 @@ describe('OsmService', () => {
       const id = 'n1';
       _osm.loadEntity(id, (err, result) => {
         const entity = result.data.find(e => e.id === id);
-        expect(entity).to.be.an.instanceof(Rapid.osmNode);
+        expect(entity).to.be.an.instanceof(Rapid.OsmNode);
         done();
       });
     });
@@ -522,7 +523,7 @@ describe('OsmService', () => {
       const id = 'w1';
       _osm.loadEntity(id, (err, result) => {
         const entity = result.data.find(e => e.id === id);
-        expect(entity).to.be.an.instanceof(Rapid.osmWay);
+        expect(entity).to.be.an.instanceof(Rapid.OsmWay);
         done();
       });
     });
@@ -538,11 +539,11 @@ describe('OsmService', () => {
       const id = 'n1';
       _osm.loadEntity(id, (err1, result1) => {
         const entity1 = result1.data.find(e1 => e1.id === id);
-        expect(entity1).to.be.an.instanceof(Rapid.osmNode);
+        expect(entity1).to.be.an.instanceof(Rapid.OsmNode);
 
         _osm.loadEntity(id, (err2, result2) => {
           const entity2 = result2.data.find(e2 => e2.id === id);
-          expect(entity2).to.be.an.instanceof(Rapid.osmNode);
+          expect(entity2).to.be.an.instanceof(Rapid.OsmNode);
           done();
         });
       });
@@ -577,7 +578,7 @@ describe('OsmService', () => {
       const id = 'n1';
       _osm.loadEntityVersion(id, 1, (err, result) => {
         const entity = result.data.find(e => e.id === id);
-        expect(entity).to.be.an.instanceof(Rapid.osmNode);
+        expect(entity).to.be.an.instanceof(Rapid.OsmNode);
         done();
       });
     });
@@ -593,7 +594,7 @@ describe('OsmService', () => {
       const id = 'w1';
       _osm.loadEntityVersion(id, 1, (err, result) => {
         const entity = result.data.find(e => e.id === id);
-        expect(entity).to.be.an.instanceof(Rapid.osmWay);
+        expect(entity).to.be.an.instanceof(Rapid.OsmWay);
         done();
       });
     });
@@ -609,11 +610,11 @@ describe('OsmService', () => {
       const id = 'n1';
       _osm.loadEntityVersion(id, 1, (err1, result1) => {
         const entity1 = result1.data.find(e1 => e1.id === id);
-        expect(entity1).to.be.an.instanceof(Rapid.osmNode);
+        expect(entity1).to.be.an.instanceof(Rapid.OsmNode);
 
         _osm.loadEntityVersion(id, 1, (err2, result2) => {
           const entity2 = result2.data.find(e2 => e2.id === id);
-          expect(entity2).to.be.an.instanceof(Rapid.osmNode);
+          expect(entity2).to.be.an.instanceof(Rapid.OsmNode);
           done();
         });
       });

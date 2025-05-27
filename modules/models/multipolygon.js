@@ -1,6 +1,6 @@
 import { actionReverse } from '../actions/reverse.js';
 import { osmIsInterestingTag } from './tags.js';
-import { osmWay } from './way.js';
+import { OsmWay } from './OsmWay.js';
 
 
 // "Old" multipolyons, previously known as "simple" multipolygons, are as follows:
@@ -117,9 +117,9 @@ export function osmOldMultipolygonOuterMember(entity, graph) {
 // start/end coordinate de-duplication.
 //
 // Members of `toJoin` must have, at minimum, `type` and `id` properties.
-// Thus either an array of `osmWay`s or a relation member array may be used.
+// Thus either an array of `OsmWay`s or a relation member array may be used.
 //
-// If an member is an `osmWay`, its tags and childnodes may be reversed via
+// If an member is an `OsmWay`, its tags and childnodes may be reversed via
 // `actionReverse` in the output.
 //
 // The returned sequences array also has an `actions` array property, containing
@@ -137,7 +137,7 @@ export function osmJoinWays(toJoin, graph) {
     function reverse(item) {
         var action = actionReverse(item.id, { reverseOneway: true });
         sequences.actions.push(action);
-        return (item instanceof osmWay) ? action(graph).entity(item.id) : item;
+        return (item instanceof OsmWay) ? action(graph).entity(item.id) : item;
     }
 
     // make a copy containing only the items to join
@@ -145,12 +145,12 @@ export function osmJoinWays(toJoin, graph) {
         return member.type === 'way' && graph.hasEntity(member.id);
     });
 
-    // Are the things we are joining relation members or `osmWays`?
-    // If `osmWays`, skip the "prefer a forward path" code below (see #4872)
+    // Are the things we are joining relation members or `OsmWays`?
+    // If `OsmWays`, skip the "prefer a forward path" code below (see iD#4872)
     var i;
     var joinAsMembers = true;
     for (i = 0; i < toJoin.length; i++) {
-        if (toJoin[i] instanceof osmWay) {
+        if (toJoin[i] instanceof OsmWay) {
             joinAsMembers = false;
             break;
         }

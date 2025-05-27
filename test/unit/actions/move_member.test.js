@@ -2,9 +2,18 @@ import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
+
 describe('actionMoveMember', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('moves a member from one index to another in the specified relation', () => {
-    const r1 = new Rapid.osmRelation({ id: 'r1', members: [{ id: '1' }, { id: '3' }] });
+    const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: '1' }, { id: '3' }] });
     const graph = new Rapid.Graph([r1]);
     const result = Rapid.actionMoveMember('r1', 1, 0)(graph);
     assert.ok(result instanceof Rapid.Graph);

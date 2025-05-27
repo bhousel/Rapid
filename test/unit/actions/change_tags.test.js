@@ -3,8 +3,16 @@ import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
 describe('actionChangeTags', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('changes an entity\'s tags', () => {
-    const entity = Rapid.osmEntity();
+    const entity = new Rapid.OsmEntity(context);
     const setTags = { foo: 'bar' };
     const graph = new Rapid.Graph([entity]);
     const result = Rapid.actionChangeTags(entity.id, setTags)(graph);

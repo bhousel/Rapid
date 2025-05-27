@@ -1,6 +1,7 @@
 import { beforeEach, describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+
 
 describe('osmRemoveLifecyclePrefix', () => {
   it('removes the lifecycle prefix from a tag key', () => {

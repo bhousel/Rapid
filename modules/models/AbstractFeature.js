@@ -5,11 +5,18 @@ import { Geometry } from './Geometry.js';
 // We did it this way to avoid the situation where you undo a feature
 // to a previous version and then increment it back to the same version.
 // see Rapid@9ac2776a
-let _nextv = 0;
+let _nextv = 1;
+
+// // Clone a {Map|Object} to a {Map}.
+// function toMap(src) {
+//   if (src instanceof Map) return new Map(src);
+//   if (src instanceof Object) return new Map(Object.entries(src));
+//   return new Map();
+// }
 
 
 /**
- * AbstractDataFeature is the base class from which all Data Features inherit.
+ * AbstractFeature is the base class from which all data Features inherit.
  * A "data feature" is the internal representation of a piece of map data.
  * It has a type, geometry, and properties (in OSM, these are the tags).
  *
@@ -17,27 +24,59 @@ let _nextv = 0;
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
  * Properties you can access:
- *   `dataID`  Unique string to use for the name of this Data Feature
+ *   `id`      Unique string to use for the name of this Data Feature
  *   `type`    String describing what kind of Data Feature this is ('node', 'way', 'relation')
  *   `v`       Version of the Feature, can be used to detect changes
+ *   `geom`    Geometry object
+ *   `props`   Properties object
  */
-export class AbstractDataFeature {
+export class AbstractFeature {
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
-   * @param  {Object}   props   - Properties to assign to the feature
-   * @abstract
+   * Features may be constructed by passing an application context or another feature.
+   * They can also accept an optional properties object.
+   * @param  {AbstractFeature|Context}  otherOrContext - copy another Feature, or pass application context
+   * @param  {Object}                   props   - Properties to assign to the Feature
    */
-  constructor(context, props) {
-    this.type = 'unknown';
-    this.context = context;
-    this.dataID = -1;
-    this.v = -1;
+  constructor(otherOrContext, props = {}) {
+    if (otherOrContext instanceof AbstractFeature) {  // copy other
+      const other = otherOrContext;
+      this.context = other.context;
+      this.props = globalThis.structuredClone(other.props);
+      this.geom = other.geom.clone();
 
-    this.geometry = new Geometry(context);
-    this.props = new Map();  // Map<string,any>
+    } else {
+      const context = otherOrContext;
+      this.context = context;
+      this.props = {};
+      this.geom = new Geometry(context);
+    }
+
+    Object.assign(this.props, props);  // override with passed in props
+    // this._assignProps();
   }
+
+
+  // /**
+  //  * _assignProps
+  //  * Some of the props we receive are special
+  //  * We'll move them out of the props object into their own properties.
+  //  */
+  // _assignProps() {
+  //   for (const [k, v] of Object.entries(this.props)) {
+  //     if (k === 'id') {
+  //       this.id = v;
+  //       delete this.props.id;
+
+  //     } else if (k === 'type') {
+  //       delete this.props.type;
+
+  //     } else if (v === undefined) {
+  //       delete this.props[k];
+  //     }
+  //   }
+  // }
 
 
   /**
@@ -47,34 +86,43 @@ export class AbstractDataFeature {
    * @abstract
    */
   destroy() {
+    this.geom.destroy();
+    this.geom = null;
+    this.props = null;
   }
 
+  /**
+   * clone
+   * Clone (deep copy) this Feature into a new Feature.
+   * @return    A deep copy of the feature
+   * @abstract
+   */
+  clone() {
+    throw new Error(`Do not call 'clone' on AbstractFeature`);
+  }
 
   /**
    * update
    * Update the Feature's properties and return a new Feature
-   * @abstract
-   * @param   {Object}    props
-   * @return  {AbstractDataFeature}
+   * @param   {Object}  props
+   * @return  this
    * @abstract
    */
   update(props) {
-    return this;  // override in derived class
+    throw new Error(`Do not call 'update' on AbstractFeature`);
   }
-
 
   /**
    * updateSelf
    * Like `update` but it modifies the Feature's properties in-place.
    * This option is slightly more performant for situations where you don't mind mutating the Feature
-   * @abstract
    * @param   {Object}  props
-   * @return  this feature
+   * @return  this
+   * @abstract
    */
   updateSelf(props) {
-    return this;
+    throw new Error(`Do not call 'updateSelf' on AbstractFeature`);
   }
-
 
   /**
    * touch
@@ -82,17 +130,50 @@ export class AbstractDataFeature {
    * @return  this feature
    */
   touch() {
-    this.v = _nextv++;
+    this.props.v = _nextv++;
     return this;
   }
 
   /**
-   * Data Feature ID
-   * @return   {string} - the dataID
-   * @readonly
+   * type
+   * @return   {string}
    */
-  get id() {
-    return this.dataID;
+  get type() {
+    return this.props.type ?? '';
+  }
+  set type(val) {
+    this.props.type = val;
   }
 
+  /**
+   * id
+   * @return   {string}
+   */
+  get id() {
+    return this.props.id ?? '';
+  }
+  set id(val) {
+    this.props.id = val;
+  }
+
+  /**
+   * v
+   * @return   {number}
+   */
+  get v() {
+    return this.props.v || 0;
+  }
+  set v(val) {
+    this.props.v = val;
+  }
+
+  /**
+   * key
+   * The 'key' includes both the id and the version
+   * @return   {string}
+   * @readonly
+   */
+  get key() {
+    return `${this.props.id}v${this.props.v}`;
+  }
 }

@@ -1,4 +1,4 @@
-import { osmRelation } from '../models/relation.js';
+import { OsmRelation } from '../models/OsmRelation.js';
 
 
 // `actionRestrictTurn` creates a turn restriction relation.
@@ -19,32 +19,37 @@ import { osmRelation } from '../models/relation.js';
 //
 export function actionRestrictTurn(turn, restrictionType, restrictionID) {
 
-    return function(graph) {
-        var fromWay = graph.entity(turn.from.way);
-        var toWay = graph.entity(turn.to.way);
-        var viaNode = turn.via.node && graph.entity(turn.via.node);
-        var viaWays = turn.via.ways && turn.via.ways.map(function(id) { return graph.entity(id); });
-        var members = [];
+  return function(graph) {
+    const fromWay = graph.entity(turn.from.way);
+    const toWay = graph.entity(turn.to.way);
+    const viaNode = turn.via.node && graph.entity(turn.via.node);
+    const viaWays = turn.via.ways && turn.via.ways.map(id => graph.entity(id));
+    const members = [];
 
-        members.push({ id: fromWay.id, type: 'way',  role: 'from' });
+    // FROM
+    members.push({ id: fromWay.id, type: 'way',  role: 'from' });
 
-        if (viaNode) {
-            members.push({ id: viaNode.id,  type: 'node', role: 'via' });
-        } else if (viaWays) {
-            viaWays.forEach(function(viaWay) {
-                members.push({ id: viaWay.id,  type: 'way', role: 'via' });
-            });
-        }
+    // VIA
+    if (viaNode) {
+      members.push({ id: viaNode.id,  type: 'node', role: 'via' });
+    } else if (viaWays) {
+      for (const viaWay of viaWays) {
+        members.push({ id: viaWay.id,  type: 'way', role: 'via' });
+      }
+    }
 
-        members.push({ id: toWay.id, type: 'way',  role: 'to' });
+    // TO
+    members.push({ id: toWay.id, type: 'way',  role: 'to' });
 
-        return graph.replace(osmRelation({
-            id: restrictionID,
-            tags: {
-                type: 'restriction',
-                restriction: restrictionType
-            },
-            members: members
-        }));
-    };
+    const relation = new OsmRelation(fromWay.context, {
+      id: restrictionID,
+      tags: {
+        type: 'restriction',
+        restriction: restrictionType
+      },
+      members: members
+    });
+
+    return graph.replace(relation);
+  };
 }

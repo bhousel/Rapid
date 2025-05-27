@@ -4,7 +4,7 @@ import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Graph, Tree, RapidDataset } from '../core/lib/index.js';
-import { osmNode, osmRelation, osmWay } from '../models/index.js';
+import { OsmNode, OsmRelation, OsmWay } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -443,11 +443,12 @@ export class EsriService extends AbstractSystem {
 
 
   _parseFeature(feature, dataset) {
+    const context = this.context;
     const geom = feature.geometry;
-    const props = feature.properties;
-    if (!geom || !props) return null;
+    const properties = feature.properties;
+    if (!geom || !properties) return null;
 
-    const featureID = props[dataset.layer.idfield] || props.OBJECTID || props.FID || props.id;
+    const featureID = properties[dataset.layer.idfield] || properties.OBJECTID || properties.FID || properties.id;
     if (!featureID) return null;
 
     // skip if we've seen this feature already on another tile
@@ -461,14 +462,16 @@ export class EsriService extends AbstractSystem {
 
     // Point:  make a single node
     if (geom.type === 'Point') {
-      return [ new osmNode({ loc: geom.coordinates, tags: parseTags(props) }, metadata) ];
+      const props = Object.assign({ loc: geom.coordinates, tags: parseTags(properties) }, metadata);
+      return [ new OsmNode(context, props) ];
 
     // LineString:  make nodes, single way
     } else if (geom.type === 'LineString') {
       const nodelist = parseCoordinates(geom.coordinates);
       if (nodelist.length < 2) return null;
 
-      const w = new osmWay({ nodes: nodelist, tags: parseTags(props) }, metadata);
+      const props = Object.assign({ nodes: nodelist, tags: parseTags(properties) }, metadata);
+      const w = new OsmWay(context, props);
       entities.push(w);
       return entities;
 
@@ -483,21 +486,21 @@ export class EsriService extends AbstractSystem {
         const last = nodelist[nodelist.length - 1];
         if (first !== last) nodelist.push(first);   // sanity check, ensure rings are closed
 
-        const w = new osmWay({ nodes: nodelist });
+        const w = new OsmWay(context, { nodes: nodelist });
         ways.push(w);
       }
 
       if (ways.length === 1) {  // single ring, assign tags and return
-        entities.push(
-          ways[0].update( Object.assign({ tags: parseTags(props) }, metadata) )
-        );
+        const props = Object.assign({ tags: parseTags(properties) }, metadata);
+        entities.push(ways[0].updateSelf(props));
       } else {  // multiple rings, make a multipolygon relation with inner/outer members
         const members = ways.map((w, i) => {
           entities.push(w);
           return { id: w.id, role: (i === 0 ? 'outer' : 'inner'), type: 'way' };
         });
-        const tags = Object.assign(parseTags(props), { type: 'multipolygon' });
-        const r = new osmRelation({ members: members, tags: tags }, metadata);
+        const tags = Object.assign(parseTags(properties), { type: 'multipolygon' });
+        const props = Object.assign({ members: members, tags: tags }, metadata);
+        const r = new OsmRelation(context, props);
         entities.push(r);
       }
 
@@ -511,7 +514,7 @@ export class EsriService extends AbstractSystem {
         const key = coord.toString();
         let n = nodemap.get(key);
         if (!n) {
-          n = new osmNode({ loc: coord });
+          n = new OsmNode(this.context, { loc: coord });
           entities.push(n);
           nodemap.set(key, n);
         }
@@ -520,11 +523,11 @@ export class EsriService extends AbstractSystem {
       return nodelist;
     }
 
-    function parseTags(props) {
+    function parseTags(properties) {
       let tags = {};
-      for (const prop of Object.keys(props)) {
+      for (const prop of Object.keys(properties)) {
         const k = clean(dataset.layer.tagmap[prop]);
-        const v = clean(props[prop]);
+        const v = clean(properties[prop]);
         if (k && v) {
           tags[k] = v;
         }

@@ -8,6 +8,7 @@ describe('validationMissingTag', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.services = {};
       this.systems = {
         l10n:  new MockLocalizationSystem()
@@ -15,25 +16,26 @@ describe('validationMissingTag', () => {
     }
   }
 
-  const validator = Rapid.validationMissingTag(new MockContext());
+  const context = new MockContext();
+  const validator = Rapid.validationMissingTag(context);
 
 
   it('ignores way with descriptive tags', () => {
-    const w = Rapid.osmWay({ tags: { leisure: 'park' }});
+    const w = new Rapid.OsmWay(context,  { tags: { leisure: 'park' }});
     const g = new Rapid.Graph([w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores multipolygon with descriptive tags', () => {
-    const r = Rapid.osmRelation({ tags: { type: 'multipolygon', leisure: 'park' }, members: [] });
+    const r = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon', leisure: 'park' }, members: [] });
     const g = new Rapid.Graph([r]);
     const issues = validator(r, g);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('flags no tags', () => {
-    const w = Rapid.osmWay({ tags: {} });
+    const w = new Rapid.OsmWay(context);
     const g = new Rapid.Graph([w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);
@@ -45,7 +47,7 @@ describe('validationMissingTag', () => {
   });
 
   it('flags no descriptive tags on a way', () => {
-    const w = Rapid.osmWay({ tags: { name: 'Main Street', source: 'Bing' } });
+    const w = new Rapid.OsmWay(context, { tags: { name: 'Main Street', source: 'Bing' }});
     const g = new Rapid.Graph([w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);
@@ -57,7 +59,7 @@ describe('validationMissingTag', () => {
   });
 
   it('flags no descriptive tags on multipolygon', () => {
-    const r = Rapid.osmRelation({ tags: { name: 'City Park', source: 'Bing', type: 'multipolygon' }, members: [] });
+    const r = new Rapid.OsmRelation(context, { tags: { name: 'City Park', source: 'Bing', type: 'multipolygon' }, members: [] });
     const g = new Rapid.Graph([r]);
     const issues = validator(r, g);
     expect(issues).to.have.lengthOf(1);
@@ -69,7 +71,7 @@ describe('validationMissingTag', () => {
   });
 
   it('flags no type tag on relation', () => {
-    const r = Rapid.osmRelation({ tags: { name: 'City Park', source: 'Bing', leisure: 'park' }, members: [] });
+    const r = new Rapid.OsmRelation(context, { tags: { name: 'City Park', source: 'Bing', leisure: 'park' }, members: [] });
     const g = new Rapid.Graph([r]);
     const issues = validator(r, g);
     expect(issues).to.have.lengthOf(1);
@@ -81,14 +83,14 @@ describe('validationMissingTag', () => {
   });
 
   it('ignores highway with classification', () => {
-    const w = Rapid.osmWay({ tags: { highway: 'primary' }});
+    const w = new Rapid.OsmWay(context, { tags: { highway: 'primary' }});
     const g = new Rapid.Graph([w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('flags highway=road', () => {
-    const w = Rapid.osmWay({ tags: { highway: 'road' }});
+    const w = new Rapid.OsmWay(context, { tags: { highway: 'road' }});
     const g = new Rapid.Graph([w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);

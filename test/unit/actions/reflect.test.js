@@ -2,11 +2,20 @@ import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
+
 function closeTo(a, b, epsilon = 1e-9) {
   return Math.abs(a - b) < epsilon;
 }
 
 describe('actionReflect', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   const viewport = {
     project:   val => val,
     unproject: val => val
@@ -14,11 +23,11 @@ describe('actionReflect', () => {
 
   it('does not create or remove nodes', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'b', loc: [4, 0] }),
-      Rapid.osmNode({ id: 'c', loc: [4, 2] }),
-      Rapid.osmNode({ id: 'd', loc: [1, 2] }),
-      Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
+      new Rapid.OsmNode(context, { id: 'd', loc: [1, 2] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
     ]);
 
     const result = Rapid.actionReflect(['-'], viewport)(graph);
@@ -32,11 +41,11 @@ describe('actionReflect', () => {
     //   /     |  ->   \     |
     //  a ---- b        d -- c
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'b', loc: [4, 0] }),
-      Rapid.osmNode({ id: 'c', loc: [4, 2] }),
-      Rapid.osmNode({ id: 'd', loc: [1, 2] }),
-      Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
+      new Rapid.OsmNode(context, { id: 'd', loc: [1, 2] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
     ]);
 
     const result = Rapid.actionReflect(['-'], viewport).useLongAxis(true)(graph);
@@ -63,11 +72,11 @@ describe('actionReflect', () => {
     //   /     |  ->  |     \
     //  a ---- b      b ---- a
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'b', loc: [4, 0] }),
-      Rapid.osmNode({ id: 'c', loc: [4, 2] }),
-      Rapid.osmNode({ id: 'd', loc: [1, 2] }),
-      Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
+      new Rapid.OsmNode(context, { id: 'd', loc: [1, 2] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
     ]);
 
     const result = Rapid.actionReflect(['-'], viewport).useLongAxis(false)(graph);
@@ -97,11 +106,11 @@ describe('actionReflect', () => {
 
     it('reflect long at t = 0', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [4, 0] }),
-        Rapid.osmNode({ id: 'c', loc: [4, 2] }),
-        Rapid.osmNode({ id: 'd', loc: [1, 2] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [1, 2] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
 
       const result = Rapid.actionReflect(['-'], viewport)(graph, 0);
@@ -125,11 +134,11 @@ describe('actionReflect', () => {
 
     it('reflect long at t = 0.5', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [4, 0] }),
-        Rapid.osmNode({ id: 'c', loc: [4, 2] }),
-        Rapid.osmNode({ id: 'd', loc: [1, 2] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [1, 2] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
       const result = Rapid.actionReflect(['-'], viewport)(graph, 0.5);
       assert.ok(result instanceof Rapid.Graph);
@@ -152,11 +161,11 @@ describe('actionReflect', () => {
 
     it('reflect long at t = 1', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [4, 0] }),
-        Rapid.osmNode({ id: 'c', loc: [4, 2] }),
-        Rapid.osmNode({ id: 'd', loc: [1, 2] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [1, 2] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
       const result = Rapid.actionReflect(['-'], viewport)(graph, 1);
       assert.ok(result instanceof Rapid.Graph);

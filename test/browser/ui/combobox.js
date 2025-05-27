@@ -1,5 +1,4 @@
 describe('uiCombobox', () => {
-  let body, container, content, input, combobox;
 
   class MockContext {
     constructor() { }
@@ -7,6 +6,7 @@ describe('uiCombobox', () => {
   }
 
   const context = new MockContext();
+  let body, container, content, input, combobox;
 
   beforeEach(() => {
     body = d3.select('body');

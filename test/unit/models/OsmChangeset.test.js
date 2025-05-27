@@ -1,21 +1,28 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
-describe('osmChangeset', () => {
+describe('OsmChangeset', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
 
   describe('constructor', () => {
     it('returns a changeset', () => {
-      const changeset = Rapid.osmChangeset();
-      assert.ok(changeset instanceof Rapid.osmChangeset);
+      const changeset = new Rapid.OsmChangeset(context);
+      assert.ok(changeset instanceof Rapid.OsmChangeset);
       assert.equal(changeset.type, 'changeset');
       assert.deepEqual(changeset.tags, {});
     });
 
     it('returns a changeset with provided tags', () => {
-      const changeset = Rapid.osmChangeset({tags: {foo: 'bar'}});
-      assert.ok(changeset instanceof Rapid.osmChangeset);
+      const changeset = new Rapid.OsmChangeset(context, {tags: {foo: 'bar'}});
+      assert.ok(changeset instanceof Rapid.OsmChangeset);
       assert.equal(changeset.type, 'changeset');
       assert.deepEqual(changeset.tags, {foo: 'bar'});
     });
@@ -34,7 +41,7 @@ describe('osmChangeset', () => {
         }
       };
 
-      const changeset = Rapid.osmChangeset({tags: {'comment': 'hello'}});
+      const changeset = new Rapid.OsmChangeset(context, {tags: {'comment': 'hello'}});
       const jxon = changeset.asJXON();
       assert.deepEqual(jxon, expected);
     });
@@ -53,16 +60,16 @@ describe('osmChangeset', () => {
         }
       };
 
-      const changeset = Rapid.osmChangeset();
+      const changeset = new Rapid.OsmChangeset(context);
       const jxon = changeset.osmChangeJXON({ created: [], modified: [], deleted: [] });
       assert.deepEqual(jxon, expected);
     });
 
     it('includes creations ordered by nodes, ways, relations', () => {
-      const n = Rapid.osmNode({ loc: [0, 0] });
-      const w = Rapid.osmWay();
-      const r = Rapid.osmRelation();
-      const c = Rapid.osmChangeset({ id: '1234' });
+      const n = new Rapid.OsmNode(context, { loc: [0, 0] });
+      const w = new Rapid.OsmWay(context);
+      const r = new Rapid.OsmRelation(context);
+      const c = new Rapid.OsmChangeset(context, { id: '1234' });
       const changes = { created: [r, w, n], modified: [], deleted: [] };
       const jxon = c.osmChangeJXON(changes);
 
@@ -73,11 +80,11 @@ describe('osmChangeset', () => {
   });
 
     it('includes creations ordered by dependencies', () => {
-      const n = Rapid.osmNode({ loc: [0, 0] });
-      const w = Rapid.osmWay({nodes: [n.id]});
-      const r1 = Rapid.osmRelation({ members: [{ id: w.id, type: 'way' }] });
-      const r2 = Rapid.osmRelation({ members: [{ id: r1.id, type: 'relation' }] });
-      const c = Rapid.osmChangeset({ id: '1234' });
+      const n = new Rapid.OsmNode(context, { loc: [0, 0] });
+      const w = new Rapid.OsmWay(context, {nodes: [n.id]});
+      const r1 = new Rapid.OsmRelation(context, { members: [{ id: w.id, type: 'way' }] });
+      const r2 = new Rapid.OsmRelation(context, { members: [{ id: r1.id, type: 'relation' }] });
+      const c = new Rapid.OsmChangeset(context, { id: '1234' });
       const changes = { created: [r2, r1, w, n], modified: [], deleted: [] };
       const jxon = c.osmChangeJXON(changes);
 
@@ -88,9 +95,9 @@ describe('osmChangeset', () => {
     });
 
     it('includes creations ignoring circular dependencies', () => {
-      const r1 = Rapid.osmRelation();
-      const r2 = Rapid.osmRelation();
-      const c = Rapid.osmChangeset({ id: '1234' });
+      const r1 = new Rapid.OsmRelation(context);
+      const r2 = new Rapid.OsmRelation(context);
+      const c = new Rapid.OsmChangeset(context, { id: '1234' });
       r1.addMember({ id: r2.id, type: 'relation' });
       r2.addMember({ id: r1.id, type: 'relation' });
       const changes = { created: [r1, r2], modified: [], deleted: [] };
@@ -103,10 +110,10 @@ describe('osmChangeset', () => {
     });
 
     it('includes modifications', () => {
-      const n = Rapid.osmNode({ loc: [0, 0] });
-      const w = Rapid.osmWay();
-      const r = Rapid.osmRelation();
-      const c = Rapid.osmChangeset({ id: '1234' });
+      const n = new Rapid.OsmNode(context, { loc: [0, 0] });
+      const w = new Rapid.OsmWay(context);
+      const r = new Rapid.OsmRelation(context);
+      const c = new Rapid.OsmChangeset(context, { id: '1234' });
       const changes = { created: [], modified: [r, w, n], deleted: [] };
       const jxon = c.osmChangeJXON(changes);
 
@@ -119,10 +126,10 @@ describe('osmChangeset', () => {
     });
 
     it('includes deletions ordered by relations, ways, nodes', () => {
-      const n = Rapid.osmNode({ loc: [0, 0] });
-      const w = Rapid.osmWay();
-      const r = Rapid.osmRelation();
-      const c = Rapid.osmChangeset({ id: '1234' });
+      const n = new Rapid.OsmNode(context, { loc: [0, 0] });
+      const w = new Rapid.OsmWay(context);
+      const r = new Rapid.OsmRelation(context);
+      const c = new Rapid.OsmChangeset(context, { id: '1234' });
       const changes = { created: [], modified: [], deleted: [n, w, r] };
       const jxon = c.osmChangeJXON(changes);
 

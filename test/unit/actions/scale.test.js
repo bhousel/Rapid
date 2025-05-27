@@ -3,15 +3,24 @@ import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
 
-const viewport = {
-  project:   val => val,
-  unproject: val => val
-};
-
 describe('actionScale', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
+  const viewport = {
+    project:   val => val,
+    unproject: val => val
+  };
+
+
   it('scales nodes around a pivot point', () => {
-    const nodeA = Rapid.osmNode({ id: 'a', loc: [0, 0] });
-    const nodeB = Rapid.osmNode({ id: 'b', loc: [1, 0] });
+    const nodeA = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
+    const nodeB = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
     const graph = new Rapid.Graph([nodeA, nodeB]);
 
     // Pivot point and scale factor

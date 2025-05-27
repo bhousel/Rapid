@@ -6,7 +6,7 @@ import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { actionConnect } from '../actions/connect.js';
 import { actionMoveNode } from '../actions/move_node.js';
 import { geoChooseEdge } from '../geo/index.js';
-import { osmNode } from '../models/node.js';
+import { OsmNode } from '../models/OsmNode.js';
 
 
 /**
@@ -67,7 +67,7 @@ export class DragNodeMode extends AbstractMode {
     if (midpoint) {
       if (!graph.hasEntity(midpoint.edge[0])) return;
       if (!graph.hasEntity(midpoint.edge[1])) return;
-      entity = osmNode();
+      entity = new OsmNode(context);
       editor.perform(actionAddMidpoint(midpoint, entity));
       graph = editor.staging.graph;         // refresh with post-action graph
       entity = graph.hasEntity(entity.id);  // refresh with post-action entity

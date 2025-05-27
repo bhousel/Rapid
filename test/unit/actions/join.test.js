@@ -4,15 +4,23 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionJoin', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   describe('#disabled', () => {
     it('returns falsy for ways that share an end/start node', () => {
       // a --> b ==> c
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']})
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -22,11 +30,11 @@ describe('actionJoin', () => {
     it('returns falsy for ways that share a start/end node', () => {
       // a <-- b <== c
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['b', 'a']}),
-        Rapid.osmWay({id: '=', nodes: ['c', 'b']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['b', 'a']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'b']})
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -36,11 +44,11 @@ describe('actionJoin', () => {
     it('returns falsy for ways that share a start/start node', () => {
       // a <-- b ==> c
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['b', 'a']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['b', 'a']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']})
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -50,11 +58,11 @@ describe('actionJoin', () => {
     it('returns falsy for ways that share an end/end node', () => {
       // a --> b <== c
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['c', 'b']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'b']})
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -64,13 +72,13 @@ describe('actionJoin', () => {
     it('returns falsy for more than two ways when connected, regardless of order', () => {
       // a --> b ==> c ~~> d
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmNode({id: 'd', loc: [6,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-        Rapid.osmWay({id: '~', nodes: ['c', 'd']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmNode(context, {id: 'd', loc: [6,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+        new Rapid.OsmWay(context, {id: '~', nodes: ['c', 'd']})
       ]);
 
       assert.ok(!Rapid.actionJoin(['-', '=', '~']).disabled(graph));
@@ -83,7 +91,7 @@ describe('actionJoin', () => {
 
     it('returns \'not_eligible\' for non-line geometries', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]})
       ]);
 
       const disabled = Rapid.actionJoin(['a']).disabled(graph);
@@ -95,12 +103,12 @@ describe('actionJoin', () => {
       //      |
       //      d
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmNode({id: 'd', loc: [2,2]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'd']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmNode(context, {id: 'd', loc: [2,2]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'd']})
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -114,12 +122,12 @@ describe('actionJoin', () => {
         // to: =
         // via: b
         const graph = new Rapid.Graph([
-          Rapid.osmNode({id: 'a', loc: [0,0]}),
-          Rapid.osmNode({id: 'b', loc: [2,0]}),
-          Rapid.osmNode({id: 'c', loc: [4,0]}),
-          Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-          Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-          Rapid.osmRelation({id: 'r', tags: {'type': type}, members: [
+          new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+          new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+          new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+          new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+          new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+          new Rapid.OsmRelation(context, {id: 'r', tags: {'type': type}, members: [
             {type: 'way', id: '-', role: 'from'},
             {type: 'way', id: '=', role: 'to'},
             {type: 'node', id: 'b', role: 'via'}
@@ -138,14 +146,14 @@ describe('actionJoin', () => {
         // to: |
         // via: b
         const graph = new Rapid.Graph([
-          Rapid.osmNode({id: 'a', loc: [0,0]}),
-          Rapid.osmNode({id: 'b', loc: [2,0]}),
-          Rapid.osmNode({id: 'c', loc: [4,0]}),
-          Rapid.osmNode({id: 'd', loc: [2,2]}),
-          Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-          Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-          Rapid.osmWay({id: '|', nodes: ['b', 'd']}),
-          Rapid.osmRelation({id: 'r', tags: {'type': type}, members: [
+          new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+          new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+          new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+          new Rapid.OsmNode(context, {id: 'd', loc: [2,2]}),
+          new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+          new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+          new Rapid.OsmWay(context, {id: '|', nodes: ['b', 'd']}),
+          new Rapid.OsmRelation(context, {id: 'r', tags: {'type': type}, members: [
             {type: 'way', id: '-', role: 'from'},
             {type: 'way', id: '|', role: 'to'},
             {type: 'node', id: 'b', role: 'via'}
@@ -164,14 +172,14 @@ describe('actionJoin', () => {
         // to: |
         // via: a
         const graph = new Rapid.Graph([
-          Rapid.osmNode({id: 'a', loc: [0,0]}),
-          Rapid.osmNode({id: 'b', loc: [2,0]}),
-          Rapid.osmNode({id: 'c', loc: [4,0]}),
-          Rapid.osmNode({id: 'd', loc: [0,2]}),
-          Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-          Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-          Rapid.osmWay({id: '|', nodes: ['a', 'd']}),
-          Rapid.osmRelation({id: 'r', tags: {'type': type}, members: [
+          new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+          new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+          new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+          new Rapid.OsmNode(context, {id: 'd', loc: [0,2]}),
+          new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+          new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+          new Rapid.OsmWay(context, {id: '|', nodes: ['a', 'd']}),
+          new Rapid.OsmRelation(context, {id: 'r', tags: {'type': type}, members: [
             {type: 'way', id: '-', role: 'from'},
             {type: 'way', id: '|', role: 'to'},
             {type: 'node', id: 'a', role: 'via'}
@@ -192,16 +200,16 @@ describe('actionJoin', () => {
         // to: \
         // via: b
         const graph = new Rapid.Graph([
-          Rapid.osmNode({id: 'a', loc: [0,0]}),
-          Rapid.osmNode({id: 'b', loc: [2,0]}),
-          Rapid.osmNode({id: 'c', loc: [4,0]}),
-          Rapid.osmNode({id: 'd', loc: [2,-2]}),
-          Rapid.osmNode({id: 'e', loc: [3,2]}),
-          Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-          Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-          Rapid.osmWay({id: '|', nodes: ['d', 'b']}),
-          Rapid.osmWay({id: '\\', nodes: ['b', 'e']}),
-          Rapid.osmRelation({id: 'r', tags: {'type': type}, members: [
+          new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+          new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+          new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+          new Rapid.OsmNode(context, {id: 'd', loc: [2,-2]}),
+          new Rapid.OsmNode(context, {id: 'e', loc: [3,2]}),
+          new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+          new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+          new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'b']}),
+          new Rapid.OsmWay(context, {id: '\\', nodes: ['b', 'e']}),
+          new Rapid.OsmRelation(context, {id: 'r', tags: {'type': type}, members: [
             {type: 'way', id: '|', role: 'from'},
             {type: 'way', id: '\\', role: 'to'},
             {type: 'node', id: 'b', role: 'via'}
@@ -218,12 +226,12 @@ describe('actionJoin', () => {
       // members: -
       // not member: =
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-        Rapid.osmRelation({id: 'r', tags: {}, members: [
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+        new Rapid.OsmRelation(context, {id: 'r', tags: {}, members: [
           {type: 'way', id: '-'},
         ]})
       ]);
@@ -239,14 +247,14 @@ describe('actionJoin', () => {
       // members: -, =
       // not member: |
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmNode({id: 'd', loc: [2,2]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-        Rapid.osmWay({id: '|', nodes: ['b', 'd']}),
-        Rapid.osmRelation({id: 'r', tags: {}, members: [
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmNode(context, {id: 'd', loc: [2,2]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+        new Rapid.OsmWay(context, {id: '|', nodes: ['b', 'd']}),
+        new Rapid.OsmRelation(context, {id: 'r', tags: {}, members: [
           {type: 'way', id: '-'},
           {type: 'way', id: '='},
         ]})
@@ -261,13 +269,13 @@ describe('actionJoin', () => {
       // both '-' and '=' are members of r1, r2
       // r1, r2 are not restriction or connectivity relations
       let graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-        Rapid.osmRelation({id: 'r1', tags: {}, members: []}),
-        Rapid.osmRelation({id: 'r2', tags: {}, members: []})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+        new Rapid.OsmRelation(context, {id: 'r1', tags: {}, members: []}),
+        new Rapid.OsmRelation(context, {id: 'r2', tags: {}, members: []})
       ]);
 
       // Add members '-', and '=' in same order
@@ -291,13 +299,13 @@ describe('actionJoin', () => {
       // both '-' and '=' are members of r1, r2
       // r1, r2 are not restriction or connectivity relations
       let graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-        Rapid.osmRelation({id: 'r1', tags: {}, members: []}),
-        Rapid.osmRelation({id: 'r2', tags: {}, members: []})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+        new Rapid.OsmRelation(context, {id: 'r1', tags: {}, members: []}),
+        new Rapid.OsmRelation(context, {id: 'r2', tags: {}, members: []})
       ]);
 
       // Add members '-', and '=' in opposite order
@@ -325,12 +333,12 @@ describe('actionJoin', () => {
       //   | /
       //   c
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [0,10]}),
-        Rapid.osmNode({id: 'c', loc: [5,5]}),
-        Rapid.osmNode({id: 'd', loc: [-5,5]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c']}),
-        Rapid.osmWay({id: '=', nodes: ['c', 'd']}),
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [0,10]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [5,5]}),
+        new Rapid.OsmNode(context, {id: 'd', loc: [-5,5]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'd']}),
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -339,11 +347,11 @@ describe('actionJoin', () => {
 
     it('returns \'conflicting_tags\' for two entities that have conflicting tags', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b'], tags: {highway: 'primary'}}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c'], tags: {highway: 'secondary'}})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b'], tags: {highway: 'primary'}}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c'], tags: {highway: 'secondary'}})
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -352,11 +360,11 @@ describe('actionJoin', () => {
 
     it('takes tag reversals into account when calculating conflicts', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b'], tags: {'oneway': 'yes'}}),
-        Rapid.osmWay({id: '=', nodes: ['c', 'b'], tags: {'oneway': '-1'}})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b'], tags: {'oneway': 'yes'}}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'b'], tags: {'oneway': '-1'}})
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -365,11 +373,11 @@ describe('actionJoin', () => {
 
     it('returns falsy for exceptions to tag conflicts: missing tag', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b'], tags: {highway: 'primary'}}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c'], tags: {}})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b'], tags: {highway: 'primary'}}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c'], tags: {}})
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -378,11 +386,11 @@ describe('actionJoin', () => {
 
     it('returns falsy for exceptions to tag conflicts: uninteresting tag', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0,0]}),
-        Rapid.osmNode({id: 'b', loc: [2,0]}),
-        Rapid.osmNode({id: 'c', loc: [4,0]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b'], tags: {'tiger:cfcc': 'A41'}}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c'], tags: {'tiger:cfcc': 'A42'}})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b'], tags: {'tiger:cfcc': 'A41'}}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c'], tags: {'tiger:cfcc': 'A42'}})
       ]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
@@ -395,11 +403,11 @@ describe('actionJoin', () => {
     // Expected result:
     // a --> b --> c
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: '=', nodes: ['b', 'c']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']})
     ]);
 
     const result = Rapid.actionJoin(['-', '='])(graph);
@@ -412,11 +420,11 @@ describe('actionJoin', () => {
     // Expected result:
     // a <-- b <-- c
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmWay({id: '-', nodes: ['b', 'a']}),
-      Rapid.osmWay({id: '=', nodes: ['c', 'b']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['b', 'a']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'b']})
     ]);
 
     const result = Rapid.actionJoin(['-', '='])(graph);
@@ -429,11 +437,11 @@ describe('actionJoin', () => {
     // Expected result:
     // a --> b --> c
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmWay({id: '-', nodes: ['b', 'a'], tags: {'lanes:forward': 2}}),
-      Rapid.osmWay({id: '=', nodes: ['b', 'c']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['b', 'a'], tags: {'lanes:forward': 2}}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']})
     ]);
 
     const result = Rapid.actionJoin(['-', '='])(graph);
@@ -448,11 +456,11 @@ describe('actionJoin', () => {
     // a --> b --> c
     // tags on === reversed
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: '=', nodes: ['c', 'b'], tags: {'lanes:forward': 2}})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'b'], tags: {'lanes:forward': 2}})
     ]);
 
     const result = Rapid.actionJoin(['-', '='])(graph);
@@ -467,15 +475,15 @@ describe('actionJoin', () => {
     // a --> b --> c --> d --> e
     // tags on === reversed
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmNode({id: 'd', loc: [6,0]}),
-      Rapid.osmNode({id: 'e', loc: [8,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: '=', nodes: ['c', 'b'], tags: {'lanes:forward': 2}}),
-      Rapid.osmWay({id: '+', nodes: ['d', 'c']}),
-      Rapid.osmWay({id: '*', nodes: ['d', 'e'], tags: {'lanes:backward': 2}})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [6,0]}),
+      new Rapid.OsmNode(context, {id: 'e', loc: [8,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'b'], tags: {'lanes:forward': 2}}),
+      new Rapid.OsmWay(context, {id: '+', nodes: ['d', 'c']}),
+      new Rapid.OsmWay(context, {id: '*', nodes: ['d', 'e'], tags: {'lanes:backward': 2}})
     ]);
 
     const result = Rapid.actionJoin(['-', '=', '+', '*'])(graph);
@@ -493,13 +501,13 @@ describe('actionJoin', () => {
     // Expected result:
     // a ==> b ==> c ==> d
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmNode({id: 'd', loc: [6,0]}),
-      Rapid.osmWay({id: 'w-1', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: 'w1', nodes: ['b', 'c']}),
-      Rapid.osmWay({id: 'w-2', nodes: ['c', 'd']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [6,0]}),
+      new Rapid.OsmWay(context, {id: 'w-1', nodes: ['a', 'b']}),
+      new Rapid.OsmWay(context, {id: 'w1', nodes: ['b', 'c']}),
+      new Rapid.OsmWay(context, {id: 'w-2', nodes: ['c', 'd']})
     ]);
 
     const result = Rapid.actionJoin(['w-1', 'w1', 'w-2'])(graph);
@@ -515,13 +523,13 @@ describe('actionJoin', () => {
     // Expected result:
     // n1 ==> n2 ==> n3 ==> n4
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n1', loc: [0,0] }),
-      Rapid.osmNode({ id: 'n2', loc: [2,0] }),
-      Rapid.osmNode({ id: 'n3', loc: [4,0] }),
-      Rapid.osmNode({ id: 'n4', loc: [6,0] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n2', 'n3'] }),
-      Rapid.osmWay({ id: 'w2', nodes: ['n1', 'n2'] }),
-      Rapid.osmWay({ id: 'w-1', nodes: ['n3', 'n4'] })
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0,0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [2,0] }),
+      new Rapid.OsmNode(context, { id: 'n3', loc: [4,0] }),
+      new Rapid.OsmNode(context, { id: 'n4', loc: [6,0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n2', 'n3'] }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n1', 'n2'] }),
+      new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n3', 'n4'] })
     ]);
 
     const result = Rapid.actionJoin(['w2', 'w1', 'w-1'])(graph);
@@ -534,14 +542,14 @@ describe('actionJoin', () => {
 
   it('merges tags', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmNode({id: 'd', loc: [6,0]}),
-      Rapid.osmNode({id: 'e', loc: [8,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b'], tags: {a: 'a', b: '-', c: 'c'}}),
-      Rapid.osmWay({id: '=', nodes: ['b', 'c'], tags: {a: 'a', b: '=', d: 'd'}}),
-      Rapid.osmWay({id: '+', nodes: ['c', 'd'], tags: {a: 'a', b: '=', e: 'e'}})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [6,0]}),
+      new Rapid.OsmNode(context, {id: 'e', loc: [8,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b'], tags: {a: 'a', b: '-', c: 'c'}}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c'], tags: {a: 'a', b: '=', d: 'd'}}),
+      new Rapid.OsmWay(context, {id: '+', nodes: ['c', 'd'], tags: {a: 'a', b: '=', e: 'e'}})
     ]);
 
     const result = Rapid.actionJoin(['-', '=', '+'])(graph);
@@ -560,11 +568,11 @@ describe('actionJoin', () => {
     //   v v v    v v v
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b'], tags: { natural: 'cliff' }}),
-      Rapid.osmWay({id: '=', nodes: ['b', 'c']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b'], tags: { natural: 'cliff' }}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']})
     ]);
 
     const result = Rapid.actionJoin(['-', '='])(graph);
@@ -583,11 +591,11 @@ describe('actionJoin', () => {
     //   v v v    v v v
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: '=', nodes: ['b', 'c'], tags: { natural: 'cliff' }})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c'], tags: { natural: 'cliff' }})
     ]);
 
     const result = Rapid.actionJoin(['-', '='])(graph);
@@ -606,11 +614,11 @@ describe('actionJoin', () => {
     //   v v v    v v v
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b'], tags: { natural: 'cliff' }}),
-      Rapid.osmWay({id: '=', nodes: ['c', 'b']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b'], tags: { natural: 'cliff' }}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'b']})
     ]);
 
     const result = Rapid.actionJoin(['-', '='])(graph);
@@ -629,11 +637,11 @@ describe('actionJoin', () => {
     //    v v v    v v v
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: '=', nodes: ['c', 'b'], tags: { natural: 'cliff' }})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'b'], tags: { natural: 'cliff' }})
     ]);
 
     const result = Rapid.actionJoin(['-', '='])(graph);
@@ -646,15 +654,15 @@ describe('actionJoin', () => {
 
   it('merges relations', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [2,0]}),
-      Rapid.osmNode({id: 'c', loc: [4,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-      Rapid.osmRelation({id: 'r1', members: [
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+      new Rapid.OsmRelation(context, {id: 'r1', members: [
         {id: '=', role: 'r1', type: 'way'}
       ]}),
-      Rapid.osmRelation({id: 'r2', members: [
+      new Rapid.OsmRelation(context, {id: 'r2', members: [
         {id: '=', role: 'r2', type: 'way'},
         {id: '-', role: 'r2', type: 'way'}
       ]})
@@ -677,14 +685,14 @@ describe('actionJoin', () => {
     //    Relation: ['-', '~', '~', '-']
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'b', loc: [1, 0] }),
-      Rapid.osmNode({ id: 'c', loc: [2, 0] }),
-      Rapid.osmNode({ id: 'd', loc: [3, 0] }),
-      Rapid.osmWay({ id: '-', nodes: ['a', 'b'] }),
-      Rapid.osmWay({ id: '=', nodes: ['b', 'c'] }),
-      Rapid.osmWay({ id: '~', nodes: ['c', 'd'] }),
-      Rapid.osmRelation({id: 'r', members: [
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
+      new Rapid.OsmNode(context, { id: 'd', loc: [3, 0] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] }),
+      new Rapid.OsmWay(context, { id: '=', nodes: ['b', 'c'] }),
+      new Rapid.OsmWay(context, { id: '~', nodes: ['c', 'd'] }),
+      new Rapid.OsmRelation(context, {id: 'r', members: [
         {id: '-', role: 'forward', type: 'way'},
         {id: '=', role: 'forward', type: 'way'},
         {id: '~', role: 'forward', type: 'way'},
@@ -721,13 +729,13 @@ describe('actionJoin', () => {
     // |#####|
     // d <-- c
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [0,2]}),
-      Rapid.osmNode({id: 'c', loc: [2,2]}),
-      Rapid.osmNode({id: 'd', loc: [2,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd']}),
-      Rapid.osmWay({id: '=', nodes: ['d', 'a']}),
-      Rapid.osmRelation({id: 'r', tags: { type: 'multipolygon', man_made: 'pier' }, members: [
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [0,2]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [2,2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [2,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['d', 'a']}),
+      new Rapid.OsmRelation(context, {id: 'r', tags: { type: 'multipolygon', man_made: 'pier' }, members: [
         {id: '-', role: 'outer', type: 'way'},
         {id: '=', role: 'outer', type: 'way'}
       ]})
@@ -756,13 +764,13 @@ describe('actionJoin', () => {
     // |#####|
     // d <-- c
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0,0]}),
-      Rapid.osmNode({id: 'b', loc: [0,2]}),
-      Rapid.osmNode({id: 'c', loc: [2,2]}),
-      Rapid.osmNode({id: 'd', loc: [2,0]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd'], tags: { surface: 'paved' }}),
-      Rapid.osmWay({id: '=', nodes: ['d', 'a']}),
-      Rapid.osmRelation({id: 'r', members: [
+      new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [0,2]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [2,2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [2,0]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd'], tags: { surface: 'paved' }}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['d', 'a']}),
+      new Rapid.OsmRelation(context, {id: 'r', members: [
         {id: '-', role: 'outer', type: 'way'},
         {id: '=', role: 'outer', type: 'way'}
       ], tags: {

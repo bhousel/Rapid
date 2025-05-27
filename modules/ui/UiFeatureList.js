@@ -3,7 +3,7 @@ import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import * as sexagesimal from '@mapbox/sexagesimal';
 
 import { Graph } from '../core/lib/index.js';
-import { osmEntity } from '../models/entity.js';
+import { createOsmFeature } from '../models/index.js';
 import { uiIcon } from './icon.js';
 import { utilCmd, utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../util/index.js';
 
@@ -490,17 +490,17 @@ export class UiFeatureList {
     for (const d of (this._geocodeResults || [])) {
       if (!d.osm_type || !d.osm_id) continue;    // some results may be missing these - iD#1890
 
-      // Make a temporary osmEntity so we can preset match and better localize the search result - iD#4725
-      const id = osmEntity.id.fromOSM(d.osm_type, d.osm_id);
+      // Make a temporary OSM Feature so we can preset match and better localize the search result - iD#4725
+      const id = `${d.osm_type[0]}${d.osm_id}`;  // e.g. w123
       const tags = {};
-      tags[d.class] = d.type;
+      tags[d.class] = d.type;   // e.g. boundary=administrative
 
       const attrs = { id: id, type: d.osm_type, tags: tags };
       if (d.osm_type === 'way') {   // for ways, add some fake closed nodes
         attrs.nodes = ['a','a'];    // so that geometry area is possible
       }
 
-      const tempEntity = osmEntity(attrs);
+      const tempEntity = createOsmFeature(context, attrs);
       const tempGraph = new Graph([tempEntity]);
       const preset = presets.match(tempEntity, tempGraph);
       const type = (preset && preset.name()) || l10n.displayType(id);

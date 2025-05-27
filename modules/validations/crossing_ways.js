@@ -5,7 +5,7 @@ import {
 } from '@rapid-sdk/math';
 
 import { actionAddMidpoint, actionChangeTags, actionMergeNodes, actionSplit, actionSyncCrossingTags } from '../actions/index.js';
-import { osmNode } from '../models/node.js';
+import { OsmNode } from '../models/OsmNode.js';
 import {
   osmFlowingWaterwayTagValues, osmPathHighwayTagValues, osmRailwayTrackTagValues,
   osmRoutableAerowayTags, osmRoutableHighwayTagValues
@@ -698,7 +698,7 @@ export function validationCrossingWays(context) {
               // the edge is long enough to insert a new node
               // the loc that would result in the full expected length
               const idealNodeLoc = locGetter(idealLengthMeters);
-              newNode = osmNode();
+              newNode = new OsmNode(context);
               graph = actionAddMidpoint({ loc: idealNodeLoc, edge: edge }, newNode)(graph);
 
             } else {
@@ -723,7 +723,7 @@ export function validationCrossingWays(context) {
                 const insetLength = crossingToEdgeEndDistance - minEdgeLengthMeters;
                 if (insetLength > minEdgeLengthMeters) {
                   const insetNodeLoc = locGetter(insetLength);
-                  newNode = osmNode();
+                  newNode = new OsmNode(context);
                   graph = actionAddMidpoint({ loc: insetNodeLoc, edge: edge }, newNode)(graph);
                 }
               }
@@ -789,7 +789,7 @@ export function validationCrossingWays(context) {
     const actionConnectCrossingWays = (graph) => {
 
       // Create a new candidate junction node which will be inserted at the connection location..
-      const newNode = osmNode({ loc: loc, tags: tags });
+      const newNode = new OsmNode(context, { loc: loc, tags: tags });
       graph = graph.replace(newNode);
 
       const mergeNodeIDs = [newNode.id];

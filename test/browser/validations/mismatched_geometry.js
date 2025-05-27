@@ -23,6 +23,7 @@ describe('validationMismatchedGeometry', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
         assets:     new Rapid.AssetSystem(this),
         l10n:       new MockLocalizationSystem(),
@@ -82,7 +83,7 @@ describe('validationMismatchedGeometry', () => {
   //  n-1  *
   //
   function createPoint(n1tags = {}) {
-    const n1 = Rapid.osmNode({ id: 'n-1', loc: [0, 0], tags: n1tags });
+    const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0], tags: n1tags });
     const entities = [n1];
     graph = new Rapid.Graph(entities);
   }
@@ -94,10 +95,10 @@ describe('validationMismatchedGeometry', () => {
   //  n-1  *   *  n-3
   //
   function createOpenWay(w1tags = {}) {
-    const n1 = Rapid.osmNode({ id: 'n-1', loc: [0, 0] });
-    const n2 = Rapid.osmNode({ id: 'n-2', loc: [1, 1] });
-    const n3 = Rapid.osmNode({ id: 'n-3', loc: [2, 0] });
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2', 'n-3'], tags: w1tags });
+    const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0] });
+    const n2 = new Rapid.OsmNode(context, { id: 'n-2', loc: [1, 1] });
+    const n3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [2, 0] });
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2', 'n-3'], tags: w1tags });
     const entities = [n1, n2, n3, w1];
     graph = new Rapid.Graph(entities);
   }
@@ -109,10 +110,10 @@ describe('validationMismatchedGeometry', () => {
   //  n-1  *---*  n-3
   //
   function createClosedWay(w1tags = {}) {
-    const n1 = Rapid.osmNode({ id: 'n-1', loc: [0, 0] });
-    const n2 = Rapid.osmNode({ id: 'n-2', loc: [1, 1] });
-    const n3 = Rapid.osmNode({ id: 'n-3', loc: [2, 0] });
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2', 'n-3', 'n-1'], tags: w1tags });
+    const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0] });
+    const n2 = new Rapid.OsmNode(context, { id: 'n-2', loc: [1, 1] });
+    const n3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [2, 0] });
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2', 'n-3', 'n-1'], tags: w1tags });
     const entities = [n1, n2, n3, w1];
     graph = new Rapid.Graph(entities);
   }

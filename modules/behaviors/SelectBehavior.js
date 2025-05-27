@@ -1,7 +1,7 @@
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
-import { osmEntity, osmNode, osmWay, QAItem } from '../models/index.js';
+import { OsmEntity, OsmNode, OsmWay, QAItem } from '../models/index.js';
 import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { geoChooseEdge } from '../geo/index.js';
 import { utilDetect } from '../util/detect.js';
@@ -357,7 +357,7 @@ export class SelectBehavior extends AbstractBehavior {
 
     // Clicked a non-OSM feature..
     if (
-      data.__fbid__ ||            // Clicked a Rapid feature..
+      data.props.__fbid__ ||      // Clicked a Rapid feature..
       data.overture ||            // Clicked an Overture feature..
       data.__featurehash__ ||     // Clicked Custom Data (e.g. gpx track)..
       data instanceof QAItem ||   // Clicked a QA Item (OSM Note, KeepRight, Osmose, Maproulette)..
@@ -369,7 +369,7 @@ export class SelectBehavior extends AbstractBehavior {
     }
 
     // Clicked an OSM feature..
-    if (data instanceof osmEntity) {
+    if (data instanceof OsmEntity) {
       let selectedIDs = context.selectedIDs();
 
       if (!isMultiselect) {
@@ -451,7 +451,7 @@ export class SelectBehavior extends AbstractBehavior {
     const point = this.lastUp.coord.map;
     const data = this.lastUp.target?.data;
 
-    const isOSMWay = data instanceof osmWay && !data.__fbid__;
+    const isOSMWay = data instanceof OsmWay && !data.props.__fbid__;
     const isMidpoint = data.type === 'midpoint';
 
     let loc, edge;
@@ -468,7 +468,7 @@ export class SelectBehavior extends AbstractBehavior {
     }
 
     if (loc && edge) {
-      editor.perform(actionAddMidpoint({ loc: loc, edge: edge }, osmNode()));
+      editor.perform(actionAddMidpoint({ loc: loc, edge: edge }, new OsmNode(context)));
       editor.commit({
         annotation: l10n.t('operations.add.annotation.vertex'),
         selectedIDs: context.selectedIDs()   // keep the parent way selected

@@ -4,17 +4,25 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionUnrestrictTurn', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('removes a restriction from a restricted turn', () => {
     //
     // u === * --- w
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'u' }),
-      Rapid.osmNode({ id: '*' }),
-      Rapid.osmNode({ id: 'w' }),
-      Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-      Rapid.osmWay({ id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } }),
-      Rapid.osmRelation({
+      new Rapid.OsmNode(context, { id: 'u' }),
+      new Rapid.OsmNode(context, { id: '*' }),
+      new Rapid.OsmNode(context, { id: 'w' }),
+      new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } }),
+      new Rapid.OsmRelation(context, {
         id: 'r',
         tags: { type: 'restriction' },
         members: [

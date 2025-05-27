@@ -1,5 +1,4 @@
 describe('uiFieldAccess', () => {
-  let selection, field;
 
   class MockLocalizationSystem {
     constructor() { }
@@ -18,6 +17,7 @@ describe('uiFieldAccess', () => {
 
 
   const context = new MockContext();
+  let selection, field;
 
   beforeEach(() => {
     selection = d3.select(document.createElement('div'));

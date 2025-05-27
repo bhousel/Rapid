@@ -4,9 +4,10 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('Preset', () => {
-
   class MockContext {
-    constructor()  { }
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
   }
 
   const context = new MockContext();
@@ -56,29 +57,29 @@ describe('Preset', () => {
   describe('#matchScore', () => {
     it('returns -1 if preset does not match tags', () => {
       const preset = new Rapid.Preset(context, 'test', { tags: { foo: 'bar' } });
-      const entity = Rapid.osmWay({ tags: { highway: 'motorway' } });
+      const entity = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
       assert.equal(preset.matchScore(entity.tags), -1);
     });
 
     it('returns the value of the matchScore property when matched', () => {
       const preset = new Rapid.Preset(context, 'test', { tags: { highway: 'motorway' }, matchScore: 0.2 });
-      const entity = Rapid.osmWay({ tags: { highway: 'motorway' } });
+      const entity = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
       assert.equal(preset.matchScore(entity.tags), 0.2);
     });
 
     it('defaults to the number of matched tags', () => {
       let preset = new Rapid.Preset(context, 'test', { tags: { highway: 'residential' } });
-      let entity = Rapid.osmWay({ tags: { highway: 'residential' } });
+      let entity = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
       assert.equal(preset.matchScore(entity.tags), 1);
 
       preset = new Rapid.Preset(context, 'test', { tags: { highway: 'service', service: 'alley' } });
-      entity = Rapid.osmWay({ tags: { highway: 'service', service: 'alley' } });
+      entity = new Rapid.OsmWay(context, { tags: { highway: 'service', service: 'alley' } });
       assert.equal(preset.matchScore(entity.tags), 2);
     });
 
     it('counts * as a match for any value with score 0.5', () => {
       const preset = new Rapid.Preset(context, 'test', { tags: { building: '*' } });
-      const entity = Rapid.osmWay({ tags: { building: 'yep' } });
+      const entity = new Rapid.OsmWay(context, { tags: { building: 'yep' } });
       assert.equal(preset.matchScore(entity.tags), 0.5);
     });
 
@@ -92,12 +93,12 @@ describe('Preset', () => {
         addTags: { 'name': 'Walmart Neighborhood Market'  }
       });
 
-      const supercenter = Rapid.osmWay({ tags: {
+      const supercenter = new Rapid.OsmWay(context, { tags: {
         'brand:wikidata': 'Q483551',
         'shop': 'supermarket',
         'name': 'Walmart Supercenter'
       } });
-      const market = Rapid.osmWay({ tags: {
+      const market = new Rapid.OsmWay(context, { tags: {
         'brand:wikidata': 'Q483551',
         'shop': 'supermarket',
         'name': 'Walmart Neighborhood Market'

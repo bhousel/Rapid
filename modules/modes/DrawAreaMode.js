@@ -6,7 +6,7 @@ import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { actionAddVertex } from '../actions/add_vertex.js';
 import { actionMoveNode } from '../actions/move_node.js';
 import { geoChooseEdge } from '../geo/index.js';
-import { osmNode, osmWay } from '../models/index.js';
+import { OsmNode, OsmWay } from '../models/index.js';
 
 const DEBUG = false;
 
@@ -468,9 +468,9 @@ export class DrawAreaMode extends AbstractMode {
       if (DEBUG) {
         console.log(`DrawAreaMode: _clickLoc, starting area at ${loc}`); // eslint-disable-line no-console
       }
-      firstNode = osmNode({ loc: loc });
-      drawNode = osmNode({ loc: loc });
-      drawWay = osmWay({
+      firstNode = new OsmNode(context, { loc: loc });
+      drawNode = new OsmNode(context, { loc: loc });
+      drawWay = new OsmWay(context, {
         tags: this.defaultTags,
         nodes: [ firstNode.id, drawNode.id, firstNode.id ]
       });
@@ -543,9 +543,9 @@ export class DrawAreaMode extends AbstractMode {
       if (DEBUG) {
         console.log(`DrawAreaMode: _clickWay, starting area at edge ${edge}`);  // eslint-disable-line no-console
       }
-      firstNode = osmNode({ loc: loc });
-      drawNode = osmNode({ loc: loc });
-      drawWay = osmWay({
+      firstNode = new OsmNode(context, { loc: loc });
+      drawNode = new OsmNode(context, { loc: loc });
+      drawWay = new OsmWay(context, {
         tags: this.defaultTags,
         nodes: [ firstNode.id, drawNode.id, firstNode.id ]
       });
@@ -624,8 +624,8 @@ export class DrawAreaMode extends AbstractMode {
         console.log(`DrawAreaMode: _clickNode, starting line at ${targetNode.id}`); // eslint-disable-line no-console
       }
 
-      drawNode = osmNode({ loc: loc });
-      drawWay = osmWay({
+      drawNode = new OsmNode(context, { loc: loc });
+      drawWay = new OsmWay(context, {
         tags: this.defaultTags,
         nodes: [ targetNode.id, drawNode.id, targetNode.id ]
       });
@@ -664,7 +664,7 @@ export class DrawAreaMode extends AbstractMode {
     const editor = context.systems.editor;
     const map = context.systems.map;
 
-    const drawNode = osmNode({ loc: loc ?? map.mouseLoc() });
+    const drawNode = new OsmNode(context, { loc: loc ?? map.mouseLoc() });
     this.drawNodeID = drawNode.id;
 
     editor.perform(

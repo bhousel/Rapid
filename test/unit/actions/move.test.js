@@ -4,24 +4,31 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionMove', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
 
   // This was moved to operationMove.  We should test operations and move this test there.
   // it('#disabled', function() {
   //     it('returns falsy by default', function() {
-  //         const node  = Rapid.osmNode({loc: [0, 0]}),
+  //         const node  = new Rapid.OsmNode(context, {loc: [0, 0]}),
   //             action = Rapid.actionMove([node.id], [0, 0], viewport),
   //             graph = new Rapid.Graph([node]);
   //         expect(action.disabled(graph)).not.to.be.ok;
   //     });
   //     it('returns \'incomplete_relation\' for an incomplete relation', function() {
-  //         const relation = Rapid.osmRelation({members: [{id: 1}]}),
+  //         const relation = new Rapid.OsmRelation(context, {members: [{id: 1}]}),
   //             action = Rapid.actionMove([relation.id], [0, 0], viewport),
   //             graph = new Rapid.Graph([relation]);
   //         expect(action.disabled(graph)).to.equal('incomplete_relation');
   //     });
   //     it('returns falsy for a complete relation', function() {
-  //         const node  = Rapid.osmNode({loc: [0, 0]}),
-  //             relation = Rapid.osmRelation({members: [{id: node.id}]}),
+  //         const node  = new Rapid.OsmNode(context, {loc: [0, 0]}),
+  //             relation = new Rapid.OsmRelation(context, {members: [{id: node.id}]}),
   //             action = Rapid.actionMove([relation.id], [0, 0], viewport),
   //             graph = new Rapid.Graph([node, relation]);
   //         expect(action.disabled(graph)).not.to.be.ok;
@@ -34,9 +41,9 @@ describe('actionMove', () => {
   };
 
   it('moves all nodes in a way by the given amount', () => {
-    const n1 = Rapid.osmNode({ id: 'n1', loc: [0, 0] });
-    const n2 = Rapid.osmNode({ id: 'n2', loc: [5, 10] });
-    const w1 = Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2'] });
+    const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+    const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [5, 10] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
     const graph = new Rapid.Graph([n1, n2, w1]);
 
     const delta = [2, 3];
@@ -48,8 +55,8 @@ describe('actionMove', () => {
 
 
   it('moves repeated nodes only once', () => {
-    const n1 = Rapid.osmNode({ id: 'n1', loc: [0, 0] });
-    const w1 = Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n1'] });
+    const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n1'] });
     const graph = new Rapid.Graph([n1, w1]);
 
     const delta = [2, 3];
@@ -60,9 +67,9 @@ describe('actionMove', () => {
 
 
   it('moves multiple ways', () => {
-    const n1 = Rapid.osmNode({ id: 'n1', loc: [0, 0] });
-    const w1 = Rapid.osmWay({ id: 'w1', nodes: ['n1'] });
-    const w2 = Rapid.osmWay({ id: 'w2', nodes: ['n1'] });
+    const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
+    const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n1'] });
     const graph = new Rapid.Graph([n1, w1, w2]);
 
     const delta = [2, 3];
@@ -73,9 +80,9 @@ describe('actionMove', () => {
 
 
   it('moves leaf nodes of a relation', () => {
-    const n1 = Rapid.osmNode({ id: 'n1', loc: [0, 0] });
-    const w1 = Rapid.osmWay({ id: 'w1', nodes: ['n1'] });
-    const r1 = Rapid.osmRelation({ id: 'r1', members: [{id: 'w1'}] });
+    const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
+    const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{id: 'w1'}] });
     const graph = new Rapid.Graph([n1, w1, r1]);
 
     const delta = [2, 3];

@@ -9,6 +9,7 @@ describe('validationDisconnectedWay', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.services = {};
       this.systems = {
         l10n:  new MockLocalizationSystem()
@@ -44,7 +45,7 @@ describe('validationDisconnectedWay', () => {
   //  n-1  *
   //
   function createDisconnectedNode(n1tags = {}) {
-    const n1 = Rapid.osmNode({ id: 'n-1', loc: [0, 0], tags: n1tags });
+    const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0], tags: n1tags });
     const entities = [n1];
     graph = new Rapid.Graph(entities);
   }
@@ -74,9 +75,9 @@ describe('validationDisconnectedWay', () => {
   //  n-1  *
   //
   function createDisconnectedWay(w1tags = {}) {
-    const n1 = Rapid.osmNode({ id: 'n-1', loc: [0, 0] });
-    const n2 = Rapid.osmNode({ id: 'n-2', loc: [0, 1] });
-    const w1 = Rapid.osmWay({ id: 'w-1', nodes: ['n-1', 'n-2'], tags: w1tags });
+    const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0] });
+    const n2 = new Rapid.OsmNode(context, { id: 'n-2', loc: [0, 1] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n-1', 'n-2'], tags: w1tags });
 
     const entities = [n1, n2, w1];
     graph = new Rapid.Graph(entities);
@@ -117,11 +118,11 @@ describe('validationDisconnectedWay', () => {
     const w2tags = tags.w2 ?? {};
     const n1tags = tags.n1 ?? {};
 
-    const n1 = Rapid.osmNode({ id: 'n-1', loc: [0, 0], tags: n1tags });
-    const n2 = Rapid.osmNode({ id: 'n-2', loc: [0, 1] });
-    const n3 = Rapid.osmNode({ id: 'n-3', loc: [1, 0] });
-    const w1 = Rapid.osmWay({ id: 'w-1', nodes: ['n-1', 'n-2'], tags: w1tags });
-    const w2 = Rapid.osmWay({ id: 'w-2', nodes: ['n-1', 'n-3'], tags: w2tags });
+    const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0], tags: n1tags });
+    const n2 = new Rapid.OsmNode(context, { id: 'n-2', loc: [0, 1] });
+    const n3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [1, 0] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n-1', 'n-2'], tags: w1tags });
+    const w2 = new Rapid.OsmWay(context, { id: 'w-2', nodes: ['n-1', 'n-3'], tags: w2tags });
 
     const entities = [n1, n2, n3, w1, w2];
     graph = new Rapid.Graph(entities);

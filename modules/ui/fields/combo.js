@@ -4,7 +4,7 @@ import { drag as d3_drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-import { osmEntity } from '../../models/entity.js';
+// import { OsmEntity } from '../../models/OsmEntity.js';
 import { uiCombobox } from '../combobox.js';
 import { utilKeybinding } from '../../util/keybinding.js';
 import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.js';
@@ -190,13 +190,14 @@ export function uiFieldCombo(context, uifield) {
                 return !d.count || d.count > 10;
             });
 
-            var deprecatedValues = osmEntity.deprecatedTagValuesByKey(_dataDeprecated)[uifield.key];
-            if (deprecatedValues) {
-                // don't suggest deprecated tag values
-                data = data.filter(function(d) {
-                    return deprecatedValues.indexOf(d.value) === -1;
-                });
-            }
+// TODO move out of osmEntity
+//            var deprecatedValues = osmEntity.deprecatedTagValuesByKey(_dataDeprecated)[uifield.key];
+//            if (deprecatedValues) {
+//                // don't suggest deprecated tag values
+//                data = data.filter(function(d) {
+//                    return deprecatedValues.indexOf(d.value) === -1;
+//                });
+//            }
 
             if (hasCountryPrefix) {
                 data = data.filter(function(d) {

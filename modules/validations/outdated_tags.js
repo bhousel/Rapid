@@ -90,14 +90,15 @@ export function validationOutdatedTags(context) {
       preset = newPreset;
     }
 
-    // Upgrade deprecated tags..
-    if (_dataDeprecated) {
-      const deprecatedTags = entity.deprecatedTags(_dataDeprecated);
-      for (const tag of deprecatedTags) {
-        graph = actionUpgradeTags(entity.id, tag.old, tag.replace)(graph);
-        entity = graph.entity(entity.id);
-      }
-    }
+// TODO: fix - deprecated tag checks shouldn't be in OsmEntity
+//    // Upgrade deprecated tags..
+//    if (_dataDeprecated) {
+//      const deprecatedTags = entity.deprecatedTags(_dataDeprecated);
+//      for (const tag of deprecatedTags) {
+//        graph = actionUpgradeTags(entity.id, tag.old, tag.replace)(graph);
+//        entity = graph.entity(entity.id);
+//      }
+//    }
 
     // Add missing addTags from the detected preset
     let newTags = Object.assign({}, entity.tags);  // shallow copy

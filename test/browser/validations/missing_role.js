@@ -8,25 +8,27 @@ describe('validationMissingRole', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
         l10n:  new MockLocalizationSystem()
       };
     }
   }
 
-  const validator = Rapid.validationMissingRole(new MockContext());
+  const context = new MockContext();
+  const validator = Rapid.validationMissingRole(context);
 
 
   it('ignores ways with no relations', () => {
-    const w = Rapid.osmWay();
+    const w = new Rapid.OsmWay(context);
     const g = new Rapid.Graph([w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores member with missing role in non-multipolygon relation', () => {
-    const w = Rapid.osmWay();
-    const r = Rapid.osmRelation({ tags: { type: 'boundary' }, members: [{ id: w.id, role: '' }] });
+    const w = new Rapid.OsmWay(context);
+    const r = new Rapid.OsmRelation(context, { tags: { type: 'boundary' }, members: [{ id: w.id, role: '' }] });
     const g = new Rapid.Graph([w, r]);
     const rIssues = validator(r, g);
     const wIssues = validator(w, g);
@@ -35,8 +37,8 @@ describe('validationMissingRole', () => {
   });
 
   it('ignores way with outer role in multipolygon', () => {
-    const w = Rapid.osmWay();
-    const r = Rapid.osmRelation({ tags: { type: 'multipolygon' }, members: [{ id: w.id, role: 'outer' }] });
+    const w = new Rapid.OsmWay(context);
+    const r = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: w.id, role: 'outer' }] });
     const g = new Rapid.Graph([w, r]);
     const rIssues = validator(r, g);
     const wIssues = validator(w, g);
@@ -45,8 +47,8 @@ describe('validationMissingRole', () => {
   });
 
   it('ignores way with inner role in multipolygon', () => {
-    const w = Rapid.osmWay();
-    const r = Rapid.osmRelation({ tags: { type: 'multipolygon' }, members: [{ id: w.id, role: 'inner' }] });
+    const w = new Rapid.OsmWay(context);
+    const r = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: w.id, role: 'inner' }] });
     const g = new Rapid.Graph([w, r]);
     const rIssues = validator(r, g);
     const wIssues = validator(w, g);
@@ -55,8 +57,8 @@ describe('validationMissingRole', () => {
   });
 
   it('flags way with missing role in multipolygon', () => {
-    const w = Rapid.osmWay();
-    const r = Rapid.osmRelation({ tags: { type: 'multipolygon' }, members: [{ id: w.id, role: '' }] });
+    const w = new Rapid.OsmWay(context);
+    const r = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: w.id, role: '' }] });
     const g = new Rapid.Graph([w, r]);
     const rIssues = validator(r, g);
     const wIssues = validator(w, g);
@@ -72,8 +74,8 @@ describe('validationMissingRole', () => {
   });
 
   it('flags way with whitespace string role in multipolygon', () => {
-    const w = Rapid.osmWay();
-    const r = Rapid.osmRelation({ tags: { type: 'multipolygon' }, members: [{ id: w.id, role: '  ' }] });
+    const w = new Rapid.OsmWay(context);
+    const r = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: w.id, role: '  ' }] });
     const g = new Rapid.Graph([w, r]);
     const rIssues = validator(r, g);
     const wIssues = validator(w, g);

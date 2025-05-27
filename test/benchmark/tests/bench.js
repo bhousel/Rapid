@@ -12,10 +12,10 @@ function jsonToOSM(renderData) {
   //Entity data is already split into points, vertices, lines, and polygons.
   let osmRenderData = {};
 
-  let points = renderData.points.map(point => Rapid.osmNode(point));
-  let vertices = renderData.vertices.map(vertex => Rapid.osmNode(vertex));
-  let lines = renderData.lines.map(line => Rapid.osmWay(line));
-  let polygons = renderData.polygons.map(polygon => Rapid.osmWay(polygon));
+  let points = renderData.points.map(point => new Rapid.OsmNode(context, point));
+  let vertices = renderData.vertices.map(vertex => new Rapid.OsmNode(context, vertex));
+  let lines = renderData.lines.map(line => new Rapid.OsmWay(context, line));
+  let polygons = renderData.polygons.map(polygon => new Rapid.OsmWay(context, polygon));
 
   osmRenderData.points = points;
   osmRenderData.vertices = vertices;
@@ -30,8 +30,8 @@ function jsonToOSM(renderData) {
 function instantiateEntities(data) {
   let entities = [];
   for (const props of data) {
-    if (props.id.charAt(0) === 'w') entities.push(new Rapid.osmWay(props));
-    if (props.id.charAt(0) === 'n') entities.push(new Rapid.osmNode(props));
+    if (props.id.charAt(0) === 'w') entities.push(new Rapid.OsmWay(context, props));
+    if (props.id.charAt(0) === 'n') entities.push(new Rapid.OsmNode(context, props));
   }
   return entities;
 }

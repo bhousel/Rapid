@@ -4,8 +4,16 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionCopyEntities', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('copies a node', () => {
-    const n1 = Rapid.osmNode({id: 'n1'});
+    const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const base = new Rapid.Graph([n1]);
 
     const head = Rapid.actionCopyEntities(['n1'], base)(base);
@@ -19,9 +27,9 @@ describe('actionCopyEntities', () => {
 
 
   it('copies a way', () => {
-    const n1 = Rapid.osmNode({id: 'n1'});
-    const n2 = Rapid.osmNode({id: 'n2'});
-    const w1 = Rapid.osmWay({id: 'w1', nodes: ['n1', 'n2']});
+    const n1 = new Rapid.OsmNode(context, {id: 'n1'});
+    const n2 = new Rapid.OsmNode(context, {id: 'n2'});
+    const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1', 'n2']});
     const base = new Rapid.Graph([n1, n2, w1]);
 
     const head = Rapid.actionCopyEntities(['w1'], base)(base);
@@ -36,8 +44,8 @@ describe('actionCopyEntities', () => {
 
   it('copies multiple nodes', () => {
     const base = new Rapid.Graph([
-      Rapid.osmNode({id: 'n1'}),
-      Rapid.osmNode({id: 'n2'})
+      new Rapid.OsmNode(context, {id: 'n1'}),
+      new Rapid.OsmNode(context, {id: 'n2'})
     ]);
     const head = Rapid.actionCopyEntities(['n1', 'n2'], base)(base);
     assert.ok(head instanceof Rapid.Graph);
@@ -52,11 +60,11 @@ describe('actionCopyEntities', () => {
 
   it('copies multiple ways, keeping the same connections', () => {
     const base = new Rapid.Graph([
-      Rapid.osmNode({id: 'n1'}),
-      Rapid.osmNode({id: 'n2'}),
-      Rapid.osmNode({id: 'n3'}),
-      Rapid.osmWay({id: 'w1', nodes: ['n1', 'n2']}),
-      Rapid.osmWay({id: 'w2', nodes: ['n2', 'n3']})
+      new Rapid.OsmNode(context, {id: 'n1'}),
+      new Rapid.OsmNode(context, {id: 'n2'}),
+      new Rapid.OsmNode(context, {id: 'n3'}),
+      new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1', 'n2']}),
+      new Rapid.OsmWay(context, {id: 'w2', nodes: ['n2', 'n3']})
     ]);
     const action = Rapid.actionCopyEntities(['w1', 'w2'], base);
     const head = action(base);
@@ -76,7 +84,7 @@ describe('actionCopyEntities', () => {
 
 
   it('obtains source entities from an alternate graph', () => {
-    const n1 = Rapid.osmNode({id: 'n1'});
+    const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const old = new Rapid.Graph([n1]);
     const base = new Rapid.Graph();
     const action = Rapid.actionCopyEntities(['n1'], old);

@@ -6,7 +6,7 @@ import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { JXON } from '../util/jxon.js';
-import { osmEntity, osmNode, osmRelation, osmWay, QAItem } from '../models/index.js';
+import { OsmEntity, OsmNode, OsmRelation, OsmWay, QAItem } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -386,8 +386,8 @@ export class OsmService extends AbstractSystem {
   // GET /api/0.6/node/#id
   // GET /api/0.6/[way|relation]/#id/full
   loadEntity(id, callback) {
-    const type = osmEntity.id.type(id);    // 'node', 'way', 'relation'
-    const osmID = osmEntity.id.toOSM(id);
+    const type = OsmEntity.type(id);    // 'node', 'way', 'relation'
+    const osmID = OsmEntity.toOSM(id);
     const options = { skipSeen: false };
     const full = (type !== 'node' ? '/full' : '');
 
@@ -402,8 +402,8 @@ export class OsmService extends AbstractSystem {
   // Load a single entity with a specific version
   // GET /api/0.6/[node|way|relation]/#id/#version
   loadEntityVersion(id, version, callback) {
-    const type = osmEntity.id.type(id);    // 'node', 'way', 'relation'
-    const osmID = osmEntity.id.toOSM(id);
+    const type = OsmEntity.type(id);    // 'node', 'way', 'relation'
+    const osmID = OsmEntity.toOSM(id);
     const options = { skipSeen: false };
 
     this.loadFromAPI(
@@ -417,8 +417,8 @@ export class OsmService extends AbstractSystem {
   // Load the relations of a single entity with the given.
   // GET /api/0.6/[node|way|relation]/#id/relations
   loadEntityRelations(id, callback) {
-    const type = osmEntity.id.type(id);
-    const osmID = osmEntity.id.toOSM(id);
+    const type = OsmEntity.type(id);
+    const osmID = OsmEntity.toOSM(id);
     const options = { skipSeen: false };
 
     this.loadFromAPI(
@@ -434,12 +434,12 @@ export class OsmService extends AbstractSystem {
   // Unlike `loadEntity`, child nodes and members are not fetched
   // GET /api/0.6/[nodes|ways|relations]?#parameters
   loadMultiple(ids, callback) {
-    const groups = utilArrayGroupBy(utilArrayUniq(ids), osmEntity.id.type);
+    const groups = utilArrayGroupBy(utilArrayUniq(ids), OsmEntity.type);
     const options = { skipSeen: false };
 
     for (const [k, vals] of Object.entries(groups)) {
       const type = k + 's';   // nodes, ways, relations
-      const osmIDs = vals.map(id => osmEntity.id.toOSM(id));
+      const osmIDs = vals.map(id => OsmEntity.toOSM(id));
 
       for (const arr of utilArrayChunk(osmIDs, 150)) {
         this.loadFromAPI(
@@ -1533,7 +1533,7 @@ export class OsmService extends AbstractSystem {
         }
         if (!parser) continue;
 
-        const uid = osmEntity.id.fromOSM(element.type, element.id);
+        const uid = OsmEntity.fromOSM(element.type, element.id);
         results.seenIDs.add(uid);
 
         if (options.skipSeen) {
@@ -1640,7 +1640,7 @@ export class OsmService extends AbstractSystem {
           results.seenIDs.add(uid);
 
         } else {
-          uid = osmEntity.id.fromOSM(child.nodeName, child.attributes.id.value);
+          uid = OsmEntity.fromOSM(child.nodeName, child.attributes.id.value);
           results.seenIDs.add(uid);
 
           if (options.skipSeen) {
@@ -1663,7 +1663,7 @@ export class OsmService extends AbstractSystem {
 
 
   _parseNodeJSON(obj, uid) {
-    return new osmNode({
+    return new OsmNode(this.context, {
       id:  uid,
       visible: typeof obj.visible === 'boolean' ? obj.visible : true,
       version: obj.version?.toString(),
@@ -1677,7 +1677,7 @@ export class OsmService extends AbstractSystem {
   }
 
   _parseWayJSON(obj, uid) {
-    return new osmWay({
+    return new OsmWay(this.context, {
       id:  uid,
       visible: typeof obj.visible === 'boolean' ? obj.visible : true,
       version: obj.version?.toString(),
@@ -1691,7 +1691,7 @@ export class OsmService extends AbstractSystem {
   }
 
   _parseRelationJSON(obj, uid) {
-    return new osmRelation({
+    return new OsmRelation(this.context, {
       id:  uid,
       visible: typeof obj.visible === 'boolean' ? obj.visible : true,
       version: obj.version?.toString(),
@@ -1706,7 +1706,7 @@ export class OsmService extends AbstractSystem {
 
   _parseNodeXML(xml, uid) {
     const attrs = xml.attributes;
-    return new osmNode({
+    return new OsmNode(this.context, {
       id: uid,
       visible: (!attrs.visible || attrs.visible.value !== 'false'),
       version: attrs.version.value,
@@ -1721,7 +1721,7 @@ export class OsmService extends AbstractSystem {
 
   _parseWayXML(xml, uid) {
     const attrs = xml.attributes;
-    return new osmWay({
+    return new OsmWay(this.context, {
       id: uid,
       visible: (!attrs.visible || attrs.visible.value !== 'false'),
       version: attrs.version.value,
@@ -1736,7 +1736,7 @@ export class OsmService extends AbstractSystem {
 
   _parseRelationXML(xml, uid) {
     const attrs = xml.attributes;
-    return new osmRelation({
+    return new OsmRelation(this.context, {
       id: uid,
       visible: (!attrs.visible || attrs.visible.value !== 'false'),
       version: attrs.version.value,

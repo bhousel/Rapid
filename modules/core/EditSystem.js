@@ -6,7 +6,7 @@ import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from './AbstractSystem.js';
 import { Difference, Edit, Graph, Tree } from './lib/index.js';
-import { osmEntity } from '../models/entity.js';
+import { createOsmFeature, OsmEntity } from '../models/index.js';
 import { uiLoading } from '../ui/loading.js';
 
 
@@ -865,7 +865,7 @@ export class EditSystem extends AbstractSystem {
     function _copyEntity(entity) {
       const copy = utilObjectOmit(entity, ['type', 'user', 'v', 'version', 'visible']);
 
-      // Note: the copy is no longer an osmEntity, so it might not have `tags`
+      // Note: the copy is no longer an OsmEntity, so it might not have `tags`
       if (copy.tags && Object.keys(copy.tags).length === 0) {
         delete copy.tags;
       }
@@ -913,7 +913,7 @@ export class EditSystem extends AbstractSystem {
       // watch out: for modified entities we index on "key" - e.g. "n1v1"
       for (const [entityID, entity] of edit.graph.local.entities) {
         if (entity) {
-          const key = osmEntity.key(entity);
+          const key = entity.key;
           modifiedEntities.set(key, _copyEntity(entity));
           modified.push(key);
         } else {
@@ -968,7 +968,7 @@ export class EditSystem extends AbstractSystem {
       entities: [...modifiedEntities.values()],
       baseEntities: [...baseEntities.values()],
       stack: historyData,
-      nextIDs: osmEntity.id.next,
+      nextIDs: OsmEntity.id.next,
       index: this._index,
       timestamp: (new Date()).getTime()
     });
@@ -1031,11 +1031,11 @@ export class EditSystem extends AbstractSystem {
     const __modifiedEntities = new Map();    // Map(Entity.key -> Entity)  (watch out: entity.key - e.g. 'n1v1')
     const __missingEntityIDs = new Set();    // Set(entityID)
 
-    osmEntity.id.next = backup.nextIDs;
+    OsmEntity.id.next = backup.nextIDs;
 
     // Reconstruct base entities..
     for (const e of backup.baseEntities) {
-      const entity = osmEntity(e);
+      const entity = createOsmFeature(context, e);
       __baseEntities.set(entity.id, entity);
     }
 
@@ -1051,7 +1051,8 @@ export class EditSystem extends AbstractSystem {
 
     // Reconstruct modified entities..
     for (const e of backup.entities) {
-      __modifiedEntities.set(osmEntity.key(e), osmEntity(e));
+      const entity = createOsmFeature(context, e);
+      __modifiedEntities.set(entity.key, entity);
     }
 
     // Load missing entities from the OSM API

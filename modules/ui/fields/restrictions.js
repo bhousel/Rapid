@@ -5,7 +5,7 @@
 //
 //import { actionRestrictTurn } from '../../actions/restrict_turn.js';
 //import { actionUnrestrictTurn } from '../../actions/unrestrict_turn.js';
-//import { osmIntersection, osmInferRestriction, osmTurn, osmWay } from '../../models/index.js';
+//import { osmIntersection, osmInferRestriction, osmTurn, OsmWay } from '../../models/index.js';
 //import { svgLayers, svgLines, svgTurns, svgVertices } from '../../svg/index.js';
 //import { utilFunctor, utilRebind } from '../../util/index.js';
 //import { utilGetDimensions, utilSetDimensions } from '../../util/dimensions.js';
@@ -54,7 +54,7 @@
 //                .filter(function(vertex) { return vertex.id === _vertexID; }).length &&
 //            _intersection.ways.length > 2 &&           // has more than 2 ways
 //            _intersection.ways                         // has more than 1 TO way
-//                .filter(function(way) { return way.__to; }).length > 1
+//                .filter(function(way) { return way.props.__to; }).length > 1
 //        );
 //
 //        // Also hide in the case where
@@ -308,7 +308,7 @@
 //                datum = entity;
 //            }
 //
-//            if (datum instanceof osmWay && (datum.__from || datum.__via)) {
+//            if (datum instanceof OsmWay && (datum.props.__from || datum.props.__via)) {
 //                _fromWayID = datum.id;
 //                _oldTurns = null;
 //                redraw();
@@ -470,7 +470,7 @@
 //            }
 //
 //            // Hovering a way
-//            if (datum instanceof osmWay && datum.__from) {
+//            if (datum instanceof OsmWay && datum.props.__from) {
 //                way = datum;
 //
 //                highlightPathsFrom(_fromWayID ? null : way.id);

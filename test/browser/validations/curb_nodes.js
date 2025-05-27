@@ -15,6 +15,7 @@ describe('validationCurbNodes', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.services = {};
       this.systems = {
         editor: new MockEditSystem(),
@@ -49,13 +50,13 @@ describe('validationCurbNodes', () => {
     //        |
     //        n1
     //
-    const n1 = Rapid.osmNode({ id: 'n1', loc: [0, -1], tags: n1tags });
-    const n2 = Rapid.osmNode({ id: 'n2', loc: [0,  1], tags: n2tags });
-    const n3 = Rapid.osmNode({ id: 'n3', loc: [-1, 0] });
-    const n4 = Rapid.osmNode({ id: 'n4', loc: [ 1, 0] });
-    const n5 = Rapid.osmNode({ id: 'n5', loc: [0,  0] });   // road-crossing junction
-    const w1 = Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n5', 'n2'], tags: w1tags });
-    const w2 = Rapid.osmWay({ id: 'w2', nodes: ['n3', 'n5', 'n4'], tags: w2tags });
+    const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, -1], tags: n1tags });
+    const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0,  1], tags: n2tags });
+    const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [-1, 0] });
+    const n4 = new Rapid.OsmNode(context, { id: 'n4', loc: [ 1, 0] });
+    const n5 = new Rapid.OsmNode(context, { id: 'n5', loc: [0,  0] });   // road-crossing junction
+    const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n5', 'n2'], tags: w1tags });
+    const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n5', 'n4'], tags: w2tags });
     const entities = [n1, n2, n3, n4, n5, w1, w2];
     graph = new Rapid.Graph(entities);
     tree = new Rapid.Tree(graph);

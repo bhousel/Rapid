@@ -7,16 +7,24 @@ function closeTo(a, b, epsilon = 1e-9) {
   return Math.abs(a - b) < epsilon;
 }
 
-const viewport = {
-  project:   val => val,
-  unproject: val => val
-};
-
 describe('actionRotate', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
+  const viewport = {
+    project:   val => val,
+    unproject: val => val
+  };
+
   it('rotates nodes around a pivot point', () => {
     // Define your nodes and graph
-    const nodeA = Rapid.osmNode({ id: 'a', loc: [0, 0] });
-    const nodeB = Rapid.osmNode({ id: 'b', loc: [1, 0] });
+    const nodeA = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
+    const nodeB = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
     const graph = new Rapid.Graph([nodeA, nodeB]);
     const pivot = [0, 0];
     const angle = Math.PI / 2;  // 90 degrees in radians

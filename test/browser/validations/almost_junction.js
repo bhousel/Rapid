@@ -15,6 +15,7 @@ describe('validationAlmostJunction', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.services = {};
       this.systems = {
         editor: new MockEditSystem(),
@@ -50,15 +51,15 @@ describe('validationAlmostJunction', () => {
 
   function horizontalVertialCloserThanThreshold() {
     // horizontal road
-    const n1 = Rapid.osmNode({id: 'n-1', loc: [22.42357, 0]});
-    const n2 = Rapid.osmNode({id: 'n-2', loc: [22.42367, 0]});
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
+    const n1 = new Rapid.OsmNode(context, {id: 'n-1', loc: [22.42357, 0]});
+    const n2 = new Rapid.OsmNode(context, {id: 'n-2', loc: [22.42367, 0]});
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
 
     // vertical road to the west of w1 by 0.00001 longitude degree
     // 5th digit after decimal point has a resolution of ~1 meter
-    const n3 = Rapid.osmNode({id: 'n-3', loc: [22.42356, 0.001]});
-    const n4 = Rapid.osmNode({id: 'n-4', loc: [22.42356, -0.001]});
-    const w2 = Rapid.osmWay({id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
+    const n3 = new Rapid.OsmNode(context, {id: 'n-3', loc: [22.42356, 0.001]});
+    const n4 = new Rapid.OsmNode(context, {id: 'n-4', loc: [22.42356, -0.001]});
+    const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
     graph = new Rapid.Graph(entities);
@@ -69,14 +70,14 @@ describe('validationAlmostJunction', () => {
 
   function horizontalTiltedCloserThanThreshold() {
     // horizontal road
-    const n1 = Rapid.osmNode({id: 'n-1', loc: [22.42357, 0]});
-    const n2 = Rapid.osmNode({id: 'n-2', loc: [22.42367, 0]});
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
+    const n1 = new Rapid.OsmNode(context, {id: 'n-1', loc: [22.42357, 0]});
+    const n2 = new Rapid.OsmNode(context, {id: 'n-2', loc: [22.42367, 0]});
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
 
     // tilted road to the west of w1 by 0.00001 longitude degree
-    const n3 = Rapid.osmNode({id: 'n-3', loc: [22.423555, 0.001]});
-    const n4 = Rapid.osmNode({id: 'n-4', loc: [22.423565, -0.001]});
-    const w2 = Rapid.osmWay({id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
+    const n3 = new Rapid.OsmNode(context, {id: 'n-3', loc: [22.423555, 0.001]});
+    const n4 = new Rapid.OsmNode(context, {id: 'n-4', loc: [22.423565, -0.001]});
+    const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
     graph = new Rapid.Graph(entities);
@@ -87,14 +88,14 @@ describe('validationAlmostJunction', () => {
 
   function horizontalVertialFurtherThanThreshold() {
     // horizontal road
-    const n1 = Rapid.osmNode({id: 'n-1', loc: [22.42357, 0]});
-    const n2 = Rapid.osmNode({id: 'n-2', loc: [22.42367, 0]});
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
+    const n1 = new Rapid.OsmNode(context, {id: 'n-1', loc: [22.42357, 0]});
+    const n2 = new Rapid.OsmNode(context, {id: 'n-2', loc: [22.42367, 0]});
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
 
     // vertical road to the west of w1 by 0.00007 longitude degree
-    const n3 = Rapid.osmNode({id: 'n-3', loc: [22.42350, 0.001]});
-    const n4 = Rapid.osmNode({id: 'n-4', loc: [22.42350, -0.001]});
-    const w2 = Rapid.osmWay({id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
+    const n3 = new Rapid.OsmNode(context, {id: 'n-3', loc: [22.42350, 0.001]});
+    const n4 = new Rapid.OsmNode(context, {id: 'n-4', loc: [22.42350, -0.001]});
+    const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
     graph = new Rapid.Graph(entities);
@@ -105,14 +106,14 @@ describe('validationAlmostJunction', () => {
 
   function twoHorizontalCloserThanThreshold() {
     // horizontal road
-    const n1 = Rapid.osmNode({id: 'n-1', loc: [22.42357, 0]});
-    const n2 = Rapid.osmNode({id: 'n-2', loc: [22.42367, 0]});
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
+    const n1 = new Rapid.OsmNode(context, {id: 'n-1', loc: [22.42357, 0]});
+    const n2 = new Rapid.OsmNode(context, {id: 'n-2', loc: [22.42367, 0]});
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
 
     // another horizontal road to the north of w1 by 0.0001 latitude degree
-    const n3 = Rapid.osmNode({id: 'n-3', loc: [22.42357, 0.00001]});
-    const n4 = Rapid.osmNode({id: 'n-4', loc: [22.42367, 0.00001]});
-    const w2 = Rapid.osmWay({id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
+    const n3 = new Rapid.OsmNode(context, {id: 'n-3', loc: [22.42357, 0.00001]});
+    const n4 = new Rapid.OsmNode(context, {id: 'n-4', loc: [22.42367, 0.00001]});
+    const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
     graph = new Rapid.Graph(entities);
@@ -122,14 +123,14 @@ describe('validationAlmostJunction', () => {
 
   function horizontalVertialWithNoExit() {
     // horizontal road
-    const n1 = Rapid.osmNode({id: 'n-1', loc: [22.42357, 0], tags: { noexit: 'yes' }});
-    const n2 = Rapid.osmNode({id: 'n-2', loc: [22.42367, 0]});
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
+    const n1 = new Rapid.OsmNode(context, {id: 'n-1', loc: [22.42357, 0], tags: { noexit: 'yes' }});
+    const n2 = new Rapid.OsmNode(context, {id: 'n-2', loc: [22.42367, 0]});
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
 
     // vertical road to the west of w1 by 0.00001 longitude degree
-    const n3 = Rapid.osmNode({id: 'n-3', loc: [22.42356, 0.001]});
-    const n4 = Rapid.osmNode({id: 'n-4', loc: [22.42356, -0.001]});
-    const w2 = Rapid.osmWay({id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
+    const n3 = new Rapid.OsmNode(context, {id: 'n-3', loc: [22.42356, 0.001]});
+    const n4 = new Rapid.OsmNode(context, {id: 'n-4', loc: [22.42356, -0.001]});
+    const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
     graph = new Rapid.Graph(entities);
@@ -140,14 +141,14 @@ describe('validationAlmostJunction', () => {
 
   function closeEndNodesSmallAngle() {
     // Vertical path
-    const n1 = Rapid.osmNode({id: 'n-1', loc: [0.0003247, 22.4423866]});
-    const n2 = Rapid.osmNode({id: 'n-2', loc: [0.0003060, 22.4432671]});
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'path' }});
+    const n1 = new Rapid.OsmNode(context, {id: 'n-1', loc: [0.0003247, 22.4423866]});
+    const n2 = new Rapid.OsmNode(context, {id: 'n-2', loc: [0.0003060, 22.4432671]});
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'path' }});
 
     // Angled path with end node within 4.25m and change of angle <9°
-    const n3 = Rapid.osmNode({id: 'n-3', loc: [0.0003379, 22.4423861]});
-    const n4 = Rapid.osmNode({id: 'n-4', loc: [0.0004354, 22.4421312]});
-    const w2 = Rapid.osmWay({id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'path' }});
+    const n3 = new Rapid.OsmNode(context, {id: 'n-3', loc: [0.0003379, 22.4423861]});
+    const n4 = new Rapid.OsmNode(context, {id: 'n-4', loc: [0.0004354, 22.4421312]});
+    const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'path' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
     graph = new Rapid.Graph(entities);
@@ -158,14 +159,14 @@ describe('validationAlmostJunction', () => {
 
   function closeEndNodesBigAngle() {
     // Vertical path
-    const n1 = Rapid.osmNode({id: 'n-1', loc: [0, 22.4427453]});
-    const n2 = Rapid.osmNode({id: 'n-2', loc: [0, 22.4429806]});
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'path' }});
+    const n1 = new Rapid.OsmNode(context, {id: 'n-1', loc: [0, 22.4427453]});
+    const n2 = new Rapid.OsmNode(context, {id: 'n-2', loc: [0, 22.4429806]});
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'path' }});
 
     // Horizontal path with end node within 4.25m and change of angle >9°
-    const n3 = Rapid.osmNode({id: 'n-3', loc: [0.0000199, 22.4427801]});
-    const n4 = Rapid.osmNode({id: 'n-4', loc: [0.0002038, 22.4427801]});
-    const w2 = Rapid.osmWay({id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'path' }});
+    const n3 = new Rapid.OsmNode(context, {id: 'n-3', loc: [0.0000199, 22.4427801]});
+    const n4 = new Rapid.OsmNode(context, {id: 'n-4', loc: [0.0002038, 22.4427801]});
+    const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'path' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
     graph = new Rapid.Graph(entities);
@@ -176,12 +177,12 @@ describe('validationAlmostJunction', () => {
 
   function closeEndNodesSmallAngleSelf() {
     // Square path that ends within 4.25m of itself and change of angle <9°
-    const n1 = Rapid.osmNode({id: 'n-1', loc: [0, 22.4427453]});
-    const n2 = Rapid.osmNode({id: 'n-2', loc: [0, 22.4429811]});
-    const n3 = Rapid.osmNode({id: 'n-3', loc: [0.0001923, 22.4429811]});
-    const n4 = Rapid.osmNode({id: 'n-4', loc: [0.0001923, 22.4427523]});
-    const n5 = Rapid.osmNode({id: 'n-5', loc: [0.0000134, 22.4427523]});
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2', 'n-3', 'n-4', 'n-5'], tags: { highway: 'path' }});
+    const n1 = new Rapid.OsmNode(context, {id: 'n-1', loc: [0, 22.4427453]});
+    const n2 = new Rapid.OsmNode(context, {id: 'n-2', loc: [0, 22.4429811]});
+    const n3 = new Rapid.OsmNode(context, {id: 'n-3', loc: [0.0001923, 22.4429811]});
+    const n4 = new Rapid.OsmNode(context, {id: 'n-4', loc: [0.0001923, 22.4427523]});
+    const n5 = new Rapid.OsmNode(context, {id: 'n-5', loc: [0.0000134, 22.4427523]});
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2', 'n-3', 'n-4', 'n-5'], tags: { highway: 'path' }});
 
     const entities = [n1, n2, n3, n4, n5, w1];
     graph = new Rapid.Graph(entities);
@@ -192,16 +193,16 @@ describe('validationAlmostJunction', () => {
 
   function closeEndNodesBothSmallAngle() {
     // Square path with both endpoints near each other
-    const n1 = Rapid.osmNode({id: 'n-1', loc: [0, 22.4427453]});
-    const n2 = Rapid.osmNode({id: 'n-2', loc: [0, 22.4429810]});
-    const n3 = Rapid.osmNode({id: 'n-3', loc: [0.0000063, 22.4429810]});
-    const n4 = Rapid.osmNode({id: 'n-4', loc: [0.0000063, 22.4427483]});
-    const w1 = Rapid.osmWay({id: 'w-1', nodes: ['n-1', 'n-2', 'n-3', 'n-4'], tags: { highway: 'path' }});
+    const n1 = new Rapid.OsmNode(context, {id: 'n-1', loc: [0, 22.4427453]});
+    const n2 = new Rapid.OsmNode(context, {id: 'n-2', loc: [0, 22.4429810]});
+    const n3 = new Rapid.OsmNode(context, {id: 'n-3', loc: [0.0000063, 22.4429810]});
+    const n4 = new Rapid.OsmNode(context, {id: 'n-4', loc: [0.0000063, 22.4427483]});
+    const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2', 'n-3', 'n-4'], tags: { highway: 'path' }});
 
     // Horizontal path with end node within 4.25m and change of angle >9° (to both endpoints)
-    const n5 = Rapid.osmNode({id: 'n-5', loc: [0.0000124, 22.4427458]});
-    const n6 = Rapid.osmNode({id: 'n-6', loc: [0.0000445, 22.4427449]});
-    const w2 = Rapid.osmWay({id: 'w-2', nodes: ['n-5', 'n-6'], tags: { highway: 'path' }});
+    const n5 = new Rapid.OsmNode(context, {id: 'n-5', loc: [0.0000124, 22.4427458]});
+    const n6 = new Rapid.OsmNode(context, {id: 'n-6', loc: [0.0000445, 22.4427449]});
+    const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-5', 'n-6'], tags: { highway: 'path' }});
 
     const entities = [n1, n2, n3, n4, n5, n6, w1, w2];
     graph = new Rapid.Graph(entities);

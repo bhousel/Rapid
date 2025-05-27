@@ -29,7 +29,7 @@ export function validationImpossibleOneway(context) {
     /**
      * typeForWay
      * Return whether the way is a 'highway' or 'waterway'.
-     * @param   {osmWay}   way
+     * @param   {OsmWay}   way
      * @return  {string?}  'highway' or 'waterway'
      */
     function typeForWay(way) {
@@ -49,7 +49,7 @@ export function validationImpossibleOneway(context) {
      *       |     |
      *       + <-- +
      *
-     * @param   {osmWay}   way
+     * @param   {OsmWay}   way
      * @param   {string}   nodeID
      * @return  {boolean}  `true` if the node occurs more than once
      */
@@ -62,8 +62,8 @@ export function validationImpossibleOneway(context) {
      * isNodeTaggedAsConnected
      * Returns `true` if the node is connected (aka reachable/escapable)
      * based on its tagging or what type of features it is attached to.
-     * @param   {osmWay}   way
-     * @param   {osmNode}  node
+     * @param   {OsmWay}   way
+     * @param   {OsmNode}  node
      * @param   {boolean}  `true` if this node occurs at the head of the way.
      * @return  {boolean}  `true` if this node is considered connected.
      */
@@ -114,8 +114,8 @@ export function validationImpossibleOneway(context) {
      * This function gets called twice, once for the start node, once for the end node.
      * (The start/end nodes can function either as the head or tail, depending on whether
      *  the way is tagged as a normal oneway or a reverse oneway, see Rapid#1302)
-     * @param   {osmWay}   way     - way to check (it should be a oneway)
-     * @param   {osmNode}  nodeID  - node to check (either the start or end node of the way)
+     * @param   {OsmWay}   way     - way to check (it should be a oneway)
+     * @param   {OsmNode}  nodeID  - node to check (either the start or end node of the way)
      * @param   {Array}    Array of any `ValidationIssue`s detected
      */
     function issuesForNode(way, nodeID) {

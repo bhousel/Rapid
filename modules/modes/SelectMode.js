@@ -74,10 +74,10 @@ export class SelectMode extends AbstractMode {
         const bounds = geoBounds(datum);
         other = new Extent(bounds[0], bounds[1]);
 
-      } else if (datum.__fbid__) {  // Rapid feature
-        const service = context.services[datum.__service__];
+      } else if (datum.props.__fbid__) {  // Rapid feature
+        const service = context.services[datum.props.__service__];
         if (!service) continue;
-        const graph = service.graph(datum.__datasetid__);
+        const graph = service.graph(datum.props.__datasetid__);
         if (!graph) continue;
         other = datum.extent(graph);
       }
@@ -97,7 +97,7 @@ export class SelectMode extends AbstractMode {
         const serviceID = datum.service;   // 'keepright', 'osmose', etc.
         layerID = serviceID === 'osm' ? 'notes' : serviceID;
         if (layerID === 'osm') layerID = 'notes';
-      } else if (datum.__fbid__) {      // a Rapid feature
+      } else if (datum.props.__fbid__) {      // a Rapid feature
         layerID = 'rapid';
       } else if (datum.overture) {  // Overture data
         layerID = 'rapid';
@@ -189,7 +189,7 @@ export class SelectMode extends AbstractMode {
       sidebarContent = Sidebar.OvertureInspector.render;
 
     // Selected Rapid feature...
-    } else if (datum.__fbid__) {
+    } else if (datum.props.__fbid__) {
       Sidebar.RapidInspector.datum = datum;
       sidebarContent = Sidebar.RapidInspector.render;
     }

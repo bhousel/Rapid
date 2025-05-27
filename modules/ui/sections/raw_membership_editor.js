@@ -5,7 +5,7 @@ import { actionAddEntity } from '../../actions/add_entity.js';
 import { actionAddMember } from '../../actions/add_member.js';
 import { actionChangeMember } from '../../actions/change_member.js';
 import { actionDeleteMembers } from '../../actions/delete_members.js';
-import { osmEntity, osmRelation } from '../../models/index.js';
+import { OsmRelation } from '../../models/OsmRelation.js';
 import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
 import { uiSection } from '../section.js';
@@ -76,7 +76,7 @@ export function uiSectionRawMembershipEditor(context) {
             membership = {
                 relation: relation,
                 members: [],
-                hash: osmEntity.key(relation)
+                hash: relation.key
             };
             for (index = 0; index < relation.members.length; index++) {
                 member = relation.members[index];
@@ -93,7 +93,7 @@ export function uiSectionRawMembershipEditor(context) {
                         membership = {
                             relation: relation,
                             members: [],
-                            hash: osmEntity.key(relation)
+                            hash: relation.key
                         };
                     }
                 }
@@ -197,7 +197,7 @@ export function uiSectionRawMembershipEditor(context) {
             });
 
         } else {
-            var relation = osmRelation();
+            var relation = new OsmRelation(context);
             editor.perform(
               actionAddEntity(relation),
               actionAddMembers(relation.id, _entityIDs, role)
@@ -291,7 +291,7 @@ export function uiSectionRawMembershipEditor(context) {
             });
 
             result.sort(function(a, b) {
-                return osmRelation.creationOrder(a.relation, b.relation);
+                return OsmRelation.creationOrder(a.relation, b.relation);
             });
 
             // Dedupe identical names by appending relation id - see iD#2891

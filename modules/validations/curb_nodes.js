@@ -2,7 +2,7 @@ import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '
 
 import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
 import { actionAddMidpoint, actionChangeTags, actionSplit} from '../actions/index.js';
-import { osmNode } from '../models/node.js';
+import { OsmNode } from '../models/OsmNode.js';
 import { uiIcon } from '../ui/icon.js';
 
 
@@ -209,7 +209,11 @@ export function validationCurbNodes(context) {
       connectedWayTags = { highway: 'footway' };
     }
     // Create a new curb node with the specified curb tags
-    const newCurbNode = osmNode({ loc: [newNodePosition.lon, newNodePosition.lat], tags: curbTags, visible: true });
+    const newCurbNode = new OsmNode(context, {
+      loc: [newNodePosition.lon, newNodePosition.lat],
+      tags: curbTags,
+      visible: true
+    });
     // Add the new node to the graph
     editor.perform(actionAddMidpoint({ loc: newCurbNode.loc, edge: [node.id, adjacentNode.id] }, newCurbNode));
 

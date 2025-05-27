@@ -4,7 +4,13 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionMergePolygon', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
 
+  const context = new MockContext();
   let graph;
 
   //                                  n15
@@ -22,27 +28,27 @@ describe('actionMergePolygon', () => {
 
   beforeEach(() => {
     graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n0', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'n1', loc: [5, 0] }),
-      Rapid.osmNode({ id: 'n2', loc: [5, 5] }),
-      Rapid.osmNode({ id: 'n3', loc: [0, 5] }),
-      Rapid.osmNode({ id: 'n4', loc: [1, 1] }),
-      Rapid.osmNode({ id: 'n5', loc: [4, 1] }),
-      Rapid.osmNode({ id: 'n6', loc: [4, 4] }),
-      Rapid.osmNode({ id: 'n7', loc: [1, 4] }),
-      Rapid.osmNode({ id: 'n8', loc: [2, 2] }),
-      Rapid.osmNode({ id: 'n9', loc: [3, 2] }),
-      Rapid.osmNode({ id: 'n10', loc: [3, 3] }),
-      Rapid.osmNode({ id: 'n11', loc: [2, 3] }),
-      Rapid.osmNode({ id: 'n13', loc: [8, 8] }),
-      Rapid.osmNode({ id: 'n14', loc: [8, 9] }),
-      Rapid.osmNode({ id: 'n15', loc: [9, 9] }),
-      Rapid.osmWay({ id: 'w0', nodes: ['n0', 'n1', 'n2', 'n3', 'n0'] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n4', 'n5', 'n6', 'n7', 'n4'] }),
-      Rapid.osmWay({ id: 'w2', nodes: ['n8', 'n9', 'n10', 'n11', 'n8'] }),
-      Rapid.osmWay({ id: 'w3', nodes: ['n4', 'n5', 'n6'] }),
-      Rapid.osmWay({ id: 'w4', nodes: ['n6', 'n7', 'n4'] }),
-      Rapid.osmWay({ id: 'w5', nodes: ['n13', 'n14', 'n15', 'n13'] })
+      new Rapid.OsmNode(context, { id: 'n0', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n1', loc: [5, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [5, 5] }),
+      new Rapid.OsmNode(context, { id: 'n3', loc: [0, 5] }),
+      new Rapid.OsmNode(context, { id: 'n4', loc: [1, 1] }),
+      new Rapid.OsmNode(context, { id: 'n5', loc: [4, 1] }),
+      new Rapid.OsmNode(context, { id: 'n6', loc: [4, 4] }),
+      new Rapid.OsmNode(context, { id: 'n7', loc: [1, 4] }),
+      new Rapid.OsmNode(context, { id: 'n8', loc: [2, 2] }),
+      new Rapid.OsmNode(context, { id: 'n9', loc: [3, 2] }),
+      new Rapid.OsmNode(context, { id: 'n10', loc: [3, 3] }),
+      new Rapid.OsmNode(context, { id: 'n11', loc: [2, 3] }),
+      new Rapid.OsmNode(context, { id: 'n13', loc: [8, 8] }),
+      new Rapid.OsmNode(context, { id: 'n14', loc: [8, 9] }),
+      new Rapid.OsmNode(context, { id: 'n15', loc: [9, 9] }),
+      new Rapid.OsmWay(context, { id: 'w0', nodes: ['n0', 'n1', 'n2', 'n3', 'n0'] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n4', 'n5', 'n6', 'n7', 'n4'] }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n8', 'n9', 'n10', 'n11', 'n8'] }),
+      new Rapid.OsmWay(context, { id: 'w3', nodes: ['n4', 'n5', 'n6'] }),
+      new Rapid.OsmWay(context, { id: 'w4', nodes: ['n6', 'n7', 'n4'] }),
+      new Rapid.OsmWay(context, { id: 'w5', nodes: ['n13', 'n14', 'n15', 'n13'] })
     ]);
   });
 
@@ -52,7 +58,7 @@ describe('actionMergePolygon', () => {
     assert.ok(result instanceof Rapid.Graph);
 
     const r = result.hasEntity('r');
-    assert.ok(r instanceof Rapid.osmRelation);
+    assert.ok(r instanceof Rapid.OsmRelation);
     assert.equal(r.geometry(result), 'area');
     assert.ok(r.isMultipolygon());
     assert.equal(r.members.length, 2);
@@ -74,7 +80,7 @@ describe('actionMergePolygon', () => {
     assert.ok(result instanceof Rapid.Graph);
 
     const r = result.hasEntity('r');
-    assert.ok(r instanceof Rapid.osmRelation);
+    assert.ok(r instanceof Rapid.OsmRelation);
     assert.equal(r.members.length, 3);
   });
 
@@ -91,7 +97,7 @@ describe('actionMergePolygon', () => {
     assert.ok(!result.hasEntity('r2'));
 
     const r = result.hasEntity('r');
-    assert.ok(r instanceof Rapid.osmRelation);
+    assert.ok(r instanceof Rapid.OsmRelation);
 
     assert.equal(r.memberById('w0').role, 'outer');
     assert.equal(r.memberById('w1').role, 'inner');
@@ -102,8 +108,8 @@ describe('actionMergePolygon', () => {
 
   it('merges multipolygon tags', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmRelation({ id: 'r1', tags: { type: 'multipolygon', a: 'a' } }),
-      Rapid.osmRelation({ id: 'r2', tags: { type: 'multipolygon', b: 'b' } })
+      new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'multipolygon', a: 'a' } }),
+      new Rapid.OsmRelation(context, { id: 'r2', tags: { type: 'multipolygon', b: 'b' } })
     ]);
 
     const result = Rapid.actionMergePolygon(['r1', 'r2'])(graph);
@@ -114,9 +120,9 @@ describe('actionMergePolygon', () => {
 
   it('merges tags from closed outer ways', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n1', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'n2', loc: [1, 0] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2', 'n1'], tags: { building: 'yes' } })
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'], tags: { building: 'yes' } })
     ]);
 
     const result = Rapid.actionMergePolygon(['w1'], 'r')(graph);
@@ -126,8 +132,8 @@ describe('actionMergePolygon', () => {
 
 
   it('merges no tags from unclosed outer ways', () => {
-    const r1 = Rapid.osmRelation({id: 'r1', tags: {type: 'multipolygon'}});
-    const r2 = Rapid.osmRelation({id: 'r2', tags: {type: 'multipolygon'},
+    const r1 = new Rapid.OsmRelation(context, {id: 'r1', tags: {type: 'multipolygon'}});
+    const r2 = new Rapid.OsmRelation(context, {id: 'r2', tags: {type: 'multipolygon'},
       members: [
         { type: 'way', role: 'outer', id: 'w3' },
         { type: 'way', role: 'outer', id: 'w4' }
@@ -147,9 +153,9 @@ describe('actionMergePolygon', () => {
 
   it('does not merge tags from unclosed outer ways', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n1', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'n2', loc: [1, 0] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2'], tags: { building: 'yes' } })
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: { building: 'yes' } })
     ]);
 
     const result = Rapid.actionMergePolygon(['w1'], 'r')(graph);
@@ -170,12 +176,12 @@ describe('actionMergePolygon', () => {
 
   it('does not merge tags from inner ways', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n1', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'n2', loc: [1, 0] }),
-      Rapid.osmNode({ id: 'n3', loc: [0.5, 0.5] }),
-      Rapid.osmNode({ id: 'n4', loc: [0.5, -0.5] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2', 'n1'], tags: { building: 'yes' } }),
-      Rapid.osmWay({ id: 'w2', nodes: ['n3', 'n4', 'n3'] })
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+      new Rapid.OsmNode(context, { id: 'n3', loc: [0.5, 0.5] }),
+      new Rapid.OsmNode(context, { id: 'n4', loc: [0.5, -0.5] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'], tags: { building: 'yes' } }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4', 'n3'] })
     ]);
 
     const result = Rapid.actionMergePolygon(['w1', 'w2'], 'r')(graph);
@@ -195,9 +201,9 @@ describe('actionMergePolygon', () => {
 
   it('does not copy area tags from ways', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n1', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'n2', loc: [1, 0] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2', 'n1'], tags: { area: 'yes' } })
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'], tags: { area: 'yes' } })
     ]);
 
     const result = Rapid.actionMergePolygon(['w1'], 'r')(graph);
@@ -231,7 +237,7 @@ describe('actionMergePolygon', () => {
 
   it('extends a multipolygon with multi-way rings', () => {
     const graph2 = graph.replace(
-      Rapid.osmRelation({ id: 'r', tags: { type: 'multipolygon' }, members: [
+      new Rapid.OsmRelation(context, { id: 'r', tags: { type: 'multipolygon' }, members: [
         { type: 'way', role: 'outer', id: 'w0' },
         { type: 'way', role: 'inner', id: 'w3' },
         { type: 'way', role: 'inner', id: 'w4' }
@@ -251,10 +257,10 @@ describe('actionMergePolygon', () => {
 
   it('disables action when there are other entities', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n1', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'n2', loc: [1, 0] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2'] }),  // This is an 'other' entity
-      Rapid.osmRelation({ id: 'r1', tags: { type: 'multipolygon' } })
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] }),  // This is an 'other' entity
+      new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'multipolygon' } })
     ]);
 
     const action = Rapid.actionMergePolygon(['w1', 'r1']);
@@ -265,9 +271,9 @@ describe('actionMergePolygon', () => {
 
   it('disables action when there are less than two closedWay and multipolygon entities', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n1', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'n2', loc: [1, 0] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2', 'n1'] })  // This is a 'closedWay' entity
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'] })  // This is a 'closedWay' entity
     ]);
 
     const action = Rapid.actionMergePolygon(['w1']);
@@ -278,10 +284,10 @@ describe('actionMergePolygon', () => {
 
   it('disables action when creating a new multipolygon would be redundant', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n1', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'n2', loc: [1, 0] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2', 'n1'] }),  // This is a 'closedWay' entity
-      Rapid.osmRelation({ id: 'r1', tags: { type: 'multipolygon' }, members: [{ type: 'way', id: 'w1' }] })  // This is a 'multipolygon' entity
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'] }),  // This is a 'closedWay' entity
+      new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'multipolygon' }, members: [{ type: 'way', id: 'w1' }] })  // This is a 'multipolygon' entity
     ]);
 
     const action = Rapid.actionMergePolygon(['w1', 'r1']);
@@ -292,10 +298,10 @@ describe('actionMergePolygon', () => {
 
   it('disables action when a way is already a member of a multipolygon', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'n1', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'n2', loc: [1, 0] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2', 'n1'] }),  // This is a 'closedWay' entity
-      Rapid.osmRelation({ id: 'r1', tags: { type: 'multipolygon' }, members: [{ type: 'way', id: 'w1' }] })  // This is a 'multipolygon' entity
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'] }),  // This is a 'closedWay' entity
+      new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'multipolygon' }, members: [{ type: 'way', id: 'w1' }] })  // This is a 'multipolygon' entity
     ]);
 
     const action = Rapid.actionMergePolygon(['w1', 'r1']);

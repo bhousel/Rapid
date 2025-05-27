@@ -6,7 +6,6 @@ import { utilUniqueString } from '@rapid-sdk/util';
 import { actionChangeMember } from '../../actions/change_member.js';
 import { actionDeleteMember } from '../../actions/delete_member.js';
 import { actionMoveMember } from '../../actions/move_member.js';
-import { osmEntity } from '../../models/entity.js';
 import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
 import { uiSection } from '../section.js';
@@ -149,8 +148,8 @@ export function uiSectionRawMemberEditor(context) {
 
     let items = list.selectAll('li')
       .data(memberships, d => {
-        const parentKey = osmEntity.key(d.relation);
-        const childKey = (d.member && osmEntity.key(d.member)) || 'incomplete';
+        const parentKey = d.relation.key;
+        const childKey = d.member?.key || 'incomplete';
         return `${parentKey},${d.index},${childKey}`;
       });
 

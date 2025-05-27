@@ -4,10 +4,17 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionDiscardTags', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
   const discardTags = { created_by: true };
 
   it('defaults to empty discardTags', () => {
-    const way = Rapid.osmWay({ id: 'w1', tags: { created_by: 'Potlatch' } });
+    const way = new Rapid.OsmWay(context, { id: 'w1', tags: { created_by: 'Potlatch' } });
     const base = new Rapid.Graph();
     const head = base.replace(way);
     const action = Rapid.actionDiscardTags(new Rapid.Difference(base, head));  // no discardTags
@@ -17,7 +24,7 @@ describe('actionDiscardTags', () => {
   });
 
   it('discards obsolete tags from modified entities', () => {
-    const way = Rapid.osmWay({ id: 'w1', tags: { created_by: 'Potlatch' } });
+    const way = new Rapid.OsmWay(context, { id: 'w1', tags: { created_by: 'Potlatch' } });
     const base = new Rapid.Graph([way]);
     const head = base.replace(way.update({ tags: { created_by: 'Potlatch', foo: 'bar' } }));
     const action = Rapid.actionDiscardTags(new Rapid.Difference(base, head), discardTags);
@@ -27,7 +34,7 @@ describe('actionDiscardTags', () => {
   });
 
   it('discards obsolete tags from created entities', () => {
-    const way = Rapid.osmWay({ id: 'w1', tags: { created_by: 'Potlatch' } });
+    const way = new Rapid.OsmWay(context, { id: 'w1', tags: { created_by: 'Potlatch' } });
     const base = new Rapid.Graph();
     const head = base.replace(way);
     const action = Rapid.actionDiscardTags(new Rapid.Difference(base, head), discardTags);
@@ -37,7 +44,7 @@ describe('actionDiscardTags', () => {
   });
 
   it('doesn\'t modify entities without obsolete tags', () => {
-    const way = Rapid.osmWay({ id: 'w1' });
+    const way = new Rapid.OsmWay(context, { id: 'w1' });
     const base = new Rapid.Graph();
     const head = base.replace(way);
     const action = Rapid.actionDiscardTags(new Rapid.Difference(base, head), discardTags);
@@ -47,7 +54,7 @@ describe('actionDiscardTags', () => {
   });
 
   it('discards tags with empty values', () => {
-    const way = Rapid.osmWay({ id: 'w1', tags: { lmnop: '' } });
+    const way = new Rapid.OsmWay(context, { id: 'w1', tags: { lmnop: '' } });
     const base = new Rapid.Graph();
     const head = base.replace(way);
     const action = Rapid.actionDiscardTags(new Rapid.Difference(base, head), discardTags);

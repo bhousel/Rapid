@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import { Extent, numWrap } from '@rapid-sdk/math';
 
 import { JXON } from '../util/jxon.js';
-import { osmChangeset } from '../models/index.js';
+import { OsmChangeset } from '../models/OsmChangeset.js';
 import { uiIcon } from './icon.js';
 import { utilDetect, utilKeybinding, utilRebind } from '../util/index.js';
 
@@ -74,7 +74,7 @@ export function uiConflicts(context) {
 
     // Download changes link
     const detected = utilDetect();
-    let changeset = new osmChangeset();
+    let changeset = new OsmChangeset(context);
     delete changeset.id;  // Export without changeset_id
 
     const data = JXON.stringify(changeset.osmChangeJXON(_origChanges));

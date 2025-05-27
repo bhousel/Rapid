@@ -1,5 +1,4 @@
 describe('uiConfirm', () => {
-  let elem;
 
   class MockLocalizationSystem {
     constructor() { }
@@ -17,6 +16,7 @@ describe('uiConfirm', () => {
   }
 
   const context = new MockContext();
+  let elem;
 
 
   beforeEach(() => {

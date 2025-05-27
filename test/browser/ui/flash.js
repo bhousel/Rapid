@@ -1,5 +1,4 @@
 describe('uiFlash', () => {
-  let body, container;
 
   class MockContext {
     constructor() { }
@@ -7,6 +6,7 @@ describe('uiFlash', () => {
   }
 
   const context = new MockContext();
+  let body, container;
 
   beforeEach(() => {
     body = d3.select('body');

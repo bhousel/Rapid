@@ -1,6 +1,5 @@
 import { select as d3_select } from 'd3-selection';
 
-import { osmEntity } from '../../models/entity.js';
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
 import { utilHighlightEntities } from '../../util/index.js';
@@ -63,7 +62,7 @@ export function uiSectionSelectionList(context) {
       .filter(Boolean);
 
     let items = list.selectAll('.feature-list-item')
-      .data(entities, osmEntity.key);
+      .data(entities, d => d.key);
 
     items.exit()
       .remove();

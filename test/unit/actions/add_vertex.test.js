@@ -3,11 +3,19 @@ import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
 describe('actionAddVertex', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('adds a vertex to the specified way at the specified index', () => {
     // Create a new graph with a way and a node
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0, 0]}),
-      Rapid.osmWay({id: '-', nodes: ['a']})
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a'] })
     ]);
 
     // Apply the action to add a vertex to the way at index 1

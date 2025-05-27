@@ -1,7 +1,7 @@
 import { /* utilArrayGroupBy,*/ utilArrayUnion } from '@rapid-sdk/util';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { osmEntity, osmLifecyclePrefixes } from '../models/index.js';
+import { osmLifecyclePrefixes } from '../models/index.js';
 
 
 const traffic_roads = {
@@ -364,7 +364,7 @@ export class FilterSystem extends AbstractSystem {
    * @param  {Entity}  entity
    */
   clearEntity(entity) {
-    const ekey = osmEntity.key(entity);
+    const ekey = entity.key;
     delete this._cache[ekey];
   }
 
@@ -384,7 +384,7 @@ export class FilterSystem extends AbstractSystem {
     // (note that multipolygons are considered 'area' geometry not 'relation')
     if (geometry === 'relation' && entity.tags.type !== 'boundary') return new Set();
 
-    const ekey = osmEntity.key(entity);
+    const ekey = entity.key;
     let cached = this._cache[ekey];
     if (!cached) {
       this._cache[ekey] = cached = { parents: null, matches: null };
@@ -398,7 +398,7 @@ export class FilterSystem extends AbstractSystem {
     const parents = cached.parents || this.getParents(entity, resolver, geometry);
     if (parents.length) {
       for (const parent of parents) {
-        const pkey = osmEntity.key(parent);
+        const pkey = parent.key;
         const pmatches = this._cache[pkey]?.matches;
         if (pmatches) continue;  // parent matching was done already
         this.getMatches(parent, resolver, parent.geometry(resolver));  // recurse up
@@ -419,7 +419,7 @@ export class FilterSystem extends AbstractSystem {
           (parents.length === 1 && parents[0].isMultipolygon()) ||
           (parents.length > 0 && parents.every(parent => parent.tags.type === 'boundary'))
         )) {
-          const pkey = osmEntity.key(parents[0]);
+          const pkey = parents[0].key;
           const pmatches = this._cache[pkey]?.matches;
           if (pmatches) {
             matches = new Set(pmatches);  // copy
@@ -449,7 +449,7 @@ export class FilterSystem extends AbstractSystem {
   getParents(entity, resolver, geometry) {
     if (geometry === 'point') return [];
 
-    const ekey = osmEntity.key(entity);
+    const ekey = entity.key;
     let cached = this._cache[ekey];
     if (!cached) {
       this._cache[ekey] = cached = { parents: null, matches: null };

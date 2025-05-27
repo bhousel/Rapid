@@ -6,7 +6,7 @@ import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { actionAddVertex } from '../actions/add_vertex.js';
 import { actionMoveNode } from '../actions/move_node.js';
 import { geoChooseEdge } from '../geo/index.js';
-import { osmNode, osmWay } from '../models/index.js';
+import { OsmNode, OsmWay } from '../models/index.js';
 
 const DEBUG = false;
 
@@ -40,7 +40,7 @@ export class DrawLineMode extends AbstractMode {
     // D is the drawNode, temporary and will be rolled back in `exit()`
     // A or C can be clicked on to finish the way
 
-    // _insertIndex determines where new nodes get added (see `osmWay.addNode()`)
+    // _insertIndex determines where new nodes get added (see `OsmWay.addNode()`)
     // `0` = beginning, `undefined` = end
     this._insertIndex = undefined;
 
@@ -88,8 +88,8 @@ export class DrawLineMode extends AbstractMode {
 
     // If either parameter is present, make sure they are both valid
     if (continueNode || continueWay) {
-      if (!(continueNode instanceof osmNode)) return false;
-      if (!(continueWay instanceof osmWay)) return false;
+      if (!(continueNode instanceof OsmNode)) return false;
+      if (!(continueWay instanceof OsmWay)) return false;
 
       if (DEBUG) {
         console.log(`DrawLineMode: entering, continuing line ${continueWay.id}`);  // eslint-disable-line no-console
@@ -506,9 +506,9 @@ export class DrawLineMode extends AbstractMode {
       if (DEBUG) {
         console.log(`DrawLineMode: _clickLoc, starting line at ${loc}`);  // eslint-disable-line no-console
       }
-      firstNode = osmNode({ loc: loc });
-      drawNode = osmNode({ loc: loc });
-      drawWay = osmWay({ tags: this.defaultTags, nodes: [ firstNode.id, drawNode.id ] });
+      firstNode = new OsmNode(context, { loc: loc });
+      drawNode = new OsmNode(context, { loc: loc });
+      drawWay = new OsmWay(context, { tags: this.defaultTags, nodes: [ firstNode.id, drawNode.id ] });
 
       this.firstNodeID = firstNode.id;
       this.lastNodeID = firstNode.id;
@@ -579,9 +579,9 @@ export class DrawLineMode extends AbstractMode {
         console.log(`DrawLineMode: _clickWay, starting line at edge ${edge}`);  // eslint-disable-line no-console
       }
 
-      firstNode = osmNode({ loc: loc });
-      drawNode = osmNode({ loc: loc });
-      drawWay = osmWay({ tags: this.defaultTags, nodes: [ firstNode.id, drawNode.id ] });
+      firstNode = new OsmNode(context, { loc: loc });
+      drawNode = new OsmNode(context, { loc: loc });
+      drawWay = new OsmWay(context, { tags: this.defaultTags, nodes: [ firstNode.id, drawNode.id ] });
 
       this.firstNodeID = firstNode.id;
       this.lastNodeID = firstNode.id;
@@ -662,8 +662,8 @@ export class DrawLineMode extends AbstractMode {
         console.log(`DrawLineMode: _clickNode, starting line at ${targetNode.id}`);  // eslint-disable-line no-console
       }
 
-      drawNode = osmNode({ loc: loc });
-      drawWay = osmWay({ tags: this.defaultTags, nodes: [ targetNode.id, drawNode.id ] });
+      drawNode = new OsmNode(context, { loc: loc });
+      drawWay = new OsmWay(context, { tags: this.defaultTags, nodes: [ targetNode.id, drawNode.id ] });
 
       this.firstNodeID = targetNode.id;
       this.lastNodeID = targetNode.id;
@@ -699,7 +699,7 @@ export class DrawLineMode extends AbstractMode {
     const editor = context.systems.editor;
     const map = context.systems.map;
 
-    const drawNode = osmNode({ loc: loc ?? map.mouseLoc() });
+    const drawNode = new OsmNode(context, { loc: loc ?? map.mouseLoc() });
     this.drawNodeID = drawNode.id;
 
     editor.perform(

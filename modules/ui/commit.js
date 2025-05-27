@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import { utilArrayGroupBy, utilUniqueString } from '@rapid-sdk/util';
 import deepEqual from 'fast-deep-equal';
 
-import { osmChangeset } from '../models/index.js';
+import { OsmChangeset } from '../models/OsmChangeset.js';
 import { uiIcon } from './icon.js';
 import { uiTooltip } from './tooltip.js';
 import { uiChangesetEditor } from './changeset_editor.js';
@@ -120,7 +120,7 @@ export function uiCommit(context) {
       tags.source = source;
     }
 
-    uploader.changeset = new osmChangeset({ tags: tags });
+    uploader.changeset = new OsmChangeset(context, { tags: tags });
   }
 
 

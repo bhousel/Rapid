@@ -2,46 +2,55 @@ import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
+
 function closeTo(a, b, epsilon = 1e-9) {
   return Math.abs(a - b) < epsilon;
 }
 
-const viewport = {
-  project:   val => val,
-  unproject: val => val
-};
-
 describe('actionStraightenWay', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
+  const viewport = {
+    project:   val => val,
+    unproject: val => val
+  };
+
   describe('#disabled', () => {
     it('returns falsy for ways with internal nodes near centerline', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 0.01] }),
-        Rapid.osmNode({ id: 'c', loc: [2, 0] }),
-        Rapid.osmNode({ id: 'd', loc: [3, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [3, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
       ]);
       assert.ok(!Rapid.actionStraightenWay(['-'], viewport).disabled(graph));
     });
 
     it('returns \'too_bendy\' for ways with internal nodes far off centerline', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [2, 0] }),
-        Rapid.osmNode({ id: 'd', loc: [3, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [3, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
       ]);
       assert.equal(Rapid.actionStraightenWay(['-'], viewport).disabled(graph), 'too_bendy');
     });
 
     it('returns \'too_bendy\' for ways with coincident start/end nodes', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'c', loc: [2, 0] }),
-        Rapid.osmNode({ id: 'd', loc: [0, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
       ]);
       assert.equal(Rapid.actionStraightenWay(['-'], viewport).disabled(graph), 'too_bendy');
     });
@@ -50,10 +59,10 @@ describe('actionStraightenWay', () => {
 
   it('deletes empty nodes', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'b', loc: [1, 0.01], tags: {} }),
-      Rapid.osmNode({ id: 'c', loc: [2, 0] }),
-      Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c'] })
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: {} }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c'] })
     ]);
 
     const result = Rapid.actionStraightenWay(['-'], viewport)(graph);
@@ -65,10 +74,10 @@ describe('actionStraightenWay', () => {
 
   it('does not delete tagged nodes', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
-      Rapid.osmNode({ id: 'c', loc: [2, 0] }),
-      Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c'] })
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c'] })
     ]);
 
     const result = Rapid.actionStraightenWay(['-'], viewport)(graph);
@@ -81,11 +90,11 @@ describe('actionStraightenWay', () => {
 
   it('does not delete nodes connected to other ways', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'b', loc: [1, 0.01] }),
-      Rapid.osmNode({ id: 'c', loc: [2, 0] }),
-      Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c'] }),
-      Rapid.osmWay({ id: '=', nodes: ['b'] })
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01] }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c'] }),
+      new Rapid.OsmWay(context, { id: '=', nodes: ['b'] })
     ]);
 
     const result = Rapid.actionStraightenWay(['-'], viewport)(graph);
@@ -98,17 +107,17 @@ describe('actionStraightenWay', () => {
 
   it('straightens multiple, connected ways', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
-      Rapid.osmNode({ id: 'c', loc: [2, -0.01] }),
-      Rapid.osmNode({ id: 'd', loc: [3, 0] }),
-      Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd'] }),
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
+      new Rapid.OsmNode(context, { id: 'd', loc: [3, 0] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] }),
 
-      Rapid.osmNode({ id: 'e', loc: [4, 0] }),
-      Rapid.osmNode({ id: 'f', loc: [5, 0.01], tags: { foo: 'bar' } }),
-      Rapid.osmNode({ id: 'g', loc: [6, -0.01] }),
-      Rapid.osmNode({ id: 'h', loc: [7, 0] }),
-      Rapid.osmWay({ id: '--', nodes: ['d', 'e', 'f', 'g', 'h'] })
+      new Rapid.OsmNode(context, { id: 'e', loc: [4, 0] }),
+      new Rapid.OsmNode(context, { id: 'f', loc: [5, 0.01], tags: { foo: 'bar' } }),
+      new Rapid.OsmNode(context, { id: 'g', loc: [6, -0.01] }),
+      new Rapid.OsmNode(context, { id: 'h', loc: [7, 0] }),
+      new Rapid.OsmWay(context, { id: '--', nodes: ['d', 'e', 'f', 'g', 'h'] })
     ]);
 
     const result = Rapid.actionStraightenWay(['-', '--'], viewport)(graph);
@@ -123,17 +132,17 @@ describe('actionStraightenWay', () => {
 
   it('straightens multiple, connected ways going in different directions', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
-      Rapid.osmNode({ id: 'c', loc: [2, -0.01] }),
-      Rapid.osmNode({ id: 'd', loc: [3, 0] }),
-      Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd'] }),
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
+      new Rapid.OsmNode(context, { id: 'd', loc: [3, 0] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] }),
 
-      Rapid.osmNode({ id: 'e', loc: [4, 0] }),
-      Rapid.osmNode({ id: 'f', loc: [5, 0.01], tags: { foo: 'bar' } }),
-      Rapid.osmNode({ id: 'g', loc: [6, -0.01] }),
-      Rapid.osmNode({ id: 'h', loc: [7, 0] }),
-      Rapid.osmWay({ id: '--', nodes: ['h', 'g', 'f', 'e', 'd'] })
+      new Rapid.OsmNode(context, { id: 'e', loc: [4, 0] }),
+      new Rapid.OsmNode(context, { id: 'f', loc: [5, 0.01], tags: { foo: 'bar' } }),
+      new Rapid.OsmNode(context, { id: 'g', loc: [6, -0.01] }),
+      new Rapid.OsmNode(context, { id: 'h', loc: [7, 0] }),
+      new Rapid.OsmWay(context, { id: '--', nodes: ['h', 'g', 'f', 'e', 'd'] })
     ]);
 
     const result = Rapid.actionStraightenWay(['-', '--'], viewport)(graph);
@@ -155,11 +164,11 @@ describe('actionStraightenWay', () => {
 
     it('straighten at t = 0', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
-        Rapid.osmNode({ id: 'c', loc: [2, -0.01] }),
-        Rapid.osmNode({ id: 'd', loc: [3, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [3, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
       ]);
 
       const result = Rapid.actionStraightenWay(['-'], viewport)(graph, 0);
@@ -174,11 +183,11 @@ describe('actionStraightenWay', () => {
 
     it('straighten at t = 0.5', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
-        Rapid.osmNode({ id: 'c', loc: [2, -0.01] }),
-        Rapid.osmNode({ id: 'd', loc: [3, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [3, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
       ]);
 
       const result = Rapid.actionStraightenWay(['-'], viewport)(graph, 0.5);
@@ -193,11 +202,11 @@ describe('actionStraightenWay', () => {
 
     it('straighten at t = 1', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
-        Rapid.osmNode({ id: 'c', loc: [2, -0.01] }),
-        Rapid.osmNode({ id: 'd', loc: [3, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b', 'c', 'd'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [3, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
       ]);
 
       const result = Rapid.actionStraightenWay(['-'], viewport)(graph, 1);

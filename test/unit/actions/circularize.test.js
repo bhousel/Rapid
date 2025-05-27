@@ -4,6 +4,13 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionCircularize', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
   // This makes our viewport operate like the d3 default of [480,250].
   // https://github.com/d3/d3-geo#projection_translate
   const viewport = new Rapid.sdk.Viewport({ x: 480, y: 250, k: 150 });
@@ -61,11 +68,11 @@ describe('actionCircularize', () => {
     //    |      |
     //    a ---- b
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0, 0]}),
-      Rapid.osmNode({id: 'b', loc: [2, 0]}),
-      Rapid.osmNode({id: 'c', loc: [2, 2]}),
-      Rapid.osmNode({id: 'd', loc: [0, 2]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
     ]);
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
@@ -80,12 +87,12 @@ describe('actionCircularize', () => {
     //    |      |
     //    a ---- b
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0, 0]}),
-      Rapid.osmNode({id: 'b', loc: [2, 0]}),
-      Rapid.osmNode({id: 'c', loc: [2, 2]}),
-      Rapid.osmNode({id: 'd', loc: [0, 2]}),
-      Rapid.osmNode({id: 'e', loc: [0, 2]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+      new Rapid.OsmNode(context, {id: 'e', loc: [0, 2]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a']})
     ]);
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
@@ -106,12 +113,12 @@ describe('actionCircularize', () => {
     //    |      |
     //    c ---- d
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [2, 2]}),
-      Rapid.osmNode({id: 'b', loc: [-2, 2]}),
-      Rapid.osmNode({id: 'c', loc: [-2, -2]}),
-      Rapid.osmNode({id: 'd', loc: [2, -2]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'a']}),
-      Rapid.osmWay({id: '=', nodes: ['d']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [2, 2]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [-2, 2]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [-2, -2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [2, -2]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['d']})
     ]);
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
@@ -127,11 +134,11 @@ describe('actionCircularize', () => {
     //    |      |
     //    a ---- b
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0, 0]}),
-      Rapid.osmNode({id: 'b', loc: [2, 0]}),
-      Rapid.osmNode({id: 'c', loc: [2, 2]}),
-      Rapid.osmNode({id: 'd', loc: [0, 2]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
     ]);
 
     const result = Rapid.actionCircularize('-', viewport, 20)(graph);
@@ -153,11 +160,11 @@ describe('actionCircularize', () => {
     //    |      |
     //    a ---- b
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0, 0]}),
-      Rapid.osmNode({id: 'b', loc: [2, 0]}),
-      Rapid.osmNode({id: 'c', loc: [2, 2]}),
-      Rapid.osmNode({id: 'd', loc: [0, 2]}),
-      Rapid.osmWay({id: '+', nodes: ['a', 'd', 'c', 'b', 'a']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+      new Rapid.OsmWay(context, {id: '+', nodes: ['a', 'd', 'c', 'b', 'a']})
     ]);
 
     assert.ok(area('+', graph) > 0);
@@ -174,11 +181,11 @@ describe('actionCircularize', () => {
     //    |      |
     //    a ---- b
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [0, 0]}),
-      Rapid.osmNode({id: 'b', loc: [2, 0]}),
-      Rapid.osmNode({id: 'c', loc: [2, 2]}),
-      Rapid.osmNode({id: 'd', loc: [0, 2]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
     ]);
 
     assert.ok(area('-', graph) < 0);
@@ -201,15 +208,15 @@ describe('actionCircularize', () => {
     //  a-b-f-g-e-a is clockwise
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [ 0,  0]}),
-      Rapid.osmNode({id: 'b', loc: [ 1,  2]}),
-      Rapid.osmNode({id: 'c', loc: [-2,  2]}),
-      Rapid.osmNode({id: 'd', loc: [-2, -2]}),
-      Rapid.osmNode({id: 'e', loc: [ 1, -2]}),
-      Rapid.osmNode({id: 'f', loc: [ 3,  2]}),
-      Rapid.osmNode({id: 'g', loc: [ 3, -2]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a']}),
-      Rapid.osmWay({id: '=', nodes: ['a', 'b', 'f', 'g', 'e', 'a']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [ 0,  0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [ 1,  2]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [-2,  2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [-2, -2]}),
+      new Rapid.OsmNode(context, {id: 'e', loc: [ 1, -2]}),
+      new Rapid.OsmNode(context, {id: 'f', loc: [ 3,  2]}),
+      new Rapid.OsmNode(context, {id: 'g', loc: [ 3, -2]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['a', 'b', 'f', 'g', 'e', 'a']})
     ]);
 
     const intersect1 = intersection(graph.entity('-').nodes, graph.entity('=').nodes);
@@ -239,15 +246,15 @@ describe('actionCircularize', () => {
     //  a-e-g-f-b-a is counterclockwise
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [ 0,  0]}),
-      Rapid.osmNode({id: 'b', loc: [ 1,  2]}),
-      Rapid.osmNode({id: 'c', loc: [-2,  2]}),
-      Rapid.osmNode({id: 'd', loc: [-2, -2]}),
-      Rapid.osmNode({id: 'e', loc: [ 1, -2]}),
-      Rapid.osmNode({id: 'f', loc: [ 3,  2]}),
-      Rapid.osmNode({id: 'g', loc: [ 3, -2]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a']}),
-      Rapid.osmWay({id: '=', nodes: ['a', 'e', 'g', 'f', 'b', 'a']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [ 0,  0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [ 1,  2]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [-2,  2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [-2, -2]}),
+      new Rapid.OsmNode(context, {id: 'e', loc: [ 1, -2]}),
+      new Rapid.OsmNode(context, {id: 'f', loc: [ 3,  2]}),
+      new Rapid.OsmNode(context, {id: 'g', loc: [ 3, -2]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['a', 'e', 'g', 'f', 'b', 'a']})
     ]);
 
     const intersect1 = intersection(graph.entity('-').nodes, graph.entity('=').nodes);
@@ -276,15 +283,15 @@ describe('actionCircularize', () => {
     //  a-b-c-d-e-a is extremely concave and 'a' is to the left of centoid..
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [ 0,  0]}),
-      Rapid.osmNode({id: 'b', loc: [10,  2]}),
-      Rapid.osmNode({id: 'c', loc: [-2,  2]}),
-      Rapid.osmNode({id: 'd', loc: [-2, -2]}),
-      Rapid.osmNode({id: 'e', loc: [10, -2]}),
-      Rapid.osmNode({id: 'f', loc: [15,  2]}),
-      Rapid.osmNode({id: 'g', loc: [15, -2]}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a']}),
-      Rapid.osmWay({id: '=', nodes: ['a', 'b', 'f', 'g', 'e', 'a']})
+      new Rapid.OsmNode(context, {id: 'a', loc: [ 0,  0]}),
+      new Rapid.OsmNode(context, {id: 'b', loc: [10,  2]}),
+      new Rapid.OsmNode(context, {id: 'c', loc: [-2,  2]}),
+      new Rapid.OsmNode(context, {id: 'd', loc: [-2, -2]}),
+      new Rapid.OsmNode(context, {id: 'e', loc: [10, -2]}),
+      new Rapid.OsmNode(context, {id: 'f', loc: [15,  2]}),
+      new Rapid.OsmNode(context, {id: 'g', loc: [15, -2]}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['a', 'b', 'f', 'g', 'e', 'a']})
     ]);
 
     assert.equal(graph.entity('-').isConvex(graph), false);
@@ -300,11 +307,11 @@ describe('actionCircularize', () => {
   describe('#disabled', () => {
     it('not disable circularize when its not circular', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0, 0]}),
-        Rapid.osmNode({id: 'b', loc: [2, 0]}),
-        Rapid.osmNode({id: 'c', loc: [2, 2]}),
-        Rapid.osmNode({id: 'd', loc: [0, 2]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+        new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
 
       const disabled = Rapid.actionCircularize('-', viewport).disabled(graph);
@@ -314,11 +321,11 @@ describe('actionCircularize', () => {
 
     it('disable circularize twice', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0, 0]}),
-        Rapid.osmNode({id: 'b', loc: [2, 0]}),
-        Rapid.osmNode({id: 'c', loc: [2, 2]}),
-        Rapid.osmNode({id: 'd', loc: [0, 2]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+        new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
 
       const result = Rapid.actionCircularize('-', viewport)(graph);
@@ -335,11 +342,11 @@ describe('actionCircularize', () => {
 
     it('circularize at t = 0', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0, 0]}),
-        Rapid.osmNode({id: 'b', loc: [2, 0]}),
-        Rapid.osmNode({id: 'c', loc: [2, 2]}),
-        Rapid.osmNode({id: 'd', loc: [0, 2]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+        new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
       const result = Rapid.actionCircularize('-', viewport)(graph, 0);
       assert.equal(isCircular('-', result), false);
@@ -349,11 +356,11 @@ describe('actionCircularize', () => {
 
     it('circularize at t = 0.5', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0, 0]}),
-        Rapid.osmNode({id: 'b', loc: [2, 0]}),
-        Rapid.osmNode({id: 'c', loc: [2, 2]}),
-        Rapid.osmNode({id: 'd', loc: [0, 2]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+        new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
       const result = Rapid.actionCircularize('-', viewport)(graph, 0.5);
       assert.equal(isCircular('-', result), false);
@@ -363,11 +370,11 @@ describe('actionCircularize', () => {
 
     it('circularize at t = 1', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a', loc: [0, 0]}),
-        Rapid.osmNode({id: 'b', loc: [2, 0]}),
-        Rapid.osmNode({id: 'c', loc: [2, 2]}),
-        Rapid.osmNode({id: 'd', loc: [0, 2]}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
+        new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
+        new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
+        new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
+        new Rapid.OsmNode(context, {id: 'd', loc: [0, 2]}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
       const result = Rapid.actionCircularize('-', viewport)(graph, 1);
       assert.ok(isCircular('-', result));

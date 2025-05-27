@@ -1,5 +1,4 @@
 describe('uiFieldWikipedia', () => {
-  let graph, entity, selection, field;
 
   class MockWikidataService {
     constructor() { }
@@ -23,7 +22,7 @@ describe('uiFieldWikipedia', () => {
   class MockContext {
     constructor()   {
       this.services = {
-        wikidata:    new MockWikidataService(this)
+        wikidata: new MockWikidataService(this)
       };
       this.systems = {
         assets:  new Rapid.AssetSystem(this),
@@ -37,10 +36,10 @@ describe('uiFieldWikipedia', () => {
   }
 
   const context = new MockContext();
-
+  let graph, entity, selection, field;
 
   beforeEach(() => {
-    entity = Rapid.osmNode({ id: 'n-1', tags: {} });
+    entity = new Rapid.OsmNode(context, { id: 'n-1', tags: {} });
     graph = new Rapid.Graph([entity]);
 
     selection = d3.select(document.createElement('div'));

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+
 
 describe('QAItem', () => {
   it('creates and updates QA item', () => {

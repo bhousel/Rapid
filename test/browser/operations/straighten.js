@@ -1,5 +1,4 @@
 describe('operationStraighten', () => {
-  let _graph;
 
   class MockEditSystem {
     constructor() {}
@@ -25,7 +24,7 @@ describe('operationStraighten', () => {
   }
 
   const context = new MockContext();
-
+  let _graph;
 
   describe('#available', () => {
     beforeEach(() => {
@@ -36,27 +35,27 @@ describe('operationStraighten', () => {
       // w4 - way with 3 nodes connected to w3
       // w5 - way with 4 nodes not connected to any other nodes
       _graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'n1' }),
-        Rapid.osmNode({ id: 'n2' }),
-        Rapid.osmNode({ id: 'n2-1' }),
-        Rapid.osmNode({ id: 'n3' }),
-        Rapid.osmNode({ id: 'n4' }),
-        Rapid.osmNode({ id: 'n5' }),
-        Rapid.osmNode({ id: 'n6' }),
-        Rapid.osmNode({ id: 'n7' }),
-        Rapid.osmNode({ id: 'n8' }),
-        Rapid.osmNode({ id: 'n9' }),
-        Rapid.osmNode({ id: 'n10' }),
-        Rapid.osmNode({ id: 'n11' }),
-        Rapid.osmNode({ id: 'n12' }),
-        Rapid.osmNode({ id: 'n13' }),
-        Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2'] }),
-        Rapid.osmWay({ id: 'w1-2', nodes: ['n2', 'n2-1'] }),
-        Rapid.osmWay({ id: 'w2', nodes: ['n2', 'n3', 'n4'] }),
-        Rapid.osmWay({ id: 'w2-2', nodes: ['n4', 'n13', 'n2'] }), // w-2 reversed
-        Rapid.osmWay({ id: 'w3', nodes: ['n4', 'n5', 'n6'] }),
-        Rapid.osmWay({ id: 'w4', nodes: ['n6', 'n7', 'n8'] }),
-        Rapid.osmWay({ id: 'w5', nodes: ['n9', 'n10', 'n11', 'n12'] }),
+        new Rapid.OsmNode(context, { id: 'n1' }),
+        new Rapid.OsmNode(context, { id: 'n2' }),
+        new Rapid.OsmNode(context, { id: 'n2-1' }),
+        new Rapid.OsmNode(context, { id: 'n3' }),
+        new Rapid.OsmNode(context, { id: 'n4' }),
+        new Rapid.OsmNode(context, { id: 'n5' }),
+        new Rapid.OsmNode(context, { id: 'n6' }),
+        new Rapid.OsmNode(context, { id: 'n7' }),
+        new Rapid.OsmNode(context, { id: 'n8' }),
+        new Rapid.OsmNode(context, { id: 'n9' }),
+        new Rapid.OsmNode(context, { id: 'n10' }),
+        new Rapid.OsmNode(context, { id: 'n11' }),
+        new Rapid.OsmNode(context, { id: 'n12' }),
+        new Rapid.OsmNode(context, { id: 'n13' }),
+        new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] }),
+        new Rapid.OsmWay(context, { id: 'w1-2', nodes: ['n2', 'n2-1'] }),
+        new Rapid.OsmWay(context, { id: 'w2', nodes: ['n2', 'n3', 'n4'] }),
+        new Rapid.OsmWay(context, { id: 'w2-2', nodes: ['n4', 'n13', 'n2'] }), // w-2 reversed
+        new Rapid.OsmWay(context, { id: 'w3', nodes: ['n4', 'n5', 'n6'] }),
+        new Rapid.OsmWay(context, { id: 'w4', nodes: ['n6', 'n7', 'n8'] }),
+        new Rapid.OsmWay(context, { id: 'w5', nodes: ['n9', 'n10', 'n11', 'n12'] }),
       ]);
     });
 

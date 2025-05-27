@@ -1,6 +1,6 @@
 import { vecInterp } from '@rapid-sdk/math';
 
-import { osmNode, osmRelation, osmWay } from '../models/index.js';
+import { OsmNode, OsmWay, OsmRelation } from '../models/index.js';
 
 
 function findConnectionPoint(graph, newNode, targetWay, nodeA, nodeB) {
@@ -54,21 +54,25 @@ function findConnectionPoint(graph, newNode, targetWay, nodeA, nodeB) {
 
 
 function locationChanged(loc1, loc2) {
-    return Math.abs(loc1[0] - loc2[0]) > 2e-5
-        || Math.abs(loc1[1] - loc2[1]) > 2e-5;
+  return Math.abs(loc1[0] - loc2[0]) > 2e-5
+    || Math.abs(loc1[1] - loc2[1]) > 2e-5;
 }
 
 
+// Removes the metadata directly, this is kind of hacky
 function removeMetadata(entity) {
-    delete entity.__fbid__;
-    delete entity.__origid__;    // old
-    delete entity.__service__;
-    delete entity.__datasetid__;
-    delete entity.tags.conn;
-    delete entity.tags.orig_id;
-    delete entity.tags.debug_way_id;
-    delete entity.tags.import;
-    delete entity.tags.dupe;
+  const props = entity.props;
+  const tags = props.tags;
+
+  delete props.__fbid__;
+  delete props.__origid__;
+  delete props.__service__;
+  delete props.__datasetid__;
+  delete tags.conn;
+  delete tags.orig_id;
+  delete tags.debug_way_id;
+  delete tags.import;
+  delete tags.dupe;
 }
 
 
@@ -93,8 +97,7 @@ export function actionRapidAcceptFeature(entityID, extGraph) {
 
         function acceptNode(extNode) {
             // copy node before modifying
-            var node = osmNode(extNode);
-            node.tags = Object.assign({}, node.tags);
+            var node = new OsmNode(extNode);
             removeMetadata(node);
 
             graph = graph.replace(node);
@@ -104,24 +107,20 @@ export function actionRapidAcceptFeature(entityID, extGraph) {
 
         function acceptWay(extWay) {
             // copy way before modifying
-            var way = osmWay(extWay);
-            way.nodes = extWay.nodes.slice();
-            way.tags = Object.assign({}, way.tags);
+            var way = new OsmWay(extWay);
             removeMetadata(way);
 
             var nodes = way.nodes.map(function(nodeId) {
                 // copy node before modifying
-                var node = osmNode(extGraph.entity(nodeId));
-                node.tags = Object.assign({}, node.tags);
-
+                var node = new OsmNode(extGraph.entity(nodeId));
                 var conn = node.tags.conn && node.tags.conn.split(',');
                 var dupeId = node.tags.dupe;
                 removeMetadata(node);
 
                 if (dupeId && graph.hasEntity(dupeId) && !locationChanged(graph.entity(dupeId).loc, node.loc)) {
                     node = graph.entity(dupeId);           // keep original node with dupeId
-                } else if (graph.hasEntity(node.id) && locationChanged(graph.entity(node.id).loc, node.loc)) {
-                    node = osmNode({ loc: node.loc });     // replace (unnecessary copy of node?)
+//                } else if (graph.hasEntity(node.id) && locationChanged(graph.entity(node.id).loc, node.loc)) {
+//                    node = new OsmNode(node.context, { loc: node.loc });     // replace (unnecessary copy of node?)
                 }
 
                 if (conn && graph.hasEntity(conn[0])) {
@@ -154,9 +153,7 @@ export function actionRapidAcceptFeature(entityID, extGraph) {
             if (seen) return seen;
 
             // copy relation before modifying
-            var relation = osmRelation(extRelation);
-            relation.members = extRelation.members.slice();
-            relation.tags = Object.assign({}, extRelation.tags);
+            var relation = new OsmRelation(extRelation);
             removeMetadata(relation);
 
             var members = relation.members.map(function(member) {

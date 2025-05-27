@@ -2,11 +2,20 @@ import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
+
 describe('actionSyncCrossingTags', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('synchronizes crossing tags between parent ways and child nodes', () => {
-    const n1 = Rapid.osmNode({ id: 'n1', loc: [0, 0], tags: { highway: 'crossing' } });
-    const n2 = Rapid.osmNode({ id: 'n2', loc: [1, 0] });
-    const w1 = Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'footway', footway: 'crossing' } });
+    const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0], tags: { highway: 'crossing' } });
+    const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'footway', footway: 'crossing' } });
     const graph = new Rapid.Graph([n1, n2, w1]);
 
     const result = Rapid.actionSyncCrossingTags('w1')(graph);

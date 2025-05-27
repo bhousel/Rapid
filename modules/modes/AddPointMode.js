@@ -4,7 +4,7 @@ import { actionAddEntity } from '../actions/add_entity.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { geoChooseEdge } from '../geo/index.js';
-import { osmNode } from '../models/node.js';
+import { OsmNode } from '../models/OsmNode.js';
 
 const DEBUG = false;
 
@@ -132,7 +132,7 @@ export class AddPointMode extends AbstractMode {
     const editor = context.systems.editor;
     const l10n = context.systems.l10n;
 
-    const node = osmNode({ loc: loc, tags: this.defaultTags });
+    const node = new OsmNode(context, { loc: loc, tags: this.defaultTags });
 
     editor.perform(actionAddEntity(node));
     editor.commit({ annotation: l10n.t('operations.add.annotation.point'), selectedIDs: [node.id] });
@@ -149,7 +149,7 @@ export class AddPointMode extends AbstractMode {
     const editor = context.systems.editor;
     const l10n = context.systems.l10n;
 
-    const node = osmNode({ tags: this.defaultTags });
+    const node = new OsmNode(context, { tags: this.defaultTags });
     editor.perform(actionAddMidpoint({ loc: loc, edge: edge }, node));
     editor.commit({ annotation: l10n.t('operations.add.annotation.vertex'), selectedIDs: [node.id] });
     context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: true });

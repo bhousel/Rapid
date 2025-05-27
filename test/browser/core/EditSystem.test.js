@@ -1,44 +1,4 @@
 describe('EditSystem', () => {
-  let _editor;
-
-  function actionNoop() {
-    return (graph) => graph;
-  }
-
-  function actionAddNode(nodeID) {
-    return (graph) => graph.replace(Rapid.osmNode({ id: nodeID }));
-  }
-
-  function actionTransitionNoop() {
-    const action = (graph, t) => graph;
-    action.transitionable = true;
-    return action;
-  }
-
-  // Some tests use this to prepare the EditSystem for testing add, update, remove, differences.
-  // After calling this, the history will contain:
-  //   Base graph contains "n1", "n2", "n3"
-  //   Edit1:  "added n-1"
-  //   Edit2:  "updated n2"
-  //   Edit3:  "deleted n3"
-  function prepareTestHistory() {
-    const node_1 = Rapid.osmNode({ id: 'n-1' });
-    const node1 = Rapid.osmNode({ id: 'n1' });
-    const node2 = Rapid.osmNode({ id: 'n2' });
-    const node3 = Rapid.osmNode({ id: 'n3' });
-
-    _editor.merge([node1, node2, node3]);   // merge base entities
-
-    _editor.perform(Rapid.actionAddEntity(node_1));
-    _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
-
-    _editor.perform(Rapid.actionChangeTags('n2', { natural: 'tree' } ));
-    _editor.commit({ annotation: 'updated n2', selectedIDs: ['n2'] });
-
-    _editor.perform(Rapid.actionDeleteNode('n3'));
-    _editor.commit({ annotation: 'deleted n3', selectedIDs: [] });
-  }
-
 
   class MockSystem {
     constructor() { }
@@ -91,7 +51,48 @@ describe('EditSystem', () => {
     selectedIDs() { return []; }
   }
 
+
   const context = new MockContext();
+  let _editor;
+
+  function actionNoop() {
+    return (graph) => graph;
+  }
+
+  function actionAddNode(nodeID) {
+    return (graph) => graph.replace(new Rapid.OsmNode(context, { id: nodeID }));
+  }
+
+  function actionTransitionNoop() {
+    const action = (graph, t) => graph;
+    action.transitionable = true;
+    return action;
+  }
+
+  // Some tests use this to prepare the EditSystem for testing add, update, remove, differences.
+  // After calling this, the history will contain:
+  //   Base graph contains "n1", "n2", "n3"
+  //   Edit1:  "added n-1"
+  //   Edit2:  "updated n2"
+  //   Edit3:  "deleted n3"
+  function prepareTestHistory() {
+    const node_1 = new Rapid.OsmNode(context, { id: 'n-1' });
+    const node1 = new Rapid.OsmNode(context, { id: 'n1' });
+    const node2 = new Rapid.OsmNode(context, { id: 'n2' });
+    const node3 = new Rapid.OsmNode(context, { id: 'n3' });
+
+    _editor.merge([node1, node2, node3]);   // merge base entities
+
+    _editor.perform(Rapid.actionAddEntity(node_1));
+    _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+
+    _editor.perform(Rapid.actionChangeTags('n2', { natural: 'tree' } ));
+    _editor.commit({ annotation: 'updated n2', selectedIDs: ['n2'] });
+
+    _editor.perform(Rapid.actionDeleteNode('n3'));
+    _editor.commit({ annotation: 'deleted n3', selectedIDs: [] });
+  }
+
 
   beforeEach(() => {
     _editor = new Rapid.EditSystem(context);
@@ -180,7 +181,7 @@ describe('EditSystem', () => {
 
   describe('#merge', () => {
     it('merges the entities into all graph versions', () => {
-      const n = Rapid.osmNode({ id: 'n1' });
+      const n = new Rapid.OsmNode(context, { id: 'n1' });
       _editor.merge([n]);
       expect(_editor.base.graph.entity('n1')).to.equal(n);
       expect(_editor.stable.graph.entity('n1')).to.equal(n);
@@ -188,7 +189,7 @@ describe('EditSystem', () => {
     });
 
     it('emits a merge event with the new entities', () => {
-      const n = Rapid.osmNode({ id: 'n1' });
+      const n = new Rapid.OsmNode(context, { id: 'n1' });
       const onMerge = sinon.spy();
       _editor.on('merge', onMerge);
       _editor.merge([n]);
@@ -806,10 +807,10 @@ describe('EditSystem', () => {
       };
       return _editor.fromJSONAsync(JSON.stringify(json))
         .then(() => {
-          expect(_editor.staging.graph.entity('n-1')).to.eql(Rapid.osmNode({id: 'n-1', loc: [1, 2]}));
+          expect(_editor.staging.graph.entity('n-1')).to.eql(new Rapid.OsmNode(context, {id: 'n-1', loc: [1, 2]}));
           expect(_editor.getUndoAnnotation()).to.eql('Added a point.');
           expect(_editor.sourcesUsed().imagery).to.include('Bing');
-          expect(Rapid.osmEntity.id.next).to.eql({ node: -2, way: -1, relation: -1 });
+          expect(Rapid.OsmEntity.id.next).to.eql({ node: -2, way: -1, relation: -1 });
           expect(_editor.difference().created().length).to.eql(1);
         });
     });
@@ -828,10 +829,10 @@ describe('EditSystem', () => {
       };
       return _editor.fromJSONAsync(JSON.stringify(json))
         .then(() => {
-          expect(_editor.staging.graph.entity('n1')).to.eql(Rapid.osmNode({ id: 'n1', loc: [2, 3], v: 1 }));
+          expect(_editor.staging.graph.entity('n1')).to.eql(new Rapid.OsmNode(context, { id: 'n1', loc: [2, 3], v: 1 }));
           expect(_editor.getUndoAnnotation()).to.eql('Moved a point.');
           expect(_editor.sourcesUsed().imagery).to.include('Bing');
-          expect(Rapid.osmEntity.id.next).to.eql({ node: -2, way: -1, relation: -1 });
+          expect(Rapid.OsmEntity.id.next).to.eql({ node: -2, way: -1, relation: -1 });
           expect(_editor.difference().modified().length).to.eql(1);
         });
     });
@@ -853,7 +854,7 @@ describe('EditSystem', () => {
           expect(_editor.staging.graph.hasEntity('n1')).to.be.undefined;
           expect(_editor.getUndoAnnotation()).to.eql('Deleted a point.');
           expect(_editor.sourcesUsed().imagery).to.include('Bing');
-          expect(Rapid.osmEntity.id.next).to.eql({ node: -1, way: -2, relation: -3 });
+          expect(Rapid.OsmEntity.id.next).to.eql({ node: -1, way: -2, relation: -3 });
           expect(_editor.difference().deleted().length).to.eql(1);
         });
     });

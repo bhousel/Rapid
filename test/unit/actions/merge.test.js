@@ -4,12 +4,20 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionMerge', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('merges multiple points to a line', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', tags: {a: 'a'}}),
-      Rapid.osmNode({id: 'b', tags: {b: 'b'}}),
-      Rapid.osmWay({id: 'w'}),
-      Rapid.osmRelation({id: 'r', members: [{id: 'a', role: 'r', type: 'node'}]})
+      new Rapid.OsmNode(context, {id: 'a', tags: {a: 'a'}}),
+      new Rapid.OsmNode(context, {id: 'b', tags: {b: 'b'}}),
+      new Rapid.OsmWay(context, {id: 'w'}),
+      new Rapid.OsmRelation(context, {id: 'r', members: [{id: 'a', role: 'r', type: 'node'}]})
     ]);
 
     const action = Rapid.actionMerge(['a', 'b', 'w']);
@@ -26,10 +34,10 @@ describe('actionMerge', () => {
 
   it('merges multiple points to an area', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', tags: {a: 'a'}}),
-      Rapid.osmNode({id: 'b', tags: {b: 'b'}}),
-      Rapid.osmWay({id: 'w', tags: {area: 'yes'}}),
-      Rapid.osmRelation({id: 'r', members: [{id: 'a', role: 'r', type: 'node'}]})
+      new Rapid.OsmNode(context, {id: 'a', tags: {a: 'a'}}),
+      new Rapid.OsmNode(context, {id: 'b', tags: {b: 'b'}}),
+      new Rapid.OsmWay(context, {id: 'w', tags: {area: 'yes'}}),
+      new Rapid.OsmRelation(context, {id: 'r', members: [{id: 'a', role: 'r', type: 'node'}]})
     ]);
 
     const action = Rapid.actionMerge(['a', 'b', 'w']);
@@ -46,10 +54,10 @@ describe('actionMerge', () => {
 
   it('preserves original point if possible', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a', loc: [1, 0], tags: {a: 'a'}}),
-      Rapid.osmNode({id: 'p', loc: [0, 0], tags: {p: 'p'}}),
-      Rapid.osmNode({id: 'q', loc: [0, 1]}),
-      Rapid.osmWay({id: 'w', nodes: ['p', 'q'], tags: {w: 'w'}})
+      new Rapid.OsmNode(context, {id: 'a', loc: [1, 0], tags: {a: 'a'}}),
+      new Rapid.OsmNode(context, {id: 'p', loc: [0, 0], tags: {p: 'p'}}),
+      new Rapid.OsmNode(context, {id: 'q', loc: [0, 1]}),
+      new Rapid.OsmWay(context, {id: 'w', nodes: ['p', 'q'], tags: {w: 'w'}})
     ]);
 
     const action = Rapid.actionMerge(['a', 'w']);
@@ -68,9 +76,9 @@ describe('actionMerge', () => {
 
   it('merges tags from points to a line', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', tags: { a: 'a' } }),
-      Rapid.osmNode({ id: 'b', tags: { b: 'b' } }),
-      Rapid.osmWay({ id: 'w' })
+      new Rapid.OsmNode(context, { id: 'a', tags: { a: 'a' } }),
+      new Rapid.OsmNode(context, { id: 'b', tags: { b: 'b' } }),
+      new Rapid.OsmWay(context, { id: 'w' })
     ]);
 
     const action = Rapid.actionMerge(['a', 'b', 'w']);
@@ -86,9 +94,9 @@ describe('actionMerge', () => {
 
   it('merges tags from points to an area', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', tags: { a: 'a' } }),
-      Rapid.osmNode({ id: 'b', tags: { b: 'b' } }),
-      Rapid.osmWay({ id: 'w', tags: { area: 'yes' } })
+      new Rapid.OsmNode(context, { id: 'a', tags: { a: 'a' } }),
+      new Rapid.OsmNode(context, { id: 'b', tags: { b: 'b' } }),
+      new Rapid.OsmWay(context, { id: 'w', tags: { area: 'yes' } })
     ]);
 
     const action = Rapid.actionMerge(['a', 'b', 'w']);
@@ -104,10 +112,10 @@ describe('actionMerge', () => {
 
   it('preserves original point if possible', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', loc: [1, 0], tags: { a: 'a' } }),
-      Rapid.osmNode({ id: 'p', loc: [0, 0], tags: { p: 'p' } }),
-      Rapid.osmNode({ id: 'q', loc: [0, 1] }),
-      Rapid.osmWay({ id: 'w', nodes: ['p', 'q'], tags: { w: 'w' } })
+      new Rapid.OsmNode(context, { id: 'a', loc: [1, 0], tags: { a: 'a' } }),
+      new Rapid.OsmNode(context, { id: 'p', loc: [0, 0], tags: { p: 'p' } }),
+      new Rapid.OsmNode(context, { id: 'q', loc: [0, 1] }),
+      new Rapid.OsmWay(context, { id: 'w', nodes: ['p', 'q'], tags: { w: 'w' } })
     ]);
 
     const action = Rapid.actionMerge(['a', 'w']);
@@ -126,8 +134,8 @@ describe('actionMerge', () => {
 
   it('disables action when there are no points', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2'] }),
-      Rapid.osmWay({ id: 'w2', nodes: ['n3', 'n4'] })
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'] })
     ]);
 
     const action = Rapid.actionMerge(['w1', 'w2']);
@@ -137,9 +145,9 @@ describe('actionMerge', () => {
 
   it('disables action when there is more than one area or line', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', tags: { a: 'a' } }),
-      Rapid.osmWay({ id: 'w1', nodes: ['n1', 'n2'] }),
-      Rapid.osmWay({ id: 'w2', nodes: ['n3', 'n4'] })
+      new Rapid.OsmNode(context, { id: 'a', tags: { a: 'a' } }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'] })
     ]);
 
     const action = Rapid.actionMerge(['a', 'w1', 'w2']);
@@ -149,9 +157,9 @@ describe('actionMerge', () => {
 
   it('disables action when there are relations', () => {
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'a', tags: { a: 'a' } }),
-      Rapid.osmWay({ id: 'w', nodes: ['n1', 'n2'] }),
-      Rapid.osmRelation({ id: 'r', members: [{ type: 'node', id: 'n1' }] })
+      new Rapid.OsmNode(context, { id: 'a', tags: { a: 'a' } }),
+      new Rapid.OsmWay(context, { id: 'w', nodes: ['n1', 'n2'] }),
+      new Rapid.OsmRelation(context, { id: 'r', members: [{ type: 'node', id: 'n1' }] })
     ]);
 
     const action = Rapid.actionMerge(['a', 'w', 'r']);

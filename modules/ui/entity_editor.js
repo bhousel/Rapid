@@ -264,7 +264,7 @@ export function uiEntityEditor(context) {
 
         // No op for source=digitalglobe or source=maxar on ML roads. TODO: switch to check on __fbid__
         const source = entity.tags.source;
-        if (entity.__fbid__ && k === 'source' && (source === 'digitalglobe' || source === 'maxar')) continue;
+        if (entity.props.__fbid__ && k === 'source' && (source === 'digitalglobe' || source === 'maxar')) continue;
 
         if (v !== undefined || tags.hasOwnProperty(k)) {
           tags[k] = v;

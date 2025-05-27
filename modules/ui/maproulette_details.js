@@ -230,7 +230,6 @@ export function uiMapRouletteDetails(context) {
           highlightFeature(osmId);
         });
     }).catch(e => {
-      console.error('error_loading_task_details:', e);
       const selection = details.selectAll('.qa-details-subsection');
       selection.html(''); // replace contents
       const error = selection

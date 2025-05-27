@@ -1,11 +1,11 @@
-import { geoSphericalDistance, vecAngle } from '@rapid-sdk/math';
+import { RAD2DEG, geoSphericalDistance, vecAngle } from '@rapid-sdk/math';
 import { utilArrayDifference, utilArrayUniq } from '@rapid-sdk/util';
 
 import { actionDeleteRelation } from '../actions/delete_relation.js';
 import { actionReverse } from '../actions/reverse.js';
 import { actionSplit } from '../actions/split.js';
 import { Graph } from '../core/lib/index.js';
-import { osmEntity } from './entity.js';
+import { OsmEntity } from './OsmEntity.js';
 
 
 export function osmTurn(turn) {
@@ -159,7 +159,7 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
 
 
     // STEP 4:  Split ways on key vertices
-    var origCount = osmEntity.id.next.way;
+    var origCount = OsmEntity.id.next.way;
     vertices.forEach(function(v) {
         // This is an odd way to do it, but we need to find all the ways that
         // will be split here, then split them one at a time to ensure that these
@@ -186,7 +186,7 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
     //     these actions later if the user decides to create a turn restriction
     //  2. Avoids churning way ids just by hovering over a vertex
     //     and displaying the turn restriction editor
-    osmEntity.id.next.way = origCount;
+    OsmEntity.id.next.way = origCount;
 
 
     // STEP 5:  Update arrays to point to vgraph entities
@@ -275,8 +275,8 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
             if (parents.length === 2) {     // vertex with 2 parents is trivial
                 var a = parents[0];
                 var b = parents[1];
-                var aIsLeaf = a && !a.__via;
-                var bIsLeaf = b && !b.__via;
+                var aIsLeaf = a && !a.props.__via;
+                var bIsLeaf = b && !b.props.__via;
                 var leaf, survivor;
 
                 if (aIsLeaf && !bIsLeaf) {
@@ -347,7 +347,7 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
         var keyVertexIds = intersection.vertices.map(function(v) { return v.id; });
 
         var start = vgraph.entity(fromWayId);
-        if (!start || !(start.__from || start.__via)) return [];
+        if (!start || !(start.props.__from || start.props.__via)) return [];
 
         // maxViaWay=0   from-*-to              (0 vias)
         // maxViaWay=1   from-*-via-*-to        (1 via max)
@@ -376,7 +376,7 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
                     var way = parents[i];
 
                     // if next way is a oneway incoming to this vertex, skip
-                    if (way.__oneWay && way.nodes[0] !== entity.id) continue;
+                    if (way.props.__oneWay && way.nodes[0] !== entity.id) continue;
 
                     // if we have seen it before (allowing for an initial u-turn), skip
                     if (currPath.indexOf(way.id) !== -1 && currPath.length >= 3) continue;
@@ -491,11 +491,11 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
                 var nextNodes = [];
 
                 if (currPath.length > 1) {
-                    if (dist > maxDistance) return;   // the next node is too far
-                    if (!entity.__via) return;        // this way is a leaf / can't be a via
+                    if (dist > maxDistance) return;         // the next node is too far
+                    if (!entity.props.__via) return;        // this way is a leaf / can't be a via
                 }
 
-                if (!entity.__oneWay &&                     // bidirectional..
+                if (!entity.props.__oneWay &&               // bidirectional..
                     keyVertexIds.indexOf(n1.id) !== -1 &&   // key vertex..
                     currPath.indexOf(n1.id) === -1) {       // haven't seen it yet..
                     nextNodes.push(n1);                     // can advance to first node
@@ -552,7 +552,7 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
 
             if (path.length === 3 && fromWayId === toWayId) {  // u turn
                 var way = vgraph.entity(fromWayId);
-                if (way.__oneWay) return null;
+                if (way.props.__oneWay) return null;
 
                 isUturn = true;
                 viaNodeId = fromVertexId = toVertexId = path[1];
@@ -595,41 +595,41 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
 }
 
 
-export function osmInferRestriction(graph, turn, viewport) {
-    var fromWay = graph.entity(turn.from.way);
-    var fromNode = graph.entity(turn.from.node);
-    var fromVertex = graph.entity(turn.from.vertex);
-    var toWay = graph.entity(turn.to.way);
-    var toNode = graph.entity(turn.to.node);
-    var toVertex = graph.entity(turn.to.vertex);
+export function osmInferRestriction(graph, turn) {
+  const fromWay = graph.entity(turn.from.way);
+  const fromNode = graph.entity(turn.from.node);
+  const fromVertex = graph.entity(turn.from.vertex);
+  const toWay = graph.entity(turn.to.way);
+  const toNode = graph.entity(turn.to.node);
+  const toVertex = graph.entity(turn.to.vertex);
 
-    var fromOneWay = (fromWay.tags.oneway === 'yes');
-    var toOneWay = (toWay.tags.oneway === 'yes');
+  const fromOneWay = (fromWay.tags.oneway === 'yes');
+  const toOneWay = (toWay.tags.oneway === 'yes');
 
-    var angle = (
-        vecAngle(viewport.project(fromVertex.loc), viewport.project(fromNode.loc)) -
-        vecAngle(viewport.project(toVertex.loc), viewport.project(toNode.loc))
-    ) * (180 / Math.PI);
+  let angle = (
+    vecAngle(fromVertex.geom.coords, fromNode.geom.coords) -
+    vecAngle(toVertex.geom.coords, toNode.geom.coords)
+  ) * RAD2DEG;
 
-    while (angle < 0) {
-        angle += 360;
-    }
+  while (angle < 0) {
+    angle += 360;
+  }
 
-    if (fromNode === toNode) {
-        return 'no_u_turn';
-    }
-    if ((angle < 23 || angle > 336) && fromOneWay && toOneWay) {
-        return 'no_u_turn';   // wider tolerance for u-turn if both ways are oneway
-    }
-    if ((angle < 40 || angle > 319) && fromOneWay && toOneWay && turn.from.vertex !== turn.to.vertex) {
-        return 'no_u_turn';   // even wider tolerance for u-turn if there is a via way (from !== to)
-    }
-    if (angle < 158) {
-        return 'no_right_turn';
-    }
-    if (angle > 202) {
-        return 'no_left_turn';
-    }
+  if (fromNode === toNode) {
+    return 'no_u_turn';
+  }
+  if ((angle < 23 || angle > 336) && fromOneWay && toOneWay) {
+    return 'no_u_turn';   // wider tolerance for u-turn if both ways are oneway
+  }
+  if ((angle < 40 || angle > 319) && fromOneWay && toOneWay && turn.from.vertex !== turn.to.vertex) {
+    return 'no_u_turn';   // even wider tolerance for u-turn if there is a via way (from !== to)
+  }
+  if (angle < 158) {
+    return 'no_right_turn';
+  }
+  if (angle > 202) {
+    return 'no_left_turn';
+  }
 
-    return 'no_straight_on';
+  return 'no_straight_on';
 }

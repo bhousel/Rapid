@@ -55,23 +55,23 @@ export class Geometry {
    * Returns a clone of this Geometry object
    * @return {Geometry}
    */
-  clone(context) {
+  clone() {
     const copy = new Geometry(this.context);
 
     // someday: check perf?  JSON.parse(JSON.stringify()) may still beat structuredClone for this data
     copy.type = this.type;
-    copy.origCoords = window.structuredClone(this.origCoords);
+    copy.origCoords = globalThis.structuredClone(this.origCoords);
     copy.extent = new Extent(this.extent);
-    copy.coords = window.structuredClone(this.coords);
-    copy.flatCoords = window.structuredClone(this.flatCoords);
-    copy.outer = window.structuredClone(this.outer);
-    copy.flatOuter = window.structuredClone(this.flatOuter);
-    copy.hull = window.structuredClone(this.hull);
-    copy.centroid = window.structuredClone(this.centroid);
-    copy.poi = window.structuredClone(this.poi);
-    copy.ssr = window.structuredClone(this.ssr);
-    copy.holes = window.structuredClone(this.holes);
-    copy.flatHoles = window.structuredClone(this.flatHoles);
+    copy.coords = globalThis.structuredClone(this.coords);
+    copy.flatCoords = globalThis.structuredClone(this.flatCoords);
+    copy.outer = globalThis.structuredClone(this.outer);
+    copy.flatOuter = globalThis.structuredClone(this.flatOuter);
+    copy.hull = globalThis.structuredClone(this.hull);
+    copy.centroid = globalThis.structuredClone(this.centroid);
+    copy.poi = globalThis.structuredClone(this.poi);
+    copy.ssr = globalThis.structuredClone(this.ssr);
+    copy.holes = globalThis.structuredClone(this.holes);
+    copy.flatHoles = globalThis.structuredClone(this.flatHoles);
 
     return copy;
   }

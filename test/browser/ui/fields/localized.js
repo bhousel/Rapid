@@ -1,5 +1,4 @@
 describe('uiFieldLocalized', () => {
-  let selection, field;
 
   class MockEditSystem {
     constructor() {}
@@ -36,6 +35,7 @@ describe('uiFieldLocalized', () => {
   }
 
   const context = new MockContext();
+  let selection, field;
 
 
   beforeEach(() => {

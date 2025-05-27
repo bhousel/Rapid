@@ -3,10 +3,18 @@ import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
 describe('actionAddMidpoint', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('adds the node at the midpoint location', () => {
-    const node = Rapid.osmNode();
-    const a = Rapid.osmNode();
-    const b = Rapid.osmNode();
+    const node = new Rapid.OsmNode(context);
+    const a = new Rapid.OsmNode(context);
+    const b = new Rapid.OsmNode(context);
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
     const graph = new Rapid.Graph([a, b]);
     const result = Rapid.actionAddMidpoint(midpoint, node)(graph);
@@ -16,11 +24,11 @@ describe('actionAddMidpoint', () => {
   });
 
   it('adds the node to a way that contains the given edge in forward order', () => {
-    const node = Rapid.osmNode();
-    const a = Rapid.osmNode();
-    const b = Rapid.osmNode();
-    const w1 = Rapid.osmWay();
-    const w2 = Rapid.osmWay({nodes: [a.id, b.id]});
+    const node = new Rapid.OsmNode(context);
+    const a = new Rapid.OsmNode(context);
+    const b = new Rapid.OsmNode(context);
+    const w1 = new Rapid.OsmWay(context);
+    const w2 = new Rapid.OsmWay(context, {nodes: [a.id, b.id]});
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
     const graph = new Rapid.Graph([a, b, w1, w2]);
     const result = Rapid.actionAddMidpoint(midpoint, node)(graph);
@@ -31,11 +39,11 @@ describe('actionAddMidpoint', () => {
   });
 
   it('adds the node to a way that contains the given edge in reverse order', () => {
-    const node = Rapid.osmNode();
-    const a = Rapid.osmNode();
-    const b = Rapid.osmNode();
-    const w1 = Rapid.osmWay();
-    const w2 = Rapid.osmWay({nodes: [b.id, a.id]});
+    const node = new Rapid.OsmNode(context);
+    const a = new Rapid.OsmNode(context);
+    const b = new Rapid.OsmNode(context);
+    const w1 = new Rapid.OsmWay(context);
+    const w2 = new Rapid.OsmWay(context, {nodes: [b.id, a.id]});
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
     const graph = new Rapid.Graph([a, b, w1, w2]);
     const result = Rapid.actionAddMidpoint(midpoint, node)(graph);
@@ -52,10 +60,10 @@ describe('actionAddMidpoint', () => {
     //  \ /
     //   c
 
-    const a = Rapid.osmNode();
-    const b = Rapid.osmNode();
-    const c = Rapid.osmNode();
-    const w = Rapid.osmWay({nodes: [a.id, b.id, a.id]});
+    const a = new Rapid.OsmNode(context);
+    const b = new Rapid.OsmNode(context);
+    const c = new Rapid.OsmNode(context);
+    const w = new Rapid.OsmWay(context, {nodes: [a.id, b.id, a.id]});
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
     const graph = new Rapid.Graph([a, b, w]);
     const result = Rapid.actionAddMidpoint(midpoint, c)(graph);

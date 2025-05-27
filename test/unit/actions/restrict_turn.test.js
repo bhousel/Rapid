@@ -4,16 +4,24 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionRestrictTurn', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('adds a via node restriction to an unrestricted turn', () => {
     //
     // u === * --- w
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'u' }),
-      Rapid.osmNode({ id: '*' }),
-      Rapid.osmNode({ id: 'w' }),
-      Rapid.osmWay({ id: '=', nodes: ['u', '*'] }),
-      Rapid.osmWay({ id: '-', nodes: ['*', 'w'] })
+      new Rapid.OsmNode(context, { id: 'u' }),
+      new Rapid.OsmNode(context, { id: '*' }),
+      new Rapid.OsmNode(context, { id: 'w' }),
+      new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'] })
     ]);
 
     const turn = {
@@ -50,13 +58,13 @@ describe('actionRestrictTurn', () => {
     // w --- v2
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'u' }),
-      Rapid.osmNode({ id: 'v1' }),
-      Rapid.osmNode({ id: 'v2' }),
-      Rapid.osmNode({ id: 'w' }),
-      Rapid.osmWay({ id: '=', nodes: ['u', 'v1'] }),
-      Rapid.osmWay({ id: '|', nodes: ['v1', 'v2'] }),
-      Rapid.osmWay({ id: '-', nodes: ['v2', 'w'] })
+      new Rapid.OsmNode(context, { id: 'u' }),
+      new Rapid.OsmNode(context, { id: 'v1' }),
+      new Rapid.OsmNode(context, { id: 'v2' }),
+      new Rapid.OsmNode(context, { id: 'w' }),
+      new Rapid.OsmWay(context, { id: '=', nodes: ['u', 'v1'] }),
+      new Rapid.OsmWay(context, { id: '|', nodes: ['v1', 'v2'] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['v2', 'w'] })
     ]);
 
     const turn = {

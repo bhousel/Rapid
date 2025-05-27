@@ -6,8 +6,7 @@ import {
 } from 'd3-polygon';
 import { vecInterp, vecLength, vecLengthSquare } from '@rapid-sdk/math';
 import { utilArrayUniq } from '@rapid-sdk/util';
-
-import { osmNode } from '../models/node.js';
+import { OsmNode } from '../models/OsmNode.js';
 
 
 export function actionCircularize(wayId, viewport, maxAngle) {
@@ -136,7 +135,7 @@ export function actionCircularize(wayId, viewport, maxAngle) {
                     }
                 }
 
-                node = osmNode({ loc: vecInterp(origNode.loc, loc, t) });
+                node = new OsmNode(way.context, { loc: vecInterp(origNode.loc, loc, t) });
                 graph = graph.replace(node);
 
                 nodes.splice(endNodeIndex + j, 0, node);

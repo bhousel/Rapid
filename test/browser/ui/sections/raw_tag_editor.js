@@ -1,5 +1,4 @@
 describe('uiSectionRawTagEditor', () => {
-  let rawTagEditor, wrap;
 
   class MockLocalizationSystem {
     constructor() { }
@@ -27,7 +26,8 @@ describe('uiSectionRawTagEditor', () => {
   }
 
   const context = new MockContext();
-  const entity = Rapid.osmNode({ id: 'n-1' });
+  const entity = new Rapid.OsmNode(context, { id: 'n-1' });
+  let rawTagEditor, wrap;
 
 
   beforeEach(() => {

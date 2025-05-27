@@ -1,7 +1,7 @@
 import { utilArrayGroupBy, utilObjectOmit } from '@rapid-sdk/util';
 
 import { osmJoinWays } from '../models/multipolygon.js';
-import { osmWay } from '../models/way.js';
+import { OsmWay } from '../models/OsmWay.js';
 
 
 export function actionAddMember(relationId, member, memberIndex, insertPair) {
@@ -59,7 +59,7 @@ export function actionAddMember(relationId, member, memberIndex, insertPair) {
             //
             // Replace the existing member with a temporary way,
             // so that `osmJoinWays` can treat the pair like a single way.
-            tempWay = osmWay({ id: 'wTemp', nodes: insertPair.nodes });
+            tempWay = new OsmWay(relation.context, { id: 'wTemp', nodes: insertPair.nodes });
             graph = graph.replace(tempWay);
             var tempMember = { id: tempWay.id, type: 'way', role: member.role };
             var tempRelation = relation.replaceMember({id: insertPair.originalID}, tempMember, true);

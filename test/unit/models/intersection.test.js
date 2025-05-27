@@ -1,20 +1,27 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('osmIntersection', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
   const maxDist = Infinity;
 
   describe('highways', () => {
     // u ==== * ---> w
     it('excludes non-highways', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'] }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'] })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'] })
       ]);
       const result = Rapid.osmIntersection(graph, '*', maxDist);
       assert.deepEqual(result.ways, []);
@@ -22,10 +29,10 @@ describe('osmIntersection', () => {
 
     it('excludes degenerate highways', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*'], tags: { highway: 'residential' } })
       ]);
       const result = Rapid.osmIntersection(graph, '*', maxDist);
       assert.equal(result.ways.length, 1);
@@ -34,11 +41,11 @@ describe('osmIntersection', () => {
 
     it('excludes untagged lines', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'] })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'] })
       ]);
       const result = Rapid.osmIntersection(graph, '*', maxDist);
       assert.equal(result.ways.length, 1);
@@ -47,10 +54,10 @@ describe('osmIntersection', () => {
 
     it('excludes area highways', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*', 'w'], tags: { highway: 'pedestrian', area: 'yes' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*', 'w'], tags: { highway: 'pedestrian', area: 'yes' } })
       ]);
       const result = Rapid.osmIntersection(graph, '*', maxDist);
       assert.deepEqual(result.ways, []);
@@ -58,10 +65,10 @@ describe('osmIntersection', () => {
 
     it('auto-splits highways at the intersection', () => {
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*', 'w'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*', 'w'], tags: { highway: 'residential' } })
       ]);
       const result = Rapid.osmIntersection(graph, '*', maxDist);
       assert.equal(result.ways.length, 2);
@@ -73,11 +80,11 @@ describe('osmIntersection', () => {
     it('permits turns onto a way forward', () => {
       // u ==== * ---> w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -97,11 +104,11 @@ describe('osmIntersection', () => {
     it('permits turns onto a way backward', () => {
       // u ==== * <--- w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['w', '*'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['w', '*'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -125,12 +132,12 @@ describe('osmIntersection', () => {
       //       |
       //       x
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [1, 1] }),
-        Rapid.osmNode({ id: 'x', loc: [1, -1] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['w', '*', 'x'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: 'x', loc: [1, -1] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['w', '*', 'x'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('-');
@@ -158,12 +165,12 @@ describe('osmIntersection', () => {
       //       |
       //       x
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [1, 1] }),
-        Rapid.osmNode({ id: 'x', loc: [1, -1] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['w', '*', 'x'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: 'x', loc: [1, -1] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['w', '*', 'x'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -187,11 +194,11 @@ describe('osmIntersection', () => {
     it('permits turns from a oneway forward', () => {
       // u ===> * ----w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -207,11 +214,11 @@ describe('osmIntersection', () => {
     it('permits turns from a reverse oneway backward', () => {
       // u <=== * ---- w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['*', 'u'], tags: { highway: 'residential', oneway: '-1' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['*', 'u'], tags: { highway: 'residential', oneway: '-1' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -227,11 +234,11 @@ describe('osmIntersection', () => {
     it('omits turns from a oneway backward', () => {
       // u <=== * ---- w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['*', 'u'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['*', 'u'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
       ]);
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('u');
       assert.deepEqual(turns, []);
@@ -241,11 +248,11 @@ describe('osmIntersection', () => {
     it('omits turns from a reverse oneway forward', () => {
       // u ===> * ---- w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential', oneway: '-1' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential', oneway: '-1' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } })
       ]);
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('u');
       assert.deepEqual(turns, []);
@@ -255,11 +262,11 @@ describe('osmIntersection', () => {
     it('permits turns onto a oneway forward', () => {
       // u ==== * ---> w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'], tags: { highway: 'residential', oneway: 'yes' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'], tags: { highway: 'residential', oneway: 'yes' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -279,11 +286,11 @@ describe('osmIntersection', () => {
     it('permits turns onto a reverse oneway backward', () => {
       // u ==== * <--- w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['w', '*'], tags: { highway: 'residential', oneway: '-1' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['w', '*'], tags: { highway: 'residential', oneway: '-1' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -303,11 +310,11 @@ describe('osmIntersection', () => {
     it('omits turns onto a oneway backward', () => {
       // u ==== * <--- w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['w', '*'], tags: { highway: 'residential', oneway: 'yes' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['w', '*'], tags: { highway: 'residential', oneway: 'yes' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -323,11 +330,11 @@ describe('osmIntersection', () => {
     it('omits turns onto a reverse oneway forward', () => {
       // u ==== * ---> w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'], tags: { highway: 'residential', oneway: '-1' } })
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'], tags: { highway: 'residential', oneway: '-1' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -343,12 +350,12 @@ describe('osmIntersection', () => {
     it('restricts turns with a restriction relation', () => {
       // u ==== * ---> w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [2, 0] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } }),
-        Rapid.osmRelation({
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'], tags: { highway: 'residential' } }),
+        new Rapid.OsmRelation(context, {
           id: 'r',
           tags: { type: 'restriction' },
           members: [
@@ -380,14 +387,14 @@ describe('osmIntersection', () => {
       //      |
       //      w
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'u', loc: [0, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'v', loc: [2, 0] }),
-        Rapid.osmNode({ id: 'w', loc: [1, -1] }),
-        Rapid.osmWay({ id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '~', nodes: ['v', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '-', nodes: ['w', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmRelation({
+        new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'v', loc: [2, 0] }),
+        new Rapid.OsmNode(context, { id: 'w', loc: [1, -1] }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '~', nodes: ['v', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['w', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmRelation(context, {
           id: 'r',
           tags: { type: 'restriction', restriction: 'only_right_turn' },
           members: [
@@ -429,13 +436,13 @@ describe('osmIntersection', () => {
       //  a -- * === u
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [1, 1] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'u', loc: [2, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'u', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -463,13 +470,13 @@ describe('osmIntersection', () => {
       //  a -- * === u
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [1, 1] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'u', loc: [2, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'u', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('-');
@@ -497,13 +504,13 @@ describe('osmIntersection', () => {
       //  a -- * === u
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [1, 1] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'u', loc: [2, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'u', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -527,13 +534,13 @@ describe('osmIntersection', () => {
       //  a -- * === u
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [1, 1] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'u', loc: [2, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential', oneway: '-1' } }),
-        Rapid.osmWay({ id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'u', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential', oneway: '-1' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
       ]);
 
       const turns = Rapid.osmIntersection(graph, '*', maxDist).turns('=');
@@ -557,13 +564,13 @@ describe('osmIntersection', () => {
       //  a -- * === u
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [1, 1] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'u', loc: [2, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'u', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
       ]);
 
       const intersection = Rapid.osmIntersection(graph, '*', maxDist);
@@ -591,13 +598,13 @@ describe('osmIntersection', () => {
       //  a -- * === u
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [1, 1] }),
-        Rapid.osmNode({ id: '*', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'u', loc: [2, 0] }),
-        Rapid.osmWay({ id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential', oneway: '-1' } }),
-        Rapid.osmWay({ id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'u', loc: [2, 0] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'a', 'b', 'c', '*'], tags: { highway: 'residential', oneway: '-1' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['*', 'u'], tags: { highway: 'residential' } })
       ]);
 
       const intersection = Rapid.osmIntersection(graph, '*', maxDist);
@@ -631,21 +638,21 @@ describe('osmIntersection', () => {
       //           h
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [2, 1] }),
-        Rapid.osmNode({ id: 'd', loc: [0, -1] }),
-        Rapid.osmNode({ id: 'e', loc: [1, -1] }),
-        Rapid.osmNode({ id: 'f', loc: [2, -1] }),
-        Rapid.osmNode({ id: 'g', loc: [2, 2] }),
-        Rapid.osmNode({ id: 'h', loc: [2, -2] }),
-        Rapid.osmWay({ id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, -1] }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [1, -1] }),
+        new Rapid.OsmNode(context, { id: 'f', loc: [2, -1] }),
+        new Rapid.OsmNode(context, { id: 'g', loc: [2, 2] }),
+        new Rapid.OsmNode(context, { id: 'h', loc: [2, -2] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } })
       ]);
 
 
@@ -723,22 +730,22 @@ describe('osmIntersection', () => {
       //           h
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [2, 1] }),
-        Rapid.osmNode({ id: 'd', loc: [0, -1] }),
-        Rapid.osmNode({ id: 'e', loc: [1, -1] }),
-        Rapid.osmNode({ id: 'f', loc: [2, -1] }),
-        Rapid.osmNode({ id: 'g', loc: [2, 2] }),
-        Rapid.osmNode({ id: 'h', loc: [2, -2] }),
-        Rapid.osmWay({ id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } }),
-        Rapid.osmRelation({
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, -1] }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [1, -1] }),
+        new Rapid.OsmNode(context, { id: 'f', loc: [2, -1] }),
+        new Rapid.OsmNode(context, { id: 'g', loc: [2, 2] }),
+        new Rapid.OsmNode(context, { id: 'h', loc: [2, -2] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } }),
+        new Rapid.OsmRelation(context, {
           id: 'r',
           tags: { type: 'restriction', restriction: 'no_right_turn' },
           members: [
@@ -823,22 +830,22 @@ describe('osmIntersection', () => {
       //           h
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [2, 1] }),
-        Rapid.osmNode({ id: 'd', loc: [0, -1] }),
-        Rapid.osmNode({ id: 'e', loc: [1, -1] }),
-        Rapid.osmNode({ id: 'f', loc: [2, -1] }),
-        Rapid.osmNode({ id: 'g', loc: [2, 2] }),
-        Rapid.osmNode({ id: 'h', loc: [2, -2] }),
-        Rapid.osmWay({ id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } }),
-        Rapid.osmRelation({
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, -1] }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [1, -1] }),
+        new Rapid.OsmNode(context, { id: 'f', loc: [2, -1] }),
+        new Rapid.OsmNode(context, { id: 'g', loc: [2, 2] }),
+        new Rapid.OsmNode(context, { id: 'h', loc: [2, -2] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } }),
+        new Rapid.OsmRelation(context, {
           id: 'r1',
           tags: { type: 'restriction', restriction: 'no_u_turn' },
           members: [
@@ -847,7 +854,7 @@ describe('osmIntersection', () => {
             { role: 'to', id: '≈', type: 'way' },
           ]
         }),
-        Rapid.osmRelation({
+        new Rapid.OsmRelation(context, {
           id: 'r2',
           tags: { type: 'restriction', restriction: 'no_right_turn' },
           members: [
@@ -932,22 +939,22 @@ describe('osmIntersection', () => {
       //           h
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [2, 1] }),
-        Rapid.osmNode({ id: 'd', loc: [0, -1] }),
-        Rapid.osmNode({ id: 'e', loc: [1, -1] }),
-        Rapid.osmNode({ id: 'f', loc: [2, -1] }),
-        Rapid.osmNode({ id: 'g', loc: [2, 2] }),
-        Rapid.osmNode({ id: 'h', loc: [2, -2] }),
-        Rapid.osmWay({ id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } }),
-        Rapid.osmRelation({
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, -1] }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [1, -1] }),
+        new Rapid.OsmNode(context, { id: 'f', loc: [2, -1] }),
+        new Rapid.OsmNode(context, { id: 'g', loc: [2, 2] }),
+        new Rapid.OsmNode(context, { id: 'h', loc: [2, -2] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } }),
+        new Rapid.OsmRelation(context, {
           id: 'r',
           tags: { type: 'restriction', restriction: 'only_right_turn' },
           members: [
@@ -1085,26 +1092,26 @@ describe('osmIntersection', () => {
       //           h
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 1] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 1] }),
-        Rapid.osmNode({ id: 'c', loc: [2, 1] }),
-        Rapid.osmNode({ id: 'd', loc: [0, -1] }),
-        Rapid.osmNode({ id: 'e', loc: [1, -1] }),
-        Rapid.osmNode({ id: 'f', loc: [2, -1] }),
-        Rapid.osmNode({ id: 'g', loc: [2, 2] }),
-        Rapid.osmNode({ id: 'h', loc: [2, -2] }),
-        Rapid.osmNode({ id: 'i', loc: [0, 2] }),
-        Rapid.osmNode({ id: 'j', loc: [2, 3] }),
-        Rapid.osmWay({ id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '≃', nodes: ['g', 'i'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '‖', nodes: ['j', 'g'], tags: { highway: 'residential' } }),
-        Rapid.osmRelation({
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, -1] }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [1, -1] }),
+        new Rapid.OsmNode(context, { id: 'f', loc: [2, -1] }),
+        new Rapid.OsmNode(context, { id: 'g', loc: [2, 2] }),
+        new Rapid.OsmNode(context, { id: 'h', loc: [2, -2] }),
+        new Rapid.OsmNode(context, { id: 'i', loc: [0, 2] }),
+        new Rapid.OsmNode(context, { id: 'j', loc: [2, 3] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '|', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '/', nodes: ['b', 'g'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '\\', nodes: ['e', 'h'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '≃', nodes: ['g', 'i'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '‖', nodes: ['j', 'g'], tags: { highway: 'residential' } }),
+        new Rapid.OsmRelation(context, {
           id: 'r1',
           tags: { type: 'restriction', restriction: 'only_u_turn' },
           members: [
@@ -1113,7 +1120,7 @@ describe('osmIntersection', () => {
             { role: 'to', id: '≈', type: 'way' }
           ]
         }),
-        Rapid.osmRelation({
+        new Rapid.OsmRelation(context, {
           id: 'r2',
           tags: { type: 'restriction', restriction: 'only_right_turn' },
           members: [
@@ -1246,19 +1253,19 @@ describe('osmIntersection', () => {
       //  d ~~~> e ≈≈≈> f
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 2] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 2] }),
-        Rapid.osmNode({ id: 'c', loc: [2, 2] }),
-        Rapid.osmNode({ id: 'd', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'e', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'f', loc: [2, 0] }),
-        Rapid.osmNode({ id: '*', loc: [1, 1] }),
-        Rapid.osmWay({ id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
-        Rapid.osmWay({ id: '|', nodes: ['b', '*'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '‖', nodes: ['*', 'e'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 2] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 2] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'f', loc: [2, 0] }),
+        new Rapid.OsmNode(context, { id: '*', loc: [1, 1] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['b', 'a'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['c', 'b'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '~', nodes: ['d', 'e'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '≈', nodes: ['e', 'f'], tags: { highway: 'residential', oneway: 'yes' } }),
+        new Rapid.OsmWay(context, { id: '|', nodes: ['b', '*'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '‖', nodes: ['*', 'e'], tags: { highway: 'residential' } })
       ]);
 
       it('with no restrictions, allows via node and via way turns', () => {
@@ -1286,7 +1293,7 @@ describe('osmIntersection', () => {
 
       it('supports `no_` via 2 way restriction (ordered)', () => {
         //  'r1': `no_u_turn` FROM '=' VIA WAYS '|','‖' TO '≈'
-        const r1 = Rapid.osmRelation({
+        const r1 = new Rapid.OsmRelation(context, {
           id: 'r1',
           tags: { type: 'restriction', restriction: 'no_u_turn' },
           members: [
@@ -1325,7 +1332,7 @@ describe('osmIntersection', () => {
 
       it('supports `no_` via 2 way restriction (unordered)', () => {
         //  'r1': `no_u_turn` FROM '=' VIA WAYS '|','‖' TO '≈'
-        const r1 = Rapid.osmRelation({
+        const r1 = new Rapid.OsmRelation(context, {
           id: 'r1',
           tags: { type: 'restriction', restriction: 'no_u_turn' },
           members: [
@@ -1364,7 +1371,7 @@ describe('osmIntersection', () => {
 
       it('supports `only_` via 2 way restriction (ordered)', () => {
         //  'r1': `only_u_turn` FROM '=' VIA WAYS '|','‖' TO '≈'
-        const r1 = Rapid.osmRelation({
+        const r1 = new Rapid.OsmRelation(context, {
           id: 'r1',
           tags: { type: 'restriction', restriction: 'only_u_turn' },
           members: [
@@ -1414,7 +1421,7 @@ describe('osmIntersection', () => {
 
       it('supports `only_` via 2 way restriction (unordered)', () => {
         //  'r1': `only_u_turn` FROM '=' VIA WAYS '‖','|' TO '≈'
-        const r1 = Rapid.osmRelation({
+        const r1 = new Rapid.OsmRelation(context, {
           id: 'r1',
           tags: { type: 'restriction', restriction: 'only_u_turn' },
           members: [
@@ -1472,16 +1479,16 @@ describe('osmIntersection', () => {
       //   a --- b === c ~~~ d
       //
       const graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [1, 0] }),
-        Rapid.osmNode({ id: 'c', loc: [3, 0] }),
-        Rapid.osmNode({ id: 'd', loc: [4, 0] }),
-        Rapid.osmNode({ id: 'e', loc: [2, 2] }),
-        Rapid.osmWay({ id: '-', nodes: ['a', 'b'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '=', nodes: ['b', 'c'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '~', nodes: ['c', 'd'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '/', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
-        Rapid.osmWay({ id: '\\', nodes: ['e', 'c'], tags: { highway: 'residential' } })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [4, 0] }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [2, 2] }),
+        new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '=', nodes: ['b', 'c'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '~', nodes: ['c', 'd'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '/', nodes: ['b', 'e'], tags: { highway: 'residential' } }),
+        new Rapid.OsmWay(context, { id: '\\', nodes: ['e', 'c'], tags: { highway: 'residential' } })
       ]);
 
       it('with no restrictions, finds all turns', () => {
@@ -1522,7 +1529,7 @@ describe('osmIntersection', () => {
 
 
       it('matches from-via-to strictly when alternate paths exist between from-via-to', () => {
-        const r1 = Rapid.osmRelation({
+        const r1 = new Rapid.OsmRelation(context, {
           id: 'r1',
           tags: { type: 'restriction', restriction: 'no_straight_on' },
           members: [
@@ -1575,7 +1582,7 @@ describe('osmIntersection', () => {
 
 
       it('`only_` restriction is only effective towards the via', () => {
-        const r1 = Rapid.osmRelation({
+        const r1 = new Rapid.OsmRelation(context, {
           id: 'r1',
           tags: { type: 'restriction', restriction: 'only_straight_on' },
           members: [
@@ -1634,7 +1641,13 @@ describe('osmIntersection', () => {
 
 
 describe('osmInferRestriction', () => {
-  const viewport = new Rapid.sdk.Viewport();
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
 
   it('infers the restriction type based on the turn angle', () => {
     //
@@ -1643,49 +1656,49 @@ describe('osmInferRestriction', () => {
     //        x
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'u', loc: [-1, 0] }),
-      Rapid.osmNode({ id: '*', loc: [0, 0] }),
-      Rapid.osmNode({ id: 'w', loc: [1, 0] }),
-      Rapid.osmNode({ id: 'x', loc: [0, -1] }),
-      Rapid.osmWay({ id: '=', nodes: ['u', '*'] }),
-      Rapid.osmWay({ id: '-', nodes: ['*', 'x'] }),
-      Rapid.osmWay({ id: '~', nodes: ['*', 'w'] })
+      new Rapid.OsmNode(context, { id: 'u', loc: [-1, 0] }),
+      new Rapid.OsmNode(context, { id: '*', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'w', loc: [1, 0] }),
+      new Rapid.OsmNode(context, { id: 'x', loc: [0, -1] }),
+      new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'x'] }),
+      new Rapid.OsmWay(context, { id: '~', nodes: ['*', 'w'] })
     ]);
 
     const r1 = Rapid.osmInferRestriction(graph, {
       from: { node: 'u', way: '=', vertex: '*' },
       to: { node: 'x', way: '-', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(r1, 'no_right_turn');
 
     const r2 = Rapid.osmInferRestriction(graph, {
       from: { node: 'x', way: '-', vertex: '*' },
       to: { node: 'w', way: '~', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(r2, 'no_right_turn');
 
     const l1 = Rapid.osmInferRestriction(graph, {
       from: { node: 'x', way: '-', vertex: '*' },
       to: { node: 'u', way: '=', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(l1, 'no_left_turn');
 
     const l2 = Rapid.osmInferRestriction(graph, {
       from: { node: 'w', way: '~', vertex: '*' },
       to: { node: 'x', way: '-', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(l2, 'no_left_turn');
 
     const s = Rapid.osmInferRestriction(graph, {
       from: { node: 'u', way: '=', vertex: '*' },
       to: { node: 'w', way: '~', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(s, 'no_straight_on');
 
     const u = Rapid.osmInferRestriction(graph, {
       from: { node: 'u', way: '=', vertex: '*' },
       to: { node: 'u', way: '=', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(u, 'no_u_turn');
   });
 
@@ -1697,17 +1710,17 @@ describe('osmInferRestriction', () => {
     //   /     \
     //  u       x
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'u', loc: [0, -5] }),
-      Rapid.osmNode({ id: '*', loc: [1, 0] }),
-      Rapid.osmNode({ id: 'x', loc: [2, -5] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['x', '*'], tags: { oneway: 'yes' } }),
-      Rapid.osmWay({ id: 'w2', nodes: ['*', 'u'], tags: { oneway: 'yes' } })
+      new Rapid.OsmNode(context, { id: 'u', loc: [0, -5] }),
+      new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+      new Rapid.OsmNode(context, { id: 'x', loc: [2, -5] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['x', '*'], tags: { oneway: 'yes' } }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['*', 'u'], tags: { oneway: 'yes' } })
     ]);
 
     const r = Rapid.osmInferRestriction(graph, {
       from: { node: 'x', way: 'w1', vertex: '*' },
       to: { node: 'u', way: 'w2', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(r, 'no_u_turn');
   });
 
@@ -1719,17 +1732,17 @@ describe('osmInferRestriction', () => {
     //   /     \         (no left turn)
     //  u       x
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'u', loc: [0, -3] }),
-      Rapid.osmNode({ id: '*', loc: [1, 0] }),
-      Rapid.osmNode({ id: 'x', loc: [2, -3] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['x', '*'], tags: { oneway: 'yes' } }),
-      Rapid.osmWay({ id: 'w2', nodes: ['*', 'u'], tags: { oneway: 'yes' } })
+      new Rapid.OsmNode(context, { id: 'u', loc: [0, -3] }),
+      new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+      new Rapid.OsmNode(context, { id: 'x', loc: [2, -3] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['x', '*'], tags: { oneway: 'yes' } }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['*', 'u'], tags: { oneway: 'yes' } })
     ]);
 
     const r = Rapid.osmInferRestriction(graph, {
       from: { node: 'x', way: 'w1', vertex: '*' },
       to: { node: 'u', way: 'w2', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(r, 'no_left_turn');
   });
 
@@ -1741,19 +1754,19 @@ describe('osmInferRestriction', () => {
     //   /          \       (no u turn)
     //  u            x
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'u', loc: [0, -5] }),
-      Rapid.osmNode({ id: '*', loc: [1, 0] }),
-      Rapid.osmNode({ id: '+', loc: [2, 0] }),
-      Rapid.osmNode({ id: 'x', loc: [3, -5] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['x', '+'], tags: { oneway: 'yes' } }),
-      Rapid.osmWay({ id: 'w2', nodes: ['*', 'u'], tags: { oneway: 'yes' } }),
-      Rapid.osmWay({ id: '-', nodes: ['*', '+'] })
+      new Rapid.OsmNode(context, { id: 'u', loc: [0, -5] }),
+      new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+      new Rapid.OsmNode(context, { id: '+', loc: [2, 0] }),
+      new Rapid.OsmNode(context, { id: 'x', loc: [3, -5] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['x', '+'], tags: { oneway: 'yes' } }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['*', 'u'], tags: { oneway: 'yes' } }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['*', '+'] })
     ]);
 
     const r = Rapid.osmInferRestriction(graph, {
       from: { node: 'x', way: 'w1', vertex: '+' },
       to: { node: 'u', way: 'w2', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(r, 'no_u_turn');
   });
 
@@ -1765,19 +1778,19 @@ describe('osmInferRestriction', () => {
     //   /          \       (no u turn)
     //  u            x
     const graph = new Rapid.Graph([
-      Rapid.osmNode({ id: 'u', loc: [0, -3] }),
-      Rapid.osmNode({ id: '*', loc: [1, 0] }),
-      Rapid.osmNode({ id: '+', loc: [2, 0] }),
-      Rapid.osmNode({ id: 'x', loc: [3, -3] }),
-      Rapid.osmWay({ id: 'w1', nodes: ['x', '+'], tags: { oneway: 'yes' } }),
-      Rapid.osmWay({ id: 'w2', nodes: ['*', 'u'], tags: { oneway: 'yes' } }),
-      Rapid.osmWay({ id: '-', nodes: ['*', '+'] })
+      new Rapid.OsmNode(context, { id: 'u', loc: [0, -3] }),
+      new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
+      new Rapid.OsmNode(context, { id: '+', loc: [2, 0] }),
+      new Rapid.OsmNode(context, { id: 'x', loc: [3, -3] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['x', '+'], tags: { oneway: 'yes' } }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['*', 'u'], tags: { oneway: 'yes' } }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['*', '+'] })
     ]);
 
     const r = Rapid.osmInferRestriction(graph, {
       from: { node: 'x', way: 'w1', vertex: '+' },
       to: { node: 'u', way: 'w2', vertex: '*' }
-    }, viewport);
+    });
     assert.equal(r, 'no_u_turn');
   });
 });

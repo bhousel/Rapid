@@ -12,10 +12,10 @@ describe('PixiRenderer', () => {
   function jsonToOSM(renderData) {
     // Entity data is already split into points, vertices, lines, and polygons.
     const osmRenderData = {};
-    const points = renderData.points.map(point => Rapid.osmNode(point));
-    const vertices = renderData.vertices.map(vertex => Rapid.osmNode(vertex));
-    const lines = renderData.lines.map(line => Rapid.osmWay(line));
-    const polygons = renderData.polygons.map(polygon => Rapid.osmWay(polygon));
+    const points = renderData.points.map(point => new Rapid.OsmNode(context, point));
+    const vertices = renderData.vertices.map(vertex => new Rapid.OsmNode(context, vertex));
+    const lines = renderData.lines.map(line => new Rapid.OsmWay(context, line));
+    const polygons = renderData.polygons.map(polygon => new Rapid.OsmWay(context, polygon));
 
     osmRenderData.points = points;
     osmRenderData.vertices = vertices;
@@ -30,8 +30,8 @@ describe('PixiRenderer', () => {
   function castEntities(entities) {
     const osmEntities = [];
     for (const entity of entities) {
-      if (entity.id.charAt(0) === 'w') osmEntities.push(new Rapid.osmWay(entity));
-      if (entity.id.charAt(0) === 'n') osmEntities.push(new Rapid.osmNode(entity));
+      if (entity.id.charAt(0) === 'w') osmEntities.push(new Rapid.OsmWay(context, entity));
+      if (entity.id.charAt(0) === 'n') osmEntities.push(new Rapid.OsmNode(context, entity));
     }
 
     return osmEntities;

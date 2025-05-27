@@ -8,41 +8,43 @@ describe('validationPrivateData', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
         l10n:  new MockLocalizationSystem()
       };
     }
   }
 
-  const validator = Rapid.validationPrivateData(new MockContext());
+  const context = new MockContext();
+  const validator = Rapid.validationPrivateData(context);
 
 
   it('ignores way with no tags', () => {
-    const n = Rapid.osmNode({ tags: {} });
+    const n = new Rapid.OsmNode(context, { tags: {} });
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores way with phone tag', () => {
-    const n = Rapid.osmNode({ tags: { phone: '123-456-7890' }});
+    const n = new Rapid.OsmNode(context, { tags: { phone: '123-456-7890' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores generic building with phone tag', () => {
-    const n = Rapid.osmNode({ tags: { building: 'yes', phone: '123-456-7890' }});
+    const n = new Rapid.OsmNode(context, { tags: { building: 'yes', phone: '123-456-7890' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores guest house with phone tag', () => {
-    const n = Rapid.osmNode({ tags: { building: 'house', phone: '123-456-7890', tourism: 'guest_house' }});
+    const n = new Rapid.OsmNode(context, { tags: { building: 'house', phone: '123-456-7890', tourism: 'guest_house' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('flags house with phone tag', () => {
-    const n = Rapid.osmNode({ tags: { building: 'house', phone: '123-456-7890' }});
+    const n = new Rapid.OsmNode(context, { tags: { building: 'house', phone: '123-456-7890' }});
     const issues = validator(n);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];

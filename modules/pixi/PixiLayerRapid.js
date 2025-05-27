@@ -281,7 +281,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       for (const entity of entities) {
         if (isAcceptedOrIgnored(entity)) continue;   // skip features already accepted/ignored by the user
         const geom = entity.geometry(dsGraph);
-        if (geom === 'point' && !!entity.__fbid__) {  // standalone points only (not vertices/childnodes)
+        if (geom === 'point' && !!entity.props.__fbid__) {  // standalone points only (not vertices/childnodes)
           data.points.push(entity);
         } else if (geom === 'line') {
           data.lines.push(entity);
@@ -299,7 +299,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       // Just support points (for now)
       for (const entity of entities) {
         entity.overture = true;
-        entity.__datasetid__ = datasetID;
+        entity.props.__datasetid__ = datasetID;
         data.points.push(entity);
       }
     }

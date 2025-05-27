@@ -1,4 +1,4 @@
-import { osmNode } from '../models/node.js';
+import { OsmNode } from '../models/OsmNode.js';
 
 
 // Disconnect the ways at the given node.
@@ -24,7 +24,7 @@ export function actionDisconnect(nodeId, newNodeID) {
 
         connections.forEach(function(connection) {
             var way = graph.entity(connection.wayID);
-            var newNode = osmNode({id: newNodeID, loc: node.loc, tags: node.tags});
+            var newNode = new OsmNode(way.context, { id: newNodeID, loc: node.loc, tags: node.tags });
 
             graph = graph.replace(newNode);
             if (connection.index === 0 && way.isArea()) {

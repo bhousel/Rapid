@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 
 import { JXON } from '../../util/jxon.js';
 import { actionDiscardTags } from '../../actions/discard_tags.js';
-import { osmChangeset } from '../../models/index.js';
+import { OsmChangeset } from '../../models/OsmChangeset.js';
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
 import { utilDetect } from '../../util/index.js';
@@ -95,7 +95,7 @@ export function uiSectionChanges(context) {
 
 
     // Download changeset link
-    let changeset = new osmChangeset().update({ id: undefined });
+    let changeset = new OsmChangeset().update({ id: undefined });
     const changes = editor.changes(actionDiscardTags(editor.difference(), _discardTags));
 
     delete changeset.id;  // Export without chnageset_id

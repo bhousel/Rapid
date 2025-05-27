@@ -1,5 +1,4 @@
 describe('ValidationSystem', () => {
-  let _validator;
 
   class MockSystem {
     constructor() { }
@@ -75,6 +74,7 @@ describe('ValidationSystem', () => {
   }
 
   const context = new MockContext();
+  let _validator;
 
   before(() => {
     const editSystem = context.systems.editor;
@@ -101,7 +101,7 @@ describe('ValidationSystem', () => {
 
 
   it('validateAsync returns a Promise, fulfilled when the validation has completed', () => {
-    const n_1 = Rapid.osmNode({ id: 'n-1', loc: [0, 0], tags: { building: 'house', phone: '555-1212' } });
+    const n_1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0], tags: { building: 'house', phone: '555-1212' } });
 
     const editor = context.systems.editor;
     editor.perform(Rapid.actionAddEntity(n_1));

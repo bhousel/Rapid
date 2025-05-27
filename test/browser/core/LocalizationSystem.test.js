@@ -1,11 +1,11 @@
 describe('LocalizationSystem', () => {
-  let _l10n;
 
   class MockContext {
     constructor() {}
   }
 
   const context = new MockContext();
+  let _l10n;
 
 
   beforeEach(() => {

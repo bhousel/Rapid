@@ -3,8 +3,8 @@ import { utilArrayIntersection, utilArrayUniq } from '@rapid-sdk/util';
 
 import { actionAddMember } from './add_member.js';
 import { osmIsOldMultipolygonOuterMember } from '../models/multipolygon.js';
-import { osmRelation } from '../models/relation.js';
-import { osmWay } from '../models/way.js';
+import { OsmRelation } from '../models/OsmRelation.js';
+import { OsmWay } from '../models/OsmWay.js';
 
 
 // Split a way at the given node.
@@ -94,7 +94,7 @@ export function actionSplit(nodeIds, newWayIDs) {
     }
 
     function split(graph, nodeId, wayA, newWayId) {
-        var wayB = osmWay({ id: newWayId, tags: wayA.tags });   // `wayB` is the NEW way
+        var wayB = new OsmWay(wayA.context, { id: newWayId, tags: wayA.tags });   // `wayB` is the NEW way
         var origNodes = wayA.nodes.slice();
         var nodesA;
         var nodesB;
@@ -242,7 +242,7 @@ export function actionSplit(nodeIds, newWayIDs) {
         });
 
         if (!isOuter && isArea) {
-            var multipolygon = osmRelation({
+            var multipolygon = new OsmRelation(wayA.context, {
                 tags: Object.assign({}, wayA.tags, { type: 'multipolygon' }),
                 members: [
                     { id: wayA.id, role: 'outer', type: 'way' },

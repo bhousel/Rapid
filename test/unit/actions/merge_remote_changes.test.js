@@ -4,34 +4,41 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionMergeRemoteChanges', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
   const discardTags = { created_by: true };
 
   const base = new Rapid.Graph([
-    Rapid.osmNode({ id: 'n1', loc: [1, 1], version: '1', tags: { foo: 'foo' }}),
+    new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1], version: '1', tags: { foo: 'foo' }}),
 
-    Rapid.osmNode({ id: 'n10', loc: [ 10,  10], version: '1' }),
-    Rapid.osmNode({ id: 'n11', loc: [ 10, -10], version: '1' }),
-    Rapid.osmNode({ id: 'n12', loc: [-10, -10], version: '1' }),
-    Rapid.osmNode({ id: 'n13', loc: [-10,  10], version: '1' }),
-    Rapid.osmWay({
+    new Rapid.OsmNode(context, { id: 'n10', loc: [ 10,  10], version: '1' }),
+    new Rapid.OsmNode(context, { id: 'n11', loc: [ 10, -10], version: '1' }),
+    new Rapid.OsmNode(context, { id: 'n12', loc: [-10, -10], version: '1' }),
+    new Rapid.OsmNode(context, { id: 'n13', loc: [-10,  10], version: '1' }),
+    new Rapid.OsmWay(context, {
       id: 'w10',
       nodes: ['n10', 'n11', 'n12', 'n13', 'n10'],
       version: '1',
       tags: { foo: 'foo', area: 'yes' }
     }),
 
-    Rapid.osmNode({ id: 'n20', loc: [ 5,  5], version: '1' }),
-    Rapid.osmNode({ id: 'n21', loc: [ 5, -5], version: '1' }),
-    Rapid.osmNode({ id: 'n22', loc: [-5, -5], version: '1' }),
-    Rapid.osmNode({ id: 'n23', loc: [-5,  5], version: '1' }),
-    Rapid.osmWay({
+    new Rapid.OsmNode(context, { id: 'n20', loc: [ 5,  5], version: '1' }),
+    new Rapid.OsmNode(context, { id: 'n21', loc: [ 5, -5], version: '1' }),
+    new Rapid.OsmNode(context, { id: 'n22', loc: [-5, -5], version: '1' }),
+    new Rapid.OsmNode(context, { id: 'n23', loc: [-5,  5], version: '1' }),
+    new Rapid.OsmWay(context, {
       id: 'w20',
       nodes: ['n20', 'n21', 'n22', 'n23', 'n20'],
       version: '1',
       tags: { foo: 'foo', area: 'yes' }
     }),
 
-    Rapid.osmRelation({
+    new Rapid.OsmRelation(context, {
       id: 'r',
       members: [{ id: 'w10', role: 'outer' }, { id: 'w20', role: 'inner' }],
       version: '1',
@@ -40,22 +47,22 @@ describe('actionMergeRemoteChanges', () => {
   ]);
 
   // some new objects not in the graph yet..
-  const n30 = Rapid.osmNode({ id: 'n30', loc: [ 12,  12], version: '1' });
-  const n31 = Rapid.osmNode({ id: 'n31', loc: [ 12, -12], version: '1' });
-  const n32 = Rapid.osmNode({ id: 'n32', loc: [-12, -12], version: '1' });
-  const n33 = Rapid.osmNode({ id: 'n33', loc: [-12,  12], version: '1' });
-  const w30 = Rapid.osmWay({
+  const n30 = new Rapid.OsmNode(context, { id: 'n30', loc: [ 12,  12], version: '1' });
+  const n31 = new Rapid.OsmNode(context, { id: 'n31', loc: [ 12, -12], version: '1' });
+  const n32 = new Rapid.OsmNode(context, { id: 'n32', loc: [-12, -12], version: '1' });
+  const n33 = new Rapid.OsmNode(context, { id: 'n33', loc: [-12,  12], version: '1' });
+  const w30 = new Rapid.OsmWay(context, {
     id: 'w30',
     nodes: ['n30', 'n31', 'n32', 'n33', 'n30'],
     version: '1',
     tags: { foo: 'foo_new', area: 'yes' }
   });
 
-  const n40 = Rapid.osmNode({ id: 'n40', loc: [ 6,  6], version: '1' });
-  const n41 = Rapid.osmNode({ id: 'n41', loc: [ 6, -6], version: '1' });
-  const n42 = Rapid.osmNode({ id: 'n42', loc: [-6, -6], version: '1' });
-  const n43 = Rapid.osmNode({ id: 'n43', loc: [-6,  6], version: '1' });
-  const w40 = Rapid.osmWay({
+  const n40 = new Rapid.OsmNode(context, { id: 'n40', loc: [ 6,  6], version: '1' });
+  const n41 = new Rapid.OsmNode(context, { id: 'n41', loc: [ 6, -6], version: '1' });
+  const n42 = new Rapid.OsmNode(context, { id: 'n42', loc: [-6, -6], version: '1' });
+  const n43 = new Rapid.OsmNode(context, { id: 'n43', loc: [-6,  6], version: '1' });
+  const w40 = new Rapid.OsmWay(context, {
     id: 'w40',
     nodes: ['n40', 'n41', 'n42', 'n43', 'n40'],
     version: '1',

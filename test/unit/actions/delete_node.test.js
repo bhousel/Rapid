@@ -4,8 +4,16 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionDeleteNode', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
+
   it('removes the node from the graph', () => {
-    const n1 = Rapid.osmNode({id: 'n1'});
+    const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const graph = new Rapid.Graph([n1]);
     const result = Rapid.actionDeleteNode('n1')(graph);
     assert.ok(result instanceof Rapid.Graph);
@@ -13,10 +21,10 @@ describe('actionDeleteNode', () => {
   });
 
   it('removes the node from parent ways', () => {
-    const n1 = Rapid.osmNode({id: 'n1'});
-    const n2 = Rapid.osmNode({id: 'n2'});
-    const n3 = Rapid.osmNode({id: 'n3'});
-    const w1 = Rapid.osmWay({id: 'w1', nodes: ['n1', 'n2', 'n3']});
+    const n1 = new Rapid.OsmNode(context, {id: 'n1'});
+    const n2 = new Rapid.OsmNode(context, {id: 'n2'});
+    const n3 = new Rapid.OsmNode(context, {id: 'n3'});
+    const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1', 'n2', 'n3']});
     const graph = new Rapid.Graph([n1, n2, n3, w1]);
     const result = Rapid.actionDeleteNode('n1')(graph);
     assert.ok(result instanceof Rapid.Graph);
@@ -25,9 +33,9 @@ describe('actionDeleteNode', () => {
   });
 
   it('removes the node from parent relations', () => {
-    const n1 = Rapid.osmNode({id: 'n1'});
-    const n2 = Rapid.osmNode({id: 'n2'});
-    const r1 = Rapid.osmRelation({ id: 'r1', members: [{ id: 'n1' }, { id: 'n2' }]});
+    const n1 = new Rapid.OsmNode(context, {id: 'n1'});
+    const n2 = new Rapid.OsmNode(context, {id: 'n2'});
+    const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1' }, { id: 'n2' }]});
     const graph = new Rapid.Graph([n1, n2, r1]);
     const result = Rapid.actionDeleteNode('n1')(graph);
     assert.ok(result instanceof Rapid.Graph);
@@ -36,9 +44,9 @@ describe('actionDeleteNode', () => {
   });
 
   it('deletes linear parent ways that become degenerate', () => {
-    const n1 = Rapid.osmNode({id: 'n1'});
-    const n2 = Rapid.osmNode({id: 'n2'});
-    const w1 = Rapid.osmWay({id: 'w1', nodes: ['n1', 'n2']});
+    const n1 = new Rapid.OsmNode(context, {id: 'n1'});
+    const n2 = new Rapid.OsmNode(context, {id: 'n2'});
+    const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1', 'n2']});
     const graph = new Rapid.Graph([n1, n2, w1]);
     const result = Rapid.actionDeleteNode('n1')(graph);
     assert.ok(result instanceof Rapid.Graph);
@@ -48,10 +56,10 @@ describe('actionDeleteNode', () => {
   });
 
   it('deletes circular parent ways that become degenerate', () => {
-    const n1 = Rapid.osmNode({id: 'n1'});
-    const n2 = Rapid.osmNode({id: 'n2'});
-    const n3 = Rapid.osmNode({id: 'n3'});
-    const w1 = Rapid.osmWay({id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1']});
+    const n1 = new Rapid.OsmNode(context, {id: 'n1'});
+    const n2 = new Rapid.OsmNode(context, {id: 'n2'});
+    const n3 = new Rapid.OsmNode(context, {id: 'n3'});
+    const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1']});
     const graph = new Rapid.Graph([n1, n2, n3, w1]);
     const result = Rapid.actionDeleteNode('n2')(graph);
     assert.ok(result instanceof Rapid.Graph);
@@ -62,8 +70,8 @@ describe('actionDeleteNode', () => {
   });
 
   it('deletes parent relations that become empty', () => {
-    const n1 = Rapid.osmNode({id: 'n1'});
-    const r1 = Rapid.osmRelation({id: 'r1', members: [{ id: 'n1' }]});
+    const n1 = new Rapid.OsmNode(context, {id: 'n1'});
+    const r1 = new Rapid.OsmRelation(context, {id: 'r1', members: [{ id: 'n1' }]});
     const graph = new Rapid.Graph([n1, r1]);
     const result = Rapid.actionDeleteNode('n1')(graph);
     assert.ok(result instanceof Rapid.Graph);

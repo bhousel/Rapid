@@ -3,7 +3,7 @@ import { utilStringQs } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Graph, RapidDataset } from '../core/lib/index.js';
-import { osmEntity, osmNode, osmWay } from '../models/index.js';
+import { OsmEntity, OsmNode, OsmWay } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -408,7 +408,7 @@ export class MapWithAIService extends AbstractSystem {
 
   _parseNode(obj, uid) {
     const attrs = obj.attributes;
-    return new osmNode({
+    return new OsmNode(this.context, {
       id: uid,
       visible: this._getVisible(attrs),
       loc: this._getLoc(attrs),
@@ -418,7 +418,7 @@ export class MapWithAIService extends AbstractSystem {
 
   _parseWay(obj, uid) {
     const attrs = obj.attributes;
-    return new osmWay({
+    return new OsmWay(this.context, {
       id: uid,
       visible: this._getVisible(attrs),
       tags: this._getTags(obj),
@@ -457,7 +457,7 @@ export class MapWithAIService extends AbstractSystem {
     if (!['node', 'way'].includes(type)) return null;
 
     let entityID, entity;
-    entityID = osmEntity.id.fromOSM(type, element.attributes.id.value);
+    entityID = OsmEntity.fromOSM(type, element.attributes.id.value);
 
     if (type === 'node') {
       if (cache.seen.has(entityID)) {   // ignore nodes we've seen already
@@ -479,7 +479,7 @@ export class MapWithAIService extends AbstractSystem {
       // If `orig_id` is present, it means that the way was split
       // by the server, and we will need to reassemble the pieces.
       if (element.attributes.orig_id) {
-        const origEntityID = osmEntity.id.fromOSM(type, element.attributes.orig_id.value);
+        const origEntityID = OsmEntity.fromOSM(type, element.attributes.orig_id.value);
         entity = this._parseWay(element, entityID);
         let ways = cache.splitWays.get(origEntityID);
         if (!ways) {
@@ -519,7 +519,8 @@ export class MapWithAIService extends AbstractSystem {
       __datasetid__: dataset.id
     };
 
-    return Object.assign(entity, metadata);
+    // Adds metadata directly, this is kind of hacky
+    return entity.updateSelf(metadata);
   }
 
 
@@ -635,7 +636,7 @@ export class MapWithAIService extends AbstractSystem {
           __service__: 'mapwithai',
           __datasetid__: dataset.id
         };
-        results.push(Object.assign(survivor, metadata));
+        results.push(survivor.updateSelf(metadata));
       }
 
     }

@@ -3,7 +3,7 @@ import { interpolateNumber } from 'd3-interpolate';
 import { Extent, vecLength } from '@rapid-sdk/math';
 import _throttle from 'lodash-es/throttle.js';
 
-import { osmEntity, QAItem } from '../models/index.js';
+import { OsmEntity, QAItem } from '../models/index.js';
 import { uiDataEditor } from './data_editor.js';
 import { UiFeatureList } from './UiFeatureList.js';
 import { UiInspector } from './UiInspector.js';
@@ -238,7 +238,7 @@ export class UiSidebar {
     if (datum?.__featurehash__) {
       this.show(this.DataEditor.datum(datum));
     // Hovering on Rapid data..
-    } else if (datum?.__fbid__) {
+    } else if (datum?.props?.__fbid__) {
       this.RapidInspector.datum = datum;
       this.show(this.RapidInspector.render);
     // Hovering on Overture data..
@@ -290,7 +290,7 @@ export class UiSidebar {
       this.$custom.classed('inspector-hover', true);
 
     // Hovering on an OSM item
-    } else if ((datum instanceof osmEntity) && graph.hasEntity(datum.id)) {
+    } else if ((datum instanceof OsmEntity) && graph.hasEntity(datum.id)) {
       $featureList.classed('inspector-hidden', true);
 
       $inspector

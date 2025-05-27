@@ -1,5 +1,4 @@
 describe('AssetSystem', () => {
-  let _assets;
 
   class MockContext {
     constructor() {}
@@ -7,6 +6,7 @@ describe('AssetSystem', () => {
   }
 
   const context = new MockContext();
+  let _assets;
 
 
   beforeEach(() => {

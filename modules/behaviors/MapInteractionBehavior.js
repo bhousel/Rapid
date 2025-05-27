@@ -1,7 +1,7 @@
 import { DEG2RAD, numClamp, vecLength, vecSubtract } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
-import { osmNode } from '../models/node.js';
+import { OsmNode } from '../models/OsmNode.js';
 
 const NEAR_TOLERANCE = 1;
 const FAR_TOLERANCE = 4;
@@ -245,7 +245,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
     if (eventManager.modifierKeys.has('Shift')) return;
 
     const down = this._getEventData(e);
-    const isDraggableTarget = (down.target?.data instanceof osmNode && down.target?.layerID === 'osm');
+    const isDraggableTarget = (down.target?.data instanceof OsmNode && down.target?.layerID === 'osm');
 
     // If left mouse button over a draggable target, user is dragging that target, not the map
     if (isDraggableTarget && e.pointerType === 'mouse' && e.button === 0) return;

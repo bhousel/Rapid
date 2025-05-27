@@ -141,7 +141,7 @@ export class UiOvertureInspector {
     const context = this.context;
     const rapid = context.systems.rapid;
 
-    const datasetID = datum.__datasetid__;
+    const datasetID = datum.props.__datasetid__;
     const dataset = rapid.datasets.get(datasetID);
     const color = dataset.color;
 
@@ -268,7 +268,7 @@ export class UiOvertureInspector {
     const datum = this.datum;
     if (!datum) return;
 
-    const datasetID = datum.__datasetid__.replace('-conflated', '');
+    const datasetID = datum.props.__datasetid__.replace('-conflated', '');
     const dataset = rapid.datasets.get(datasetID);
 
     // Only display notice data for open data (for now)

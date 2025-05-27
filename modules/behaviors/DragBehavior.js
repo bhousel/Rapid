@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
-import { osmNode, QAItem } from '../models/index.js';
+import { OsmNode, QAItem } from '../models/index.js';
 import { utilDetect } from '../util/detect.js';
 
 const NEAR_TOLERANCE = 1;
@@ -119,7 +119,7 @@ export class DragBehavior extends AbstractBehavior {
     if (!data) return;
 
     const isNote = data instanceof QAItem && data.isNew() && target.layerID === 'notes';
-    const isNode = data instanceof osmNode && target.layerID === 'osm';       // not 'rapid'
+    const isNode = data instanceof OsmNode && target.layerID === 'osm';       // not 'rapid'
     const isMidpoint = data.type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
 
     if (!(isNote || isNode || isMidpoint)) return;
@@ -179,7 +179,7 @@ export class DragBehavior extends AbstractBehavior {
         // What are we dragging?
         const data = target.data;
         const isNote = data instanceof QAItem;
-        const isNode = data instanceof osmNode;
+        const isNode = data instanceof OsmNode;
         const isMidpoint = (data.type === 'midpoint');
 
         // If the current selection includes a parent of the dragged item,

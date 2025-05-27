@@ -15,6 +15,7 @@ describe('validationCrossingWays', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.services = {};
       this.systems = {
         editor: new MockEditSystem(),
@@ -59,13 +60,13 @@ describe('validationCrossingWays', () => {
   //        n-1
   //
   function createWaysWithOneCrossingPoint(w1tags = {}, w2tags = {}) {
-    const n1 = Rapid.osmNode({ id: 'n-1', loc: [0, -1] });
-    const n2 = Rapid.osmNode({ id: 'n-2', loc: [0,  1] });
-    const w1 = Rapid.osmWay({ id: 'w-1', nodes: ['n-1', 'n-2'], tags: w1tags });
+    const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, -1] });
+    const n2 = new Rapid.OsmNode(context, { id: 'n-2', loc: [0,  1] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n-1', 'n-2'], tags: w1tags });
 
-    const n3 = Rapid.osmNode({ id: 'n-3', loc: [-1, 0] });
-    const n4 = Rapid.osmNode({ id: 'n-4', loc: [ 1, 0] });
-    const w2 = Rapid.osmWay({ id: 'w-2', nodes: ['n-3', 'n-4'], tags: w2tags });
+    const n3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [-1, 0] });
+    const n4 = new Rapid.OsmNode(context, { id: 'n-4', loc: [ 1, 0] });
+    const w2 = new Rapid.OsmWay(context, { id: 'w-2', nodes: ['n-3', 'n-4'], tags: w2tags });
 
     const entities = [n1, n2, n3, n4, w1, w2];
     graph = new Rapid.Graph(entities);
@@ -441,15 +442,15 @@ describe('validationCrossingWays', () => {
   //        n-1
   //
   function createWaysWithTwoCrossingPoints() {
-    const n1 = Rapid.osmNode({ id: 'n-1', loc: [0, -2] });
-    const n2 = Rapid.osmNode({ id: 'n-2', loc: [0,  2] });
-    const w1 = Rapid.osmWay({ id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
+    const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, -2] });
+    const n2 = new Rapid.OsmNode(context, { id: 'n-2', loc: [0,  2] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n-1', 'n-2'], tags: { highway: 'residential' }});
 
-    const n3 = Rapid.osmNode({ id: 'n-3', loc: [-1,  1] });
-    const n4 = Rapid.osmNode({ id: 'n-4', loc: [ 1,  1] });
-    const n5 = Rapid.osmNode({ id: 'n-5', loc: [ 1, -1] });
-    const n6 = Rapid.osmNode({ id: 'n-6', loc: [-1, -1] });
-    const w2 = Rapid.osmWay({ id: 'w-2', nodes: ['n-3', 'n-4', 'n-5', 'n-6'], tags: { highway: 'residential' }});
+    const n3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [-1,  1] });
+    const n4 = new Rapid.OsmNode(context, { id: 'n-4', loc: [ 1,  1] });
+    const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [ 1, -1] });
+    const n6 = new Rapid.OsmNode(context, { id: 'n-6', loc: [-1, -1] });
+    const w2 = new Rapid.OsmWay(context, { id: 'w-2', nodes: ['n-3', 'n-4', 'n-5', 'n-6'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, n5, n6, w1, w2];
     graph = new Rapid.Graph(entities);
@@ -495,17 +496,17 @@ describe('validationCrossingWays', () => {
   //        n-1
   //
   function createWayAndRelationWithOneCrossingPoint(w1tags = {}, r1tags = {}) {
-    const n1 = Rapid.osmNode({ id: 'n-1', loc: [0, -1] });
-    const n2 = Rapid.osmNode({ id: 'n-2', loc: [0,  1] });
-    const w1 = Rapid.osmWay({ id: 'w-1', nodes: ['n-1', 'n-2'], tags: w1tags });
+    const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, -1] });
+    const n2 = new Rapid.OsmNode(context, { id: 'n-2', loc: [0,  1] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n-1', 'n-2'], tags: w1tags });
 
-    const n3 = Rapid.osmNode({ id: 'n-3', loc: [-1, 0] });
-    const n4 = Rapid.osmNode({ id: 'n-4', loc: [ 1, 0] });
-    const n5 = Rapid.osmNode({ id: 'n-5', loc: [ 1, 3] });
-    const n6 = Rapid.osmNode({ id: 'n-6', loc: [-1, 3] });
-    const w2 = Rapid.osmWay({ id: 'w-2', nodes: ['n-3', 'n-4', 'n-5'], tags: {} });
-    const w3 = Rapid.osmWay({ id: 'w-3', nodes: ['n-5', 'n-6', 'n-3'], tags: {} });
-    const r1 = Rapid.osmRelation({id: 'r-1', members: [{ id: 'w-2', type: 'way' }, { id: 'w-3', type: 'way' }], tags: r1tags });
+    const n3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [-1, 0] });
+    const n4 = new Rapid.OsmNode(context, { id: 'n-4', loc: [ 1, 0] });
+    const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [ 1, 3] });
+    const n6 = new Rapid.OsmNode(context, { id: 'n-6', loc: [-1, 3] });
+    const w2 = new Rapid.OsmWay(context, { id: 'w-2', nodes: ['n-3', 'n-4', 'n-5'], tags: {} });
+    const w3 = new Rapid.OsmWay(context, { id: 'w-3', nodes: ['n-5', 'n-6', 'n-3'], tags: {} });
+    const r1 = new Rapid.OsmRelation(context, {id: 'r-1', members: [{ id: 'w-2', type: 'way' }, { id: 'w-3', type: 'way' }], tags: r1tags });
 
     const entities = [n1, n2, n3, n4, n5, n6, w1, w2, w3, r1];
     graph = new Rapid.Graph(entities);

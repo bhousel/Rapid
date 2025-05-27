@@ -8,6 +8,7 @@ describe('validationOutdatedTags', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.services = {};
       this.systems = {
         assets:     new Rapid.AssetSystem(this),
@@ -18,18 +19,19 @@ describe('validationOutdatedTags', () => {
     }
   }
 
-  const validator = Rapid.validationOutdatedTags(new MockContext());
+  const context = new MockContext();
+  const validator = Rapid.validationOutdatedTags(context);
 
 
   it('has no errors on good tags', () => {
-    const w = Rapid.osmWay({ tags: { highway: 'unclassified' }});
+    const w = new Rapid.OsmWay(context, { tags: { highway: 'unclassified' }});
     const g = new Rapid.Graph([w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('flags deprecated tag with replacement', () => {
-    const w = Rapid.osmWay({ tags: { highway: 'ford' }});
+    const w = new Rapid.OsmWay(context, { tags: { highway: 'ford' }});
     const g = new Rapid.Graph([w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);
@@ -42,7 +44,7 @@ describe('validationOutdatedTags', () => {
   });
 
   it('flags deprecated tag with no replacement', () => {
-    const w = Rapid.osmWay({ tags: { highway: 'no' }});
+    const w = new Rapid.OsmWay(context, { tags: { highway: 'no' }});
     const g = new Rapid.Graph([w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);
@@ -55,8 +57,11 @@ describe('validationOutdatedTags', () => {
   });
 
   it('ignores multipolygon tagged on the relation', () => {
-    const w = Rapid.osmWay({ tags: {} });
-    const r = Rapid.osmRelation({ tags: { building: 'yes', type: 'multipolygon' }, members: [{ id: w.id, role: 'outer' }] });
+    const w = new Rapid.OsmWay(context);
+    const r = new Rapid.OsmRelation(context, {
+      tags: { building: 'yes', type: 'multipolygon' },
+      members: [{ id: w.id, role: 'outer' }]
+    });
     const g = new Rapid.Graph([w, r]);
     const wIssues = validator(w, g);
     const rIssues = validator(r, g);
@@ -65,8 +70,11 @@ describe('validationOutdatedTags', () => {
   });
 
   it('flags multipolygon tagged on the outer way', () => {
-    const w = Rapid.osmWay({ tags: { building: 'yes' } });
-    const r = Rapid.osmRelation({ tags: { type: 'multipolygon' }, members: [{ id: w.id, role: 'outer' }] });
+    const w = new Rapid.OsmWay(context, { tags: { building: 'yes' } });
+    const r = new Rapid.OsmRelation(context, {
+      tags: { type: 'multipolygon' },
+      members: [{ id: w.id, role: 'outer' }]
+    });
     const g = new Rapid.Graph([w, r]);
     const wIssues = validator(w, g);
     const rIssues = validator(r, g);

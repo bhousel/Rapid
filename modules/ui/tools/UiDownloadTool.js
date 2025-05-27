@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 
 import { JXON } from '../../util/jxon.js';
-import { osmChangeset } from '../../models/index.js';
+import { OsmChangeset } from '../../models/OsmChangeset.js';
 import { actionDiscardTags } from '../../actions/index.js';
 import { uiIcon } from '../icon.js';
 import { uiTooltip } from '../tooltip.js';
@@ -110,7 +110,7 @@ export class UiDownloadTool {
     const editor = context.systems.editor;
 
     const changes = editor.changes(actionDiscardTags(editor.difference()));
-    const changeset = new osmChangeset();
+    const changeset = new OsmChangeset(context);
     const data = JXON.stringify(changeset.osmChangeJXON(changes));
     const fileName = 'change.osc';
 

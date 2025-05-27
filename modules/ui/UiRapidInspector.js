@@ -183,9 +183,9 @@ export class UiRapidInspector {
       return;
     }
 
-    const service = context.services[datum.__service__];
-    const graph = service.graph(datum.__datasetid__);
-    const datasetID = datum.__datasetid__.replace('-conflated', '');
+    const service = context.services[datum.props.__service__];
+    const graph = service.graph(datum.props.__datasetid__);
+    const datasetID = datum.props.__datasetid__.replace('-conflated', '');
     const dataset = rapid.datasets.get(datasetID);
 
     // In place of a string annotation, this introduces an "object-style"
@@ -307,7 +307,7 @@ export class UiRapidInspector {
     const l10n = context.systems.l10n;
     const rapid = context.systems.rapid;
 
-    const datasetID = datum.__datasetid__.replace('-conflated', '');
+    const datasetID = datum.props.__datasetid__.replace('-conflated', '');
     const dataset = rapid.datasets.get(datasetID);
     const color = dataset.color;
 
@@ -456,7 +456,7 @@ export class UiRapidInspector {
     const datum = this.datum;
     if (!datum) return;
 
-    const datasetID = datum.__datasetid__.replace('-conflated', '');
+    const datasetID = datum.props.__datasetid__.replace('-conflated', '');
     const dataset = rapid.datasets.get(datasetID);
 
     // Only display notice data for open data (for now)

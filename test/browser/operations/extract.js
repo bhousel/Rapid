@@ -1,5 +1,4 @@
 describe('operationExtract', () => {
-  let _graph;
 
   class MockEditSystem {
     constructor() {}
@@ -27,7 +26,7 @@ describe('operationExtract', () => {
   }
 
   const context = new MockContext();
-
+  let _graph;
 
   describe('available', () => {
     beforeEach(() => {
@@ -38,14 +37,14 @@ describe('operationExtract', () => {
       // e - node with tags, no parent way
       // f - node with no tags, no parent way
       _graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0], tags: { 'name': 'fake' } }),
-        Rapid.osmNode({ id: 'b', loc: [0, 0], tags: { 'name': 'fake' } }),
-        Rapid.osmNode({ id: 'c', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'd', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'e', loc: [0, 0], tags: { 'name': 'fake' } }),
-        Rapid.osmNode({ id: 'f', loc: [0, 0] }),
-        Rapid.osmWay({ id: 'x', nodes: ['a', 'b', 'c', 'd'] }),
-        Rapid.osmWay({ id: 'y', nodes: ['b', 'd'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0], tags: { 'name': 'fake' } }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 0], tags: { 'name': 'fake' } }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [0, 0], tags: { 'name': 'fake' } }),
+        new Rapid.OsmNode(context, { id: 'f', loc: [0, 0] }),
+        new Rapid.OsmWay(context, { id: 'x', nodes: ['a', 'b', 'c', 'd'] }),
+        new Rapid.OsmWay(context, { id: 'y', nodes: ['b', 'd'] })
       ]);
     });
 
@@ -104,10 +103,10 @@ describe('operationExtract', () => {
   describe('disabled', () => {
     it('returns enabled for non-related node', () => {
       _graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 0], tags: { 'name': 'fake' } }),
-        Rapid.osmNode({ id: 'c', loc: [0, 0] }),
-        Rapid.osmWay({ id: 'x', nodes: ['a', 'b', 'c'] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 0], tags: { 'name': 'fake' } }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),
+        new Rapid.OsmWay(context, { id: 'x', nodes: ['a', 'b', 'c'] })
       ]);
 
       const result = Rapid.operationExtract(context, ['b']).disabled();
@@ -116,11 +115,11 @@ describe('operationExtract', () => {
 
     it('returns enabled for non-restriction related node', () => {
       _graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 0], tags: { 'name': 'fake' } }),
-        Rapid.osmNode({ id: 'c', loc: [0, 0] }),
-        Rapid.osmWay({ id: 'x', nodes: ['a', 'b', 'c'] }),
-        Rapid.osmRelation({ id: 'r', members: [{ id: 'b', role: 'label' }] })
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 0], tags: { 'name': 'fake' } }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),
+        new Rapid.OsmWay(context, { id: 'x', nodes: ['a', 'b', 'c'] }),
+        new Rapid.OsmRelation(context, { id: 'r', members: [{ id: 'b', role: 'label' }] })
       ]);
       const result = Rapid.operationExtract(context, ['b']).disabled();
       expect(result).to.be.not.ok;
@@ -130,16 +129,16 @@ describe('operationExtract', () => {
       // https://wiki.openstreetmap.org/wiki/Relation:restriction indicates that
       // from and to roles are only appropriate for Ways
       _graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'c', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'd', loc: [0, 0], tags: { 'name': 'fake' } }),
-        Rapid.osmNode({ id: 'e', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'f', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'g', loc: [0, 0] }),
-        Rapid.osmWay({ id: 'x', nodes: ['a', 'b', 'c'] }),
-        Rapid.osmWay({ id: 'y', nodes: ['e', 'f', 'g'] }),
-        Rapid.osmRelation({id: 'r', tags: { type: 'restriction', restriction: 'no_right_turn' },
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, 0], tags: { 'name': 'fake' } }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'f', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'g', loc: [0, 0] }),
+        new Rapid.OsmWay(context, { id: 'x', nodes: ['a', 'b', 'c'] }),
+        new Rapid.OsmWay(context, { id: 'y', nodes: ['e', 'f', 'g'] }),
+        new Rapid.OsmRelation(context, {id: 'r', tags: { type: 'restriction', restriction: 'no_right_turn' },
           members: [
             { id: 'x', type: 'way', role: 'from' },
             { id: 'd', type: 'node', role: 'via' },
@@ -155,16 +154,16 @@ describe('operationExtract', () => {
       // https://wiki.openstreetmap.org/wiki/Relation:restriction indicates that
       // from and to roles are only appropriate for Ways
       _graph = new Rapid.Graph([
-        Rapid.osmNode({ id: 'a', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'b', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'c', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'd', loc: [0, 0], tags: { 'name': 'fake' } }),
-        Rapid.osmNode({ id: 'e', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'f', loc: [0, 0] }),
-        Rapid.osmNode({ id: 'g', loc: [0, 0] }),
-        Rapid.osmWay({ id: 'x', nodes: ['a', 'b'] }),
-        Rapid.osmWay({ id: 'y', nodes: ['e', 'f', 'g'] }),
-        Rapid.osmRelation({id: 'r', tags: {type: 'restriction', restriction: 'no_right_turn'},
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'd', loc: [0, 0], tags: { 'name': 'fake' } }),
+        new Rapid.OsmNode(context, { id: 'e', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'f', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'g', loc: [0, 0] }),
+        new Rapid.OsmWay(context, { id: 'x', nodes: ['a', 'b'] }),
+        new Rapid.OsmWay(context, { id: 'y', nodes: ['e', 'f', 'g'] }),
+        new Rapid.OsmRelation(context, {id: 'r', tags: {type: 'restriction', restriction: 'no_right_turn'},
           members: [
             { id: 'x', type: 'way', role: 'from' },
             { id: 'c', type: 'node', role: 'via' },

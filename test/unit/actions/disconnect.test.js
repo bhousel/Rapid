@@ -4,6 +4,13 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionDisconnect', () => {
+  class MockContext {
+    constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+    }
+  }
+
+  const context = new MockContext();
 
   it('replaces the node with a new node in all but the first way', () => {
     // Situation:
@@ -20,12 +27,12 @@ describe('actionDisconnect', () => {
     //          d
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b'}),
-      Rapid.osmNode({id: 'c'}),
-      Rapid.osmNode({id: 'd'}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c']}),
-      Rapid.osmWay({id: '|', nodes: ['d', 'b']})
+      new Rapid.OsmNode(context, {id: 'a'}),
+      new Rapid.OsmNode(context, {id: 'b'}),
+      new Rapid.OsmNode(context, {id: 'c'}),
+      new Rapid.OsmNode(context, {id: 'd'}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c']}),
+      new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'b']})
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
@@ -48,13 +55,13 @@ describe('actionDisconnect', () => {
     //             d
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b'}),
-      Rapid.osmNode({id: 'c'}),
-      Rapid.osmNode({id: 'd'}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-      Rapid.osmWay({id: '|', nodes: ['d', 'b']})
+      new Rapid.OsmNode(context, {id: 'a'}),
+      new Rapid.OsmNode(context, {id: 'b'}),
+      new Rapid.OsmNode(context, {id: 'c'}),
+      new Rapid.OsmNode(context, {id: 'd'}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+      new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'b']})
     ]);
 
     const result = Rapid.actionDisconnect('b', '*').limitWays(['-'])(graph);
@@ -79,13 +86,13 @@ describe('actionDisconnect', () => {
     //            e -- d
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b'}),
-      Rapid.osmNode({id: 'c'}),
-      Rapid.osmNode({id: 'd'}),
-      Rapid.osmNode({id: 'e'}),
-      Rapid.osmWay({id: '=', nodes: ['a', 'b']}),
-      Rapid.osmWay({id: '-', nodes: ['b', 'c', 'd', 'e', 'b']})
+      new Rapid.OsmNode(context, {id: 'a'}),
+      new Rapid.OsmNode(context, {id: 'b'}),
+      new Rapid.OsmNode(context, {id: 'c'}),
+      new Rapid.OsmNode(context, {id: 'd'}),
+      new Rapid.OsmNode(context, {id: 'e'}),
+      new Rapid.OsmWay(context, {id: '=', nodes: ['a', 'b']}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['b', 'c', 'd', 'e', 'b']})
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
@@ -109,10 +116,10 @@ describe('actionDisconnect', () => {
     //  * --- c
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b'}),
-      Rapid.osmNode({id: 'c'}),
-      Rapid.osmWay({id: 'w', nodes: ['a', 'b', 'c', 'a']})
+      new Rapid.OsmNode(context, {id: 'a'}),
+      new Rapid.OsmNode(context, {id: 'b'}),
+      new Rapid.OsmNode(context, {id: 'c'}),
+      new Rapid.OsmWay(context, {id: 'w', nodes: ['a', 'b', 'c', 'a']})
     ]);
 
     const result = Rapid.actionDisconnect('a', '*')(graph);
@@ -136,12 +143,12 @@ describe('actionDisconnect', () => {
     //  * -- e -- d
     //
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b'}),
-      Rapid.osmNode({id: 'c'}),
-      Rapid.osmNode({id: 'd'}),
-      Rapid.osmNode({id: 'e'}),
-      Rapid.osmWay({id: 'w', nodes: ['a', 'b', 'c', 'd', 'e', 'b', 'a'], tags: {area: 'yes'}})
+      new Rapid.OsmNode(context, {id: 'a'}),
+      new Rapid.OsmNode(context, {id: 'b'}),
+      new Rapid.OsmNode(context, {id: 'c'}),
+      new Rapid.OsmNode(context, {id: 'd'}),
+      new Rapid.OsmNode(context, {id: 'e'}),
+      new Rapid.OsmWay(context, {id: 'w', nodes: ['a', 'b', 'c', 'd', 'e', 'b', 'a'], tags: {area: 'yes'}})
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
@@ -168,13 +175,13 @@ describe('actionDisconnect', () => {
     // 2 areas: a-b-c-a  and  *-d-e-*
 
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b'}),
-      Rapid.osmNode({id: 'c'}),
-      Rapid.osmNode({id: 'd'}),
-      Rapid.osmNode({id: 'e'}),
-      Rapid.osmWay({id: 'w1', nodes: ['a', 'b', 'c', 'a'], tags: {area: 'yes'}}),
-      Rapid.osmWay({id: 'w2', nodes: ['b', 'd', 'e', 'b'], tags: {area: 'yes'}})
+      new Rapid.OsmNode(context, {id: 'a'}),
+      new Rapid.OsmNode(context, {id: 'b'}),
+      new Rapid.OsmNode(context, {id: 'c'}),
+      new Rapid.OsmNode(context, {id: 'd'}),
+      new Rapid.OsmNode(context, {id: 'e'}),
+      new Rapid.OsmWay(context, {id: 'w1', nodes: ['a', 'b', 'c', 'a'], tags: {area: 'yes'}}),
+      new Rapid.OsmWay(context, {id: 'w2', nodes: ['b', 'd', 'e', 'b'], tags: {area: 'yes'}})
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
@@ -202,13 +209,13 @@ describe('actionDisconnect', () => {
     // 2 areas: b-c-a-b  and  *-d-e-*
 
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b'}),
-      Rapid.osmNode({id: 'c'}),
-      Rapid.osmNode({id: 'd'}),
-      Rapid.osmNode({id: 'e'}),
-      Rapid.osmWay({id: 'w1', nodes: ['b', 'c', 'a', 'b'], tags: {area: 'yes'}}),
-      Rapid.osmWay({id: 'w2', nodes: ['b', 'd', 'e', 'b'], tags: {area: 'yes'}})
+      new Rapid.OsmNode(context, {id: 'a'}),
+      new Rapid.OsmNode(context, {id: 'b'}),
+      new Rapid.OsmNode(context, {id: 'c'}),
+      new Rapid.OsmNode(context, {id: 'd'}),
+      new Rapid.OsmNode(context, {id: 'e'}),
+      new Rapid.OsmWay(context, {id: 'w1', nodes: ['b', 'c', 'a', 'b'], tags: {area: 'yes'}}),
+      new Rapid.OsmWay(context, {id: 'w2', nodes: ['b', 'd', 'e', 'b'], tags: {area: 'yes'}})
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
@@ -222,12 +229,12 @@ describe('actionDisconnect', () => {
     const tags = { highway: 'traffic_signals' };
     const loc = [1, 2];
     const graph = new Rapid.Graph([
-      Rapid.osmNode({id: 'a'}),
-      Rapid.osmNode({id: 'b', loc: loc, tags: tags}),
-      Rapid.osmNode({id: 'c'}),
-      Rapid.osmNode({id: 'd'}),
-      Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c']}),
-      Rapid.osmWay({id: '|', nodes: ['d', 'b']})
+      new Rapid.OsmNode(context, {id: 'a'}),
+      new Rapid.OsmNode(context, {id: 'b', loc: loc, tags: tags}),
+      new Rapid.OsmNode(context, {id: 'c'}),
+      new Rapid.OsmNode(context, {id: 'd'}),
+      new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c']}),
+      new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'b']})
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
@@ -250,7 +257,7 @@ describe('actionDisconnect', () => {
 
   describe('#disabled', () => {
     it('returns \'not_connected\' for a node shared by less than two ways', () => {
-      const graph = new Rapid.Graph([Rapid.osmNode({id: 'a'})]);
+      const graph = new Rapid.Graph([new Rapid.OsmNode(context, {id: 'a'})]);
       const disabled = Rapid.actionDisconnect('a').disabled(graph);
       assert.equal(disabled, 'not_connected');
     });
@@ -260,11 +267,11 @@ describe('actionDisconnect', () => {
       //  |     |
       //  d --- c
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a'}),
-        Rapid.osmNode({id: 'b'}),
-        Rapid.osmNode({id: 'c'}),
-        Rapid.osmNode({id: 'd'}),
-        Rapid.osmWay({id: 'w', nodes: ['a', 'b', 'c', 'd', 'a']})
+        new Rapid.OsmNode(context, {id: 'a'}),
+        new Rapid.OsmNode(context, {id: 'b'}),
+        new Rapid.OsmNode(context, {id: 'c'}),
+        new Rapid.OsmNode(context, {id: 'd'}),
+        new Rapid.OsmWay(context, {id: 'w', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
       const disabled = Rapid.actionDisconnect('a').disabled(graph);
       assert.ok(!disabled);
@@ -275,11 +282,11 @@ describe('actionDisconnect', () => {
       //  |     |
       //  d --- c
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a'}),
-        Rapid.osmNode({id: 'b'}),
-        Rapid.osmNode({id: 'c'}),
-        Rapid.osmNode({id: 'd'}),
-        Rapid.osmWay({id: 'w', nodes: ['a', 'b', 'c', 'd', 'a'], tags: {area: 'yes'}})
+        new Rapid.OsmNode(context, {id: 'a'}),
+        new Rapid.OsmNode(context, {id: 'b'}),
+        new Rapid.OsmNode(context, {id: 'c'}),
+        new Rapid.OsmNode(context, {id: 'd'}),
+        new Rapid.OsmWay(context, {id: 'w', nodes: ['a', 'b', 'c', 'd', 'a'], tags: {area: 'yes'}})
       ]);
       const disabled = Rapid.actionDisconnect('a').disabled(graph);
       assert.equal(disabled, 'not_connected');
@@ -290,12 +297,12 @@ describe('actionDisconnect', () => {
       //        |     |
       //        e --- d
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a'}),
-        Rapid.osmNode({id: 'b'}),
-        Rapid.osmNode({id: 'c'}),
-        Rapid.osmNode({id: 'd'}),
-        Rapid.osmNode({id: 'e'}),
-        Rapid.osmWay({id: 'w', nodes: ['a', 'b', 'c', 'd', 'e', 'b', 'a'], tags: {area: 'yes'}})
+        new Rapid.OsmNode(context, {id: 'a'}),
+        new Rapid.OsmNode(context, {id: 'b'}),
+        new Rapid.OsmNode(context, {id: 'c'}),
+        new Rapid.OsmNode(context, {id: 'd'}),
+        new Rapid.OsmNode(context, {id: 'e'}),
+        new Rapid.OsmWay(context, {id: 'w', nodes: ['a', 'b', 'c', 'd', 'e', 'b', 'a'], tags: {area: 'yes'}})
       ]);
       const disabled = Rapid.actionDisconnect('b').disabled(graph);
       assert.ok(!disabled);
@@ -306,12 +313,12 @@ describe('actionDisconnect', () => {
       //        |
       //        d
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a'}),
-        Rapid.osmNode({id: 'b'}),
-        Rapid.osmNode({id: 'c'}),
-        Rapid.osmNode({id: 'd'}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b', 'c']}),
-        Rapid.osmWay({id: '|', nodes: ['d', 'b']})
+        new Rapid.OsmNode(context, {id: 'a'}),
+        new Rapid.OsmNode(context, {id: 'b'}),
+        new Rapid.OsmNode(context, {id: 'c'}),
+        new Rapid.OsmNode(context, {id: 'd'}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c']}),
+        new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'b']})
       ]);
       const disabled = Rapid.actionDisconnect('b').disabled(graph);
       assert.ok(!disabled);
@@ -322,13 +329,13 @@ describe('actionDisconnect', () => {
       //        |
       //        d
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a'}),
-        Rapid.osmNode({id: 'b'}),
-        Rapid.osmNode({id: 'c'}),
-        Rapid.osmNode({id: 'd'}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-        Rapid.osmWay({id: '|', nodes: ['d', 'b']})
+        new Rapid.OsmNode(context, {id: 'a'}),
+        new Rapid.OsmNode(context, {id: 'b'}),
+        new Rapid.OsmNode(context, {id: 'c'}),
+        new Rapid.OsmNode(context, {id: 'd'}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+        new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'b']})
       ]);
       const disabled = Rapid.actionDisconnect('b').limitWays(['-']).disabled(graph);
       assert.ok(!disabled);
@@ -339,12 +346,12 @@ describe('actionDisconnect', () => {
       // Covers restriction relations, routes, multipolygons.
       // a --- b === c
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a'}),
-        Rapid.osmNode({id: 'b'}),
-        Rapid.osmNode({id: 'c'}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-        Rapid.osmRelation({id: 'r', members: [{ id: '-' }, { id: '=' }]})
+        new Rapid.OsmNode(context, {id: 'a'}),
+        new Rapid.OsmNode(context, {id: 'b'}),
+        new Rapid.OsmNode(context, {id: 'c'}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+        new Rapid.OsmRelation(context, {id: 'r', members: [{ id: '-' }, { id: '=' }]})
       ]);
       const disabled = Rapid.actionDisconnect('b').disabled(graph);
       assert.equal(disabled, 'relation');
@@ -355,14 +362,14 @@ describe('actionDisconnect', () => {
       //        |
       //        d
       const graph = new Rapid.Graph([
-        Rapid.osmNode({id: 'a'}),
-        Rapid.osmNode({id: 'b'}),
-        Rapid.osmNode({id: 'c'}),
-        Rapid.osmNode({id: 'd'}),
-        Rapid.osmWay({id: '-', nodes: ['a', 'b']}),
-        Rapid.osmWay({id: '=', nodes: ['b', 'c']}),
-        Rapid.osmWay({id: '|', nodes: ['d', 'b']}),
-        Rapid.osmRelation({id: 'r', members: [{ id: '-' }, { id: '=' }]})
+        new Rapid.OsmNode(context, {id: 'a'}),
+        new Rapid.OsmNode(context, {id: 'b'}),
+        new Rapid.OsmNode(context, {id: 'c'}),
+        new Rapid.OsmNode(context, {id: 'd'}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
+        new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'b']}),
+        new Rapid.OsmRelation(context, {id: 'r', members: [{ id: '-' }, { id: '=' }]})
       ]);
       const disabled = Rapid.actionDisconnect('b').limitWays(['|']).disabled(graph);
       assert.ok(!disabled);

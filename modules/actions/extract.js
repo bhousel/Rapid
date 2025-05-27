@@ -1,7 +1,7 @@
 import { polygonCentroid as d3_polygonCentroid } from 'd3-polygon';
 import { vecInterp } from '@rapid-sdk/math';
 
-import { osmNode } from '../models/node.js';
+import { OsmNode } from '../models/OsmNode.js';
 
 
 export function actionExtract(entityID, viewport) {
@@ -21,7 +21,7 @@ export function actionExtract(entityID, viewport) {
     _extractedNodeID = node.id;
 
     // Create a new node to replace the one we will detach
-    const replacement = osmNode({ loc: node.loc });
+    const replacement = new OsmNode(node.context, { loc: node.loc });
     graph = graph.replace(replacement);
 
     for (const parentWay of graph.parentWays(node)) {
@@ -99,7 +99,7 @@ export function actionExtract(entityID, viewport) {
       entityTags.area = 'yes';  // ensure that areas keep area geometry
     }
 
-    const replacement = osmNode({ loc: extractedLoc, tags: extractTags });
+    const replacement = new OsmNode(entity.context, { loc: extractedLoc, tags: extractTags });
     graph = graph.replace(replacement);
     _extractedNodeID = replacement.id;
 

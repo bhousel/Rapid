@@ -2,7 +2,7 @@ import { geomPathIntersections, geomPathLength, vecAdd, vecAngle, vecEqual, vecI
 import { utilArrayIntersection } from '@rapid-sdk/util';
 
 import { geoChooseEdge } from '../geo/index.js';
-import { osmNode } from '../models/node.js';
+import { OsmNode } from '../models/OsmNode.js';
 
 
 // https://github.com/openstreetmap/josm/blob/mirror/src/org/openstreetmap/josm/command/MoveCommand.java
@@ -152,7 +152,7 @@ export function actionMove(moveIDs, tryDelta, viewport, cache) {
         var key = wayId + '_' + nodeId;
         var orig = cache.replacedVertex[key];
         if (!orig) {
-            orig = osmNode();
+            orig = new OsmNode(way.context);
             cache.replacedVertex[key] = orig;
             cache.startLoc[orig.id] = cache.startLoc[nodeId];
         }
