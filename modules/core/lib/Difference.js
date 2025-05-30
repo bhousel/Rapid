@@ -1,5 +1,4 @@
 import deepEqual from 'fast-deep-equal';
-import { vecEqual } from '@rapid-sdk/math';
 import { utilArrayUnion } from '@rapid-sdk/util';
 
 
@@ -22,7 +21,7 @@ export class Difference {
   constructor(base, head) {
     this._base = base;
     this._head = head;
-    this._changes = new Map();   // Map(entityID -> Object)
+    this._changes = new Map();   // Map<entityID, Object>
     this.didChange = {};         // 'addition', 'deletion', 'geometry', 'properties'
 
     if (base === head) return;   // same Graph, no difference
@@ -36,6 +35,8 @@ export class Difference {
       const b = base.hasEntity(id);
       if (h === b) continue;  // no change
 
+      const type = h?.type || b?.type;
+
       if (b && !h) {
         this._changes.set(id, { base: b, head: h });
         this.didChange.deletion = true;
@@ -48,21 +49,26 @@ export class Difference {
       }
 
       if (h && b) {
-        if (h.members && b.members && !deepEqual(h.members, b.members)) {
-          this._changes.set(id, { base: b, head: h });
-          this.didChange.geometry = true;
-          this.didChange.properties = true;
-          continue;
+        if (type === 'relation') {
+          if (!deepEqual(h.members, b.members)) {
+            this._changes.set(id, { base: b, head: h });
+            this.didChange.geometry = true;
+            this.didChange.properties = true;
+            continue;
+          }
+        } else if (type === 'way') {
+          if (!deepEqual(h.nodes, b.nodes)) {
+            this._changes.set(id, { base: b, head: h });
+            this.didChange.geometry = true;
+          }
+        } else if (type === 'node') {
+          if (!deepEqual(h.loc, b.loc)) {
+            this._changes.set(id, { base: b, head: h });
+            this.didChange.geometry = true;
+          }
         }
-        if (h.loc && b.loc && !vecEqual(h.loc, b.loc)) {
-          this._changes.set(id, { base: b, head: h });
-          this.didChange.geometry = true;
-        }
-        if (h.nodes && b.nodes && !deepEqual(h.nodes, b.nodes)) {
-          this._changes.set(id, { base: b, head: h });
-          this.didChange.geometry = true;
-        }
-        if (h.tags && b.tags && !deepEqual(h.tags, b.tags)) {
+
+        if (!deepEqual(h.tags, b.tags)) {
           this._changes.set(id, { base: b, head: h });
           this.didChange.properties = true;
         }
@@ -130,12 +136,12 @@ export class Difference {
    * summary
    * Generates a difference "summary" in a format like what is presented on the
    * pre-save commit component, with list items like "created", "modified", "deleted".
-   * @return  Map(entityID -> change detail)
+   * @return  Map<entityID, change detail>
    */
   summary() {
     const base = this._base;
     const head = this._head;
-    const result = new Map();  // Map(entityID -> change detail)
+    const result = new Map();  // Map<entityID, change detail>
 
     for (const change of this._changes.values()) {
       const h = change.head;
@@ -148,7 +154,7 @@ export class Difference {
         _addEntity(b, base, 'deleted');
 
       } else if (b && h) {  // modified vertex
-        const moved = !vecEqual(b.loc, h.loc);
+        const moved = !deepEqual(b.loc, h.loc);
         const retagged = !deepEqual(b.tags, h.tags);
         if (moved) {
           for (const parent of head.parentWays(h)) {
@@ -185,7 +191,7 @@ export class Difference {
    */
   complete() {
     const head = this._head;
-    const result = new Map();  // Map(entityID -> Entity)
+    const result = new Map();  // Map<entityID, Entity>
 
     for (const [entityID, change] of this._changes) {
       const h = change.head;

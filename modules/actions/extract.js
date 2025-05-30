@@ -1,6 +1,3 @@
-import { polygonCentroid as d3_polygonCentroid } from 'd3-polygon';
-import { vecInterp } from '@rapid-sdk/math';
-
 import { OsmNode } from '../models/OsmNode.js';
 
 
@@ -35,32 +32,14 @@ export function actionExtract(entityID, viewport) {
 
 
   function _extractFromWayOrRelation(entity, graph) {
-    const fromGeometry = entity.geometry(graph);
     const keysToCopyAndRetain = ['source', 'wheelchair'];
     const keysToRetain = ['area'];
     const buildingKeysToRetain = /architect|building|height|layer|nycdoitt:bin|roof/i;
 
-    const geojson = entity.asGeoJSON(graph);
-    const coords = geojson.type === 'LineString' ? geojson.coordinates :
-      geojson.type === 'Polygon' ? geojson.coordinates[0] :
-      geojson.type === 'MultiPolygon' ? geojson.coordinates[0][0] : [];
-    const points = coords.map(coord => viewport.project(coord));
+    const poi = entity.geom.poi;  // Pole of Inaccessability (in world coords)
+    if (!poi) return graph;
 
-    let centroid;
-    if (!points.length) {
-      return graph;
-    } else if (points.length === 1) {
-      centroid = points[0];
-    } else if (points.length === 2) {
-      centroid = vecInterp(points[0], points[1], 0.5);
-    } else {
-      centroid = d3_polygonCentroid(points);
-    }
-
-    let extractedLoc = viewport.unproject(centroid);
-    if (!extractedLoc  || !isFinite(extractedLoc[0]) || !isFinite(extractedLoc[1])) {
-      extractedLoc = entity.extent(graph).center();
-    }
+    const extractLoc = viewport.worldToWgs84(poi);
 
     const indoorAreaValues = {
       area: true,
@@ -70,13 +49,13 @@ export function actionExtract(entityID, viewport) {
       room: true
     };
 
+    const isArea = (entity.geometry(graph) === 'area');
+    const isIndoorArea = isArea && entity.tags.indoor && indoorAreaValues[entity.tags.indoor];
     const isBuilding = (entity.tags.building && entity.tags.building !== 'no') ||
       (entity.tags['building:part'] && entity.tags['building:part'] !== 'no');
 
-    const isIndoorArea = fromGeometry === 'area' && entity.tags.indoor && indoorAreaValues[entity.tags.indoor];
-
-    let entityTags = Object.assign({}, entity.tags);  // shallow copy
-    let extractTags = {};
+    const entityTags = Object.assign({}, entity.tags);  // shallow copy
+    const extractTags = {};
 
     for (const key in entityTags) {
       if (entity.type === 'relation' && key === 'type') continue;
@@ -95,15 +74,15 @@ export function actionExtract(entityID, viewport) {
       delete entityTags[key];
     }
 
-    if (!isBuilding && !isIndoorArea && fromGeometry === 'area') {
+    if (isArea && !isBuilding && !isIndoorArea) {
       entityTags.area = 'yes';  // ensure that areas keep area geometry
     }
 
-    const replacement = new OsmNode(entity.context, { loc: extractedLoc, tags: extractTags });
+    const replacement = new OsmNode(entity.context, { loc: extractLoc, tags: extractTags });
     graph = graph.replace(replacement);
     _extractedNodeID = replacement.id;
 
-    return graph.replace(entity.update({tags: entityTags}));
+    return graph.replace(entity.update({ tags: entityTags }));
   }
 
 

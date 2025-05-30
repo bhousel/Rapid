@@ -5,7 +5,7 @@ import polylabel from '@mapbox/polylabel';
 
 /**
  * Geometry
- * Wrapper for geometry data.
+ * Wrapper for both original and projected geometry data.
  *
  * Previously this code lived in `PixiGeometry` where it applied only to rendered features,
  * and worked with screen coordinates.  Now it works with all features and with world coordinates.
@@ -59,8 +59,10 @@ export class Geometry {
   clone() {
     const copy = new Geometry(this.context);
 
-    // someday: check perf?  JSON.parse(JSON.stringify()) may still beat structuredClone for this data
     copy.type = this.type;
+    copy.dirty = this.dirty;
+
+    // someday: check perf?  JSON.parse(JSON.stringify()) may still beat structuredClone for Array data
     copy.origCoords = globalThis.structuredClone(this.origCoords);
     copy.origExtent = new Extent(this.origExtent);
 
@@ -85,6 +87,8 @@ export class Geometry {
    * Remove all stored data
    */
   reset() {
+    this.dirty = true;
+
     // Original data - These are in WGS84 coordinates
     // ([0,0] is Null Island)
     this.origCoords = null;     // coordinate data
@@ -110,9 +114,10 @@ export class Geometry {
    * update
    */
   update() {
-    if (!this.origCoords) return;  // nothing to do
+    if (!this.dirty || !this.origCoords) return;  // nothing to do
 
     const viewport = this.context.viewport;
+    this.dirty = false;
 
     // reset all projected properties
     this.extent = null;
@@ -170,8 +175,7 @@ export class Geometry {
       this.flatOuter = projFlatRings[0];
       this.holes = null;
       this.flatHoles = null;
-
-    } else {
+    } else {  // polygon
       this.coords = projRings;
       this.flatCoords = projFlatRings;
       this.outer = projRings[0];
@@ -192,7 +196,7 @@ export class Geometry {
       this.centroid = vecInterp(this.outer[0], this.outer[1], 0.5);  // average the 2 points
       this.poi = this.centroid;
 
-    } else {     // > 2 coordinates...
+    } else {   // > 2 coordinates...
       // Convex Hull
       this.hull = polygonHull(this.outer);
 
@@ -203,8 +207,12 @@ export class Geometry {
         this.centroid = polygonCentroid(this.hull);
       }
 
-      // Pole of Inaccessability
-      this.poi = polylabel(this.coords);   // it expects outer + rings
+      // Pole of Inaccessability (for polygons)
+      if (this.type === 'line') {
+        this.poi = this.centroid;
+      } else {
+        this.poi = polylabel(this.coords);   // it expects outer + rings
+      }
 
       // Smallest Surrounding Rectangle
       this.ssr = geomGetSmallestSurroundingRectangle(this.hull);
@@ -230,8 +238,14 @@ export class Geometry {
    *    ]
    */
   setCoords(data) {
-    const type = this._inferType(data);
+    let type = this._inferType(data);
     if (!type) return;  // do nothing if data is missing
+
+if (type === 'multipolygon') {
+  if (data.length > 1) { console.warn('todo: no proper support for true MultiPolygon yet'); }
+  data = data[0];
+  type = 'polygon';
+}
 
     this.reset();
     this.type = type;
@@ -248,6 +262,7 @@ export class Geometry {
       }
     }
 
+    this.dirty = true;
     this.update();
   }
 
@@ -267,6 +282,9 @@ export class Geometry {
 
     const c = Array.isArray(b) && b[0];
     if (typeof c === 'number') return 'polygon';
+
+const d = Array.isArray(c) && c[0];
+if (typeof d === 'number') return 'multipolygon';
 
     return null;
   }

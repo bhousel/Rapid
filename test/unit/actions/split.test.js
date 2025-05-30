@@ -1152,10 +1152,10 @@ describe('actionSplit', () => {
 
       it('converts simple multipolygon to a proper multipolygon', () => {
         let graph = new Rapid.Graph([
-          new Rapid.OsmNode(context, { id: 'a' }),
-          new Rapid.OsmNode(context, { id: 'b' }),
-          new Rapid.OsmNode(context, { id: 'c' }),
-          new Rapid.OsmWay(context, { 'id': '-', nodes: ['a', 'b', 'c'], tags: { area: 'yes' } }),
+          new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
+          new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
+          new Rapid.OsmNode(context, { id: 'c', loc: [1, 0] }),
+          new Rapid.OsmWay(context, { 'id': '-', nodes: ['a', 'b', 'c', 'a'], tags: { area: 'yes' } }),
           new Rapid.OsmRelation(context, { id: 'r', members: [{ id: '-', type: 'way', role: 'outer' }], tags: { type: 'multipolygon' } })
         ]);
 

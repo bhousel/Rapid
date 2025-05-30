@@ -12,8 +12,9 @@ export function utilTotalExtent(vals, graph) {
 
   for (const val of vals) {
     const entity = (typeof val === 'string' ? graph.hasEntity(val) : val);
-    if (entity) {
-      extent.extendSelf(entity.extent(graph));
+    const other = entity?.extent(graph);
+    if (other) {
+      extent.extendSelf(other);
     }
   }
 

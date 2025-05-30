@@ -16,11 +16,13 @@ export class Graph {
    * @param  mutable?  Do updates affect this Graph or return a new Graph
    */
   constructor(other, mutable) {
+    this._transients = new Map();   // Map<entityID, Map<k,v>>
+    this._childNodes = new Map();   // Map<entityID, Array<Entity>>
 
     // A Graph derived from a predecessor Graph
     if (other instanceof Graph) {
-      this._base = other._base;      // Base data is shared among the chain of Graphs
-      this._local = {                // Local data is a clone of the predecessor data
+      this._base = other._base;     // Base data is shared among the chain of Graphs
+      this._local = {               // Local data is a clone of the predecessor data
         entities: new Map(other._local.entities),       // shallow clone
         parentWays: new Map(other._local.parentWays),   // shallow clone
         parentRels: new Map(other._local.parentRels)    // shallow clone
@@ -29,21 +31,19 @@ export class Graph {
      // A fresh Graph
      } else {
       this._base = {
-        entities: new Map(),      // Map<entityID, Entity>
-        parentWays: new Map(),    // Map<entityID, Set(entityIDs>>
-        parentRels: new Map()     // Map<entityID, Set(entityIDs>>
+        entities: new Map(),    // Map<entityID, Entity>
+        parentWays: new Map(),  // Map<entityID, Set(entityIDs>>
+        parentRels: new Map()   // Map<entityID, Set(entityIDs>>
       };
       this._local = {
-        entities: new Map(),      // Map<entityID, Entity>
-        parentWays: new Map(),    // Map<entityID, Set(entityIDs>
-        parentRels: new Map()     // Map<entityID, Set(entityIDs>
+        entities: new Map(),    // Map<entityID, Entity>
+        parentWays: new Map(),  // Map<entityID, Set(entityIDs>
+        parentRels: new Map()   // Map<entityID, Set(entityIDs>
       };
 
       this.rebase(other || [], [this]);   // seed with Entities, if provided
     }
 
-    this._transients = new Map();     // Map<entityID, Map<k,v>>
-    this._childNodes = new Map();
     this._frozen = !mutable;
   }
 
@@ -263,6 +263,7 @@ export class Graph {
    * Unlike other Graph methods that return a new Graph, rebase mutates in place.
    * This is because it is used during to merge newly downloaded data into an existing stack of edits.
    * To external consumers of the Graph, it should appear as if the Graph always contained the newly downloaded data.
+   * NOTE: It is probably important to call this ordered: Nodes, Ways, Relations
    * @param  entities  Entities to add to the base Graph
    * @param  stack     Stack of graphs that need updates after this rebase
    * @param  force     If `true`, always update, if `false` skip entities that we've seen already
@@ -344,8 +345,7 @@ export class Graph {
 
   /**
    * _updateCalculated
-   * Internal function, used to update parentWays and parentRels caches
-   * based on an entity update
+   * Internal function, used to update internal caches after an Entity update
    * @param  previous?     The previous Entity
    * @param  current?      The current Entity
    * @param  parentWays?   parentWays Map() to update (defaults to `this._local.parentWays`)
@@ -413,6 +413,13 @@ export class Graph {
         parentIDs.add(entity.id);
         parentRels.set(childID, parentIDs);
       }
+    }
+
+    // Caches for the new Entity should be consistent, so we can compute its geometry.
+    // Don't need to do this for nodes, because their geometry is just stored in `loc`
+    // which was set in their constructor.
+    if (current && (current.type === 'way' || current.type === 'relation')) {
+      current.updateGeometry(this);
     }
   }
 

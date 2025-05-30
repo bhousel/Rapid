@@ -40,7 +40,6 @@ export class PixiGeometry {
    */
   constructor() {
     this.type = null;      // 'point', 'line', or 'polygon'
-    this.dirty = true;
     this.reset();
   }
 
@@ -60,6 +59,8 @@ export class PixiGeometry {
    * Remove all stored data
    */
   reset() {
+    this.dirty = true;
+
     // Original data - These are in WGS84 coordinates
     // ([0,0] is Null Island)
     this.origCoords = null;     // coordinate data

@@ -12,8 +12,6 @@ describe('actionExtract', () => {
 
   const context = new MockContext();
   const viewport = context.viewport;
-  viewport.project = (val) => val;
-  viewport.unproject = (val) => val;
 
   let graph;
 

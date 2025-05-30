@@ -1,3 +1,5 @@
+import { Extent } from '@rapid-sdk/math';
+
 import { Geometry } from './Geometry.js';
 
 
@@ -71,9 +73,12 @@ export class AbstractFeature {
 
   /**
    * update
-   * Update the Feature's properties and return a new Feature
-   * @param   {Object}  props
-   * @return  this
+   * Update the Feature's properties and return a new Feature.
+   * Features are intended to be immutable.  To modify them a Feature,
+   *  pass in the properties to change, and you'll get a new Feature.
+   * The new Feature will have an updated `v` internal version number.
+   * @param   {Object}           props - the updated properties
+   * @return  {AbstractFeature}  a new Feature
    * @abstract
    */
   update(props) {
@@ -82,10 +87,12 @@ export class AbstractFeature {
 
   /**
    * updateSelf
-   * Like `update` but it modifies the Feature's properties in-place.
-   * This option is slightly more performant for situations where you don't mind mutating the Feature
-   * @param   {Object}  props
-   * @return  this
+   * Like `update` but it modifies the current Feature's properties in-place.
+   * This will also update the Feature's `v` internal version number.
+   * `updateSelf` is slightly more performant for situations where you don't need
+   * immutability and don't mind mutating the Feature.
+   * @param   {Object}           props - the updated properties
+   * @return  {AbstractFeature}  this Feature
    * @abstract
    */
   updateSelf(props) {
@@ -93,9 +100,33 @@ export class AbstractFeature {
   }
 
   /**
+   * extent
+   * Get an Extent (in WGS84 lon/lat) from the Geometry object.
+   * Note that this may return `null` in situations where an Extent could not be determined.
+   * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
+   * @return {Extent}  Extent representing the feature's bounding box, or `null`
+   */
+  extent() {
+    return this.geom.origExtent;
+  }
+
+  /**
+   * intersects
+   * Test if this feature intersects the given other Extent
+   * Note that this may return `false` in situations where an Extent could not be determined.
+   * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
+   * @param  {Extent}   other - the test extent
+   * @return {boolean}  `true` if it intersects, `false` if not
+   */
+  intersects(other) {
+    const extent = this.geom.origExtent;
+    return extent?.intersects(other);
+  }
+
+  /**
    * touch
    * Bump internal version number in place (forcing a rerender)
-   * @return  this feature
+   * @return  {AbstractFeature}  this Feature
    */
   touch() {
     this.props.v = _nextv++;
