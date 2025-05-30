@@ -121,15 +121,15 @@ describe('Tree', () => {
     it('includes intersecting ways after missing nodes are loaded', () => {
       const base = new Rapid.Graph();
       const tree = new Rapid.Tree(base);
-      const node = new Rapid.OsmNode(context, {id: 'n', loc: [0.5, 0.5]});
       const way = new Rapid.OsmWay(context, {nodes: ['n']});
       const graph = base.replace(way);
       const extent = new Rapid.sdk.Extent([0, 0], [1, 1]);
 
       assert.deepEqual(tree.intersects(extent, graph), []);
 
+      const node = new Rapid.OsmNode(context, {id: 'n', loc: [0.5, 0.5]});
       base.rebase([node], [base, graph]);
-      tree.rebase([node]);
+      tree.rebase([node], true);  // force will ensure that includeParents updates the parentway too
       assert.deepEqual(tree.intersects(extent, graph), [node, way]);
     });
 

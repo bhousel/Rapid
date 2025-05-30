@@ -54,29 +54,7 @@ export class AbstractFeature {
     }
 
     Object.assign(this.props, props);  // override with passed in props
-    // this._assignProps();
   }
-
-
-  // /**
-  //  * _assignProps
-  //  * Some of the props we receive are special
-  //  * We'll move them out of the props object into their own properties.
-  //  */
-  // _assignProps() {
-  //   for (const [k, v] of Object.entries(this.props)) {
-  //     if (k === 'id') {
-  //       this.id = v;
-  //       delete this.props.id;
-
-  //     } else if (k === 'type') {
-  //       delete this.props.type;
-
-  //     } else if (v === undefined) {
-  //       delete this.props[k];
-  //     }
-  //   }
-  // }
 
 
   /**
@@ -89,16 +67,6 @@ export class AbstractFeature {
     this.geom.destroy();
     this.geom = null;
     this.props = null;
-  }
-
-  /**
-   * clone
-   * Clone (deep copy) this Feature into a new Feature.
-   * @return    A deep copy of the feature
-   * @abstract
-   */
-  clone() {
-    throw new Error(`Do not call 'clone' on AbstractFeature`);
   }
 
   /**

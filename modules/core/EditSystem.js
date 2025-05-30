@@ -977,7 +977,7 @@ export class EditSystem extends AbstractSystem {
     // Return a simplified copy of the Entity to save space.
     function _copyEntity(entity) {
       // omit 'visible'
-      const copy = utilObjectOmit(entity, ['visible']);
+      const copy = utilObjectOmit(entity.asJSON(), ['type','visible']);
 
       // omit 'tags' if empty
       if (copy.tags && Object.keys(copy.tags).length === 0) {
@@ -986,8 +986,12 @@ export class EditSystem extends AbstractSystem {
 
       // simplify float precision
       if (Array.isArray(copy.loc)) {
-        copy.loc[0] = +copy.loc[0].toFixed(OSM_PRECISION);
-        copy.loc[1] = +copy.loc[1].toFixed(OSM_PRECISION);
+        if (entity.isDegenerate()) {
+          delete copy.loc;
+        } else {
+          copy.loc[0] = +copy.loc[0].toFixed(OSM_PRECISION);
+          copy.loc[1] = +copy.loc[1].toFixed(OSM_PRECISION);
+        }
       }
       return copy;
     }
@@ -1110,12 +1114,12 @@ export class EditSystem extends AbstractSystem {
     // This merges the base entities, reconstructs history, and unblocks the other parts of the app.
     const _finish = () => {
 
-      // Merge base entities into base graph (force = false, as base graph is assumed to be fresh)
+      // Merge base entities into base graph (force = true, as new nodes may affect their parentways extents in tree)
       const baseEntities = [...__baseEntities.values()];
       const baseEntityIDs = new Set(__baseEntities.keys());
       const baseGraph = this.base.graph;
-      baseGraph.rebase(baseEntities, [baseGraph], false);   // force = false
-      this._tree.rebase(baseEntities, false);               // force = false
+      baseGraph.rebase(baseEntities, [baseGraph], true);   // force = true
+      this._tree.rebase(baseEntities, true);               // force = true
 
       // Reconstruct the edit history, each Graph derives from the previous one..
       // Start at i = 1, leaving base edit alone, the first edit will have nothing in it.
@@ -1140,7 +1144,7 @@ export class EditSystem extends AbstractSystem {
         if (Array.isArray(item.dataUsed))     sources.data = item.dataUsed;
 
         // Handle legacy transform scale parameter, if found
-        if (item.transform.k) {
+        if (item.transform?.k) {
           item.transform.z = geoScaleToZoom(item.transform.k);
           delete item.transform.k;
         }

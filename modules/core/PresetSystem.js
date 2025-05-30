@@ -284,7 +284,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
         geometry = 'point';
       }
       const entityExtent = entity.extent(resolver);
-      return this.matchTags(entity.tags, geometry, entityExtent.center());
+      return this.matchTags(entity.tags, geometry, entityExtent?.center());
     });
   }
 

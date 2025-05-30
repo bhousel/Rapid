@@ -8,6 +8,7 @@ describe('uiFieldAccess', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
         l10n: new MockLocalizationSystem(this)
       };

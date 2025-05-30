@@ -3,7 +3,11 @@ import { OsmEntity } from './OsmEntity.js';
 
 /**
  * OsmChangeset
+ * @see https://wiki.openstreetmap.org/wiki/Changeset
  *
+ * Properties you can access:
+ *   `props`   - Object containing Feature properties (inherited from `AbstractFeature`)
+ *   `tags`    - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
  */
 export class OsmChangeset extends OsmEntity {
 
@@ -24,19 +28,13 @@ export class OsmChangeset extends OsmEntity {
   }
 
   /**
-   * destroy
-   * Every Feature should have a destroy function that frees all the resources
-   * Do not use the Feature after calling `destroy()`.
-   */
-  destroy() {
-    super.destroy();
-  }
-
-  /**
    * update
-   * Update the Feature's properties and return a new Feature
-   * @param   {Object}    props
-   * @return  this
+   * Update the Feature's properties and return a new Feature.
+   * Features are intended to be immutable.  To modify them a Feature,
+   *  pass in the properties to change, and you'll get a new Feature.
+   * The new Feature will have an updated `v` internal version number.
+   * @param   {Object}        props - the updated properties
+   * @return  {OsmChangeset}  a new OsmChangeset
    */
   update(props) {
     return new OsmChangeset(this, props).touch();

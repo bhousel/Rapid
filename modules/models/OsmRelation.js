@@ -7,7 +7,12 @@ import { osmJoinWays } from './multipolygon.js';
 
 /**
  * OsmRelation
+ * @see https://wiki.openstreetmap.org/wiki/Relation
  *
+ * Properties you can access:
+ *   `props`   - Object containing Feature properties (inherited from `AbstractFeature`)
+ *   `tags`    - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ *   `members` - Accessor for the members, an Array of Objects with properties, `id`, `type`, `role`
  */
 export class OsmRelation extends OsmEntity {
 
@@ -29,52 +34,31 @@ export class OsmRelation extends OsmEntity {
     if (!this.props.members) {
       this.props.members = [];
     }
-
-    // this._assignProps();
-  }
-
-  // /**
-  //  * _assignProps
-  //  * Some of the props we receive are special
-  //  * We'll move them out of the props object into their own properties.
-  //  */
-  // _assignProps() {
-  //   super._assignProps();
-
-  //   if (this.props.members) {
-  //     this.members = this.props.members.slice();  // copy
-  //     delete this.props.members;
-  //   }
-
-  //   if (!Array.isArray(this.members)) {
-  //     this.members = [];
-  //   }
-  //   if (!this.id) {  // no ID provided - generate one
-  //     this.id = `w${OsmEntity.id.next.relation--}`;
-  //   }
-  // }
-
-  /**
-   * destroy
-   * Every Feature should have a destroy function that frees all the resources
-   * Do not use the Feature after calling `destroy()`.
-   */
-  destroy() {
-    super.destroy();
-    // this.members = null;
   }
 
   /**
    * update
-   * Update the Feature's properties and return a new Feature
-   * @param   {Object}    props
-   * @return  this
+   * Update the Feature's properties and return a new Feature.
+   * Features are intended to be immutable.  To modify them a Feature,
+   *  pass in the properties to change, and you'll get a new Feature.
+   * The new Feature will have an updated `v` internal version number.
+   * @param   {Object}       props - the updated properties
+   * @return  {OsmRelation}  a new OsmRelation
    */
   update(props) {
     return new OsmRelation(this, props).touch();
   }
 
-
+  /**
+   * copy
+   * Makes a (mostly) deep copy of a feature.
+   * Copied entities will start out with a fresh `id` and cleared out metadata.
+   * This is like the sort of copy you would want when copy-pasting a feature.
+   * When completed, the `memo` argument will contain all the copied data elements.
+   * @param   {Graph}        fromGraph - The Graph that owns the source object (needed for some data types)
+   * @param   {Object}       memo      - An Object to store seen copies (to prevent circular/infinite copying)
+   * @return  {OsmRelation}  a copy of this OsmRelation
+   */
   copy(fromGraph, memo = {}) {
     if (memo[this.id]) {
       return memo[this.id];
@@ -99,15 +83,11 @@ export class OsmRelation extends OsmEntity {
   /**
    * members
    * get/set the members property
+   * @readonly
    */
   get members() {
     return this.props.members;
   }
-  // set members(val) {
-  //   this.members = val || [];
-  //   this.touch();
-  // }
-
 
 
   // compare entities by their osm id (move to OsmEntity?)
@@ -120,21 +100,35 @@ export class OsmRelation extends OsmEntity {
   };
 
 
-  // `memo` keeps track of the "seen" entities, to avoid infinite looping
+  /**
+   * extent
+   * Get the Extent from the geometry object
+   * `memo` keeps track of the "seen" entities, to avoid infinite looping
+   * @param  {Graph}  graph
+   * @return {Extent}
+   */
   extent(graph, memo) {
     return graph.transient(this, 'extent', () => {
-      if (memo && memo[this.props.id]) return new Extent();
-      memo = memo || {};
-      memo[this.props.id] = true;
 
-      const extent = new Extent();
-      for (let i = 0; i < this.members.length; i++) {
-        const member = graph.hasEntity(this.members[i].id);
-        if (member) {
-          extent.extendSelf(member.extent(graph, memo));
+// setup the geometry here (for now) - borrowed from asGeoJSON():
+      if (this.isMultipolygon()) {
+        this.geom.setCoords(this.multipolygon(graph));
+        return this.geom.origExtent;
+
+      } else {  // a FeatureCollection - recurse to gather extents of all members.
+        if (memo && memo[this.props.id]) return new Extent();
+        memo = memo || {};
+        memo[this.props.id] = true;
+
+        const extent = new Extent();
+        for (let i = 0; i < this.members.length; i++) {
+          const member = graph.hasEntity(this.members[i].id);
+          if (member) {
+            extent.extendSelf(member.extent(graph, memo));
+          }
         }
+        return extent;
       }
-      return extent;
     });
   }
 

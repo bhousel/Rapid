@@ -122,16 +122,16 @@ export class Tree {
     for (const way of graph.parentWays(entity)) {
       if (this._entityBoxes.has(way.id)) {
         this._removeEntity(way.id);
-        toUpdate.set(way.id, way);
       }
+      toUpdate.set(way.id, way);
       this._includeParents(way, toUpdate, seen);
     }
 
     for (const relation of graph.parentRelations(entity)) {
       if (this._entityBoxes.has(relation.id)) {
         this._removeEntity(relation.id);
-        toUpdate.set(relation.id, relation);
       }
+      toUpdate.set(relation.id, relation);
       this._includeParents(relation, toUpdate, seen);
     }
   }

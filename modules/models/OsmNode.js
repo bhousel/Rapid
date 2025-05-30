@@ -5,11 +5,12 @@ import { OsmEntity } from './OsmEntity.js';
 
 /**
  * OsmNode
+ * @see https://wiki.openstreetmap.org/wiki/Node
  *
  * Properties you can access:
  *   `props`  - Object containing Feature properties (inherited from `AbstractFeature`)
- *   `tags`   - Object containing key-value string pairs for the OSM tags
- *   `loc`    - Accessor for the `geometry`, used to get/set WGS84 coords
+ *   `tags`   - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ *   `loc`    - Accessor for the `geometry`, used to get WGS84 coords
  */
 export class OsmNode extends OsmEntity {
 
@@ -27,53 +28,47 @@ export class OsmNode extends OsmEntity {
     if (!this.props.id) {  // no ID provided - generate one
       this.props.id = `n${OsmEntity.id.next.node--}`;
     }
-
-    if (this.props.loc) {
-      this.geom.setCoords(this.props.loc);
-      delete this.props.loc;
+    if (!this.props.loc) {
+      this.props.loc = [9999, 9999];  // (Need a dummy loc so that Difference will work)
     }
-  }
-
-  /**
-   * destroy
-   * Every Feature should have a destroy function that frees all the resources
-   * Do not use the Feature after calling `destroy()`.
-   */
-  destroy() {
-    super.destroy();
+    this.geom.setCoords(this.props.loc);
   }
 
   /**
    * update
-   * Return a new Feature with the given properties
-   * @param   {Object}  props
-   * @return  this
+   * Update the Feature's properties and return a new Feature.
+   * Features are intended to be immutable.  To modify them a Feature,
+   *  pass in the properties to change, and you'll get a new Feature.
+   * The new Feature will have an updated `v` internal version number.
+   * @param   {Object}   props - the updated properties
+   * @return  {OsmNode}  a new OsmNode
    */
   update(props) {
     return new OsmNode(this, props).touch();
   }
 
-
   /**
    * loc
    * get/set the loc from the geometry object
+   * @readonly
    */
   get loc() {
     return this.geom.origCoords;
   }
-  // set loc(val) {
-  //   this.geom.setCoords(val);
-  //   this.touch();
-  // }
 
   /**
    * extent
-   * get the extent from the geometry object
-   * @param {Graph}  graph - unused for OSM nodes, but needed for other OSM types
+   * Get the Extent from the geometry object
+   * @param  {Graph}  graph
+   * @return {Extent}
    */
-  extent() {
-    // return new Extent(this.geom.extent);  // always return a copy?
-    return this.geom.extent;
+  extent(graph) {
+    // return graph.transient(this, 'extent', () => {
+      // return new Extent(this.loc);
+// setup the geometry here (for now)
+      // this.geom.setCoords(this.props.loc);
+      return this.geom.origExtent;
+    // });
   }
 
 
@@ -297,6 +292,12 @@ export class OsmNode extends OsmEntity {
       coordinates: this.loc
     };
   }
+
+  // Convert the entity to a JSON in the format that we save to history backup
+  asJSON() {
+    return Object.assign({}, this.props, { loc: this.loc });
+  }
+
 }
 
 

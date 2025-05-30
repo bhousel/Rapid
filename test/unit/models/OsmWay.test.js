@@ -159,34 +159,38 @@ describe('OsmWay', () => {
     });
   });
 
-  // describe('#extent', () => {
-  //   it('returns the minimal Extent containing all member nodes', () => {
-  //     const node1 = new Rapid.OsmNode(context, { loc: [0, 0] });
-  //     const node2 = new Rapid.OsmNode(context, { loc: [5, 10] });
-  //     let way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id] });
-  //     const graph = new Rapid.Graph([node1, node2, way]);
-  //     const extent = way.extent(graph);
-  //     assert.ok(extent.equals(new Rapid.sdk.Extent([0, 0], [5, 10])));
-  //   });
-  // });
+  describe('#extent', () => {
+    it('returns the minimal Extent containing all member nodes', () => {
+      const node1 = new Rapid.OsmNode(context, { loc: [0, 0] });
+      const node2 = new Rapid.OsmNode(context, { loc: [5, 10] });
+      let way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id] });
+      const graph = new Rapid.Graph([node1, node2, way]);
+      const extent = way.extent(graph);
+      assert.ok(extent.equals(new Rapid.sdk.Extent([0, 0], [5, 10])));
+    });
+  });
 
-  // describe('#intersects', () => {
-  //   it('returns true for a way with a node within the given extent', () => {
-  //     const node = new Rapid.OsmNode(context, {loc: [0, 0]});
-  //     const way = new Rapid.OsmWay(context, {nodes: [node.id]});
-  //     const graph = new Rapid.Graph([node, way]);
-  //     const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
-  //     assert.equal(result, true);
-  //   });
+  describe('#intersects', () => {
+    it('returns true for a way with a node within the given extent', () => {
+      const node = new Rapid.OsmNode(context, {loc: [0, 0]});
+      const way = new Rapid.OsmWay(context, {nodes: [node.id]});
+      const graph = new Rapid.Graph([node, way]);
+//TODO: must compute extent first!
+way.extent(graph);
+      const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
+      assert.equal(result, true);
+    });
 
-  //   it('returns false for way with no nodes within the given extent', () => {
-  //     const node = new Rapid.OsmNode(context, {loc: [6, 6]});
-  //     const way = new Rapid.OsmWay(context, {nodes: [node.id]});
-  //     const graph = new Rapid.Graph([node, way]);
-  //     const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
-  //     assert.equal(result, false);
-  //   });
-  // });
+    it('returns false for way with no nodes within the given extent', () => {
+      const node = new Rapid.OsmNode(context, {loc: [6, 6]});
+      const way = new Rapid.OsmWay(context, {nodes: [node.id]});
+      const graph = new Rapid.Graph([node, way]);
+//TODO: must compute extent first!
+way.extent(graph);
+      const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
+      assert.equal(result, false);
+    });
+  });
 
 
   describe('#isClosed', () => {

@@ -385,9 +385,9 @@ describe('OsmService', () => {
     it('retries an authenticated call unauthenticated if 403 Forbidden', done => {
       const badResponse = { status: 403, body: 'Forbidden', headers: { 'Content-Type': 'text/plain' } };
 
-    fetchMock
-       .route(match => /map\.json/.test(match.url) && match.options.headers?.authorization,  badResponse)
-       .route(match => /map\.json/.test(match.url) && !match.options.headers?.authorization, okResponse);
+      fetchMock
+        .route(match => /map\.json/.test(match.url) && match.options.headers?.authorization,  badResponse)
+        .route(match => /map\.json/.test(match.url) && !match.options.headers?.authorization, okResponse);
 
       loginAsync()
         .then(() => {
@@ -444,7 +444,7 @@ describe('OsmService', () => {
   ]
 }`;
     beforeEach(() => {
-      const v = _osm.context.viewport;
+      const v = context.viewport;
       v.transform.zoom = 20;
       v.transform.translation = [55212042.434589595, 33248879.510193843];  // -74.0444216, 40.6694299
       v.dimensions = [64, 64];
@@ -740,6 +740,12 @@ describe('OsmService', () => {
 
 
   describe('#notes', () => {
+    beforeEach(() => {
+      const v = context.viewport;
+      v.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
+      v.dimensions = [64, 64];
+    });
+
     it('returns notes in the visible map area', () => {
       const notes = [
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: { key: '0', loc: [10,0] } },

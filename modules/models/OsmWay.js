@@ -16,10 +16,12 @@ function noRepeatNodes(node, i, arr) {
 
 /**
  * OsmWay
+ * @see https://wiki.openstreetmap.org/wiki/Way
  *
  * Properties you can access:
- *   `tags`   Object containing key-value string pairs for the OSM tags
- *   `nodes`  Array of node ids
+ *   `props`  - Object containing Feature properties (inherited from `AbstractFeature`)
+ *   `tags`   - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ *   `nodes`  - Accessor for the nodes, an Array of node ids
  */
 export class OsmWay extends OsmEntity {
 
@@ -41,52 +43,31 @@ export class OsmWay extends OsmEntity {
     if (!this.props.nodes) {
       this.props.nodes = [];
     }
-
-    // this._assignProps();
-  }
-
-  // /**
-  //  * _assignProps
-  //  * Some of the props we receive are special
-  //  * We'll move them out of the props object into their own properties.
-  //  */
-  // _assignProps() {
-  //   super._assignProps();
-
-  //   if (this.props.nodes) {
-  //     this.nodes = this.props.nodes.slice();  // copy
-  //     delete this.props.nodes;
-  //   }
-
-  //   if (!Array.isArray(this.nodes)) {
-  //     this.nodes = [];
-  //   }
-  //   if (!this.id) {  // no ID provided - generate one
-  //     this.id = `w${OsmEntity.id.next.way--}`;
-  //   }
-  // }
-
-  /**
-   * destroy
-   * Every Feature should have a destroy function that frees all the resources
-   * Do not use the Feature after calling `destroy()`.
-   */
-  destroy() {
-    super.destroy();
-    // this.nodes = null;
   }
 
   /**
    * update
-   * Update the Feature's properties and return a new Feature
-   * @param   {Object}    props
-   * @return  this
+   * Update the Feature's properties and return a new Feature.
+   * Features are intended to be immutable.  To modify them a Feature,
+   *  pass in the properties to change, and you'll get a new Feature.
+   * The new Feature will have an updated `v` internal version number.
+   * @param   {Object}  props - the updated properties
+   * @return  {OsmWay}  a new OsmWay
    */
   update(props) {
     return new OsmWay(this, props).touch();
   }
 
-
+  /**
+   * copy
+   * Makes a (mostly) deep copy of a feature.
+   * Copied entities will start out with a fresh `id` and cleared out metadata.
+   * This is like the sort of copy you would want when copy-pasting a feature.
+   * When completed, the `memo` argument will contain all the copied data elements.
+   * @param   {Graph}   fromGraph - The Graph that owns the source object (needed for some data types)
+   * @param   {Object}  memo      - An Object to store seen copies (to prevent circular/infinite copying)
+   * @return  {OsmWay}  a copy of this OsmWay
+   */
   copy(fromGraph, memo = {}) {
     if (memo[this.id]) {
       return memo[this.id];
@@ -107,28 +88,39 @@ export class OsmWay extends OsmEntity {
     return copy.updateSelf({ nodes: nodes });
   }
 
-
   /**
    * nodes
    * get/set the nodes property
+   * @readonly
    */
   get nodes() {
     return this.props.nodes;
   }
-  // set nodes(val) {
-  //   this.nodes = val || [];
-  //   this.touch();
-  // }
-
 
   /**
    * extent
-   * calculate the way's extent
-   * @param {Graph}  The graph is needed to lookup the nodes.
+   * Get the Extent from the geometry object
+   * @param  {Graph}  graph
+   * @return {Extent}
    */
   extent(graph) {
     return graph.transient(this, 'extent', () => {
-      return utilTotalExtent(this.nodes, graph);
+      // return utilTotalExtent(this.nodes, graph);
+// setup the geometry here (for now) - borrowed from asGeoJSON():
+      const coords = [];
+      for (const nodeID of this.nodes) {
+        const node = graph.hasEntity(nodeID);
+        if (node) {
+          coords.push(node.loc);
+        }
+      }
+      if (this.isArea() && this.isClosed()) {
+        this.geom.setCoords([coords]);
+      } else {
+        this.geom.setCoords(coords);
+      }
+
+      return this.geom.origExtent;
     });
   }
 

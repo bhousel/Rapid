@@ -38,24 +38,14 @@ export class OsmEntity extends AbstractFeature {
     }
   }
 
-
-  /**
-   * destroy
-   * Every Feature should have a destroy function that frees all the resources
-   * Do not use the Feature after calling `destroy()`.
-   * @abstract
-   */
-  destroy() {
-    super.destroy();
-    // this.tags = null;
-  }
-
   /**
    * update
-   * Update the Feature's properties and return a new Feature
-   * @param   {Object}  props
-   * @return  this
-   * @abstract
+   * Update the Feature's properties and return a new Feature.
+   * Features are intended to be immutable.  To modify them a Feature,
+   *  pass in the properties to change, and you'll get a new Feature.
+   * The new Feature will have an updated `v` internal version number.
+   * @param   {Object}     props - the updated properties
+   * @return  {OsmEntity}  a new OsmEntity
    */
   update(props) {
     return new OsmEntity(this, props).touch();
@@ -63,11 +53,12 @@ export class OsmEntity extends AbstractFeature {
 
   /**
    * updateSelf
-   * Like `update` but it modifies the Feature's properties in-place.
-   * This option is slightly more performant for situations where you don't mind mutating the Feature
-   * @param   {Object}  props
-   * @return  this
-   * @abstract
+   * Like `update` but it modifies the current Feature's properties in-place.
+   * This will also update the Feature's `v` internal version number.
+   * `updateSelf` is slightly more performant for situations where you don't need
+   * immutability and don't mind mutating the Feature.
+   * @param   {Object}     props - the updated properties
+   * @return  {OsmEntity}  this same OsmEntity
    */
   updateSelf(props) {
     this.props = Object.assign(this.props, props);
@@ -75,7 +66,17 @@ export class OsmEntity extends AbstractFeature {
     return this;
   }
 
-
+  /**
+   * copy
+   * Makes a (mostly) deep copy of a feature.
+   * Copied entities will start out with a fresh `id` and cleared out metadata.
+   * This is like the sort of copy you would want when copy-pasting a feature.
+   * Note that this function is subclassed, so that Ways and Relations can copy their child data too.
+   * When completed, the `memo` argument will contain all the copied data elements.
+   * @param   {Graph}      fromGraph - The Graph that owns the source object (needed for some data types)
+   * @param   {Object}     memo      - An Object to store seen copies (to prevent circular/infinite copying)
+   * @return  {OsmEntity}  a copy of this OsmEntity
+   */
   copy(fromGraph, memo = {}) {
     if (memo[this.id]) {
       return memo[this.id];
@@ -86,21 +87,22 @@ export class OsmEntity extends AbstractFeature {
     return copy;
   }
 
-
   /**
    * tags
+   * Tags are the key=value pairs of strings that assign meaning to an OSM element.
+   * @see https://wiki.openstreetmap.org/wiki/Elements#Tag
    * @return {Object}
+   * @readonly
    */
   get tags() {
     return this.props.tags;
   }
-  // set tags(val) {
-  //   this.props.tags = val || {};
-  //   this.touch();
-  // }
 
   /**
    * visible
+   * This is the OSM `visibility` attribute.
+   * Objects with `visibility=false` are considered deleted.
+   * @see https://wiki.openstreetmap.org/wiki/Elements#Common_attributes
    * @return {boolean}
    */
   get visible() {
@@ -112,6 +114,10 @@ export class OsmEntity extends AbstractFeature {
 
   /**
    * version
+   * This is the OSM `version` attribute, used for conflict detection.
+   * When updating an OSM object, its version must match the value on the server,
+   *  otherwise the editing API will raise a conflict.
+   * @see https://wiki.openstreetmap.org/wiki/Elements#Common_attributes
    * @return {string}
    */
   get version() {
@@ -179,7 +185,7 @@ export class OsmEntity extends AbstractFeature {
 
 
   intersects(other) {
-    const extent = this.geom.extent;
+    const extent = this.geom.origExtent;
     return extent?.intersects(other);
   }
 
@@ -207,6 +213,11 @@ export class OsmEntity extends AbstractFeature {
 
   isDegenerate() {
     return true;
+  }
+
+  // Convert the entity to a JSON in the format that we save to history backup
+  asJSON() {
+    return Object.assign({}, this.props);
   }
 
 }

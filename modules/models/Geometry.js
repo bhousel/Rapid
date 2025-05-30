@@ -8,13 +8,14 @@ import polylabel from '@mapbox/polylabel';
  * Wrapper for geometry data.
  *
  * Previously this code lived in `PixiGeometry` where it applied only to rendered features,
- * and worked with screen coordinates.  Now it works with features and with world coordinates.
+ * and worked with screen coordinates.  Now it works with all features and with world coordinates.
  *
  * The geometry data should be passed to `setCoords()`
  *
  * Properties you can access:
  *   `type`          String describing what kind of geometry this is ('point', 'line', 'polygon')
- *   `origCoords`    Original coordinate data (in WGS84 long/lat)
+ *   `origCoords`    Original coordinate data (in WGS84 lon/lat)
+ *   `origExtent`    Original extent data (in WGS84 lon/lat)
  *   `coords`        Projected coordinate data
  *   `flatCoords`    Projected coordinate data, flat Array how Pixi wants it [ x,y, x,y, … ]
  *   `extent`        Projected extent
@@ -61,6 +62,8 @@ export class Geometry {
     // someday: check perf?  JSON.parse(JSON.stringify()) may still beat structuredClone for this data
     copy.type = this.type;
     copy.origCoords = globalThis.structuredClone(this.origCoords);
+    copy.origExtent = new Extent(this.origExtent);
+
     copy.extent = new Extent(this.extent);
     copy.coords = globalThis.structuredClone(this.coords);
     copy.flatCoords = globalThis.structuredClone(this.flatCoords);
@@ -85,6 +88,7 @@ export class Geometry {
     // Original data - These are in WGS84 coordinates
     // ([0,0] is Null Island)
     this.origCoords = null;     // coordinate data
+    this.origExtent = null;     // extent (bounding box)
 
     // The rest of the data is projected data in world coordinates
     // ([0,0] is the top left corner of a 256x256 Web Mercator world)
@@ -128,6 +132,7 @@ export class Geometry {
       this.coords = viewport.wgs84ToWorld(this.origCoords);
       this.extent = new Extent(this.coords);
       this.centroid = this.coords;
+      this.poi = this.coords;
       return;
     }
 
@@ -231,6 +236,18 @@ export class Geometry {
     this.reset();
     this.type = type;
     this.origCoords = data;
+
+    // Determine extent (bounds)
+    if (type === 'point') {
+      this.origExtent = new Extent(data);
+    } else {
+      this.origExtent = new Extent();
+      const outer = (this.type === 'line') ? this.origCoords : this.origCoords[0];  // outer only
+      for (const loc of outer) {
+        this.origExtent.extendSelf(loc);
+      }
+    }
+
     this.update();
   }
 

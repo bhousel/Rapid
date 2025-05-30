@@ -21,6 +21,7 @@ describe('uiFieldWikipedia', () => {
 
   class MockContext {
     constructor()   {
+      this.viewport = new Rapid.sdk.Viewport();
       this.services = {
         wikidata: new MockWikidataService(this)
       };

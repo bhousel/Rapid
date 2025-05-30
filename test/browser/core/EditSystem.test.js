@@ -796,7 +796,7 @@ describe('EditSystem', () => {
     it('restores from v3 JSON (creation)', () => {
       const json = {
         version: 3,
-        entities: [{ loc: [1, 2], id: 'n-1' }],
+        entities: [{ id: 'n-1', loc: [1, 2], v: 0 }],
         baseEntities: [],
         stack: [
           { },
@@ -807,7 +807,11 @@ describe('EditSystem', () => {
       };
       return _editor.fromJSONAsync(JSON.stringify(json))
         .then(() => {
-          expect(_editor.staging.graph.entity('n-1')).to.eql(new Rapid.OsmNode(context, {id: 'n-1', loc: [1, 2]}));
+          const restored = _editor.staging.graph.entity('n-1');
+          expect(restored).to.be.an.instanceOf(Rapid.OsmNode);
+          expect(restored.id).to.equal('n-1');
+          expect(restored.loc).to.eql([1, 2]);
+          expect(restored.v).to.equal(0);
           expect(_editor.getUndoAnnotation()).to.eql('Added a point.');
           expect(_editor.sourcesUsed().imagery).to.include('Bing');
           expect(Rapid.OsmEntity.id.next).to.eql({ node: -2, way: -1, relation: -1 });

@@ -135,32 +135,32 @@ describe('OsmRelation', () => {
   });
 
 
-  // describe('#extent', () => {
-  //   it('returns the minimal extent containing the extents of all members', () => {
-  //     const a = new Rapid.OsmNode(context, { loc: [0, 0] });
-  //     const b = new Rapid.OsmNode(context, { loc: [5, 10] });
-  //     const r = new Rapid.OsmRelation(context, { members: [{ id: a.id }, { id: b.id }] });
-  //     const graph = new Rapid.Graph([a, b, r]);
-  //     assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [5, 10]));
-  //   });
+  describe('#extent', () => {
+    it('returns the minimal extent containing the extents of all members', () => {
+      const a = new Rapid.OsmNode(context, { loc: [0, 0] });
+      const b = new Rapid.OsmNode(context, { loc: [5, 10] });
+      const r = new Rapid.OsmRelation(context, { members: [{ id: a.id }, { id: b.id }] });
+      const graph = new Rapid.Graph([a, b, r]);
+      assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [5, 10]));
+    });
 
 
-  //   it('returns the known extent of incomplete relations', () => {
-  //     const a = new Rapid.OsmNode(context, { loc: [0, 0] });
-  //     const b = new Rapid.OsmNode(context, { loc: [5, 10] });
-  //     const r = new Rapid.OsmRelation(context, { members: [{ id: a.id }, { id: b.id }] });
-  //     const graph = new Rapid.Graph([a, r]);
-  //     assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [0, 0]));
-  //   });
+    it('returns the known extent of incomplete relations', () => {
+      const a = new Rapid.OsmNode(context, { loc: [0, 0] });
+      const b = new Rapid.OsmNode(context, { loc: [5, 10] });
+      const r = new Rapid.OsmRelation(context, { members: [{ id: a.id }, { id: b.id }] });
+      const graph = new Rapid.Graph([a, r]);
+      assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [0, 0]));
+    });
 
 
-  //   it('does not error on self-referencing relations', () => {
-  //     var r = new Rapid.OsmRelation(context);
-  //     r = r.addMember({ id: r.id });
-  //     const graph = new Rapid.Graph([r]);
-  //     assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent());
-  //   });
-  // });
+    it('does not error on self-referencing relations', () => {
+      var r = new Rapid.OsmRelation(context);
+      r = r.addMember({ id: r.id });
+      const graph = new Rapid.Graph([r]);
+      assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent());
+    });
+  });
 
 
   describe('#geometry', () => {

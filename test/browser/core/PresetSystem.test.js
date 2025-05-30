@@ -21,6 +21,7 @@ describe('PresetSystem', () => {
 
   class MockContext {
     constructor()   {
+      this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
         assets:     new Rapid.AssetSystem(this),
         l10n:       new MockLocalizationSystem(),

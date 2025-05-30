@@ -21,6 +21,7 @@ describe('FilterSystem', () => {
 
   class MockContext {
     constructor()   {
+      this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
         editor:  new MockEditSystem(),
         storage: new MockStorageSystem(),

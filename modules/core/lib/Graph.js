@@ -3,6 +3,10 @@ import { utilArrayDifference } from '@rapid-sdk/util';
 
 /**
  *  Graph
+ *  A `Graph` is a special collection of OSM Entities.
+ *  Each graph contains a base state (uneditied) and local state (edited).
+ *  The graph also contains all the caches and methods needed to manage OSM topology.
+ *  (parentWays, childNodes, parentRels)
  */
 export class Graph {
 
@@ -25,20 +29,20 @@ export class Graph {
      // A fresh Graph
      } else {
       this._base = {
-        entities: new Map(),      // Map(entityID -> Entity)
-        parentWays: new Map(),    // Map(entityID -> Set(entityIDs))
-        parentRels: new Map()     // Map(entityID -> Set(entityIDs))
+        entities: new Map(),      // Map<entityID, Entity>
+        parentWays: new Map(),    // Map<entityID, Set(entityIDs>>
+        parentRels: new Map()     // Map<entityID, Set(entityIDs>>
       };
       this._local = {
-        entities: new Map(),      // Map(entityID -> Entity)
-        parentWays: new Map(),    // Map(entityID -> Set(entityIDs))
-        parentRels: new Map()     // Map(entityID -> Set(entityIDs))
+        entities: new Map(),      // Map<entityID, Entity>
+        parentWays: new Map(),    // Map<entityID, Set(entityIDs>
+        parentRels: new Map()     // Map<entityID, Set(entityIDs>
       };
 
       this.rebase(other || [], [this]);   // seed with Entities, if provided
     }
 
-    this._transients = new Map();     // Map(entityID -> Map(k -> v))
+    this._transients = new Map();     // Map<entityID, Map<k,v>>
     this._childNodes = new Map();
     this._frozen = !mutable;
   }
@@ -316,7 +320,7 @@ export class Graph {
       if (!baseWayIDs) continue;
       for (const wayID of baseWayIDs) {
         if (!local.entities.has(wayID)) {  // if the Way hasn't been edited
-          parentWayIDs.add(wayID);        // update `this.parentWays` cache
+          parentWayIDs.add(wayID);         // update `this.parentWays` cache
         }
       }
     }
@@ -326,7 +330,7 @@ export class Graph {
       if (!baseRelIDs) continue;
       for (const relID of baseRelIDs) {
         if (!local.entities.has(relID)) {  // if the Relation hasn't been edited
-          parentRelIDs.add(relID);        // update `this.parentRels` cache
+          parentRelIDs.add(relID);         // update `this.parentRels` cache
         }
       }
     }
