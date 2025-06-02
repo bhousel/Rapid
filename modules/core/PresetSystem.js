@@ -1,7 +1,7 @@
 import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetPointTags, osmSetVertexTags } from '../models/tags.js';
+import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../models/tags.js';
 import { Category, Collection, Field, Preset } from './lib/index.js';
 import { uiFields } from '../ui/fields/index.js';
 
@@ -99,12 +99,14 @@ export class PresetSystem extends AbstractSystem {
           assets.loadAssetAsync('tagging_preset_defaults'),
           assets.loadAssetAsync('tagging_preset_presets'),
           assets.loadAssetAsync('tagging_preset_fields'),
-          assets.loadAssetAsync('tagging_preset_overrides')   // customizations to merge in after the id-tagging-schema
+          assets.loadAssetAsync('tagging_preset_overrides'),   // customizations to merge in after the id-tagging-schema
+          assets.loadAssetAsync('tagging_deprecated')
         ]);
       })
       .then(vals => {
         this.merge({ categories: vals[0], defaults: vals[1], presets: vals[2], fields: vals[3] });
         this.merge(vals[4]);
+        osmSetDeprecatedTags(vals[5]);
         osmSetAreaKeys(this.areaKeys());
         osmSetPointTags(this.pointTags());
         osmSetVertexTags(this.vertexTags());

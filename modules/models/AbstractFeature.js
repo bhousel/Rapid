@@ -1,5 +1,3 @@
-import { Extent } from '@rapid-sdk/math';
-
 import { Geometry } from './Geometry.js';
 
 

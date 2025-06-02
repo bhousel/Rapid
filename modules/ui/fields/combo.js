@@ -4,7 +4,7 @@ import { drag as d3_drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-// import { OsmEntity } from '../../models/OsmEntity.js';
+import { deprecatedTagValuesByKey } from '../../models/tags.js';
 import { uiCombobox } from '../combobox.js';
 import { utilKeybinding } from '../../util/keybinding.js';
 import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.js';
@@ -19,7 +19,6 @@ export {
 
 
 export function uiFieldCombo(context, uifield) {
-  const assets = context.systems.assets;
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const dispatch = d3_dispatch('change');
@@ -44,12 +43,6 @@ export function uiFieldCombo(context, uifield) {
     var _tags;
     var _countryCode;
     var _staticPlaceholder;
-
-    // initialize deprecated tags array
-    var _dataDeprecated = [];
-    assets.loadAssetAsync('tagging_deprecated')
-      .then(function(d) { _dataDeprecated = d; })
-      .catch(e => console.error(e));  // eslint-disable-line
 
 
     // ensure multiCombo field.key ends with a ':'
@@ -190,14 +183,13 @@ export function uiFieldCombo(context, uifield) {
                 return !d.count || d.count > 10;
             });
 
-// TODO move out of osmEntity
-//            var deprecatedValues = osmEntity.deprecatedTagValuesByKey(_dataDeprecated)[uifield.key];
-//            if (deprecatedValues) {
-//                // don't suggest deprecated tag values
-//                data = data.filter(function(d) {
-//                    return deprecatedValues.indexOf(d.value) === -1;
-//                });
-//            }
+            // don't suggest deprecated tag values
+            var deprecatedValues = deprecatedTagValuesByKey()[uifield.key];
+            if (deprecatedValues) {
+                data = data.filter(function(d) {
+                    return deprecatedValues.indexOf(d.value) === -1;
+                });
+            }
 
             if (hasCountryPrefix) {
                 data = data.filter(function(d) {

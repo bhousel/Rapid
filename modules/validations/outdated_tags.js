@@ -3,7 +3,7 @@ import { utilHashcode, utilTagDiff } from '@rapid-sdk/util';
 import { actionChangePreset } from '../actions/change_preset.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionUpgradeTags } from '../actions/upgrade_tags.js';
-import { osmIsOldMultipolygonOuterMember, osmOldMultipolygonOuterMemberOfRelation } from '../models/multipolygon.js';
+import { getDeprecatedTags, osmIsOldMultipolygonOuterMember, osmOldMultipolygonOuterMemberOfRelation } from '../models/index.js';
 import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
 
 
@@ -14,20 +14,9 @@ const pathVals = new Set([
 
 export function validationOutdatedTags(context) {
   const type = 'outdated_tags';
-  const assets = context.systems.assets;
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const presets = context.systems.presets;
-
-  let _waitingForDeprecated = true;
-  let _dataDeprecated;
-
-  // fetch deprecated tags
-  assets.loadAssetAsync('tagging_deprecated')
-    .then(d => _dataDeprecated = d)
-    .catch(() => { /* ignore */ })
-    .finally(() => _waitingForDeprecated = false);
-
 
   /**
    * _isCrossingWay
@@ -90,15 +79,12 @@ export function validationOutdatedTags(context) {
       preset = newPreset;
     }
 
-// TODO: fix - deprecated tag checks shouldn't be in OsmEntity
-//    // Upgrade deprecated tags..
-//    if (_dataDeprecated) {
-//      const deprecatedTags = entity.deprecatedTags(_dataDeprecated);
-//      for (const tag of deprecatedTags) {
-//        graph = actionUpgradeTags(entity.id, tag.old, tag.replace)(graph);
-//        entity = graph.entity(entity.id);
-//      }
-//    }
+    // Upgrade deprecated tags..
+    const deprecatedTags = getDeprecatedTags(entity.tags);
+    for (const tag of deprecatedTags) {
+      graph = actionUpgradeTags(entity.id, tag.old, tag.replace)(graph);
+      entity = graph.entity(entity.id);
+    }
 
     // Add missing addTags from the detected preset
     let newTags = Object.assign({}, entity.tags);  // shallow copy
@@ -116,11 +102,11 @@ export function validationOutdatedTags(context) {
 
     // Attempt to match a canonical record in the name-suggestion-index.
     const nsi = context.services.nsi;
-    let waitingForNsi = false;
+    let isWaitingForNsi = false;
     let nsiResult;
     if (nsi) {
-      waitingForNsi = (nsi.status === 'loading');
-      if (!waitingForNsi) {
+      isWaitingForNsi = (nsi.status === 'loading');
+      if (!isWaitingForNsi) {
         const loc = entity.extent(graph).center();
         nsiResult = nsi.upgradeTags(newTags, loc);
         if (nsiResult) {
@@ -131,7 +117,7 @@ export function validationOutdatedTags(context) {
     }
 
     let issues = [];
-    issues.provisional = (_waitingForDeprecated || waitingForNsi);
+    issues.provisional = isWaitingForNsi;
 
     // determine diff
     const tagDiff = utilTagDiff(oldTags, newTags);

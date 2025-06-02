@@ -203,16 +203,15 @@ export class OsmEntity extends AbstractFeature {
     return changed ? this.update({ tags: merged }) : this;
   }
 
+  hasParentRelations(graph) {
+    return graph.parentRelations(this).length > 0;
+  }
 
   hasNonGeometryTags() {
     for (const k of Object.keys(this.props.tags)) {
       if (k !== 'area') return true;
     }
     return false;
-  }
-
-  hasParentRelations(graph) {
-    return graph.parentRelations(this).length > 0;
   }
 
   hasInterestingTags() {
@@ -236,62 +235,3 @@ export class OsmEntity extends AbstractFeature {
   }
 
 }
-
-//     // TODO - This does not belong here.
-//     // Entities should not be responsible for checking their tags are deprecated.
-//     // (It's telling that `dataDeprecated` needs to be passed in for it to even do this.)
-//     // `deprecatedTags` is only called by the `outdated_tags` validator, so maybe it should be moved there.
-//     // Or maybe into the `PresetSystem`, if this is a thing might be called from outside the validator.
-//
-//     deprecatedTags: function(dataDeprecated) {
-//         var tags = this.tags;
-
-//         // if there are no tags, none can be deprecated
-//         if (Object.keys(tags).length === 0) return [];
-
-//         var results = [];
-//         dataDeprecated.forEach(function(d) {
-//             var oldKeys = Object.keys(d.old);
-//             if (d.replace) {
-//                 var hasExistingValues = Object.keys(d.replace).some(function(replaceKey) {
-//                     if (!tags[replaceKey] || d.old[replaceKey]) return false;
-//                     var replaceValue = d.replace[replaceKey];
-//                     if (replaceValue === '*') return false;
-//                     if (replaceValue === tags[replaceKey]) return false;
-//                     return true;
-//                 });
-//                 // don't flag deprecated tags if the upgrade path would overwrite existing data - #7843
-//                 if (hasExistingValues) return;
-//             }
-//             var matchesDeprecatedTags = oldKeys.every(function(oldKey) {
-//                 if (!tags[oldKey]) return false;
-//                 if (d.old[oldKey] === '*') return true;
-//                 if (d.old[oldKey] === tags[oldKey]) return true;
-
-//                 var vals = tags[oldKey].split(';').filter(Boolean);
-//                 if (vals.length === 0) {
-//                     return false;
-//                 } else if (vals.length > 1) {
-//                     return vals.indexOf(d.old[oldKey]) !== -1;
-//                 } else {
-//                     if (tags[oldKey] === d.old[oldKey]) {
-//                         if (d.replace && d.old[oldKey] === d.replace[oldKey]) {
-//                             var replaceKeys = Object.keys(d.replace);
-//                             return !replaceKeys.every(function(replaceKey) {
-//                                 return tags[replaceKey] === d.replace[replaceKey];
-//                             });
-//                         } else {
-//                             return true;
-//                         }
-//                     }
-//                 }
-//                 return false;
-//             });
-//             if (matchesDeprecatedTags) {
-//                 results.push(d);
-//             }
-//         });
-
-//         return results;
-//     }
-// };
