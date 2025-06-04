@@ -1,5 +1,3 @@
-import { Extent } from '@rapid-sdk/math';
-
 import { OsmEntity } from './OsmEntity.js';
 
 
@@ -52,22 +50,18 @@ export class OsmChangeset extends OsmEntity {
   }
 
   /**
-   * extent
-   * Changeset extent not currently supported, but we could support it eventually.
-   * @return  {Extent}  An empty extent
+   * asGeoJSON
+   * GeoJSON not currently supported, but we could support it eventually
+   * @return  {Object}  An empty object
    */
-  extent() {
-    return new Extent();
-  }
-
-  geometry() {
-    return 'changeset';
-  }
-
   asGeoJSON() {
     return {};
   }
 
+
+  geometry() {
+    return 'changeset';
+  }
 
   asJXON() {
     return {

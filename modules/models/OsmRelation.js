@@ -1,5 +1,5 @@
 import { geoArea as d3_geoArea } from 'd3-geo';
-import { Extent, geomPolygonContainsPolygon, geomPolygonIntersectsPolygon } from '@rapid-sdk/math';
+import { geomPolygonContainsPolygon, geomPolygonIntersectsPolygon } from '@rapid-sdk/math';
 
 import { OsmEntity } from './OsmEntity.js';
 import { osmJoinWays } from './multipolygon.js';
@@ -37,6 +37,15 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
+   * members
+   * get/set the members property
+   * @readonly
+   */
+  get members() {
+    return this.props.members;
+  }
+
+  /**
    * update
    * Update the Feature's properties and return a new Feature.
    * Features are intended to be immutable.  To modify them a Feature,
@@ -51,49 +60,75 @@ export class OsmRelation extends OsmEntity {
 
   /**
    * updateGeometry
-   * Relation geometry requires a Graph in order to assemble a multipolygon.
+   * Relations require a Graph in order to get the member information.
    * This should be called after the Graph has been updated and is consistent.
    * @param   {Graph}        graph - the Graph that holds the information needed
    * @return  {OsmRelation}  this same OsmRelation
    */
   updateGeometry(graph) {
     // should we prevent it from being called again?
-    if (this.isMultipolygon()) {
-      this.geom.setCoords(this.multipolygon(graph));
-    } else {
-      console.warn('todo: no proper support for FeatureCollection yet');
-    }
+    this.geoms.setData(this.asGeoJSON(graph));
     return this;
   }
 
   /**
-   * extent
-   * Get the Extent from the geometry object
-   * `memo` keeps track of the "seen" entities, to avoid infinite looping
-   * @param  {Graph}  graph
-   * @return {Extent}
+   * asGeoJSON
+   * Returns a GeoJSON representation of the OsmRelation.
+   * Relations are represented by either:
+   *  a Feature with MultiPolygon geometry, or
+   *  a FeatureCollection containing the Relation's child members.
+   * @param   {Graph}        graph - the Graph that holds the information needed
+   * @param   {Set<string>}  seen - seen ids, used to avoid infinite loops and cycles.
+   * @return  {Object}       GeoJSON representation of the OsmRelation
    */
-  extent(graph, memo) {
-    if (this.isMultipolygon()) {
-      return this.geom.origExtent;
+  asGeoJSON(graph, seen) {
+    return graph.transient(this, 'geojson', () => {
 
-    } else {  // A FeatureCollection, gather and cache the extent the old way
-      return graph.transient(this, 'extent', () => {
-        if (memo && memo[this.props.id]) return new Extent();
-        memo = memo || {};
-        memo[this.props.id] = true;
-
-        const extent = new Extent();
-        for (let i = 0; i < this.members.length; i++) {
-          const member = graph.hasEntity(this.members[i].id);
-          if (member) {
-            extent.extendSelf(member.extent(graph, memo));
+      if (this.isMultipolygon()) {
+        return {
+          type: 'Feature',
+          id: this.id,
+          properties: this.tags,
+          geometry: {
+            type: 'MultiPolygon',
+            coordinates: this.multipolygon(graph)
           }
+        };
+
+      } else {  // Gather children into a FeatureCollection
+
+        if (!seen) {
+          seen = new Set();
         }
-        return extent;
-      });
-    }
+        if (seen.has(this.id)) {
+          return {};  // seen this already, avoid infinite loops and cycles
+        } else {
+          seen.add(this.id);
+        }
+
+        const features = [];
+        for (const member of this.members) {
+          const entity = graph.hasEntity(member.id);
+          if (!entity) continue;
+
+          const child = entity.asGeoJSON(graph, seen) || {};
+          if (!Object.keys(child).length) continue;  // skip if empty
+
+          child.role = member.role;  // `role` here is not GeoJSON spec
+          features.push(child);
+        }
+
+        return {
+          type: 'FeatureCollection',
+          id: this.id,
+          properties: this.tags,  // `properties` here is not GeoJSON spec
+          features: features
+        };
+      }
+
+    });
   }
+
 
   /**
    * copy
@@ -123,16 +158,6 @@ export class OsmRelation extends OsmEntity {
     }
 
     return copy.updateSelf({ members: members });
-  }
-
-
-  /**
-   * members
-   * get/set the members property
-   * @readonly
-   */
-  get members() {
-    return this.props.members;
   }
 
 
@@ -288,26 +313,6 @@ export class OsmRelation extends OsmEntity {
       result.relation['@changeset'] = changesetID;
     }
     return result;
-  }
-
-
-  asGeoJSON(graph) {
-    return graph.transient(this, 'GeoJSON', () => {
-      if (this.isMultipolygon()) {
-        return {
-          type: 'MultiPolygon',
-          coordinates: this.multipolygon(graph)
-        };
-      } else {
-        return {
-          type: 'FeatureCollection',
-          properties: this.tags,
-          features: this.members.map(member => {
-            return Object.assign({role: member.role}, graph.entity(member.id).asGeoJSON(graph));
-          })
-        };
-      }
-    });
   }
 
 

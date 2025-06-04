@@ -6,16 +6,17 @@ import polylabel from '@mapbox/polylabel';
 /**
  * Geometry
  * Wrapper for both original and projected geometry data.
+ * This class deals with singular Geometry elements only: 'Point', 'LineString', 'Polygon'
  *
  * Previously this code lived in `PixiGeometry` where it applied only to rendered features,
  * and worked with screen coordinates.  Now it works with all features and with world coordinates.
  *
- * The geometry data should be passed to `setCoords()`
+ * The geometry data should be passed to `setData()` as a GeoJSON geometry object.
  *
  * Properties you can access:
- *   `type`          String describing what kind of geometry this is ('point', 'line', 'polygon')
+ *   `origData`      Original GeoJSON data (in WGS84 lon/lat)
  *   `origCoords`    Original coordinate data (in WGS84 lon/lat)
- *   `origExtent`    Original extent data (in WGS84 lon/lat)
+ *   `origExtent`    Original Extent bounding box (in WGS84 lon/lat)
  *   `coords`        Projected coordinate data
  *   `flatCoords`    Projected coordinate data, flat Array how Pixi wants it [ x,y, x,y, … ]
  *   `extent`        Projected extent
@@ -32,11 +33,11 @@ export class Geometry {
 
   /**
    * @constructor
-   * @param  {Context} context - Global shared application context
+   * @param  {AbstractFeature} feature - The data feature that owns this Geometry
    */
-  constructor(context) {
-    this.type = null;    // 'point', 'line', or 'polygon'
-    this.context = context;
+  constructor(feature) {
+    this.feature = feature;
+    this.context = feature.context;
     this.reset();
   }
 
@@ -54,16 +55,16 @@ export class Geometry {
   /**
    * clone
    * Returns a clone of this Geometry object
+   * @param  {AbstractFeature} feature - The data feature that will own the clone GeometryCollection
    * @return {Geometry}
    */
   clone() {
-    const copy = new Geometry(this.context);
+    const copy = new Geometry(this.feature);
 
-    copy.type = this.type;
     copy.dirty = this.dirty;
 
     // someday: check perf?  JSON.parse(JSON.stringify()) may still beat structuredClone for Array data
-    copy.origCoords = globalThis.structuredClone(this.origCoords);
+    copy.origData = globalThis.structuredClone(this.origData);
     copy.origExtent = new Extent(this.origExtent);
 
     copy.extent = new Extent(this.extent);
@@ -91,8 +92,8 @@ export class Geometry {
 
     // Original data - These are in WGS84 coordinates
     // ([0,0] is Null Island)
-    this.origCoords = null;     // coordinate data
-    this.origExtent = null;     // extent (bounding box)
+    this.origData = null;    // GeoJSON data
+    this.origExtent = null;  // extent (bounding box)
 
     // The rest of the data is projected data in world coordinates
     // ([0,0] is the top left corner of a 256x256 Web Mercator world)
@@ -114,9 +115,10 @@ export class Geometry {
    * update
    */
   update() {
-    if (!this.dirty || !this.origCoords) return;  // nothing to do
+    if (!this.dirty || !this.origData?.coordinates) return;  // nothing to do
 
     const viewport = this.context.viewport;
+    const origCoords = this.origData.coordinates;
     this.dirty = false;
 
     // reset all projected properties
@@ -133,8 +135,8 @@ export class Geometry {
     this.ssr = null;
 
     // Points are simple, just project once.
-    if (this.type === 'point') {
-      this.coords = viewport.wgs84ToWorld(this.origCoords);
+    if (this.type === 'Point') {
+      this.coords = viewport.wgs84ToWorld(origCoords);
       this.extent = new Extent(this.coords);
       this.centroid = this.coords;
       this.poi = this.coords;
@@ -146,7 +148,7 @@ export class Geometry {
     // Generate both normal coordinate rings and flattened rings at the same time to avoid extra iterations.
     // Preallocate Arrays to avoid garbage collection formerly caused by excessive Array.push()
     this.extent = new Extent();
-    const origRings = (this.type === 'line') ? [this.origCoords] : this.origCoords;
+    const origRings = (this.type === 'LineString') ? [origCoords] : origCoords;
     const projRings = new Array(origRings.length);
     const projFlatRings = new Array(origRings.length);
 
@@ -168,7 +170,7 @@ export class Geometry {
     }
 
     // Assign outer and holes
-    if (this.type === 'line') {
+    if (this.type === 'LineString') {
       this.coords = projRings[0];
       this.flatCoords = projFlatRings[0];
       this.outer = projRings[0];
@@ -208,7 +210,7 @@ export class Geometry {
       }
 
       // Pole of Inaccessability (for polygons)
-      if (this.type === 'line') {
+      if (this.type === 'LineString') {
         this.poi = this.centroid;
       } else {
         this.poi = polylabel(this.coords);   // it expects outer + rings
@@ -221,42 +223,56 @@ export class Geometry {
 
 
   /**
-   * setCoords
-   * @param {Array<*>} data - Geometry `Array` (contents depends on the Feature type)
-   *
-   * 'point' - Single wgs84 coordinate
-   *    [lon, lat]
-   *
-   * 'line' - Array of coordinates
-   *    [ [lon, lat], [lon, lat],  … ]
-   *
-   * 'polygon' - Array of Arrays
-   *    [
-   *      [ [lon, lat], [lon, lat], … ],   // outer ring
-   *      [ [lon, lat], [lon, lat], … ],   // inner rings
-   *      …
-   *    ]
+   * geojson
+   * The original data format is GeoJSON, this is just a convenience getter.
+   * @return {GeoJSON}
+   * @readonly
    */
-  setCoords(data) {
-    let type = this._inferType(data);
-    if (!type) return;  // do nothing if data is missing
+  get geojson() {
+    return this.origData;
+  }
 
-if (type === 'multipolygon') {
-  if (data.length > 1) { console.warn('todo: no proper support for true MultiPolygon yet'); }
-  data = data[0];
-  type = 'polygon';
-}
+  /**
+   * origCoords
+   * The original data format is GeoJSON, this is just a convenience getter.
+   * @return {Array<*>}
+   * @readonly
+   */
+  get origCoords() {
+    return this.origData?.coordinates;
+  }
 
-    this.reset();
-    this.type = type;
-    this.origCoords = data;
+  /**
+   * type
+   * The original data format is GeoJSON, this is just a convenience getter.
+   * @return {string} One of 'Point', 'LineString', 'Polygon'
+   * @readonly
+   */
+  get type() {
+    return this.origData?.type;
+  }
+
+
+  /**
+   * setData
+   * This setter accepts singular GeoJSON geometries only:  'Point', 'LineString', and 'Polygon'
+   * If there is any existing data, it is first removed.
+   * @param {GeoJSON} geojson - GeoJSON data
+   */
+  setData(geojson = {}) {
+    this.destroy();
+    this.origData = globalThis.structuredClone(geojson);
+
+    const type = geojson.type;
+    const coords = geojson.coordinates;
+    if (!(/^(Point|LineString|Polygon)$/.test(type)) || !coords) return;  // do nothing
 
     // Determine extent (bounds)
-    if (type === 'point') {
-      this.origExtent = new Extent(data);
+    if (type === 'Point') {
+      this.origExtent = new Extent(coords);
     } else {
       this.origExtent = new Extent();
-      const outer = (this.type === 'line') ? this.origCoords : this.origCoords[0];  // outer only
+      const outer = (this.type === 'LineString') ? coords : coords[0];  // outer only
       for (const loc of outer) {
         this.origExtent.extendSelf(loc);
       }
@@ -264,29 +280,6 @@ if (type === 'multipolygon') {
 
     this.dirty = true;
     this.update();
-  }
-
-
-  /**
-   * _inferType
-   * Determines what kind of geometry we were passed.
-   * @param   {Array<*>}  arr - Geometry `Array` (contents depends on the Feature type)
-   * @return  {string?}   'point', 'line', 'polygon' or null
-   */
-  _inferType(data) {
-    const a = Array.isArray(data) && data[0];
-    if (typeof a === 'number') return 'point';
-
-    const b = Array.isArray(a) && a[0];
-    if (typeof b === 'number') return 'line';
-
-    const c = Array.isArray(b) && b[0];
-    if (typeof c === 'number') return 'polygon';
-
-const d = Array.isArray(c) && c[0];
-if (typeof d === 'number') return 'multipolygon';
-
-    return null;
   }
 
 }

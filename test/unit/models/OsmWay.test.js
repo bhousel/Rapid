@@ -1291,7 +1291,6 @@ way.extent(graph);
       });
     });
 
-
     it('includes changeset if provided', () => {
       const jxon = new Rapid.OsmWay(context).asJXON('1234');
       assert.equal(jxon.way['@changeset'], '1234');
@@ -1300,43 +1299,60 @@ way.extent(graph);
 
 
   describe('#asGeoJSON', () => {
-    it('converts a line to a GeoJSON LineString geometry', () => {
-      const a = new Rapid.OsmNode(context, { loc: [1, 2] });
-      const b = new Rapid.OsmNode(context, { loc: [3, 4] });
-      const w = new Rapid.OsmWay(context, { tags: { highway: 'residential' }, nodes: [a.id, b.id] });
-      const graph = new Rapid.Graph([a, b, w]);
-      const json = w.asGeoJSON(graph);
-
-      assert.equal(json.type, 'LineString');
-      assert.deepEqual(json.coordinates, [a.loc, b.loc]);
+    it('converts a line to a GeoJSON LineString feature', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 2] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 4] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', tags: { highway: 'residential' }, nodes: ['n1', 'n2'] });
+      const graph = new Rapid.Graph([n1, n2, w1]);
+      const result = w1.asGeoJSON(graph);
+      const expected = {
+        type: 'Feature',
+        id: 'w1',
+        properties: { highway: 'residential' },
+        geometry: {
+          type: 'LineString',
+          coordinates: [[1, 2], [3, 4]]
+        }
+      };
+      assert.deepEqual(result, expected);
     });
 
-
-    it('converts an area to a GeoJSON Polygon geometry', () => {
-      const a = new Rapid.OsmNode(context, { loc: [1, 2] });
-      const b = new Rapid.OsmNode(context, { loc: [5, 6] });
-      const c = new Rapid.OsmNode(context, { loc: [3, 4] });
-      const w = new Rapid.OsmWay(context, { tags: { area: 'yes' }, nodes: [a.id, b.id, c.id, a.id] });
-      const graph = new Rapid.Graph([a, b, c, w]);
-      const json = w.asGeoJSON(graph);
-
-      assert.equal(json.type, 'Polygon');
-      assert.deepEqual(json.coordinates, [
-        [a.loc, b.loc, c.loc, a.loc]
-      ]);
+    it('converts an area to a GeoJSON Polygon feature', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 2] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 4] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [1, 6] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', tags: { area: 'yes' }, nodes: ['n1', 'n2', 'n3', 'n1'] });
+      const graph = new Rapid.Graph([n1, n2, n3, w1]);
+      const result = w1.asGeoJSON(graph);
+      const expected = {
+        type: 'Feature',
+        id: 'w1',
+        properties: { area: 'yes' },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[[1, 2], [3, 4], [1, 6], [1, 2]]]
+        }
+      };
+      assert.deepEqual(result, expected);
     });
 
-
-    it('converts an unclosed area to a GeoJSON LineString geometry', () => {
-      const a = new Rapid.OsmNode(context, { loc: [1, 2] });
-      const b = new Rapid.OsmNode(context, { loc: [5, 6] });
-      const c = new Rapid.OsmNode(context, { loc: [3, 4] });
-      const w = new Rapid.OsmWay(context, { tags: { area: 'yes' }, nodes: [a.id, b.id, c.id] });
-      const graph = new Rapid.Graph([a, b, c, w]);
-      const json = w.asGeoJSON(graph);
-
-      assert.equal(json.type, 'LineString');
-      assert.deepEqual(json.coordinates, [a.loc, b.loc, c.loc]);
+    it('converts an unclosed area to a GeoJSON LineString feature', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 2] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 4] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [1, 6] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', tags: { area: 'yes' }, nodes: ['n1', 'n2', 'n3'] });
+      const graph = new Rapid.Graph([n1, n2, n3, w1]);
+      const result = w1.asGeoJSON(graph);
+      const expected = {
+        type: 'Feature',
+        id: 'w1',
+        properties: { area: 'yes' },
+        geometry: {
+          type: 'LineString',
+          coordinates: [[1, 2], [3, 4], [1, 6]]
+        }
+      };
+      assert.deepEqual(result, expected);
     });
   });
 

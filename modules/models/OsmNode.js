@@ -1,5 +1,6 @@
 import { RAD2DEG, vecAngle } from '@rapid-sdk/math';
 import { utilArrayUniq } from '@rapid-sdk/util';
+
 import { OsmEntity } from './OsmEntity.js';
 
 
@@ -33,6 +34,14 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
+   * loc
+   * @readonly
+   */
+  get loc() {
+    return this.props.loc;
+  }
+
+  /**
    * update
    * Update the Feature's properties and return a new Feature.
    * Features are intended to be immutable.  To modify them a Feature,
@@ -47,24 +56,39 @@ export class OsmNode extends OsmEntity {
 
   /**
    * updateGeometry
-   * Node geometry is simple because it represents a single coordinate.
+   * Nodes are simple because they represent a single coordinate.
    * We can update it as soon as the Node is constructed, and the Graph is not needed.
-   * @param   {Graph}     graph - unused for OsmNode
-   * @return  {OsmNode}   this same OsmNode
+   * @param   {Graph}    graph - Unused for OsmNode
+   * @return  {OsmNode}  this same OsmNode
    */
-  updateGeometry(graph) {
+  updateGeometry() {
     // should we prevent it from being called again?
-    this.geom.setCoords(this.props.loc);
+    this.geoms.setData(this.asGeoJSON());
     return this;
   }
 
   /**
-   * loc
-   * get/set the loc from the geometry object
-   * @readonly
+   * asGeoJSON
+   * Returns a GeoJSON representation of the OsmNode.
+   * Nodes are represented by a Feature with a Point geometry.
+   * @param   {Graph}   graph - Unused for OsmNode
+   * @return  {Object}  GeoJSON representation of the OsmNode
    */
-  get loc() {
-    return this.geom.origCoords;
+  asGeoJSON() {
+    const coords = this.loc;
+    if (Array.isArray(coords) && coords.length >= 2) {
+      return {
+        type: 'Feature',
+        id: this.id,
+        properties: this.tags,
+        geometry: {
+          type: 'Point',
+          coordinates: coords
+        }
+      };
+    } else {
+      return {};
+    }
   }
 
 
@@ -181,8 +205,8 @@ export class OsmNode extends OsmEntity {
 //        results.push( (vecAngle(a, b) * 180 / Math.PI) + 90 );
 // using world coords - no projection!
         // +90 because vecAngle returns angle from X axis, not Y (north)
-        const a = this.geom.coords;
-        const b = (graph.entity(nodeID).geom.coords);
+        const a = this.geoms.items[0].coords;
+        const b = (graph.entity(nodeID).geoms.items[0].coords);
         if (a === null || b === null) continue;
         results.push((vecAngle(a, b) * RAD2DEG) + 90);
       }
@@ -279,17 +303,6 @@ export class OsmNode extends OsmEntity {
       result.node['@changeset'] = changesetID;
     }
     return result;
-  }
-
-
-  asGeoJSON() {
-    if (this.geom.dirty) {
-      throw new Error(`asGeoJSON: Not ready - must first call updateGeometry`);
-    }
-    return {
-      type: 'Point',
-      coordinates: this.geom.origCoords
-    };
   }
 
 }

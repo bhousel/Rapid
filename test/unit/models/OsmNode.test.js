@@ -31,29 +31,29 @@ describe('OsmNode', () => {
   });
 
 
-  // describe('#extent', () => {
-  //   it('returns a point extent', () => {
-  //     const node = new Rapid.OsmNode(context, { loc: [5, 10] });
-  //     const extent = node.extent();
-  //     assert.deepEqual(extent, new Rapid.sdk.Extent([5, 10], [5, 10]));
-  //   });
-  // });
+  describe('#extent', () => {
+    it('returns a point extent', () => {
+      const node = new Rapid.OsmNode(context, { loc: [5, 10] });
+      const extent = node.extent();
+      assert.deepEqual(extent, new Rapid.sdk.Extent([5, 10], [5, 10]));
+    });
+  });
 
 
-  // describe('#intersects', () => {
-  //   it('returns true for a node within the given extent', () => {
-  //     const node = new Rapid.OsmNode(context, { loc: [0, 0] });
-  //     const extent = new Rapid.sdk.Extent([-5, -5], [5, 5]);
-  //     assert.equal(node.intersects(extent), true);
-  //   });
+  describe('#intersects', () => {
+    it('returns true for a node within the given extent', () => {
+      const node = new Rapid.OsmNode(context, { loc: [0, 0] });
+      const extent = new Rapid.sdk.Extent([-5, -5], [5, 5]);
+      assert.equal(node.intersects(extent), true);
+    });
 
 
-  //   it('returns false for a node outside the given extent', () => {
-  //     const node = new Rapid.OsmNode(context, { loc: [6, 6] });
-  //     const extent = new Rapid.sdk.Extent([-5, -5], [5, 5]);
-  //     assert.equal(node.intersects(extent), false);
-  //   });
-  // });
+    it('returns false for a node outside the given extent', () => {
+      const node = new Rapid.OsmNode(context, { loc: [6, 6] });
+      const extent = new Rapid.sdk.Extent([-5, -5], [5, 5]);
+      assert.equal(node.intersects(extent), false);
+    });
+  });
 
 
   describe('#geometry', () => {
@@ -720,12 +720,20 @@ describe('OsmNode', () => {
 
 
   describe('#asGeoJSON', () => {
-    it('converts to a GeoJSON Point geometry', () => {
-      const node = new Rapid.OsmNode(context, { tags: { amenity: 'cafe' }, loc: [1, 2] });
-      const json = node.asGeoJSON();
+    it('converts to a GeoJSON Point feature', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { amenity: 'cafe' }, loc: [1, 2] });
+      const result = n1.asGeoJSON();
+      const expected = {
+        type: 'Feature',
+        id: 'n1',
+        properties: { amenity: 'cafe' },
+        geometry: {
+          type: 'Point',
+          coordinates: [1, 2]
+        }
+      };
 
-      assert.equal(json.type, 'Point');
-      assert.deepEqual(json.coordinates, [1, 2]);
+      assert.deepEqual(result, expected);
     });
   });
 });

@@ -45,6 +45,15 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
+   * nodes
+   * get/set the nodes property
+   * @readonly
+   */
+  get nodes() {
+    return this.props.nodes;
+  }
+
+  /**
    * update
    * Update the Feature's properties and return a new Feature.
    * Features are intended to be immutable.  To modify them a Feature,
@@ -59,27 +68,63 @@ export class OsmWay extends OsmEntity {
 
   /**
    * updateGeometry
-   * Way geometry requires a Graph in order to get the childNode information.
+   * Ways require a Graph in order to get the childNode information.
    * This should be called after the Graph has been updated and is consistent.
-   * @param   {Graph}    graph - the Graph that holds the information needed
-   * @return  {OsmWay}   this same OsmWay
+   * @param   {Graph}   graph - the Graph that holds the information needed
+   * @return  {OsmWay}  this same OsmWay
    */
   updateGeometry(graph) {
     // should we prevent it from being called again?
-    const coords = [];
-    for (const nodeID of this.nodes) {
-      const node = graph.hasEntity(nodeID);
-      if (node) {
-        coords.push(node.loc);
-      }
-    }
-    if (this.isArea() && this.isClosed()) {
-      this.geom.setCoords([coords]);
-    } else {
-      this.geom.setCoords(coords);
-    }
+    this.geoms.setData(this.asGeoJSON(graph));
     return this;
   }
+
+  /**
+   * asGeoJSON
+   * Returns a GeoJSON representation of the OsmWay.
+   * Ways are represented by a Feature with either LineString or a Polygon geometry.
+   * @param   {Graph}   graph - the Graph that holds the information needed
+   * @return  {Object}  GeoJSON representation of the OsmWay
+   */
+  asGeoJSON(graph) {
+    return graph.transient(this, 'geojson', () => {
+      const coords = [];
+      for (const nodeID of this.nodes) {
+        const node = graph.hasEntity(nodeID);
+        if (node?.loc) {
+          coords.push(node.loc);
+        }
+      }
+
+      if (coords.length) {
+        if (this.isArea() && this.isClosed()) {
+          return {
+            type: 'Feature',
+            id: this.id,
+            properties: this.tags,
+            geometry: {
+              type: 'Polygon',
+              coordinates: [coords]
+            }
+          };
+        } else {
+          return {
+            type: 'Feature',
+            id: this.id,
+            properties: this.tags,
+            geometry: {
+              type: 'LineString',
+              coordinates: coords
+            }
+          };
+        }
+      } else {
+        return {};
+      }
+
+    });
+  }
+
 
   /**
    * copy
@@ -109,15 +154,6 @@ export class OsmWay extends OsmEntity {
     }
 
     return copy.updateSelf({ nodes: nodes });
-  }
-
-  /**
-   * nodes
-   * get/set the nodes property
-   * @readonly
-   */
-  get nodes() {
-    return this.props.nodes;
   }
 
 
@@ -568,29 +604,6 @@ export class OsmWay extends OsmEntity {
       result.way['@changeset'] = changesetID;
     }
     return result;
-  }
-
-
-  asGeoJSON() {
-    if (this.geom.dirty) {
-      throw new Error(`asGeoJSON: Not ready - must first call updateGeometry`);
-    }
-
-    if (this.geom.type === 'polygon') {
-      return {
-        type: 'Polygon',
-        coordinates: this.geom.origCoords
-      };
-
-    } else if (this.geom.type === 'line') {
-      return {
-        type: 'LineString',
-        coordinates: this.geom.origCoords
-      };
-
-    } else {  // shouldn't happen
-      return {};
-    }
   }
 
 }

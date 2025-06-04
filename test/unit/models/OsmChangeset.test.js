@@ -21,13 +21,21 @@ describe('OsmChangeset', () => {
     });
 
     it('returns a changeset with provided tags', () => {
-      const changeset = new Rapid.OsmChangeset(context, {tags: {foo: 'bar'}});
+      const changeset = new Rapid.OsmChangeset(context, { tags: { foo: 'bar' }});
       assert.ok(changeset instanceof Rapid.OsmChangeset);
       assert.equal(changeset.type, 'changeset');
-      assert.deepEqual(changeset.tags, {foo: 'bar'});
+      assert.deepEqual(changeset.tags, { foo: 'bar' });
     });
   });
 
+  describe('#asGeoJSON', () => {
+    it('not supported', () => {
+      const c1 = new Rapid.OsmChangeset(context, { id: 'c1', tags: { foo: 'bar' }});
+      const result = c1.asGeoJSON();
+      const expected = {};
+      assert.deepEqual(result, expected);
+    });
+  });
 
   describe('#asJXON', () => {
     it('converts a changeset to jxon', () => {
@@ -41,7 +49,7 @@ describe('OsmChangeset', () => {
         }
       };
 
-      const changeset = new Rapid.OsmChangeset(context, {tags: {'comment': 'hello'}});
+      const changeset = new Rapid.OsmChangeset(context, { tags: { comment: 'hello' }});
       const jxon = changeset.asJXON();
       assert.deepEqual(jxon, expected);
     });

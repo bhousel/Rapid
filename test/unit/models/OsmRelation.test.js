@@ -155,10 +155,10 @@ describe('OsmRelation', () => {
 
 
     it('does not error on self-referencing relations', () => {
-      var r = new Rapid.OsmRelation(context);
+      let r = new Rapid.OsmRelation(context);
       r = r.addMember({ id: r.id });
       const graph = new Rapid.Graph([r]);
-      assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent());
+      assert.equal(r.extent(graph), null);
     });
   });
 
@@ -604,66 +604,194 @@ describe('OsmRelation', () => {
     });
   });
 
+
   describe('#asGeoJSON', () => {
-    it('converts a multipolygon to a GeoJSON MultiPolygon geometry', function() {
-      const a = new Rapid.OsmNode(context, { loc: [1, 1] });
-      const b = new Rapid.OsmNode(context, { loc: [3, 3] });
-      const c = new Rapid.OsmNode(context, { loc: [2, 2] });
-      const w = new Rapid.OsmWay(context, { nodes: [a.id, b.id, c.id, a.id] });
-      const r = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: w.id, type: 'way' }] });
-      const g = new Rapid.Graph([a, b, c, w, r]);
-      const json = r.asGeoJSON(g);
-
-      assert.equal(json.type, 'MultiPolygon');
-      assert.deepEqual(json.coordinates, [
-        [
-          [a.loc, b.loc, c.loc, a.loc]
-        ]
-      ]);
+    //
+    //  3
+    //  |\
+    //  | \
+    //  |  \
+    //  | 6 \
+    //  | |\ \
+    //  | 4-5 \
+    //  1------2
+    //
+    it('converts a multipolygon to a GeoJSON MultiPolygon feature', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0, 9] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [9, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1'] });  // counterclockwise
+      const r1 = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'multipolygon' },
+        members: [{ id: 'w1', type: 'way' }]  // 'outer' assumed
+      });
+      const graph = new Rapid.Graph([n1, n2, n3, w1, r1]);
+      const result = r1.asGeoJSON(graph);
+      const expected = {
+        type: 'Feature',
+        id: 'r1',
+        properties: { type: 'multipolygon' },
+        geometry: {
+          type: 'MultiPolygon',
+          coordinates: [
+            [
+              [[0, 0], [0, 9], [9, 0], [0, 0]]  // counterclockwise outer
+            ]
+          ]
+        }
+      };
+      assert.deepEqual(result, expected);
     });
 
-
-    it('forces clockwise winding order for outer multipolygon ways', function() {
-      const a = new Rapid.OsmNode(context, { loc: [0, 0] });
-      const b = new Rapid.OsmNode(context, { loc: [0, 1] });
-      const c = new Rapid.OsmNode(context, { loc: [1, 0] });
-      const w = new Rapid.OsmWay(context, { nodes: [a.id, c.id, b.id, a.id] });
-      const r = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: w.id, type: 'way' }] });
-      const g = new Rapid.Graph([a, b, c, w, r]);
-      const json = r.asGeoJSON(g);
-
-      assert.deepEqual(json.coordinates[0][0], [a.loc, b.loc, c.loc, a.loc]);
+    it('forces counterclockwise winding order for outer multipolygon ways', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0, 9] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [9, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n3', 'n2', 'n1'] });  // clockwise
+      const r1 = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'multipolygon' },
+        members: [{ id: 'w1', type: 'way' }]  // 'outer' assumed
+      });
+      const graph = new Rapid.Graph([n1, n2, n3, w1, r1]);
+      const result = r1.asGeoJSON(graph);
+      const expected = {
+        type: 'Feature',
+        id: 'r1',
+        properties: { type: 'multipolygon' },
+        geometry: {
+          type: 'MultiPolygon',
+          coordinates: [
+            [
+              [[0, 0], [0, 9], [9, 0], [0, 0]]  // counterclockwise outer
+            ]
+          ]
+        }
+      };
+      assert.deepEqual(result, expected);
     });
 
-
-    it('forces counterclockwise winding order for inner multipolygon ways', function() {
-      const a = new Rapid.OsmNode(context, { loc: [0, 0] });
-      const b = new Rapid.OsmNode(context, { loc: [0, 1] });
-      const c = new Rapid.OsmNode(context, { loc: [1, 0] });
-      const d = new Rapid.OsmNode(context, { loc: [0.1, 0.1] });
-      const e = new Rapid.OsmNode(context, { loc: [0.1, 0.2] });
-      const f = new Rapid.OsmNode(context, { loc: [0.2, 0.1] });
-      const outer = new Rapid.OsmWay(context, { nodes: [a.id, b.id, c.id, a.id] });
-      const inner = new Rapid.OsmWay(context, { nodes: [d.id, e.id, f.id, d.id] });
-      const r = new Rapid.OsmRelation(context, { members: [{ id: outer.id, type: 'way' }, { id: inner.id, role: 'inner', type: 'way' }] });
-      const g = new Rapid.Graph([a, b, c, d, e, f, outer, inner, r]);
-
-      assert.deepEqual(r.multipolygon(g)[0][1], [d.loc, f.loc, e.loc, d.loc]);
+    it('forces clockwise winding order for inner multipolygon ways', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0, 9] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [9, 0] });
+      const n4 = new Rapid.OsmNode(context, { id: 'n4', loc: [1, 1] });
+      const n5 = new Rapid.OsmNode(context, { id: 'n5', loc: [1, 8] });
+      const n6 = new Rapid.OsmNode(context, { id: 'n6', loc: [8, 1] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n3', 'n2', 'n1'] });  // clockwise outer
+      const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n4', 'n5', 'n6', 'n4'] });  // counterclockwise inner
+      const r1 = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'multipolygon' },
+        members: [{ id: 'w1', type: 'way', role: 'outer' }, { id: 'w2', type: 'way', role: 'inner' }]
+      });
+      const graph = new Rapid.Graph([n1, n2, n3, n4, n5, n6, w1, w2, r1]);
+      const result = r1.asGeoJSON(graph);
+      const expected = {
+        type: 'Feature',
+        id: 'r1',
+        properties: { type: 'multipolygon' },
+        geometry: {
+          type: 'MultiPolygon',
+          coordinates: [
+            [
+              [[0, 0], [0, 9], [9, 0], [0, 0]], // counterclockwise outer
+              [[1, 1], [8, 1], [1, 8], [1, 1]]  // clockwise inner
+            ]
+          ]
+        }
+      };
+      assert.deepEqual(result, expected);
     });
 
+    it('converts a relation to a GeoJSON FeatureCollection', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
+      const r1 = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'foo' },
+        members: [{ id: 'n1', role: 'via' }]
+      });
+      const graph = new Rapid.Graph([n1, r1]);
+      const result = r1.asGeoJSON(graph);
+      const expected = {
+        type: 'FeatureCollection',
+        id: 'r1',
+        properties: { type: 'foo' },
+        features: [{
+          type: 'Feature',
+          id: 'n1',
+          role: 'via',
+          properties: {},
+          geometry: {
+            type: 'Point',
+            coordinates: [1, 1]
+          }
+        }]
+      };
+      assert.deepEqual(result, expected);
+    });
 
-    it('converts a relation to a GeoJSON FeatureCollection', function() {
-      const a = new Rapid.OsmNode(context, { loc: [1, 1] });
-      const r = new Rapid.OsmRelation(context, { tags: { type: 'type' }, members: [{ id: a.id, role: 'role' }] });
-      const g = new Rapid.Graph([a, r]);
-      const json = r.asGeoJSON(g);
+    it('does not error on incomplete relations', () => {
+      const r1 = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'foo' },
+        members: [{ id: 'n1', role: 'via' }]
+      });
+      const graph = new Rapid.Graph([r1]);  // n1 not in the graph
+      const result = r1.asGeoJSON(graph);
+      const expected = {
+        type: 'FeatureCollection',
+        id: 'r1',
+        properties: { type: 'foo' },
+        features: []
+      };
+      assert.deepEqual(result, expected);
+    });
 
-      assert.equal(json.type, 'FeatureCollection');
-      assert.deepEqual(json.properties, { type: 'type' });
+    it('does not error on self-referencing relations', () => {
+      const r1 = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'foo' },
+        members: [{ id: 'r1', role: 'self' }]
+      });
+      const graph = new Rapid.Graph([r1]);
+      const result = r1.asGeoJSON(graph);
+      const expected = {
+        type: 'FeatureCollection',
+        id: 'r1',
+        properties: { type: 'foo' },
+        features: [] // empty
+      };
+      assert.deepEqual(result, expected);
+    });
 
-      const nodejson = a.asGeoJSON(g);
-      nodejson.role = 'role';
-      assert.deepEqual(json.features, [nodejson]);
+    it('does not error on cyclical relations', () => {
+      const r1 = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'foo' },
+        members: [{ id: 'r2', role: 'other' }]
+      });
+      const r2 = new Rapid.OsmRelation(context, {
+        id: 'r2',
+        tags: { type: 'bar' },
+        members: [{ id: 'r1', role: 'other' }]
+      });
+      const graph = new Rapid.Graph([r1, r2]);
+      const result = r1.asGeoJSON(graph);
+      const expected = {
+        type: 'FeatureCollection',
+        id: 'r1',
+        properties: { type: 'foo' },
+        features: [{
+          type: 'FeatureCollection',
+          id: 'r2',
+          role: 'other',
+          properties: { type: 'bar' },
+          features: [] // empty
+        }]
+      };
+      assert.deepEqual(result, expected);
     });
   });
 

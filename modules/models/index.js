@@ -1,4 +1,5 @@
 import { AbstractFeature } from './AbstractFeature.js';
+import { GeometryCollection } from './GeometryCollection.js';
 import { Geometry } from './Geometry.js';
 import { OsmChangeset } from './OsmChangeset.js';
 import { OsmEntity } from './OsmEntity.js';
@@ -9,6 +10,7 @@ import { QAItem } from './qa_item.js';
 
 export {
   AbstractFeature,
+  GeometryCollection,
   Geometry,
   OsmChangeset,
   OsmEntity,

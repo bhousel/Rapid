@@ -1,4 +1,4 @@
-import { Geometry } from './Geometry.js';
+import { GeometryCollection } from './GeometryCollection.js';
 
 
 // Global version sequence used by all features
@@ -27,7 +27,7 @@ let _nextv = 1;
  *   `id`      Unique string to use for the name of this Data Feature
  *   `type`    String describing what kind of Data Feature this is ('node', 'way', 'relation')
  *   `v`       Version of the Feature, can be used to detect changes
- *   `geom`    Geometry object
+ *   `geoms`   GeometryCollection object
  *   `props`   Properties object
  */
 export class AbstractFeature {
@@ -44,13 +44,13 @@ export class AbstractFeature {
       const other = otherOrContext;
       this.context = other.context;
       this.props = globalThis.structuredClone(other.props);
-      this.geom = other.geom.clone();
+      this.geoms = other.geoms.clone(this);
 
     } else {
       const context = otherOrContext;
       this.context = context;
       this.props = {};
-      this.geom = new Geometry(context);
+      this.geoms = new GeometryCollection(this);
     }
 
     Object.assign(this.props, props);  // override with passed in props
@@ -64,8 +64,8 @@ export class AbstractFeature {
    * @abstract
    */
   destroy() {
-    this.geom.destroy();
-    this.geom = null;
+    this.geoms.destroy();
+    this.geoms = null;
     this.props = null;
   }
 
@@ -105,7 +105,7 @@ export class AbstractFeature {
    * @return {Extent}  Extent representing the feature's bounding box, or `null`
    */
   extent() {
-    return this.geom.origExtent;
+    return this.geoms.origExtent;
   }
 
   /**
@@ -117,7 +117,7 @@ export class AbstractFeature {
    * @return {boolean}  `true` if it intersects, `false` if not
    */
   intersects(other) {
-    const extent = this.geom.origExtent;
+    const extent = this.geoms.origExtent;
     return extent?.intersects(other);
   }
 
