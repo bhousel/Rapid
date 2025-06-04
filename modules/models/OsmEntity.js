@@ -1,29 +1,29 @@
 import { utilArrayUnion, utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
-import { AbstractFeature } from './AbstractFeature.js';
+import { AbstractData } from './AbstractData.js';
 import { osmIsInterestingTag } from './tags.js';
 
 
 /**
  * OsmEntity
- * Here is where we put logic that is common to OSM data.
- * Aside from the `props`, OSM features support a special `tags` object.
+ * Here is where we put logic that is common to OSM data elements.
+ * Aside from the `props`, OSM data elements all contain a special `tags` object.
  *
  * OSM Entities are intended to be immutable - the `update()` method will return a new Entity.
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
  * Properties you can access:
- *   `props`  - Object containing Feature properties (inherited from `AbstractFeature`)
+ *   `props`  - Object containing properties (inherited from `AbstractData`)
  *   `tags`   - Object containing key-value string pairs for the OSM tags
  */
-export class OsmEntity extends AbstractFeature {
+export class OsmEntity extends AbstractData {
 
   /**
    * @constructor
-   * Features may be constructed by passing an application context or another feature.
+   * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractFeature|Context}  otherOrContext - copy another Feature, or pass application context
-   * @param  {Object}                   props   - Properties to assign to the Feature
+   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
+   * @param  {Object}                props  - Properties to assign to the data element
    */
   constructor(otherOrContext, props = {}) {
     super(otherOrContext, props);
@@ -40,10 +40,10 @@ export class OsmEntity extends AbstractFeature {
 
   /**
    * update
-   * Update the Feature's properties and return a new Feature.
-   * Features are intended to be immutable.  To modify them a Feature,
-   *  pass in the properties to change, and you'll get a new Feature.
-   * The new Feature will have an updated `v` internal version number.
+   * Update the data element's properties and return a new data element.
+   * data elements are intended to be immutable.  To modify a data element,
+   *  pass in the properties to change, and you'll get a new data element.
+   * The new data element will have an updated `v` internal version number.
    * @param   {Object}     props - the updated properties
    * @return  {OsmEntity}  a new OsmEntity
    */
@@ -53,10 +53,10 @@ export class OsmEntity extends AbstractFeature {
 
   /**
    * updateSelf
-   * Like `update` but it modifies the current Feature's properties in-place.
-   * This will also update the Feature's `v` internal version number.
+   * Like `update` but it modifies the current data element's properties in-place.
+   * This will also update the data element's `v` internal version number.
    * `updateSelf` is slightly more performant for situations where you don't need
-   * immutability and don't mind mutating the Feature.
+   * immutability and don't mind mutating the data element.
    *
    * A warning - this can circumvent `updateGeometry`.
    * So you shouldn't `updateSelf` for OsmNodes where to try to change it's `loc`.
@@ -88,7 +88,7 @@ export class OsmEntity extends AbstractFeature {
 
   /**
    * copy
-   * Makes a (mostly) deep copy of a feature.
+   * Makes a (mostly) deep copy of an OSM Entity.
    * Copied entities will start out with a fresh `id` and cleared out metadata.
    * This is like the sort of copy you would want when copy-pasting a feature.
    * Note that this function is subclassed, so that Ways and Relations can copy their child data too.
@@ -109,7 +109,7 @@ export class OsmEntity extends AbstractFeature {
 
   /**
    * tags
-   * Tags are the key=value pairs of strings that assign meaning to an OSM element.
+   * Tags are the `key=value` pairs of strings that assign meaning to an OSM element.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Tag
    * @return {Object}
    * @readonly

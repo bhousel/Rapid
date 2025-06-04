@@ -1,7 +1,7 @@
 import { GeometryCollection } from './GeometryCollection.js';
 
 
-// Global version sequence used by all features
+// Global version sequence used by all data elements
 // We did it this way to avoid the situation where you undo a feature
 // to a previous version and then increment it back to the same version.
 // see Rapid@9ac2776a
@@ -16,31 +16,32 @@ let _nextv = 1;
 
 
 /**
- * AbstractFeature is the base class from which all data Features inherit.
- * A "data feature" is the internal representation of a piece of map data.
+ * AbstractData is the base class from which all managed data elements inherit.
+ * A data element is the internal representation of a piece of map data.
+ * It can refer to an OSM Entity or a GeoJSON object.
  * It has a type, geometry, and properties (in OSM, these are the tags).
  *
- * Data Features are intended to be immutable - the `update()` method will return a new Feature.
+ * Data elements are intended to be immutable - the `update()` method will return a new data element.
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
  * Properties you can access:
- *   `id`      Unique string to use for the name of this Data Feature
- *   `type`    String describing what kind of Data Feature this is ('node', 'way', 'relation')
- *   `v`       Version of the Feature, can be used to detect changes
+ *   `id`      Unique string to identify this data element (elsewhere, referred to as the `dataID`)
+ *   `type`    String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
+ *   `v`       Internal version of the data element, can be used to detect changes
  *   `geoms`   GeometryCollection object
  *   `props`   Properties object
  */
-export class AbstractFeature {
+export class AbstractData {
 
   /**
    * @constructor
-   * Features may be constructed by passing an application context or another feature.
+   * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractFeature|Context}  otherOrContext - copy another Feature, or pass application context
-   * @param  {Object}                   props   - Properties to assign to the Feature
+   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
+   * @param  {Object}                props  - Properties to assign to the data element
    */
   constructor(otherOrContext, props = {}) {
-    if (otherOrContext instanceof AbstractFeature) {  // copy other
+    if (otherOrContext instanceof AbstractData) {  // copy other
       const other = otherOrContext;
       this.context = other.context;
       this.props = globalThis.structuredClone(other.props);
@@ -59,7 +60,7 @@ export class AbstractFeature {
 
   /**
    * destroy
-   * Every Feature should have a destroy function that frees all the resources
+   * Every data element should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    * @abstract
    */
@@ -71,38 +72,38 @@ export class AbstractFeature {
 
   /**
    * update
-   * Update the Feature's properties and return a new Feature.
-   * Features are intended to be immutable.  To modify them a Feature,
-   *  pass in the properties to change, and you'll get a new Feature.
-   * The new Feature will have an updated `v` internal version number.
-   * @param   {Object}           props - the updated properties
-   * @return  {AbstractFeature}  a new Feature
+   * Update the data element's properties and return a new data element.
+   * data elements are intended to be immutable.  To modify a data element,
+   *  pass in the properties to change, and you'll get a new data element.
+   * The new data element will have an updated `v` internal version number.
+   * @param   {Object}        props - the updated properties
+   * @return  {AbstractData}  a new data element
    * @abstract
    */
   update(props) {
-    throw new Error(`Do not call 'update' on AbstractFeature`);
+    throw new Error(`Do not call 'update' on AbstractData`);
   }
 
   /**
    * updateSelf
-   * Like `update` but it modifies the current Feature's properties in-place.
-   * This will also update the Feature's `v` internal version number.
+   * Like `update` but it modifies the current data element's properties in-place.
+   * This will also update the data element's `v` internal version number.
    * `updateSelf` is slightly more performant for situations where you don't need
-   * immutability and don't mind mutating the Feature.
-   * @param   {Object}           props - the updated properties
-   * @return  {AbstractFeature}  this Feature
+   * immutability and don't mind mutating the data element.
+   * @param   {Object}        props - the updated properties
+   * @return  {AbstractData}  this data element
    * @abstract
    */
   updateSelf(props) {
-    throw new Error(`Do not call 'updateSelf' on AbstractFeature`);
+    throw new Error(`Do not call 'updateSelf' on AbstractData`);
   }
 
   /**
    * extent
-   * Get an Extent (in WGS84 lon/lat) from the Geometry object.
+   * Get an Extent (in WGS84 lon/lat) from this data elemenent's geometry.
    * Note that this may return `null` in situations where an Extent could not be determined.
    * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
-   * @return {Extent}  Extent representing the feature's bounding box, or `null`
+   * @return {Extent}  Extent representing the data element's bounding box, or `null`
    */
   extent() {
     return this.geoms.origExtent;
@@ -110,7 +111,7 @@ export class AbstractFeature {
 
   /**
    * intersects
-   * Test if this feature intersects the given other Extent
+   * Test if this data element intersects the given other Extent
    * Note that this may return `false` in situations where an Extent could not be determined.
    * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
    * @param  {Extent}   other - the test extent
@@ -123,8 +124,8 @@ export class AbstractFeature {
 
   /**
    * touch
-   * Bump internal version number in place (forcing a rerender)
-   * @return  {AbstractFeature}  this Feature
+   * Bump internal version number in place (typically, forcing a rerender)
+   * @return  {AbstractData}  this data element
    */
   touch() {
     this.props.v = _nextv++;
@@ -133,6 +134,7 @@ export class AbstractFeature {
 
   /**
    * type
+   * String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
    * @return   {string}
    */
   get type() {
@@ -144,7 +146,8 @@ export class AbstractFeature {
 
   /**
    * id
-   * @return   {string}
+   * Unique string to identify this data element (elsewhere, referred to as the `dataID`)
+   * @return  {string}
    */
   get id() {
     return this.props.id ?? '';
@@ -155,7 +158,8 @@ export class AbstractFeature {
 
   /**
    * v
-   * @return   {number}
+   * Internal version of the data element, can be used to detect changes.
+   * @return  {number}
    */
   get v() {
     return this.props.v || 0;

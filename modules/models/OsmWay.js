@@ -18,7 +18,7 @@ function noRepeatNodes(node, i, arr) {
  * @see https://wiki.openstreetmap.org/wiki/Way
  *
  * Properties you can access:
- *   `props`  - Object containing Feature properties (inherited from `AbstractFeature`)
+ *   `props`  - Object containing Feature properties (inherited from `AbstractData`)
  *   `tags`   - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
  *   `nodes`  - Accessor for the nodes, an Array of node ids
  */
@@ -26,10 +26,10 @@ export class OsmWay extends OsmEntity {
 
   /**
    * @constructor
-   * Features may be constructed by passing an application context or another feature.
+   * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractFeature|Context}  otherOrContext - copy another Feature, or pass application context
-   * @param  {Object}                   props   - Properties to assign to the Feature
+   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
+   * @param  {Object}                props  - Properties to assign to the data element
    */
   constructor(otherOrContext, props = {}) {
     super(otherOrContext, props);
@@ -55,10 +55,10 @@ export class OsmWay extends OsmEntity {
 
   /**
    * update
-   * Update the Feature's properties and return a new Feature.
-   * Features are intended to be immutable.  To modify them a Feature,
-   *  pass in the properties to change, and you'll get a new Feature.
-   * The new Feature will have an updated `v` internal version number.
+   * Update the data element's properties and return a new data element.
+   * data elements are intended to be immutable.  To modify a data element,
+   *  pass in the properties to change, and you'll get a new data element.
+   * The new data element will have an updated `v` internal version number.
    * @param   {Object}  props - the updated properties
    * @return  {OsmWay}  a new OsmWay
    */
@@ -128,7 +128,7 @@ export class OsmWay extends OsmEntity {
 
   /**
    * copy
-   * Makes a (mostly) deep copy of a feature.
+   * Makes a (mostly) deep copy of an OSM Entity.
    * Copied entities will start out with a fresh `id` and cleared out metadata.
    * This is like the sort of copy you would want when copy-pasting a feature.
    * When completed, the `memo` argument will contain all the copied data elements.

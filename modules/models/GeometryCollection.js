@@ -20,7 +20,7 @@ export class GeometryCollection {
 
   /**
    * @constructor
-   * @param  {AbstractFeature} feature - The data feature that owns this GeometryCollection
+   * @param  {AbstractData} feature - The data feature that owns this GeometryCollection
    */
   constructor(feature) {
     this.feature = feature;
@@ -46,7 +46,7 @@ export class GeometryCollection {
    * clone
    * Returns a clone of this GeometryCollection object
    * It clones both the calculated extents as well as the Geometries in the collection.
-   * @param  {AbstractFeature} feature - The data feature that will own the clone GeometryCollection
+   * @param  {AbstractData} feature - The data feature that will own the clone GeometryCollection
    * @return {GeometryCollection}
    */
   clone(feature) {

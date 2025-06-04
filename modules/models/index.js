@@ -1,4 +1,4 @@
-import { AbstractFeature } from './AbstractFeature.js';
+import { AbstractData } from './AbstractData.js';
 import { GeometryCollection } from './GeometryCollection.js';
 import { Geometry } from './Geometry.js';
 import { OsmChangeset } from './OsmChangeset.js';
@@ -9,7 +9,7 @@ import { OsmWay } from './OsmWay.js';
 import { QAItem } from './qa_item.js';
 
 export {
-  AbstractFeature,
+  AbstractData,
   GeometryCollection,
   Geometry,
   OsmChangeset,
@@ -66,11 +66,11 @@ export {
  * Features may be constructed by copying another feature, or by passing a context and properties.
  * If passed context and properties, this function will determine what type of Entity to create
  *  based on its `id` or `type` properties.
- * @param  {AbstractFeature|Context}  otherOrContext - copy another Feature, or pass application context
+ * @param  {AbstractData|Context}  otherOrContext - copy another Feature, or pass application context
  * @param  {Object}                   props   - Properties to assign to the Feature
  */
 export function createOsmFeature(otherOrContext, props = {}) {
-  if (otherOrContext instanceof AbstractFeature) {  // copy other
+  if (otherOrContext instanceof AbstractData) {  // copy other
     const Type = otherOrContext.constructor;
     return new Type(otherOrContext, props);
 
