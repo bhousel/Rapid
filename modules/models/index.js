@@ -1,6 +1,7 @@
 import { AbstractData } from './AbstractData.js';
 import { GeometryCollection } from './GeometryCollection.js';
 import { Geometry } from './Geometry.js';
+import { GeoJSON } from './GeoJSON.js';
 import { OsmChangeset } from './OsmChangeset.js';
 import { OsmEntity } from './OsmEntity.js';
 import { OsmNode } from './OsmNode.js';
@@ -12,6 +13,7 @@ export {
   AbstractData,
   GeometryCollection,
   Geometry,
+  GeoJSON,
   OsmChangeset,
   OsmEntity,
   OsmNode,

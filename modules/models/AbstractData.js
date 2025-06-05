@@ -119,7 +119,7 @@ export class AbstractData {
    */
   intersects(other) {
     const extent = this.geoms.origExtent;
-    return extent?.intersects(other);
+    return extent?.intersects(other) ?? false;
   }
 
   /**
