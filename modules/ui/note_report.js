@@ -1,4 +1,3 @@
-import { QAItem } from '../models/qa_item.js';
 import { uiIcon } from './icon.js';
 
 
@@ -10,7 +9,7 @@ export function uiNoteReport(context) {
   function render(selection) {
     let url;
     const osm = context.services.osm;
-    if (osm && (_note instanceof QAItem) && !_note.isNew()) {
+    if (osm && _note && !_note.isNew()) {
       url = osm.noteReportURL(_note);
     }
 

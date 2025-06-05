@@ -13,21 +13,21 @@ export function uiOsmoseDetails(context) {
   const presets = context.systems.presets;
   const scene = context.systems.gfx.scene;
 
-  let _qaItem;
+  let _marker;
 
 
   function issueString(d, type) {
     if (!osmose || !d) return '';
 
     // Issue strings are cached from Osmose API
-    const s = osmose.getStrings(d.itemType);
+    const s = osmose.getStrings(d.type);
     return (type in s) ? s[type] : '';
   }
 
 
   function render(selection) {
     const details = selection.selectAll('.sidebar-details')
-      .data(_qaItem ? [_qaItem] : [], d => d.key);
+      .data(_marker ? [_marker] : [], d => d.key);
 
     details.exit()
       .remove();
@@ -38,7 +38,7 @@ export function uiOsmoseDetails(context) {
 
 
     // Description
-    if (issueString(_qaItem, 'detail')) {
+    if (issueString(_marker, 'detail')) {
       const div = detailsEnter
         .append('div')
         .attr('class', 'qa-details-subsection');
@@ -66,7 +66,7 @@ export function uiOsmoseDetails(context) {
       .attr('class', 'qa-details-subsection');
 
     // Suggested Fix (mustn't exist for every issue type)
-    if (issueString(_qaItem, 'fix')) {
+    if (issueString(_marker, 'fix')) {
       const div = detailsEnter
         .append('div')
         .attr('class', 'qa-details-subsection');
@@ -84,7 +84,7 @@ export function uiOsmoseDetails(context) {
     }
 
     // Common Pitfalls (mustn't exist for every issue type)
-    if (issueString(_qaItem, 'trap')) {
+    if (issueString(_marker, 'trap')) {
       const div = detailsEnter
         .append('div')
         .attr('class', 'qa-details-subsection');
@@ -103,23 +103,23 @@ export function uiOsmoseDetails(context) {
 
     // Save current item to check if UI changed by time request resolves
     if (!osmose) return;
-    osmose.loadIssueDetailAsync(_qaItem)
+    osmose.loadIssueDetailAsync(_marker)
       .then(d => {
-        // Do nothing if _qaItem has changed by the time Promise resolves
-        if (_qaItem.id !== d.id) return;
+        // Do nothing if _marker has changed by the time Promise resolves
+        if (_marker.id !== d.id) return;
 
         // No details to add if there are no associated issue elements
-        if (!d.elems || d.elems.length === 0) return;
+        if (!d.props.elems || d.props.elems.length === 0) return;
 
         // Things like keys and values are dynamically added to a subtitle string
-        if (d.detail) {
+        if (d.props.detail) {
           detailsDiv
             .append('h4')
             .text(l10n.t('QA.osmose.detail_title'));
 
           detailsDiv
             .append('p')
-            .html(d => d.detail)
+            .html(d => d.props.detail)
             .selectAll('a')
             .attr('rel', 'noopener')
             .attr('target', '_blank');
@@ -132,7 +132,7 @@ export function uiOsmoseDetails(context) {
 
         elemsDiv
           .append('ul').selectAll('li')
-          .data(d.elems)
+          .data(d.props.elems)
           .enter()
           .append('li')
           .append('a')
@@ -180,7 +180,7 @@ export function uiOsmoseDetails(context) {
           });
 
         // Don't hide entities related to this issue - iD#5880
-        filters.forceVisible(d.elems);
+        filters.forceVisible(d.props.elems);
         gfx.immediateRedraw();
       })
       .catch(e => console.error(e));  // eslint-disable-line
@@ -188,8 +188,8 @@ export function uiOsmoseDetails(context) {
 
 
   render.issue = function(val) {
-    if (!arguments.length) return _qaItem;
-    _qaItem = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

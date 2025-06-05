@@ -52,26 +52,6 @@ export class OsmEntity extends AbstractData {
   }
 
   /**
-   * updateSelf
-   * Like `update` but it modifies the current data element's properties in-place.
-   * This will also update the data element's `v` internal version number.
-   * `updateSelf` is slightly more performant for situations where you don't need
-   * immutability and don't mind mutating the data element.
-   *
-   * A warning - this can circumvent `updateGeometry`.
-   * So you shouldn't `updateSelf` for OsmNodes where to try to change it's `loc`.
-   * And you shouldn't `updateSelf` for any entity after it has been added to a Graph.
-   *
-   * @param   {Object}     props - the updated properties
-   * @return  {OsmEntity}  this same OsmEntity
-   */
-  updateSelf(props) {
-    this.props = Object.assign(this.props, props);
-    this.touch();
-    return this;
-  }
-
-  /**
    * updateGeometry
    * OSM geometry can be complicated.
    * Nodes are easy because they represent a single coordinate.

@@ -7,7 +7,7 @@ export function uiMapRouletteDetails(context) {
   const l10n = context.systems.l10n;
   const maproulette = context.services.maproulette;
 
-  let _qaItem;
+  let _marker;
 
 
   /**
@@ -64,7 +64,7 @@ export function uiMapRouletteDetails(context) {
       // Check if the property name is 'osmIdentifier' and task has a title
       if (propertyName === 'osmIdentifier' && task.title) {
         // Extract the OSM ID including the prefix from the task's title
-        const osmId = task.title.split('@')[0];
+        const osmId = task.props.title.split('@')[0];
         // Return an anchor tag with a class for highlighting and data attribute for the OSM ID
         return `<a href="#" class="highlight-link" data-osm-id="${osmId}">${osmId}</a>`;
       }
@@ -72,7 +72,7 @@ export function uiMapRouletteDetails(context) {
       // Tasks have a featureCollection. Usually there is only one feature, but we still have to handle multiple.
       // In case properties are duplicated between features, we take the last value. I don't expect this to happen or be an issue.
       const allProperties = new Map();
-      task.taskFeatures.map(f => f.properties).forEach(properties => {
+      task.props.taskFeatures.map(f => f.properties).forEach(properties => {
         Object.keys(properties).forEach(key => {
           allProperties.set(key, properties[key]);
         });
@@ -114,7 +114,7 @@ export function uiMapRouletteDetails(context) {
    */
   function render(selection) {
     let details = selection.selectAll('.sidebar-details')
-      .data(_qaItem ? [_qaItem] : [], d => d.key);
+      .data(_marker ? [_marker] : [], d => d.key);
     details.exit().remove();
 
     const detailsEnter = details.enter()
@@ -131,9 +131,9 @@ export function uiMapRouletteDetails(context) {
 
     details = details.merge(detailsEnter);
 
-    maproulette.loadTaskDetailAsync(_qaItem).then(task => {
+    maproulette.loadTaskDetailAsync(_marker).then(task => {
       if (!task) return;
-      if (_qaItem.id !== task.id) return;
+      if (_marker.id !== task.id) return;
       const selection = details.selectAll('.qa-details-subsection');
       selection.html(''); // replace contents
 
@@ -147,19 +147,19 @@ export function uiMapRouletteDetails(context) {
           .text(l10n.t('map_data.layers.maproulette.id_title'));
         titleSection
           .append('p')
-          .text(`${task.parentId} / ${task.id}`)
+          .text(`${task.props.parentId} / ${task.id}`)
           .selectAll('a')
           .attr('rel', 'noopener')
           .attr('target', '_blank');
       }
 
-      const descriptionHtml = generateDynamicContent(marked.parse(replaceMustacheTags(task.description, task), { async: false }));
-      const instructionHtml = generateDynamicContent(marked.parse(replaceMustacheTags(task.instruction, task), { async: false }));
+      const descriptionHtml = generateDynamicContent(marked.parse(replaceMustacheTags(task.props.description, task), { async: false }));
+      const instructionHtml = generateDynamicContent(marked.parse(replaceMustacheTags(task.props.instruction, task), { async: false }));
 
       // We show the challenge description when user select an unkown challenge.
       // But we hide it if a specific (assumed to be know) challenge is selected.
       const explicitChallengeIdGiven = Boolean(maproulette.challengeIDs);
-      if (!explicitChallengeIdGiven && task.description) {
+      if (!explicitChallengeIdGiven && task.props.description) {
         const descSection = selection
           .append('article');
         const descHeader = descSection
@@ -178,7 +178,7 @@ export function uiMapRouletteDetails(context) {
           .attr('target', '_blank');
       }
 
-      if (task.instruction && task.instruction !== task.description) {
+      if (task.props.instruction && task.props.instruction !== task.props.description) {
         const instructionSection = selection
           .append('article');
         const descHeader = instructionSection
@@ -241,8 +241,8 @@ export function uiMapRouletteDetails(context) {
 
 
   render.task = function(val) {
-    if (!arguments.length) return _qaItem;
-    _qaItem = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

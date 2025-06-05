@@ -4,7 +4,7 @@ import * as PIXI from 'pixi.js';
 export function uiOsmoseHeader(context) {
   const l10n = context.systems.l10n;
   const osmose = context.services.osmose;
-  let _qaItem;
+  let _marker;
 
 
   function issueTitle(d) {
@@ -12,7 +12,7 @@ export function uiOsmoseHeader(context) {
     if (!osmose || !d) return unknown;
 
     // Issue titles supplied by Osmose
-    const s = osmose.getStrings(d.itemType);
+    const s = osmose.getStrings(d.type);
     return ('title' in s) ? s.title : unknown;
   }
 
@@ -20,11 +20,11 @@ export function uiOsmoseHeader(context) {
   function render(selection) {
     let iconFill = 0xffffff;
     if (osmose) {
-      iconFill = osmose.getColor(_qaItem?.item);
+      iconFill = osmose.getColor(_marker?.item);
     }
 
     const header = selection.selectAll('.qa-header')
-      .data(_qaItem ? [_qaItem] : [], d => d.key);
+      .data(_marker ? [_marker] : [], d => d.key);
 
     header.exit()
       .remove();
@@ -40,7 +40,7 @@ export function uiOsmoseHeader(context) {
       .attr('width', '20px')
       .attr('height', '27px')
       .attr('viewbox', '0 0 20 27')
-      .attr('class', d => `qaItem ${d.service}`);
+      .attr('class', d => `qaItem ${d.serviceID}`);
 
     svgEnter
       .append('polygon')
@@ -54,7 +54,7 @@ export function uiOsmoseHeader(context) {
       .attr('width', '13px')
       .attr('height', '13px')
       .attr('transform', 'translate(3.5, 5)')
-      .attr('xlink:href', d => d.icon ? `#${d.icon}` : '');
+      .attr('xlink:href', d => d.props.iconID ? `#${d.props.iconID}` : '');
 
     headerEnter
       .append('div')
@@ -63,8 +63,8 @@ export function uiOsmoseHeader(context) {
   }
 
   render.issue = function(val) {
-    if (!arguments.length) return _qaItem;
-    _qaItem = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

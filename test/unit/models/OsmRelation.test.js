@@ -12,35 +12,32 @@ describe('OsmRelation', () => {
 
   const context = new MockContext();
 
+  describe('constructor', () => {
+    it('constructs a Relation', () => {
+      const relation = new Rapid.OsmRelation(context);
+      assert(relation instanceof Rapid.OsmRelation);
+      assert.equal(relation.type, 'relation');
+    });
 
-  it('returns a relation', () => {
-    const relation = new Rapid.OsmRelation(context);
-    assert(relation instanceof Rapid.OsmRelation);
-    assert.equal(relation.type, 'relation');
-  });
+    it('defaults members to an empty array', () => {
+      const relation = new Rapid.OsmRelation(context);
+      assert.deepEqual(relation.members, []);
+    });
 
+    it('sets members as specified', () => {
+      const relation = new Rapid.OsmRelation(context, { members: ['n-1'] });
+      assert.deepEqual(relation.members, ['n-1']);
+    });
 
-  it('defaults members to an empty array', () => {
-    const relation = new Rapid.OsmRelation(context);
-    assert.deepEqual(relation.members, []);
-  });
+    it('defaults tags to an empty object', () => {
+      const relation = new Rapid.OsmRelation(context);
+      assert.deepEqual(relation.tags, {});
+    });
 
-
-  it('sets members as specified', () => {
-    const relation = new Rapid.OsmRelation(context, { members: ['n-1'] });
-    assert.deepEqual(relation.members, ['n-1']);
-  });
-
-
-  it('defaults tags to an empty object', () => {
-    const relation = new Rapid.OsmRelation(context);
-    assert.deepEqual(relation.tags, {});
-  });
-
-
-  it('sets tags as specified', () => {
-    const relation = new Rapid.OsmRelation(context, { tags: { foo: 'bar' } });
-    assert.deepEqual(relation.tags, { foo: 'bar' });
+    it('sets tags as specified', () => {
+      const relation = new Rapid.OsmRelation(context, { tags: { foo: 'bar' } });
+      assert.deepEqual(relation.tags, { foo: 'bar' });
+    });
   });
 
 

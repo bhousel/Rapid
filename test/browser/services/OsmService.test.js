@@ -673,8 +673,8 @@ describe('OsmService', () => {
       });
 
       it('sets/gets a note', () => {
-        const note = new Rapid.QAItem(_osm, null, '1', { loc: [0, 0] });
-        const note2 = new Rapid.QAItem(_osm, null, '2', { loc: [0, 0] });
+        const note = new Rapid.Marker(context, { id: '1', loc: [0, 0], serviceID: 'osm' });
+        const note2 = new Rapid.Marker(context, { id: '2', loc: [0, 0], serviceID: 'osm' });
         const obj = {
           note: { note: { '1': note, '2': note2 } }
         };
@@ -765,7 +765,7 @@ describe('OsmService', () => {
 
   describe('#getNote', () => {
     it('returns a note', () => {
-      const note = new Rapid.QAItem(_osm, null, '1', { loc: [0, 0] });
+      const note = new Rapid.Marker(context, { id: '1', loc: [0, 0], serviceID: 'osm' });
       const obj = {
         note: { note: { '1': note } }
       };
@@ -777,7 +777,7 @@ describe('OsmService', () => {
 
   describe('#removeNote', () => {
     it('removes a note that is new', () => {
-      const note = new Rapid.QAItem(_osm, null, '-1', { loc: [0, 0] });
+      const note = new Rapid.Marker(context, { id: '-1', isNew: true, loc: [0, 0], serviceID: 'osm' });
       _osm.replaceNote(note);
       _osm.removeNote(note);
       const result = _osm.getNote('-1');
@@ -788,7 +788,7 @@ describe('OsmService', () => {
 
   describe('#replaceNote', () => {
     it('returns a new note', () => {
-      const note = new Rapid.QAItem(_osm, null, '2', { loc: [0, 0] });
+      const note = new Rapid.Marker(context, { id: '2', loc: [0, 0], serviceID: 'osm' });
       const result = _osm.replaceNote(note);
       expect(result.id).to.eql('2');
       expect(_osm.caches().note.note['2']).to.eql(note);
@@ -799,16 +799,16 @@ describe('OsmService', () => {
     });
 
     it('replaces a note', () => {
-      const note = new Rapid.QAItem(_osm, null, '2', { loc: [0, 0] });
+      const note = new Rapid.Marker(context, { id: '2', loc: [0, 0], serviceID: 'osm' });
       _osm.replaceNote(note);
-      note.status = 'closed';
+      note.updateSelf({ status: 'closed' });
       const result = _osm.replaceNote(note);
-      expect(result.status).to.eql('closed');
+      expect(result.props.status).to.eql('closed');
 
       const rbush = _osm.caches().note.rbush;
       const result_rbush = rbush.search({ 'minX': -1, 'minY': -1, 'maxX': 1, 'maxY': 1 });
       expect(result_rbush.length).to.eql(1);
-      expect(result_rbush[0].data.status).to.eql('closed');
+      expect(result_rbush[0].data.props.status).to.eql('closed');
     });
   });
 

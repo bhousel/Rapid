@@ -2,24 +2,24 @@ import { AbstractData } from './AbstractData.js';
 import { GeometryCollection } from './GeometryCollection.js';
 import { Geometry } from './Geometry.js';
 import { GeoJSON } from './GeoJSON.js';
+import { Marker } from './Marker.js';  // was "QAItem"
 import { OsmChangeset } from './OsmChangeset.js';
 import { OsmEntity } from './OsmEntity.js';
 import { OsmNode } from './OsmNode.js';
 import { OsmRelation } from './OsmRelation.js';
 import { OsmWay } from './OsmWay.js';
-import { QAItem } from './qa_item.js';
 
 export {
   AbstractData,
   GeometryCollection,
   Geometry,
   GeoJSON,
+  Marker,
   OsmChangeset,
   OsmEntity,
   OsmNode,
   OsmRelation,
-  OsmWay,
-  QAItem
+  OsmWay
 };
 
 export {
@@ -65,11 +65,11 @@ export {
 
 /**
  * createOsmFeature
- * Features may be constructed by copying another feature, or by passing a context and properties.
- * If passed context and properties, this function will determine what type of Entity to create
- *  based on its `id` or `type` properties.
- * @param  {AbstractData|Context}  otherOrContext - copy another Feature, or pass application context
- * @param  {Object}                   props   - Properties to assign to the Feature
+ * This function allows us to construct the correct OSM Entity type.
+ * If passed another OSM Entity, inspect its constructor.
+ * If passed context and properties, inspect its `id` or `type` properties.
+ * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
+ * @param  {Object}                props - Properties to assign to the data element
  */
 export function createOsmFeature(otherOrContext, props = {}) {
   if (otherOrContext instanceof AbstractData) {  // copy other

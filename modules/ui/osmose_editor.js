@@ -14,7 +14,7 @@ export function uiOsmoseEditor(context) {
   const qaDetails = uiOsmoseDetails(context);
   const qaHeader = uiOsmoseHeader(context);
   const ViewOn = new UiViewOn(context);
-  let _qaItem;
+  let _marker;
 
 
   function render(selection) {
@@ -50,12 +50,12 @@ export function uiOsmoseEditor(context) {
       .append('div')
       .attr('class', 'modal-section qa-editor')
       .merge(editor)
-      .call(qaHeader.issue(_qaItem))
-      .call(qaDetails.issue(_qaItem))
+      .call(qaHeader.issue(_marker))
+      .call(qaDetails.issue(_marker))
       .call(osmoseSaveSection);
 
     ViewOn.stringID = 'inspector.view_on_osmose';
-    ViewOn.url = osmose.itemURL(_qaItem);
+    ViewOn.url = osmose.itemURL(_marker);
 
     const $footer = selection.selectAll('.sidebar-footer')
       .data([0]);
@@ -68,11 +68,11 @@ export function uiOsmoseEditor(context) {
   }
 
   function osmoseSaveSection(selection) {
-    const errID = _qaItem?.id;
+    const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
-    const isShown = (_qaItem && isSelected);
+    const isShown = (_marker && isSelected);
     let saveSection = selection.selectAll('.qa-save')
-      .data(isShown ? [_qaItem] : [], d => d.key);
+      .data(isShown ? [_marker] : [], d => d.key);
 
     // exit
     saveSection.exit()
@@ -90,10 +90,10 @@ export function uiOsmoseEditor(context) {
   }
 
   function qaSaveButtons(selection) {
-    const errID = _qaItem?.id;
+    const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
     let buttonSection = selection.selectAll('.buttons')
-      .data(isSelected ? [_qaItem] : [], d => d.key);
+      .data(isSelected ? [_marker] : [], d => d.key);
 
     // exit
     buttonSection.exit()
@@ -121,7 +121,7 @@ export function uiOsmoseEditor(context) {
       .on('click.close', function(d3_event, d) {
         this.blur();    // avoid keeping focus on the button - iD#4641
         if (osmose) {
-          d.newStatus = 'done';
+          d.updateSelf({ newStatus: 'done' });
           osmose.postUpdate(d, (err, item) => dispatch.call('change', item));
         }
       });
@@ -131,15 +131,15 @@ export function uiOsmoseEditor(context) {
       .on('click.ignore', function(d3_event, d) {
         this.blur();    // avoid keeping focus on the button - iD#4641
         if (osmose) {
-          d.newStatus = 'false';
+          d.updateSelf({ newStatus: 'false' });
           osmose.postUpdate(d, (err, item) => dispatch.call('change', item));
         }
       });
   }
 
   render.error = function(val) {
-    if (!arguments.length) return _qaItem;
-    _qaItem = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

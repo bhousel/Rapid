@@ -34,7 +34,7 @@ export function uiMapRouletteMenu(context) {
   let _menuTop = false;
   let _menuHeight;
   let _menuWidth;
-  let _qaItem;
+  let _marker;
   let _mapRouletteApiKey;
 
 
@@ -118,16 +118,16 @@ export function uiMapRouletteMenu(context) {
   function executeAction(actionId, d3_event) {
     switch (actionId) {
       case 'fixed':
-        fixedIt(d3_event, _qaItem);
+        fixedIt(d3_event, _marker);
         break;
       case 'cantComplete':
-        cantComplete(d3_event, _qaItem);
+        cantComplete(d3_event, _marker);
         break;
       case 'alreadyFixed':
-        alreadyFixed(d3_event, _qaItem);
+        alreadyFixed(d3_event, _marker);
         break;
       case 'notAnIssue':
-        notAnIssue(d3_event, _qaItem);
+        notAnIssue(d3_event, _marker);
         break;
     }
   }
@@ -357,8 +357,8 @@ export function uiMapRouletteMenu(context) {
    * @return {Object|Function} The current QA item or the menu component.
    */
   mapRouletteMenu.error = function(val) {
-    if (!arguments.length) return _qaItem;
-    _qaItem = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return mapRouletteMenu;
   };
 

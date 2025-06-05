@@ -5,12 +5,12 @@ import { uiIcon } from './icon.js';
 
 export function uiKeepRightHeader(context) {
   const l10n = context.systems.l10n;
-  let _qaItem;
+  let _marker;
 
 
   function issueTitle(d) {
     const unknown = l10n.t('inspector.unknown');
-    let replacements = d.replacements || {};
+    let replacements = d.props.replacements || {};
     replacements.default = unknown;  // special key `default` works as a fallback string
 
     let title = l10n.t(`QA.keepRight.errorTypes.${d.itemType}.title`, replacements);
@@ -25,11 +25,11 @@ export function uiKeepRightHeader(context) {
     let iconFill = 0xffffff;
     const keepright = context.services.keepRight;
     if (keepright) {
-      iconFill = keepright.getColor(_qaItem?.parentIssueType);
+      iconFill = keepright.getColor(_marker?.props.parentIssueType);
     }
 
     const header = selection.selectAll('.qa-header')
-      .data(_qaItem ? [_qaItem] : [], d => d.key);
+      .data(_marker ? [_marker] : [], d => d.key);
 
     header.exit()
       .remove();
@@ -42,7 +42,7 @@ export function uiKeepRightHeader(context) {
       .append('div')
       .attr('class', 'qa-header-icon')
       .append('div')
-      .attr('class', d => `qaItem ${d.service}`)
+      .attr('class', d => `qaItem ${d.serviceID}`)
       .call(uiIcon('#rapid-icon-bolt'));
 
     headerEnter
@@ -58,8 +58,8 @@ export function uiKeepRightHeader(context) {
 
 
   render.issue = function(val) {
-    if (!arguments.length) return _qaItem;
-    _qaItem = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

@@ -5,7 +5,7 @@ import {
 } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { QAItem } from '../models/index.js';
+import { Marker } from '../models/Marker.js';
 import { utilTotalExtent } from '../util/index.js';
 
 const TILESIZE = 256;
@@ -434,7 +434,7 @@ export class MapSystem extends AbstractSystem {
     let noteID;
     const [pair] = context.selectedData();  // get the first thing in the Map()
     const [datumID, datum] = pair || [];
-    if (datum instanceof QAItem && datum.service === 'osm') {
+    if (datum instanceof Marker && datum.serviceID === 'osm') {
       noteID = datumID;
     }
 

@@ -2,7 +2,7 @@ import { Tiler, vecSubtract } from '@rapid-sdk/math';
 import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem';
-import { QAItem } from '../models/qa_item.js';
+import { Marker } from '../models/Marker.js';
 import { utilFetchResponse } from '../util';
 
 const TILEZOOM = 14;
@@ -218,28 +218,8 @@ export class MapRouletteService extends AbstractSystem {
       .then(data => {
         cache.tileRequest.set(tile.id, { status: 'loaded' });
 
-        for (const task of (data ?? [])) {
-          const taskID = task.id.toString();
-          const challengeID = task.parentId.toString();
-          if (cache.tasks.has(taskID)) continue;  // seen it already
-
-          // Have we seen this challenge before?
-          const challenge = cache.challenges.get(challengeID);
-          if (!challenge) {
-            cache.challengeRequest.set(challengeID, {});  // queue fetching it
-            task.isVisible = false;
-          } else {
-            task.isVisible = challenge.isVisible;
-          }
-
-          task.id = taskID;               // force to string
-          task.parentId = challengeID;    // force to string
-          task.loc = this._preventCoincident(cache.rbush, [task.point.lng, task.point.lat]);
-
-          // save the task
-          const d = new QAItem(this, null, taskID, task);
-          cache.tasks.set(taskID, d);
-          cache.rbush.insert(this._encodeIssueRBush(d));
+        for (const props of (data ?? [])) {
+          this._cacheTask(props);
         }
 
         this.loadChallenges();   // call this sometimes
@@ -285,8 +265,8 @@ export class MapRouletteService extends AbstractSystem {
 
           // update task statuses
           for (const task of cache.tasks.values()) {
-            if (task.parentId === challengeID) {
-              task.isVisible = challenge.isVisible;
+            if (task.props.parentId === challengeID) {
+              task.updateSelf({ isVisible: challenge.isVisible });
             }
           }
 
@@ -314,62 +294,69 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * loadTaskDetailAsync
-   * This loads the challenge data (not the task) and add the task GeoJSON features to it
-   * https://maproulette.org/docs/swagger-ui/index.html#/Challenge/read
-   * @param   task
-   * @return  Promise
+   * This loads the challenge instructions and adds it to an existing task.
+   * @see https://maproulette.org/docs/swagger-ui/index.html#/Challenge/read
+   * @param  {Marker}  task
+   * @return {Promise}
    */
   loadTaskDetailAsync(task) {
-    if (task.description !== undefined) return Promise.resolve(task);  // already done
+    if (task.props.description !== undefined) return Promise.resolve(task);  // already done
 
-    const url = `${MAPROULETTE_API}/challenge/${task.parentId}`;
-    const handleResponse = (data) => {
-      task.instruction = data.instruction || '';
-      task.description = data.description || '';
-      return task;
-    };
+    const challengeID = task.props.parentId;
+    const url = `${MAPROULETTE_API}/challenge/${challengeID}`;
 
     return fetch(url)
       .then(utilFetchResponse)
-      .then(handleResponse)
-      .then(this.loadTaskTaskDetailAsync);
+      .then(data => {
+        return task.updateSelf({
+          instruction: data.instruction || '',
+          description: data.description || ''
+        });
+      })
+      .then(task => this.loadTaskFeaturesAsync(task));
   }
 
 
   /**
-   * loadTaskDetailAsync
-   * This loads the task data and adds the geojson properties that are embedded into the task as `taskFeatures`.
+   * loadTaskFeaturesAsync
+   * This loads the task features geojson and adds it to an existing task.
    * Those properties are used to replace the Mustache tags in the challenge.instruction/.description.
-   * https://maproulette.org/docs/swagger-ui/index.html#/Task/read
-   * @param   task
-   * @return  Promise
+   * @see https://maproulette.org/docs/swagger-ui/index.html#/Task/read
+   * @param   {Marker}  task
+   * @return  {Promise}
    */
-  loadTaskTaskDetailAsync(task) {
-    if (task.taskInstructions !== undefined) return Promise.resolve(task);  // already done
+  loadTaskFeaturesAsync(task) {
+    if (task.props.taskFeatures !== undefined) return Promise.resolve(task);  // already done
 
     const url = `${MAPROULETTE_API}/task/${task.id}`;
-    const handleResponse = (data) => {
-      task.taskFeatures = data.geometries.features;
-      return task;
-    };
 
     return fetch(url)
       .then(utilFetchResponse)
-      .then(handleResponse);
+      .then(data => {
+        return task.updateSelf({
+          taskFeatures: data?.geometries?.features || []
+        });
+      });
   }
 
 
   /**
    * postUpdate
-   * @param   task
-   * @param   callback
+   * @param   {Marker}    task
+   * @param   {function}  callback
    */
   postUpdate(task, callback) {
     const cache = this._cache;
 
+    const taskID = task.id;
+    const challengeID = task.props.parentId;
+    const taskStatus = task.props.taskStatus;
+    const taskComment = task.props.comment;
+    const apikey = task.props.mapRouletteApiKey;
+
     // A comment is optional, but if we have one, POST it..
-    const commentUrl = `${MAPROULETTE_API}/task/${task.id}/comment`;
-    if (task.comment && !cache.inflight.has(commentUrl)) {
+    const commentUrl = `${MAPROULETTE_API}/task/${taskID}/comment`;
+    if (taskComment && !cache.inflight.has(commentUrl)) {
       const commentController = new AbortController();
       cache.inflight.set(commentUrl, commentController);
 
@@ -377,9 +364,9 @@ export class MapRouletteService extends AbstractSystem {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apiKey': task.mapRouletteApiKey
+          'apiKey': apikey
         },
-        body: JSON.stringify({ actionId: 2, comment: task.comment }),
+        body: JSON.stringify({ actionId: 2, comment: taskComment }),
         signal: commentController.signal
       })
       .then(utilFetchResponse)
@@ -396,8 +383,8 @@ export class MapRouletteService extends AbstractSystem {
     }
 
     // update the status and release the task
-    const updateTaskUrl = `${MAPROULETTE_API}/task/${task.id}/${task.taskStatus}`;
-    const releaseTaskUrl = `${MAPROULETTE_API}/task/${task.id}/release`;
+    const updateTaskUrl = `${MAPROULETTE_API}/task/${taskID}/${taskStatus}`;
+    const releaseTaskUrl = `${MAPROULETTE_API}/task/${taskID}/release`;
 
     if (!cache.inflight.has(updateTaskUrl) && !cache.inflight.has(releaseTaskUrl)) {
       const updateTaskController = new AbortController();
@@ -409,7 +396,7 @@ export class MapRouletteService extends AbstractSystem {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'apiKey': task.mapRouletteApiKey
+          'apiKey': apikey
         },
         signal: updateTaskController.signal
       })
@@ -418,15 +405,15 @@ export class MapRouletteService extends AbstractSystem {
         return fetch(releaseTaskUrl, {
           signal: releaseTaskController.signal,
           headers: {
-            'apiKey': task.mapRouletteApiKey
+            'apiKey': apikey
           }
         });
       })
       .then(utilFetchResponse)
       .then(() => {
         // All requests completed successfully
-        if (task.taskStatus === 1) {  // only counts if the use chose "I Fixed It".
-          this._cache.closed.push({ taskID: task.id, challengeID: task.parentId });
+        if (taskStatus === 1) {  // only counts if the use chose "I Fixed It".
+          this._cache.closed.push({ taskID: taskID, challengeID: challengeID });
         }
         this.removeTask(task);
         this.context.enter('browse');
@@ -451,8 +438,8 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * getError
    * Get a Task from cache
-   * @param   taskID
-   * @return  Task
+   * @param  {string}   taskID
+   * @return {Marker?}  Task
    */
   getError(taskID) {
     return this._cache.tasks.get(taskID);
@@ -462,11 +449,11 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * replaceTask
    * Replace a single Task in the cache
-   * @param   task
-   * @return  the task, or `null` if it couldn't be replaced
+   * @param   {Marker}  task to replace
+   * @return  {Marker?} the task, or `null` if it couldn't be replaced
    */
   replaceTask(task) {
-    if (!(task instanceof QAItem) || !task.id) return;
+    if (!(task instanceof Marker) || !task.id) return;
 
     this._cache.tasks.set(task.id, task);
     this._updateRBush(this._encodeIssueRBush(task), true); // true = replace
@@ -477,10 +464,10 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * removeTask
    * Remove a single Task from the cache
-   * @param   task to remove
+   * @param   {Marker}  task to remove
    */
   removeTask(task) {
-    if (!(task instanceof QAItem) || !task.id) return;
+    if (!(task instanceof Marker) || !task.id) return;
     this._cache.tasks.delete(task.id);
     this._updateRBush(this._encodeIssueRBush(task), false);
   }
@@ -489,7 +476,7 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * getClosed
    * Get details about all taskks closed in this session
-   * @return  Array of objects
+   * @return  {Array<*>}  Array of objects
    */
   getClosed() {
     return this._cache.closed;
@@ -499,11 +486,11 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * flyToNearbyTask
    * Initiates the process to find and fly to a nearby task based on the current task's challenge ID and task ID.
-   * @param {Object} task - The current task object containing task details.
+   * @param  {Marker}  task - The current task containing task details.
    */
   flyToNearbyTask(task) {
     if (!this.nearbyTaskEnabled) return;
-    const challengeID = task.parentId;
+    const challengeID = task.props.parentId;
     const taskID = task.id;
     if (!challengeID || !taskID) return;
     this.filterNearbyTasks(challengeID, taskID);
@@ -513,10 +500,11 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * getChallengeDetails
    * Retrieves challenge details from cache or API.
-   * @param {string} challengeID - The ID of the challenge.
-   * @returns {Promise} Promise resolving with challenge data.
+   * @param    {string}   challengeID - The ID of the challenge.
+   * @returns  {Promise}  Promise resolving with challenge data.
    */
   getChallengeDetails(challengeID) {
+// Why is this different from what `loadChallenges()` does???
     const cachedChallenge = this._cache.challenges.get(challengeID);
     if (cachedChallenge) {
       return Promise.resolve(cachedChallenge);
@@ -531,69 +519,71 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * filterNearbyTasks
    * Fetches nearby tasks for a given challenge and task ID, and flies to the nearest task.
-   * @param {string} challengeID - The ID of the challenge.
-   * @param {string} taskID - The ID of the current task.
-   * @param {number} [zoom] - Optional zoom level for the map.
+   * @param  {string}  challengeID - The ID of the challenge.
+   * @param  {string}  taskID - The ID of the current task.
+   * @param  {number}  [zoom] - Optional zoom level for the map.
    */
   filterNearbyTasks(challengeID, taskID, zoom) {
     const nearbyTasksUrl = `${MAPROULETTE_API}/challenge/${challengeID}/tasksNearby/${taskID}?excludeSelfLocked=true&limit=1`;
     if (!taskID) return;
+
     fetch(nearbyTasksUrl)
       .then(utilFetchResponse)
       .then(nearbyTasks => {
-        if (nearbyTasks.length > 0) {
-          const nearestTaskData = nearbyTasks[0];
-          nearestTaskData.parentId = nearestTaskData.parent.toString();
-          return this.getChallengeDetails(challengeID)
-            .then(challengeData => {
-              // Set the title and parentName using the challenge name
-              nearestTaskData.title = challengeData.name;
-              nearestTaskData.parentName = challengeData.name;
+        if (!nearbyTasks?.length) return;  // no nearby tasks?
 
-              // Create a new QAItem with the updated title and parentName
-              const nearestTask = new QAItem(this, null, nearestTaskData.id.toString(), nearestTaskData);
-              const [lng, lat] = nearestTask.location.coordinates;
+        const props = nearbyTasks[0];
+        // fix a few things that are named differently?
+        props.parentId = props.parent.toString();
+        props.point.lng = props.location.coordinates[0];
+        props.point.lat = props.location.coordinates[1];
 
-              const map = this.context.systems.map;
-              if (map) {
-                map.centerZoomEase([lng, lat], zoom);
-                this.selectAndDisplayTask(nearestTask);
-              }
+        const task = this._cacheTask(props);  // create task, or get existing from cache
+
+// Why is this different from what `loadChallenges()` does???
+        return this.getChallengeDetails(challengeID)
+          .then(challengeData => {
+            // Set the title and parentName using the challenge name
+            task.updateSelf({
+              title: challengeData.name,
+              parentName: challengeData.name
             });
-      }
-    })
-    .catch(err => {
-      console.error('Error fetching nearby tasks for challenge:', challengeID, err);  // eslint-disable-line no-console
-    });
+
+            const map = this.context.systems.map;
+            if (map) {
+              map.centerZoomEase(task.loc, zoom);
+              this.selectAndDisplayTask(task);
+            }
+          });
+      })
+      .catch(err => {
+        console.error('Error fetching nearby tasks for challenge:', challengeID, err);  // eslint-disable-line no-console
+      });
   }
 
 
   /**
    * selectAndDisplayTask
    * Selects a task and updates the sidebar reflect the selection
-   * @param {QAItem} task - The task to be selected
+   * @param  {Marker}  task - The task to be selected
    */
   selectAndDisplayTask(task) {
-    const maproulette = this.context.services.maproulette;
-    if (maproulette) {
-      if (!(task instanceof QAItem)) return;
+    if (!(task instanceof Marker)) return;
 
-      maproulette.currentTask = task;
-      const selection = new Map();
-      selection.set(task.id, task);
-      this.context.enter('select', { selection });
-    }
+    this.currentTask = task;
+    const selection = new Map().set(task.id, task);
+    this.context.enter('select', { selection });
   }
 
 
   /**
    * itemURL
    * Returns the url to link to task about a challenge
-   * @param   task
-   * @return  the url
+   * @param   {Marker}  task
+   * @return  {string}  the url
    */
   itemURL(task) {
-    return `https://maproulette.org/challenge/${task.parentId}/task/${task.id}`;
+    return `https://maproulette.org/challenge/${task.props.parentId}/task/${task.id}`;
   }
 
 
@@ -615,12 +605,48 @@ export class MapRouletteService extends AbstractSystem {
   }
 
 
-  // Replace or remove Task from rbush
+  // Replace or remove data from the rbush spatial index
   _updateRBush(task, replace) {
     this._cache.rbush.remove(task, (a, b) => a.data.id === b.data.id);
     if (replace) {
       this._cache.rbush.insert(task);
     }
+  }
+
+  /**
+   * _cacheTask
+   * Store the given task in the cache
+   * @param  {Object}  props - the task properties
+   * @return {Marker}  The task
+   */
+  _cacheTask(props) {
+    const cache = this._cache;
+    const taskID = props.id.toString();
+    const challengeID = props.parentId.toString();
+
+    let task = cache.tasks.get(taskID);
+    if (task) return task;  // seen it already
+
+    // Have we seen this challenge before?
+    const challenge = cache.challenges.get(challengeID);
+    if (!challenge) {
+      cache.challengeRequest.set(challengeID, {});  // queue fetching it
+      props.isVisible = false;
+    } else {
+      props.isVisible = challenge.isVisible;
+    }
+
+    props.id = taskID;               // force to string
+    props.parentId = challengeID;    // force to string
+    props.loc = this._preventCoincident(cache.rbush, [props.point.lng, props.point.lat]);
+    props.serviceID = 'maproulette';
+
+    // Create a Marker for the task
+    task = new Marker(this.context, props);
+    cache.tasks.set(taskID, task);
+    cache.rbush.insert(this._encodeIssueRBush(task));
+
+    return task;
   }
 
 

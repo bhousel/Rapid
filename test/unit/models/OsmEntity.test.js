@@ -29,9 +29,7 @@ describe('createOsmFeature', () => {
 });
 
 
-
 describe('OsmEntity', () => {
-
   describe('.id', () => {
     it('generates unique IDs', () => {
       const a = new Rapid.OsmNode(context);

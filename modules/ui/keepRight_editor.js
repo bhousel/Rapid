@@ -16,7 +16,7 @@ export function uiKeepRightEditor(context) {
   const qaHeader = uiKeepRightHeader(context);
   const ViewOn = new UiViewOn(context);
 
-  let _qaItem;
+  let _marker;
 
 
   function render(selection) {
@@ -52,13 +52,13 @@ export function uiKeepRightEditor(context) {
       .append('div')
       .attr('class', 'modal-section qa-editor')
       .merge(editor)
-      .call(qaHeader.issue(_qaItem))
-      .call(qaDetails.issue(_qaItem))
+      .call(qaHeader.issue(_marker))
+      .call(qaDetails.issue(_marker))
       .call(keepRightSaveSection);
 
 
     ViewOn.stringID = 'inspector.view_on_keepRight';
-    ViewOn.url = keepright.issueURL(_qaItem);
+    ViewOn.url = keepright.issueURL(_marker);
 
     const $footer = selection.selectAll('.sidebar-footer')
       .data([0]);
@@ -72,11 +72,11 @@ export function uiKeepRightEditor(context) {
 
 
   function keepRightSaveSection(selection) {
-    const errID = _qaItem?.id;
+    const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
-    const isShown = (_qaItem && (isSelected || _qaItem.newComment || _qaItem.comment));
+    const isShown = (_marker && (isSelected || _marker.props.newComment || _marker.props.comment));
     let saveSection = selection.selectAll('.qa-save')
-      .data(isShown ? [_qaItem] : [], d => d.key);
+      .data(isShown ? [_marker] : [], d => d.key);
 
     // exit
     saveSection.exit()
@@ -97,7 +97,7 @@ export function uiKeepRightEditor(context) {
       .attr('class', 'new-comment-input')
       .attr('placeholder', l10n.t('QA.keepRight.comment_placeholder'))
       .attr('maxlength', 1000)
-      .property('value', d => d.newComment || d.comment)
+      .property('value', d => d.props.newComment || d.props.comment)
       .call(utilNoAuto)
       .on('input', changeInput)
       .on('blur', changeInput);
@@ -111,15 +111,15 @@ export function uiKeepRightEditor(context) {
       const input = d3_select(this);
       let val = input.property('value').trim();
 
-      if (val === _qaItem.comment) {
+      if (val === _marker.props.comment) {
         val = undefined;
       }
 
       // store the unsaved comment with the issue itself
-      _qaItem = _qaItem.update({ newComment: val });
+      _marker = _marker.update({ newComment: val });
 
       if (keepright) {
-        keepright.replaceItem(_qaItem);  // update keepright cache
+        keepright.replaceItem(_marker);  // update keepright cache
       }
 
       saveSection
@@ -129,10 +129,10 @@ export function uiKeepRightEditor(context) {
 
 
   function qaSaveButtons(selection) {
-    const errID = _qaItem?.id;
+    const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
     let buttonSection = selection.selectAll('.buttons')
-      .data(isSelected ? [_qaItem] : [], d => d.key);
+      .data(isSelected ? [_marker] : [], d => d.key);
 
     // exit
     buttonSection.exit()
@@ -161,9 +161,9 @@ export function uiKeepRightEditor(context) {
       .merge(buttonEnter);
 
     buttonSection.select('.comment-button')   // select and propagate data
-      .attr('disabled', d => d.newComment ? null : true)
+      .attr('disabled', d => d.props.newComment ? null : true)
       .on('click.comment', function(d3_event, d) {
-        this.blur();    // avoid keeping focus on the button - #4641
+        this.blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
           keepright.postUpdate(d, (err, item) => dispatch.call('change', item));
         }
@@ -171,34 +171,34 @@ export function uiKeepRightEditor(context) {
 
     buttonSection.select('.close-button')   // select and propagate data
       .text(d => {
-        const andComment = (d.newComment ? '_comment' : '');
+        const andComment = (d.props.newComment ? '_comment' : '');
         return l10n.t(`QA.keepRight.close${andComment}`);
       })
       .on('click.close', function(d3_event, d) {
-        this.blur();    // avoid keeping focus on the button - #4641
+        this.blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
-          d.newStatus = 'ignore_t';   // ignore temporarily (item fixed)
+          d.props.newStatus = 'ignore_t';   // ignore temporarily (item fixed)
           keepright.postUpdate(d, (err, item) => dispatch.call('change', item));
         }
       });
 
     buttonSection.select('.ignore-button')   // select and propagate data
       .text(d => {
-        const andComment = (d.newComment ? '_comment' : '');
+        const andComment = (d.props.newComment ? '_comment' : '');
         return l10n.t(`QA.keepRight.ignore${andComment}`);
       })
       .on('click.ignore', function(d3_event, d) {
-        this.blur();    // avoid keeping focus on the button - #4641
+        this.blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
-          d.newStatus = 'ignore';   // ignore permanently (false positive)
+          d.props.newStatus = 'ignore';   // ignore permanently (false positive)
           keepright.postUpdate(d, (err, item) => dispatch.call('change', item));
         }
       });
   }
 
   render.error = function(val) {
-    if (!arguments.length) return _qaItem;
-    _qaItem = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

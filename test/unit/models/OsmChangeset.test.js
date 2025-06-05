@@ -13,14 +13,14 @@ describe('OsmChangeset', () => {
   const context = new MockContext();
 
   describe('constructor', () => {
-    it('returns a changeset', () => {
+    it('constructs a changeset', () => {
       const changeset = new Rapid.OsmChangeset(context);
       assert.ok(changeset instanceof Rapid.OsmChangeset);
       assert.equal(changeset.type, 'changeset');
       assert.deepEqual(changeset.tags, {});
     });
 
-    it('returns a changeset with provided tags', () => {
+    it('constructs a changeset with provided tags', () => {
       const changeset = new Rapid.OsmChangeset(context, { tags: { foo: 'bar' }});
       assert.ok(changeset instanceof Rapid.OsmChangeset);
       assert.equal(changeset.type, 'changeset');

@@ -4,7 +4,7 @@ import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilGetAllNodes } from '@rapid-sdk/util';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
-import { QAItem } from '../../models/index.js';
+import { Marker } from '../../models/Marker.js';
 import { uiIcon } from '../icon.js';
 import { utilCmd } from '../../util/cmd.js';
 
@@ -140,7 +140,7 @@ export class UiMeasurementCard extends AbstractUiCard {
     const selectedIDs = context.selectedIDs();
     const selectedData = context.selectedData();
     const [selectedItem] = selectedData.values();  // first item
-    const isNote = (selectedItem instanceof QAItem && selectedItem.service === 'osm');
+    const isNote = (selectedItem instanceof Marker && selectedItem.serviceID === 'osm');
 
     if (selectedData.size === 1 && isNote) {   // selected 1 OSM Note
       const note = selectedItem;

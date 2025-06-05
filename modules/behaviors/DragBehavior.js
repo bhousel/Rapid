@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
-import { OsmNode, QAItem } from '../models/index.js';
+import { OsmNode, Marker } from '../models/index.js';
 import { utilDetect } from '../util/detect.js';
 
 const NEAR_TOLERANCE = 1;
@@ -118,7 +118,7 @@ export class DragBehavior extends AbstractBehavior {
     const data = target?.data;
     if (!data) return;
 
-    const isNote = data instanceof QAItem && data.isNew() && target.layerID === 'notes';
+    const isNote = data instanceof Marker && data.isNew && target.layerID === 'notes';
     const isNode = data instanceof OsmNode && target.layerID === 'osm';       // not 'rapid'
     const isMidpoint = data.type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
 
@@ -178,7 +178,7 @@ export class DragBehavior extends AbstractBehavior {
 
         // What are we dragging?
         const data = target.data;
-        const isNote = data instanceof QAItem;
+        const isNote = data instanceof Marker;
         const isNode = data instanceof OsmNode;
         const isMidpoint = (data.type === 'midpoint');
 

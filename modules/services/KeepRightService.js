@@ -3,7 +3,7 @@ import { utilQsString } from '@rapid-sdk/util';
 import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { QAItem } from '../models/qa_item.js';
+import { Marker } from '../models/Marker.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -228,8 +228,10 @@ export class KeepRightService extends AbstractSystem {
 
             loc = this._preventCoincident(this._cache.rbush, loc);
 
-            const d = new QAItem(this, itemType, id, {
+            const props = {
+              id: id,
               loc: loc,
+              type: itemType,
               comment: comment,
               description: description,
               whichType: whichType,
@@ -238,11 +240,13 @@ export class KeepRightService extends AbstractSystem {
               objectId: objectId,
               objectType: objectType,
               schema: schema,
-              title: title
-            });
+              title: title,
+              serviceID: 'keepright'
+            };
 
-            d.replacements = this._tokenReplacements(d);
+            props.replacements = this._tokenReplacements(props);
 
+            const d = new Marker(this.context, props);
             this._cache.data[id] = d;
             this._cache.rbush.insert(this._encodeIssueRBush(d));
           }
@@ -262,21 +266,24 @@ export class KeepRightService extends AbstractSystem {
 
   /**
    * postUpdate
-   * @param  d
-   * @param  callback
+   * Called to change some properies (status, comments) about the KeepRight data item.
+   * Will send the update to the KeepRight API and refresh the local data cache.
+   * @param  {Marker}    item
+   * @param  {function}  callback
    */
-  postUpdate(d, callback) {
-    if (this._cache.inflightPost[d.id]) {
-      return callback({ message: 'Error update already inflight', status: -2 }, d);
+  postUpdate(item, callback) {
+    const dataID = item.id;
+    if (this._cache.inflightPost[dataID]) {
+      return callback({ message: 'Error update already inflight', status: -2 }, item);
     }
 
-    const params = { schema: d.schema, id: d.id };
+    const params = { schema: item.props.schema, id: dataID };
 
-    if (d.newStatus) {
-      params.st = d.newStatus;
+    if (item.props.newStatus) {
+      params.st = item.props.newStatus;
     }
-    if (d.newComment !== undefined) {
-      params.co = d.newComment;
+    if (item.props.newComment !== undefined) {
+      params.co = item.props.newComment;
     }
 
     // NOTE: This throws a CORS err, but it seems successful.
@@ -284,41 +291,41 @@ export class KeepRightService extends AbstractSystem {
     const url = `${KEEPRIGHT_API}/comment.php?` + utilQsString(params);
     const controller = new AbortController();
 
-    this._cache.inflightPost[d.id] = controller;
+    this._cache.inflightPost[dataID] = controller;
 
     // Since this is expected to throw an error just continue as if it worked
     // (worst case scenario the request truly fails and issue will show up if Rapid restarts)
     fetch(url, { signal: controller.signal })
       .then(utilFetchResponse)
       .finally(() => {
-        delete this._cache.inflightPost[d.id];
+        delete this._cache.inflightPost[dataID];
 
-        if (d.newStatus === 'ignore') {    // ignore permanently (false positive)
-          this.removeItem(d);
-        } else if (d.newStatus === 'ignore_t') {   // ignore temporarily (error fixed)
-          this.removeItem(d);
-          this._cache.closed[`${d.schema}:${d.id}`] = true;
+        if (item.props.newStatus === 'ignore') {    // ignore permanently (false positive)
+          this.removeItem(item);
+        } else if (item.props.newStatus === 'ignore_t') {   // ignore temporarily (error fixed)
+          this.removeItem(item);
+          this._cache.closed[`${item.props.schema}:${dataID}`] = true;
         } else {
-          d = this.replaceItem(d.update({
-            comment: d.newComment,
+          item = this.replaceItem(item.update({
+            comment: item.props.newComment,
             newComment: undefined,
             newState: undefined
           }));
         }
 
-        if (callback) callback(null, d);
+        if (callback) callback(null, item);
       });
   }
 
 
   /**
    * getError
-   * Get a QAItem from cache
-   * @param   id
-   * @return  QAItem
+   * Get data with given id from cache
+   * @param   {string}  dataID
+   * @return  {Marker}  the cached marker
    */
-  getError(id) {
-    return this._cache.data[id];
+  getError(dataID) {
+    return this._cache.data[dataID];
   }
 
 
@@ -335,12 +342,12 @@ export class KeepRightService extends AbstractSystem {
 
   /**
    * replaceItem
-   * Replace a single QAItem in the cache
-   * @param   item
-   * @return  the item, or `null` if it couldn't be replaced
+   * Replace a single item in the cache
+   * @param   {Marker}  item to replace
+   * @return  {Marker}  the item, or `null` if it couldn't be replaced
    */
   replaceItem(item) {
-    if (!(item instanceof QAItem) || !item.id) return null;
+    if (!(item instanceof Marker) || !item.id) return null;
 
     this._cache.data[item.id] = item;
     this._updateRBush(this._encodeIssueRBush(item), true); // true = replace
@@ -350,11 +357,11 @@ export class KeepRightService extends AbstractSystem {
 
   /**
    * removeItem
-   * Remove a single QAItem from the cache
-   * @param   item to remove
+   * Remove a single item from the cache
+   * @param  {Marker}  item to remove
    */
   removeItem(item) {
-    if (!(item instanceof QAItem) || !item.id) return;
+    if (!(item instanceof Marker) || !item.id) return;
 
     delete this._cache.data[item.id];
     this._updateRBush(this._encodeIssueRBush(item), false); // false = remove
@@ -364,11 +371,11 @@ export class KeepRightService extends AbstractSystem {
   /**
    * issueURL
    * Returns the url to link to details about an item
-   * @param   item
-   * @return  the url
+   * @param  {Marker}  item
+   * @return {string}  the url
    */
   issueURL(item) {
-    return `${KEEPRIGHT_API}/report_map.php?schema=${item.schema}&error=${item.id}`;
+    return `${KEEPRIGHT_API}/report_map.php?schema=${item.props.schema}&error=${item.id}`;
   }
 
   /**
@@ -404,7 +411,7 @@ export class KeepRightService extends AbstractSystem {
   }
 
 
-  // Replace or remove QAItem from rbush
+  // Replace or remove data from the rbush spatial index
   _updateRBush(item, replace) {
     this._cache.rbush.remove(item, (a, b) => a.data.id === b.data.id);
 
@@ -432,18 +439,16 @@ export class KeepRightService extends AbstractSystem {
   }
 
 
-  _tokenReplacements(d) {
-    if (!(d instanceof QAItem)) return;
-
+  _tokenReplacements(props) {
     const l10n = this.context.systems.l10n;
     const htmlRegex = new RegExp(/<\/[a-z][\s\S]*>/);
     const replacements = {};
 
-    const issueTemplate = this._krData.errorTypes[d.whichType];
+    const issueTemplate = this._krData.errorTypes[props.whichType];
     if (!issueTemplate) {
       /* eslint-disable no-console */
-      console.log('No Template: ', d.whichType);
-      console.log('  ', d.description);
+      console.log('No Template: ', props.whichType);
+      console.log('  ', props.description);
       /* eslint-enable no-console */
       return;
     }
@@ -453,11 +458,11 @@ export class KeepRightService extends AbstractSystem {
 
     // regex pattern should match description with variable details captured
     const errorRegex = new RegExp(issueTemplate.regex, 'i');
-    const errorMatch = errorRegex.exec(d.description);
+    const errorMatch = errorRegex.exec(props.description);
     if (!errorMatch) {
       /* eslint-disable no-console */
-      console.log('Unmatched: ', d.whichType);
-      console.log('  ', d.description);
+      console.log('Unmatched: ', props.whichType);
+      console.log('  ', props.description);
       console.log('  ', errorRegex);
       /* eslint-enable no-console */
       return;

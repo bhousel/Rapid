@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 

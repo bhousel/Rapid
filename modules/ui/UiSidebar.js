@@ -3,7 +3,7 @@ import { interpolateNumber } from 'd3-interpolate';
 import { Extent, vecLength } from '@rapid-sdk/math';
 import _throttle from 'lodash-es/throttle.js';
 
-import { OsmEntity, QAItem } from '../models/index.js';
+import { OsmEntity, Marker } from '../models/index.js';
 import { uiDataEditor } from './data_editor.js';
 import { UiFeatureList } from './UiFeatureList.js';
 import { UiInspector } from './UiInspector.js';
@@ -34,7 +34,7 @@ const DEFAULT_WIDTH = 400;  // needs to match the flex-basis in our css file
  *  <div class='sidebar'>
  *    <div class='feature-list-wrap'/>   // Feature list / search component
  *    <div class='inspector-wrap'/>      // Inspector - the components for working with OSM
- *    <div class='sidebar-component'/>   // Custom UI - everything else (Notes, Rapid, QA Icons, Save, etc)
+ *    <div class='sidebar-component'/>   // Custom UI - everything else (Notes, Rapid, QA items, Save, etc)
  *  </div>
  *  <div class='resizer'/>
  */
@@ -250,7 +250,7 @@ export class UiSidebar {
       this.show(this.DetectionInspector.datum(datum));
 
     // Hovering on OSM Note..
-    } else if (datum instanceof QAItem && datum.service === 'osm') {
+    } else if (datum instanceof Marker && datum.serviceID === 'osm') {
       if (context.mode?.id === 'drag-note') return;
 
       const service = context.services.osm;
@@ -261,8 +261,8 @@ export class UiSidebar {
       this.show(this.NoteEditor.note(datum));
 
     // Hovering on other QA Item..
-    } else if (datum instanceof QAItem && datum.service !== 'osm') {
-      const service = context.services[datum.service];
+    } else if (datum instanceof Marker && datum.serviceID !== 'osm') {
+      const service = context.services[datum.serviceID];
       let Component;
 
       if (service) {

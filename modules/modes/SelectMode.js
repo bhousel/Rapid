@@ -2,7 +2,7 @@ import { geoBounds } from 'd3-geo';
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractMode } from './AbstractMode.js';
-import { QAItem } from '../models/index.js';
+import { Marker } from '../models/Marker.js';
 import { uiOsmoseEditor } from '../ui/osmose_editor.js';
 import { uiDataEditor } from '../ui/data_editor.js';
 import { uiDetectionInspector } from '../ui/detection_inspector.js';
@@ -67,8 +67,8 @@ export class SelectMode extends AbstractMode {
     for (const datum of selection.values()) {
       let other;
 
-      if (datum.loc) {   // OSM Note or QA Item
-        other = new Extent(datum.loc);
+      if (datum instanceof Marker && datum.extent) {
+        other = datum.extent;
 
       } else if (datum.__featurehash__) {   // Custom GeoJSON feature
         const bounds = geoBounds(datum);
@@ -83,7 +83,7 @@ export class SelectMode extends AbstractMode {
       }
 
       if (other) {
-        this.extent = this.extent.extend(other);
+        this.extent.extendSelf(other);
       }
     }
 
@@ -93,8 +93,8 @@ export class SelectMode extends AbstractMode {
       let layerID = null;
 
       // hacky - improve?
-      if (datum instanceof QAItem) {       // in most cases the `service` is the layerID
-        const serviceID = datum.service;   // 'keepright', 'osmose', etc.
+      if (datum instanceof Marker) {         // in most cases the `service` is the layerID
+        const serviceID = datum.serviceID;   // 'keepright', 'osmose', etc.
         layerID = serviceID === 'osm' ? 'notes' : serviceID;
         if (layerID === 'osm') layerID = 'notes';
       } else if (datum.props.__fbid__) {      // a Rapid feature
@@ -122,43 +122,43 @@ export class SelectMode extends AbstractMode {
  // The update handlers feel like they should live with the sidebar content components, not here
     let sidebarContent = null;
     // Selected a note...
-    if (datum instanceof QAItem && datum.service === 'osm') {
+    if (datum instanceof Marker && datum.serviceID === 'osm') {
       sidebarContent = uiNoteEditor(context).note(datum);
       sidebarContent
         .on('change', () => {
           gfx.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const osm = context.services.osm;
           const note = osm?.getNote(datumID);
-          if (!(note instanceof QAItem)) return;   // or - go to browse mode
+          if (!(note instanceof Marker)) return;  // or - go to browse mode
           Sidebar.show(sidebarContent.note(note));
           this._selectedData.set(datumID, note);  // update selectedData after a change happens?
         });
 
-    } else if (datum instanceof QAItem && datum.service === 'keepRight') {
+    } else if (datum instanceof Marker && datum.serviceID === 'keepRight') {
       sidebarContent = uiKeepRightEditor(context).error(datum);
       sidebarContent
         .on('change', () => {
           gfx.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const keepright = context.services.keepRight;
           const error = keepright?.getError(datumID);
-          if (!(error instanceof QAItem)) return;  // or - go to browse mode?
+          if (!(error instanceof Marker)) return;  // or - go to browse mode?
           Sidebar.show(sidebarContent.error(error));
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
 
-    } else if (datum instanceof QAItem && datum.service === 'osmose') {
+    } else if (datum instanceof Marker && datum.serviceID === 'osmose') {
       sidebarContent = uiOsmoseEditor(context).error(datum);
       sidebarContent
         .on('change', () => {
           gfx.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const osmose = context.services.osmose;
           const error = osmose?.getError(datumID);
-          if (!(error instanceof QAItem)) return;  // or - go to browse mode?
+          if (!(error instanceof Marker)) return;  // or - go to browse mode?
           Sidebar.show(sidebarContent.error(error));
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
 
-    } else if (datum instanceof QAItem && datum.service === 'maproulette') {
+    } else if (datum instanceof Marker && datum.serviceID === 'maproulette') {
       sidebarContent = uiMapRouletteEditor(context).error(datum);
       let uiSystem = this.context.systems.ui;
       uiSystem.MapRouletteMenu.error(datum);
@@ -167,7 +167,7 @@ export class SelectMode extends AbstractMode {
           gfx.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const maproulette = context.services.maproulette;
           const error = maproulette?.getError(datumID);
-          if (!(error instanceof QAItem)) return;  // or - go to browse mode?
+          if (!(error instanceof Marker)) return;  // or - go to browse mode?
           Sidebar.show(sidebarContent.error(error));
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });

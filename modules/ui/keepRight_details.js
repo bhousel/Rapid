@@ -12,13 +12,13 @@ export function uiKeepRightDetails(context) {
   const presets = context.systems.presets;
   const scene = context.systems.gfx.scene;
 
-  let _qaItem;
+  let _marker;
 
 
   function issueDetailHTML(d) {
-    const { itemType, parentIssueType } = d;
+    const { itemType, parentIssueType } = d.props;
     const unknown = l10n.t('inspector.unknown');
-    let replacements = d.replacements || {};  // some replacements are html linkified
+    let replacements = d.props.replacements || {};  // some replacements are html linkified
     replacements.default = unknown;  // special key `default` works as a fallback string
 
     let detail = l10n.t(`QA.keepRight.errorTypes.${itemType}.description`, replacements);
@@ -31,7 +31,7 @@ export function uiKeepRightDetails(context) {
 
   function render(selection) {
     const details = selection.selectAll('.sidebar-details')
-      .data(_qaItem ? [_qaItem] : [], d => d.key);
+      .data(_marker ? [_marker] : [], d => d.key);
 
     details.exit()
       .remove();
@@ -62,7 +62,7 @@ export function uiKeepRightDetails(context) {
         const node = nodes[i];
         const link = d3_select(node);
         const isObjectLink = link.classed('error_object_link');
-        const entityID = isObjectLink ? (_qaItem.objectType.charAt(0) + _qaItem.objectId) : node.textContent;
+        const entityID = isObjectLink ? (_marker.props.objectType.charAt(0) + _marker.props.objectId) : node.textContent;
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(entityID);
 
@@ -82,7 +82,7 @@ export function uiKeepRightDetails(context) {
             utilHighlightEntities([entityID], false, context);
 
             scene.enableLayers('osm');  // make sure osm layer is even on
-            map.centerZoomEase(_qaItem.loc, 20);
+            map.centerZoomEase(_marker.loc, 20);
             map.selectEntityID(entityID);
           });
 
@@ -108,8 +108,8 @@ export function uiKeepRightDetails(context) {
 
 
   render.issue = function(val) {
-    if (!arguments.length) return _qaItem;
-    _qaItem = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

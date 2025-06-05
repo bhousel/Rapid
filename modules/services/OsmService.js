@@ -6,7 +6,7 @@ import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { JXON } from '../util/jxon.js';
-import { OsmEntity, OsmNode, OsmRelation, OsmWay, QAItem } from '../models/index.js';
+import { OsmEntity, OsmNode, OsmRelation, OsmWay, Marker } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -1090,16 +1090,18 @@ export class OsmService extends AbstractSystem {
   // Create a note
   // POST /api/0.6/notes?params
   postNoteCreate(note, callback) {
-    if (this._noteCache.inflightPost[note.id]) {
+    const noteID = note.id;
+
+    if (this._noteCache.inflightPost[noteID]) {
       return callback({ message: 'Note update already inflight', status: -2 }, note);
     } else if (!this.authenticated()) {
       return callback({ message: 'Not Authenticated', status: -3 }, note);
     }
 
-    if (!note.loc[0] || !note.loc[1] || !note.newComment) return;  // location & description required
+    if (!Array.isArray(note.loc) || !note.props.newComment) return;  // location & description required
 
     const createdNote = (err, xml) => {
-      delete this._noteCache.inflightPost[note.id];
+      delete this._noteCache.inflightPost[noteID];
       if (err) { return callback(err); }
 
       // we get the updated note back, remove from caches and reparse..
@@ -1120,7 +1122,7 @@ export class OsmService extends AbstractSystem {
 
     const errback = this._wrapcb(createdNote);
     const resource = this._apiroot + '/api/0.6/notes?' +
-      utilQsString({ lon: note.loc[0], lat: note.loc[1], text: note.newComment });
+      utilQsString({ lon: note.loc[0], lat: note.loc[1], text: note.props.newComment });
     const controller = new AbortController();
     const options = { method: 'POST', signal: controller.signal };
 
@@ -1136,7 +1138,7 @@ export class OsmService extends AbstractSystem {
         }
       });
 
-    this._noteCache.inflightPost[note.id] = controller;
+    this._noteCache.inflightPost[noteID] = controller;
   }
 
 
@@ -1145,25 +1147,27 @@ export class OsmService extends AbstractSystem {
   // POST /api/0.6/notes/#id/close?text=comment
   // POST /api/0.6/notes/#id/reopen?text=comment
   postNoteUpdate(note, newStatus, callback) {
+    const noteID = note.id;
+
     if (!this.authenticated()) {
       return callback({ message: 'Not Authenticated', status: -3 }, note);
     }
-    if (this._noteCache.inflightPost[note.id]) {
+    if (this._noteCache.inflightPost[noteID]) {
       return callback({ message: 'Note update already inflight', status: -2 }, note);
     }
 
     let action;
-    if (note.status !== 'closed' && newStatus === 'closed') {
+    if (note.props.status !== 'closed' && newStatus === 'closed') {
       action = 'close';
-    } else if (note.status !== 'open' && newStatus === 'open') {
+    } else if (note.props.status !== 'open' && newStatus === 'open') {
       action = 'reopen';
     } else {
       action = 'comment';
-      if (!note.newComment) return; // when commenting, comment required
+      if (!note.props.newComment) return; // when commenting, comment required
     }
 
     const updatedNote = (err, xml) => {
-      delete this._noteCache.inflightPost[note.id];
+      delete this._noteCache.inflightPost[noteID];
       if (err) { return callback(err); }
 
       // we get the updated note back, remove from caches and reparse..
@@ -1171,9 +1175,9 @@ export class OsmService extends AbstractSystem {
 
       // update closed note cache - used to populate `closed:note` changeset tag
       if (action === 'close') {
-        this._noteCache.closed[note.id] = true;
+        this._noteCache.closed[noteID] = true;
       } else if (action === 'reopen') {
-        delete this._noteCache.closed[note.id];
+        delete this._noteCache.closed[noteID];
       }
 
       const options = { skipSeen: false };
@@ -1190,9 +1194,9 @@ export class OsmService extends AbstractSystem {
     };
 
     const errback = this._wrapcb(updatedNote);
-    let resource = this._apiroot + `/api/0.6/notes/${note.id}/${action}`;
-    if (note.newComment) {
-      resource += '?' + utilQsString({ text: note.newComment });
+    let resource = this._apiroot + `/api/0.6/notes/${noteID}/${action}`;
+    if (note.props.newComment) {
+      resource += '?' + utilQsString({ text: note.props.newComment });
     }
     const controller = new AbortController();
     const options = { method: 'POST', signal: controller.signal };
@@ -1209,7 +1213,7 @@ export class OsmService extends AbstractSystem {
         }
       });
 
-    this._noteCache.inflightPost[note.id] = controller;
+    this._noteCache.inflightPost[noteID] = controller;
   }
 
 
@@ -1324,32 +1328,51 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  // get a single note from the cache
-  getNote(id) {
-    return this._noteCache.note[id];
+  /**
+   * getNote
+   * Get a note with given id from cache
+   * @param   {string}  noteID
+   * @return  {Marker}  the cached note
+   */
+  getNote(noteID) {
+    return this._noteCache.note[noteID];
   }
 
 
-  // remove a single note from the cache
+  /**
+   * removeNote
+   * Remove a single note from the cache
+   * @param  {Marker}  note - note to remove
+   */
   removeNote(note) {
-    if (!(note instanceof QAItem) || !note.id) return;
+    if (!(note instanceof Marker) || !note.id) return;
 
     delete this._noteCache.note[note.id];
     this._updateRBush(this._encodeNoteRBush(note), false);  // false = remove
   }
 
 
-  // replace a single note in the cache
+  /**
+   * replaceNote
+   * Replace a single note in the cache
+   * @param   {Marker}  note to replace
+   * @return  {Marker}  the note, or `null` if it couldn't be replaced
+   */
   replaceNote(note) {
-    if (!(note instanceof QAItem) || !note.id) return;
+    if (!(note instanceof Marker) || !note.id) return;
 
     this._noteCache.note[note.id] = note;
     this._updateRBush(this._encodeNoteRBush(note), true);  // true = replace
     return note;
   }
 
-  // Get an array of note IDs closed during this session.
-  // Used to populate `closed:note` changeset tag
+
+  /**
+   * getClosedIDs
+   * Get an array of noteIDs closed during this session.
+   * Used to populate `closed:note` changeset tag
+   * @return  {Array<string>}  Array of closed note ids
+   */
   getClosedIDs() {
     return Object.keys(this._noteCache.closed).sort();
   }
@@ -1752,10 +1775,11 @@ export class OsmService extends AbstractSystem {
   _parseNoteXML(xml, uid) {
     const attrs = xml.attributes;
     const childNodes = xml.childNodes;
-    const props = {};
-
-    props.id = uid;
-    props.loc = this._getLoc(attrs);
+    const props = {
+      id: uid,
+      loc: this._getLoc(attrs),
+      serviceID: 'osm'
+    };
 
     // if notes are coincident, move them apart slightly
     let coincident = false;
@@ -1781,10 +1805,10 @@ export class OsmService extends AbstractSystem {
       }
     }
 
-    const note = new QAItem(this, null, props.id, props);
-    const item = this._encodeNoteRBush(note);
+    const note = new Marker(this.context, props);
+    const box = this._encodeNoteRBush(note);
     this._noteCache.note[note.id] = note;
-    this._noteCache.rbush.insert(item);
+    this._noteCache.rbush.insert(box);
 
     return note;
   }

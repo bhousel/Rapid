@@ -26,7 +26,7 @@ export class GeoJSON extends AbstractData {
     this.geoms.setData(props);
 
     if (!this.props.id) {  // no ID provided - generate one
-      this.props.id = `geojson-${_nextid++}`;
+      this.props.id = `geojson${_nextid++}`;
     }
   }
 

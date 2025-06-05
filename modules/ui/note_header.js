@@ -8,7 +8,7 @@ export function uiNoteHeader(context) {
 
   function render(selection) {
     let header = selection.selectAll('.note-header')
-      .data((_note ? [_note] : []), d => d.status + d.id );
+      .data((_note ? [_note] : []), d => d.props.status + d.id );
 
     header.exit()
       .remove();
@@ -19,7 +19,7 @@ export function uiNoteHeader(context) {
 
     let iconEnter = headerEnter
       .append('div')
-      .attr('class', d => `note-header-icon ${d.status}`)
+      .attr('class', d => `note-header-icon ${d.props.status}`)
       .classed('new', d => d.id < 0);
 
     iconEnter
@@ -32,7 +32,7 @@ export function uiNoteHeader(context) {
         let statusIcon;
         if (d.id < 0) {
           statusIcon = '#rapid-icon-plus';
-        } else if (d.status === 'open') {
+        } else if (d.props.status === 'open') {
           statusIcon = '#rapid-icon-close';
         } else {
           statusIcon = '#rapid-icon-apply';
@@ -51,7 +51,7 @@ export function uiNoteHeader(context) {
           return l10n.t('note.new');
         } else {
           return l10n.t('note.note') + ' ' + d.id + ' ' +
-            (d.status === 'closed' ? l10n.t('note.closed') : '');
+            (d.props.status === 'closed' ? l10n.t('note.closed') : '');
         }
       });
   }

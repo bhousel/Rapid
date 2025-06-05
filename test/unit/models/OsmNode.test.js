@@ -12,22 +12,22 @@ describe('OsmNode', () => {
 
   const context = new MockContext();
 
-  it('returns a node', () => {
-    const node = new Rapid.OsmNode(context);
-    assert.ok(node instanceof Rapid.OsmNode);
-    assert.equal(node.type, 'node');
-  });
+  describe('constructor', () => {
+    it('constructs a Node', () => {
+      const node = new Rapid.OsmNode(context);
+      assert.ok(node instanceof Rapid.OsmNode);
+      assert.equal(node.type, 'node');
+    });
 
+    it('defaults tags to an empty object', () => {
+      const node = new Rapid.OsmNode(context);
+      assert.deepEqual(node.tags, {});
+    });
 
-  it('defaults tags to an empty object', () => {
-    const node = new Rapid.OsmNode(context);
-    assert.deepEqual(node.tags, {});
-  });
-
-
-  it('sets tags as specified', () => {
-    const node = new Rapid.OsmNode(context, { tags: { foo: 'bar' } });
-    assert.deepEqual(node.tags, { foo: 'bar' });
+    it('sets tags as specified', () => {
+      const node = new Rapid.OsmNode(context, { tags: { foo: 'bar' } });
+      assert.deepEqual(node.tags, { foo: 'bar' });
+    });
   });
 
 

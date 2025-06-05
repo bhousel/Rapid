@@ -23,36 +23,33 @@ describe('OsmWay', () => {
   });
 
 
-  it('returns a way', () => {
-    const way = new Rapid.OsmWay(context);
-    assert.ok(way instanceof Rapid.OsmWay);
-    assert.equal(way.type, 'way');
+  describe('constructor', () => {
+    it('constructs a Way', () => {
+      const way = new Rapid.OsmWay(context);
+      assert.ok(way instanceof Rapid.OsmWay);
+      assert.equal(way.type, 'way');
+    });
+
+    it('defaults nodes to an empty array', () => {
+      const way = new Rapid.OsmWay(context);
+      assert.deepEqual(way.nodes, []);
+    });
+
+    it('sets nodes as specified', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['n-1'] });
+      assert.deepEqual(way.nodes, ['n-1']);
+    });
+
+    it('defaults tags to an empty object', () => {
+      const way = new Rapid.OsmWay(context);
+      assert.deepEqual(way.tags, {});
+    });
+
+    it('sets tags as specified', () => {
+      const way = new Rapid.OsmWay(context, { tags: { foo: 'bar' } });
+      assert.deepEqual(way.tags, { foo: 'bar' });
+    });
   });
-
-
-  it('defaults nodes to an empty array', () => {
-    const way = new Rapid.OsmWay(context);
-    assert.deepEqual(way.nodes, []);
-  });
-
-
-  it('sets nodes as specified', () => {
-    const way = new Rapid.OsmWay(context, { nodes: ['n-1'] });
-    assert.deepEqual(way.nodes, ['n-1']);
-  });
-
-
-  it('defaults tags to an empty object', () => {
-    const way = new Rapid.OsmWay(context);
-    assert.deepEqual(way.tags, {});
-  });
-
-
-  it('sets tags as specified', () => {
-    const way = new Rapid.OsmWay(context, { tags: { foo: 'bar' } });
-    assert.deepEqual(way.tags, { foo: 'bar' });
-  });
-
 
   describe('#copy', () => {
     it('returns a new Way', () => {

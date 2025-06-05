@@ -1,7 +1,7 @@
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
-import { OsmEntity, OsmNode, OsmWay, QAItem } from '../models/index.js';
+import { OsmEntity, OsmNode, OsmWay, Marker } from '../models/index.js';
 import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { geoChooseEdge } from '../geo/index.js';
 import { utilDetect } from '../util/detect.js';
@@ -255,7 +255,7 @@ export class SelectBehavior extends AbstractBehavior {
           this._doSelect();    // Select it first, if needed
         }
         const target = down.target;
-        if (target && target.data && target.data.service === 'maproulette') {
+        if (target?.data?.serviceID === 'maproulette') {
           const ui = this.context.systems.ui;
           const anchorPoint = up.coord.screen;
           ui.showMapRouletteMenu(anchorPoint, 'rightclick');
@@ -360,7 +360,7 @@ export class SelectBehavior extends AbstractBehavior {
       data.props.__fbid__ ||      // Clicked a Rapid feature..
       data.overture ||            // Clicked an Overture feature..
       data.__featurehash__ ||     // Clicked Custom Data (e.g. gpx track)..
-      data instanceof QAItem ||   // Clicked a QA Item (OSM Note, KeepRight, Osmose, Maproulette)..
+      data instanceof Marker ||   // Clicked a Marker (OSM Note, KeepRight, Osmose, Maproulette)..
       data.type === 'detection'   // Clicked on an object detection / traffic sign..
     ) {
       const selection = new Map().set(dataID, data);
@@ -502,7 +502,7 @@ export class SelectBehavior extends AbstractBehavior {
     const target = eventData.target;
     const data = target?.data;
     // Check if the clicked item is a MapRoulette task
-    if (data instanceof QAItem && data.service === 'maproulette') {
+    if (data instanceof Marker && data.serviceID === 'maproulette') {
       const anchorPoint = eventData.coord.screen;
       if (this._showsMapRouletteMenu) {
         ui.closeMapRouletteMenu();

@@ -20,7 +20,7 @@ export function uiNoteComments(context) {
       .merge(comments);
 
     let commentEnter = comments.selectAll('.comment')
-      .data(_note.comments)
+      .data(_note.props.comments)
       .enter()
       .append('div')
       .attr('class', 'comment');
@@ -80,7 +80,7 @@ export function uiNoteComments(context) {
     if (showThirdPartyIcons !== 'true' || !osm) return;
 
     const uids = new Set();  // gather uids in the comment thread
-    for (const d of _note.comments) {
+    for (const d of _note.props.comments) {
       if (d.uid) uids.add(d.uid);
     }
 

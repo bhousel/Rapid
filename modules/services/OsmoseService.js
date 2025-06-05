@@ -5,7 +5,7 @@ import { marked } from 'marked';
 import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { QAItem } from '../models/qa_item.js';
+import { Marker } from '../models/Marker.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -90,7 +90,7 @@ export class OsmoseService extends AbstractSystem {
       Object.values(this._cache.inflightTile).forEach(controller => this._abortRequest(controller));
     }
     this._cache = {
-      issues: new Map(),    // Map (itemID -> QAItem)
+      issues: new Map(),    // Map<itemID, Marker>
       loadedTile: {},
       inflightTile: {},
       inflightPost: {},
@@ -146,25 +146,34 @@ export class OsmoseService extends AbstractSystem {
         .then(data => {
           this._cache.loadedTile[tile.id] = true;
 
-          for (const issue of (data.features ?? [])) {
+          for (const feature of (data.features ?? [])) {
             // Osmose issues are uniquely identified by a unique
             // `item` and `class` combination (both integer values)
-            const { item, class: cl, uuid: id } = issue.properties;
+            const { item: item, class: cl, uuid: id } = feature.properties;
             const itemType = `${item}-${cl}`;
+            const iconID = this._osmoseData.icons[itemType];
 
             // Filter out unsupported issue types (some are too specific or advanced)
-            if (itemType in this._osmoseData.icons) {
-              const loc = this._preventCoincident(this._cache.rbush, issue.geometry.coordinates);
-              const d = new QAItem(this, itemType, id, { loc: loc, item: item });
+            if (!iconID) continue;
 
-              // Assigning `elems` here prevents UI detail requests
-              if (item === 8300 || item === 8360) {
-                d.elems = [];
-              }
+            const props = {
+              id: id,
+              class: cl,
+              item: item,
+              type: itemType,
+              iconID: iconID,
+              serviceID: 'osmose',
+              loc: this._preventCoincident(this._cache.rbush, feature.geometry.coordinates)
+            };
 
-              this._cache.issues.set(d.id, d);
-              this._cache.rbush.insert(this._encodeIssueRBush(d));
+            // Assigning `elems` here prevents UI detail requests
+            if (item === 8300 || item === 8360) {
+              props.elems = [];
             }
+
+            const d = new Marker(this.context, props);
+            this._cache.issues.set(d.id, d);
+            this._cache.rbush.insert(this._encodeIssueRBush(d));
           }
 
           const gfx = this.context.systems.gfx;
@@ -184,36 +193,38 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * loadIssueDetailAsync
-   * @param   issue
-   * @return  Promise
+   * Fetch additional issue details when needed.
+   * @param   {Marker}  issue
+   * @return  {Promise} Promise resolved once the data has been fetched
    */
   loadIssueDetailAsync(issue) {
     // Issue details only need to be fetched once
-    if (issue.elems !== undefined) return Promise.resolve(issue);
+    if (issue.props.elems !== undefined) return Promise.resolve(issue);
 
     const localeCode = this.context.systems.l10n.localeCode();
     const url = `${OSMOSE_API}/issue/${issue.id}?langs=${localeCode}`;
-    const handleResponse = (data) => {
-      // Associated elements used for highlighting
-      // Assign directly for immediate use in the callback
-      issue.elems = data.elems.map(e => e.type.substring(0,1) + e.id);
-      // Some issues have instance specific detail in a subtitle
-      issue.detail = data.subtitle ? marked.parse(data.subtitle.auto) : '';
-      this.replaceItem(issue);
-    };
 
     return fetch(url)
       .then(utilFetchResponse)
-      .then(handleResponse)
-      .then(() => issue);
+      .then(data => {
+        // Associated elements used for highlighting
+        // Assign directly for immediate use in the callback
+        const elems = data.elems.map(e => e.type.substring(0,1) + e.id);
+        // Some issues have instance specific detail in a subtitle
+        const detail = data.subtitle ? marked.parse(data.subtitle.auto) : '';
+
+        issue = issue.updateSelf({ elems: elems, detail: detail });
+        this.replaceItem(issue);
+        return issue;
+      });
   }
 
 
   /**
    * getStrings
-   * @param   itemType
-   * @param   locale
-   * @return  stringdata
+   * @param   {string}  itemType
+   * @param   {string}  locale
+   * @return  {Object}  stringdata
    */
   getStrings(itemType, locale) {
     locale = locale || this.context.systems.l10n.localeCode();
@@ -247,37 +258,42 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * postUpdate
-   * @param   issue
-   * @param   callback
+   * @param   {Marker}    issue
+   * @param   {function}  callback
    */
   postUpdate(issue, callback) {
-    if (this._cache.inflightPost[issue.id]) {
+    const issueID = issue.id;
+    const status = issue.props.newStatus;
+    const item = issue.props.item;
+
+    if (this._cache.inflightPost[issueID]) {
       return callback({ message: 'Issue update already inflight', status: -2 }, issue);
     }
 
     // UI sets the status to either 'done' or 'false'
-    const url = `${OSMOSE_API}/issue/${issue.id}/${issue.newStatus}`;
+    const url = `${OSMOSE_API}/issue/${issueID}/${status}`;
     const controller = new AbortController();
+
     const after = () => {
-      delete this._cache.inflightPost[issue.id];
+      delete this._cache.inflightPost[issueID];
 
       this.removeItem(issue);
       if (issue.newStatus === 'done') {
         // Keep track of the number of issues closed per `item` to tag the changeset
-        if (!(issue.item in this._cache.closed)) {
-          this._cache.closed[issue.item] = 0;
+        if (!(item in this._cache.closed)) {
+          this._cache.closed[item] = 0;
         }
-        this._cache.closed[issue.item] += 1;
+        this._cache.closed[item] += 1;
       }
       if (callback) callback(null, issue);
     };
 
-    this._cache.inflightPost[issue.id] = controller;
+    this._cache.inflightPost[issueID] = controller;
 
     fetch(url, { signal: controller.signal })
       .then(after)
       .catch(err => {
-        delete this._cache.inflightPost[issue.id];
+        delete this._cache.inflightPost[issueID];
         if (callback) callback(err.message);
       });
   }
@@ -285,9 +301,9 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * getError
-   * Get a QAItem from cache
-   * @param   issueID
-   * @return  QAItem
+   * Get a issue from cache
+   * @param   {string}  issueID
+   * @return  {Marker}  the issue
    */
   getError(issueID) {
     return this._cache.issues.get(issueID);
@@ -296,12 +312,12 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * replaceItem
-   * Replace a single QAItem in the cache
-   * @param   item
-   * @return  the item, or `null` if it couldn't be replaced
+   * Replace a single item in the cache
+   * @param   {Marker}  item to replace
+   * @return  {Marker}  the item, or `null` if it couldn't be replaced
    */
   replaceItem(item) {
-    if (!(item instanceof QAItem) || !item.id) return;
+    if (!(item instanceof Marker) || !item.id) return;
 
     this._cache.issues.set(item.id, item);
     this._updateRBush(this._encodeIssueRBush(item), true); // true = replace
@@ -311,11 +327,11 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * removeItem
-   * Remove a single QAItem from the cache
-   * @param   item to remove
+   * Remove a single item from the cache
+   * @param  {Marker}  item to remove
    */
   removeItem(item) {
-    if (!(item instanceof QAItem) || !item.id) return;
+    if (!(item instanceof Marker) || !item.id) return;
 
     this._cache.isseus.delete(item.id);
     this._updateRBush(this._encodeIssueRBush(item), false); // false = remove
@@ -325,7 +341,7 @@ export class OsmoseService extends AbstractSystem {
   /**
    * getClosedCounts
    * Used to populate `closed:osmose:*` changeset tags
-   * @return   the closed cache
+   * @return  {Object}  the closed cache
    */
   getClosedCounts() {
     return this._cache.closed;
@@ -335,8 +351,8 @@ export class OsmoseService extends AbstractSystem {
   /**
    * itemURL
    * Returns the url to link to details about an item
-   * @param   item
-   * @return  the url
+   * @param  {Marker}  item
+   * @return {string}  the url
    */
   itemURL(item) {
     return `https://osmose.openstreetmap.fr/en/error/${item.id}`;
@@ -363,7 +379,7 @@ export class OsmoseService extends AbstractSystem {
     return { minX: d.loc[0], minY: d.loc[1], maxX: d.loc[0], maxY: d.loc[1], data: d };
   }
 
-  // Replace or remove QAItem from the RBush spatial cache
+  // Replace or remove data from the rbush spatial index
   _updateRBush(item, replace) {
     this._cache.rbush.remove(item, (a, b) => a.data.id === b.data.id);
     if (replace) {

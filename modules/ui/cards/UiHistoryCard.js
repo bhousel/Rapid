@@ -2,7 +2,7 @@ import { selection } from 'd3-selection';
 import debounce from 'lodash-es/debounce.js';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
-import { QAItem } from '../../models/index.js';
+import { Marker } from '../../models/Marker.js';
 import { uiIcon } from '../icon.js';
 import { utilCmd } from '../../util/cmd.js';
 
@@ -116,7 +116,7 @@ export class UiHistoryCard extends AbstractUiCard {
 
     // We can only currently show info about OSM Entities and OSM notes.
     for (const [datumID, datum] of selected) {
-      if (datum instanceof QAItem && datum.service === 'osm') continue;  // OSM Note
+      if (datum instanceof Marker && datum.serviceID === 'osm') continue;  // OSM Note
       if (graph.hasEntity(datumID)) continue;  // OSM Entity
       selected.delete(datumID);  // something else, discard
     }
@@ -131,7 +131,7 @@ export class UiHistoryCard extends AbstractUiCard {
       const [pair] = selected;  // get the first (only) thing in the Map()
       const [datumID, datum] = pair;
 
-      if (datum instanceof QAItem) {  // a note
+      if (datum instanceof Marker) {  // a note
         $content
           .append('h4')
           .attr('class', 'history-heading')
@@ -163,7 +163,9 @@ export class UiHistoryCard extends AbstractUiCard {
     const l10n = context.systems.l10n;
     const osm = context.services.osm;
 
-    if (!note || note.isNew()) {
+    const comments = note.props.comments;
+
+    if (!note || note.isNew) {
       $selection
         .append('div')
         .text(l10n.t('info_panels.history.note_no_history'));
@@ -177,19 +179,19 @@ export class UiHistoryCard extends AbstractUiCard {
       .append('li')
       .text(l10n.t('info_panels.history.note_comments') + ':')
       .append('span')
-      .text(note.comments.length);
+      .text(comments.length);
 
-    if (note.comments.length) {
+    if (comments.length) {
       $list
         .append('li')
         .text(l10n.t('info_panels.history.note_created_date') + ':')
         .append('span')
-        .text(this.displayTimestamp(note.comments[0].date));
+        .text(this.displayTimestamp(comments[0].date));
 
       $list
         .append('li')
         .text(l10n.t('info_panels.history.note_created_user') + ':')
-        .call(this.renderUser, note.comments[0].user);
+        .call(this.renderUser, comments[0].user);
     }
 
     if (osm) {
@@ -251,23 +253,23 @@ export class UiHistoryCard extends AbstractUiCard {
       .append('li')
       .text(l10n.t('info_panels.history.version') + ':')
       .append('span')
-      .text(entity.version);
+      .text(entity.props.version);
 
     $list
       .append('li')
       .text(l10n.t('info_panels.history.last_edit') + ':')
       .append('span')
-      .text(this.displayTimestamp(entity.timestamp));
+      .text(this.displayTimestamp(entity.props.timestamp));
 
     $list
       .append('li')
       .text(l10n.t('info_panels.history.edited_by') + ':')
-      .call(this.renderUser, entity.user);
+      .call(this.renderUser, entity.props.user);
 
     $list
       .append('li')
       .text(l10n.t('info_panels.history.changeset') + ':')
-      .call(this.renderChangeset, entity.changeset);
+      .call(this.renderChangeset, entity.props.changeset);
   }
 
 

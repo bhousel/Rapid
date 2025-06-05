@@ -87,7 +87,7 @@ export function uiNoteEditor(context) {
     function noteSaveSection(selection) {
         var isSelected = (_note && _note.id === context.selectedIDs()[0]);
         var noteSave = selection.selectAll('.note-save')
-            .data((isSelected ? [_note] : []), function(d) { return d.status + d.id; });
+            .data((isSelected ? [_note] : []), function(d) { return d.props.status + d.id; });
 
         // exit
         noteSave.exit()
@@ -110,7 +110,7 @@ export function uiNoteEditor(context) {
             .attr('class', 'new-comment-input')
             .attr('placeholder', l10n.t('note.inputPlaceholder'))
             .attr('maxlength', 1000)
-            .property('value', function(d) { return d.newComment; })
+            .property('value', d => d.props.newComment)
             .call(utilNoAuto)
             .on('keydown.note-input', keydown)
             .on('input.note-input', changeInput)
@@ -139,7 +139,7 @@ export function uiNoteEditor(context) {
             var hasAuth = osm.authenticated();
             if (!hasAuth) return;
 
-            if (!_note.newComment) return;
+            if (!_note.props.newComment) return;
 
             d3_event.preventDefault();
 
@@ -272,7 +272,7 @@ export function uiNoteEditor(context) {
 
         var isSelected = (_note && _note.id === context.selectedIDs()[0]);
         var buttonSection = selection.selectAll('.buttons')
-            .data((isSelected ? [_note] : []), function(d) { return d.status + d.id; });
+            .data((isSelected ? [_note] : []), function(d) { return d.props.status + d.id; });
 
         // exit
         buttonSection.exit()
@@ -320,8 +320,8 @@ export function uiNoteEditor(context) {
         buttonSection.select('.status-button')   // select and propagate data
             .attr('disabled', (hasAuth ? null : true))
             .text(function(d) {
-                var action = (d.status === 'open' ? 'close' : 'open');
-                var andComment = (d.newComment ? '_comment' : '');
+                var action = (d.props.status === 'open' ? 'close' : 'open');
+                var andComment = (d.props.newComment ? '_comment' : '');
                 return l10n.t('note.' + action + andComment);
             })
             .on('click.status', clickStatus);
@@ -332,7 +332,7 @@ export function uiNoteEditor(context) {
 
 
         function isSaveDisabled(d) {
-            return (hasAuth && d.status === 'open' && d.newComment) ? null : true;
+            return (hasAuth && d.props.status === 'open' && d.props.newComment) ? null : true;
         }
     }
 
@@ -364,7 +364,7 @@ export function uiNoteEditor(context) {
         this.blur();    // avoid keeping focus on the button - #4641
         var osm = context.services.osm;
         if (osm) {
-            var setStatus = (d.status === 'open' ? 'closed' : 'open');
+            var setStatus = (d.props.status === 'open' ? 'closed' : 'open');
             osm.postNoteUpdate(d, setStatus, function(err, note) {
                 dispatch.call('change', note);
             });
@@ -375,7 +375,7 @@ export function uiNoteEditor(context) {
         this.blur();    // avoid keeping focus on the button - #4641
         var osm = context.services.osm;
         if (osm) {
-            osm.postNoteUpdate(d, d.status, function(err, note) {
+            osm.postNoteUpdate(d, d.props.status, function(err, note) {
                 dispatch.call('change', note);
             });
         }

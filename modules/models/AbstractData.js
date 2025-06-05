@@ -90,12 +90,18 @@ export class AbstractData {
    * This will also update the data element's `v` internal version number.
    * `updateSelf` is slightly more performant for situations where you don't need
    * immutability and don't mind mutating the data element.
-   * @param   {Object}        props - the updated properties
-   * @return  {AbstractData}  this data element
-   * @abstract
+   *
+   * A warning for OSM entities - this can circumvent `updateGeometry`.
+   * So you shouldn't `updateSelf` for OsmNodes where to try to change it's `loc`.
+   * And you shouldn't `updateSelf` for any entity after it has been added to a Graph.
+   *
+   * @param   {Object}     props - the updated properties
+   * @return  {OsmEntity}  this same OsmEntity
    */
   updateSelf(props) {
-    throw new Error(`Do not call 'updateSelf' on AbstractData`);
+    this.props = Object.assign(this.props, props);
+    this.touch();
+    return this;
   }
 
   /**

@@ -1,5 +1,5 @@
 import { AbstractMode } from './AbstractMode.js';
-import { QAItem } from '../models/qa_item.js';
+import { Marker } from '../models/Marker.js';
 
 const DEBUG = false;
 
@@ -79,7 +79,8 @@ export class AddNoteMode extends AbstractMode {
     if (!osm) return;
 
     // pass `null` to generate a new noteID
-    const note = new QAItem(osm, null, null, { loc: loc, status: 'open', comments: [] });
+    const props = { serviceID: 'osm', loc: loc, isNew: true, status: 'open', comments: [] };
+    const note = new Marker(context, props);
     osm.replaceNote(note);
 
     const selection = new Map().set(note.id, note);
