@@ -679,7 +679,7 @@ describe('OsmService', () => {
           note: { note: { '1': note, '2': note2 } }
         };
         _osm.caches(obj);
-        expect(_osm.caches().note.note[note.id]).to.eql(note);
+        expect(_osm.caches().note.note[note.id]).to.deep.equal(note);
         expect(Object.keys(_osm.caches().note.note).length).to.eql(2);
       });
 
@@ -753,7 +753,7 @@ describe('OsmService', () => {
         { minX: 10, minY: 1, maxX: 10, maxY: 1, data: { key: '2', loc: [10,1] } }
       ];
 
-      _osm.caches('get').note.rbush.load(notes);
+      _osm._noteCache.rbush.load(notes);
       const result = _osm.getNotes();
       expect(result).to.deep.eql([
         { key: '0', loc: [10,0] },
@@ -763,52 +763,62 @@ describe('OsmService', () => {
   });
 
 
+  describe('#replaceNote', () => {
+    it('adds a note', () => {
+      const noteID = '-1';
+      const note = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm', isNew: true });
+      const result = _osm.replaceNote(note);
+      expect(result).to.equal(note);  // strict ===
+      expect(_osm._noteCache.note[noteID]).to.equal(note);  // note is added to cache
+
+      const rbush = _osm._noteCache.rbush;
+      const result_rbush = rbush.search({ 'minX': -1, 'minY': -1, 'maxX': 1, 'maxY': 1 });
+      expect(result_rbush.length).to.eql(1);        // note is added to rbush
+      expect(result_rbush[0].data).to.equal(note);  // strict ===
+    });
+
+    it('replaces a note', () => {
+      const noteID = '1';
+      const note1 = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm' });
+      _osm.replaceNote(note1);  // note1 added to caches
+
+      const note2 = note1.update({ status: 'closed' });  // note2 is an updated note1
+      expect(note2).to.not.equal(note1);
+      expect(note2.id).to.equal(noteID);  // id unchanged
+      const result = _osm.replaceNote(note2);
+      expect(result).to.equal(note2);  // strict ===
+      expect(_osm._noteCache.note[noteID]).to.equal(note2);  // note2 has replaced note1 in cache
+
+      const rbush = _osm._noteCache.rbush;
+      const result_rbush = rbush.search({ 'minX': -1, 'minY': -1, 'maxX': 1, 'maxY': 1 });
+      expect(result_rbush.length).to.eql(1);
+      expect(result_rbush[0].data).to.equal(note2);  // note2 has replaced note1 in rbush
+    });
+  });
+
   describe('#getNote', () => {
-    it('returns a note', () => {
-      const note = new Rapid.Marker(context, { id: '1', loc: [0, 0], serviceID: 'osm' });
-      const obj = {
-        note: { note: { '1': note } }
-      };
-      _osm.caches(obj);
-      const result = _osm.getNote('1');
-      expect(result).to.deep.equal(note);
+    it('returns a note from the cache', () => {
+      const noteID = '3';
+      const note = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm' });
+      _osm.replaceNote(note);  // note added to caches
+      const result = _osm.getNote(noteID);
+      expect(result).to.equal(note);  // strict ===
     });
   });
 
   describe('#removeNote', () => {
-    it('removes a note that is new', () => {
-      const note = new Rapid.Marker(context, { id: '-1', isNew: true, loc: [0, 0], serviceID: 'osm' });
-      _osm.replaceNote(note);
+    it('removes a note', () => {
+      const noteID = '4';
+      const note = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm', isNew: true });
+      _osm.replaceNote(note);  // note added to caches
+      expect(_osm._noteCache.note[noteID]).to.equal(note);  // note is added to cache
+
       _osm.removeNote(note);
-      const result = _osm.getNote('-1');
-      expect(result).to.eql(undefined);
-    });
-  });
+      expect(_osm._noteCache.note[noteID]).to.be.undefined;  // note is removed from cache
 
-
-  describe('#replaceNote', () => {
-    it('returns a new note', () => {
-      const note = new Rapid.Marker(context, { id: '2', loc: [0, 0], serviceID: 'osm' });
-      const result = _osm.replaceNote(note);
-      expect(result.id).to.eql('2');
-      expect(_osm.caches().note.note['2']).to.eql(note);
-      const rbush = _osm.caches().note.rbush;
+      const rbush = _osm._noteCache.rbush;
       const result_rbush = rbush.search({ 'minX': -1, 'minY': -1, 'maxX': 1, 'maxY': 1 });
-      expect(result_rbush.length).to.eql(1);
-      expect(result_rbush[0].data).to.eql(note);
-    });
-
-    it('replaces a note', () => {
-      const note = new Rapid.Marker(context, { id: '2', loc: [0, 0], serviceID: 'osm' });
-      _osm.replaceNote(note);
-      note.updateSelf({ status: 'closed' });
-      const result = _osm.replaceNote(note);
-      expect(result.props.status).to.eql('closed');
-
-      const rbush = _osm.caches().note.rbush;
-      const result_rbush = rbush.search({ 'minX': -1, 'minY': -1, 'maxX': 1, 'maxY': 1 });
-      expect(result_rbush.length).to.eql(1);
-      expect(result_rbush[0].data.props.status).to.eql('closed');
+      expect(result_rbush.length).to.eql(0);  // note is removed from rbush
     });
   });
 

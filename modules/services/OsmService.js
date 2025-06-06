@@ -1226,15 +1226,13 @@ export class OsmService extends AbstractSystem {
       for (const [k, v] of Object.entries(source)) {
         if (k === 'rbush') {
           target.rbush = new RBush().fromJSON(v.toJSON());  // clone rbush
-        } else if (k === 'toLoad' || k === 'loaded' || k === 'seen') {
-          target[k] = new Set(v);    // clone Set
         } else if (k === 'note') {
           target.note = {};
           for (const id of Object.keys(v)) {
-            target.note[id] = source.note[id].update({});  // copy note
+            target.note[id] = new Marker(source.note[id]);  // clone notes
           }
         } else {
-          target[k] = JSON.parse(JSON.stringify(v));   // clone deep
+          target[k] = globalThis.structuredClone(v);  // clone anything else
         }
       }
       return target;
@@ -1245,15 +1243,6 @@ export class OsmService extends AbstractSystem {
         tile: cloneCache(this._tileCache),
         note: cloneCache(this._noteCache),
         user: cloneCache(this._userCache)
-      };
-    }
-
-    // access caches directly for testing (e.g., loading notes rbush)
-    if (obj === 'get') {
-      return {
-        tile: this._tileCache,
-        note: this._noteCache,
-        user: this._userCache
       };
     }
 
