@@ -1,33 +1,20 @@
-import { Extent, geomGetSmallestSurroundingRectangle, vecInterp } from '@rapid-sdk/math';
-import { polygonHull, polygonCentroid } from 'd3-polygon';
-import polylabel from '@mapbox/polylabel';
+import { Extent } from '@rapid-sdk/math';
+
+import { GeometryPart } from './GeometryPart.js';
 
 
 /**
  * Geometry
  * Wrapper for both original and projected geometry data.
- * This class deals with singular Geometry elements only: 'Point', 'LineString', 'Polygon'
+ * This class wraps `0..n` multiple Geometry elements in a collection.
  *
- * Previously this code lived in `PixiGeometry` where it applied only to rendered features,
- * and worked with screen coordinates.  Now it works with all features and with world coordinates.
- *
- * The geometry data should be passed to `setData()` as a GeoJSON geometry object.
+ * The geometry data should be passed to `setData()` as a GeoJSON object.
  *
  * Properties you can access:
  *   `origData`      Original GeoJSON data (in WGS84 lon/lat)
- *   `origCoords`    Original coordinate data (in WGS84 lon/lat)
  *   `origExtent`    Original Extent bounding box (in WGS84 lon/lat)
- *   `coords`        Projected coordinate data
- *   `flatCoords`    Projected coordinate data, flat Array how Pixi wants it [ x,y, x,y, … ]
- *   `extent`        Projected extent
- *   `outer`         Projected outer ring, Array of coordinate pairs [ [x,y], [x,y], … ]
- *   `flatOuter`     Projected outer ring, flat Array how Pixi wants it [ x,y, x,y, … ]
- *   `holes`         Projected hole rings, Array of Array of coordinate pairs [ [ [x,y], [x,y], … ] ]
- *   `flatHoles`     Projected hole rings, Array of flat Array how Pixi wants it [ [ x,y, x,y, … ] ]
- *   `hull`          Projected convex hull, Array of coordinate pairs [ [x,y], [x,y], … ]
- *   `centroid`      Projected centroid, [x, y]
- *   `poi`           Projected pole of inaccessability, [x, y]
- *   `ssr`           Projected smallest surrounding rectangle data (angle, poly)
+ *   `extent`        Projected extent (in world coordinates x/y)
+ *   `parts`         Array of GeometryParts
  */
 export class Geometry {
 
@@ -38,6 +25,8 @@ export class Geometry {
   constructor(feature) {
     this.feature = feature;
     this.context = feature.context;
+
+    this.parts = [];  // Array<GeometryPart>
     this.reset();
   }
 
@@ -49,35 +38,30 @@ export class Geometry {
    */
   destroy() {
     this.reset();
+    this.parts = [];
   }
 
 
   /**
    * clone
    * Returns a clone of this Geometry object
-   * @param  {AbstractData} feature - The data feature that will own the clone GeometryCollection
+   * It clones both the calculated extents as well as the Geometries in the collection.
+   * @param  {AbstractData} feature - The data feature that will own the clone Geometry
    * @return {Geometry}
    */
-  clone() {
-    const copy = new Geometry(this.feature);
+  clone(feature) {
+    const copy = new Geometry(feature);
 
     copy.dirty = this.dirty;
 
     // someday: check perf?  JSON.parse(JSON.stringify()) may still beat structuredClone for Array data
     copy.origData = globalThis.structuredClone(this.origData);
     copy.origExtent = new Extent(this.origExtent);
-
     copy.extent = new Extent(this.extent);
-    copy.coords = globalThis.structuredClone(this.coords);
-    copy.flatCoords = globalThis.structuredClone(this.flatCoords);
-    copy.outer = globalThis.structuredClone(this.outer);
-    copy.flatOuter = globalThis.structuredClone(this.flatOuter);
-    copy.hull = globalThis.structuredClone(this.hull);
-    copy.centroid = globalThis.structuredClone(this.centroid);
-    copy.poi = globalThis.structuredClone(this.poi);
-    copy.ssr = globalThis.structuredClone(this.ssr);
-    copy.holes = globalThis.structuredClone(this.holes);
-    copy.flatHoles = globalThis.structuredClone(this.flatHoles);
+
+    for (const part of this.parts) {
+      copy.parts.push(part.clone(this.context));
+    }
 
     return copy;
   }
@@ -95,129 +79,50 @@ export class Geometry {
     this.origData = null;    // GeoJSON data
     this.origExtent = null;  // extent (bounding box)
 
-    // The rest of the data is projected data in world coordinates
+    // Projected data - These are in world coordinates
     // ([0,0] is the top left corner of a 256x256 Web Mercator world)
     this.extent = null;      // extent (bounding box)
-    this.coords = null;
-    this.flatCoords = null;
-    this.outer = null;
-    this.flatOuter = null;
-    this.holes = null;
-    this.flatHoles = null;
-    this.hull = null;        // convex hull
-    this.centroid = null;    // centroid (center of mass / rotation)
-    this.poi = null;         // pole of inaccessability
-    this.ssr = null;         // smallest surrounding rectangle
+
+    for (const part of this.parts) {
+      part.reset();
+    }
   }
 
 
   /**
-   * update
+   * setData
+   * This setter can accept all types of GeoJSON data.
+   * It will automatically break multitypes and collections into parts
+   *  and create separate GeometryPart elements for each part.
+   * If there is any existing data, it is first removed.
+   * @param {GeoJSON} geojson - GeoJSON data
    */
-  update() {
-    if (!this.dirty || !this.origData?.coordinates) return;  // nothing to do
+  setData(geojson) {
+    this.destroy();
 
-    const viewport = this.context.viewport;
-    const origCoords = this.origData.coordinates;
-    this.dirty = false;
+    this.origData = globalThis.structuredClone(geojson);
+    const geojsonParts = this._geojsonToParts(geojson);
+    if (!geojsonParts.length) return; // do nothing if we found no usable parts
 
-    // reset all projected properties
-    this.extent = null;
-    this.coords = null;
-    this.flatCoords = null;
-    this.outer = null;
-    this.flatOuter = null;
-    this.holes = null;
-    this.flatHoles = null;
-    this.hull = null;
-    this.centroid = null;
-    this.poi = null;
-    this.ssr = null;
+    const origExtent = new Extent();
+    const extent = new Extent();
+    let isValid = false;
 
-    // Points are simple, just project once.
-    if (this.type === 'Point') {
-      this.coords = viewport.wgs84ToWorld(origCoords);
-      this.extent = new Extent(this.coords);
-      this.centroid = this.coords;
-      this.poi = this.coords;
-      return;
+    for (const geojsonPart of geojsonParts) {
+      const part = new GeometryPart(this.feature);
+      part.setData(geojsonPart);
+      if (part.dirty) continue;  // if the GeometryPart was invalid, skip it
+
+      this.parts.push(part);
+      origExtent.extendSelf(part.origExtent);
+      extent.extendSelf(part.extent);
+      isValid = true;
     }
 
-    // A line or a polygon.
-    // Project the coordinate data..
-    // Generate both normal coordinate rings and flattened rings at the same time to avoid extra iterations.
-    // Preallocate Arrays to avoid garbage collection formerly caused by excessive Array.push()
-    this.extent = new Extent();
-    const origRings = (this.type === 'LineString') ? [origCoords] : origCoords;
-    const projRings = new Array(origRings.length);
-    const projFlatRings = new Array(origRings.length);
-
-    for (let i = 0; i < origRings.length; i++) {
-      const origRing = origRings[i];
-      projRings[i] = new Array(origRing.length);
-      projFlatRings[i] = new Array(origRing.length * 2);
-
-      for (let j = 0; j < origRing.length; j++) {
-        const xy = viewport.wgs84ToWorld(origRing[j]);
-        projRings[i][j] = xy;
-        projFlatRings[i][j * 2] = xy[0];
-        projFlatRings[i][j * 2 + 1] = xy[1];
-
-        if (i === 0) {  // the outer ring
-          this.extent.extendSelf(xy);
-        }
-      }
-    }
-
-    // Assign outer and holes
-    if (this.type === 'LineString') {
-      this.coords = projRings[0];
-      this.flatCoords = projFlatRings[0];
-      this.outer = projRings[0];
-      this.flatOuter = projFlatRings[0];
-      this.holes = null;
-      this.flatHoles = null;
-    } else {  // polygon
-      this.coords = projRings;
-      this.flatCoords = projFlatRings;
-      this.outer = projRings[0];
-      this.flatOuter = projFlatRings[0];
-      this.holes = projRings.slice(1);
-      this.flatHoles = projFlatRings.slice(1);
-    }
-
-    // Calculate hull, centroid, poi, ssr if possible
-    if (this.outer.length === 0) {          // no coordinates? - shouldn't happen
-      // no-op
-
-    } else if (this.outer.length === 1) {   // single coordinate? - wrong but can happen
-      this.centroid = this.outer[0];
-      this.poi = this.centroid;
-
-    } else if (this.outer.length === 2) {   // 2 coordinate line
-      this.centroid = vecInterp(this.outer[0], this.outer[1], 0.5);  // average the 2 points
-      this.poi = this.centroid;
-
-    } else {   // > 2 coordinates...
-      // Convex Hull
-      this.hull = polygonHull(this.outer);
-
-      // Centroid
-      if (this.hull.length === 2) {
-        this.centroid = vecInterp(this.hull[0], this.hull[1], 0.5);  // average the 2 points
-      } else {
-        this.centroid = polygonCentroid(this.hull);
-      }
-
-      // Pole of Inaccessability (for polygons)
-      if (this.type === 'LineString') {
-        this.poi = this.centroid;
-      } else {
-        this.poi = polylabel(this.coords);   // it expects outer + rings
-      }
-
-      // Smallest Surrounding Rectangle
-      this.ssr = geomGetSmallestSurroundingRectangle(this.hull);
+    if (isValid) {   // at least one part is valid
+      this.origExtent = origExtent;
+      this.extent = extent;
+      this.dirty = false;
     }
   }
 
@@ -232,54 +137,49 @@ export class Geometry {
     return this.origData;
   }
 
-  /**
-   * origCoords
-   * The original data format is GeoJSON, this is just a convenience getter.
-   * @return {Array<*>}
-   * @readonly
-   */
-  get origCoords() {
-    return this.origData?.coordinates;
-  }
 
   /**
-   * type
-   * The original data format is GeoJSON, this is just a convenience getter.
-   * @return {string} One of 'Point', 'LineString', 'Polygon'
-   * @readonly
+   * _geojsonToParts
+   * Break arbitrary GeoJSON into Geometry parts.
+   * This will recurse down through the collection types if needed.
+   * @return {Array<GeoJSON>}  An array of singular GeoJSON geometries
    */
-  get type() {
-    return this.origData?.type;
-  }
+  _geojsonToParts(geojson = {}, parts = [], depth = 0) {
+    if (depth > 4) return;  // limit recursion
 
+    if (geojson.type === 'Feature') {
+      this._geojsonToParts(geojson.geometry, parts, depth + 1);
 
-  /**
-   * setData
-   * This setter accepts singular GeoJSON geometries only:  'Point', 'LineString', and 'Polygon'
-   * If there is any existing data, it is first removed.
-   * @param {GeoJSON} geojson - GeoJSON data
-   */
-  setData(geojson = {}) {
-    this.destroy();
-    this.origData = globalThis.structuredClone(geojson);
-
-    const type = geojson.type;
-    const coords = geojson.coordinates;
-    if (!(/^(Point|LineString|Polygon)$/.test(type)) || !coords) return;  // do nothing
-
-    // Determine extent (bounds)
-    if (type === 'Point') {
-      this.origExtent = new Extent(coords);
-    } else {
-      this.origExtent = new Extent();
-      const outer = (this.type === 'LineString') ? coords : coords[0];  // outer only
-      for (const loc of outer) {
-        this.origExtent.extendSelf(loc);
+    } else if (geojson.type === 'FeatureCollection') {
+      for (const feature of (geojson.features || [])) {
+        this._geojsonToParts(feature, parts, depth + 1);
       }
+
+    } else if (geojson.type === 'GeometryCollection') {
+      for (const geometry of (geojson.geometries || [])) {
+        this._geojsonToParts(geometry, parts, depth + 1);
+      }
+
+    } else if (geojson.type === 'MultiPoint') {
+      for (const coords of (geojson.coordinates || [])) {
+        parts.push({ type: 'Point', coordinates: coords });
+      }
+
+    } else if (geojson.type === 'MultiLineString') {
+      for (const coords of (geojson.coordinates || [])) {
+        parts.push({ type: 'LineString', coordinates: coords });
+      }
+
+    } else if (geojson.type === 'MultiPolygon') {
+      for (const coords of (geojson.coordinates || [])) {
+        parts.push({ type: 'Polygon', coordinates: coords });
+      }
+
+    } else if (/^(Point|LineString|Polygon)$/.test(geojson.type)) {
+      parts.push(geojson);  // singular geometry parts are what we want
     }
 
-    this.dirty = true;
-    this.update();
+    return parts;
   }
 
 }

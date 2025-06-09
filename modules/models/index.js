@@ -1,6 +1,6 @@
 import { AbstractData } from './AbstractData.js';
-import { GeometryCollection } from './GeometryCollection.js';
 import { Geometry } from './Geometry.js';
+import { GeometryPart } from './GeometryPart.js';
 import { GeoJSON } from './GeoJSON.js';
 import { Marker } from './Marker.js';  // was "QAItem"
 import { OsmChangeset } from './OsmChangeset.js';
@@ -11,8 +11,8 @@ import { OsmWay } from './OsmWay.js';
 
 export {
   AbstractData,
-  GeometryCollection,
   Geometry,
+  GeometryPart,
   GeoJSON,
   Marker,
   OsmChangeset,

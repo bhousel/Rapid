@@ -1,4 +1,4 @@
-import { GeometryCollection } from './GeometryCollection.js';
+import { Geometry } from './Geometry.js';
 
 
 // Global version sequence used by all data elements
@@ -28,7 +28,7 @@ let _nextv = 1;
  *   `id`      Unique string to identify this data element (elsewhere, referred to as the `dataID`)
  *   `type`    String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
  *   `v`       Internal version of the data element, can be used to detect changes
- *   `geoms`   GeometryCollection object
+ *   `geoms`   Geometry object
  *   `props`   Properties object
  */
 export class AbstractData {
@@ -51,7 +51,7 @@ export class AbstractData {
       const context = otherOrContext;
       this.context = context;
       this.props = {};
-      this.geoms = new GeometryCollection(this);
+      this.geoms = new Geometry(this);
     }
 
     Object.assign(this.props, props);  // override with passed in props

@@ -10,7 +10,7 @@ let _nextid = 1;
  * This used to be called "QAItem".
  *
  * Properties you can access:
- *   `geoms`   GeometryCollection object (inherited from `AbstractData`)
+ *   `geoms`   Geometry object (inherited from `AbstractData`)
  *   `props`   Properties object (inherited from `AbstractData`)
  */
 export class Marker extends AbstractData {

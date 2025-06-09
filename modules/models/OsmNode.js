@@ -205,8 +205,8 @@ export class OsmNode extends OsmEntity {
 //        results.push( (vecAngle(a, b) * 180 / Math.PI) + 90 );
 // using world coords - no projection!
         // +90 because vecAngle returns angle from X axis, not Y (north)
-        const a = this.geoms.items[0].coords;
-        const b = (graph.entity(nodeID).geoms.items[0].coords);
+        const a = this.geoms.parts[0].coords;
+        const b = (graph.entity(nodeID).geoms.parts[0].coords);
         if (a === null || b === null) continue;
         results.push((vecAngle(a, b) * RAD2DEG) + 90);
       }

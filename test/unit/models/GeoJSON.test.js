@@ -111,112 +111,112 @@ describe('GeoJSON', () => {
       const data = new Rapid.GeoJSON(context, {});
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isTrue(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 0);
+      assert.lengthOf(data.geoms.parts, 0);
     });
 
     it('constructs a Point from a Feature', () => {
       const data = new Rapid.GeoJSON(context, point);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 1);
+      assert.lengthOf(data.geoms.parts, 1);
     });
 
     it('constructs a Point from a Geometry', () => {
       const data = new Rapid.GeoJSON(context, point.geometry);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 1);
+      assert.lengthOf(data.geoms.parts, 1);
     });
 
     it('constructs a MultiPoint from a Feature', () => {
       const data = new Rapid.GeoJSON(context, multipoint);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 2);
+      assert.lengthOf(data.geoms.parts, 2);
     });
 
     it('constructs a MultiPoint from a Geometry', () => {
       const data = new Rapid.GeoJSON(context, multipoint.geometry);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 2);
+      assert.lengthOf(data.geoms.parts, 2);
     });
 
     it('constructs a LineString from a Feature', () => {
       const data = new Rapid.GeoJSON(context, linestring);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 1);
+      assert.lengthOf(data.geoms.parts, 1);
     });
 
     it('constructs a LineString from a Geometry', () => {
       const data = new Rapid.GeoJSON(context, linestring.geometry);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 1);
+      assert.lengthOf(data.geoms.parts, 1);
     });
 
     it('constructs a MultiLineString from a Feature', () => {
       const data = new Rapid.GeoJSON(context, multilinestring);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 2);
+      assert.lengthOf(data.geoms.parts, 2);
     });
 
     it('constructs a MultiLineString from a Geometry', () => {
       const data = new Rapid.GeoJSON(context, multilinestring.geometry);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 2);
+      assert.lengthOf(data.geoms.parts, 2);
     });
 
     it('constructs a Polygon from a Feature', () => {
       const data = new Rapid.GeoJSON(context, polygon);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 1);
+      assert.lengthOf(data.geoms.parts, 1);
     });
 
     it('constructs a Polygon from a Geometry', () => {
       const data = new Rapid.GeoJSON(context, polygon.geometry);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 1);
+      assert.lengthOf(data.geoms.parts, 1);
     });
 
     it('constructs a MultiPolygon from a Feature', () => {
       const data = new Rapid.GeoJSON(context, multipolygon);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 2);
+      assert.lengthOf(data.geoms.parts, 2);
     });
 
     it('constructs a MultiPolygon from a Geometry', () => {
       const data = new Rapid.GeoJSON(context, multipolygon.geometry);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 2);
+      assert.lengthOf(data.geoms.parts, 2);
     });
 
     it('constructs multiple items from a FeatureCollection', () => {
       const data = new Rapid.GeoJSON(context, featurecollection);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 3);
+      assert.lengthOf(data.geoms.parts, 3);
     });
 
     it('constructs multiple items from a Feature GeometryCollection', () => {
       const data = new Rapid.GeoJSON(context, geometrycollection);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 3);
+      assert.lengthOf(data.geoms.parts, 3);
     });
 
     it('constructs multiple items from a Geometry GeometryCollection', () => {
       const data = new Rapid.GeoJSON(context, geometrycollection.geometry);
       assert.instanceOf(data, Rapid.GeoJSON);
       assert.isFalse(data.geoms.dirty);
-      assert.lengthOf(data.geoms.items, 3);
+      assert.lengthOf(data.geoms.parts, 3);
     });
 
   });
