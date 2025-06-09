@@ -2,7 +2,7 @@ import { Tiler } from '@rapid-sdk/math';
 import { utilStringQs } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { Graph, RapidDataset } from '../core/lib/index.js';
+import { Graph, Tree, RapidDataset } from '../core/lib/index.js';
 import { OsmEntity, OsmNode, OsmWay } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
@@ -49,16 +49,18 @@ export class MapWithAIService extends AbstractSystem {
         // allocate a special dataset for the rapid intro graph.
         const datasetID = 'rapid_intro_graph';
         const graph = new Graph();
+        const tree = new Tree(graph);
         const cache = {
           inflight: {},
-          loaded: new Set(),           // Set(tileID)
-          seen: new Set(),             // Set(entityID)
-          seenFirstNodeID: new Set(),  // Set(entityID)
-          splitWays: new Map()         // Map(originalID -> Set(Entity))
+          loaded: new Set(),           // Set<tileID>
+          seen: new Set(),             // Set<entityID>
+          seenFirstNodeID: new Set(),  // Set<entityID>
+          splitWays: new Map()         // Map<originalID, Set<Entity>>
         };
         const ds = {
           id: datasetID,
           graph: graph,
+          tree: tree,
           cache: cache,
           lastv: null
         };
@@ -174,6 +176,7 @@ export class MapWithAIService extends AbstractSystem {
       }
       ds.lastv = null;
       ds.graph = new Graph();
+      ds.tree = new Tree(ds.graph);
       ds.cache = {
         inflight: {},
         loaded: new Set(),           // Set(tileID)
@@ -194,7 +197,7 @@ export class MapWithAIService extends AbstractSystem {
    */
   getData(datasetID) {
     const ds = this._datasets[datasetID];
-    if (!ds || !ds.graph) return [];
+    if (!ds || !ds.tree || !ds.graph) return [];
 
     const extent = this.context.viewport.visibleExtent();
     return ds.tree.intersects(extent, ds.graph);
@@ -210,25 +213,28 @@ export class MapWithAIService extends AbstractSystem {
     if (this._paused) return;
 
     let ds = this._datasets[datasetID];
-    let graph, cache;
+    let graph, tree, cache;
 
     if (ds) {
       graph = ds.graph;
+      tree = ds.tree;
       cache = ds.cache;
 
     } else {
       // as tile requests arrive, setup the resources needed to hold the results
       graph = new Graph();
+      tree = new Tree(graph);
       cache = {
         inflight: {},
-        loaded: new Set(),           // Set(tileID)
-        seen: new Set(),             // Set(entityID)
-        seenFirstNodeID: new Set(),  // Set(entityID)
-        splitWays: new Map()         // Map(originalID -> Set(Entity))
+        loaded: new Set(),           // Set<tileID>
+        seen: new Set(),             // Set<entityID>
+        seenFirstNodeID: new Set(),  // Set<entityID>
+        splitWays: new Map()         // Map<originalID, Set<Entity>>
       };
       ds = {
         id: datasetID,
         graph: graph,
+        tree: tree,
         cache: cache,
         lastv: null
       };
@@ -238,7 +244,6 @@ export class MapWithAIService extends AbstractSystem {
     const context = this.context;
     const gfx = context.systems.gfx;
     const locations = context.systems.locations;
-    const spatial = context.systems.spatial;
     const viewport = context.viewport;
 
     if (ds.lastv === viewport.v) return;  // exit early if the view is unchanged
@@ -303,7 +308,7 @@ export class MapWithAIService extends AbstractSystem {
   /* this is called to merge in the rapid_intro_graph */
   merge(datasetID, entities) {
     const ds = this._datasets[datasetID];
-    if (!ds || !ds.graph) return;
+    if (!ds || !ds.tree || !ds.graph) return;
     ds.graph.rebase(entities, [ds.graph], false);
     ds.tree.rebase(entities, false);
   }

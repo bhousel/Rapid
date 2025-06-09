@@ -22,11 +22,11 @@ export class Tree {
     this._current = graph;
 
     this._entityRBush = new RBush();
-    this._entityBoxes = new Map();     // Map(entityID -> Box Object)
-    this._entitySegments = new Map();  // Map(entityID -> Array[segments])
+    this._entityBoxes = new Map();     // Map<entityID, Box Object>
+    this._entitySegments = new Map();  // Map<entityID, Array[segments]>
 
     this._segmentRBush = new RBush();
-    this._segmentBoxes = new Map();    // Map(segmentID -> Box Object)
+    this._segmentBoxes = new Map();    // Map<segmentID, Box Object>
 
   }
 
@@ -59,7 +59,7 @@ export class Tree {
   /**
    * _loadEntities
    * Add or update multiple Entities in the internal indexes.
-   * @param  toUpdate  Map(entityID -> Entity) to load
+   * @param  toUpdate  Map<entityID, Entity> to load
    */
   _loadEntities(toUpdate) {
     const graph = this._current;
@@ -108,8 +108,8 @@ export class Tree {
    * the positions of that Entity's parent ways and relations.
    *
    * @param  entity    Entity to check
-   * @param  toUpdate  Map(entityID -> Entity)
-   * @param  seen?     Set(seen entityIDs) (to avoid infinite recursion)
+   * @param  toUpdate  Map<entityID, Entity>
+   * @param  seen?     Set<seen entityIDs> (to avoid infinite recursion)
    */
   _includeParents(entity, toUpdate, seen) {
     const graph = this._current;

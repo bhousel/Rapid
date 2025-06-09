@@ -273,12 +273,16 @@ export class Graph {
     const head = stack[stack.length - 1]._local.entities;
     const restoreIDs = new Set();
 
+// need to force update any parent geometry when new children appear?
+const newEntities = new Set();
+
     for (const entity of entities) {
       if (!entity.visible || (!force && base.entities.has(entity.id))) continue;
 
       // Merge data into the base graph
       base.entities.set(entity.id, entity);
       this._updateCalculated(undefined, entity, base.parentWays, base.parentRels);
+newEntities.add(entity);
 
       // A weird thing we have to watch out for..
       // Sometimes an edit can remove a node, then we download more information and realize
@@ -301,7 +305,7 @@ export class Graph {
           local.delete(id);
         }
       }
-      graph._updateRebased();
+      graph._updateRebased(newEntities);
     }
   }
 
@@ -311,8 +315,9 @@ export class Graph {
    * Internal function - Update a graph following a `rebase` (base graph has changed).
    * Check local `parentWays` and `parentRels` caches and make sure they
    * are consistent with the data in the base caches.
+   * @param newEntities - the new entities  If they have parents the parents need their geometry updated.
    */
-  _updateRebased() {
+  _updateRebased(newEntities) {
     const base = this._base;
     const local = this._local;
 
@@ -336,11 +341,43 @@ export class Graph {
       }
     }
 
+// Note that clearing the transients used to fix the "newEntities" problem,
+// because this is where the calculated extents used to live.
     this._transients = new Map();
+
+// force update the geometries?
+const toUpdate = new Map();
+for (const entity of newEntities) {
+  this._getParents(entity, toUpdate);
+}
+for (const entity of toUpdate.values()) {
+  entity.updateGeometry(this);
+}
 
     // this._childNodes is not updated, under the assumption that
     // ways are always downloaded with their child nodes.
   }
+
+
+
+// borrowed from Tree._includeParents, we may need it here.
+_getParents(entity, toUpdate, seen) {
+  const entityID = entity.id;
+  if (!seen) seen = new Set();
+
+  if (seen.has(entityID)) return;
+  seen.add(entityID);
+
+  for (const way of this.parentWays(entity)) {
+    toUpdate.set(way.id, way);
+    this._getParents(way, toUpdate, seen);
+  }
+
+  for (const relation of this.parentRelations(entity)) {
+    toUpdate.set(relation.id, relation);
+    this._getParents(relation, toUpdate, seen);
+  }
+}
 
 
   /**

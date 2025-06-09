@@ -25,8 +25,8 @@ describe('Marker', () => {
       const props = {
         id: 'test1',
         serviceID: 'service',
-        loc: [0, 0],
-      }
+        loc: [0, 0]
+      };
       const marker = new Rapid.Marker(context, props);
       assert.instanceOf(marker, Rapid.Marker);
       assert.equal(marker.id, 'test1');
