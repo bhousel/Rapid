@@ -4,13 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionOrthogonalize', () => {
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
 
   const viewport = {
     project: val => val,

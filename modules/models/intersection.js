@@ -5,7 +5,6 @@ import { actionDeleteRelation } from '../actions/delete_relation.js';
 import { actionReverse } from '../actions/reverse.js';
 import { actionSplit } from '../actions/split.js';
 import { Graph } from '../core/lib/index.js';
-import { OsmEntity } from './OsmEntity.js';
 
 
 export function osmTurn(turn) {
@@ -16,7 +15,7 @@ export function osmTurn(turn) {
 }
 
 
-export function osmIntersection(graph, startVertexId, maxDistance) {
+export function osmIntersection(context, graph, startVertexId, maxDistance) {
     maxDistance = maxDistance || 30;    // in meters
     var vgraph = new Graph();           // virtual graph
     var i, j, k;
@@ -159,7 +158,7 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
 
 
     // STEP 4:  Split ways on key vertices
-    var origCount = OsmEntity.id.next.way;
+    const origCount = context.sequences.way || 0;
     vertices.forEach(function(v) {
         // This is an odd way to do it, but we need to find all the ways that
         // will be split here, then split them one at a time to ensure that these
@@ -186,7 +185,7 @@ export function osmIntersection(graph, startVertexId, maxDistance) {
     //     these actions later if the user decides to create a turn restriction
     //  2. Avoids churning way ids just by hovering over a vertex
     //     and displaying the turn restriction editor
-    OsmEntity.id.next.way = origCount;
+    context.sequences.way = origCount;
 
 
     // STEP 5:  Update arrays to point to vgraph entities

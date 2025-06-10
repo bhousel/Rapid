@@ -4,13 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionDeleteRelation', () => {
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
 
   it('removes the relation from the graph', () => {
     const r1 = new Rapid.OsmRelation(context, {id: 'r1'});

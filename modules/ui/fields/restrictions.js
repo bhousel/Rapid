@@ -41,7 +41,7 @@
 //        // try to reuse the intersection, but always rebuild it if the graph has changed
 //        if (_vertexID && (editor.staging.graph !== _graph || !_intersection)) {
 //            _graph = editor.staging.graph;
-//            _intersection = osmIntersection(_graph, _vertexID, _maxDistance);
+//            _intersection = osmIntersection(context, _graph, _vertexID, _maxDistance);
 //        }
 //
 //        // It's possible for there to be no actual intersection here.

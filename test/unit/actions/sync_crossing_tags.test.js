@@ -4,13 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionSyncCrossingTags', () => {
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
 
   it('synchronizes crossing tags between parent ways and child nodes', () => {
     const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0], tags: { highway: 'crossing' } });

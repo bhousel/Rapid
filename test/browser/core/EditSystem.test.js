@@ -37,6 +37,7 @@ describe('EditSystem', () => {
 
   class MockContext {
     constructor()   {
+      this.sequences = {};
       this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
         imagery:  new MockImagerySystem(),
@@ -48,7 +49,13 @@ describe('EditSystem', () => {
       };
       this.services = {};
     }
-    selectedIDs() { return []; }
+    selectedIDs() {
+      return [];
+    }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
+    }
   }
 
 
@@ -802,7 +809,7 @@ describe('EditSystem', () => {
           { },
           { modified: ['n-1v0'], imageryUsed: ['Bing'], annotation: 'Added a point.' }
         ],
-        nextIDs: { node: -2, way: -1, relation: -1 },
+        nextIDs: { node: 2, way: 1, relation: 1 },
         index: 1
       };
       return _editor.fromJSONAsync(JSON.stringify(json))
@@ -814,8 +821,8 @@ describe('EditSystem', () => {
           expect(restored.v).to.equal(0);
           expect(_editor.getUndoAnnotation()).to.eql('Added a point.');
           expect(_editor.sourcesUsed().imagery).to.include('Bing');
-          expect(Rapid.OsmEntity.id.next).to.eql({ node: -2, way: -1, relation: -1 });
           expect(_editor.difference().created().length).to.eql(1);
+          expect(context.sequences).to.include({ node: 2, way: 1, relation: 1 });
         });
     });
 
@@ -828,7 +835,7 @@ describe('EditSystem', () => {
           { },
           { modified: ['n1v1'], imageryUsed: ['Bing'], annotation: 'Moved a point.' }
         ],
-        nextIDs: { node: -2, way: -1, relation: -1 },
+        nextIDs: { node: 2, way: 1, relation: 1 },
         index: 1
       };
       return _editor.fromJSONAsync(JSON.stringify(json))
@@ -836,8 +843,8 @@ describe('EditSystem', () => {
           expect(_editor.staging.graph.entity('n1')).to.eql(new Rapid.OsmNode(context, { id: 'n1', loc: [2, 3], v: 1 }));
           expect(_editor.getUndoAnnotation()).to.eql('Moved a point.');
           expect(_editor.sourcesUsed().imagery).to.include('Bing');
-          expect(Rapid.OsmEntity.id.next).to.eql({ node: -2, way: -1, relation: -1 });
           expect(_editor.difference().modified().length).to.eql(1);
+          expect(context.sequences).to.include({ node: 2, way: 1, relation: 1 });
         });
     });
 
@@ -850,7 +857,7 @@ describe('EditSystem', () => {
           { },
           { deleted: ['n1'], imageryUsed: ['Bing'], annotation: 'Deleted a point.' }
         ],
-        nextIDs: { node: -1, way: -2, relation: -3 },
+        nextIDs: { node: 1, way: 2, relation: 3 },
         index: 1
       };
       return _editor.fromJSONAsync(JSON.stringify(json))
@@ -858,9 +865,28 @@ describe('EditSystem', () => {
           expect(_editor.staging.graph.hasEntity('n1')).to.be.undefined;
           expect(_editor.getUndoAnnotation()).to.eql('Deleted a point.');
           expect(_editor.sourcesUsed().imagery).to.include('Bing');
-          expect(Rapid.OsmEntity.id.next).to.eql({ node: -1, way: -2, relation: -3 });
           expect(_editor.difference().deleted().length).to.eql(1);
+          expect(context.sequences).to.include({ node: 1, way: 2, relation: 3 });
         });
     });
+
+    it('converts legacy negative nextIDs to positive nextIDs', () => {
+      const json = {
+        version: 3,
+        entities: [{ id: 'n-1', loc: [1, 2], v: 0 }],
+        baseEntities: [],
+        stack: [
+          { },
+          { modified: ['n-1v0'], imageryUsed: ['Bing'], annotation: 'Added a point.' }
+        ],
+        nextIDs: { node: -2, way: -1, relation: -1 },
+        index: 1
+      };
+      return _editor.fromJSONAsync(JSON.stringify(json))
+        .then(() => {
+          expect(context.sequences).to.include({ node: 2, way: 1, relation: 1 });
+        });
+    });
+
   });
 });

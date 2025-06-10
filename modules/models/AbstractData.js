@@ -1,12 +1,6 @@
 import { Geometry } from './Geometry.js';
 
 
-// Global version sequence used by all data elements
-// We did it this way to avoid the situation where you undo a feature
-// to a previous version and then increment it back to the same version.
-// see Rapid@9ac2776a
-let _nextv = 1;
-
 // // Clone a {Map|Object} to a {Map}.
 // function toMap(src) {
 //   if (src instanceof Map) return new Map(src);
@@ -131,10 +125,14 @@ export class AbstractData {
   /**
    * touch
    * Bump internal version number in place (typically, forcing a rerender)
+   * Note that this version number always increases and is shared by all data elements.
+   * We did it this way to avoid situations where you undo a feature
+   *  to a previous version and then increment it back to the same version.
+   * @see Rapid@9ac2776a
    * @return  {AbstractData}  this data element
    */
   touch() {
-    this.props.v = _nextv++;
+    this.props.v = this.context.next('v');
     return this;
   }
 

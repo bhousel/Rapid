@@ -4,13 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('multipolygons', () => {
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
 
   describe('osmIsOldMultipolygonOuterMember', () => {
     it('returns the parent relation of a simple multipolygon outer', () => {

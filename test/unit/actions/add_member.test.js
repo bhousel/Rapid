@@ -3,14 +3,7 @@ import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
 describe('actionAddMember', () => {
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
-
+  const context = new Rapid.MockContext();
 
   it('adds an member to a relation at the specified index', () => {
     const r = new Rapid.OsmRelation(context, {members: [{id: '1'}, {id: '3'}]});

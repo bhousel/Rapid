@@ -6,7 +6,7 @@ import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from './AbstractSystem.js';
 import { Difference, Edit, Graph, Tree } from './lib/index.js';
-import { createOsmFeature, OsmEntity } from '../models/index.js';
+import { createOsmFeature } from '../models/index.js';
 import { uiLoading } from '../ui/loading.js';
 
 
@@ -822,7 +822,7 @@ export class EditSystem extends AbstractSystem {
     const nextID = { n: 0, r: 0, w: 0 };
     const permIDs = {};
     const graph = this.stable.graph;
-    const result = new Map();   // Map(entityID -> Entity)
+    const result = new Map();   // Map<entityID, Entity>
 
     // Copy base entities..
     for (const entity of graph.base.entities.values()) {
@@ -901,8 +901,8 @@ export class EditSystem extends AbstractSystem {
 
     const OSM_PRECISION = 7;
     const baseGraph = this.base.graph;   // The initial unedited graph
-    const modifiedEntities = new Map();  // Map(Entity.key -> Entity)
-    const baseEntities = new Map();      // Map(entityID -> Entity)
+    const modifiedEntities = new Map();  // Map<Entity.key, Entity>
+    const baseEntities = new Map();      // Map<entityID, Entity>
     const historyData = [];
 
     // Preserve the users history of edits..
@@ -968,7 +968,7 @@ export class EditSystem extends AbstractSystem {
       entities: [...modifiedEntities.values()],
       baseEntities: [...baseEntities.values()],
       stack: historyData,
-      nextIDs: OsmEntity.id.next,
+      nextIDs: this.context.sequences,
       index: this._index,
       timestamp: (new Date()).getTime()
     });
@@ -1031,11 +1031,18 @@ export class EditSystem extends AbstractSystem {
       context.container().call(loading);   // block ui
     }
 
-    const __baseEntities = new Map();        // Map(entityID -> Entity)
-    const __modifiedEntities = new Map();    // Map(Entity.key -> Entity)  (watch out: entity.key - e.g. 'n1v1')
-    const __missingEntityIDs = new Set();    // Set(entityID)
+    const __baseEntities = new Map();        // Map<entityID, Entity>
+    const __modifiedEntities = new Map();    // Map<Entity.key, Entity>  (watch out: entity.key - e.g. 'n1v1')
+    const __missingEntityIDs = new Set();    // Set<entityID>
 
-    OsmEntity.id.next = backup.nextIDs;
+    // Restore the nextIDs..
+    // Old: OsmEntity.id.next = backup.nextIDs;
+    // New: We store sequences in the context, these will be positive numbers.
+    // We might find negative numbers in old backup from before we started doing this.
+    const nextIDs = backup.nextIDs || {};
+    for (const [k, v] of Object.entries(nextIDs)) {
+      context.sequences[k] = Math.abs(v);
+    }
 
     // Reconstruct base entities..
     for (const e of backup.baseEntities) {

@@ -4,13 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('lanes', () => {
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
 
   describe('default lane tags', () => {
     it('implies lane count for highway=motorway', () => {

@@ -4,13 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionMoveMember', () => {
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
 
   it('moves a member from one index to another in the specified relation', () => {
     const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: '1' }, { id: '3' }] });

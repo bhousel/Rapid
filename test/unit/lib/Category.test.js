@@ -4,12 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('Category', () => {
-
-  class MockContext {
-    constructor()   { }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
   const residential = new Rapid.Preset(context, 'highway/residential', { tags: { highway: 'residential' }, geometry: ['line'] });
   const allPresets = { 'highway/residential': residential };
 

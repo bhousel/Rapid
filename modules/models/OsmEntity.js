@@ -128,10 +128,6 @@ export class OsmEntity extends AbstractData {
   }
 
 
-  static id = {
-    next: { changeset: -1, node: -1, way: -1, relation: -1 }
-  };
-
   static type(id) {
     return {
       'c': 'changeset', 'n': 'node', 'w': 'way', 'r': 'relation'

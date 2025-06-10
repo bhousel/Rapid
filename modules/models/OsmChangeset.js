@@ -23,7 +23,7 @@ export class OsmChangeset extends OsmEntity {
     this.props.type = 'changeset';
 
     if (!this.props.id) {  // no ID provided - generate one
-      this.props.id = `c${OsmEntity.id.next.changeset--}`;
+      this.props.id = 'c-' + this.context.next('changeset');
     }
   }
 

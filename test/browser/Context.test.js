@@ -1,6 +1,6 @@
 describe('Context', () => {
 
-  describe('#debug', () => {
+  describe('debug', () => {
     it('sets and gets debug flags', () => {
       const context = new Rapid.Context();
       const TESTFLAGS = {
@@ -21,6 +21,20 @@ describe('Context', () => {
 
       context.setDebug('tile', false);
       expect(context.getDebug('tile')).to.be.false;
+    });
+  });
+
+  describe('next', () => {
+    it('gets the next number in the given sequence', () => {
+      const context = new Rapid.Context();
+      expect(context.next('node')).to.equal(1);
+      expect(context.next('node')).to.equal(2);
+    });
+
+    it('handles sequence replacement', () => {
+      const context = new Rapid.Context();
+      context.sequences = { node: 100 };
+      expect(context.next('node')).to.equal(101);
     });
   });
 

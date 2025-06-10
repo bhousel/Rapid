@@ -22,6 +22,7 @@ describe('validationSuspiciousName', () => {
 
   class MockContext {
     constructor() {
+      this.sequences = {};
       this.viewport = new Rapid.sdk.Viewport();
       this.services = {
         nsi: new MockNsi()
@@ -29,6 +30,10 @@ describe('validationSuspiciousName', () => {
       this.systems = {
         l10n: new MockLocalizationSystem()
       };
+    }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
     }
   }
 

@@ -16,9 +16,11 @@ describe('ValidationIssue', () => {
       },
     };
   });
+
   afterEach(() => {
     context = null;
   });
+
   it('should construct a ValidationIssue object and test its methods', () => {
     const props = {
       type: 'Test Type',

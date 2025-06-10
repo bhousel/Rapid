@@ -2,13 +2,7 @@ import { describe, it } from 'node:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
-class MockContext {
-  constructor() {
-    this.viewport = new Rapid.sdk.Viewport();
-  }
-}
-
-const context = new MockContext();
+const context = new Rapid.MockContext();
 
 
 describe('createOsmFeature', () => {

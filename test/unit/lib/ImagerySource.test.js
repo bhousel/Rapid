@@ -19,7 +19,7 @@ class MockLocalizationSystem {
 }
 
 class MockContext {
-  constructor()  {
+  constructor() {
     this.systems = {
       l10n:  new MockLocalizationSystem(this)
     };

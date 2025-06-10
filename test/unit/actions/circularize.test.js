@@ -4,13 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionCircularize', () => {
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
   // This makes our viewport operate like the d3 default of [480,250].
   // https://github.com/d3/d3-geo#projection_translate
   const viewport = new Rapid.sdk.Viewport({ x: 480, y: 250, k: 150 });

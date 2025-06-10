@@ -2,22 +2,14 @@ import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
-
-class MockContext {
-  constructor() {
-    this.viewport = new Rapid.sdk.Viewport();
-  }
-}
-
-const context = new MockContext();
-
-const viewport = {
-  project:   val => val,
-  unproject: val => val
-};
-
+const context = new Rapid.MockContext();
 
 describe('geoChooseEdge', () => {
+  const viewport = {
+    project:   val => val,
+    unproject: val => val
+  };
+
   it('returns null for a degenerate way (no nodes)', () => {
     const choice = Rapid.geoChooseEdge([], [0, 0], viewport);
     assert.equal(choice, null);

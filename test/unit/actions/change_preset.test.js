@@ -3,13 +3,7 @@ import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
 describe('actionChangePreset', () => {
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
   const oldPreset = new Rapid.Preset(context, 'old', { tags: { old: 'true' } });
   const newPreset = new Rapid.Preset(context, 'new', { tags: { new: 'true' } });
 

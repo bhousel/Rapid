@@ -5,7 +5,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('osmRemoveLifecyclePrefix', () => {
   it('removes the lifecycle prefix from a tag key', () => {
-    var result = Rapid.osmRemoveLifecyclePrefix('was:natural');
+    let result = Rapid.osmRemoveLifecyclePrefix('was:natural');
     assert.equal(result, 'natural');
 
     result = Rapid.osmRemoveLifecyclePrefix('destroyed:seamark:type');
@@ -14,7 +14,7 @@ describe('osmRemoveLifecyclePrefix', () => {
 
 
   it('ignores invalid lifecycle prefixes', () => {
-    var result = Rapid.osmRemoveLifecyclePrefix('ex:leisure');
+    let result = Rapid.osmRemoveLifecyclePrefix('ex:leisure');
     assert.equal(result, 'ex:leisure');
   });
 });
@@ -27,7 +27,7 @@ describe('osmTagSuggestingArea', () => {
 
 
   it('handles features with a lifecycle prefixes', () => {
-    var result = Rapid.osmTagSuggestingArea({ leisure: 'stadium' });
+    let result = Rapid.osmTagSuggestingArea({ leisure: 'stadium' });
     assert.deepEqual(result, { leisure: 'stadium' });
 
     result = Rapid.osmTagSuggestingArea({ 'disused:leisure': 'stadium' });

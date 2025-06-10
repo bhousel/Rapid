@@ -14,6 +14,7 @@ describe('uiSectionRawTagEditor', () => {
 
   class MockContext {
     constructor()   {
+      this.sequences = {};
       this.viewport = new Rapid.sdk.Viewport();
       this.services = {};
       this.systems = {

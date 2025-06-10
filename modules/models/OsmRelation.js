@@ -28,7 +28,7 @@ export class OsmRelation extends OsmEntity {
     this.props.type = 'relation';
 
     if (!this.props.id) {  // no ID provided - generate one
-      this.props.id = `r${OsmEntity.id.next.relation--}`;
+      this.props.id = 'r-' + this.context.next('relation');
     }
 
     if (!this.props.members) {

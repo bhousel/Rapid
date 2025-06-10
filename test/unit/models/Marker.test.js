@@ -4,14 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('Marker', () => {
-
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
 
   describe('constructor', () => {
     it('constructs a Marker with no props', () => {

@@ -1,8 +1,6 @@
 import { AbstractData } from './AbstractData.js';
 
 
-let _nextid = 1;
-
 /**
  * GeoJSON
  * This is a wrapper for any kind of arbitrary GeoJSON data.
@@ -26,7 +24,7 @@ export class GeoJSON extends AbstractData {
     this.geoms.setData(props);
 
     if (!this.props.id) {  // no ID provided - generate one
-      this.props.id = `geojson${_nextid++}`;
+      this.props.id = 'geojson-' + this.context.next('geojson');
     }
   }
 

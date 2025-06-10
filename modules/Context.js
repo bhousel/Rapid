@@ -45,6 +45,9 @@ export class Context extends EventEmitter {
     this.maxCharsForTagValue = 255;
     this.maxCharsForRelationRole = 255;
 
+    // Sequence Numbers - for places where we want a next number.
+    this.sequences = {};
+
     // Assets
     this.assetOrigin = null;
     this.assetPath = null;
@@ -481,4 +484,16 @@ export class Context extends EventEmitter {
     return this;
   }
 
+  /**
+   * next
+   * Return the next number for the given sequence.
+   * The numbers returned will start at 1 and increase by 1 each time `next` is called.
+   * @param  {string}  which - which next number to get?  e.g. 'node', 'way', 'relation'
+   * @return {number}  the next number in the sequence
+   */
+  next(which) {
+    let num = this.sequences[which] || 0;
+    return this.sequences[which] = ++num;
+  }
 }
+

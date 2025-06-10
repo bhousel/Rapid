@@ -23,3 +23,17 @@ export const d3 = {
 import * as SDKMATH from '@rapid-sdk/math';
 import * as SDKUTIL from '@rapid-sdk/util';
 export const sdk = { ...SDKMATH, ...SDKUTIL };
+
+// Used for testing
+export class MockContext {
+  constructor() {
+    this.sequences = {};
+    this.services = {};
+    this.systems = {};
+    this.viewport = new sdk.Viewport();
+  }
+  next(which) {
+    let num = this.sequences[which] || 0;
+    return this.sequences[which] = ++num;
+  }
+}

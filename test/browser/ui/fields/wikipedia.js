@@ -21,6 +21,7 @@ describe('uiFieldWikipedia', () => {
 
   class MockContext {
     constructor()   {
+      this.sequences = {};
       this.viewport = new Rapid.sdk.Viewport();
       this.services = {
         wikidata: new MockWikidataService(this)
@@ -34,6 +35,10 @@ describe('uiFieldWikipedia', () => {
     cleanTagKey(val)    { return val; }
     cleanTagValue(val)  { return val; }
     container()         { return selection; }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
+    }
   }
 
   const context = new MockContext();

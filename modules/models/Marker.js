@@ -1,8 +1,6 @@
 import { AbstractData } from './AbstractData.js';
 
 
-let _nextid = 1;
-
 /**
  * Marker
  * This is a wrapper for any kind of arbitrary point data that appears on the map.
@@ -26,7 +24,7 @@ export class Marker extends AbstractData {
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one
-      this.props.id = `marker-${_nextid++}`;
+      this.props.id = 'marker-' + this.context.next('marker');
     }
 
     this.geoms.setData(this.asGeoJSON());
