@@ -91,6 +91,31 @@ export class OsmNode extends OsmEntity {
     }
   }
 
+  /**
+   * asJXON
+   * Returns a JXON representation of the OsmNode.
+   * For OSM Entities, this is used to prepare an OSM changeset XML.
+   * @param   {string}  changesetID - optional changeset ID to include in the output
+   * @return  {Object}  JXON representation of the OsmNode
+   */
+  asJXON(changesetID) {
+    const result = {
+      node: {
+        '@id': this.osmId(),
+        '@lon': this.loc[0],
+        '@lat': this.loc[1],
+        '@version': (this.props.version || 0),
+        tag: Object.keys(this.tags).map(k => {
+          return { keyAttributes: { k: k, v: this.tags[k] } };
+        })
+      }
+    };
+    if (changesetID) {
+      result.node['@changeset'] = changesetID;
+    }
+    return result;
+  }
+
 
   geometry(graph) {
     return graph.transient(this, 'geometry', function() {
@@ -286,23 +311,5 @@ export class OsmNode extends OsmEntity {
     });
   }
 
-
-  asJXON(changesetID) {
-    const result = {
-      node: {
-        '@id': this.osmId(),
-        '@lon': this.loc[0],
-        '@lat': this.loc[1],
-        '@version': (this.props.version || 0),
-        tag: Object.keys(this.tags).map(k => {
-          return { keyAttributes: { k: k, v: this.tags[k] } };
-        })
-      }
-    };
-    if (changesetID) {
-      result.node['@changeset'] = changesetID;
-    }
-    return result;
-  }
 
 }

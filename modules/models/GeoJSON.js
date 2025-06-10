@@ -42,9 +42,19 @@ export class GeoJSON extends AbstractData {
   }
 
   /**
+   * asGeoJSON
+   * For compatibility with other data elements, this just returns the original
+   *  GeoJSON data, which we have stored in `props`.
+   * @return  {Object}  GeoJSON representation of this data element
+   */
+  asGeoJSON() {
+    return this.props;
+  }
+
+  /**
    * properties
-   * Get the real GeoJSON properties
-   * @return {Object}
+   * Get the real GeoJSON properties.
+   * @return  {Object}
    * @readonly
    */
   get properties() {

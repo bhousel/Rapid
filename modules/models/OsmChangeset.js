@@ -58,11 +58,12 @@ export class OsmChangeset extends OsmEntity {
     return {};
   }
 
-
-  geometry() {
-    return 'changeset';
-  }
-
+  /**
+   * asJXON
+   * Returns a JXON representation of the OsmChangeset.
+   * For OSM Entities, this is used to prepare an OSM changeset XML.
+   * @return  {Object}  JXON representation of the OsmChangeset
+   */
   asJXON() {
     return {
       osm: {
@@ -77,6 +78,10 @@ export class OsmChangeset extends OsmEntity {
     };
   }
 
+  //
+  geometry() {
+    return 'changeset';
+  }
 
   // Generate [osmChange](http://wiki.openstreetmap.org/wiki/OsmChange) XML.
   // Returns a string.

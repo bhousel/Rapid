@@ -65,6 +65,38 @@ export class OsmEntity extends AbstractData {
     throw new Error(`Do not call 'updateGeometry' on OsmEntity`);
   }
 
+  /**
+   * asGeoJSON
+   * Returns a GeoJSON representation of this data element.
+   * @param   {Graph?}  graph - optional param, used only for some OSM Entities
+   * @return  {Object}  GeoJSON representation of this data element
+   * @abstract
+   */
+  asGeoJSON(graph) {
+    throw new Error(`Do not call 'asGeoJSON' on OSMEntity`);
+  }
+
+  /**
+   * asJSON
+   * Returns a JSON representation of this data element.
+   * For OSM Entities, this is used to serialize the Entity into the backup history.
+   * @return  {Object}  JSON representation of this data element
+   */
+  asJSON() {
+    return Object.assign({}, this.props);
+  }
+
+  /**
+   * asJXON
+   * Returns a JXON representation of the data element.
+   * For OSM Entities, this is used to prepare an OSM changeset XML.
+   * @param   {string}  changesetID - optional changeset ID to include in the output
+   * @return  {Object}  JXON representation of the OsmWay
+   * @abstract
+   */
+  asJXON(changesetID) {
+    throw new Error(`Do not call 'asJXON' on OSMEntity`);
+  }
 
   /**
    * copy
@@ -203,11 +235,6 @@ export class OsmEntity extends AbstractData {
 
   isDegenerate() {
     return true;
-  }
-
-  // Convert the entity to a JSON in the format that we save to history backup
-  asJSON() {
-    return Object.assign({}, this.props);
   }
 
 }

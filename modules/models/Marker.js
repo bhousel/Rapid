@@ -36,7 +36,7 @@ export class Marker extends AbstractData {
    * data elements are intended to be immutable.  To modify a data element,
    *  pass in the properties to change, and you'll get a new data element.
    * The new data element will have an updated `v` internal version number.
-   * @param   {Object}   props - the updated properties
+   * @param   {Object}  props - the updated properties
    * @return  {Marker}  a new Marker
    */
   update(props) {

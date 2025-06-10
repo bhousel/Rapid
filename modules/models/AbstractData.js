@@ -85,12 +85,12 @@ export class AbstractData {
    * `updateSelf` is slightly more performant for situations where you don't need
    * immutability and don't mind mutating the data element.
    *
-   * A warning for OSM entities - this can circumvent `updateGeometry`.
+   * A warning for OSM Entities - this can circumvent `updateGeometry`.
    * So you shouldn't `updateSelf` for OsmNodes where to try to change it's `loc`.
    * And you shouldn't `updateSelf` for any entity after it has been added to a Graph.
    *
-   * @param   {Object}     props - the updated properties
-   * @return  {OsmEntity}  this same OsmEntity
+   * @param   {Object}        props - the updated properties
+   * @return  {AbstractData}  this same data element
    */
   updateSelf(props) {
     this.props = Object.assign(this.props, props);
@@ -99,11 +99,22 @@ export class AbstractData {
   }
 
   /**
+   * asGeoJSON
+   * Returns a GeoJSON representation of this data element.
+   * @param   {Graph?}  graph - optional param, used only for some OSM Entities
+   * @return  {Object}  GeoJSON representation of the OsmNode
+   * @abstract
+   */
+  asGeoJSON() {
+    throw new Error(`Do not call 'asGeoJSON' on AbstractData`);
+  }
+
+  /**
    * extent
    * Get an Extent (in WGS84 lon/lat) from this data elemenent's geometry.
    * Note that this may return `null` in situations where an Extent could not be determined.
    * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
-   * @return {Extent}  Extent representing the data element's bounding box, or `null`
+   * @return  {Extent}  Extent representing the data element's bounding box, or `null`
    */
   extent() {
     return this.geoms.origExtent;
@@ -114,8 +125,8 @@ export class AbstractData {
    * Test if this data element intersects the given other Extent
    * Note that this may return `false` in situations where an Extent could not be determined.
    * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
-   * @param  {Extent}   other - the test extent
-   * @return {boolean}  `true` if it intersects, `false` if not
+   * @param   {Extent}   other - the test extent
+   * @return  {boolean}  `true` if it intersects, `false` if not
    */
   intersects(other) {
     const extent = this.geoms.origExtent;
@@ -138,8 +149,10 @@ export class AbstractData {
 
   /**
    * type
-   * String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
-   * @return   {string}
+   * A string describing what kind of data element this is (e.g. 'node', 'way', 'relation')
+   * The meaning of this type is data-dependant.  For OSM data it will be something like
+   *  'node', 'way', 'relation', but for other data may be unset.
+   * @return  {string}  string describing what kind of data element this is
    */
   get type() {
     return this.props.type ?? '';
@@ -175,10 +188,11 @@ export class AbstractData {
   /**
    * key
    * The 'key' includes both the id and the version
-   * @return   {string}
+   * @return   {string}  The id and the version, for example "n1v0"
    * @readonly
    */
   get key() {
     return `${this.props.id}v${this.props.v}`;
   }
+
 }

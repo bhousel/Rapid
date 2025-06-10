@@ -127,6 +127,33 @@ export class OsmWay extends OsmEntity {
 
 
   /**
+   * asJXON
+   * Returns a JXON representation of the OsmWay.
+   * For OSM Entities, this is used to prepare an OSM changeset XML.
+   * @param   {string}  changesetID - optional changeset ID to include in the output
+   * @return  {Object}  JXON representation of the OsmWay
+   */
+  asJXON(changesetID) {
+    const result = {
+      way: {
+        '@id': this.osmId(),
+        '@version': this.props.version || 0,
+        nd: this.nodes.map(nodeID => {
+          return { keyAttributes: { ref: OsmEntity.toOSM(nodeID) } };
+        }),
+        tag: Object.keys(this.tags).map(k => {
+          return { keyAttributes: { k: k, v: this.tags[k] } };
+        })
+      }
+    };
+    if (changesetID) {
+      result.way['@changeset'] = changesetID;
+    }
+    return result;
+  }
+
+
+  /**
    * copy
    * Makes a (mostly) deep copy of an OSM Entity.
    * Copied entities will start out with a fresh `id` and cleared out metadata.
@@ -584,26 +611,6 @@ export class OsmWay extends OsmEntity {
 
       return isNaN(area) ? 0 : area;
     });
-  }
-
-
-  asJXON(changesetID) {
-    const result = {
-      way: {
-        '@id': this.osmId(),
-        '@version': this.props.version || 0,
-        nd: this.nodes.map(nodeID => {
-          return { keyAttributes: { ref: OsmEntity.toOSM(nodeID) } };
-        }),
-        tag: Object.keys(this.tags).map(k => {
-          return { keyAttributes: { k: k, v: this.tags[k] } };
-        })
-      }
-    };
-    if (changesetID) {
-      result.way['@changeset'] = changesetID;
-    }
-    return result;
   }
 
 }

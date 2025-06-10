@@ -129,6 +129,38 @@ export class OsmRelation extends OsmEntity {
     });
   }
 
+  /**
+   * asJXON
+   * Returns a JXON representation of the OsmRelation.
+   * For OSM Entities, this is used to prepare an OSM changeset XML.
+   * @param   {string}  changesetID - optional changeset ID to include in the output
+   * @return  {Object}  JXON representation of the OsmRelation
+   */
+  asJXON(changesetID) {
+    var result = {
+      relation: {
+        '@id': this.osmId(),
+        '@version': this.props.version || 0,
+        member: this.members.map(member => {
+          return {
+            keyAttributes: {
+              type: member.type,
+              role: member.role,
+              ref: OsmEntity.toOSM(member.id)
+            }
+          };
+        }, this),
+        tag: Object.keys(this.tags).map(k => {
+          return { keyAttributes: { k: k, v: this.tags[k] } };
+        })
+      }
+    };
+    if (changesetID) {
+      result.relation['@changeset'] = changesetID;
+    }
+    return result;
+  }
+
 
   /**
    * copy
@@ -288,33 +320,6 @@ export class OsmRelation extends OsmEntity {
 
     return this.update({ members: members });
   }
-
-
-  asJXON(changesetID) {
-    var result = {
-      relation: {
-        '@id': this.osmId(),
-        '@version': this.props.version || 0,
-        member: this.members.map(member => {
-          return {
-            keyAttributes: {
-              type: member.type,
-              role: member.role,
-              ref: OsmEntity.toOSM(member.id)
-            }
-          };
-        }, this),
-        tag: Object.keys(this.tags).map(k => {
-          return { keyAttributes: { k: k, v: this.tags[k] } };
-        })
-      }
-    };
-    if (changesetID) {
-      result.relation['@changeset'] = changesetID;
-    }
-    return result;
-  }
-
 
   area(graph) {
     return graph.transient(this, 'area', () => {
