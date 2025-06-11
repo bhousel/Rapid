@@ -111,10 +111,14 @@ export class MoveMode extends AbstractMode {
 
     // If there is work in progress, finalize it.
     if (editor.hasWorkInProgress) {
-      const graph = editor.staging.graph;
-      const annotation = (this._entityIDs.length === 1) ?
-        l10n.t('operations.move.annotation.' + graph.geometry(this._entityIDs[0])) :
-        l10n.t('operations.move.annotation.feature', { n: this._entityIDs.length });
+      let annotation;
+      if (this._entityIDs.length === 1) {
+        const graph = editor.staging.graph;
+        const entity = graph.entity(this._entityIDs[0]);
+        annotation = l10n.t('operations.move.annotation.' + entity.geometry(graph));
+      } else {
+        annotation = l10n.t('operations.move.annotation.feature', { n: this._entityIDs.length });
+      }
 
       editor.commit({
         annotation: annotation,

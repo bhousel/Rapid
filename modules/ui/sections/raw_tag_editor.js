@@ -403,7 +403,8 @@ export function uiSectionRawTagEditor(context, id) {
     }
 
     const graph = editor.staging.graph;
-    const geometry = graph.geometry(_entityIDs[0]);
+    const entity = graph.hasEntity(_entityIDs[0]);
+    const geometry = entity?.geometry(graph);
 
     key.call(uiCombobox(context, 'tag-key')
       .fetcher(function(value, callback) {

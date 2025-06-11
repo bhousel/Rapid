@@ -77,10 +77,13 @@ export function operationMove(context, selectedIDs) {
 
 
   operation.annotation = function() {
-    const graph = editor.staging.graph;
-    return selectedIDs.length === 1 ?
-      l10n.t('operations.move.annotation.' + graph.geometry(selectedIDs[0])) :
-      l10n.t('operations.move.annotation.feature', { n: selectedIDs.length });
+    if (selectedIDs.length === 1) {
+      const graph = editor.staging.graph;
+      const entity = graph.entity(selectedIDs[0]);
+      return l10n.t('operations.move.annotation.' + entity.geometry(graph));
+    } else {
+      return l10n.t('operations.move.annotation.feature', { n: selectedIDs.length });
+    }
   };
 
 

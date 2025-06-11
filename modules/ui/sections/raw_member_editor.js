@@ -368,7 +368,7 @@ export function uiSectionRawMemberEditor(context) {
         let geometry;
         if (d.member) {
           const graph = editor.staging.graph;  // the current graph
-          geometry = graph.geometry(d.member.id);
+          geometry = d.member.geometry(graph);
         } else if (d.type === 'relation') {
           geometry = 'relation';
         } else if (d.type === 'way') {

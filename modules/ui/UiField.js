@@ -420,7 +420,9 @@ export class UiField {
 
     // Does this field work with all the geometries of the entities selected?
     if (presetField.geometry && !this.entityIDs.every(entityID => {
-      return presetField.matchGeometry(graph.geometry(entityID));
+      const entity = graph.hasEntity(entityID);
+      if (!entity) return false;
+      return presetField.matchGeometry(entity.geometry(graph));
     })) {
       return false;
     }

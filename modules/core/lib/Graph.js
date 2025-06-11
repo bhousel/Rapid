@@ -12,8 +12,8 @@ export class Graph {
 
   /**
    * @constructor
-   * @param  other?    Optional other Graph to derive from or Array of nodes
-   * @param  mutable?  Do updates affect this Graph or return a new Graph
+   * @param {Graph|Array<Entity>} other?   - Predecessor Graph, or Array of entities to load into new Graph.
+   * @param {boolean}             mutable? - Do updates affect this Graph or return a new Graph
    */
   constructor(other, mutable) {
     this._transients = new Map();   // Map<entityID, Map<k,v>>
@@ -32,13 +32,13 @@ export class Graph {
      } else {
       this._base = {
         entities: new Map(),    // Map<entityID, Entity>
-        parentWays: new Map(),  // Map<entityID, Set(entityIDs>>
-        parentRels: new Map()   // Map<entityID, Set(entityIDs>>
+        parentWays: new Map(),  // Map<entityID, Set<entityIDs>>
+        parentRels: new Map()   // Map<entityID, Set<entityIDs>>
       };
       this._local = {
         entities: new Map(),    // Map<entityID, Entity>
-        parentWays: new Map(),  // Map<entityID, Set(entityIDs>
-        parentRels: new Map()   // Map<entityID, Set(entityIDs>
+        parentWays: new Map(),  // Map<entityID, Set<entityIDs>>
+        parentRels: new Map()   // Map<entityID, Set<entityIDs>>
       };
 
       this.rebase(other || [], [this]);   // seed with Entities, if provided
@@ -50,6 +50,7 @@ export class Graph {
 
   /**
    * base
+   * @return  {Object}  Access to `_base` caches.
    * @readonly
    */
   get base() {
@@ -58,26 +59,19 @@ export class Graph {
 
   /**
    * local
+   * @return  {Object}  Access to `_local` caches.
    * @readonly
    */
   get local() {
     return this._local;
   }
 
-  /**
-   * frozen
-   * @readonly
-   */
-  get frozen() {
-    return this._frozen;
-  }
-
 
   /**
    * hasEntity
    * Gets an Entity, searches the local graph first, then the base graph.
-   * @param   entityID  The entityID to lookup
-   * @return  Entity from either local or base graph, or `undefined` if not found.
+   * @param   {string}   entityID - The entityID to lookup
+   * @return  {Entity?}  Entity from either local or base graph, or `undefined` if not found.
    */
   hasEntity(entityID) {
     const base = this._base.entities;
@@ -90,8 +84,8 @@ export class Graph {
    * entity
    * Gets an Entity, searches the local graph first, then the base graph.
    * (same as `hasEntity` but throws if not found)
-   * @param   entityID  The entityID to lookup
-   * @return  Entity from either local or base graph
+   * @param   {string}  entityID - The entityID to lookup
+   * @return  {Entity}  Entity from either local or base graph
    * @throws  Will throw if the entity is not found
    */
   entity(entityID) {
@@ -104,26 +98,14 @@ export class Graph {
 
 
   /**
-   * geometry
-   * Returns the geometry of the given entityID.
-   * @param   entityID  The entityID to lookup
-   * @return  String geometry of that entity (e.g. 'point', 'vertex', 'line', 'area')
-   * @throws  Will throw if the entity is not found
-   */
-  geometry(entityID) {
-    return this.entity(entityID).geometry(this);
-  }
-
-
-  /**
    * transient
    * Stores a computed property for the given Entity in the graph itself,
    * to avoid frequent and expensive recomputation.  We're essentially
    * implementating "memoization" for the provided function.
-   * @param   entity   The Entity to compute a value for
-   * @param   key      String cache key to lookup the computed value (e.g. 'extent')
-   * @param   fn       Function that performs the computation, will be passed `entity`
-   * @return  The result of the function call
+   * @param   {Entity}    entity - The Entity to compute a value for
+   * @param   {string}    key - String cache key to lookup the computed value (e.g. 'extent')
+   * @param   {function}  fn  - Function that performs the computation, will be passed `entity`
+   * @return  {*}         The result of the function call
    */
   transient(entity, key, fn) {
     const entityID = entity.id;
@@ -145,8 +127,8 @@ export class Graph {
   /**
    * isPoi
    * Returns `true` if the Entity is a Node with no parents
-   * @param   entity
-   * @return  `true` if a Node with no parents
+   * @param   {Entity}   entity - The Entity to test
+   * @return  {boolean}  `true` if a Node with no parents
    */
   isPoi(entity) {
     if (entity.type !== 'node') return false;
@@ -163,8 +145,8 @@ export class Graph {
    * Returns `true` if the Entity has multiple connections:
    *  - a Node with multiple parents, OR
    *  - a Node connected to a single parent in multiple places.
-   * @param   entity
-   * @return  `true` if a Node has multiple connections
+   * @param   {Entity}   entity - The Entity to test
+   * @return  {boolean}  `true` if a Node has multiple connections
    */
   isShared(entity) {
     if (entity.type !== 'node') return false;
@@ -193,8 +175,8 @@ export class Graph {
    * parentWays
    * Makes an Array containing parent Ways for the given Entity.
    * Makes a shallow copy (i.e. the Array is new, but the Entities in it are references)
-   * @param   entity
-   * @return  Array of parent Ways
+   * @param   {Entity}      entity - The Entity to get parentWays for
+   * @return  {Array<Way>}  Array of parent Ways
    * @throws  Will throw if any parent Way is not found
    */
   parentWays(entity) {
@@ -209,8 +191,8 @@ export class Graph {
    * parentRelations
    * Makes an Array containing parent Relations for the given Entity.
    * Makes a shallow copy (i.e. the Array is new, but the Entities in it are references)
-   * @param   entity
-   * @return  Array of parent Relations
+   * @param   {Entity}           entity - The Entity to get parentRelations for
+   * @return  {Array<Relation>}  Array of parent Relations
    * @throws  Will throw if any parent Relation is not found
    */
   parentRelations(entity) {
@@ -222,24 +204,12 @@ export class Graph {
 
 
   /**
-   * parentMultipolygons
-   * Same as parentRelations, but filtered for multipolygons.
-   * @param   entity
-   * @return  Array of parent Relations that are multipolygons
-   * @throws  Will throw if any parent Relation is not found
-   */
-  parentMultipolygons(entity) {
-    return this.parentRelations(entity).filter(relation => relation.isMultipolygon());
-  }
-
-
-  /**
    * childNodes
    * Makes an Array containing child Nodes for the given Entity.
    * This function is memoized, so that repeated calls return the same Array.
-   * @param   entity
-   * @return  Array of child Nodes
-   * @throws  Will throw if any parent Relation is not found
+   * @param   {Entity}       entity - The Entity to get childNodes for
+   * @return  {Array<Node>}  Array of child Nodes
+   * @throws  Will throw if any child Node is not found
    */
   childNodes(entity) {
     if (!entity.nodes) return [];  // not a way?
@@ -264,9 +234,9 @@ export class Graph {
    * This is because it is used during to merge newly downloaded data into an existing stack of edits.
    * To external consumers of the Graph, it should appear as if the Graph always contained the newly downloaded data.
    * NOTE: It is probably important to call this ordered: Nodes, Ways, Relations
-   * @param  entities  Entities to add to the base Graph
-   * @param  stack     Stack of graphs that need updates after this rebase
-   * @param  force     If `true`, always update, if `false` skip entities that we've seen already
+   * @param  {Array<Entity>}  entities - Entities to add to the base Graph
+   * @param  {Array<Graph>}   stack - Stack of graphs that need updates after this rebase
+   * @param  {boolean}        force - If `true`, always update, if `false` skip entities that we've seen already
    */
   rebase(entities, stack, force) {
     const base = this._base;
@@ -315,7 +285,7 @@ newEntities.add(entity);
    * Internal function - Update a graph following a `rebase` (base graph has changed).
    * Check local `parentWays` and `parentRels` caches and make sure they
    * are consistent with the data in the base caches.
-   * @param newEntities - the new entities  If they have parents the parents need their geometry updated.
+   * @param {Array<Entity>}  newEntities - the new Entities  If they have parents the parents need their geometry updated.
    */
   _updateRebased(newEntities) {
     const base = this._base;
@@ -383,10 +353,10 @@ _getParents(entity, toUpdate, seen) {
   /**
    * _updateCalculated
    * Internal function, used to update internal caches after an Entity update
-   * @param  previous?     The previous Entity
-   * @param  current?      The current Entity
-   * @param  parentWays?   parentWays Map() to update (defaults to `this._local.parentWays`)
-   * @param  parentRels?   parentRels Map() to update (defaults to `this._local.parentRels`)
+   * @param  {Entity}                previous?     The previous Entity
+   * @param  {Entity}                current?      The current Entity
+   * @param  {Map<entityID,Entity>}  parentWays?   parentWays Map() to update (defaults to `this._local.parentWays`)
+   * @param  {Map<entityID,Entity>}  parentRels?   parentRels Map() to update (defaults to `this._local.parentRels`)
    */
   _updateCalculated(previous, current, parentWays, parentRels) {
     const base = this._base;
@@ -464,8 +434,8 @@ _getParents(entity, toUpdate, seen) {
   /**
    * replace
    * Replace an Entity in this Graph
-   * @param   entity  The Entity to replace
-   * @return  A new Graph
+   * @param   {Entity}  entity - The Entity to replace
+   * @return  {Graph}   A new Graph
    */
   replace(replacement) {
     const entityID = replacement.id;
@@ -482,8 +452,8 @@ _getParents(entity, toUpdate, seen) {
   /**
    * remove
    * Remove an Entity from this Graph
-   * @param   entity  The Entity to remove
-   * @return  A new Graph
+   * @param   {Entity}  entity - The Entity to remove
+   * @return  {Graph}   A new Graph
    */
   remove(entity) {
     const entityID = entity.id;
@@ -500,8 +470,8 @@ _getParents(entity, toUpdate, seen) {
   /**
    * revert
    * Revert an Entity back to whatever state it had in the base graph
-   * @param   entityID   The entityID of the Entity to revert
-   * @return  A new Graph
+   * @param   {Entity}  entityID - The entityID of the Entity to revert
+   * @return  {Graph}   A new Graph
    */
   revert(entityID) {
     const original = this._base.entities.get(entityID);
@@ -518,8 +488,8 @@ _getParents(entity, toUpdate, seen) {
   /**
    * update
    * Applies the given list of function arguments to the Graph, and returns a new Graph
-   * @param   {...function} args  Functions to apply to the graph to update it
-   * @return  A new Graph
+   * @param   {...function}  args - Functions to apply to the graph to update it
+   * @return  {Graph}        A new Graph
    */
   update(...args) {
     const graph = this._frozen ? new Graph(this, true) : this;
@@ -541,8 +511,8 @@ _getParents(entity, toUpdate, seen) {
    * Loads new Entities into the local Graph, obliterating any existing Entities.
    * Used when restoring history or entering/leaving walkthrough.
    * This basically does the same thing as `replace`/`remove`, but without creating a new Graph.
-   * @param   entities   `Object (entityID -> Entity)`
-   * @return  this Graph
+   * @param   {Object<entityID, Entity>} entities -  Entities to load into the Graph
+   * @return  {Graph}  this Graph
    */
   load(entities) {
     for (const [entityID, entity] of Object.entries(entities)) {

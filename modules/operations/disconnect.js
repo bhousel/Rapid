@@ -62,7 +62,8 @@ export function operationDisconnect(context, selectedIDs) {
 
     _descriptionID += _actions.length === 1 ? 'single_point.' : 'multiple_points.';
     if (_wayIDs.length === 1) {
-      _descriptionID += 'single_way.' + graph.geometry(_wayIDs[0]);
+      const entity = graph.entity(_wayIDs[0]);
+      _descriptionID += 'single_way.' + entity.geometry(graph);
     } else {
       _descriptionID += _wayIDs.length === 0 ? 'no_ways' : 'multiple_ways';
     }
@@ -118,7 +119,8 @@ export function operationDisconnect(context, selectedIDs) {
       _actions = unsharedActions;
       _disconnectingVertexIDs = unsharedNodes.map(node => node.id);
       if (_wayIDs.length === 1) {
-        _descriptionID += graph.geometry(_wayIDs[0]);
+        const entity = graph.entity(_wayIDs[0]);
+        _descriptionID += entity.geometry(graph);
       } else {
         _descriptionID += 'separate';
       }

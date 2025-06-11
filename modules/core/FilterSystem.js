@@ -59,7 +59,7 @@ export class FilterSystem extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  context  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -306,10 +306,10 @@ export class FilterSystem extends AbstractSystem {
 //  /**
 //   * gatherStats
 //   * Gathers all filter stats for the given scene
-//   * @param   {Array<Entity>  d   Array of entities to test
-//   * @param   {Graph}         resolver
+//   * @param   {Array<Entity>  d - Array of entities to test
+//   * @param   {Graph}         graph
 //   */
-//  gatherStats(d, resolver) {
+//  gatherStats(d, graph) {
 //    const types = utilArrayGroupBy(d, 'type');
 //    const entities = [].concat(types.relation || [], types.way || [], types.node || []);
 //
@@ -318,8 +318,8 @@ export class FilterSystem extends AbstractSystem {
 //    }
 //
 //    for (const entity of entities) {
-//      const geometry = entity.geometry(resolver);
-//      const matchedKeys = Object.keys(this.getMatches(entity, resolver, geometry));
+//      const geometry = entity.geometry(graph);
+//      const matchedKeys = Object.keys(this.getMatches(entity, graph, geometry));
 //      for (const filterID of matchedKeys) {
 //        const filter = this._filters.get(filterID);
 //        filter.count++;
@@ -373,11 +373,11 @@ export class FilterSystem extends AbstractSystem {
    * getMatches
    * Matches a single entity against the filters
    * @param   {Entity}       entity   - The Entity to test
-   * @param   {Graph}        resolver - Graph
+   * @param   {Graph}        graph    - Graph
    * @param   {string}       geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return  {Set<string>}  A Set containing the matched filterIDs
    */
-  getMatches(entity, resolver, geometry) {
+  getMatches(entity, graph, geometry) {
     // skip - vertexes are hidden based on whatever filters their parent ways have matched
     if (geometry === 'vertex') return new Set();
     // skip - most relations don't have a geometry worth checking
@@ -395,13 +395,13 @@ export class FilterSystem extends AbstractSystem {
 
     // If this entity has parents, make sure the parents are matched first.
     // see iD#2548, iD#2887
-    const parents = cached.parents || this.getParents(entity, resolver, geometry);
+    const parents = cached.parents || this.getParents(entity, graph, geometry);
     if (parents.length) {
       for (const parent of parents) {
         const pkey = parent.key;
         const pmatches = this._cache[pkey]?.matches;
         if (pmatches) continue;  // parent matching was done already
-        this.getMatches(parent, resolver, parent.geometry(resolver));  // recurse up
+        this.getMatches(parent, graph, parent.geometry(graph));  // recurse up
       }
     }
 
@@ -442,11 +442,11 @@ export class FilterSystem extends AbstractSystem {
    * getParents
    * Returns parentWays of vertexes or parentRelations of other geometry types
    * @param   {Entity}  entity   - The Entity to test
-   * @param   {Graph}   resolver - Graph
+   * @param   {Graph}   graph    - Graph
    * @param   {string}  geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return  {Array<Entity>}  An array of parent entities
    */
-  getParents(entity, resolver, geometry) {
+  getParents(entity, graph, geometry) {
     if (geometry === 'point') return [];
 
     const ekey = entity.key;
@@ -458,9 +458,9 @@ export class FilterSystem extends AbstractSystem {
     if (!cached.parents) {
       let parents;
       if (geometry === 'vertex') {
-        parents = resolver.parentWays(entity);
+        parents = graph.parentWays(entity);
       } else {   // 'line', 'area', 'relation'
-        parents = resolver.parentRelations(entity);
+        parents = graph.parentRelations(entity);
       }
       cached.parents = parents;
     }
@@ -472,7 +472,7 @@ export class FilterSystem extends AbstractSystem {
   /**
    * isHiddenPreset
    * Checks whether a given preset would be hidden by the current filtering rules
-   * @param   {Preset}   preset   - he Preset to test
+   * @param   {Preset}   preset   - The Preset to test
    * @param   {string}   geometry - geometry of the Preset ('point', 'line', 'vertex', 'area', 'relation')
    * @return  {string?}  The first `filterID` which causes the Preset to be hidden, or `null`
    */
@@ -499,16 +499,16 @@ export class FilterSystem extends AbstractSystem {
    * Important note:  In OSM a feature can be several things, so there might be multiple matches.
    * We only consider a feature hidden of _all_ of the matched rules are hidden.
    * @param   {Entity}   entity   - The Entity to test
-   * @param   {Graph}    resolver - Graph
+   * @param   {Graph}    graph    - Graph
    * @param   {string}   geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return  {string?}  The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHiddenFeature(entity, resolver, geometry) {
+  isHiddenFeature(entity, graph, geometry) {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
     if (this._forceVisible.has(entity.id)) return null;
 
-    const filterIDs = [...this.getMatches(entity, resolver, geometry)];
+    const filterIDs = [...this.getMatches(entity, graph, geometry)];
     if (filterIDs.length && filterIDs.every(filterID => this._hidden.has(filterID))) {
       return filterIDs[0];
     } else {
@@ -521,21 +521,21 @@ export class FilterSystem extends AbstractSystem {
    * isHiddenVertex
    * Checks whether a given child entity would be hidden by the current filtering rules
    * We only consider a child hidden of _all_ of the matched parent features are hidden.
-   * @param   {Entity}   entity   - The Entity to test
-   * @param   {Graph}    resolver - Graph
+   * @param   {Entity}   entity - The Entity to test
+   * @param   {Graph}    graph  - Graph
    * @return  {string?}  The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHiddenVertex(entity, resolver) {
+  isHiddenVertex(entity, graph) {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
     if (this._forceVisible.has(entity.id)) return null;
 
-    const parents = this.getParents(entity, resolver, 'vertex');
+    const parents = this.getParents(entity, graph, 'vertex');
     if (!parents.length) return null;
 
     let filterID = null;
     for (const parent of parents) {
-      const parentFilterID = this.isHidden(parent, resolver, parent.geometry(resolver));
+      const parentFilterID = this.isHidden(parent, graph, parent.geometry(graph));
       if (!parentFilterID) return null;  // parent is not hidden
       if (!filterID) filterID = parentFilterID;  // keep the first one
     }
@@ -546,28 +546,28 @@ export class FilterSystem extends AbstractSystem {
   /**
    * hasHiddenConnections
    * Checks whether a given entity is connected to a feature that is hidden
-   * @param   {Entity}   entity   - The Entity to test
-   * @param   {Graph}    resolver - Graph
+   * @param   {Entity}   entity - The Entity to test
+   * @param   {Graph}    graph  - Graph
    * @return  {boolean}  true/false
    */
-  hasHiddenConnections(entity, resolver) {
+  hasHiddenConnections(entity, graph) {
     if (!this._hidden.size) return false;
 
     let childNodes, connections;
     if (entity.type === 'midpoint') {
-      childNodes = [resolver.entity(entity.edge[0]), resolver.entity(entity.edge[1])];
+      childNodes = [graph.entity(entity.edge[0]), graph.entity(entity.edge[1])];
       connections = [];
     } else {
-      childNodes = entity.nodes ? resolver.childNodes(entity) : [];
-      connections = this.getParents(entity, resolver, entity.geometry(resolver));
+      childNodes = entity.nodes ? graph.childNodes(entity) : [];
+      connections = this.getParents(entity, graph, entity.geometry(graph));
     }
 
     // Gather ways connected to child nodes..
     connections = childNodes.reduce((result, e) => {
-      return resolver.isShared(e) ? utilArrayUnion(result, resolver.parentWays(e)) : result;
+      return graph.isShared(e) ? utilArrayUnion(result, graph.parentWays(e)) : result;
     }, connections);
 
-    return connections.some(other => this.isHidden(other, resolver, other.geometry(resolver)));
+    return connections.some(other => this.isHidden(other, graph, other.geometry(graph)));
   }
 
 
@@ -575,18 +575,18 @@ export class FilterSystem extends AbstractSystem {
    * isHidden
    * Checks whether a given entity is hidden
    * @param   {Entity}   entity   - The Entity to test
-   * @param   {Graph}    resolver - Graph
+   * @param   {Graph}    graph    - Graph
    * @param   {string}   geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return  {string?}  The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHidden(entity, resolver, geometry) {
+  isHidden(entity, graph, geometry) {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
 
     if (geometry === 'vertex') {
-      return this.isHiddenVertex(entity, resolver);
+      return this.isHiddenVertex(entity, graph);
     } else {
-      return this.isHiddenFeature(entity, resolver, geometry);
+      return this.isHiddenFeature(entity, graph, geometry);
     }
   }
 
@@ -597,10 +597,10 @@ export class FilterSystem extends AbstractSystem {
    * This function also gathers the stats about how many entities are
    * being filtered by the enabled filter rules.
    * @param   {Array<Entity>}  entities - the Entities to test
-   * @param   {Graph}          resolver - Graph
+   * @param   {Graph}          graph    - Graph
    * @return  {Array<Entity>}  Array of non-hidden entities
    */
-  filterScene(entities, resolver) {
+  filterScene(entities, graph) {
     for (const filter of this._filters.values()) {
       filter.count = 0;
     }
@@ -609,8 +609,8 @@ export class FilterSystem extends AbstractSystem {
 
     const results = [];
     for (const entity of entities) {
-      const geometry = entity.geometry(resolver);
-      const filterID = this.isHidden(entity, resolver, geometry);
+      const geometry = entity.geometry(graph);
+      const filterID = this.isHidden(entity, graph, geometry);
       if (filterID) {
         // don't count uninteresting vertices
         const ignore = (geometry === 'vertex' && !entity.hasInterestingTags());
@@ -629,7 +629,7 @@ export class FilterSystem extends AbstractSystem {
 
   /**
    * forceVisible
-   * Adds the given entityIDs to the _forceVisible Set
+   * Adds the given entityIDs to the `_forceVisible` Set
    * This is usually done temporarily so that users can see stuff as they edit
    * that might otherwise be hidden
    * @param   {Array<string>}  entityIDs - Array of Entity ids

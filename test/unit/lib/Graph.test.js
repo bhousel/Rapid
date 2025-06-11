@@ -34,14 +34,6 @@ describe('Graph', () => {
       const graph2 = new Rapid.Graph(graph1);
       assert.equal(graph1.base, graph2.base);
     });
-
-    it('freezes by default', () => {
-      assert.equal(new Rapid.Graph().frozen, true);
-    });
-
-    it('remains mutable if passed true as second argument', () => {
-      assert.equal(new Rapid.Graph([], true).frozen, false);
-    });
   });
 
   describe('#hasEntity', () => {

@@ -136,7 +136,8 @@ export function uiSectionFeatureType(context) {
 
     const graph = editor.staging.graph;
     for (const entityID of _entityIDs) {
-      const geometry = graph.geometry(entityID);
+      const entity = graph.entity(entityID);
+      const geometry = entity.geometry(graph);
       if (!counts[geometry]) counts[geometry] = 0;
       counts[geometry] += 1;
     }

@@ -82,7 +82,8 @@ export function operationExtract(context, selectedIDs) {
     if (!isNew && tooLarge()) {
       return 'too_large';
     } else if (selectedIDs.some(entityID => {
-      return graph.geometry(entityID) === 'vertex' && context.hasHiddenConnections(entityID);
+      const entity = graph.entity(entityID);
+      return entity.geometry(graph) === 'vertex' && context.hasHiddenConnections(entityID);
     })) {
       return 'connected_to_hidden';
     }

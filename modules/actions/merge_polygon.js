@@ -129,10 +129,12 @@ export function actionMergePolygon(ids, newRelationID) {
     if (!entities.multipolygon.length) {
       let sharedMultipolygons = [];
       entities.closedWay.forEach(function(way, i) {
+        const parentMultipolygons = graph.parentRelations(way).filter(relation => relation.isMultipolygon());
+
         if (i === 0) {
-          sharedMultipolygons = graph.parentMultipolygons(way);
+          sharedMultipolygons = parentMultipolygons;
         } else {
-          sharedMultipolygons = utilArrayIntersection(sharedMultipolygons, graph.parentMultipolygons(way));
+          sharedMultipolygons = utilArrayIntersection(sharedMultipolygons, parentMultipolygons);
         }
       });
       sharedMultipolygons = sharedMultipolygons.filter(relation => {
@@ -142,8 +144,10 @@ export function actionMergePolygon(ids, newRelationID) {
         // don't create a new multipolygon if it'd be redundant
         return 'not_eligible';
       }
+
     } else if (entities.closedWay.some(way => {
-        return utilArrayIntersection(graph.parentMultipolygons(way), entities.multipolygon).length;
+        const parentMultipolygons = graph.parentRelations(way).filter(relation => relation.isMultipolygon());
+        return utilArrayIntersection(parentMultipolygons, entities.multipolygon).length;
       })) {
       // don't add a way to a multipolygon again if it's already a member
       return 'not_eligible';

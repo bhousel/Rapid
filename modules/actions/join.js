@@ -82,17 +82,16 @@ export function actionJoin(ids, options = {}) {
             graph = graph.replace(survivor);
         }
 
-        // Finds if the join created a single-member multipolygon,
-        // and if so turns it into a basic area instead
+        // Did the join create a single-member multipolygon?
+        // If so turn it into a basic area instead..
         function checkForSimpleMultipolygon() {
             if (!survivor.isClosed()) return;
 
-            var multipolygons = graph.parentMultipolygons(survivor).filter(function(multipolygon) {
-                // find multipolygons where the survivor is the only member
-                return multipolygon.members.length === 1;
-            });
+            // parent multipolygons where this survivor is the only remaining member
+            var multipolygons = graph.parentRelations(survivor)
+                .filter(relation => relation.isMultipolygon() && relation.members.length === 1);
 
-            // skip if this is the single member of multiple multipolygons
+            // skip if there are multiple parent multipolygons
             if (multipolygons.length !== 1) return;
 
             var multipolygon = multipolygons[0];

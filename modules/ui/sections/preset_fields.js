@@ -30,7 +30,9 @@ export function uiSectionPresetFields(context) {
       const graph = editor.staging.graph;
 
       const geometries = Object.keys(_entityIDs.reduce((geoms, entityID) => {
-        geoms[graph.entity(entityID).geometry(graph)] = true;
+        const entity = graph.entity(entityID);
+        const geometry = entity.geometry(graph);
+        geoms[geometry] = true;
         return geoms;
       }, {}));
 

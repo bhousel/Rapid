@@ -51,13 +51,14 @@ export function uiSectionRawMembershipEditor(context) {
     function getSharedParentRelations() {
         var parents = [];
         for (var i = 0; i < _entityIDs.length; i++) {
-            var entity = editor.staging.graph.hasEntity(_entityIDs[i]);
+            const graph = editor.staging.graph;
+            var entity = graph.hasEntity(_entityIDs[i]);
             if (!entity) continue;
 
             if (i === 0) {
-                parents = editor.staging.graph.parentRelations(entity);
+                parents = graph.parentRelations(entity);
             } else {
-                parents = utilArrayIntersection(parents, editor.staging.graph.parentRelations(entity));
+                parents = utilArrayIntersection(parents, graph.parentRelations(entity));
             }
             if (!parents.length) break;
         }
@@ -565,11 +566,14 @@ export function uiSectionRawMembershipEditor(context) {
 
             role.call(uiCombobox(context, 'member-role')
                 .fetcher(function(role, callback) {
-                    var rtype = d.relation.tags.type;
+                    const graph = editor.staging.graph;
+                    const entity = graph.hasEntity(_entityIDs[0]);
+                    const geometry = entity?.geometry(graph);
+                    const rtype = d.relation.tags.type;
                     taginfo.roles({
                         debounce: true,
                         rtype: rtype || '',
-                        geometry: editor.staging.graph.geometry(_entityIDs[0]),
+                        geometry: geometry || '',
                         query: role
                     }, function(err, data) {
                         if (!err) callback(sort(role, data));

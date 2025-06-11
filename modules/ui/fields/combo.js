@@ -167,7 +167,8 @@ export function uiFieldCombo(context, uifield) {
         };
 
         if (_entityIDs.length) {
-            params.geometry = graph.geometry(_entityIDs[0]);
+            const entity = graph.entity(_entityIDs[0]);
+            params.geometry = entity.geometry(graph);
         }
 
         fn(params, function(err, data) {

@@ -149,10 +149,13 @@ export function operationDelete(context, selectedIDs) {
 
 
   operation.annotation = function() {
-    const graph = editor.staging.graph;
-    return selectedIDs.length === 1 ?
-      l10n.t('operations.delete.annotation.' + graph.geometry(selectedIDs[0])) :
-      l10n.t('operations.delete.annotation.feature', { n: selectedIDs.length });
+    if (selectedIDs.length === 1) {
+      const graph = editor.staging.graph;
+      const entity = graph.entity(selectedIDs[0]);
+      return l10n.t('operations.delete.annotation.' + entity.geometry(graph));
+    } else {
+      return l10n.t('operations.delete.annotation.feature', { n: selectedIDs.length });
+    }
   };
 
 
