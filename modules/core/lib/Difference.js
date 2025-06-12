@@ -1,5 +1,4 @@
 import deepEqual from 'fast-deep-equal';
-import { utilArrayUnion } from '@rapid-sdk/util';
 
 
 /**
@@ -15,8 +14,8 @@ export class Difference {
 
   /**
    * @constructor
-   * @param  base   Base Graph
-   * @param  head   Head Graph
+   * @param  {Graph}  base - Base Graph
+   * @param  {Graph}  head - Head Graph
    */
   constructor(base, head) {
     this._base = base;
@@ -80,7 +79,7 @@ export class Difference {
   /**
    * changes
    * @readonly
-   * @return  Map(entityID -> change Object)
+   * @return  {Map<entityID, Object>  The change details
    */
   get changes() {
     return this._changes;
@@ -89,7 +88,7 @@ export class Difference {
 
   /**
    * modified
-   * @return  `Array`
+   * @return  {Array<Entity>}  Array of Entities modified
    */
   modified() {
     let result = [];
@@ -104,7 +103,7 @@ export class Difference {
 
   /**
    * created
-   * @return  `Array`
+   * @return  {Array<Entity>}  Array of Entities created
    */
   created() {
     let result = [];
@@ -119,7 +118,7 @@ export class Difference {
 
   /**
    * deleted
-   * @return  `Array`
+   * @return  {Array<Entity>}  Array of Entities deleted
    */
   deleted() {
     let result = [];
@@ -136,7 +135,7 @@ export class Difference {
    * summary
    * Generates a difference "summary" in a format like what is presented on the
    * pre-save commit component, with list items like "created", "modified", "deleted".
-   * @return  Map<entityID, change detail>
+   * @return  {Map<entityID, Object>  Returns a summary of changes
    */
   summary() {
     const base = this._base;
@@ -185,9 +184,10 @@ export class Difference {
 
   /**
    * complete
-   * Returns complete set of entities affected by a change.
+   * Returns complete set of Entities affected by the changes in this difference.
    * This is used to know which entities need redraw or revalidation
-   * @return  Map(entityID -> Entity)
+   * Recurses up to include all ancestor Entities in the result.
+   * @return  {Map<entityID, Entity>   Returns the complete set of entities affected by the change
    */
   complete() {
     const head = this._head;
@@ -201,17 +201,17 @@ export class Difference {
       result.set(entityID, h);
 
       if (entity.type === 'way') {
-        const headNodes = h ? h.nodes : [];
-        const baseNodes = b ? b.nodes : [];
-        for (const nodeID of utilArrayUnion(headNodes, baseNodes)) {
+        const headNodes = new Set(h?.nodes);
+        const baseNodes = new Set(b?.nodes);
+        for (const nodeID of headNodes.union(baseNodes)) {
           result.set(nodeID, head.hasEntity(nodeID));
         }
       }
 
       if (entity.type === 'relation' && entity.isMultipolygon()) {
-        const headMembers = h ? h.members.map(m => m.id) : [];
-        const baseMembers = b ? b.members.map(m => m.id) : [];
-        for (const memberID of utilArrayUnion(headMembers, baseMembers)) {
+        const headMembers = new Set(h?.members?.map(m => m.id));
+        const baseMembers = new Set(b?.members?.map(m => m.id));
+        for (const memberID of headMembers.union(baseMembers)) {
           const member = head.hasEntity(memberID);
           if (!member) continue;   // not downloaded
           result.set(memberID, member);

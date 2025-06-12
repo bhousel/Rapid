@@ -16,7 +16,7 @@ export class Tree {
 
   /**
    * @constructor
-   * @param  graph  The "current" Graph of entities that this tree is tracking
+   * @param  {Graph}  graph - The "current" Graph of entities that this tree is tracking
    */
   constructor(graph) {
     this._current = graph;
@@ -27,14 +27,13 @@ export class Tree {
 
     this._segmentRBush = new RBush();
     this._segmentBoxes = new Map();    // Map<segmentID, Box Object>
-
   }
 
 
   /**
    * _removeEntity
    * Remove an Entity from all internal indexes.
-   * @param  entityID
+   * @param  {string}  entityID
    */
   _removeEntity(entityID) {
     const ebox = this._entityBoxes.get(entityID);
@@ -59,7 +58,7 @@ export class Tree {
   /**
    * _loadEntities
    * Add or update multiple Entities in the internal indexes.
-   * @param  toUpdate  Map<entityID, Entity> to load
+   * @param  {Map<entityID, Entity>}  toUpdate - Entities to load into the tree
    */
   _loadEntities(toUpdate) {
     const graph = this._current;
@@ -107,9 +106,9 @@ export class Tree {
    * When updating an Entity's position in the tree, we must also update
    * the positions of that Entity's parent ways and relations.
    *
-   * @param  entity    Entity to check
-   * @param  toUpdate  Map<entityID, Entity>
-   * @param  seen?     Set<seen entityIDs> (to avoid infinite recursion)
+   * @param  {Entity}                 entity - Entity to check
+   * @param  {Map<entityID, Entity>}  toUpdate - gathered Entities that need updating
+   * @param  {Set<entityID>?}         seen - to avoid infinite recursion
    */
   _includeParents(entity, toUpdate, seen) {
     const graph = this._current;
@@ -141,7 +140,7 @@ export class Tree {
    * _setCurrentGraph
    * This will change the "current" Graph of this tree, performing whatever
    * operations are needed to add/update/remove tracked entities.
-   * @param  graph
+   * @param  {Graph}  graph - the Graph to set "current"
    */
   _setCurrentGraph(graph) {
     if (graph === this._current) return;
@@ -183,8 +182,8 @@ export class Tree {
    * rebase
    * This is used to load new Entities into the tree, but without adjusting which Graph is current.
    * It's called when fetching new data from the OSM API, restoring saved history, etc.
-   * @param  entities   Array of Entities
-   * @param  force?     If `true`, replace an Entity, even if we've seen it already
+   * @param  {Array<Entity>}  entities - entities to load into the Tree
+   * @param  {boolean?}       force - If `true`, replace an Entity, even if we've seen it already
    */
   rebase(entities, force) {
     const graph = this._current;
@@ -217,9 +216,9 @@ export class Tree {
    * intersects
    * Returns a result of Entities that intersect the given map extent.
    * We first update the current graph if needed, to make sure the results are fresh.
-   * @param  extent   Extent to check
-   * @param  graph    The current graph
-   * @return Array of entities with bounding boxes overlapping `extent` for the given `graph`
+   * @param   {Extent}  extent - Extent to check
+   * @param   {Graph}   graph - The current graph
+   * @return  {Array<Entity>}  Entities with bounding boxes that intersect the given Extent
    */
   intersects(extent, graph) {
     this._setCurrentGraph(graph);
@@ -230,9 +229,9 @@ export class Tree {
    * waySegments
    * Returns the result of Segments that intersect the given map extent.
    * We first update the current graph if needed, to make sure the results are fresh.
-   * @param  extent   Extent to check
-   * @param  graph    The current graph
-   * @return Array of segment objects with bounding boxes overlapping `extent` for the given `graph`
+   * @param   {Extent}  extent - Extent to check
+   * @param   {Graph}   graph - The current graph
+   * @return  {Array<Object>}  Segments with bounding boxes that intersect the given Extent
    */
   waySegments(extent, graph) {
     this._setCurrentGraph(graph);

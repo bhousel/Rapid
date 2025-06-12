@@ -45,7 +45,7 @@ export class ValidationSystem extends AbstractSystem {
     this._disabledRuleIDs = new Set();
     this._ignoredIssueIDs = new Set();
     this._resolvedIssueIDs = new Set();
-    this._completeDiff = new Map();    // complete diff base -> head of what the user changed
+    this._completeDiff = new Map();  // complete diff base -> head of what the user changed
     this._deferredRIC = new Map();   // Deferred `requestIdleCallback` - Map(handle -> Promise.reject)
     this._deferredST = new Set();    // Deferred `setTimeout` - Set(handles)
     this._errorOverrides = [];

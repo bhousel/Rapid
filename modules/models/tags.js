@@ -152,7 +152,7 @@ export function getDeprecatedTags(tags) {
         return true;
       });
       // don't flag deprecated tags if the upgrade path would overwrite existing data - iD#7843
-      if (hasExistingValues) return;
+      if (hasExistingValues) continue;
     }
     const matchesDeprecatedTags = oldKeys.every(oldKey => {
       if (!tags[oldKey]) return false;

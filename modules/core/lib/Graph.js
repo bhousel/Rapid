@@ -1,4 +1,3 @@
-import { utilArrayDifference } from '@rapid-sdk/util';
 
 
 /**
@@ -367,19 +366,11 @@ _getParents(entity, toUpdate, seen) {
     const entity = current ?? previous;
     if (!entity) return;   // Either current or previous must be set
 
-    let removed, added;
-
     if (entity.type === 'way') {  // Update parentWays
-      if (previous && current) {  // Way Modified
-        removed = utilArrayDifference(previous.nodes, current.nodes);
-        added = utilArrayDifference(current.nodes, previous.nodes);
-      } else if (previous) {      // Way Deleted
-        removed = previous.nodes;
-        added = [];
-      } else if (current) {       // Way Added
-        removed = [];
-        added = current.nodes;
-      }
+      const prevNodes = new Set(previous?.nodes);
+      const currNodes = new Set(current?.nodes);
+      const removed = prevNodes.difference(currNodes);
+      const added = currNodes.difference(prevNodes);
 
       // shallow copy whatever parentWays had in it before, and perform deletes/adds as needed
       for (const childID of removed) {
@@ -395,19 +386,10 @@ _getParents(entity, toUpdate, seen) {
 
     } else if (entity.type === 'relation') {   // Update parentRels
       // diff only on the IDs since the same entity can be a member multiple times with different roles
-      const previousMemberIDs = previous ? previous.members.map(m => m.id) : [];
-      const currentMemberIDs = current ? current.members.map(m => m.id) : [];
-
-      if (previous && current) {   // Relation Modified
-        removed = utilArrayDifference(previousMemberIDs, currentMemberIDs);
-        added = utilArrayDifference(currentMemberIDs, previousMemberIDs);
-      } else if (previous) {       // Relation Deleted
-        removed = previousMemberIDs;
-        added = [];
-      } else if (current) {        // Relation Added
-        removed = [];
-        added = currentMemberIDs;
-      }
+      const prevMembers = new Set(previous?.members?.map(m => m.id));
+      const currMembers = new Set(current?.members?.map(m => m.id));
+      const removed = prevMembers.difference(currMembers);
+      const added = currMembers.difference(prevMembers);
 
       // shallow copy whatever parentRels had in it before, and perform deletes/adds as needed
       for (const childID of removed) {
