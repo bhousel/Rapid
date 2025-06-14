@@ -324,6 +324,15 @@ export class AbstractPixiFeature {
   }
 
   /**
+   * setGeoemtry
+   * This sets which GeometryPart we are rendering
+   * @param  {GeometryPart}  GeometryPart to render
+   */
+  setGeometry(geometryPart) {
+    this.geometry.setGeometry(geometryPart);
+  }
+
+  /**
    * addChildData
    * Adds a mapping from parent data to child data.
    * @param  {string}  parentID - dataID of the parent (e.g. 'r123')

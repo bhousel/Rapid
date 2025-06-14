@@ -181,11 +181,11 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         const cornersInSSR = c0in || c1in || c2in || c3in;
 
         this._ssrdata = {
-          ssr: this.geometry.ssr,
-          origSsr: this.geometry.origSsr,
-          origAxis1: axis1.map(coord => viewport.unproject(coord)),
-          origAxis2: axis2.map(coord => viewport.unproject(coord)),
-          origCenter: viewport.unproject(center),
+          screenSSR: this.geometry.ssr,
+          worldSSR: this.geometry.geometryPart.ssr,
+          worldAxis1: axis1.map(coord => viewport.screenToWorld(coord)),
+          worldAxis2: axis2.map(coord => viewport.screenToWorld(coord)),
+          worldCenter: viewport.screenToWorld(center),
           shapeType: (cornersInSSR ? 'square' : 'circle')
         };
       }
@@ -262,10 +262,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const ssrdata = this._ssrdata;
       const filling = isWireframeMode ? '-unfilled' : '';
       const textureName = `lowres${filling}-${ssrdata.shapeType}`;
-      const [x, y] = viewport.project(ssrdata.origCenter);
-      const rotation = ssrdata.ssr.angle;
-      const axis1 = ssrdata.origAxis1.map(coord => viewport.project(coord));
-      const axis2 = ssrdata.origAxis2.map(coord => viewport.project(coord));
+      const [x, y] = viewport.worldToScreen(ssrdata.worldCenter);
+      const rotation = ssrdata.worldSSR.angle;
+      const axis1 = ssrdata.worldAxis1.map(coord => viewport.worldToScreen(coord));
+      const axis2 = ssrdata.worldAxis2.map(coord => viewport.worldToScreen(coord));
       const w = vecLength(axis1[0], axis1[1]);
       const h = vecLength(axis2[0], axis2[1]);
 
@@ -436,7 +436,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     // Debug SSR
-    // const p = this._ssrdata.ssr.poly;
+    // const p = this._ssrdata.screenSSR.poly;
     // const ssrflat = [
     //  p[0][0], p[0][1],
     //  p[1][0], p[1][1],

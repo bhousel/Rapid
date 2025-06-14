@@ -291,6 +291,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
+return; // not yet
     const streetside = this.context.services.streetside;
     if (!this.enabled || !streetside?.started || zoom < MINZOOM) return;
 

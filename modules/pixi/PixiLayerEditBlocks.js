@@ -52,6 +52,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport) {
+return; // not yet
     const context = this.context;
     const locations = context.systems.locations;
     const mapViewport = context.viewport;  // context viewport !== pixi viewport (they are offset)

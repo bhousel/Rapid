@@ -432,7 +432,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param  features  The features to place point labels on
    */
   labelPoints(features) {
-    features.sort((a, b) => b.geometry.origCoords[1] - a.geometry.origCoords[1]);
+    // features.sort((a, b) => b.geometry.origCoords[1] - a.geometry.origCoords[1]);
+    features.sort((a, b) => a.geometry.coords[1] - b.geometry.coords[1]);
 
     for (const feature of features) {
       if (this._labelBoxes.has(feature.id)) continue;  // processed it already
@@ -685,12 +686,12 @@ this.placeRopeLabel(feature, labelObj, coords);
    * We generate chains of bounding boxes along the line,
    * then add the labels in spaces along the line wherever they fit.
    *
-   * @param  feature   The feature to place point labels on
-   * @param  labelObj  a PIXI.Sprite to use as the label
-   * @param  origCoords    The coordinates to place a rope on (these are coords relative to 'origin' container)
+   * @param  feature       The feature to place point labels on
+   * @param  labelObj      A PIXI.Sprite to use as the label
+   * @param  screenCoords  The coordinates to place a rope on (these are coords relative to 'origin' container)
    */
-  placeRopeLabel(feature, labelObj, origCoords) {
-    if (!feature || !labelObj || !origCoords) return;
+  placeRopeLabel(feature, labelObj, screenCoords) {
+    if (!feature || !labelObj || !screenCoords) return;
     if (!feature.container.visible || !feature.container.renderable) return;
 
     const featureID = feature.id;
@@ -714,12 +715,11 @@ this.placeRopeLabel(feature, labelObj, coords);
     // We'll break long chains into smaller regions and center a label within each region
     const maxChainLength = numBoxes + 15;
 
-
-    // Convert from original projected coords to global coords..
+    // Convert from screen coords to global coords..
     const origin = this.gfx.origin;
     const labelOffset = this._labelOffset;
     const temp = new PIXI.Point();
-    const coords = origCoords.map(([x, y]) => {
+    const coords = screenCoords.map(([x, y]) => {
       origin.toGlobal({x: x, y: y}, temp);
       return [temp.x - labelOffset.x, temp.y - labelOffset.y];
     });

@@ -114,6 +114,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
+return; // not yet
     const osmose = this.context.services.osmose;
     if (!this.enabled || !osmose?.started || zoom < MINZOOM) return;
 

@@ -117,7 +117,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     // sort markers by latitude ascending
     // sort markers with viewfields above markers without viewfields
-    const z = -this.geometry.origCoords[1];  // latitude
+    // const z = -this.geometry.origCoords[1];  // latitude
+    const z = y;  // use y coord as the z-index
     this.container.zIndex = (this._viewfieldCount > 0) ? (z + 1000) : z;
   }
 
@@ -138,7 +139,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     const marker = this.marker;
     const icon = this.icon;
-    const latitude = this.geometry.origCoords[1];
+    const z = this.geometry.coords[1];  // use y coord as the z-index
+    // const latitude = this.geometry.origCoords[1];
 
     // Apply anti-rotation to keep the icons and markers facing up.
     // (However viewfields container _should_ include the bearing, and will below)
@@ -176,7 +178,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       vfTexture = style.viewfieldTexture || textureManager.get(style.viewfieldName) || PIXI.Texture.WHITE;
 
       // Sort markers with viewfields above markers without viewfields
-      this.container.zIndex = -latitude + 1000;
+      // this.container.zIndex = -latitude + 1000;
+      this.container.zIndex = z + 1000;
 
       // Ensure viewfield container exists
       if (!this.viewfields) {
@@ -224,7 +227,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     } else if (this.viewfields) {  // Had viewfields before and now should not
       this.viewfields.destroy({ children: true });
       this.viewfields = null;
-      this.container.zIndex = -latitude;   // restore default marker sorting
+      // this.container.zIndex = -latitude;   // restore default marker sorting
+      this.container.zIndex = z;   // restore default marker sorting
       this._viewfieldCount = 0;
     }
 

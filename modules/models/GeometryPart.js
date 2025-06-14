@@ -18,12 +18,9 @@ import polylabel from '@mapbox/polylabel';
  *   `origCoords`    Original coordinate data (in WGS84 lon/lat)
  *   `origExtent`    Original Extent bounding box (in WGS84 lon/lat)
  *   `coords`        Projected coordinate data
- *   `flatCoords`    Projected coordinate data, flat Array how Pixi wants it [ x,y, x,y, … ]
  *   `extent`        Projected extent
  *   `outer`         Projected outer ring, Array of coordinate pairs [ [x,y], [x,y], … ]
- *   `flatOuter`     Projected outer ring, flat Array how Pixi wants it [ x,y, x,y, … ]
  *   `holes`         Projected hole rings, Array of Array of coordinate pairs [ [ [x,y], [x,y], … ] ]
- *   `flatHoles`     Projected hole rings, Array of flat Array how Pixi wants it [ [ x,y, x,y, … ] ]
  *   `hull`          Projected convex hull, Array of coordinate pairs [ [x,y], [x,y], … ]
  *   `centroid`      Projected centroid, [x, y]
  *   `poi`           Projected pole of inaccessability, [x, y]
@@ -69,15 +66,12 @@ export class GeometryPart {
 
     copy.extent = new Extent(this.extent);
     copy.coords = globalThis.structuredClone(this.coords);
-    copy.flatCoords = globalThis.structuredClone(this.flatCoords);
     copy.outer = globalThis.structuredClone(this.outer);
-    copy.flatOuter = globalThis.structuredClone(this.flatOuter);
     copy.hull = globalThis.structuredClone(this.hull);
     copy.centroid = globalThis.structuredClone(this.centroid);
     copy.poi = globalThis.structuredClone(this.poi);
     copy.ssr = globalThis.structuredClone(this.ssr);
     copy.holes = globalThis.structuredClone(this.holes);
-    copy.flatHoles = globalThis.structuredClone(this.flatHoles);
 
     return copy;
   }
@@ -99,11 +93,8 @@ export class GeometryPart {
     // ([0,0] is the top left corner of a 256x256 Web Mercator world)
     this.extent = null;      // extent (bounding box)
     this.coords = null;
-    this.flatCoords = null;
     this.outer = null;
-    this.flatOuter = null;
     this.holes = null;
-    this.flatHoles = null;
     this.hull = null;        // convex hull
     this.centroid = null;    // centroid (center of mass / rotation)
     this.poi = null;         // pole of inaccessability
@@ -124,11 +115,8 @@ export class GeometryPart {
     // reset all projected properties
     this.extent = null;
     this.coords = null;
-    this.flatCoords = null;
     this.outer = null;
-    this.flatOuter = null;
     this.holes = null;
-    this.flatHoles = null;
     this.hull = null;
     this.centroid = null;
     this.poi = null;
@@ -145,23 +133,18 @@ export class GeometryPart {
 
     // A line or a polygon.
     // Project the coordinate data..
-    // Generate both normal coordinate rings and flattened rings at the same time to avoid extra iterations.
     // Preallocate Arrays to avoid garbage collection formerly caused by excessive Array.push()
     this.extent = new Extent();
     const origRings = (this.type === 'LineString') ? [origCoords] : origCoords;
     const projRings = new Array(origRings.length);
-    const projFlatRings = new Array(origRings.length);
 
     for (let i = 0; i < origRings.length; i++) {
       const origRing = origRings[i];
       projRings[i] = new Array(origRing.length);
-      projFlatRings[i] = new Array(origRing.length * 2);
 
       for (let j = 0; j < origRing.length; j++) {
         const xy = viewport.wgs84ToWorld(origRing[j]);
         projRings[i][j] = xy;
-        projFlatRings[i][j * 2] = xy[0];
-        projFlatRings[i][j * 2 + 1] = xy[1];
 
         if (i === 0) {  // the outer ring
           this.extent.extendSelf(xy);
@@ -172,18 +155,12 @@ export class GeometryPart {
     // Assign outer and holes
     if (this.type === 'LineString') {
       this.coords = projRings[0];
-      this.flatCoords = projFlatRings[0];
       this.outer = projRings[0];
-      this.flatOuter = projFlatRings[0];
       this.holes = null;
-      this.flatHoles = null;
     } else {  // polygon
       this.coords = projRings;
-      this.flatCoords = projFlatRings;
       this.outer = projRings[0];
-      this.flatOuter = projFlatRings[0];
       this.holes = projRings.slice(1);
-      this.flatHoles = projFlatRings.slice(1);
     }
 
     // Calculate hull, centroid, poi, ssr if possible

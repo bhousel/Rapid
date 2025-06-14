@@ -339,39 +339,25 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const l10n = this.context.systems.l10n;
 
     for (const entity of data.polygons) {
-      // Cache GeoJSON resolution, as we expect the rewind and asGeoJSON calls to be kinda slow.
-      // This is ok because the rapid features won't change once loaded.
-      let geojson = this._resolved.get(entity.id);
-      if (!geojson) {
-        geojson = geojsonRewind(entity.asGeoJSON(graph), true);
-        this._resolved.set(entity.id, geojson);
-      }
-
-      const parts = (geojson.type === 'Polygon') ? [geojson.coordinates]
-        : (geojson.type === 'MultiPolygon') ? geojson.coordinates : [];
-
-      for (let i = 0; i < parts.length; ++i) {
-        const coords = parts[i];
+      for (let i = 0; i < entity.geoms.parts.length; ++i) {
+        const part = entity.geoms.parts[i];
         const featureID = `${this.layerID}-${dataset.id}-${entity.id}-${i}`;
         let feature = this.features.get(featureID);
 
         if (!feature) {
-          feature = new PixiFeaturePolygon(this, featureID);
+          const coords = part.origCoords;
+          if (!coords) continue;
 
-          feature.geometry.setCoords(coords);
-          const area = feature.geometry.origExtent.area();   // estimate area from extent for speed
+          feature = new PixiFeaturePolygon(this, featureID);
+          // feature.geometry.setCoords(coords);
+          feature.setGeometry(part);
+          // const area = feature.geometry.origExtent.area();   // estimate area from extent for speed
+          const area = part.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
           feature.parentContainer = parentContainer;
           feature.rapidFeature = true;
           feature.setData(entity.id, entity);
-// shader experiment:
-// check https://github.com/pixijs/pixijs/discussions/7728 for some discussion
-// we are fighting with the batch system which is unfortunate
-// feature.fill.geometry.isBatchable = () => { return false; };
-// feature.fill.shader = this._customshader;
-
-// also custom `.shader` dont work on sprites at all, and so we'd have to switch to meshes maybe?
         }
 
         this.syncFeatureClasses(feature);
@@ -380,7 +366,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           const style = {
             labelTint: color,
             fill: { width: 2, color: color, alpha: 0.3 },
-            // fill: { width: 2, color: color, alpha: 1, pattern: 'stripe' }
           };
           feature.style = style;
           feature.label = l10n.displayName(entity.tags);
@@ -390,6 +375,59 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         this.retainFeature(feature, frame);
       }
     }
+
+//     for (const entity of data.polygons) {
+//       // Cache GeoJSON resolution, as we expect the rewind and asGeoJSON calls to be kinda slow.
+//       // This is ok because the rapid features won't change once loaded.
+//       let geojson = this._resolved.get(entity.id);
+//       if (!geojson) {
+//         geojson = geojsonRewind(entity.asGeoJSON(graph), true);
+//         this._resolved.set(entity.id, geojson);
+//       }
+
+//       const parts = (geojson.type === 'Polygon') ? [geojson.coordinates]
+//         : (geojson.type === 'MultiPolygon') ? geojson.coordinates : [];
+
+//       for (let i = 0; i < parts.length; ++i) {
+//         const coords = parts[i];
+//         const featureID = `${this.layerID}-${dataset.id}-${entity.id}-${i}`;
+//         let feature = this.features.get(featureID);
+
+//         if (!feature) {
+//           feature = new PixiFeaturePolygon(this, featureID);
+
+//           feature.geometry.setCoords(coords);
+//           const area = feature.geometry.origExtent.area();   // estimate area from extent for speed
+//           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
+
+//           feature.parentContainer = parentContainer;
+//           feature.rapidFeature = true;
+//           feature.setData(entity.id, entity);
+// // shader experiment:
+// // check https://github.com/pixijs/pixijs/discussions/7728 for some discussion
+// // we are fighting with the batch system which is unfortunate
+// // feature.fill.geometry.isBatchable = () => { return false; };
+// // feature.fill.shader = this._customshader;
+
+// // also custom `.shader` dont work on sprites at all, and so we'd have to switch to meshes maybe?
+//         }
+
+//         this.syncFeatureClasses(feature);
+
+//         if (feature.dirty) {
+//           const style = {
+//             labelTint: color,
+//             fill: { width: 2, color: color, alpha: 0.3 },
+//             // fill: { width: 2, color: color, alpha: 1, pattern: 'stripe' }
+//           };
+//           feature.style = style;
+//           feature.label = l10n.displayName(entity.tags);
+//           feature.update(viewport, zoom);
+//         }
+
+//         this.retainFeature(feature, frame);
+//       }
+//     }
   }
 
 
@@ -401,39 +439,79 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const l10n = this.context.systems.l10n;
 
     for (const entity of data.lines) {
-      const featureID = `${this.layerID}-${dataset.id}-${entity.id}`;
-      let feature = this.features.get(featureID);
+      for (let i = 0; i < entity.geoms.parts; i++) {
+        const part = entity.geoms.parts[i];
+        const featureID = `${this.layerID}-${dataset.id}-${entity.id}-${i}`;
+        let feature = this.features.get(featureID);
 
-      if (!feature) {
-        const geojson = entity.asGeoJSON(graph);
-        const coords = geojson.coordinates;
-        if (entity.tags.oneway === '-1') {
-          coords.reverse();
+        if (!feature) {
+          const coords = part.origCoords;
+          if (!coords) continue;
+
+          if (entity.tags.oneway === '-1') {
+            coords.reverse();
+          }
+
+          feature = new PixiFeatureLine(this, featureID);
+//          feature.geometry.setCoords(coords);
+          feature.setGeometry(part);
+          feature.parentContainer = parentContainer;
+          feature.rapidFeature = true;
+          feature.setData(entity.id, entity);
         }
 
-        feature = new PixiFeatureLine(this, featureID);
-        feature.geometry.setCoords(coords);
-        feature.parentContainer = parentContainer;
-        feature.rapidFeature = true;
-        feature.setData(entity.id, entity);
+        this.syncFeatureClasses(feature);
+
+        if (feature.dirty) {
+          const style = {
+            labelTint: color,
+            casing: { width: 5, color: 0x444444 },
+            stroke: { width: 3, color: color },
+          };
+          style.lineMarkerName = entity.isOneWay() ? 'oneway' : '';
+          feature.style = style;
+          feature.label = l10n.displayName(entity.tags);
+          feature.update(viewport, zoom);
+        }
+
+        this.retainFeature(feature, frame);
       }
-
-      this.syncFeatureClasses(feature);
-
-      if (feature.dirty) {
-        const style = {
-          labelTint: color,
-          casing: { width: 5, color: 0x444444 },
-          stroke: { width: 3, color: color },
-        };
-        style.lineMarkerName = entity.isOneWay() ? 'oneway' : '';
-        feature.style = style;
-        feature.label = l10n.displayName(entity.tags);
-        feature.update(viewport, zoom);
-      }
-
-      this.retainFeature(feature, frame);
     }
+
+    // for (const entity of data.lines) {
+    //   const featureID = `${this.layerID}-${dataset.id}-${entity.id}`;
+    //   let feature = this.features.get(featureID);
+
+    //   if (!feature) {
+    //     const geojson = entity.asGeoJSON(graph);
+    //     const coords = geojson.coordinates;
+    //     if (entity.tags.oneway === '-1') {
+    //       coords.reverse();
+    //     }
+
+    //     feature = new PixiFeatureLine(this, featureID);
+    //     feature.geometry.setCoords(coords);
+    //     feature.parentContainer = parentContainer;
+    //     feature.rapidFeature = true;
+    //     feature.setData(entity.id, entity);
+    //   }
+
+    //   this.syncFeatureClasses(feature);
+
+    //   if (feature.dirty) {
+    //     const style = {
+    //       labelTint: color,
+    //       casing: { width: 5, color: 0x444444 },
+    //       stroke: { width: 3, color: color },
+    //     };
+    //     style.lineMarkerName = entity.isOneWay() ? 'oneway' : '';
+    //     feature.style = style;
+    //     feature.label = l10n.displayName(entity.tags);
+    //     feature.update(viewport, zoom);
+    //   }
+
+    //   this.retainFeature(feature, frame);
+    // }
   }
 
 
@@ -462,7 +540,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(entity.loc || entity.geojson.geometry.coordinates);
+        // feature.geometry.setCoords(entity.loc || entity.geojson.geometry.coordinates);
+        const part = entity.geoms.parts[0];
+        feature.setGeometry(part);
         feature.parentContainer = parentContainer;
         feature.rapidFeature = true;
         feature.setData(entity.id, entity);
@@ -498,7 +578,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(entity.loc);
+        // feature.geometry.setCoords(entity.loc);
+        const part = entity.geoms.parts[0];
+        feature.setGeometry(part);
         feature.parentContainer = parentContainer;
         feature.rapidFeature = true;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive

@@ -299,22 +299,28 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     for (const [entityID, entity] of entities) {
       const version = entity.v || 0;
 
-      // Cache GeoJSON resolution, as we expect the rewind and asGeoJSON calls to be kinda slow.
-      let geojson = this._resolved.get(entityID);
-      if (geojson?.v !== version) {  // bust cache if the entity has a new version
-        geojson = null;
-      }
-      if (!geojson) {
-        geojson = geojsonRewind(entity.asGeoJSON(graph), true);
-        geojson.v = version;
-        this._resolved.set(entityID, geojson);
-      }
+//      // Cache GeoJSON resolution, as we expect the rewind and asGeoJSON calls to be kinda slow.
+//      let geojson = this._resolved.get(entityID);
+//      if (geojson?.v !== version) {  // bust cache if the entity has a new version
+//        geojson = null;
+//      }
+//      if (!geojson) {
+//        geojson = geojsonRewind(entity.asGeoJSON(graph), true);
+//        geojson.v = version;
+//        this._resolved.set(entityID, geojson);
+//      }
+//
+//      const parts = (geojson.type === 'Polygon') ? [geojson.coordinates]
+//        : (geojson.type === 'MultiPolygon') ? geojson.coordinates : [];
 
-      const parts = (geojson.type === 'Polygon') ? [geojson.coordinates]
-        : (geojson.type === 'MultiPolygon') ? geojson.coordinates : [];
+      const parts = entity.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-        const coords = parts[i];
+//        const coords = parts[i];
+        const part = parts[i];
+        const coords = part.origCoords;
+        if (!coords) continue;
+
         const featureID = `${this.layerID}-${entityID}-${i}`;
         let feature = this.features.get(featureID);
 
@@ -332,8 +338,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         // If data has changed.. Replace data and parent-child links.
         if (feature.v !== version) {
           feature.v = version;
-          feature.geometry.setCoords(coords);
-          const area = feature.geometry.origExtent.area();   // estimate area from extent for speed
+//          feature.geometry.setCoords(coords);
+          feature.setGeometry(part);
+          // const area = feature.geometry.origExtent.area();   // estimate area from extent for speed
+          const area = part.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
           feature.setData(entityID, entity);
@@ -373,46 +381,46 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.update(viewport, zoom);
         this.retainFeature(feature, frame);
 
-        // Same as above, but for the virtual POI, if any
-        // Confirm that `feature.geometry.origPoi` exists - we may have skipped it if `feature.geometry.lod = 0`
-        if (feature.poiFeatureID && feature.poiPreset && feature.geometry.origPoi) {
-          let poiFeature = this.features.get(feature.poiFeatureID);
-
-          if (!poiFeature) {
-            poiFeature = new PixiFeaturePoint(this, feature.poiFeatureID);
-            poiFeature.virtual = true;
-            poiFeature.parentContainer = pointsContainer;
-          }
-
-          if (poiFeature.v !== version) {
-            poiFeature.v = version;
-            poiFeature.geometry.setCoords(feature.geometry.origPoi);  // pole of inaccessability
-            poiFeature.setData(entityID, entity);
-          }
-
-          this.syncFeatureClasses(poiFeature);
-
-          if (poiFeature.dirty) {
-            let markerStyle = {
-              iconName: feature.poiPreset.icon,
-              iconTint: 0x111111,
-              markerName: 'pin',
-              markerTint: 0xffffff
-            };
-
-            if (hasWikidata(entity)) {
-              markerStyle.iconTint = 0x444444;
-              markerStyle.labelTint = 0xdddddd;
-              markerStyle.markerName = 'boldPin';
-              markerStyle.markerTint = 0xdddddd;
-            }
-            poiFeature.style = markerStyle;
-            poiFeature.label = feature.label;
-          }
-
-          poiFeature.update(viewport, zoom);
-          this.retainFeature(poiFeature, frame);
-        }
+//        // Same as above, but for the virtual POI, if any
+//        // Confirm that `feature.geometry.origPoi` exists - we may have skipped it if `feature.geometry.lod = 0`
+//        if (feature.poiFeatureID && feature.poiPreset && feature.geometry.origPoi) {
+//          let poiFeature = this.features.get(feature.poiFeatureID);
+//
+//          if (!poiFeature) {
+//            poiFeature = new PixiFeaturePoint(this, feature.poiFeatureID);
+//            poiFeature.virtual = true;
+//            poiFeature.parentContainer = pointsContainer;
+//          }
+//
+//          if (poiFeature.v !== version) {
+//            poiFeature.v = version;
+//            poiFeature.geometry.setCoords(feature.geometry.origPoi);  // pole of inaccessability
+//            poiFeature.setData(entityID, entity);
+//          }
+//
+//          this.syncFeatureClasses(poiFeature);
+//
+//          if (poiFeature.dirty) {
+//            let markerStyle = {
+//              iconName: feature.poiPreset.icon,
+//              iconTint: 0x111111,
+//              markerName: 'pin',
+//              markerTint: 0xffffff
+//            };
+//
+//            if (hasWikidata(entity)) {
+//              markerStyle.iconTint = 0x444444;
+//              markerStyle.labelTint = 0xdddddd;
+//              markerStyle.markerName = 'boldPin';
+//              markerStyle.markerTint = 0xdddddd;
+//            }
+//            poiFeature.style = markerStyle;
+//            poiFeature.label = feature.label;
+//          }
+//
+//          poiFeature.update(viewport, zoom);
+//          this.retainFeature(poiFeature, frame);
+//        }
 
       }
     }
@@ -440,26 +448,33 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const zindex = getzIndex(entity.tags);
       const version = entity.v || 0;
 
-      // Cache GeoJSON resolution, as we expect the asGeoJSON call to be kinda slow.
-      let geojson = this._resolved.get(entityID);
-      if (geojson?.v !== version) {  // bust cache if the entity has a new version
-        geojson = null;
-      }
-      if (!geojson) {
-        geojson = entity.asGeoJSON(graph);
-        geojson.v = version;
-        if (geojson.type === 'LineString' && entity.tags.oneway === '-1') {
-          geojson.coordinates.reverse();
-        }
-        this._resolved.set(entityID, geojson);
-      }
+//      // Cache GeoJSON resolution, as we expect the asGeoJSON call to be kinda slow.
+//      let geojson = this._resolved.get(entityID);
+//      if (geojson?.v !== version) {  // bust cache if the entity has a new version
+//        geojson = null;
+//      }
+//      if (!geojson) {
+//        geojson = entity.asGeoJSON(graph);
+//        geojson.v = version;
+//        if (geojson.type === 'LineString' && entity.tags.oneway === '-1') {
+//          geojson.coordinates.reverse();
+//        }
+//        this._resolved.set(entityID, geojson);
+//      }
+//
+//      const parts = (geojson.type === 'LineString') ? [[geojson.coordinates]]
+//        : (geojson.type === 'Polygon') ? [geojson.coordinates]
+//        : (geojson.type === 'MultiPolygon') ? geojson.coordinates : [];
 
-      const parts = (geojson.type === 'LineString') ? [[geojson.coordinates]]
-        : (geojson.type === 'Polygon') ? [geojson.coordinates]
-        : (geojson.type === 'MultiPolygon') ? geojson.coordinates : [];
+      const parts = entity.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-        const segments = parts[i];
+//        const segments = parts[i];
+        const part = parts[i];
+        const segments = (part.type === 'LineString') ? [part.origCoords]
+          : (part.type === 'Polygon') ? part.origCoords
+          : [];
+
         for (let j = 0; j < segments.length; ++j) {
           const coords = segments[j];
           const featureID = `${this.layerID}-${entityID}-${i}-${j}`;
@@ -478,7 +493,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           // If data has changed.. Replace data and parent-child links.
           if (feature.v !== version) {
             feature.v = version;
-            feature.geometry.setCoords(coords);
+            // feature.geometry.setCoords(coords);
+            feature.setGeometry(part);
             feature.parentContainer = levelContainer;    // Change layer stacking if necessary
             feature.container.zIndex = zindex;
 
@@ -602,7 +618,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       // If data has changed, replace it.
       if (feature.v !== version) {
         feature.v = version;
-        feature.geometry.setCoords(node.loc);
+        // feature.geometry.setCoords(node.loc);
+        const part = node.geoms.parts[0];
+        feature.setGeometry(part);
         feature.setData(nodeID, node);
       }
 
@@ -688,7 +706,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       // If data has changed, replace it.
       if (feature.v !== version) {
         feature.v = version;
-        feature.geometry.setCoords(node.loc);
+        // feature.geometry.setCoords(node.loc);
+        const part = node.geoms.parts[0];
+        feature.setGeometry(part);
         feature.setData(nodeID, node);
       }
 
@@ -807,34 +827,34 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
     }
 
-    for (const [midpointID, midpoint] of midpoints) {
-      const featureID = `${this.layerID}-${midpointID}`;
-      let feature = this.features.get(featureID);
-
-      if (!feature) {
-        feature = new PixiFeaturePoint(this, featureID);
-        feature.style = MIDPOINT_STYLE;
-        feature.parentContainer = selectedContainer;
-      }
-
-      // Something about the midpoint has changed
-      const v = _midpointVersion(midpoint);
-      if (feature.v !== v) {
-        feature.v = v;
-        feature.geometry.setCoords(midpoint.loc);
-
-        // Remember to apply rotation - it needs to go on the marker,
-        // because the container automatically rotates to be face up.
-        feature.marker.rotation = midpoint.rot;
-
-        feature.setData(midpointID, midpoint);
-        feature.addChildData(midpoint.way.id, midpointID);
-      }
-
-      this.syncFeatureClasses(feature);
-      feature.update(viewport, zoom);
-      this.retainFeature(feature, frame);
-    }
+//    for (const [midpointID, midpoint] of midpoints) {
+//      const featureID = `${this.layerID}-${midpointID}`;
+//      let feature = this.features.get(featureID);
+//
+//      if (!feature) {
+//        feature = new PixiFeaturePoint(this, featureID);
+//        feature.style = MIDPOINT_STYLE;
+//        feature.parentContainer = selectedContainer;
+//      }
+//
+//      // Something about the midpoint has changed
+//      const v = _midpointVersion(midpoint);
+//      if (feature.v !== v) {
+//        feature.v = v;
+//        feature.geometry.setCoords(midpoint.loc);
+//
+//        // Remember to apply rotation - it needs to go on the marker,
+//        // because the container automatically rotates to be face up.
+//        feature.marker.rotation = midpoint.rot;
+//
+//        feature.setData(midpointID, midpoint);
+//        feature.addChildData(midpoint.way.id, midpointID);
+//      }
+//
+//      this.syncFeatureClasses(feature);
+//      feature.update(viewport, zoom);
+//      this.retainFeature(feature, frame);
+//    }
 
 
     // If any of these change, the midpoint needs to be redrawn.

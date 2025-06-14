@@ -134,6 +134,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
+return; // not yet
     const osm = this.context.services.osm;
     if (!this.enabled || !osm?.started || zoom < MINZOOM) return;
 

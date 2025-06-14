@@ -114,6 +114,7 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
    * @param  zoom         Effective zoom to use for rendering
    */
   render(frame, projection, zoom) {
+return; // not yet
     const maproulette = this.context.services.maproulette;
     if (!this.enabled || !maproulette?.started || zoom < MINZOOM) return;
 

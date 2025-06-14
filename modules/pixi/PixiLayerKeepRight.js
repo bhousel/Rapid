@@ -109,6 +109,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
+return; // not yet
     const keepRight = this.context.services.keepRight;
     if (!this.enabled || !keepRight?.started || zoom < MINZOOM) return;
 

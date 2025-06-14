@@ -149,6 +149,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
+return; // not yet
     const mapillary = this.context.services.mapillary;
     if (!this.enabled || !mapillary?.started || zoom < MINZOOM) return;
 

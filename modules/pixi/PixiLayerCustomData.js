@@ -84,6 +84,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
+return; // not yet
     if (!this.enabled || !(this.hasData())) return;
 
     const vtService = this.context.services.vectortile;
