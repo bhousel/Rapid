@@ -112,7 +112,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     // Reproject
     this.geometry.update(viewport, zoom);
 
-    const [x, y] = this.geometry.coords;
+    const [x, y] = this.geometry.screen.coords;
     this.container.position.set(x, y);
 
     // sort markers by latitude ascending
@@ -139,7 +139,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     const marker = this.marker;
     const icon = this.icon;
-    const z = this.geometry.coords[1];  // use y coord as the z-index
+    const z = this.geometry.screen.coords[1];  // use y coord as the z-index
     // const latitude = this.geometry.origCoords[1];
 
     // Apply anti-rotation to keep the icons and markers facing up.

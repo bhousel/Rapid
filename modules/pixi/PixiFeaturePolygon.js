@@ -146,7 +146,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this._ssrdata = null;
 
       // We use the SSR to approximate a low resolution polygon at low zooms
-      if (this.geometry.ssr?.poly) {
+      if (this.geometry.screen.ssr?.poly) {
         // Calculate axes of symmetry to determine width, height
         // The shape's surrounding rectangle has 2 axes of symmetry.
         //
@@ -159,7 +159,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         //        \/ q1
         //        3
 
-        const poly = this.geometry.ssr.poly;
+        const poly = this.geometry.screen.ssr.poly;
         const p1 = [(poly[0][0] + poly[1][0]) / 2, (poly[0][1] + poly[1][1]) / 2 ];
         const q1 = [(poly[2][0] + poly[3][0]) / 2, (poly[2][1] + poly[3][1]) / 2 ];
         const p2 = [(poly[3][0] + poly[0][0]) / 2, (poly[3][1] + poly[0][1]) / 2 ];
@@ -172,7 +172,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         // Are the SSR corners part of the shape?
         const EPSILON = 0.1;
         let c0in, c1in, c2in, c3in;
-        this.geometry.outer.forEach(point => {
+        this.geometry.screen.outer.forEach(point => {
           if (!c0in) c0in = vecEqual(point, poly[0], EPSILON);
           if (!c1in) c1in = vecEqual(point, poly[1], EPSILON);
           if (!c2in) c2in = vecEqual(point, poly[2], EPSILON);
@@ -181,8 +181,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         const cornersInSSR = c0in || c1in || c2in || c3in;
 
         this._ssrdata = {
-          screenSSR: this.geometry.ssr,
-          worldSSR: this.geometry.geometryPart.ssr,
+          screenSSR: this.geometry.screen.ssr,
+          worldSSR: this.geometry.world.ssr,
           worldAxis1: axis1.map(coord => viewport.screenToWorld(coord)),
           worldAxis2: axis2.map(coord => viewport.screenToWorld(coord)),
           worldCenter: viewport.screenToWorld(center),
@@ -192,8 +192,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     // Calculate bounds
-    const [minX, minY] = this.geometry.extent.min;
-    const [maxX, maxY] = this.geometry.extent.max;
+    const [minX, minY] = this.geometry.screen.extent.min;
+    const [maxX, maxY] = this.geometry.screen.extent.max;
     const [w, h] = [maxX - minX, maxY - minY];
     this.sceneBounds.x = minX;
     this.sceneBounds.y = minY;
@@ -287,7 +287,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     //
     // redraw the shapes
     //
-    const rings = this.geometry.flatCoords || [];  // outer, followed by holes if any
+    const rings = this.geometry.screen.flatCoords || [];  // outer, followed by holes if any
     this._bufferdata = null;
 
     // STROKES

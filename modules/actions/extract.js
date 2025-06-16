@@ -36,7 +36,7 @@ export function actionExtract(entityID, viewport) {
     const keysToRetain = ['area'];
     const buildingKeysToRetain = /architect|building|height|layer|nycdoitt:bin|roof/i;
 
-    const poi = entity.geoms.parts[0]?.poi;  // Pole of Inaccessability (in world coords)
+    const poi = entity.geoms.parts[0]?.world?.poi;  // Pole of Inaccessability (in world coords)
     if (!poi) return graph;
 
     const extractLoc = viewport.worldToWgs84(poi);

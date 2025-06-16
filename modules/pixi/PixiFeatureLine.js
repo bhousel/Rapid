@@ -92,8 +92,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this.geometry.update(viewport, zoom);
 
       // Calculate bounds
-      const [minX, minY] = this.geometry.extent.min;
-      const [maxX, maxY] = this.geometry.extent.max;
+      const [minX, minY] = this.geometry.screen.extent.min;
+      const [maxX, maxY] = this.geometry.screen.extent.max;
       const [w, h] = [maxX - minX, maxY - minY];
       this.sceneBounds.x = minX;
       this.sceneBounds.y = minY;
@@ -158,7 +158,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         lineMarkers.removeChildren();
 
         if (oneway) {
-          const segments = getLineSegments(this.geometry.coords, ONEWAY_SPACING, false, true);  /* sided = false, limited = true */
+          const segments = getLineSegments(this.geometry.screen.coords, ONEWAY_SPACING, false, true);  /* sided = false, limited = true */
 
           segments.forEach(segment => {
             segment.coords.forEach(([x, y]) => {
@@ -177,7 +177,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         }
 
         if (sided) {
-          const segments = getLineSegments(this.geometry.coords, SIDED_SPACING, true, true);  /* sided = true, limited = true */
+          const segments = getLineSegments(this.geometry.screen.coords, SIDED_SPACING, true, true);  /* sided = true, limited = true */
 
           segments.forEach(segment => {
             segment.coords.forEach(([x, y]) => {
@@ -226,7 +226,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
           cap: 'butt',
           join: 'bevel'
         };
-        this._bufferdata = lineToPoly(this.geometry.flatCoords, bufferStyle);
+        this._bufferdata = lineToPoly(this.geometry.screen.flatCoords, bufferStyle);
         this.container.hitArea = new PIXI.Polygon(this._bufferdata.perimeter);
       } else {
         this._bufferdata = null;
@@ -238,10 +238,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
     if (this.casing.renderable) {
-      this.updateGraphic('casing', this.casing, this.geometry.coords, style, zoom, isWireframe);
+      this.updateGraphic('casing', this.casing, this.geometry.screen.coords, style, zoom, isWireframe);
     }
     if (this.stroke.renderable) {
-      this.updateGraphic('stroke', this.stroke, this.geometry.coords, style, zoom, isWireframe);
+      this.updateGraphic('stroke', this.stroke, this.geometry.screen.coords, style, zoom, isWireframe);
     }
 
     this.updateHalo();

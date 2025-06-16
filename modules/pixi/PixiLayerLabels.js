@@ -433,7 +433,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   labelPoints(features) {
     // features.sort((a, b) => b.geometry.origCoords[1] - a.geometry.origCoords[1]);
-    features.sort((a, b) => a.geometry.coords[1] - b.geometry.coords[1]);
+    features.sort((a, b) => a.geometry.screen.coords[1] - b.geometry.screen.coords[1]);
 
     for (const feature of features) {
       if (this._labelBoxes.has(feature.id)) continue;  // processed it already
@@ -483,17 +483,18 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     for (const feature of features) {
       const featureID = feature.id;
+      const screen = feature.geometry.screen;
 
       if (this._labelBoxes.has(featureID)) continue;  // processed it already
       this._labelBoxes.set(featureID, []);
 
-      if (!feature.label) continue;                                                 // no label
-      if (!feature.geometry.coords) continue;                                       // no points
-      if (!feature.container.visible || !feature.container.renderable) continue;    // not visible
-      if (feature.geometry.width < 40 && feature.geometry.height < 40) continue;    // too small
+      if (!feature.label) continue;   // no label
+      if (!screen.coords) continue;     // no points
+      if (!feature.container.visible || !feature.container.renderable) continue; // not visible
+      if (screen.width < 40 && screen.height < 40) continue;    // too small
 
       const labelObj = this.getLabelSprite(feature.label, 'normal');
-      this.placeRopeLabel(feature, labelObj, feature.geometry.coords);
+      this.placeRopeLabel(feature, labelObj, screen.coords);
     }
   }
 
@@ -507,14 +508,15 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   labelPolygons(features) {
     for (const feature of features) {
       const featureID = feature.id;
+      const screen = feature.geometry.screen;
 
       if (this._labelBoxes.has(featureID)) continue;  // processed it already
       this._labelBoxes.set(featureID, []);
 
-      if (!feature.label) continue;                                                 // no label
-      if (!feature.geometry.flatOuter) continue;                                    // no points
-      if (!feature.container.visible || !feature.container.renderable) continue;    // not visible
-      if (feature.geometry.width < 600 && feature.geometry.height < 600) continue;  // too small
+      if (!feature.label) continue;      // no label
+      if (!screen.flatOuter) continue;   // no points
+      if (!feature.container.visible || !feature.container.renderable) continue;  // not visible
+      if (screen.width < 600 && screen.height < 600) continue;  // too small
 
       const labelObj = this.getLabelSprite(feature.label, 'italic');
 
@@ -527,7 +529,7 @@ const hitStyle = {
   join: 'bevel',
   cap: 'butt'
 };
-const bufferdata = lineToPoly(feature.geometry.flatOuter, hitStyle);
+const bufferdata = lineToPoly(screen.flatOuter, hitStyle);
 if (!bufferdata.inner) continue;
 let coords = new Array(bufferdata.inner.length / 2);  // un-flatten :(
 for (let i = 0; i < bufferdata.inner.length / 2; ++i) {

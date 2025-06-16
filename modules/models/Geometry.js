@@ -111,11 +111,11 @@ export class Geometry {
     for (const geojsonPart of geojsonParts) {
       const part = new GeometryPart(this.feature);
       part.setData(geojsonPart);
-      if (part.dirty) continue;  // if the GeometryPart was invalid, skip it
+      if (!part.orig || !part.world) continue;  // if the GeometryPart was invalid, skip it
 
       this.parts.push(part);
-      origExtent.extendSelf(part.origExtent);
-      extent.extendSelf(part.extent);
+      origExtent.extendSelf(part.orig.extent);
+      extent.extendSelf(part.world.extent);
       isValid = true;
     }
 

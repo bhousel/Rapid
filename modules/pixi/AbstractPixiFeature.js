@@ -324,12 +324,12 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * setGeoemtry
-   * This sets which GeometryPart we are rendering
-   * @param  {GeometryPart}  GeometryPart to render
+   * setCoords
+   * This sets the coordinate data to render
+   * @param  {Object}  world - object containing world coordinate data
    */
-  setGeometry(geometryPart) {
-    this.geometry.setGeometry(geometryPart);
+  setCoords(world) {
+    this.geometry.setCoords(world);
   }
 
   /**

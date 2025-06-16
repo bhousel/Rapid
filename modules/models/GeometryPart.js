@@ -14,17 +14,17 @@ import polylabel from '@mapbox/polylabel';
  * The geometry data should be passed to `setData()` as a GeoJSON geometry object.
  *
  * Properties you can access:
- *   `origData`      Original GeoJSON data (in WGS84 lon/lat)
- *   `origCoords`    Original coordinate data (in WGS84 lon/lat)
- *   `origExtent`    Original Extent bounding box (in WGS84 lon/lat)
- *   `coords`        Projected coordinate data
- *   `extent`        Projected extent
- *   `outer`         Projected outer ring, Array of coordinate pairs [ [x,y], [x,y], … ]
- *   `holes`         Projected hole rings, Array of Array of coordinate pairs [ [ [x,y], [x,y], … ] ]
- *   `hull`          Projected convex hull, Array of coordinate pairs [ [x,y], [x,y], … ]
- *   `centroid`      Projected centroid, [x, y]
- *   `poi`           Projected pole of inaccessability, [x, y]
- *   `ssr`           Projected smallest surrounding rectangle data (angle, poly)
+ *   `orig.data`      Original GeoJSON data (in WGS84 lon/lat)
+ *   `orig.coords`    Original coordinate data (in WGS84 lon/lat)
+ *   `orig.extent`    Original Extent bounding box (in WGS84 lon/lat)
+ *   `world.coords`   Projected coordinate data
+ *   `world.extent`   Projected Extent
+ *   `world.outer`    Projected outer ring, Array of coordinate pairs [ [x,y], [x,y], … ]
+ *   `world.holes`    Projected hole rings, Array of Array of coordinate pairs [ [ [x,y], [x,y], … ] ]
+ *   `world.hull`     Projected convex hull, Array of coordinate pairs [ [x,y], [x,y], … ]
+ *   `world.centroid` Projected centroid, [x, y]
+ *   `world.poi`      Projected pole of inaccessability, [x, y]
+ *   `world.ssr`      Projected smallest surrounding rectangle data (angle, poly)
  */
 export class GeometryPart {
 
@@ -58,20 +58,18 @@ export class GeometryPart {
   clone() {
     const copy = new GeometryPart(this.feature);
 
-    copy.dirty = this.dirty;
+    for (const obj of ['orig', 'world']) {
+      const src = this[obj];
+      if (!src) continue;
 
-    // someday: check perf?  JSON.parse(JSON.stringify()) may still beat structuredClone for Array data
-    copy.origData = globalThis.structuredClone(this.origData);
-    copy.origExtent = new Extent(this.origExtent);
-
-    copy.extent = new Extent(this.extent);
-    copy.coords = globalThis.structuredClone(this.coords);
-    copy.outer = globalThis.structuredClone(this.outer);
-    copy.hull = globalThis.structuredClone(this.hull);
-    copy.centroid = globalThis.structuredClone(this.centroid);
-    copy.poi = globalThis.structuredClone(this.poi);
-    copy.ssr = globalThis.structuredClone(this.ssr);
-    copy.holes = globalThis.structuredClone(this.holes);
+      for (const [k, v] of Object.entries(src)) {
+        if (v instanceof Extent) {
+          copy[k] = new Extent(v);
+        } else {
+          copy[k] = globalThis.structuredClone(v);
+        }
+      }
+    }
 
     return copy;
   }
@@ -82,59 +80,94 @@ export class GeometryPart {
    * Remove all stored data
    */
   reset() {
-    this.dirty = true;
-
-    // Original data - These are in WGS84 coordinates
+    // Original data, in WGS84 coordinates
     // ([0,0] is Null Island)
-    this.origData = null;    // GeoJSON data
-    this.origExtent = null;  // extent (bounding box)
+    this.orig = null;
 
-    // The rest of the data is projected data in world coordinates
+    // Projected data in world coordinates
     // ([0,0] is the top left corner of a 256x256 Web Mercator world)
-    this.extent = null;      // extent (bounding box)
-    this.coords = null;
-    this.outer = null;
-    this.holes = null;
-    this.hull = null;        // convex hull
-    this.centroid = null;    // centroid (center of mass / rotation)
-    this.poi = null;         // pole of inaccessability
-    this.ssr = null;         // smallest surrounding rectangle
+    this.world = null;
   }
 
 
   /**
-   * update
+   * geojson
+   * The original data format is GeoJSON, this is just a convenience getter.
+   * @return {GeoJSON}
+   * @readonly
    */
-  update() {
-    if (!this.dirty || !this.origData?.coordinates) return;  // nothing to do
+  get geojson() {
+    return this.orig?.data;
+  }
+
+  /**
+   * type
+   * The original data format is GeoJSON, this is just a convenience getter.
+   * @return {string} One of 'Point', 'LineString', 'Polygon'
+   * @readonly
+   */
+  get type() {
+    return this.orig?.data?.type;
+  }
+
+
+  /**
+   * setData
+   * This setter accepts singular GeoJSON geometries only:  'Point', 'LineString', and 'Polygon'
+   * If there is any existing data, it is first removed.
+   * @param {GeoJSON} geojson - GeoJSON geometry data
+   */
+  setData(geojson = {}) {
+    this.destroy();
+
+    const type = geojson.type;
+    const coords = geojson.coordinates;
+    if (!(/^(Point|LineString|Polygon)$/.test(type)) || !coords) return;  // do nothing
+
+    const orig = this.orig = {};
+    orig.data = globalThis.structuredClone(geojson);
+    orig.coords = orig.data.coordinates;
+
+    // Determine extent (bounds)
+    if (type === 'Point') {
+      orig.extent = new Extent(coords);
+    } else {
+      orig.extent = new Extent();
+      const outer = (type === 'LineString') ? coords : coords[0];  // outer only
+      for (const loc of outer) {
+        orig.extent.extendSelf(loc);
+      }
+    }
+
+    this.updateWorld();
+  }
+
+
+  /**
+   * updateWorld
+   */
+  updateWorld() {
+    if (!this.orig || this.world) return;  // can't do it, or done already
 
     const viewport = this.context.viewport;
-    const origCoords = this.origData.coordinates;
-    this.dirty = false;
+    const origCoords = this.orig.data.coordinates;
 
-    // reset all projected properties
-    this.extent = null;
-    this.coords = null;
-    this.outer = null;
-    this.holes = null;
-    this.hull = null;
-    this.centroid = null;
-    this.poi = null;
-    this.ssr = null;
+    // Reset all projected properties
+    const world = this.world = {};
 
     // Points are simple, just project once.
     if (this.type === 'Point') {
-      this.coords = viewport.wgs84ToWorld(origCoords);
-      this.extent = new Extent(this.coords);
-      this.centroid = this.coords;
-      this.poi = this.coords;
+      world.coords = viewport.wgs84ToWorld(origCoords);
+      world.extent = new Extent(world.coords);
+      world.centroid = world.coords;
+      world.poi = world.coords;
       return;
     }
 
     // A line or a polygon.
     // Project the coordinate data..
     // Preallocate Arrays to avoid garbage collection formerly caused by excessive Array.push()
-    this.extent = new Extent();
+    world.extent = new Extent();
     const origRings = (this.type === 'LineString') ? [origCoords] : origCoords;
     const projRings = new Array(origRings.length);
 
@@ -147,116 +180,55 @@ export class GeometryPart {
         projRings[i][j] = xy;
 
         if (i === 0) {  // the outer ring
-          this.extent.extendSelf(xy);
+          world.extent.extendSelf(xy);
         }
       }
     }
 
     // Assign outer and holes
     if (this.type === 'LineString') {
-      this.coords = projRings[0];
-      this.outer = projRings[0];
-      this.holes = null;
+      world.coords = projRings[0];
+      world.outer = projRings[0];
+      world.holes = null;
     } else {  // polygon
-      this.coords = projRings;
-      this.outer = projRings[0];
-      this.holes = projRings.slice(1);
+      world.coords = projRings;
+      world.outer = projRings[0];
+      world.holes = projRings.slice(1);
     }
 
     // Calculate hull, centroid, poi, ssr if possible
-    if (this.outer.length === 0) {          // no coordinates? - shouldn't happen
+    if (world.outer.length === 0) {          // no coordinates? - shouldn't happen
       // no-op
 
-    } else if (this.outer.length === 1) {   // single coordinate? - wrong but can happen
-      this.centroid = this.outer[0];
-      this.poi = this.centroid;
+    } else if (world.outer.length === 1) {   // single coordinate? - wrong but can happen
+      world.centroid = world.outer[0];
+      world.poi = world.centroid;
 
-    } else if (this.outer.length === 2) {   // 2 coordinate line
-      this.centroid = vecInterp(this.outer[0], this.outer[1], 0.5);  // average the 2 points
-      this.poi = this.centroid;
+    } else if (world.outer.length === 2) {   // 2 coordinate line
+      world.centroid = vecInterp(world.outer[0], world.outer[1], 0.5);  // average the 2 points
+      world.poi = world.centroid;
 
     } else {   // > 2 coordinates...
       // Convex Hull
-      this.hull = polygonHull(this.outer);
+      world.hull = polygonHull(world.outer);
 
       // Centroid
-      if (this.hull.length === 2) {
-        this.centroid = vecInterp(this.hull[0], this.hull[1], 0.5);  // average the 2 points
+      if (world.hull.length === 2) {
+        world.centroid = vecInterp(world.hull[0], world.hull[1], 0.5);  // average the 2 points
       } else {
-        this.centroid = polygonCentroid(this.hull);
+        world.centroid = polygonCentroid(world.hull);
       }
 
       // Pole of Inaccessability (for polygons)
-      if (this.type === 'LineString') {
-        this.poi = this.centroid;
+      if (world.type === 'LineString') {
+        world.poi = world.centroid;
       } else {
-        this.poi = polylabel(this.coords);   // it expects outer + rings
+        world.poi = polylabel(world.coords);   // it expects outer + rings
       }
 
       // Smallest Surrounding Rectangle
-      this.ssr = geomGetSmallestSurroundingRectangle(this.hull);
+      world.ssr = geomGetSmallestSurroundingRectangle(world.hull);
     }
-  }
-
-
-  /**
-   * geojson
-   * The original data format is GeoJSON, this is just a convenience getter.
-   * @return {GeoJSON}
-   * @readonly
-   */
-  get geojson() {
-    return this.origData;
-  }
-
-  /**
-   * origCoords
-   * The original data format is GeoJSON, this is just a convenience getter.
-   * @return {Array<*>}
-   * @readonly
-   */
-  get origCoords() {
-    return this.origData?.coordinates;
-  }
-
-  /**
-   * type
-   * The original data format is GeoJSON, this is just a convenience getter.
-   * @return {string} One of 'Point', 'LineString', 'Polygon'
-   * @readonly
-   */
-  get type() {
-    return this.origData?.type;
-  }
-
-
-  /**
-   * setData
-   * This setter accepts singular GeoJSON geometries only:  'Point', 'LineString', and 'Polygon'
-   * If there is any existing data, it is first removed.
-   * @param {GeoJSON} geojson - GeoJSON data
-   */
-  setData(geojson = {}) {
-    this.destroy();
-    this.origData = globalThis.structuredClone(geojson);
-
-    const type = geojson.type;
-    const coords = geojson.coordinates;
-    if (!(/^(Point|LineString|Polygon)$/.test(type)) || !coords) return;  // do nothing
-
-    // Determine extent (bounds)
-    if (type === 'Point') {
-      this.origExtent = new Extent(coords);
-    } else {
-      this.origExtent = new Extent();
-      const outer = (this.type === 'LineString') ? coords : coords[0];  // outer only
-      for (const loc of outer) {
-        this.origExtent.extendSelf(loc);
-      }
-    }
-
-    this.dirty = true;
-    this.update();
   }
 
 }

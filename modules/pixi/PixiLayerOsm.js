@@ -318,8 +318,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       for (let i = 0; i < parts.length; ++i) {
 //        const coords = parts[i];
         const part = parts[i];
-        const coords = part.origCoords;
-        if (!coords) continue;
+        if (!part.world) continue;  // invalid?
+        // const coords = part.origCoords;
+        // if (!coords) continue;
 
         const featureID = `${this.layerID}-${entityID}-${i}`;
         let feature = this.features.get(featureID);
@@ -339,9 +340,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         if (feature.v !== version) {
           feature.v = version;
 //          feature.geometry.setCoords(coords);
-          feature.setGeometry(part);
+          feature.setCoords(part.world);
           // const area = feature.geometry.origExtent.area();   // estimate area from extent for speed
-          const area = part.extent.area();
+          const area = part.world.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
           feature.setData(entityID, entity);
@@ -381,46 +382,46 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.update(viewport, zoom);
         this.retainFeature(feature, frame);
 
-//        // Same as above, but for the virtual POI, if any
-//        // Confirm that `feature.geometry.origPoi` exists - we may have skipped it if `feature.geometry.lod = 0`
-//        if (feature.poiFeatureID && feature.poiPreset && feature.geometry.origPoi) {
-//          let poiFeature = this.features.get(feature.poiFeatureID);
-//
-//          if (!poiFeature) {
-//            poiFeature = new PixiFeaturePoint(this, feature.poiFeatureID);
-//            poiFeature.virtual = true;
-//            poiFeature.parentContainer = pointsContainer;
-//          }
-//
-//          if (poiFeature.v !== version) {
-//            poiFeature.v = version;
-//            poiFeature.geometry.setCoords(feature.geometry.origPoi);  // pole of inaccessability
-//            poiFeature.setData(entityID, entity);
-//          }
-//
-//          this.syncFeatureClasses(poiFeature);
-//
-//          if (poiFeature.dirty) {
-//            let markerStyle = {
-//              iconName: feature.poiPreset.icon,
-//              iconTint: 0x111111,
-//              markerName: 'pin',
-//              markerTint: 0xffffff
-//            };
-//
-//            if (hasWikidata(entity)) {
-//              markerStyle.iconTint = 0x444444;
-//              markerStyle.labelTint = 0xdddddd;
-//              markerStyle.markerName = 'boldPin';
-//              markerStyle.markerTint = 0xdddddd;
-//            }
-//            poiFeature.style = markerStyle;
-//            poiFeature.label = feature.label;
-//          }
-//
-//          poiFeature.update(viewport, zoom);
-//          this.retainFeature(poiFeature, frame);
-//        }
+        // Same as above, but for the virtual POI, if any
+        if (feature.poiFeatureID && feature.poiPreset) {
+          let poiFeature = this.features.get(feature.poiFeatureID);
+
+          if (!poiFeature) {
+            poiFeature = new PixiFeaturePoint(this, feature.poiFeatureID);
+            poiFeature.virtual = true;
+            poiFeature.parentContainer = pointsContainer;
+          }
+
+          if (poiFeature.v !== version) {
+            poiFeature.v = version;
+            // poiFeature.geometry.setCoords(feature.geometry.origPoi);  // pole of inaccessability
+            poiFeature.setCoords({ coords: part.world.poi });
+            poiFeature.setData(entityID, entity);
+          }
+
+          this.syncFeatureClasses(poiFeature);
+
+          if (poiFeature.dirty) {
+            let markerStyle = {
+              iconName: feature.poiPreset.icon,
+              iconTint: 0x111111,
+              markerName: 'pin',
+              markerTint: 0xffffff
+            };
+
+            if (hasWikidata(entity)) {
+              markerStyle.iconTint = 0x444444;
+              markerStyle.labelTint = 0xdddddd;
+              markerStyle.markerName = 'boldPin';
+              markerStyle.markerTint = 0xdddddd;
+            }
+            poiFeature.style = markerStyle;
+            poiFeature.label = feature.label;
+          }
+
+          poiFeature.update(viewport, zoom);
+          this.retainFeature(poiFeature, frame);
+        }
 
       }
     }
@@ -469,14 +470,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const parts = entity.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-//        const segments = parts[i];
         const part = parts[i];
-        const segments = (part.type === 'LineString') ? [part.origCoords]
-          : (part.type === 'Polygon') ? part.origCoords
+        if (!part.world) continue;  // invalid?
+        const rings = (part.type === 'LineString') ? [part.world.coords]
+          : (part.type === 'Polygon') ? part.world.coords
           : [];
 
-        for (let j = 0; j < segments.length; ++j) {
-          const coords = segments[j];
+        for (let j = 0; j < rings.length; ++j) {
+          // const coords = rings[j];
           const featureID = `${this.layerID}-${entityID}-${i}-${j}`;
           let feature = this.features.get(featureID);
 
@@ -494,7 +495,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           if (feature.v !== version) {
             feature.v = version;
             // feature.geometry.setCoords(coords);
-            feature.setGeometry(part);
+            feature.setCoords(part.world);
             feature.parentContainer = levelContainer;    // Change layer stacking if necessary
             feature.container.zIndex = zindex;
 
@@ -620,7 +621,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.v = version;
         // feature.geometry.setCoords(node.loc);
         const part = node.geoms.parts[0];
-        feature.setGeometry(part);
+        feature.setCoords(part.world);
         feature.setData(nodeID, node);
       }
 
@@ -708,7 +709,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.v = version;
         // feature.geometry.setCoords(node.loc);
         const part = node.geoms.parts[0];
-        feature.setGeometry(part);
+        feature.setCoords(part.world);
         feature.setData(nodeID, node);
       }
 
@@ -789,7 +790,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const nodes = graph.childNodes(way);
       if (!nodes.length) continue;
 
-      // Compute midpoints in projected coordinates
+      // Compute midpoints in projected screen coordinates
+      // We do this so that we can skip midpoints that are closer than the minimum distance.
       let nodeData = nodes.map(node => {
         return {
           id: node.id,
@@ -808,15 +810,17 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const dist = vecLength(a.point, b.point);
         if (dist < MIN_MIDPOINT_DIST) continue;
 
-        const pos = vecInterp(a.point, b.point, 0.5);
+        const point = vecInterp(a.point, b.point, 0.5);
         const rot = vecAngle(a.point, b.point) + viewport.transform.rotation;
-        const loc = viewport.unproject(pos);  // store as wgs84 lon/lat
+        const world = viewport.screenToWorld(point);
+        const loc = viewport.worldToWgs84(world);  // store as wgs84 lon/lat
         const midpoint = {
           type: 'midpoint',
           id: midpointID,
           a: a,
           b: b,
           way: way,
+          world: world,
           loc: loc,
           rot: rot
         };
@@ -827,34 +831,35 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
     }
 
-//    for (const [midpointID, midpoint] of midpoints) {
-//      const featureID = `${this.layerID}-${midpointID}`;
-//      let feature = this.features.get(featureID);
-//
-//      if (!feature) {
-//        feature = new PixiFeaturePoint(this, featureID);
-//        feature.style = MIDPOINT_STYLE;
-//        feature.parentContainer = selectedContainer;
-//      }
-//
-//      // Something about the midpoint has changed
-//      const v = _midpointVersion(midpoint);
-//      if (feature.v !== v) {
-//        feature.v = v;
-//        feature.geometry.setCoords(midpoint.loc);
-//
-//        // Remember to apply rotation - it needs to go on the marker,
-//        // because the container automatically rotates to be face up.
-//        feature.marker.rotation = midpoint.rot;
-//
-//        feature.setData(midpointID, midpoint);
-//        feature.addChildData(midpoint.way.id, midpointID);
-//      }
-//
-//      this.syncFeatureClasses(feature);
-//      feature.update(viewport, zoom);
-//      this.retainFeature(feature, frame);
-//    }
+    for (const [midpointID, midpoint] of midpoints) {
+      const featureID = `${this.layerID}-${midpointID}`;
+      let feature = this.features.get(featureID);
+
+      if (!feature) {
+        feature = new PixiFeaturePoint(this, featureID);
+        feature.style = MIDPOINT_STYLE;
+        feature.parentContainer = selectedContainer;
+      }
+
+      // Something about the midpoint has changed
+      const v = _midpointVersion(midpoint);
+      if (feature.v !== v) {
+        feature.v = v;
+        // feature.geometry.setCoords(midpoint.loc);
+        feature.setCoords({ coords: midpoint.world });
+
+        // Remember to apply rotation - it needs to go on the marker,
+        // because the container automatically rotates to be face up.
+        feature.marker.rotation = midpoint.rot;
+
+        feature.setData(midpointID, midpoint);
+        feature.addChildData(midpoint.way.id, midpointID);
+      }
+
+      this.syncFeatureClasses(feature);
+      feature.update(viewport, zoom);
+      this.retainFeature(feature, frame);
+    }
 
 
     // If any of these change, the midpoint needs to be redrawn.
