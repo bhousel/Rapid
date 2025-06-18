@@ -1,8 +1,9 @@
 import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 import RBush from 'rbush';
-import { geojsonExtent } from '../util/util.js';
+
 import { AbstractSystem } from '../core/AbstractSystem.js';
+import { GeoJSON } from '../models/GeoJSON.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -25,13 +26,12 @@ export class GeoScribbleService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
     this.id = 'geoScribble';
     this.autoStart = false;
-    this._nextID = 0;
 
     this._cache = {};
     this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
@@ -41,7 +41,7 @@ export class GeoScribbleService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return this.resetAsync();
@@ -51,7 +51,7 @@ export class GeoScribbleService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -62,20 +62,21 @@ export class GeoScribbleService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     if (this._cache.inflight) {
-      for (const inflight of this._cache.inflight.values()) {
-        inflight.controller.abort();
+      for (const controller of this._cache.inflight.values()) {
+        controller.abort();
       }
     }
-    this._nextID = 0;
+
     this._cache = {
-      shapes: {},
-      loadedTile: {},
-      inflightTile: {},
-      rbush: new RBush()
+      features:  new Map(),   // Map<featureID, GeoJSON>
+      inflight:  new Map(),   // Map<tileID, AbortController>
+      loaded:    new Map(),   // Map<tileID, Tile>
+      rbush:     new RBush(),
+      lastv:     null         // viewport version last time we fetched data
     };
 
     return Promise.resolve();
@@ -84,22 +85,12 @@ export class GeoScribbleService extends AbstractSystem {
 
   /**
    * getData
-   * Get already loaded image data that appears in the current map view
-   * @return  {Array}  Array of image data
+   * Get already loaded data that appears in the current map view
+   * @return  {Array<GeoJSON>}  Array of data
    */
   getData() {
     const extent = this.context.viewport.visibleExtent();
     return this._cache.rbush.search(extent.bbox()).map(d => d.data);
-  }
-
-
-  /**
-   * getNextID
-   * Get a unique ID
-   * @return  {string}   Unique ID
-   */
-  getNextID() {
-    return (this._nextID++).toString();
   }
 
 
@@ -110,40 +101,46 @@ export class GeoScribbleService extends AbstractSystem {
   loadTiles() {
     const cache = this._cache;
 
-    // determine the needed tiles to cover the view
     const viewport = this.context.viewport;
+    if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
+    cache.lastv = viewport.v;
+
+    // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
 
-    // Abort inflight requests that are no longer needed
-    this._abortUnwantedRequests(cache, tiles);
+    // Abort inflight requests that are no longer needed..
+    for (const [tileID, controller] of cache.inflight) {
+      const needed = tiles.find(tile => tile.id === tileID);
+      if (!needed) {
+        controller.abort();
+      }
+    }
 
     // Issue new requests..
     for (const tile of tiles) {
-      if (cache.loadedTile[tile.id] || cache.inflightTile[tile.id]) continue;
+      const tileID = tile.id;
+      if (cache.loaded.has(tileID) || cache.inflight.has(tileID)) return;
 
       const rect = tile.wgs84Extent.rectangle().join(',');
       const url = GEOSCRIBBLE_API + '?' + utilQsString({ bbox: rect });
 
       const controller = new AbortController();
-      cache.inflightTile[tile.id] = controller;
+      cache.inflight.set(tileID, controller);
 
       fetch(url, { signal: controller.signal })
         .then(utilFetchResponse)
         .then(data => {
-          cache.loadedTile[tile.id] = true;
-          cache.shapes = data;
+          cache.loaded.set(tileID, tile);
 
           for (const shape of data.features) {
-            const featureID = this.getNextID();   // Generate a unique id for this feature
-            shape.id = featureID;
-            shape.__featurehash__ = featureID;    // legacy
+            const feature = new GeoJSON(this.context, shape);
+            const extent = feature.extent();
+            if (!extent) continue;  // invalid shape?
 
-            // afaict the shapes never get updates, so the version can just be 0
-            // (if we ever need to stitch partial geometries together, this will bump their version)
-            shape.v = 0;
+            cache.features.set(feature.id, feature);
 
-            const box = geojsonExtent(shape).bbox();
-            box.data = shape;
+            const box = extent.bbox();
+            box.data = feature;
             cache.rbush.insert(box);
           }
 
@@ -152,31 +149,13 @@ export class GeoScribbleService extends AbstractSystem {
           this.emit('loadedData');
         })
         .catch(err => {
-          if (err.name === 'AbortError') return;    // ok
-          cache.loadedTile[tile.id] = true;         // don't retry
+          if (err.name === 'AbortError') return;  // ok
+          cache.loaded.set(tileID, tile);         // don't retry
+          if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         })
         .finally(() => {
-          delete cache.inflightTile[tile.id];
+          cache.inflight.delete(tileID);
         });
     }
   }
-
-
-  _abortRequest(requests) {
-    for (const controller of Object.values(requests)) {
-      controller.abort();
-    }
-  }
-
-
-  _abortUnwantedRequests(cache, tiles) {
-    Object.keys(cache.inflightTile).forEach(k => {
-      const wanted = tiles.find(tile => k === tile.id);
-      if (!wanted) {
-        this._abortRequest(cache.inflightTile[k]);
-        delete cache.inflightTile[k];
-      }
-    });
-  }
-
 }

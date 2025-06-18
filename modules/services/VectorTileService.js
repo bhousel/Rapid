@@ -32,23 +32,22 @@ export class VectorTileService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
     this.id = 'vectortile';
 
     // Sources are identified by their URL template..
-    this._sources = new Map();   // Map(template -> source)
+    this._sources = new Map();   // Map<template, source>
     this._tiler = new Tiler().tileSize(512).margin(1);
-//    this._nextID = 0;
   }
 
 
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise}  Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return Promise.resolve();
@@ -97,16 +96,6 @@ export class VectorTileService extends AbstractSystem {
   }
 
 
-//  /**
-//   * getNextID
-//   * Get a unique ID
-//   * @return  {string}   Unique ID
-//   */
-//  getNextID() {
-//    return (this._nextID++).toString();
-//  }
-
-
   /**
    * getData
    * Get already loaded data that appears in the current map view
@@ -123,9 +112,6 @@ export class VectorTileService extends AbstractSystem {
 
     // Note that because vector tiles are 512px, they are offset by -1 zoom level
     // from the main map zoom, which follows 256px and OSM convention.
-//worldcoordinates
-//    const scale = viewport.transform.scale;
-//    const zoom = Math.round(geoScaleToZoom(scale, 512));
     const z = viewport.transform.zoom - 1;
     const zoom = Math.round(Math.max(z, 0));
 
@@ -388,7 +374,7 @@ export class VectorTileService extends AbstractSystem {
 
           const feat = new GeoJSON(this.context, part);
           const featureID = feat.id;  // the generated ID
-// todo, rewind?  really something that `GeometryPart` should handle now
+          // rewind?  really something that `GeometryPart` should handle now
 
           // For Polygons only, determine if this feature clips to a tile edge.
           // If so, we'll try to merge it with similar features on the neighboring tile
@@ -554,8 +540,7 @@ export class VectorTileService extends AbstractSystem {
     this._uncacheFeatureIDs(cache, featureIDs);
 
     // Union the coordinates together
-    // const sourceCoords = features.map(feature => feature.geojson.geometry.coordinates);
-// (I believe these should all be single part Polygons)
+    // (I believe these should all be single part Polygons)
     const sourceCoords = features.map(feature => feature.geoms.parts[0].orig.coords);
     const mergedCoords = Polyclip.union(...sourceCoords);
     if (!mergedCoords || !mergedCoords.length) {
@@ -589,7 +574,7 @@ export class VectorTileService extends AbstractSystem {
 
       const feat = new GeoJSON(this.context, part);
       const featureID = feat.id;  // the generated ID
-// todo, rewind?  really something that `GeometryPart` should handle now
+      // rewind?  really something that `GeometryPart` should handle now
 
       // More merging may be necessary
       if (extent.min[0] < lowTileExtent.min[0])                   { this._queueMerge(cache, featureID, prophash, lowLeftEdge); }

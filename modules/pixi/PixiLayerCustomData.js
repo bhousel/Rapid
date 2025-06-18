@@ -93,7 +93,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       if (zoom >= 13) {  // avoid firing off too many API requests
         vtService.loadTiles(this._template);
       }
-      // geoData = vtService.getData(this._template).map(d => d.geojson);
       geoData = vtService.getData(this._template);
     } else {
       geoData = this._geoData;  //geojsonFeatures(this._geojson);
@@ -237,11 +236,11 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
   /**
    * renderLines
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  lines      Array of line data
-   * @param styleOverride Custom style
+   * @param  frame          Integer frame being rendered
+   * @param  viewport       Pixi viewport to use for rendering
+   * @param  zoom           Effective zoom to use for rendering
+   * @param  lines          Array of line data
+   * @param  styleOverride  Custom style
    */
   renderLines(frame, viewport, zoom, lines, styleOverride) {
     const l10n = this.context.systems.l10n;
@@ -528,16 +527,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       const features = geojsonFeatures(geojson);
       for (const feature of features) {
         const d = new GeoJSON(this.context, feature);
-// could do this if we really need to, but lets not
-// d.updateSelf({ __featurehash__: d.id });  // legacy
         this._geoData.push(d);
         this._geoDataExtent.extendSelf(d.geoms.origExtent);
       }
 
-//      this._geojson = this._ensureIDs(geojson);
-//      geojsonRewind(this._geojson);
-//      this._geojsonExtent = geojsonExtent(geojson);
-      // this._geoDataExtent = this._geojson.geoms.origExtent;
       this.fitZoom();
       this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
     }
@@ -547,41 +540,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     }
   }
 
-
-//  /**
-//   * _ensureIDs
-//   * After loading GeoJSON data, check the Features and make sure they have unique IDs.
-//   * This function modifies the GeoJSON features in place and then returns it.
-//   * @param  {Object}  geojson - A GeoJSON Feature or FeatureCollection
-//   * @return {Object}  The GeoJSON, but with IDs added
-//   */
-//  _ensureIDs(geojson) {
-//    if (!geojson) return null;
-//
-//    for (const feature of geojsonFeatures(geojson)) {
-//      this._ensureFeatureID(feature);
-//    }
-//    return geojson;
-//  }
-//
-//
-//  /**
-//   * _ensureFeatureID
-//   * Ensure that this GeoJSON Feature has a unique ID.
-//   * This function modifies the GeoJSON Feature in place and then returns it.
-//   * @param  {Object}  A GeoJSON feature
-//   * @return {Object}  The GeoJSON Feature, but with an ID added
-//   */
-//  _ensureFeatureID(feature) {
-//    if (!feature) return;
-//
-//    const vtService = this.context.services.vectortile;
-//    const featureID = vtService.getNextID();
-//    feature.id = featureID;
-//    feature.__featurehash__ = featureID;
-//    return feature;
-//  }
-//
 
   /**
    * _getExtension

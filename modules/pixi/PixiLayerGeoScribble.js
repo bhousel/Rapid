@@ -93,12 +93,11 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   /**
    * render
    * Render the geojson custom data
-   * @param  frame        Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom         Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     if (!this.enabled) return;
 
     const geoScribble = this.context.services.geoScribble;
@@ -106,9 +105,10 @@ return; // not yet
 
     const geoData = geoScribble.getData();
 
+    // Determine which renderer(s) to use for each feature
     // No polygons will be returned by the service, so we don't need to consider those types.
-    const lines = geoData.filter(d => d.geometry.type === 'LineString' || d.geometry.type === 'MultiLineString');
-    const points = geoData.filter(d => d.geometry.type === 'Point' || d.geometry.type === 'MultiPoint');
+    const lines = geoData.filter(d => d.geoms.parts.some(part => part.type === 'LineString'));
+    const points = geoData.filter(d => d.geoms.parts.some(part => part.type === 'Point'));
 
     this.renderLines(frame, viewport, zoom, lines);
     this.renderPoints(frame, viewport, zoom, points);
@@ -117,56 +117,57 @@ return; // not yet
 
   /**
    * getLineStyle
-   * @param styleOverride Custom style
-   * @param line the geojson formatted scribble object with the following useful (but optional) style properties:
-   * `thin` (boolean)
+   * @param  props - The GeoJSON properties object, may contain:
+   * `thin`   (boolean)
    * `dashed` (boolean)
-   * `color` (hex code string like `#FFEECC`)
-   * `style` One of: "scribble", "eraser", "road", "track", "footway", "path", "cycleway", "cycleway_shared",
+   * `color`  (hex code string like `#FFEECC`)
+   * `style`  One of: "scribble", "eraser", "road", "track", "footway", "path", "cycleway", "cycleway_shared",
    *          "wall", "fence", "power","stream", "drain", etc.
-   * @return a style object that can be given to the pixi renderer
+   * @return  A style object that can be given to the pixi renderer
    */
-  getLineStyle(styleOverride, line) {
-    // Start with the default style object.
-    const lineStyle = styleOverride || {
+  getLineStyle(props) {
+    const lineStyle = {
       stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
       labelTint: CUSTOM_COLOR
     };
 
-    const color = line.properties.color ? new PIXI.Color(line.properties.color) : CUSTOM_COLOR;
-    const thin = line.properties.thin;
-    const dashed = line.properties.dashed;
+    const color = props.color ? new PIXI.Color(props.color) : CUSTOM_COLOR;
+    const thin = props.thin;
+    const dashed = props.dashed;
 
     // Modify the alpha down a bit to add to 'scribble' factor.
     lineStyle.stroke.alpha = 0.70;
     lineStyle.stroke.color = color;
     lineStyle.stroke.width =  thin ? 4 : 8;
     if (dashed) {
-      lineStyle.stroke.dash = thin ? [12,6] : [24,12]; // Thinner lines get shorter dashes
+      lineStyle.stroke.dash = thin ? [12, 6] : [24, 12]; // Thinner lines get shorter dashes
     }
+
     return lineStyle;
   }
 
 
   /**
    * renderLines
-   * @param  frame        Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom         Effective zoom to use for rendering
-   * @param  lines        Array of line data
-   * @param styleOverride Custom style
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
+   * @param  lines     Array of line data
    */
-  renderLines(frame, viewport, zoom, lines, styleOverride) {
+  renderLines(frame, viewport, zoom, lines) {
     const parentContainer = this.scribblesContainer;
 
     for (const d of lines) {
-      const dataID = d.__featurehash__;
+      const lineStyle = this.getLineStyle(d.properties);
+      const dataID = d.id;
       const version = d.v || 0;
-      const parts = (d.geometry.type === 'LineString') ? [d.geometry.coordinates]
-        : (d.geometry.type === 'MultiLineString') ? d.geometry.coordinates : [];
+      const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-        const coords = parts[i];
+        // Check that this part has coordinates and is a LineString
+        const part = parts[i];
+        if (!part.world || part.type !== 'LineString') continue;
+
         const featureID = `${this.layerID}-${dataID}-${i}`;
         let feature = this.features.get(featureID);
 
@@ -176,7 +177,6 @@ return; // not yet
           feature = null;
         }
 
-        const lineStyle = this.getLineStyle(styleOverride, d);
         if (!feature) {
           feature = new PixiFeatureLine(this, featureID);
           feature.style = lineStyle;
@@ -186,8 +186,8 @@ return; // not yet
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.geometry.setCoords(coords);
           feature.label = d.properties.text;
+          feature.setCoords(part.world);
           feature.setData(dataID, d);
         }
 
@@ -201,10 +201,10 @@ return; // not yet
 
   /**
    * renderPoints
-   * @param  frame        Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom         Effective zoom to use for rendering
-   * @param  lines        Array of point data
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
+   * @param  points    Array of point data
    */
   renderPoints(frame, viewport, zoom, points) {
     const parentContainer = this.scribblesContainer;
@@ -217,13 +217,15 @@ return; // not yet
     };
 
     for (const d of points) {
-      const dataID = d.__featurehash__;
+      const dataID = d.id;
       const version = d.v || 0;
-      const parts = (d.geometry.type === 'Point') ? [d.geometry.coordinates]
-        : (d.geometry.type === 'MultiPoint') ? d.geometry.coordinates : [];
+      const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-        const coords = parts[i];
+        // Check that this part has coordinates and is a Point
+        const part = parts[i];
+        if (!part.world || part.type !== 'Point') continue;
+
         const featureID = `${this.layerID}-${dataID}-${i}`;
         let feature = this.features.get(featureID);
 
@@ -242,8 +244,8 @@ return; // not yet
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.geometry.setCoords(coords);
           feature.label = d.properties.text;
+          feature.setCoords(part.world);
           feature.setData(dataID, d);
         }
 
