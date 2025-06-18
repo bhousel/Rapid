@@ -1,7 +1,7 @@
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
-import { OsmEntity, OsmNode, OsmWay, Marker } from '../models/index.js';
+import { GeoJSON, Marker, OsmEntity, OsmNode, OsmWay } from '../models/index.js';
 import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { geoChooseEdge } from '../geo/index.js';
 import { utilDetect } from '../util/detect.js';
@@ -359,7 +359,7 @@ export class SelectBehavior extends AbstractBehavior {
     if (
       data.props.__fbid__ ||      // Clicked a Rapid feature..
       data.overture ||            // Clicked an Overture feature..
-      data.__featurehash__ ||     // Clicked Custom Data (e.g. gpx track)..
+      data instanceof GeoJSON ||  // Clicked Custom Data (e.g. gpx track)..
       data instanceof Marker ||   // Clicked a Marker (OSM Note, KeepRight, Osmose, Maproulette)..
       data.type === 'detection'   // Clicked on an object detection / traffic sign..
     ) {

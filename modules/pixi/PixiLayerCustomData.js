@@ -1,8 +1,9 @@
+import { Extent } from '@rapid-sdk/math';
 import { gpx, kml } from '@tmcw/togeojson';
-import geojsonRewind from '@mapbox/geojson-rewind';
 import { parse as wktParse } from 'wkt';
 
-import { geojsonExtent, geojsonFeatures } from '../util/util.js';
+import { geojsonFeatures } from '../util/util.js';
+import { GeoJSON } from '../models/GeoJSON.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeatureLine } from './PixiFeatureLine.js';
 import { PixiFeaturePoint } from './PixiFeaturePoint.js';
@@ -84,7 +85,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     if (!this.enabled || !(this.hasData())) return;
 
     const vtService = this.context.services.vectortile;
@@ -93,14 +93,16 @@ return; // not yet
       if (zoom >= 13) {  // avoid firing off too many API requests
         vtService.loadTiles(this._template);
       }
-      geoData = vtService.getData(this._template).map(d => d.geojson);
+      // geoData = vtService.getData(this._template).map(d => d.geojson);
+      geoData = vtService.getData(this._template);
     } else {
-      geoData = geojsonFeatures(this._geojson);
+      geoData = this._geoData;  //geojsonFeatures(this._geojson);
     }
 
-    const polygons = geoData.filter(d => d.geometry.type === 'Polygon' || d.geometry.type === 'MultiPolygon');
-    const lines = geoData.filter(d => d.geometry.type === 'LineString' || d.geometry.type === 'MultiLineString');
-    const points = geoData.filter(d => d.geometry.type === 'Point' || d.geometry.type === 'MultiPoint');
+    // Determine which renderer(s) to use for each feature
+    const polygons = geoData.filter(d => d.geoms.parts.some(part => part.type === 'Polygon'));
+    const lines = geoData.filter(d => d.geoms.parts.some(part => part.type === 'LineString'));
+    const points = geoData.filter(d => d.geoms.parts.some(part => part.type === 'Point'));
 
     this.renderPolygons(frame, viewport, zoom, polygons);
     this.renderLines(frame, viewport, zoom, lines);
@@ -193,13 +195,15 @@ return; // not yet
     };
 
     for (const d of polygons) {
-      const dataID = d.__featurehash__;
+      const dataID = d.id;
       const version = d.v || 0;
-      const parts = (d.geometry.type === 'Polygon') ? [d.geometry.coordinates]
-        : (d.geometry.type === 'MultiPolygon') ? d.geometry.coordinates : [];
+      const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-        const coords = parts[i];
+        // Check that this part has coordinates and is a Polygon (we may be part of a FeatureCollection)
+        const part = parts[i];
+        if (!part.world || part.type !== 'Polygon') continue;
+
         const featureID = `${this.layerID}-${dataID}-${i}`;
         let feature = this.features.get(featureID);
 
@@ -218,8 +222,8 @@ return; // not yet
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.geometry.setCoords(coords);
           feature.label = l10n.displayName(d.properties);
+          feature.setCoords(part.world);
           feature.setData(dataID, d);
         }
 
@@ -249,13 +253,15 @@ return; // not yet
     };
 
     for (const d of lines) {
-      const dataID = d.__featurehash__;
+      const dataID = d.id;
       const version = d.v || 0;
-      const parts = (d.geometry.type === 'LineString') ? [d.geometry.coordinates]
-        : (d.geometry.type === 'MultiLineString') ? d.geometry.coordinates : [];
+      const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-        const coords = parts[i];
+        // Check that this part has coordinates and is a LineString (we may be part of a FeatureCollection)
+        const part = parts[i];
+        if (!part.world || part.type !== 'LineString') continue;
+
         const featureID = `${this.layerID}-${dataID}-${i}`;
         let feature = this.features.get(featureID);
 
@@ -274,8 +280,8 @@ return; // not yet
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.geometry.setCoords(coords);
           feature.label = l10n.displayName(d.properties);
+          feature.setCoords(part.world);
           feature.setData(dataID, d);
         }
 
@@ -306,13 +312,15 @@ return; // not yet
     };
 
     for (const d of points) {
-      const dataID = d.__featurehash__;
+      const dataID = d.id;
       const version = d.v || 0;
-      const parts = (d.geometry.type === 'Point') ? [d.geometry.coordinates]
-        : (d.geometry.type === 'MultiPoint') ? d.geometry.coordinates : [];
+      const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-        const coords = parts[i];
+        // Check that this part has coordinates and is a Point (we may be part of a FeatureCollection)
+        const part = parts[i];
+        if (!part.world || part.type !== 'Point') continue;
+
         const featureID = `${this.layerID}-${dataID}-${i}`;
         let feature = this.features.get(featureID);
 
@@ -331,8 +339,8 @@ return; // not yet
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.geometry.setCoords(coords);
           feature.label = l10n.displayName(d.properties);
+          feature.setCoords(part.world);
           feature.setData(dataID, d);
         }
 
@@ -347,10 +355,10 @@ return; // not yet
   /**
    * hasData
    * Return true if there is custom data to display
-   * @return {boolean}  `true` if there is a vector tile template or geojson to display
+   * @return {boolean}  `true` if there is a vector tile template or file data to display
    */
   hasData() {
-    return !!(this._template || this._geojson);
+    return !!(this._template || Array.isArray(this._geoData));
   }
 
   /**
@@ -364,10 +372,10 @@ return; // not yet
 
   /**
    * fitZoom
-   * Fits the map view to show the extent of the loaded geojson data
+   * Fits the map view to show the extent of the loaded file data
    */
   fitZoom() {
-    const extent = this._geojsonExtent;
+    const extent = this._geoDataExtent;
     if (!extent) return;
 
     this.context.systems.map.trimmedExtent(extent);
@@ -510,11 +518,26 @@ return; // not yet
     }
 
     geojson = geojson || {};
+
     if (Object.keys(geojson).length) {
       this._dataUsed = `${extension} data file`;
-      this._geojson = this._ensureIDs(geojson);
-      geojsonRewind(this._geojson);
-      this._geojsonExtent = geojsonExtent(geojson);
+      this._geoData = [];
+      this._geoDataExtent = new Extent();
+
+      // We may have a Feature or a FeatureCollection, coax it to an array of Features.
+      const features = geojsonFeatures(geojson);
+      for (const feature of features) {
+        const d = new GeoJSON(this.context, feature);
+// could do this if we really need to, but lets not
+// d.updateSelf({ __featurehash__: d.id });  // legacy
+        this._geoData.push(d);
+        this._geoDataExtent.extendSelf(d.geoms.origExtent);
+      }
+
+//      this._geojson = this._ensureIDs(geojson);
+//      geojsonRewind(this._geojson);
+//      this._geojsonExtent = geojsonExtent(geojson);
+      // this._geoDataExtent = this._geojson.geoms.origExtent;
       this.fitZoom();
       this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
     }
@@ -525,40 +548,40 @@ return; // not yet
   }
 
 
-  /**
-   * _ensureIDs
-   * After loading GeoJSON data, check the Features and make sure they have unique IDs.
-   * This function modifies the GeoJSON features in place and then returns it.
-   * @param  {Object}  geojson - A GeoJSON Feature or FeatureCollection
-   * @return {Object}  The GeoJSON, but with IDs added
-   */
-  _ensureIDs(geojson) {
-    if (!geojson) return null;
-
-    for (const feature of geojsonFeatures(geojson)) {
-      this._ensureFeatureID(feature);
-    }
-    return geojson;
-  }
-
-
-  /**
-   * _ensureFeatureID
-   * Ensure that this GeoJSON Feature has a unique ID.
-   * This function modifies the GeoJSON Feature in place and then returns it.
-   * @param  {Object}  A GeoJSON feature
-   * @return {Object}  The GeoJSON Feature, but with an ID added
-   */
-  _ensureFeatureID(feature) {
-    if (!feature) return;
-
-    const vtService = this.context.services.vectortile;
-    const featureID = vtService.getNextID();
-    feature.id = featureID;
-    feature.__featurehash__ = featureID;
-    return feature;
-  }
-
+//  /**
+//   * _ensureIDs
+//   * After loading GeoJSON data, check the Features and make sure they have unique IDs.
+//   * This function modifies the GeoJSON features in place and then returns it.
+//   * @param  {Object}  geojson - A GeoJSON Feature or FeatureCollection
+//   * @return {Object}  The GeoJSON, but with IDs added
+//   */
+//  _ensureIDs(geojson) {
+//    if (!geojson) return null;
+//
+//    for (const feature of geojsonFeatures(geojson)) {
+//      this._ensureFeatureID(feature);
+//    }
+//    return geojson;
+//  }
+//
+//
+//  /**
+//   * _ensureFeatureID
+//   * Ensure that this GeoJSON Feature has a unique ID.
+//   * This function modifies the GeoJSON Feature in place and then returns it.
+//   * @param  {Object}  A GeoJSON feature
+//   * @return {Object}  The GeoJSON Feature, but with an ID added
+//   */
+//  _ensureFeatureID(feature) {
+//    if (!feature) return;
+//
+//    const vtService = this.context.services.vectortile;
+//    const featureID = vtService.getNextID();
+//    feature.id = featureID;
+//    feature.__featurehash__ = featureID;
+//    return feature;
+//  }
+//
 
   /**
    * _getExtension
@@ -668,8 +691,8 @@ return; // not yet
     this._template = null;
     this._wkt = null;
     this._url = null;
-    this._geojson = null;
-    this._geojsonExtent = null;
+    this._geoData = null;
+    this._geoDataExtent = null;
   }
 
 }

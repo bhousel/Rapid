@@ -7,7 +7,7 @@ export function uiDataHeader(context) {
 
   function dataHeader(selection) {
     let header = selection.selectAll('.data-header')
-      .data((_datum ? [_datum] : []), d => d.__featurehash__ );
+      .data((_datum ? [_datum] : []), d => d.key );
 
     header.exit()
       .remove();
@@ -33,9 +33,9 @@ export function uiDataHeader(context) {
 
 
   dataHeader.datum = function(val) {
-      if (!arguments.length) return _datum;
-      _datum = val;
-      return this;
+    if (!arguments.length) return _datum;
+    _datum = val;
+    return this;
   };
 
 

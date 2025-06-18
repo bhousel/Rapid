@@ -3,7 +3,7 @@ import { interpolateNumber } from 'd3-interpolate';
 import { Extent, vecLength } from '@rapid-sdk/math';
 import _throttle from 'lodash-es/throttle.js';
 
-import { OsmEntity, Marker } from '../models/index.js';
+import { GeoJSON, Marker, OsmEntity } from '../models/index.js';
 import { uiDataEditor } from './data_editor.js';
 import { UiFeatureList } from './UiFeatureList.js';
 import { UiInspector } from './UiInspector.js';
@@ -235,7 +235,7 @@ export class UiSidebar {
     this.reset();
 
     // Hovering on Geo Data (vector tile, geojson, etc..)
-    if (datum?.__featurehash__) {
+    if (datum instanceof GeoJSON) {
       this.show(this.DataEditor.datum(datum));
     // Hovering on Rapid data..
     } else if (datum?.props?.__fbid__) {

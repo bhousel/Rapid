@@ -1,8 +1,7 @@
-import { geoBounds } from 'd3-geo';
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractMode } from './AbstractMode.js';
-import { Marker } from '../models/Marker.js';
+import { GeoJSON, Marker } from '../models/index.js';
 import { uiOsmoseEditor } from '../ui/osmose_editor.js';
 import { uiDataEditor } from '../ui/data_editor.js';
 import { uiDetectionInspector } from '../ui/detection_inspector.js';
@@ -67,12 +66,8 @@ export class SelectMode extends AbstractMode {
     for (const datum of selection.values()) {
       let other;
 
-      if (datum instanceof Marker && datum.extent) {
+      if ((datum instanceof GeoJSON || datum instanceof Marker) && datum.extent) {
         other = datum.extent;
-
-      } else if (datum.__featurehash__) {   // Custom GeoJSON feature
-        const bounds = geoBounds(datum);
-        other = new Extent(bounds[0], bounds[1]);
 
       } else if (datum.props.__fbid__) {  // Rapid feature
         const service = context.services[datum.props.__service__];
@@ -101,7 +96,7 @@ export class SelectMode extends AbstractMode {
         layerID = 'rapid';
       } else if (datum.overture) {  // Overture data
         layerID = 'rapid';
-      } else if (datum.__featurehash__) {  // custom data
+      } else if (datum instanceof GeoJSON) {  // custom data
         layerID = 'custom-data';
       } else if (datum.type === 'detection') {   // A detection (object or sign)
         if (datum.service === 'mapillary' && datum.object_type === 'point') {
@@ -180,7 +175,7 @@ export class SelectMode extends AbstractMode {
       photos.selectDetection(layerID, datum.id);
 
     // Selected custom data (e.g. gpx track)...
-    } else if (datum.__featurehash__) {
+    } else if (datum instanceof GeoJSON) {
       sidebarContent = uiDataEditor(context).datum(datum);
 
     // Selected Overture feature...
