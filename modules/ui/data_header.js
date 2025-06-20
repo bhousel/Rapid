@@ -39,7 +39,7 @@ export function uiDataHeader(context) {
     $$header
       .append('div')
       .attr('class', 'data-header-label')
-      .text(issueTitle);
+      .text(d => issueTitle(d));
   }
 
 
