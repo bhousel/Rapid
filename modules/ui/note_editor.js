@@ -16,384 +16,381 @@ export function uiNoteEditor(context) {
   const noteHeader = uiNoteHeader(context);
   const ViewOn = new UiViewOn(context);
 
-  var _note;
-  var _newNote;
+  let _note;
+  let _newNote;
 
 
-    function render(selection) {
-        var header = selection.selectAll('.header')
-            .data([0]);
+  function render($selection) {
+    const osm = context.services.osm;
 
-        var headerEnter = header.enter()
-            .append('div')
-            .attr('class', 'header fillL');
+    let $header = $selection.selectAll('.header')
+      .data([0]);
 
-        headerEnter
-            .append('button')
-            .attr('class', 'close')
-            .on('click', function() {
-                context.enter('browse');
-            })
-            .call(uiIcon('#rapid-icon-close'));
+    const $$header = $header.enter()
+      .append('div')
+      .attr('class', 'header fillL');
 
-        headerEnter
-            .append('h3')
-            .text(l10n.t('note.title'));
+    $$header
+      .append('button')
+      .attr('class', 'close')
+      .on('click', () => context.enter('browse'))
+      .call(uiIcon('#rapid-icon-close'));
 
-
-        var body = selection.selectAll('.body')
-            .data([0]);
-
-        body = body.enter()
-            .append('div')
-            .attr('class', 'body')
-            .merge(body);
-
-        var editor = body.selectAll('.note-editor')
-            .data([0]);
-
-        editor.enter()
-            .append('div')
-            .attr('class', 'modal-section note-editor')
-            .merge(editor)
-            .call(noteHeader.note(_note))
-            .call(noteComments.note(_note))
-            .call(noteSaveSection);
-
-        ViewOn.stringID = 'inspector.view_on_osm';
-        ViewOn.url = osm?.noteURL(_note);
-
-        const $footer = selection.selectAll('.sidebar-footer')
-          .data([0]);
-
-        $footer.enter()
-          .append('div')
-          .attr('class', 'sidebar-footer')
-          .merge($footer)
-          .call(ViewOn.render)
-          .call(uiNoteReport(context).note(_note));
+    $$header
+      .append('h3')
+      .text(l10n.t('note.title'));
 
 
-        // rerender the note editor on any auth change
-        var osm = context.services.osm;
-        if (osm) {
-            osm.on('authchange', function() {
-                selection.call(render);
-            });
+    let $body = $selection.selectAll('.body')
+      .data([0]);
+
+    $body = $body.enter()
+      .append('div')
+      .attr('class', 'body')
+      .merge($body);
+
+    let $editor = $body.selectAll('.note-editor')
+      .data([0]);
+
+    $editor.enter()
+      .append('div')
+      .attr('class', 'modal-section note-editor')
+      .merge($editor)
+      .call(noteHeader.note(_note))
+      .call(noteComments.note(_note))
+      .call(noteSaveSection);
+
+    ViewOn.stringID = 'inspector.view_on_osm';
+    ViewOn.url = osm?.noteURL(_note);
+
+    const $footer = $selection.selectAll('.sidebar-footer')
+      .data([0]);
+
+    $footer.enter()
+      .append('div')
+      .attr('class', 'sidebar-footer')
+      .merge($footer)
+      .call(ViewOn.render)
+      .call(uiNoteReport(context).note(_note));
+
+
+    // rerender the note editor on any auth change
+    if (osm) {
+      osm.on('authchange', () => {
+        $selection.call(render);
+      });
+    }
+  }
+
+
+  function noteSaveSection($selection) {
+    const isSelected = (_note && _note.id === context.selectedIDs()[0]);
+    let $noteSave = $selection.selectAll('.note-save')
+      .data((isSelected ? [_note] : []), d => d.key);
+
+    // exit
+    $noteSave.exit()
+      .remove();
+
+    // enter
+    const $$noteSave = $noteSave.enter()
+      .append('div')
+      .attr('class', 'note-save save-section cf');
+
+    $$noteSave
+      .append('h4')
+      .attr('class', '.note-save-header')
+      .text(() => {
+        return _note.isNew ? l10n.t('note.newDescription') : l10n.t('note.newComment');
+      });
+
+    const $$textarea = $$noteSave
+      .append('textarea')
+      .attr('class', 'new-comment-input')
+      .attr('placeholder', l10n.t('note.inputPlaceholder'))
+      .attr('maxlength', 1000)
+      .property('value', d => d.props.newComment)
+      .call(utilNoAuto)
+      .on('keydown.note-input', keydown)
+      .on('input.note-input', changeInput)
+      .on('blur.note-input', changeInput);
+
+    if (!$$textarea.empty() && _newNote) {
+      // autofocus the comment field for new notes
+      $$textarea.node().focus();
+    }
+
+    // update
+    $noteSave = $$noteSave
+      .merge($noteSave)
+      .call(renderUserDetails)
+      .call(renderButtons);
+
+
+    // fast submit if user presses cmd+enter
+    function keydown(d3_event) {
+      if (!(d3_event.keyCode === 13 && d3_event.metaKey)) return; // ↩ Return
+
+      let osm = context.services.osm;
+      if (!osm) return;
+
+      let hasAuth = osm.authenticated();
+      if (!hasAuth) return;
+
+      if (!_note.props.newComment) return;
+
+      d3_event.preventDefault();
+
+      d3_select(this)
+        .on('keydown.note-input', null);
+
+      // focus on button and submit
+      window.setTimeout(() => {
+        if (_note.isNew) {
+          $noteSave.selectAll('.save-button').node().focus();
+          clickSave(_note);
+        } else  {
+          $noteSave.selectAll('.comment-button').node().focus();
+          clickComment(_note);
         }
+      }, 10);
     }
 
 
-    function noteSaveSection(selection) {
-        var isSelected = (_note && _note.id === context.selectedIDs()[0]);
-        var noteSave = selection.selectAll('.note-save')
-            .data((isSelected ? [_note] : []), function(d) { return d.props.status + d.id; });
+    function changeInput() {
+      let input = d3_select(this);
+      let val = input.property('value').trim() || undefined;
 
-        // exit
-        noteSave.exit()
-            .remove();
+      // store the unsaved comment with the note itself
+      _note = _note.update({ newComment: val });
 
-        // enter
-        var noteSaveEnter = noteSave.enter()
-            .append('div')
-            .attr('class', 'note-save save-section cf');
+      let osm = context.services.osm;
+      if (osm) {
+        osm.replaceNote(_note);  // update note cache
+      }
 
-        noteSaveEnter
-            .append('h4')
-            .attr('class', '.note-save-header')
-            .text(function() {
-                return _note.isNew() ? l10n.t('note.newDescription') : l10n.t('note.newComment');
-            });
-
-        var commentTextarea = noteSaveEnter
-            .append('textarea')
-            .attr('class', 'new-comment-input')
-            .attr('placeholder', l10n.t('note.inputPlaceholder'))
-            .attr('maxlength', 1000)
-            .property('value', d => d.props.newComment)
-            .call(utilNoAuto)
-            .on('keydown.note-input', keydown)
-            .on('input.note-input', changeInput)
-            .on('blur.note-input', changeInput);
-
-        if (!commentTextarea.empty() && _newNote) {
-            // autofocus the comment field for new notes
-            commentTextarea.node().focus();
-        }
-
-        // update
-        noteSave = noteSaveEnter
-            .merge(noteSave)
-            .call(userDetails)
-            .call(noteSaveButtons);
+      $noteSave
+        .call(renderButtons);
+    }
+  }
 
 
-        // fast submit if user presses cmd+enter
-        function keydown(d3_event) {
-            if (!(d3_event.keyCode === 13 && // ↩ Return
-                d3_event.metaKey)) return;
+  function renderUserDetails($selection) {
+    let $detail = $selection.selectAll('.detail-section')
+      .data([0]);
 
-            var osm = context.services.osm;
-            if (!osm) return;
+    $detail = $detail.enter()
+      .append('div')
+      .attr('class', 'detail-section')
+      .merge($detail);
 
-            var hasAuth = osm.authenticated();
-            if (!hasAuth) return;
+    const osm = context.services.osm;
+    if (!osm) return;
 
-            if (!_note.props.newComment) return;
+    // Add warning if user is not logged in
+    const hasAuth = osm.authenticated();
+    let $auth = $detail.selectAll('.auth-warning')
+      .data(hasAuth ? [] : [0]);
 
-            d3_event.preventDefault();
+    $auth.exit()
+      .transition()
+      .duration(200)
+      .style('opacity', 0)
+      .remove();
 
-            d3_select(this)
-                .on('keydown.note-input', null);
+    const $$auth = $auth.enter()
+      .insert('div', '.tag-reference-body')
+      .attr('class', 'field-warning auth-warning')
+      .style('opacity', 0);
 
-            // focus on button and submit
-            window.setTimeout(function() {
-                if (_note.isNew()) {
-                    noteSave.selectAll('.save-button').node().focus();
-                    clickSave(_note);
-                } else  {
-                    noteSave.selectAll('.comment-button').node().focus();
-                    clickComment(_note);
-                }
-            }, 10);
-        }
+    $$auth
+      .call(uiIcon('#rapid-icon-alert', 'inline'));
+
+    $$auth
+      .append('span')
+      .text(l10n.t('note.login'));
+
+    $$auth
+      .append('a')
+      .attr('target', '_blank')
+      .call(uiIcon('#rapid-icon-out-link', 'inline'))
+      .append('span')
+      .text(l10n.t('login'))
+      .on('click.note-login', e => {
+        e.preventDefault();
+        osm.authenticate();
+      });
+
+    $$auth
+      .transition()
+      .duration(200)
+      .style('opacity', 1);
 
 
-        function changeInput() {
-            var input = d3_select(this);
-            var val = input.property('value').trim() || undefined;
+    let $prose = $detail.selectAll('.note-save-prose')
+      .data(hasAuth ? [0] : []);
 
-            // store the unsaved comment with the note itself
-            _note = _note.update({ newComment: val });
+    $prose.exit()
+      .remove();
 
-            var osm = context.services.osm;
-            if (osm) {
-                osm.replaceNote(_note);  // update note cache
-            }
+    $prose = $prose.enter()
+      .append('p')
+      .attr('class', 'note-save-prose')
+      .text(l10n.t('note.upload_explanation'))
+      .merge($prose);
 
-            noteSave
-                .call(noteSaveButtons);
-        }
+    osm.userDetails((err, user) => {
+      if (err) return;
+
+      let $userLink = d3_select(document.createElement('div'));
+
+      if (user.image_url) {
+        $userLink
+          .append('img')
+          .attr('src', user.image_url)
+          .attr('class', 'icon pre-text user-icon');
+      }
+
+      $userLink
+        .append('a')
+        .attr('class', 'user-info')
+        .text(user.display_name)
+        .attr('href', osm.userURL(user.display_name))
+        .attr('target', '_blank');
+
+      $prose
+        .html(l10n.tHtml('note.upload_explanation_with_user', { user: $userLink.html() }));
+    });
+  }
+
+
+  function renderButtons($selection) {
+    const osm = context.services.osm;
+    const hasAuth = osm && osm.authenticated();
+    const isSelected = (_note && _note.id === context.selectedIDs()[0]);
+
+    let $buttons = $selection.selectAll('.buttons')
+      .data((isSelected ? [_note] : []), d => d.key);
+
+    // exit
+    $buttons.exit()
+      .remove();
+
+    // enter
+    const $$buttons = $buttons.enter()
+      .append('div')
+      .attr('class', 'buttons');
+
+    if (_note.isNew) {
+      $$buttons
+        .append('button')
+        .attr('class', 'button cancel-button secondary-action')
+        .text(l10n.t('confirm.cancel'));
+
+      $$buttons
+        .append('button')
+        .attr('class', 'button save-button action')
+        .text(l10n.t('note.save'));
+
+    } else {
+      $$buttons
+        .append('button')
+        .attr('class', 'button status-button action');
+
+      $$buttons
+        .append('button')
+        .attr('class', 'button comment-button action')
+        .text(l10n.t('note.comment'));
     }
 
 
-    function userDetails(selection) {
-        var detailSection = selection.selectAll('.detail-section')
-            .data([0]);
+    // update
+    $buttons = $buttons
+      .merge($$buttons);
 
-        detailSection = detailSection.enter()
-            .append('div')
-            .attr('class', 'detail-section')
-            .merge(detailSection);
+    $buttons.select('.cancel-button')   // select and propagate data
+      .on('click.cancel', clickCancel);
 
-        var osm = context.services.osm;
-        if (!osm) return;
+    $buttons.select('.save-button')     // select and propagate data
+      .attr('disabled', isSaveDisabled)
+      .on('click.save', clickSave);
 
-        // Add warning if user is not logged in
-        var hasAuth = osm.authenticated();
-        var authWarning = detailSection.selectAll('.auth-warning')
-            .data(hasAuth ? [] : [0]);
+    $buttons.select('.status-button')   // select and propagate data
+      .attr('disabled', (hasAuth ? null : true))
+      .text(d => {
+        const action = (d.props.status === 'open' ? 'close' : 'open');
+        const andComment = (d.props.newComment ? '_comment' : '');
+        return l10n.t('note.' + action + andComment);
+      })
+      .on('click.status', clickStatus);
 
-        authWarning.exit()
-            .transition()
-            .duration(200)
-            .style('opacity', 0)
-            .remove();
-
-        var authEnter = authWarning.enter()
-            .insert('div', '.tag-reference-body')
-            .attr('class', 'field-warning auth-warning')
-            .style('opacity', 0);
-
-        authEnter
-            .call(uiIcon('#rapid-icon-alert', 'inline'));
-
-        authEnter
-            .append('span')
-            .text(l10n.t('note.login'));
-
-        authEnter
-            .append('a')
-            .attr('target', '_blank')
-            .call(uiIcon('#rapid-icon-out-link', 'inline'))
-            .append('span')
-            .text(l10n.t('login'))
-            .on('click.note-login', function(d3_event) {
-                d3_event.preventDefault();
-                osm.authenticate();
-            });
-
-        authEnter
-            .transition()
-            .duration(200)
-            .style('opacity', 1);
+    $buttons.select('.comment-button')   // select and propagate data
+      .attr('disabled', isSaveDisabled)
+      .on('click.comment', clickComment);
 
 
-        var prose = detailSection.selectAll('.note-save-prose')
-            .data(hasAuth ? [0] : []);
-
-        prose.exit()
-            .remove();
-
-        prose = prose.enter()
-            .append('p')
-            .attr('class', 'note-save-prose')
-            .text(l10n.t('note.upload_explanation'))
-            .merge(prose);
-
-        osm.userDetails(function(err, user) {
-            if (err) return;
-
-            var userLink = d3_select(document.createElement('div'));
-
-            if (user.image_url) {
-                userLink
-                    .append('img')
-                    .attr('src', user.image_url)
-                    .attr('class', 'icon pre-text user-icon');
-            }
-
-            userLink
-                .append('a')
-                .attr('class', 'user-info')
-                .text(user.display_name)
-                .attr('href', osm.userURL(user.display_name))
-                .attr('target', '_blank');
-
-            prose
-                .html(l10n.tHtml('note.upload_explanation_with_user', { user: userLink.html() }));
-        });
+    function isSaveDisabled(d) {
+      return (hasAuth && d.props.status === 'open' && d.props.newComment) ? null : true;
     }
+  }
 
 
-    function noteSaveButtons(selection) {
-        var osm = context.services.osm;
-        var hasAuth = osm && osm.authenticated();
-
-        var isSelected = (_note && _note.id === context.selectedIDs()[0]);
-        var buttonSection = selection.selectAll('.buttons')
-            .data((isSelected ? [_note] : []), function(d) { return d.props.status + d.id; });
-
-        // exit
-        buttonSection.exit()
-            .remove();
-
-        // enter
-        var buttonEnter = buttonSection.enter()
-            .append('div')
-            .attr('class', 'buttons');
-
-        if (_note.isNew()) {
-            buttonEnter
-                .append('button')
-                .attr('class', 'button cancel-button secondary-action')
-                .text(l10n.t('confirm.cancel'));
-
-            buttonEnter
-                .append('button')
-                .attr('class', 'button save-button action')
-                .text(l10n.t('note.save'));
-
-        } else {
-            buttonEnter
-                .append('button')
-                .attr('class', 'button status-button action');
-
-            buttonEnter
-                .append('button')
-                .attr('class', 'button comment-button action')
-                .text(l10n.t('note.comment'));
-        }
-
-
-        // update
-        buttonSection = buttonSection
-            .merge(buttonEnter);
-
-        buttonSection.select('.cancel-button')   // select and propagate data
-            .on('click.cancel', clickCancel);
-
-        buttonSection.select('.save-button')     // select and propagate data
-            .attr('disabled', isSaveDisabled)
-            .on('click.save', clickSave);
-
-        buttonSection.select('.status-button')   // select and propagate data
-            .attr('disabled', (hasAuth ? null : true))
-            .text(function(d) {
-                var action = (d.props.status === 'open' ? 'close' : 'open');
-                var andComment = (d.props.newComment ? '_comment' : '');
-                return l10n.t('note.' + action + andComment);
-            })
-            .on('click.status', clickStatus);
-
-        buttonSection.select('.comment-button')   // select and propagate data
-            .attr('disabled', isSaveDisabled)
-            .on('click.comment', clickComment);
-
-
-        function isSaveDisabled(d) {
-            return (hasAuth && d.props.status === 'open' && d.props.newComment) ? null : true;
-        }
+  function clickCancel(d3_event, d) {
+    this.blur();    // avoid keeping focus on the button - iD#4641
+    const osm = context.services.osm;
+    if (osm) {
+      osm.removeNote(d);
     }
+    context.enter('browse');
+    dispatch.call('change');
+  }
 
 
-
-    function clickCancel(d3_event, d) {
-        this.blur();    // avoid keeping focus on the button - #4641
-        var osm = context.services.osm;
-        if (osm) {
-            osm.removeNote(d);
-        }
-        context.enter('browse');
-        dispatch.call('change');
+  function clickSave(d3_event, d) {
+    this.blur();    // avoid keeping focus on the button - iD#4641
+    const osm = context.services.osm;
+    if (osm) {
+      osm.postNoteCreate(d, (err, note) => {
+        dispatch.call('change', note);
+      });
     }
+  }
 
 
-    function clickSave(d3_event, d) {
-        this.blur();    // avoid keeping focus on the button - #4641
-        var osm = context.services.osm;
-        if (osm) {
-            osm.postNoteCreate(d, function(err, note) {
-                dispatch.call('change', note);
-            });
-        }
+  function clickStatus(d3_event, d) {
+    this.blur();    // avoid keeping focus on the button - iD#4641
+    const osm = context.services.osm;
+    if (osm) {
+      const setStatus = (d.props.status === 'open' ? 'closed' : 'open');
+      osm.postNoteUpdate(d, setStatus, (err, note) => {
+        dispatch.call('change', note);
+      });
     }
+  }
 
-
-    function clickStatus(d3_event, d) {
-        this.blur();    // avoid keeping focus on the button - #4641
-        var osm = context.services.osm;
-        if (osm) {
-            var setStatus = (d.props.status === 'open' ? 'closed' : 'open');
-            osm.postNoteUpdate(d, setStatus, function(err, note) {
-                dispatch.call('change', note);
-            });
-        }
+  function clickComment(d3_event, d) {
+    this.blur();    // avoid keeping focus on the button - iD#4641
+    const osm = context.services.osm;
+    if (osm) {
+      osm.postNoteUpdate(d, d.props.status, (err, note) => {
+        dispatch.call('change', note);
+      });
     }
-
-    function clickComment(d3_event, d) {
-        this.blur();    // avoid keeping focus on the button - #4641
-        var osm = context.services.osm;
-        if (osm) {
-            osm.postNoteUpdate(d, d.props.status, function(err, note) {
-                dispatch.call('change', note);
-            });
-        }
-    }
+  }
 
 
-    render.note = function(val) {
-        if (!arguments.length) return _note;
-        _note = val;
-        return render;
-    };
+  render.note = function(val) {
+    if (!arguments.length) return _note;
+    _note = val;
+    return render;
+  };
 
-    render.newNote = function(val) {
-        if (!arguments.length) return _newNote;
-        _newNote = val;
-        return render;
-    };
+  render.newNote = function(val) {
+    if (!arguments.length) return _newNote;
+    _newNote = val;
+    return render;
+  };
 
 
-    return utilRebind(render, dispatch, 'on');
+  return utilRebind(render, dispatch, 'on');
 }

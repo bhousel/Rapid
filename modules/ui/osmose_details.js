@@ -20,82 +20,85 @@ export function uiOsmoseDetails(context) {
     if (!osmose || !d) return '';
 
     // Issue strings are cached from Osmose API
-    const s = osmose.getStrings(d.type);
+    const s = osmose.getStrings(d.props.type);
     return (type in s) ? s[type] : '';
   }
 
 
-  function render(selection) {
-    const details = selection.selectAll('.sidebar-details')
+  function render($selection) {
+    const $details = $selection.selectAll('.sidebar-details')
       .data(_marker ? [_marker] : [], d => d.key);
 
-    details.exit()
+    $details.exit()
       .remove();
 
-    const detailsEnter = details.enter()
+    const $$details = $details.enter()
       .append('div')
       .attr('class', 'sidebar-details qa-details-container');
 
+    const detailHtml = issueString(_marker, 'detail');
+    const trapHtml = issueString(_marker, 'trap');
+    const fixHtml = issueString(_marker, 'fix');
 
     // Description
-    if (issueString(_marker, 'detail')) {
-      const div = detailsEnter
+    if (detailHtml) {
+      const $$div = $$details
         .append('div')
         .attr('class', 'qa-details-subsection');
 
-      div
+      $$div
         .append('h4')
         .text(l10n.t('QA.keepRight.detail_description'));
 
-      div
+      $$div
         .append('p')
         .attr('class', 'qa-details-description-text')
-        .html(d => issueString(d, 'detail'))
+        .html(detailHtml)
         .selectAll('a')
         .attr('rel', 'noopener')
         .attr('target', '_blank');
     }
 
+    const $$detailsDiv = $$details
+      .append('div')
+      .attr('class', 'qa-details-subsection');
+
     // Elements (populated later as data is requested)
-    const detailsDiv = detailsEnter
+    const $$elemsDiv = $$details
       .append('div')
       .attr('class', 'qa-details-subsection');
 
-    const elemsDiv = detailsEnter
-      .append('div')
-      .attr('class', 'qa-details-subsection');
-
-    // Suggested Fix (mustn't exist for every issue type)
-    if (issueString(_marker, 'fix')) {
-      const div = detailsEnter
+    // Suggested Fix (might not exist for every issue type)
+    if (fixHtml) {
+      const $$div = $$details
         .append('div')
         .attr('class', 'qa-details-subsection');
 
-      div
+      $$div
         .append('h4')
         .text(l10n.t('QA.osmose.fix_title'));
 
-      div
+      $$div
         .append('p')
-        .html(d => issueString(d, 'fix'))
+        .html(fixHtml)
         .selectAll('a')
         .attr('rel', 'noopener')
         .attr('target', '_blank');
     }
 
-    // Common Pitfalls (mustn't exist for every issue type)
-    if (issueString(_marker, 'trap')) {
-      const div = detailsEnter
+    // Common Pitfalls (might not exist for every issue type)
+    if (trapHtml) {
+      const $$div = $$details
         .append('div')
         .attr('class', 'qa-details-subsection');
 
-      div
+      $$div
         .append('h4')
         .text(l10n.t('QA.osmose.trap_title'));
 
-      div
+      $$div
         .append('p')
-        .html(d => issueString(d, 'trap'))
+        .html(trapHtml)
         .selectAll('a')
         .attr('rel', 'noopener')
         .attr('target', '_blank');
@@ -103,6 +106,7 @@ export function uiOsmoseDetails(context) {
 
     // Save current item to check if UI changed by time request resolves
     if (!osmose) return;
+
     osmose.loadIssueDetailAsync(_marker)
       .then(d => {
         // Do nothing if _marker has changed by the time Promise resolves
@@ -113,11 +117,11 @@ export function uiOsmoseDetails(context) {
 
         // Things like keys and values are dynamically added to a subtitle string
         if (d.props.detail) {
-          detailsDiv
+          $$detailsDiv
             .append('h4')
             .text(l10n.t('QA.osmose.detail_title'));
 
-          detailsDiv
+          $$detailsDiv
             .append('p')
             .html(d => d.props.detail)
             .selectAll('a')
@@ -126,11 +130,11 @@ export function uiOsmoseDetails(context) {
         }
 
         // Create list of linked issue elements
-        elemsDiv
+        $$elemsDiv
           .append('h4')
           .text(l10n.t('QA.osmose.elems_title'));
 
-        elemsDiv
+        $$elemsDiv
           .append('ul').selectAll('li')
           .data(d.props.elems)
           .enter()
@@ -141,13 +145,13 @@ export function uiOsmoseDetails(context) {
           .html(d => d)
           .each((d, i, nodes) => {
             const node = nodes[i];
-            const link = d3_select(node);
+            const $$link = d3_select(node);
             const entityID = node.textContent;
             const graph = editor.staging.graph;
             const entity = graph.hasEntity(entityID);
 
             // Add click handler
-            link
+            $$link
               .on('mouseenter', () => {
                 utilHighlightEntities([entityID], true, context);
               })

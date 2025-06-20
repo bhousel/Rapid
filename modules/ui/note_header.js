@@ -6,48 +6,48 @@ export function uiNoteHeader(context) {
   let _note;
 
 
-  function render(selection) {
-    let header = selection.selectAll('.note-header')
-      .data((_note ? [_note] : []), d => d.props.status + d.id );
+  function render($selection) {
+    const $header = $selection.selectAll('.note-header')
+      .data((_note ? [_note] : []), d => d.key );
 
-    header.exit()
+    $header.exit()
       .remove();
 
-    let headerEnter = header.enter()
+    const $$header = $header.enter()
       .append('div')
       .attr('class', 'note-header');
 
-    let iconEnter = headerEnter
+    const $$icon = $$header
       .append('div')
       .attr('class', d => `note-header-icon ${d.props.status}`)
-      .classed('new', d => d.id < 0);
+      .classed('new', d => d.isNew);
 
-    iconEnter
+    $$icon
       .append('div')
       .attr('class', 'preset-icon-28')
       .call(uiIcon('#rapid-icon-note', 'note-fill'));
 
-    iconEnter
+    $$icon
       .each(d => {
         let statusIcon;
-        if (d.id < 0) {
+        if (d.isNew) {
           statusIcon = '#rapid-icon-plus';
         } else if (d.props.status === 'open') {
           statusIcon = '#rapid-icon-close';
         } else {
           statusIcon = '#rapid-icon-apply';
         }
-        iconEnter
+        $$icon
           .append('div')
           .attr('class', 'note-icon-annotation')
           .call(uiIcon(statusIcon, 'icon-annotation'));
       });
 
-    headerEnter
+    $$header
       .append('div')
       .attr('class', 'note-header-label')
       .text(d => {
-        if (_note.isNew()) {
+        if (d.isNew) {
           return l10n.t('note.new');
         } else {
           return l10n.t('note.note') + ' ' + d.id + ' ' +

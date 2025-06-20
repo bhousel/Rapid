@@ -8,59 +8,59 @@ export function uiNoteComments(context) {
   let _note;
 
 
-  function render(selection) {
-    if (_note.isNew()) return;  // new notes won't have a comment section
+  function render($selection) {
+    if (!_note || _note.isNew) return;  // new notes won't have a comment section
 
-    let comments = selection.selectAll('.comments-container')
+    let $comments = $selection.selectAll('.comments-container')
       .data([0]);
 
-    comments = comments.enter()
+    $comments = $comments.enter()
       .append('div')
       .attr('class', 'comments-container')
-      .merge(comments);
+      .merge($comments);
 
-    let commentEnter = comments.selectAll('.comment')
+    const $$comment = $comments.selectAll('.comment')
       .data(_note.props.comments)
       .enter()
       .append('div')
       .attr('class', 'comment');
 
-    commentEnter
+    $$comment
       .append('div')
       .attr('class', d => `comment-avatar user-${d.uid}`)
       .call(uiIcon('#rapid-icon-avatar', 'comment-avatar-icon'));
 
-    let mainEnter = commentEnter
+    const $$main = $$comment
       .append('div')
       .attr('class', 'comment-main');
 
-    let metadataEnter = mainEnter
+    const $$metadata = $$main
       .append('div')
       .attr('class', 'comment-metadata');
 
-    metadataEnter
+    $$metadata
       .append('div')
       .attr('class', 'comment-author')
       .each((d, i, nodes) => {
-        let selection = d3_select(nodes[i]);
+        let $selection = d3_select(nodes[i]);
         const osm = context.services.osm;
         if (osm && d.user) {
-          selection = selection
+          $selection = $selection
             .append('a')
             .attr('class', 'comment-author-link')
             .attr('href', osm.userURL(d.user))
             .attr('target', '_blank');
         }
-        selection
+        $selection
           .html(d => d.user || l10n.tHtml('note.anonymous'));
       });
 
-    metadataEnter
+    $$metadata
       .append('div')
       .attr('class', 'comment-date')
       .html(d => l10n.t(`note.status.${d.action}`, { when: localeDateString(d.date) }));
 
-    mainEnter
+    $$main
       .append('div')
       .attr('class', 'comment-text')
       .html(d => d.html)
@@ -68,12 +68,12 @@ export function uiNoteComments(context) {
         .attr('rel', 'noopener nofollow')
         .attr('target', '_blank');
 
-    comments
+    $comments
       .call(replaceAvatars);
   }
 
 
-  function replaceAvatars(selection) {
+  function replaceAvatars($selection) {
     const storage = context.systems.storage;
     const showThirdPartyIcons = storage.getItem('preferences.privacy.thirdpartyicons') ?? 'true';
     const osm = context.services.osm;
@@ -88,7 +88,7 @@ export function uiNoteComments(context) {
       osm.loadUser(uid, (err, user) => {
         if (!user || !user.image_url) return;
 
-        selection.selectAll(`.comment-avatar.user-${uid}`)
+        $selection.selectAll(`.comment-avatar.user-${uid}`)
           .html('')
           .append('img')
           .attr('class', 'icon comment-avatar-icon')

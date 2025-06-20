@@ -78,20 +78,23 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
     const items = osmose.getData();
 
     for (const d of items) {
+      const part = d.geoms.parts[0];
+      if (!part?.world || part?.type !== 'Point') continue;
+
       const featureID = `${this.layerID}-${d.id}`;
       let feature = this.features.get(featureID);
 
       if (!feature) {
         const style = {
           markerName: 'osmose',
-          markerTint: osmose.getColor(d.item),
-          iconName: d.icon
+          markerTint: osmose.getColor(d.props.item),
+          iconName: d.props.iconID
         };
 
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(d.loc);
         feature.style = style;
         feature.parentContainer = parentContainer;
+        feature.setCoords(part.world);
         feature.setData(d.id, d);
       }
 
@@ -114,7 +117,6 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     const osmose = this.context.services.osmose;
     if (!this.enabled || !osmose?.started || zoom < MINZOOM) return;
 

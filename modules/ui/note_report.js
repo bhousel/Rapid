@@ -6,29 +6,27 @@ export function uiNoteReport(context) {
   let _note;
 
 
-  function render(selection) {
+  function render($selection) {
     let url;
     const osm = context.services.osm;
-    if (osm && _note && !_note.isNew()) {
+    if (osm && _note && !_note.isNew) {
       url = osm.noteReportURL(_note);
     }
 
-    let link = selection.selectAll('.note-report')
+    let $link = $selection.selectAll('.note-report')
       .data(url ? [url] : []);
 
-    // exit
-    link.exit()
+    $link.exit()
       .remove();
 
-    // enter
-    let linkEnter = link.enter()
+    const $$link = $link.enter()
       .append('a')
       .attr('class', 'note-report')
       .attr('target', '_blank')
       .attr('href', d => d)
       .call(uiIcon('#rapid-icon-out-link', 'inline'));
 
-    linkEnter
+    $$link
       .append('span')
       .text(l10n.t('note.report'));
   }

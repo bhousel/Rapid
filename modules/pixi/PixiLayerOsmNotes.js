@@ -78,6 +78,9 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     const notes = osm.getNotes();
 
     for (const note of notes) {
+      const part = note.geoms.parts[0];
+      if (!part?.world || part?.type !== 'Point') continue;
+
       const featureID = `${this.layerID}-${note.id}`;
       const version = note.v || 0;
 
@@ -91,7 +94,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
       // If data has changed, replace it..
       if (feature.v !== version) {
         feature.v = version;
-        feature.geometry.setCoords(note.loc);
+        feature.setCoords(part.world);
         feature.setData(note.id, note);
       }
 
@@ -100,11 +103,11 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
       if (feature.dirty) {
         let color = 0xff3300;  // open (red)
         let iconName = 'rapid-icon-close';
-        if (note.status === 'closed') {
+        if (note.props.status === 'closed') {
           color = 0x55dd00;  // closed (green)
           iconName = 'rapid-icon-apply';
         }
-        if (note.isNew()) {
+        if (note.isNew) {
           color = 0xffee00;  // new (yellow)
           iconName = 'rapid-icon-plus';
         }
@@ -134,7 +137,6 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     const osm = this.context.services.osm;
     if (!this.enabled || !osm?.started || zoom < MINZOOM) return;
 

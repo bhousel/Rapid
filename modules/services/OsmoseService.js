@@ -149,7 +149,7 @@ export class OsmoseService extends AbstractSystem {
           for (const feature of (data.features ?? [])) {
             // Osmose issues are uniquely identified by a unique
             // `item` and `class` combination (both integer values)
-            const { item: item, class: cl, uuid: id } = feature.properties;
+            const { item, class: cl, uuid: id } = feature.properties;
             const itemType = `${item}-${cl}`;
             const iconID = this._osmoseData.icons[itemType];
 
@@ -333,7 +333,7 @@ export class OsmoseService extends AbstractSystem {
   removeItem(item) {
     if (!(item instanceof Marker) || !item.id) return;
 
-    this._cache.isseus.delete(item.id);
+    this._cache.issues.delete(item.id);
     this._updateRBush(this._encodeIssueRBush(item), false); // false = remove
   }
 

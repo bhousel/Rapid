@@ -17,39 +17,39 @@ export function uiOsmoseEditor(context) {
   let _marker;
 
 
-  function render(selection) {
-    const header = selection.selectAll('.header')
+  function render($selection) {
+    const $header = $selection.selectAll('.header')
       .data([0]);
 
-    const headerEnter = header.enter()
+    const $$header = $header.enter()
       .append('div')
       .attr('class', 'header fillL');
 
-    headerEnter
+    $$header
       .append('button')
       .attr('class', 'close')
       .on('click', () => context.enter('browse'))
       .call(uiIcon('#rapid-icon-close'));
 
-    headerEnter
+    $$header
       .append('h3')
       .text(l10n.t('QA.osmose.title'));
 
-    let body = selection.selectAll('.body')
+    let $body = $selection.selectAll('.body')
       .data([0]);
 
-    body = body.enter()
+    $body = $body.enter()
       .append('div')
       .attr('class', 'body')
-      .merge(body);
+      .merge($body);
 
-    let editor = body.selectAll('.qa-editor')
+    let $editor = $body.selectAll('.qa-editor')
       .data([0]);
 
-    editor.enter()
+    $editor.enter()
       .append('div')
       .attr('class', 'modal-section qa-editor')
-      .merge(editor)
+      .merge($editor)
       .call(qaHeader.issue(_marker))
       .call(qaDetails.issue(_marker))
       .call(osmoseSaveSection);
@@ -57,7 +57,7 @@ export function uiOsmoseEditor(context) {
     ViewOn.stringID = 'inspector.view_on_osmose';
     ViewOn.url = osmose.itemURL(_marker);
 
-    const $footer = selection.selectAll('.sidebar-footer')
+    const $footer = $selection.selectAll('.sidebar-footer')
       .data([0]);
 
     $footer.enter()
@@ -67,56 +67,58 @@ export function uiOsmoseEditor(context) {
       .call(ViewOn.render);
   }
 
-  function osmoseSaveSection(selection) {
+
+  function osmoseSaveSection($selection) {
     const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
     const isShown = (_marker && isSelected);
-    let saveSection = selection.selectAll('.qa-save')
+    let $saveSection = $selection.selectAll('.qa-save')
       .data(isShown ? [_marker] : [], d => d.key);
 
     // exit
-    saveSection.exit()
+    $saveSection.exit()
       .remove();
 
     // enter
-    const saveSectionEnter = saveSection.enter()
+    const $$saveSection = $saveSection.enter()
       .append('div')
       .attr('class', 'qa-save save-section cf');
 
     // update
-    saveSection = saveSectionEnter
-      .merge(saveSection)
+    $saveSection = $$saveSection
+      .merge($saveSection)
       .call(qaSaveButtons);
   }
 
-  function qaSaveButtons(selection) {
+
+  function qaSaveButtons($selection) {
     const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
-    let buttonSection = selection.selectAll('.buttons')
+    let $buttons = $selection.selectAll('.buttons')
       .data(isSelected ? [_marker] : [], d => d.key);
 
     // exit
-    buttonSection.exit()
+    $buttons.exit()
       .remove();
 
     // enter
-    const buttonEnter = buttonSection.enter()
+    const $$buttons = $buttons.enter()
       .append('div')
       .attr('class', 'buttons');
 
-    buttonEnter
+    $$buttons
       .append('button')
       .attr('class', 'button close-button action');
 
-    buttonEnter
+    $$buttons
       .append('button')
       .attr('class', 'button ignore-button action');
 
     // update
-    buttonSection = buttonSection
-      .merge(buttonEnter);
+    $buttons = $buttons
+      .merge($$buttons);
 
-    buttonSection.select('.close-button')
+    $buttons.select('.close-button')
       .text(l10n.t('QA.keepRight.close'))
       .on('click.close', function(d3_event, d) {
         this.blur();    // avoid keeping focus on the button - iD#4641
@@ -126,7 +128,7 @@ export function uiOsmoseEditor(context) {
         }
       });
 
-    buttonSection.select('.ignore-button')
+    $buttons.select('.ignore-button')
       .text(l10n.t('QA.keepRight.ignore'))
       .on('click.ignore', function(d3_event, d) {
         this.blur();    // avoid keeping focus on the button - iD#4641
