@@ -30,38 +30,38 @@ export function uiKeepRightDetails(context) {
 
 
   function render(selection) {
-    const details = selection.selectAll('.sidebar-details')
+    const $details = selection.selectAll('.sidebar-details')
       .data(_marker ? [_marker] : [], d => d.key);
 
-    details.exit()
+    $details.exit()
       .remove();
 
-    const detailsEnter = details.enter()
+    const $$details = $details.enter()
       .append('div')
       .attr('class', 'sidebar-details qa-details-container');
 
     // description
-    const descriptionEnter = detailsEnter
+    const $$description = $$details
       .append('div')
       .attr('class', 'qa-details-subsection');
 
-    descriptionEnter
+    $$description
       .append('h4')
       .text(l10n.t('QA.keepRight.detail_description'));
 
-    descriptionEnter
+    $$description
       .append('div')
       .attr('class', 'qa-details-description-text')
       .html(issueDetailHTML);
 
     // If there are entity links in the error message..
-    let relatedEntities = [];
-    descriptionEnter.selectAll('.error_entity_link, .error_object_link')
+    const relatedEntities = [];
+    $$description.selectAll('.error_entity_link, .error_object_link')
       .attr('href', '#')
       .each((d, i, nodes) => {
         const node = nodes[i];
-        const link = d3_select(node);
-        const isObjectLink = link.classed('error_object_link');
+        const $link = d3_select(node);
+        const isObjectLink = $link.classed('error_object_link');
         const entityID = isObjectLink ? (_marker.props.objectType.charAt(0) + _marker.props.objectId) : node.textContent;
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(entityID);
@@ -69,7 +69,7 @@ export function uiKeepRightDetails(context) {
         relatedEntities.push(entityID);
 
         // Add click handler
-        link
+        $link
           .on('mouseenter', () => {
             utilHighlightEntities([entityID], true, context);
           })

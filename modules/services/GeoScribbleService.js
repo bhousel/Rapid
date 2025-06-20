@@ -72,7 +72,7 @@ export class GeoScribbleService extends AbstractSystem {
     }
 
     this._cache = {
-      features:  new Map(),   // Map<featureID, GeoJSON>
+      data:      new Map(),   // Map<dataID, GeoJSON>
       inflight:  new Map(),   // Map<tileID, AbortController>
       loaded:    new Map(),   // Map<tileID, Tile>
       rbush:     new RBush(),
@@ -110,8 +110,8 @@ export class GeoScribbleService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     for (const [tileID, controller] of cache.inflight) {
-      const needed = tiles.find(tile => tile.id === tileID);
-      if (!needed) {
+      const isNeeded = tiles.find(tile => tile.id === tileID);
+      if (!isNeeded) {
         controller.abort();
       }
     }
@@ -119,7 +119,7 @@ export class GeoScribbleService extends AbstractSystem {
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
-      if (cache.loaded.has(tileID) || cache.inflight.has(tileID)) return;
+      if (cache.loaded.has(tileID) || cache.inflight.has(tileID)) continue;
 
       const rect = tile.wgs84Extent.rectangle().join(',');
       const url = GEOSCRIBBLE_API + '?' + utilQsString({ bbox: rect });
@@ -129,25 +129,7 @@ export class GeoScribbleService extends AbstractSystem {
 
       fetch(url, { signal: controller.signal })
         .then(utilFetchResponse)
-        .then(data => {
-          cache.loaded.set(tileID, tile);
-
-          for (const shape of data.features) {
-            const feature = new GeoJSON(this.context, shape);
-            const extent = feature.extent();
-            if (!extent) continue;  // invalid shape?
-
-            cache.features.set(feature.id, feature);
-
-            const box = extent.bbox();
-            box.data = feature;
-            cache.rbush.insert(box);
-          }
-
-          const gfx = this.context.systems.gfx;
-          gfx.deferredRedraw();
-          this.emit('loadedData');
-        })
+        .then(response => this._gotTile(tile, response))
         .catch(err => {
           if (err.name === 'AbortError') return;  // ok
           cache.loaded.set(tileID, tile);         // don't retry
@@ -158,4 +140,39 @@ export class GeoScribbleService extends AbstractSystem {
         });
     }
   }
+
+
+  /**
+   * _gotTile
+   * Parse the response from the tile fetch
+   * @param  {Object}  tile - Tile data
+   * @param  {Object}  response - Response data
+   */
+  _gotTile(tile, response) {
+    const cache = this._cache;
+    cache.loaded.set(tile.id, tile);
+
+    if (!Array.isArray(response?.features)) {
+      throw new Error('Invalid response');
+    }
+
+    for (const props of response.features) {
+      props.serviceID = this.id;
+
+      const d = new GeoJSON(this.context, props);
+      const extent = d.extent();
+      if (!extent) continue;  // invalid shape?
+
+      cache.data.set(d.id, d);
+
+      const box = extent.bbox();
+      box.data = d;
+      cache.rbush.insert(box);
+    }
+
+    const gfx = this.context.systems.gfx;
+    gfx.deferredRedraw();
+    this.emit('loadedData');
+  }
+
 }

@@ -54,7 +54,7 @@ export class KeepRightService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -64,16 +64,15 @@ export class KeepRightService extends AbstractSystem {
     // persistent data - loaded at init
     this._krData = { errorTypes: {}, localizeStrings: {} };
 
-    this._cache = null;   // cache gets replaced on init/reset
+    this._cache = {};
     this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
-    this._lastv = null;
   }
 
 
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return this.resetAsync();
@@ -83,7 +82,7 @@ export class KeepRightService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     const assets = this.context.systems.assets;
@@ -98,23 +97,24 @@ export class KeepRightService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
-    if (this._cache) {
-      Object.values(this._cache.inflightTile).forEach(controller => this._abortRequest(controller));
+    if (this._cache.inflightTile) {
+      for (const controller of this._cache.inflightTile.values()) {
+        controller.abort();
+      }
     }
 
     this._cache = {
-      data: {},
-      loadedTile: {},
-      inflightTile: {},
-      inflightPost: {},
-      closed: {},
-      rbush: new RBush()
+      data:          new Map(),   // Map<dataID, Marker>
+      loadedTile:    new Map(),   // Map<tileID, Tile>
+      inflightTile:  new Map(),   // Map<tileID, AbortController>
+      inflightPost:  new Map(),   // Map<dataID, AbortController>
+      closed:        {},
+      rbush:         new RBush(),
+      lastv:         null         // viewport version last time we fetched data
     };
-
-    this._lastv = null;
 
     return Promise.resolve();
   }
@@ -137,130 +137,148 @@ export class KeepRightService extends AbstractSystem {
    * KeepRight API:  http://osm.mueschelsoft.de/keepright/interfacing.php
    */
   loadTiles() {
-    const options = {
-      format: 'geojson',
-      ch: KR_RULES
-    };
+    const cache = this._cache;
+    const options = { format: 'geojson', ch: KR_RULES };
 
     const viewport = this.context.viewport;
-    if (this._lastv === viewport.v) return;  // exit early if the view is unchanged
-    this._lastv = viewport.v;
+    if (cache._lastv === viewport.v) return;  // exit early if the view is unchanged
+    cache._lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    this._abortUnwantedRequests(this._cache, tiles);
+    for (const [tileID, controller] of cache.inflightTile) {
+      const isNeeded = tiles.find(tile => tile.id === tileID);
+      if (!isNeeded) {
+        controller.abort();
+      }
+    }
 
     // Issue new requests..
     for (const tile of tiles) {
-      if (this._cache.loadedTile[tile.id] || this._cache.inflightTile[tile.id]) continue;
+      const tileID = tile.id;
+      if (cache.loadedTile.has(tileID) || cache.loadedTile.has(tileID)) continue;
 
       const [ left, top, right, bottom ] = tile.wgs84Extent.rectangle();
       const params = Object.assign({}, options, { left, bottom, right, top });
       const url = `${KEEPRIGHT_API}/export.php?` + utilQsString(params);
-      const controller = new AbortController();
 
-      this._cache.inflightTile[tile.id] = controller;
+      const controller = new AbortController();
+      cache.inflightTile.set(tileID, controller);
 
       fetch(url, { signal: controller.signal })
         .then(utilFetchResponse)
-        .then(data => {
-          delete this._cache.inflightTile[tile.id];
-          this._cache.loadedTile[tile.id] = true;
-          if (!data || !data.features || !data.features.length) {
-            throw new Error('No Data');
-          }
-
-          for (const feature of data.features) {
-            const {
-              properties: {
-                error_type: itemType,
-                error_id: id,
-                comment = null,
-                object_id: objectId,
-                object_type: objectType,
-                schema,
-                title
-              }
-            } = feature;
-            let {
-              geometry: { coordinates: loc },
-              properties: { description = '' }
-            } = feature;
-
-            // if there is a parent, save its error type e.g.:
-            //  Error 191 = "highway-highway"
-            //  Error 190 = "intersections without junctions"  (parent)
-            const issueTemplate = this._krData.errorTypes[itemType];
-            const parentIssueType = (Math.floor(itemType / 10) * 10).toString();
-
-            // try to handle error type directly, fallback to parent error type.
-            const whichType = issueTemplate ? itemType : parentIssueType;
-            const whichTemplate = this._krData.errorTypes[whichType];
-
-            // Rewrite a few of the errors at this point..
-            // This is done to make them easier to linkify and translate.
-            switch (whichType) {
-              case '170':
-                description = `This feature has a FIXME tag: ${description}`;
-                break;
-              case '292':
-              case '293':
-                description = description.replace('A turn-', 'This turn-');
-                break;
-              case '294':
-              case '295':
-              case '296':
-              case '297':
-              case '298':
-                description = `This turn-restriction~${description}`;
-                break;
-              case '300':
-                description = 'This highway is missing a maxspeed tag';
-                break;
-              case '411':
-              case '412':
-              case '413':
-                description = `This feature~${description}`;
-                break;
-            }
-
-            loc = this._preventCoincident(this._cache.rbush, loc);
-
-            const props = {
-              id: id,
-              loc: loc,
-              type: itemType,
-              comment: comment,
-              description: description,
-              whichType: whichType,
-              parentIssueType: parentIssueType,
-              severity: whichTemplate.severity || 'error',
-              objectId: objectId,
-              objectType: objectType,
-              schema: schema,
-              title: title,
-              serviceID: 'keepright'
-            };
-
-            props.replacements = this._tokenReplacements(props);
-
-            const d = new Marker(this.context, props);
-            this._cache.data[id] = d;
-            this._cache.rbush.insert(this._encodeIssueRBush(d));
-          }
-
-          const gfx = this.context.systems.gfx;
-          gfx.deferredRedraw();
-          this.emit('loadedData');
+        .then(response => this._gotTile(tile, response))
+        .catch(err => {
+          if (err.name === 'AbortError') return;   // ok
+          cache.loadedTile.set(tileID, tile);      // don't retry
+          if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         })
-        .catch(() => {
-          delete this._cache.inflightTile[tile.id];
-          this._cache.loadedTile[tile.id] = true;
+        .finally(() => {
+          cache.inflightTile.delete(tileID);
         });
-
     }
+  }
+
+
+  /**
+   * _gotTile
+   * Parse the response from the tile fetch
+   * @param  {Object}  tile - Tile data
+   * @param  {Object}  response - Response data
+   */
+  _gotTile(tile, response) {
+    const cache = this._cache;
+    cache.loadedTile.set(tile.id, tile);
+
+    if (!Array.isArray(response?.features)) {
+      throw new Error('Invalid response');
+    }
+
+    for (const feature of response.features) {
+      const {
+        properties: {
+          error_type: itemType,
+          error_id: id,
+          comment = null,
+          object_id: objectId,
+          object_type: objectType,
+          schema,
+          title
+        }
+      } = feature;
+      let {
+        geometry: { coordinates: loc },
+        properties: { description = '' }
+      } = feature;
+
+      // if there is a parent, save its error type e.g.:
+      //  Error 191 = "highway-highway"
+      //  Error 190 = "intersections without junctions"  (parent)
+      const issueTemplate = this._krData.errorTypes[itemType];
+      const parentIssueType = (Math.floor(itemType / 10) * 10).toString();
+
+      // try to handle error type directly, fallback to parent error type.
+      const whichType = issueTemplate ? itemType : parentIssueType;
+      const whichTemplate = this._krData.errorTypes[whichType];
+
+      // Rewrite a few of the errors at this point..
+      // This is done to make them easier to linkify and translate.
+      switch (whichType) {
+        case '170':
+          description = `This feature has a FIXME tag: ${description}`;
+          break;
+        case '292':
+        case '293':
+          description = description.replace('A turn-', 'This turn-');
+          break;
+        case '294':
+        case '295':
+        case '296':
+        case '297':
+        case '298':
+          description = `This turn-restriction~${description}`;
+          break;
+        case '300':
+          description = 'This highway is missing a maxspeed tag';
+          break;
+        case '411':
+        case '412':
+        case '413':
+          description = `This feature~${description}`;
+          break;
+      }
+
+      loc = this._preventCoincident(cache.rbush, loc);
+
+      const props = {
+        id: id,
+        loc: loc,
+        itemType: itemType,
+        comment: comment,
+        description: description,
+        whichType: whichType,
+        parentIssueType: parentIssueType,
+        severity: whichTemplate.severity || 'error',
+        objectId: objectId,
+        objectType: objectType,
+        schema: schema,
+        title: title,
+        serviceID: this.id
+      };
+
+      props.replacements = this._tokenReplacements(props);
+
+      const d = new Marker(this.context, props);
+
+      cache.data.set(d.id, d);
+      cache.rbush.insert(this._encodeIssueRBush(d));
+    }
+
+    const gfx = this.context.systems.gfx;
+    gfx.deferredRedraw();
+    this.emit('loadedData');
   }
 
 
@@ -272,8 +290,9 @@ export class KeepRightService extends AbstractSystem {
    * @param  {function}  callback
    */
   postUpdate(item, callback) {
+    const cache = this._cache;
     const dataID = item.id;
-    if (this._cache.inflightPost[dataID]) {
+    if (cache.inflightPost.has(dataID)) {
       return callback({ message: 'Error update already inflight', status: -2 }, item);
     }
 
@@ -286,25 +305,23 @@ export class KeepRightService extends AbstractSystem {
       params.co = item.props.newComment;
     }
 
-    // NOTE: This throws a CORS err, but it seems successful.
-    // We don't care too much about the response, so this is fine.
+    // NOTE: We'll send a no-cors request to avoid the CORS error.
+    // We don't care about the response, so this is fine.
     const url = `${KEEPRIGHT_API}/comment.php?` + utilQsString(params);
+
     const controller = new AbortController();
+    cache.inflightPost.set(dataID, controller);
 
-    this._cache.inflightPost[dataID] = controller;
-
-    // Since this is expected to throw an error just continue as if it worked
-    // (worst case scenario the request truly fails and issue will show up if Rapid restarts)
-    fetch(url, { signal: controller.signal })
+    fetch(url, { signal: controller.signal, mode: 'no-cors' })
       .then(utilFetchResponse)
       .finally(() => {
-        delete this._cache.inflightPost[dataID];
+        cache.inflightPost.delete(dataID);
 
         if (item.props.newStatus === 'ignore') {    // ignore permanently (false positive)
           this.removeItem(item);
         } else if (item.props.newStatus === 'ignore_t') {   // ignore temporarily (error fixed)
           this.removeItem(item);
-          this._cache.closed[`${item.props.schema}:${dataID}`] = true;
+          cache.closed[`${item.props.schema}:${dataID}`] = true;
         } else {
           item = this.replaceItem(item.update({
             comment: item.props.newComment,
@@ -325,7 +342,7 @@ export class KeepRightService extends AbstractSystem {
    * @return  {Marker}  the cached marker
    */
   getError(dataID) {
-    return this._cache.data[dataID];
+    return this._cache.data.get(dataID);
   }
 
 
@@ -349,8 +366,8 @@ export class KeepRightService extends AbstractSystem {
   replaceItem(item) {
     if (!(item instanceof Marker) || !item.id) return null;
 
-    this._cache.data[item.id] = item;
-    this._updateRBush(this._encodeIssueRBush(item), true); // true = replace
+    this._cache.data.set(item.id, item);
+    this._updateRBush(this._encodeIssueRBush(item), true);  // true = replace
     return item;
   }
 
@@ -363,8 +380,8 @@ export class KeepRightService extends AbstractSystem {
   removeItem(item) {
     if (!(item instanceof Marker) || !item.id) return;
 
-    delete this._cache.data[item.id];
-    this._updateRBush(this._encodeIssueRBush(item), false); // false = remove
+    this._cache.data.delete(item.id);
+    this._updateRBush(this._encodeIssueRBush(item), false);  // false = remove
   }
 
 
@@ -388,23 +405,6 @@ export class KeepRightService extends AbstractSystem {
     return Object.keys(this._cache.closed).sort();
   }
 
-
-
-  _abortRequest(controller) {
-    if (controller) {
-      controller.abort();
-    }
-  }
-
-  _abortUnwantedRequests(cache, tiles) {
-    Object.keys(cache.inflightTile).forEach(k => {
-      const wanted = tiles.find(tile => k === tile.id);
-      if (!wanted) {
-        this._abortRequest(cache.inflightTile[k]);
-        delete cache.inflightTile[k];
-      }
-    });
-  }
 
   _encodeIssueRBush(d) {
     return { minX: d.loc[0], minY: d.loc[1], maxX: d.loc[0], maxY: d.loc[1], data: d };

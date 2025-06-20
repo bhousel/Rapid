@@ -19,39 +19,39 @@ export function uiKeepRightEditor(context) {
   let _marker;
 
 
-  function render(selection) {
-    const headerEnter = selection.selectAll('.header')
+  function render($selection) {
+    const $$header = $selection.selectAll('.header')
       .data([0])
       .enter()
       .append('div')
       .attr('class', 'header fillL');
 
-    headerEnter
+    $$header
       .append('button')
       .attr('class', 'close')
       .on('click', () => context.enter('browse'))
       .call(uiIcon('#rapid-icon-close'));
 
-    headerEnter
+    $$header
       .append('h3')
       .text(l10n.t('QA.keepRight.title'));
 
 
-    let body = selection.selectAll('.body')
+    let $body = $selection.selectAll('.body')
       .data([0]);
 
-    body = body.enter()
+    $body = $body.enter()
       .append('div')
       .attr('class', 'body')
-      .merge(body);
+      .merge($body);
 
-    const editor = body.selectAll('.qa-editor')
+    const $editor = $body.selectAll('.qa-editor')
       .data([0]);
 
-    editor.enter()
+    $editor.enter()
       .append('div')
       .attr('class', 'modal-section qa-editor')
-      .merge(editor)
+      .merge($editor)
       .call(qaHeader.issue(_marker))
       .call(qaDetails.issue(_marker))
       .call(keepRightSaveSection);
@@ -60,7 +60,7 @@ export function uiKeepRightEditor(context) {
     ViewOn.stringID = 'inspector.view_on_keepRight';
     ViewOn.url = keepright.issueURL(_marker);
 
-    const $footer = selection.selectAll('.sidebar-footer')
+    const $footer = $selection.selectAll('.sidebar-footer')
       .data([0]);
 
     $footer.enter()
@@ -71,28 +71,28 @@ export function uiKeepRightEditor(context) {
   }
 
 
-  function keepRightSaveSection(selection) {
+  function keepRightSaveSection($selection) {
     const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
     const isShown = (_marker && (isSelected || _marker.props.newComment || _marker.props.comment));
-    let saveSection = selection.selectAll('.qa-save')
+    let $saveSection = $selection.selectAll('.qa-save')
       .data(isShown ? [_marker] : [], d => d.key);
 
     // exit
-    saveSection.exit()
+    $saveSection.exit()
       .remove();
 
     // enter
-    const saveSectionEnter = saveSection.enter()
+    const $$saveSection = $saveSection.enter()
       .append('div')
       .attr('class', 'qa-save save-section cf');
 
-    saveSectionEnter
+    $$saveSection
       .append('h4')
       .attr('class', '.qa-save-header')
       .text(l10n.t('QA.keepRight.comment'));
 
-    saveSectionEnter
+    $$saveSection
       .append('textarea')
       .attr('class', 'new-comment-input')
       .attr('placeholder', l10n.t('QA.keepRight.comment_placeholder'))
@@ -103,8 +103,8 @@ export function uiKeepRightEditor(context) {
       .on('blur', changeInput);
 
     // update
-    saveSection = saveSectionEnter
-      .merge(saveSection)
+    $saveSection = $saveSection
+      .merge($$saveSection)
       .call(qaSaveButtons);
 
     function changeInput() {
@@ -122,16 +122,16 @@ export function uiKeepRightEditor(context) {
         keepright.replaceItem(_marker);  // update keepright cache
       }
 
-      saveSection
+      $saveSection
         .call(qaSaveButtons);
     }
   }
 
 
-  function qaSaveButtons(selection) {
+  function qaSaveButtons($selection) {
     const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
-    let buttonSection = selection.selectAll('.buttons')
+    let buttonSection = $selection.selectAll('.buttons')
       .data(isSelected ? [_marker] : [], d => d.key);
 
     // exit

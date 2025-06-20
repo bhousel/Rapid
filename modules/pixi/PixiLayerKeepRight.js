@@ -75,22 +75,28 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
     if (!keepRight?.started) return;
 
     const parentContainer = this.scene.groups.get('qa');
-    const items = keepRight.getData();
+    const data = keepRight.getData();
 
-    for (const d of items) {
+    for (const d of data) {
+      const part = d.geoms.parts[0];
+      if (!part?.world || part?.type !== 'Point') continue;
+
       const featureID = `${this.layerID}-${d.id}`;
       let feature = this.features.get(featureID);
 
       if (!feature) {
         const style = {
-          markerName: 'keepright',
-          markerTint: keepRight.getColor(d.parentIssueType)
+          markerName: 'xlargeCircle',
+          markerTint: '#000000',
+          iconName: 'keepright',
+          iconSize: 16,
+          iconTint: keepRight.getColor(d.props.parentIssueType)
         };
 
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(d.loc);
         feature.style = style;
         feature.parentContainer = parentContainer;
+        feature.setCoords(part.world);
         feature.setData(d.id, d);
       }
 
@@ -109,7 +115,6 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     const keepRight = this.context.services.keepRight;
     if (!this.enabled || !keepRight?.started || zoom < MINZOOM) return;
 

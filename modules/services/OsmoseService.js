@@ -162,7 +162,7 @@ export class OsmoseService extends AbstractSystem {
               item: item,
               type: itemType,
               iconID: iconID,
-              serviceID: 'osmose',
+              serviceID: this.id,
               loc: this._preventCoincident(this._cache.rbush, feature.geometry.coordinates)
             };
 

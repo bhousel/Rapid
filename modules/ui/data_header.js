@@ -5,30 +5,41 @@ export function uiDataHeader(context) {
   const l10n = context.systems.l10n;
   let _datum;
 
-  function dataHeader(selection) {
-    let header = selection.selectAll('.data-header')
+
+  // We show a few different kinds of data in this pane
+  // If there is a `serviceID`, try to show a better title.
+  function issueTitle(d) {
+    const serviceID = d.serviceID || 'custom';
+    const custom =  l10n.t('map_data.layers.custom.title'); // Fallback to "Custom Map Data"
+
+    return l10n.t(`map_data.layers.${serviceID}.title`, { default: custom });
+  }
+
+
+  function dataHeader($selection) {
+    let $header = $selection.selectAll('.data-header')
       .data((_datum ? [_datum] : []), d => d.key );
 
-    header.exit()
+    $header.exit()
       .remove();
 
-    let headerEnter = header.enter()
+    const $$header = $header.enter()
       .append('div')
       .attr('class', 'data-header');
 
-    let iconEnter = headerEnter
+    const $$icon = $$header
       .append('div')
       .attr('class', 'data-header-icon');
 
-    iconEnter
+    $$icon
       .append('div')
       .attr('class', 'preset-icon-28')
       .call(uiIcon('#rapid-icon-data'));
 
-    headerEnter
+    $$header
       .append('div')
       .attr('class', 'data-header-label')
-      .html(l10n.tHtml('map_data.layers.custom.title'));
+      .text(issueTitle);
   }
 
 

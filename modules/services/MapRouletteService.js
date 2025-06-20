@@ -639,7 +639,7 @@ export class MapRouletteService extends AbstractSystem {
     props.id = taskID;               // force to string
     props.parentId = challengeID;    // force to string
     props.loc = this._preventCoincident(cache.rbush, [props.point.lng, props.point.lat]);
-    props.serviceID = 'maproulette';
+    props.serviceID = this.id;
 
     // Create a Marker for the task
     task = new Marker(this.context, props);

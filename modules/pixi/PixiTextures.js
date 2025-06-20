@@ -620,7 +620,7 @@ export class PixiTextures {
       .fill({ color: 0xffffff })
       .stroke({ color: 0x333333, width: 1 });
 
-    this.graphicToTexture('keepright', keepright);
+    this.graphicToTexture('keepright', keepright, { frame: new PIXI.Rectangle(0, 0, 20, 20) });
     this.graphicToTexture('osmnote', osmnote);
     this.graphicToTexture('osmose', osmose);
 

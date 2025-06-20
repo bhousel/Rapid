@@ -1767,7 +1767,7 @@ export class OsmService extends AbstractSystem {
     const props = {
       id: uid,
       loc: this._getLoc(attrs),
-      serviceID: 'osm'
+      serviceID: this.id
     };
 
     // if notes are coincident, move them apart slightly

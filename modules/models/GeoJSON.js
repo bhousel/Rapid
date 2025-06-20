@@ -52,6 +52,17 @@ export class GeoJSON extends AbstractData {
   }
 
   /**
+   * serviceID
+   * GeoJSON may be associated with a 'serviceID' string.
+   * For example 'keepright', 'maproulette', 'mapillary', etc.
+   * @return  {string?}
+   * @readonly
+   */
+  get serviceID() {
+    return this.props.serviceID;
+  }
+
+  /**
    * properties
    * Get the real GeoJSON properties.
    * @return  {Object}
