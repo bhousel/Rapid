@@ -378,7 +378,7 @@ export class DrawLineMode extends AbstractMode {
     const destPoint = vecSubtract(currPoint, nudge);
     const loc = viewport.unproject(destPoint);
 
-    if (locations.blocksAt(loc).length) {  // editing is blocked here
+    if (locations.isBlockedAt(loc)) {  // editing is blocked here
       this._cancel();
       return;
     }
@@ -401,7 +401,7 @@ export class DrawLineMode extends AbstractMode {
     const point = eventData.coord.map;
     let loc = viewport.unproject(point);
 
-    if (locations.blocksAt(loc).length) return;   // editing is blocked here
+    if (locations.isBlockedAt(loc)) return;   // editing is blocked here
 
     const eventManager = context.systems.gfx.events;
     eventManager.setCursor('crosshair');

@@ -3,6 +3,8 @@ import whichPolygon from 'which-polygon';
 import calcArea from '@mapbox/geojson-area';
 
 import { AbstractSystem } from './AbstractSystem.js';
+import { GeoJSON } from '../models/GeoJSON.js';
+
 
 const LOCO = new LocationConflation();    // shared instance of a location-conflation resolver
 
@@ -33,7 +35,7 @@ export class LocationSystem extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  context  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -41,33 +43,35 @@ export class LocationSystem extends AbstractSystem {
     this.dependencies = new Set();
 
     this._wp = null;                        // A which-polygon index
-    this._resolved = new Map();             // Map (id -> GeoJSON feature)
-    this._knownLocationSets = new Map();    // Map (locationSetID -> Number area)
-    this._locationIncludedIn = new Map();   // Map (locationID -> Set(locationSetID) )
-    this._locationExcludedIn = new Map();   // Map (locationID -> Set(locationSetID) )
+    this._resolved = new Map();             // Map<locationSetID|locationID, GeoJSON>
+    this._knownLocationSets = new Map();    // Map<locationSetID, Number area>
+    this._locationIncludedIn = new Map();   // Map<locationID, Set<locationSetID>>
+    this._locationExcludedIn = new Map();   // Map<locationID, Set<locationSetID>>
+
+    // Pre-resolve the worldwide locationSet
+    const world = { locationSet: { include: ['Q2'] } };
+    this._resolveLocationSet(world);
 
     // BLOCKED REGIONS
     this._blocks = [{
+      block: true,
       locationSet: { include: ['Q7835', 'ua'] },
       text: 'Editing has been blocked in this region per request of the OSM Ukrainian community.',
       url: 'https://wiki.openstreetmap.org/wiki/Russian%E2%80%93Ukrainian_war'
     }];
 
     const blockedFeatures = this._blocks.map(block => {
-      // Pre-resolve the blocked region locationSets into GeoJSON features
-      this._resolveLocationSet(block);
-      // Merge the info about the block into the GeoJSON's properties
-      let feature = this._resolved.get(block.locationSetID);
-      Object.assign(feature.properties, block);
-      return feature;
+      // Pre-resolve any blocked region locationSets into GeoJSON data features
+      const data = this._resolveLocationSet(block);
+      // Update the props in-place to include the block information.
+      data.updateSelf(block);
+      // Confusingly, `props` is the where the _actual_ geojson lives.
+      return data.props;
     });
 
     // Make a separate which-polygon just for these (static, very few features, very frequent lookups)
     this._wpblocks = whichPolygon({ type: 'FeatureCollection', features: blockedFeatures });
 
-    // pre-resolve the worldwide locationSet
-    const world = { locationSet: { include: ['Q2'] } };
-    this._resolveLocationSet(world);
     this._rebuildIndex();
   }
 
@@ -75,7 +79,7 @@ export class LocationSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     for (const id of this.dependencies) {
@@ -90,7 +94,7 @@ export class LocationSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise} Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -101,7 +105,7 @@ export class LocationSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();
@@ -113,21 +117,23 @@ export class LocationSystem extends AbstractSystem {
    * Pass an Object with a `locationSet` property.
    * Validates the `locationSet` and sets a `locationSetID` property on the object.
    * To avoid so much computation we only resolve the include and exclude regions, but not the locationSet itself.
+   * If the given Object does not have a valid `locationSet` property, we'll assign it a worldwide `locationSet`.
    *
    * Use `_resolveLocationSet()` instead if you need to resolve geojson of locationSet, for example to render it.
    * Note: You need to call `_rebuildIndex()` after you're all finished validating the locationSets.
    *
-   * @param  `obj`  Object to check, it should have `locationSet` property
+   * @param  {Object}   obj - Object to check, it should have `locationSet` property
    */
   _validateLocationSet(obj) {
     if (obj.locationSetID) return;  // work was done already
+    const context = this.context;
 
     try {
       let locationSet = obj.locationSet;
       if (!locationSet) {
         throw new Error('object missing locationSet property');
       }
-      if (!locationSet.include) {      // missing `include`, default to worldwide include
+      if (!locationSet.include) {      // Missing `include`, default to worldwide include
         locationSet.include = ['Q2'];  // https://github.com/openstreetmap/iD/pull/8305#discussion_r662344647
       }
 
@@ -140,15 +146,15 @@ export class LocationSystem extends AbstractSystem {
       let area = 0;
 
       // Resolve and index the 'includes'
-      (locationSet.include || []).forEach(location => {
+      for (const location of (locationSet.include || [])) {
         const locationID = LOCO.validateLocation(location).id;
-        let geojson = this._resolved.get(locationID);
+        let data = this._resolved.get(locationID);
 
-        if (!geojson) {    // first time seeing a location like this
-          geojson = LOCO.resolveLocation(location).feature;     // resolve to GeoJSON
-          this._resolved.set(locationID, geojson);
+        if (!data) {    // first time seeing a location like this
+          data = new GeoJSON(context, LOCO.resolveLocation(location).feature);
+          this._resolved.set(locationID, data);
         }
-        area += geojson.properties.area;
+        area += data.properties.area;
 
         let s = this._locationIncludedIn.get(locationID);
         if (!s) {
@@ -156,18 +162,18 @@ export class LocationSystem extends AbstractSystem {
           this._locationIncludedIn.set(locationID, s);
         }
         s.add(locationSetID);
-      });
+      }
 
       // Resolve and index the 'excludes'
-      (locationSet.exclude || []).forEach(location => {
+      for (const location of (locationSet.exclude || [])) {
         const locationID = LOCO.validateLocation(location).id;
-        let geojson = this._resolved.get(locationID);
+        let data = this._resolved.get(locationID);
 
-        if (!geojson) {    // first time seeing a location like this
-          geojson = LOCO.resolveLocation(location).feature;     // resolve to GeoJSON
-          this._resolved.set(locationID, geojson);
+        if (!data) {    // first time seeing a location like this
+          data = new GeoJSON(context, LOCO.resolveLocation(location).feature);
+          this._resolved.set(locationID, data);
         }
-        area -= geojson.properties.area;
+        area -= data.properties.area;
 
         let s = this._locationExcludedIn.get(locationID);
         if (!s) {
@@ -175,7 +181,7 @@ export class LocationSystem extends AbstractSystem {
           this._locationExcludedIn.set(locationID, s);
         }
         s.add(locationSetID);
-      });
+      }
 
       this._knownLocationSets.set(locationSetID, area);
 
@@ -190,10 +196,12 @@ export class LocationSystem extends AbstractSystem {
    * _resolveLocationSet
    * Does everything that `_validateLocationSet()` does, but then "resolves" the locationSet into GeoJSON.
    * This step is a bit more computationally expensive, so really only needed if you intend to render the shape.
+   * If the given Object does not have a valid `locationSet` property, we'll assign it a worldwide `locationSet`.
    *
    * Note: You need to call `_rebuildIndex()` after you're all finished validating the locationSets.
    *
-   * @param  `obj`  Object to check, it should have `locationSet` property
+   * @param   {Object}   obj - Object to resolve, it should have `locationSet` property
+   * @return  {GeoJSON}  GeoJSON data feature (fallback to the world feature)
    */
   _resolveLocationSet(obj) {
     this._validateLocationSet(obj);
@@ -209,14 +217,19 @@ export class LocationSystem extends AbstractSystem {
         throw new Error(`locationSet ${locationSetID} resolves to an empty feature.`);
       }
 
-      let geojson = JSON.parse(JSON.stringify(result.feature));   // deep clone
-      geojson.id = locationSetID;      // Important: always use the locationSet `id` (`+[Q30]`), not the feature `id` (`Q30`)
-      geojson.properties.id = locationSetID;
-      this._resolved.set(locationSetID, geojson);
+      // Important: here we use the locationSet `id` (`+[Q30]`), not the feature `id` (`Q30`)
+      const props = JSON.parse(JSON.stringify(result.feature));   // deep clone the GeoJSON feature
+      props.id = locationSetID;
+      props.properties.id = locationSetID;
+
+      const data = new GeoJSON(this.context, props);
+      this._resolved.set(locationSetID, data);
+      return data;
 
     } catch (err) {
       obj.locationSet = { include: ['Q2'] };  // default worldwide
       obj.locationSetID = '+[Q2]';
+      return this._resolved.get('+[Q2]');  // was resolved in the constructor so it should return something.
     }
   }
 
@@ -226,7 +239,9 @@ export class LocationSystem extends AbstractSystem {
    * Rebuilds the whichPolygon index with whatever features have been resolved into GeoJSON.
    */
   _rebuildIndex() {
-    this._wp = whichPolygon({ features: [...this._resolved.values()] });
+    // Confusingly, `props` is the where the _actual_ geojson lives.
+    const features = [...this._resolved.values()].map(d => d.props);
+    this._wp = whichPolygon({ features: features });
     this.emit('locationchange');
   }
 
@@ -247,18 +262,18 @@ export class LocationSystem extends AbstractSystem {
    *   ]
    * }
    *
-   * @param  `fc`  FeatureCollection-like Object containing custom locations
+   * @param  {Object}  fc - FeatureCollection-like Object containing custom locations
    */
   mergeCustomGeoJSON(fc) {
     if (!fc || fc.type !== 'FeatureCollection' || !Array.isArray(fc.features)) return;
 
-    fc.features.forEach(feature => {
+    for (const feature of fc.features) {
       feature.properties = feature.properties || {};
       let props = feature.properties;
 
       // Get `id` from either `id` or `properties`
       let id = feature.id || props.id;
-      if (!id || !/^\S+\.geojson$/i.test(id)) return;
+      if (!id || !/^\S+\.geojson$/i.test(id)) continue;
 
       // Ensure `id` exists and is lowercase
       id = id.toLowerCase();
@@ -272,7 +287,7 @@ export class LocationSystem extends AbstractSystem {
       }
 
       LOCO._cache[id] = feature;   // insert directly into LocationConflations internal cache
-    });
+    }
   }
 
 
@@ -291,13 +306,15 @@ export class LocationSystem extends AbstractSystem {
    *  …
    * ]
    *
-   * @param  `objects`  Objects to check - they should have `locationSet` property
-   * @return  Promise resolved true (this function used to be slow/async, now it's faster and sync)
+   * @param   {Array<Object>}  objects - Objects to check - they should have `locationSet` property
+   * @return  {Promise}        Promise resolved true  (this function used to be slow/async, now it's faster and sync)
    */
   mergeLocationSets(objects) {
     if (!Array.isArray(objects)) return Promise.reject('nothing to do');
 
-    objects.forEach(obj => this._validateLocationSet(obj));
+    for (const obj of objects) {
+      this._validateLocationSet(obj);
+    }
     this._rebuildIndex();
     return Promise.resolve(objects);
   }
@@ -308,8 +325,8 @@ export class LocationSystem extends AbstractSystem {
    * Returns a locationSetID for a given locationSet (fallback to `+[Q2]`, world)
    * (The locationSet doesn't necessarily need to be resolved to compute its `id`)
    *
-   * @param  `locationSet`  A {LocationSet} Object, e.g. `{ include: ['us'] }`
-   * @return  String locationSetID, e.g. `+[Q30]`
+   * @param   {LocationSet}  locationSet - A {LocationSet} Object, e.g. `{ include: ['us'] }`
+   * @return  {string}       String locationSetID, e.g. `+[Q30]`
    */
   locationSetID(locationSet) {
     let locationSetID;
@@ -319,28 +336,6 @@ export class LocationSystem extends AbstractSystem {
       locationSetID = '+[Q2]';  // the world
     }
     return locationSetID;
-  }
-
-
-  /**
-   * feature
-   * Returns the resolved GeoJSON feature for a given locationSetID (fallback to 'world')
-   * A GeoJSON feature:
-   * {
-   *   type: 'Feature',
-   *   id: '+[Q30]',
-   *   properties: { id: '+[Q30]', area: 21817019.17, … },
-   *   geometry: { … }
-   * }
-   *
-   * @param  `locationSetID`  String identifier, e.g. `+[Q30]`
-   * @return  GeoJSON object (fallback to world)
-   */
-  feature(locationSetID = '+[Q2]') {
- // should we actually resolve it if it hasn't been?
- // this shouldn't matter, as it's currently only used to render the blocked regions
-    const feature = this._resolved.get(locationSetID);
-    return feature || this._resolved.get('+[Q2]');
   }
 
 
@@ -357,72 +352,89 @@ export class LocationSystem extends AbstractSystem {
    *   …
    * }
    *
-   * @param  `loc`  `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
-   * @return  Object of locationSetIDs valid at given location
+   * @param  {Array<number>}  loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
+   * @return {Object}         Result Object of locationSetIDs valid at given location
    */
   locationSetsAt(loc) {
-    let result = {};
-
-    const hits = this._wp(loc, true) || [];
-    const thiz = this;
+    const result = {};
+    const hits = this._wp(loc, true) || [];  // what's here?
 
     // locationSets
-    hits.forEach(prop => {
-      if (prop.id[0] !== '+') return;  // skip - it's a location
+    for (const prop of hits) {
+      if (prop.id[0] !== '+') continue;  // skip - it's a location
       const locationSetID = prop.id;
-      const area = thiz._knownLocationSets.get(locationSetID);
+      const area = this._knownLocationSets.get(locationSetID);
       if (area) {
         result[locationSetID] = area;
       }
-    });
+    }
 
     // locations included
-    hits.forEach(prop => {
-      if (prop.id[0] === '+') return;   // skip - it's a locationset
+    for (const prop of hits) {
+      if (prop.id[0] === '+') continue;   // skip - it's a locationset
       const locationID = prop.id;
-      const included = thiz._locationIncludedIn.get(locationID);
-      (included || []).forEach(locationSetID => {
-        const area = thiz._knownLocationSets.get(locationSetID);
+      const included = this._locationIncludedIn.get(locationID) || [];
+      for (const locationSetID of included) {
+        const area = this._knownLocationSets.get(locationSetID);
         if (area) {
           result[locationSetID] = area;
         }
-      });
-    });
+      }
+    }
 
     // locations excluded
-    hits.forEach(prop => {
-      if (prop.id[0] === '+') return;   // skip - it's a locationset
+    for (const prop of hits) {
+      if (prop.id[0] === '+') continue;   // skip - it's a locationset
       const locationID = prop.id;
-      const excluded = thiz._locationExcludedIn.get(locationID);
-      (excluded || []).forEach(locationSetID => {
+      const excluded = this._locationExcludedIn.get(locationID) || [];
+      for (const locationSetID of excluded) {
         delete result[locationSetID];
-      });
-    });
+      }
+    }
 
     return result;
   }
 
 
   /**
-   * blocksAt
-   * Returns any blocks that exist for the given location
-   *
-   * @param  `loc`  `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
-   * @return  Array of block Objects (empty array if none)
+   * isBlockedAt
+   * Is editing blocked at the given location?
+   * @param   {Array<number>}  loc -  `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
+   * @return  {boolean}  `true` if a block exists there, `false` if not
    */
-  blocksAt(loc) {
+  isBlockedAt(loc) {
+    if (!this._blocks.length) return false;
+    return !!this._wpblocks(loc);
+  }
+
+
+  /**
+   * getBlocks
+   * Returns any blocked regions that exist within the given extent.
+   * @param   {Extent}          extent -  the extent to query
+   * @return  {Array<GeoJSON>}  Array of GeoJSON data objects
+   */
+  getBlocks(extent) {
     if (!this._blocks.length) return [];
-    return this._wpblocks(loc, true) || [];
+
+    const hits = this._wpblocks.bbox(extent.rectangle());
+    const results = new Set();
+
+    // whichPolygon returns properties objects, we need to lookup the original GeoJSON data features.
+    for (const hit of hits) {
+      const data = this._resolved.get(hit.id);
+      if (data) {
+        results.add(data);
+      }
+    }
+
+    return [...results];
   }
 
 
   // Direct access to the location-conflation resolver
+  // @return  {LocationConflation}
   loco() {
     return LOCO;
-  }
-
-  // Direct access to the "blocks" which-polygon index
-  wpblocks() {
-    return this._wpblocks;
   }
 }

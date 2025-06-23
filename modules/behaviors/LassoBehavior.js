@@ -173,7 +173,7 @@ export class LassoBehavior extends AbstractBehavior {
           entity.type === 'node' &&
           geomPointInPolygon(entity.loc, polygonLocs) &&
           !filters.isHidden(entity, graph, entity.geometry(graph)) &&
-          !locations.blocksAt(entity.loc).length
+          !locations.isBlockedAt(entity.loc)
         );
       });
 

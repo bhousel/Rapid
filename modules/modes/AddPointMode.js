@@ -91,7 +91,7 @@ export class AddPointMode extends AbstractMode {
     const viewport = context.viewport;
     const point = eventData.coord.map;
     const loc = viewport.unproject(point);
-    if (locations.blocksAt(loc).length) return;   // editing is blocked here
+    if (locations.isBlockedAt(loc)) return;   // editing is blocked here
 
     // Allow snapping only for OSM Entities in the actual graph (i.e. not Rapid features)
     const datum = eventData?.target?.data;

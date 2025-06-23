@@ -18,7 +18,6 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
   constructor(scene, layerID) {
     super(scene, layerID);
     this.enabled = true;   // this layer should always be enabled
-    this._lastv = null;
   }
 
 
@@ -40,94 +39,90 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    */
   reset() {
     super.reset();
-    this._lastv = null;
   }
 
 
   /**
    * render
    * Render any edit blocking polygons that are visible in the viewport
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  {number}    frame    - Integer frame being rendered
+   * @param  {Viewport}  viewport - Pixi viewport to use for rendering
+   * @param  {number}    zoom     - Effective zoom to use for rendering
    */
   render(frame, viewport) {
-return; // not yet
     const context = this.context;
+    const l10n = context.systems.l10n;
     const locations = context.systems.locations;
     const mapViewport = context.viewport;  // context viewport !== pixi viewport (they are offset)
     const zoom = mapViewport.transform.zoom;   // use real zoom for this, not "effective" zoom
 
-    if (this._lastv === mapViewport.v) return;  // exit early if the view is unchanged
-    this._lastv = mapViewport.v;
-
     let blocks = [];
     if (zoom >= MINZOOM) {
-      const searchRect = mapViewport.visibleExtent().rectangle();
-      blocks = locations.wpblocks().bbox(searchRect);
+      blocks = locations.getBlocks(mapViewport.visibleExtent());
       this.renderEditBlocks(frame, viewport, zoom, blocks);
     }
 
     // setup the explanation
     // add a special 'api-status' line to the map footer explain the block
-    const explanationRow = context.container().select('.main-content > .map-footer')
+    let $explanationRow = context.container().select('.main-content > .map-footer')
       .selectAll('.api-status.blocks')
       .data(blocks, d => d.id);
 
-    explanationRow.exit()
+    $explanationRow.exit()
       .remove();
 
-    const explanationRowEnter = explanationRow.enter()
+    // enter
+    const $$explanationRow = $explanationRow.enter()
       .insert('div', '.api-status')   // before any existing
       .attr('class', 'api-status blocks error');
 
-    explanationRowEnter
+    $$explanationRow
       .append('span')
       .attr('class', 'explanation-item')
-      .text(d => d.text);
+      .text(d => d.props.text);
 
-    explanationRowEnter
+    $$explanationRow
       .append('a')
       .attr('target', '_blank')
-      .attr('href', d => d.url)
-      .text('More Info');
+      .attr('href', d => d.props.url)
+      .text(l10n.t('rapid_menu.more_info'));
   }
 
 
   /**
    * renderEditBlocks
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  blocks     Array of block data visible in the view
+   * @param  {number}          frame    -  Integer frame being rendered
+   * @param  {Viewport}        viewport -  Pixi viewport to use for rendering
+   * @param  {number}          zoom     -  Effective zoom to use for rendering
+   * @param  {Array<GeoJSON>}  blocks   -  Array of block data visible in the view
    */
   renderEditBlocks(frame, viewport, zoom, blocks) {
     const locations = this.context.systems.locations;
     const parentContainer = this.scene.groups.get('blocks');
-    const BLOCK_STYLE = {
+    const blockStyle = {
       requireFill: true,    // no partial fill option - must fill fully
       fill: { pattern: 'construction', color: 0x000001, alpha: 0.7 }
     };
 
     for (const d of blocks) {
-      const geometry = locations.feature(d.locationSetID).geometry;  // get GeoJSON
-      if (!geometry) continue;
-
-      const parts = (geometry.type === 'Polygon') ? [geometry.coordinates]
-        : (geometry.type === 'MultiPolygon') ? geometry.coordinates : [];
+      const dataID = d.id;
+      const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-        const coords = parts[i];
-        const featureID = `${this.layerID}-${d.locationSetID}-${i}`;
+        // Check that this part has coordinates and is a Polygon
+        const part = parts[i];
+        if (!part.world || part.type !== 'Polygon') continue;
+
+        const featureID = `${this.layerID}-${dataID}-${i}`;
         let feature = this.features.get(featureID);
 
         if (!feature) {
           feature = new PixiFeaturePolygon(this, featureID);
-          feature.geometry.setCoords(coords);
-          feature.style = BLOCK_STYLE;
+          feature.style = blockStyle;
           feature.parentContainer = parentContainer;
           feature.container.cursor = 'not-allowed';
-          feature.setData(d.locationSetID, d);
+          feature.setCoords(part.world);
+          feature.setData(dataID, d);
         }
 
         this.syncFeatureClasses(feature);

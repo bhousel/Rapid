@@ -231,7 +231,7 @@ export class DragNodeMode extends AbstractMode {
       loc = viewport.unproject(adjustedCoord);
     }
 
-    if (locations.blocksAt(loc).length) {  // editing is blocked here
+    if (locations.isBlockedAt(loc)) {  // editing is blocked here
       this._cancel();
       return;
     }
@@ -263,7 +263,7 @@ export class DragNodeMode extends AbstractMode {
     const destPoint = vecSubtract(currPoint, nudge);
     const loc = viewport.unproject(destPoint);
 
-    if (locations.blocksAt(loc).length) {  // editing is blocked here
+    if (locations.isBlockedAt(loc)) {  // editing is blocked here
       this._cancel();
       return;
     }

@@ -88,7 +88,7 @@ export class SelectOsmMode extends AbstractMode {
     for (const entityID of entityIDs) {
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;   // not in the osm graph
-      if (entity.type === 'node' && locations.blocksAt(entity.loc).length) continue;  // editing is blocked
+      if (entity.type === 'node' && locations.isBlockedAt(entity.loc)) continue;  // editing is blocked
 
       this._selectedData.set(entityID, entity);
 

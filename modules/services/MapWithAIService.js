@@ -266,7 +266,7 @@ export class MapWithAIService extends AbstractSystem {
 
       // Exit if this tile covers a blocked region (all corners are blocked)
       const corners = tile.wgs84Extent.polygon().slice(0, 4);
-      const tileBlocked = corners.every(loc => locations.blocksAt(loc).length);
+      const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
       if (tileBlocked) {
         cache.loaded.add(tile.id);  // don't try again
         continue;
