@@ -5,18 +5,18 @@ export function uiMapRouletteHeader(context) {
   let _marker;
 
 
-  function render(selection) {
-    const header = selection.selectAll('.qa-header')
+  function render($selection) {
+    const $header = $selection.selectAll('.qa-header')
       .data(_marker ? [_marker] : [], d => d.key);
 
-    header.exit()
+    $header.exit()
       .remove();
 
-    const headerEnter = header.enter()
+    const $$header = $header.enter()
       .append('div')
       .attr('class', 'qa-header');
 
-    const svgEnter = headerEnter
+    const $$svg = $$header
       .append('div')
       .attr('class', 'qa-header-icon')
       .append('svg')
@@ -24,13 +24,13 @@ export function uiMapRouletteHeader(context) {
       .attr('height', '27px')
       .attr('viewbox', '0 0 20 27');
 
-    svgEnter
+    $$svg
       .append('polygon')
       .attr('fill', '#01ff00')
       .attr('stroke', '#333')
       .attr('points', '16,3 4,3 1,6 1,17 4,20 7,20 10,27 13,20 16,20 19,17.033 19,6');
 
-    svgEnter
+    $$svg
       .append('use')
       .attr('class', 'icon-annotation')
       .attr('width', '13px')
@@ -39,10 +39,10 @@ export function uiMapRouletteHeader(context) {
       .attr('fill', '#01ff00');
 
     // `parentName` contains the name of the challenge
-    headerEnter
+    $$header
       .append('div')
       .attr('class', 'qa-header-label')
-      .text(d => d.parentName || l10n.t('inspector.unknown'));
+      .text(d => d.props.parentName || l10n.t('inspector.unknown'));
   }
 
   render.task = function(val) {

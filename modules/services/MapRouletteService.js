@@ -145,9 +145,9 @@ export class MapRouletteService extends AbstractSystem {
       .map(d => d.data)
       .filter(task => {
         if (this._challengeIDs.size) {
-          return this._challengeIDs.has(task.parentId);  // ignore isVisible if it's in the list
+          return this._challengeIDs.has(task.props.parentId);  // ignore isVisible if it's in the list
         } else {
-          return task.isVisible;
+          return task.props.isVisible;
         }
       });
   }

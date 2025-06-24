@@ -42,13 +42,13 @@ describe('LocationSystem', () => {
   });
 
 
-  // describe('#mergeCustomGeoJSON', () => {
-  //   it('merges geojson into lococation-conflation cache', () => {
-  //     _locations.mergeCustomGeoJSON(fc);
-  //     const loco = _locations._loco;
-  //     expect(loco._cache['colorado.geojson']).to.eql(colorado);
-  //   });
-  // });
+  describe('#mergeCustomGeoJSON', () => {
+    it('merges geojson into lococation-conflation cache', () => {
+      _locations.mergeCustomGeoJSON(fc);
+      const loco = _locations._loco;
+      expect(loco._cache['colorado.geojson']).to.eql(colorado);
+    });
+  });
 
 
   describe('#mergeLocationSets', () => {

@@ -13,9 +13,9 @@ export function uiMapRouletteDetails(context) {
   /**
    * Generates HTML for a dropdown menu with the specified name and options.
    *
-   * @param {string} dropdownName The name attribute for the dropdown.
-   * @param {Array<string>} options An array of options to be included in the dropdown.
-   * @returns {string} HTML string representing a dropdown menu.
+   * @param   {string}        dropdownName - The name attribute for the dropdown.
+   * @param   {Array<string>} options      - An array of options to be included in the dropdown.
+   * @returns {string}        HTML string representing a dropdown menu.
    */
   function generateDropdownHtml(dropdownName, options) {
     return `<select name="${dropdownName}"><option value=""></option>${options.map(option => `<option value="${option.trim()}">${option.trim()}</option>`).join('')}</select>`;
@@ -30,7 +30,7 @@ export function uiMapRouletteDetails(context) {
    * Example input:
    * "[select &quot;dropdownName&quot; values=&quot;option1,option2,option3&quot;]"
    *
-   * @param {string} text The text containing short codes to be transformed into HTML content.
+   * @param   {string} text - The text containing short codes to be transformed into HTML content.
    * @returns {string} The transformed text with HTML content.
    */
   function generateDynamicContent(text) {
@@ -54,15 +54,15 @@ export function uiMapRouletteDetails(context) {
    * This function searches for mustache tags defined by double curly braces (e.g., `{{propertyName}}`) and replaces them
    * with actual values from the task's properties or generates clickable links if the property is an OSM identifier.
    * https://learn.maproulette.org/en-us/documentation/mustache-tag-replacement/#content
-   * @param {string} text The text containing mustache tags to be replaced.
-   * @param {Object} task The task object containing properties that may replace the tags.
+   * @param  {string} text - The text containing mustache tags to be replaced.
+   * @param  {Object} task - The task object containing properties that may replace the tags.
    * @return {string} The text with mustache tags replaced by actual values or links.
    */
   function replaceMustacheTags(text, task) {
     const tagRegex = /\{\{([\w:]+)\}\}/g;
     return text.replace(tagRegex, (match, propertyName) => {
       // Check if the property name is 'osmIdentifier' and task has a title
-      if (propertyName === 'osmIdentifier' && task.title) {
+      if (propertyName === 'osmIdentifier' && task.props.title) {
         // Extract the OSM ID including the prefix from the task's title
         const osmId = task.props.title.split('@')[0];
         // Return an anchor tag with a class for highlighting and data attribute for the OSM ID
@@ -110,42 +110,52 @@ export function uiMapRouletteDetails(context) {
    * and instructions, and sets up the necessary event listeners for interactive elements.
    * It fetches task details asynchronously and updates the DOM based on the fetched data.
    *
-   * @param {d3.selection} selection The D3 selection where the challenge details should be rendered.
+   * @param {d3.selection} $selection - The D3 selection where the challenge details should be rendered.
    */
-  function render(selection) {
-    let details = selection.selectAll('.sidebar-details')
+  function render($selection) {
+    let $details = $selection.selectAll('.sidebar-details')
       .data(_marker ? [_marker] : [], d => d.key);
-    details.exit().remove();
 
-    const detailsEnter = details.enter()
+    $details.exit()
+      .remove();
+
+    const $$details = $details.enter()
       .append('section')
       .attr('class', 'sidebar-details');
-    const qaDetails = detailsEnter
+
+    const $$qaDetails = $$details
       .append('div')
       .attr('class', 'qa-details-subsection');
 
-    const loading = qaDetails
+    const $$loading = $$qaDetails
       .append('div')
       .attr('class', 'qa-details-container');
-    loading.text(l10n.t('map_data.layers.maproulette.loading_task_details'));
 
-    details = details.merge(detailsEnter);
+    $$loading
+      .text(l10n.t('map_data.layers.maproulette.loading_task_details'));
+
+    $details = $details
+      .merge($$details);
+
 
     maproulette.loadTaskDetailAsync(_marker).then(task => {
       if (!task) return;
       if (_marker.id !== task.id) return;
-      const selection = details.selectAll('.qa-details-subsection');
-      selection.html(''); // replace contents
+
+      const $qaDetails = $details.selectAll('.qa-details-subsection');
+      $qaDetails.html(''); // replace contents
 
       // Display Challenge ID and Task ID
       if (task.id) {
-        const titleSection = selection
+        const $header = $qaDetails
           .append('header')
           .attr('class', 'qa-details-header');
-        titleSection
+
+        $header
           .append('h4')
           .text(l10n.t('map_data.layers.maproulette.id_title'));
-        titleSection
+
+        $header
           .append('p')
           .text(`${task.props.parentId} / ${task.id}`)
           .selectAll('a')
@@ -158,20 +168,24 @@ export function uiMapRouletteDetails(context) {
 
       // We show the challenge description when user select an unkown challenge.
       // But we hide it if a specific (assumed to be know) challenge is selected.
-      const explicitChallengeIdGiven = Boolean(maproulette.challengeIDs);
-      if (!explicitChallengeIdGiven && task.props.description) {
-        const descSection = selection
+      const hasChallengeID = (maproulette.challengeIDs.length === 1);
+      if (!hasChallengeID && task.props.description) {
+        const $description = $qaDetails
           .append('article');
-        const descHeader = descSection
+
+        const $descriptionHeader = $description
           .append('header')
           .attr('class', 'qa-details-header');
-        descHeader
+
+        $descriptionHeader
           .append('h4')
           .text(l10n.t('map_data.layers.maproulette.detail_title'));
-        const descContent = descSection
+
+        const $descriptionContent = $description
           .append('section')
           .attr('class', 'qa-details-container');
-        descContent
+
+        $descriptionContent
           .html(descriptionHtml)
           .selectAll('a')
           .attr('rel', 'noopener')
@@ -179,18 +193,22 @@ export function uiMapRouletteDetails(context) {
       }
 
       if (task.props.instruction && task.props.instruction !== task.props.description) {
-        const instructionSection = selection
+        const $instruction = $qaDetails
           .append('article');
-        const descHeader = instructionSection
+
+        const $instructionHeader = $instruction
           .append('header')
           .attr('class', 'qa-details-header');
-        descHeader
+
+        $instructionHeader
           .append('h4')
           .text(l10n.t('map_data.layers.maproulette.instruction_title'));
-        const instructionContent = instructionSection
+
+        const $instructionContent = $instruction
           .append('article')
           .attr('class', 'qa-details-container');
-        instructionContent
+
+        $instructionContent
           .html(instructionHtml)
           .selectAll('a')
           .attr('rel', 'noopener')
@@ -214,7 +232,7 @@ export function uiMapRouletteDetails(context) {
       };
 
       // Attach hover and click event listeners
-      selection.selectAll('.highlight-link')
+      $selection.selectAll('.highlight-link')
         .on('mouseover', function () {
           const osmId = transformId(d3_select(this).attr('data-osm-id'));
           utilHighlightEntities([osmId], true, context);
@@ -230,12 +248,15 @@ export function uiMapRouletteDetails(context) {
           highlightFeature(osmId);
         });
     }).catch(e => {
-      const selection = details.selectAll('.qa-details-subsection');
-      selection.html(''); // replace contents
-      const error = selection
+      const $selection = $details.selectAll('.qa-details-subsection');
+      $selection.html(''); // replace contents
+
+      const $errorContent = $selection
         .append('div')
         .attr('class', 'qa-details-container');
-      error.text(l10n.t('map_data.layers.maproulette.error_loading_task_details'));
+
+      $errorContent
+        .text(l10n.t('map_data.layers.maproulette.error_loading_task_details'));
     });
   }
 

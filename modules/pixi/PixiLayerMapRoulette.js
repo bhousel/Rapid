@@ -75,9 +75,12 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
     if (!maproulette?.started) return;
 
     const parentContainer = this.scene.groups.get('qa');
-    const items = maproulette.getData();
+    const data = maproulette.getData();
 
-    for (const d of items) {
+    for (const d of data) {
+      const part = d.geoms.parts[0];
+      if (!part?.world || part?.type !== 'Point') continue;
+
       const featureID = `${this.layerID}-${d.id}`;
       let feature = this.features.get(featureID);
 
@@ -89,9 +92,9 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
         };
 
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(d.loc);
         feature.style = style;
         feature.parentContainer = parentContainer;
+        feature.setCoords(part.world);
         feature.setData(d.id, d);
       }
 
@@ -114,7 +117,6 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
    * @param  zoom         Effective zoom to use for rendering
    */
   render(frame, projection, zoom) {
-return; // not yet
     const maproulette = this.context.services.maproulette;
     if (!this.enabled || !maproulette?.started || zoom < MINZOOM) return;
 
