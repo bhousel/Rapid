@@ -6,12 +6,17 @@ describe('OsmService', () => {
     immediateRedraw() {}
   }
 
+  class MockLocationSystem {
+    constructor() { }
+    isBlockedAt() { return false; }
+  }
+
   class MockContext {
     constructor() {
       this.sequences = {};
       this.systems = {
         gfx:       new MockGfxSystem(),
-        locations: new Rapid.LocationSystem(this)
+        locations: new MockLocationSystem()
       };
       this.viewport = new Rapid.sdk.Viewport();
       this.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]

@@ -18,8 +18,8 @@ describe('validationAmbiguousCrossingTags', () => {
       this.viewport = new Rapid.sdk.Viewport();
       this.services = {};
       this.systems = {
-        editor:     new MockEditSystem(this),
-        l10n:       new MockLocalizationSystem(this),
+        editor:     new MockEditSystem(),
+        l10n:       new MockLocalizationSystem(),
         locations:  new Rapid.LocationSystem(this),
         presets:    new Rapid.PresetSystem(this)
       };
@@ -32,6 +32,12 @@ describe('validationAmbiguousCrossingTags', () => {
 
   const context = new MockContext();
   const validator = Rapid.validationAmbiguousCrossingTags(context);
+
+  before(() => {
+    return Promise.all([
+      context.systems.locations.initAsync()
+    ]);
+  });
 
   beforeEach(() => {
     graph = new Rapid.Graph();     // reset

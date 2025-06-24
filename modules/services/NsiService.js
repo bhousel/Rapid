@@ -348,7 +348,9 @@ export class NsiService extends AbstractSystem {
   //  Returns a Promise fulfilled when the other data have been downloaded and processed
   //
   _loadNsiDataAsync() {
-    const assets = this.context.systems.assets;
+    const context = this.context;
+    const assets = context.systems.assets;
+    const locations = context.systems.locations;
 
     return (
       Promise.all([
@@ -363,9 +365,9 @@ export class NsiService extends AbstractSystem {
           dissolved:     vals[1].dissolved,      // list of dissolved items
           replacements:  vals[2].replacements,   // trivial old->new qid replacements
           trees:         vals[3].trees,          // metadata about trees, main tags
-          kvt:           new Map(),              // Map (k -> Map (v -> t) )
-          qids:          new Map(),              // Map (wd/wp tag values -> qids)
-          ids:           new Map()               // Map (id -> NSI item)
+          kvt:           new Map(),              // Map<k, Map<v, t>>
+          qids:          new Map(),              // Map<wd/wp tag values, qids>
+          ids:           new Map()               // Map<id, NSI item>
         };
 
         const matcher = this._nsi.matcher = new Matcher();
@@ -374,7 +376,7 @@ export class NsiService extends AbstractSystem {
 // *** BEGIN HACK ***
 
 // old - built in matcher will set up its own locationindex by resolving all the locationSets one-by-one
-        // matcher.buildLocationIndex(this._nsi.data, locationSystem.loco());
+        // matcher.buildLocationIndex(this._nsi.data, locations.loco());
 
 // new - Use Rapid's LocationSystem instead of redoing that work
 // It has already processed the presets at this point
@@ -387,12 +389,11 @@ matcher.itemLocation = new Map();
 // We definitely need this, but don't need full geojson, just { properties: { area: xxx }}
 matcher.locationSets = new Map();
 
-const locationSystem = this.context.systems.locations;
 for (const category of Object.values(this._nsi.data)) {
   for (const item of category.items ?? []) {
     if (matcher.itemLocation.has(item.id)) continue;   // we've seen item id already - shouldn't be possible?
 
-    const locationSetID = locationSystem.locationSetID(item.locationSet);
+    const locationSetID = locations.locationSetID(item.locationSet);
     matcher.itemLocation.set(item.id, locationSetID);
 
     if (matcher.locationSets.has(locationSetID)) continue;   // we've seen this locationSet before..
@@ -406,7 +407,7 @@ for (const category of Object.values(this._nsi.data)) {
 // We only really need this to _look like_ which-polygon query `_wp.locationIndex(bbox, true);`
 // i.e. it needs to return the properties of the locationsets
 matcher.locationIndex = (bbox) => {
-  const validHere = locationSystem.locationSetsAt([bbox[0], bbox[1]]);
+  const validHere = locations.locationSetsAt([bbox[0], bbox[1]]);
   const results = [];
 
   for (const [locationSetID, area] of Object.entries(validHere)) {

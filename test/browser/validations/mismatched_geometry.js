@@ -43,6 +43,12 @@ describe('validationMismatchedGeometry', () => {
   const context = new MockContext();
   const validator = Rapid.validationMismatchedGeometry(context);
 
+  before(() => {
+    return Promise.all([
+      context.systems.locations.initAsync()
+    ]);
+  });
+
   beforeEach(() => {
     graph = new Rapid.Graph();     // reset
     _savedAreaKeys = Rapid.osmAreaKeys;
