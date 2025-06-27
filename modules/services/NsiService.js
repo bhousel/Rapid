@@ -37,7 +37,7 @@ export class NsiService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -51,7 +51,7 @@ export class NsiService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     const presets = this.context.systems.presets;
@@ -69,7 +69,7 @@ export class NsiService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -80,21 +80,19 @@ export class NsiService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();
   }
 
 
-  // `isGenericName()`
-  // Is the `name` tag generic?
-  //
-  // Arguments
-  //   `tags`: `Object` containing the feature's OSM tags
-  // Returns
-  //   `true` if it is generic, `false` if not
-  //
+  /**
+   * isGenericName
+   * Is the `name` tag generic?
+   * @param   {Object}   tags - `Object` containing the feature's OSM tags
+   * @return  {boolean}  `true` if it is generic, `false` if not
+   */
   isGenericName(tags) {
     const n = tags.name;
     if (!n) return false;
@@ -120,20 +118,20 @@ export class NsiService extends AbstractSystem {
   }
 
 
-  // `upgradeTags()`
-  // Suggest tag upgrades.
-  // This function will not modify the input tags, it makes a copy.
-  //
-  // Arguments
-  //   `tags`: `Object` containing the feature's OSM tags
-  //   `loc`: Location where this feature exists, as a [lon, lat]
-  // Returns
-  //   `Object` containing the result, or `null` if no changes needed:
-  //   {
-  //     'newTags': `Object` - The tags the the feature should have
-  //     'matched': `Object` - The matched item
-  //   }
-  //
+  /**
+   * upgradeTags
+   * Suggest tag upgrades.
+   * This function will not modify the input tags, it makes a copy.
+   * Returns a result about the suggested tags, and the item that matched:
+   *  {
+   *    'newTags': `Object` - The tags the the feature should have
+   *    'matched': `Object` - The matched item
+   *  }
+   *
+   * @param   {Object}         tags - `Object` containing the feature's OSM tags
+   * @param   {Array<number>}  loc  -  Location where this feature exists, as a [lon, lat]
+   * @return  {Object}         The result, or `null` if no changes suggested
+   */
   upgradeTags(tags, loc) {
     let newTags = Object.assign({}, tags);  // shallow copy
     let changed = false;
@@ -321,9 +319,10 @@ export class NsiService extends AbstractSystem {
   }
 
 
-
-  // _loadNsiPresetsAsync()
-  //  Returns a Promise fulfilled when the presets have been downloaded and merged into Rapid.
+  /**
+   * _loadNsiPresetsAsync
+   * @return  {Promise} Promise fulfilled when the presets have been downloaded and merged into Rapid.
+   */
   _loadNsiPresetsAsync() {
     const assets = this.context.systems.assets;
 
@@ -344,9 +343,10 @@ export class NsiService extends AbstractSystem {
   }
 
 
-  // this._loadNsiDataAsync()
-  //  Returns a Promise fulfilled when the other data have been downloaded and processed
-  //
+  /**
+   * _loadNsiDataAsync
+   * @return  {Promise} Promise fulfilled when the other data have been downloaded and processed
+   */
   _loadNsiDataAsync() {
     const context = this.context;
     const assets = context.systems.assets;
@@ -460,26 +460,27 @@ matcher.locationIndex = (bbox) => {
   }
 
 
-  // _gatherKVs()
-  // Gather all the k/v pairs that we will run through the NSI matcher.
-  // An OSM tags object can contain anything, but only a few tags will be interesting to NSI.
-  //
-  // This function will return the interesting tag pairs like:
-  //   "amenity/restaurant", "man_made/flagpole"
-  // and fallbacks like
-  //   "amenity/yes"
-  // excluding things like
-  //   "tiger:reviewed", "surface", "ref", etc.
-  //
-  // Arguments
-  //   `tags`: `Object` containing the feature's OSM tags
-  // Returns
-  //   `Object` containing kv pairs to test:
-  //   {
-  //     'primary': Set(),
-  //     'alternate': Set()
-  //   }
-  //
+  /**
+   * _gatherKVs
+   * Gather all the key/value pairs that we will run through the NSI matcher.
+   * An OSM tags object can contain anything, but only a few tags will be interesting to NSI.
+   *
+   * This function will return the interesting tag pairs like:
+   *   "amenity/restaurant", "man_made/flagpole"
+   * and fallbacks like
+   *   "amenity/yes"
+   * excluding things like
+   *   "tiger:reviewed", "surface", "ref", etc.
+   *
+   * Returns a result `Object` containing kv pairs to test:
+   * {
+   *   'primary': Set(),
+   *   'alternate': Set()
+   * }
+   *
+   * @param   {Object}  tags - `Object` containing the feature's OSM tags
+   * @return  {Object}  Object containing the primary and alternate key/value pairs to test
+   */
   _gatherKVs(tags) {
     let primary = new Set();
     let alternate = new Set();
@@ -500,7 +501,7 @@ matcher.locationIndex = (bbox) => {
       }
     }
 
-    // Can we try a generic building fallback match? - See #6122, #7197
+    // Can we try a generic building fallback match? - See iD#6122, iD#7197
     // Only try this if we do a preset match and find nothing else remarkable about that building.
     // For example, a way with `building=yes` + `name=Westfield` may be a Westfield department store.
     // But a way with `building=yes` + `name=Westfield` + `public_transport=station` is a train station for a town named "Westfield"
@@ -514,18 +515,18 @@ matcher.locationIndex = (bbox) => {
   }
 
 
-  // _identifyTree()
-  // NSI has a concept of trees: "brands", "operators", "flags", "transit".
-  // The tree determines things like which tags are namelike, and which tags hold important wikidata.
-  // This takes an Object of tags and tries to identify what tree to use.
-  //
-  // Arguments
-  //   `tags`: `Object` containing the feature's OSM tags
-  // Returns
-  //   `string` the name of the tree if known
-  //   or 'unknown' if it could match several trees (e.g. amenity/yes)
-  //   or null if no match
-  //
+  /**
+   * _identifyTree
+   * NSI has a concept of trees: "brands", "operators", "flags", "transit".
+   * The tree determines things like which tags are namelike, and which tags hold important wikidata.
+   * This takes an Object of tags and tries to identify what tree to use.
+   * Returns the name of the tree if known,
+   *  or 'unknown' if it could match several trees (e.g. amenity/yes),
+   *  or `null` if no match
+   *
+   * @param   {Object}   tags - `Object` containing the feature's OSM tags
+   * @return  {string?}  The name of the tree if known, or 'unknown' for multiple, or `null` if no match
+   */
   _identifyTree(tags) {
     let unknown;
     let t;
@@ -552,20 +553,21 @@ matcher.locationIndex = (bbox) => {
   }
 
 
-  // _gatherNames()
-  // Gather all the namelike values that we will run through the NSI matcher.
-  // It will gather values primarily from tags `name`, `name:ru`, `flag:name`
-  //  and fallback to alternate tags like `brand`, `brand:ru`, `alt_name`
-  //
-  // Arguments
-  //   `tags`: `Object` containing the feature's OSM tags
-  // Returns
-  //   `Object` containing namelike values to test:
-  //   {
-  //     'primary': Set(),
-  //     'fallbacks': Set()
-  //   }
-  //
+  /**
+   * _gatherNames
+   * Gather all the namelike values that we will run through the NSI matcher.
+   * It will gather values primarily from tags `name`, `name:ru`, `flag:name`
+   *  and fallback to alternate tags like `brand`, `brand:ru`, `alt_name`
+   *
+   * Returns a result `Object` containing namelike values to test:
+   * {
+   *   'primary': Set(),
+   *   'alternate': Set()
+   * }
+   *
+   * @param   {Object}  tags - `Object` containing the feature's OSM tags
+   * @return  {Object}  Object containing the primary and alternate names to test
+   */
   _gatherNames(tags) {
     const empty = { primary: new Set(), alternate: new Set() };
     let primary = new Set();
@@ -664,16 +666,15 @@ matcher.locationIndex = (bbox) => {
   }
 
 
-  // _gatherTuples()`
-  // Generate all combinations of [key,value,name] that we want to test.
-  // This prioritizes them so that the primary name and k/v pairs go first
-  //
-  // Arguments
-  //   `tryKVs`: `Object` containing primary and alternate k/v pairs to test
-  //   `tryNames`: `Object` containing primary and alternate names to test
-  // Returns
-  //   `Array`: tuple objects ordered by priority
-  //
+  /**
+   * _gatherTuples
+   * Generate all combinations of [key,value,name] that we want to test.
+   * This prioritizes them so that the primary name and key/value pairs go first.
+   *
+   * @param   {Object}  tryKVs - `Object` containing the primary and alternate key/value pairs to test
+   * @param   {Object}  tryNames - `Object` containing the primary and alternate names to test
+   * @return  {Array<Object}  Array of tuple objects, ordered by priority
+   */
   _gatherTuples(tryKVs, tryNames) {
     let tuples = [];
 

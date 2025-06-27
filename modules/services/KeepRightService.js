@@ -149,7 +149,7 @@ export class KeepRightService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     for (const [tileID, controller] of cache.inflightTile) {
-      const isNeeded = tiles.find(tile => tile.id === tileID);
+      const isNeeded = tiles.some(tile => tile.id === tileID);
       if (!isNeeded) {
         controller.abort();
       }
@@ -287,7 +287,7 @@ export class KeepRightService extends AbstractSystem {
    * Called to change some properies (status, comments) about the KeepRight data item.
    * Will send the update to the KeepRight API and refresh the local data cache.
    * @param  {Marker}    item
-   * @param  {function}  callback
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   postUpdate(item, callback) {
     const cache = this._cache;
@@ -337,12 +337,12 @@ export class KeepRightService extends AbstractSystem {
 
   /**
    * getError
-   * Get data with given id from cache
-   * @param   {string}  dataID
-   * @return  {Marker}  the cached marker
+   * Get item with given id from cache
+   * @param   {string}   itemID
+   * @return  {Marker?}  the cached item, or `undefined` if not found
    */
-  getError(dataID) {
-    return this._cache.data.get(dataID);
+  getError(itemID) {
+    return this._cache.data.get(itemID);
   }
 
 
@@ -387,7 +387,7 @@ export class KeepRightService extends AbstractSystem {
 
   /**
    * issueURL
-   * Returns the url to link to details about an item
+   * Returns the URL to link to details about an item
    * @param  {Marker}  item
    * @return {string}  the url
    */
@@ -406,15 +406,25 @@ export class KeepRightService extends AbstractSystem {
   }
 
 
+  /**
+   * _encodeIssueRBush
+   * Convert a Marker to a Box Object for use with RBush.
+   * @param   {Marker}  d - the item to encode
+   * @return  {Object}  Box Object for use with RBush
+   */
   _encodeIssueRBush(d) {
     return { minX: d.loc[0], minY: d.loc[1], maxX: d.loc[0], maxY: d.loc[1], data: d };
   }
 
 
-  // Replace or remove data from the rbush spatial index
+  /**
+   * _updateRBush
+   * Replace or remove data from the rbush spatial index.
+   * @param   {Marker}   item - the item to replace or remove
+   * @param   {boolean}  replace - if `true` replace the item with the given new item
+   */
   _updateRBush(item, replace) {
     this._cache.rbush.remove(item, (a, b) => a.data.id === b.data.id);
-
     if (replace) {
       this._cache.rbush.insert(item);
     }

@@ -15,7 +15,7 @@ export class WikipediaService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -26,7 +26,7 @@ export class WikipediaService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return Promise.resolve();
@@ -36,7 +36,7 @@ export class WikipediaService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -47,7 +47,7 @@ export class WikipediaService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();
@@ -56,9 +56,9 @@ export class WikipediaService extends AbstractSystem {
 
   /**
    * search
-   * @param  lang
-   * @param  query
-   * @param  callback
+   * @param  {string}    lang - language code
+   * @param  {string}    query - string to search for
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   search(lang, query, callback) {
     if (!query) {
@@ -99,9 +99,9 @@ export class WikipediaService extends AbstractSystem {
 
   /**
    * suggestions
-   * @param  lang
-   * @param  query
-   * @param  callback
+   * @param  {string}    lang - language code
+   * @param  {string}    query - string to search for
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   suggestions(lang, query, callback) {
     if (!query) {
@@ -138,9 +138,9 @@ export class WikipediaService extends AbstractSystem {
 
   /**
    * translations
-   * @param  lang
-   * @param  title
-   * @param  callback
+   * @param  {string}    lang - language code
+   * @param  {string}    title - string to search for
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   translations(lang, title, callback) {
     if (!title) {

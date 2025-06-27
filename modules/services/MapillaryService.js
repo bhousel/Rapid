@@ -51,9 +51,8 @@ export class MapillaryService extends AbstractSystem {
     this._loadPromise = null;
     this._startPromise = null;
 
-    this._selectedImageID = null;
     this._cache = {};
-
+    this._selectedImageID = null;
     this._viewer = null;
     this._viewerFilter = ['all'];
     this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
@@ -128,7 +127,7 @@ export class MapillaryService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
-    if (this._cache?.inflight) {
+    if (this._cache.inflight) {
       for (const req of this._cache.inflight.values()) {
         req.controller.abort();
       }

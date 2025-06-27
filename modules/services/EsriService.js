@@ -28,7 +28,7 @@ export class EsriService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -46,7 +46,7 @@ export class EsriService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -59,7 +59,7 @@ export class EsriService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -70,16 +70,21 @@ export class EsriService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     for (const ds of Object.values(this._datasets)) {
-      if (ds.cache.inflight) {
-        Object.values(ds.cache.inflight).forEach(controller => this._abortRequest(controller));
+      for (const controller of ds.cache.inflight.values()) {
+        controller.abort();
       }
+
       ds.graph = new Graph();
       ds.tree = new Tree(ds.graph);
-      ds.cache = { inflight: {}, loaded: {}, seen: {} };
+      ds.cache = {
+        inflight:  new Map(),   // Map<tileID, AbortController>
+        loaded:    new Map(),   // Map<tileID, Tile>
+        seen:      new Set()    // Set<featureID>
+      };
       ds.lastv = null;
     }
 
@@ -90,7 +95,7 @@ export class EsriService extends AbstractSystem {
   /**
    * getAvailableDatasets
    * Called by `RapidSystem` to get the datasets that this service provides.
-   * @return {Array<RapidDataset>}  The datasets this service provides
+   * @return  {Array<RapidDataset>}  The datasets this service provides
    */
   getAvailableDatasets() {
     // Convert the internal datasets into "Rapid" datasets for the catalog.
@@ -164,8 +169,8 @@ export class EsriService extends AbstractSystem {
    * For Rapid#1309 we need to change the "data used" string from
    * 'Google Buildings for <Country>' to 'Google Open Buildings'.
    * All other titles are returned unmodified.
-   * @param  {string}  title - the title to consider
-   * @return {string}  The same title in most cases, or the proper google buildings title if applicable.
+   * @param   {string}  title - the title to consider
+   * @return  {string}  The same title in most cases, or the proper google buildings title if applicable.
    */
   getDataUsed(title) {
     if (title.startsWith('Google Buildings for')) {
@@ -208,22 +213,23 @@ export class EsriService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const k of Object.keys(cache.inflight)) {
-      const wanted = tiles.find(tile => tile.id === k);
-      if (!wanted) {
-        this._abortRequest(cache.inflight[k]);
-        delete cache.inflight[k];
+    for (const [tileID, controller] of cache.inflight) {
+      const isNeeded = tiles.some(tile => tile.id === tileID);
+      if (!isNeeded) {
+        controller.abort();
+        cache.inflight.delete(tileID);
       }
     }
 
     for (const tile of tiles) {
-      if (cache.loaded[tile.id] || cache.inflight[tile.id]) continue;
+      const tileID = tile.id;
+      if (cache.loaded.has(tileID) || cache.inflight.has(tileID)) continue;
 
-      // exit if this tile covers a blocked region (all corners are blocked)
+      // Exit if this tile covers a blocked region (all corners are blocked)
       const corners = tile.wgs84Extent.polygon().slice(0, 4);
-      const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
-      if (tileBlocked) {
-        cache.loaded[tile.id] = true;  // don't try again
+      const isBlocked = corners.every(loc => locations.isBlockedAt(loc));
+      if (isBlocked) {
+        cache.loaded.set(tileID, tile);  // don't try again
         continue;
       }
 
@@ -235,7 +241,7 @@ export class EsriService extends AbstractSystem {
   /**
    * _loadDatasetsAsync
    * Loads all the available datasets from the Esri server
-   * @return {Promise} Promise resolved when all pages of data have been loaded
+   * @return  {Promise}  Promise resolved when all pages of data have been loaded
    */
   _loadDatasetsAsync() {
     if (this._datasetsPromise) return this._datasetsPromise;
@@ -277,7 +283,11 @@ export class EsriService extends AbstractSystem {
     this._datasets[ds.id] = ds;
     ds.graph = new Graph();
     ds.tree = new Tree(ds.graph);
-    ds.cache = { inflight: {}, loaded: {}, seen: {} };
+    ds.cache = {
+      inflight:  new Map(),   // Map<tileID, AbortController>
+      loaded:    new Map(),   // Map<tileID, Tile>
+      seen:      new Set()    // Set<featureID>
+    };
     ds.lastv = null;
     ds.layer = null;   // the schema info will live here
 
@@ -295,8 +305,8 @@ export class EsriService extends AbstractSystem {
    * _loadDatasetLayerAsync
    * Each dataset has a schema (aka "tagmap") which is available behind the "layerUrl".
    * Before we can use the dataset we need to load this information.
-   * @param  {Object}  ds - the dataset to load the schema informarion
-   * @return {Promise} Promise resolved with the layer data when the dataset schema has been loaded
+   * @param   {Object}   ds - the dataset to load the schema informarion
+   * @return  {Promise}  Promise resolved with the layer data when the dataset schema has been loaded
    */
   _loadDatasetLayerAsync(ds) {
     if (!ds || !ds.url) {
@@ -333,14 +343,13 @@ export class EsriService extends AbstractSystem {
   }
 
 
-
-  _abortRequest(controller) {
-    controller.abort();
-  }
-
-
-  // API
-  //https://developers.arcgis.com/rest/users-groups-and-items/search.htm
+  /**
+   * _searchURL
+   * Returns the URL used to search ArcGIS for datasets.
+   * @see https://developers.arcgis.com/rest/users-groups-and-items/search.htm
+   * @param   {number}  start - the starting page
+   * @return  {string}  the url to fetch the datasets
+   */
   _searchURL(start) {
     const params = {
       f: 'json',
@@ -360,6 +369,12 @@ export class EsriService extends AbstractSystem {
     //   .url (featureServer)
   }
 
+  /**
+   * _layerURL
+   * Returns the URL used to get available layers from a ArcGIS feature server.
+   * @param   {string}  featureServerURL - The feature server URL
+   * @return  {string}  The url to fetch the layers
+   */
   _layerURL(featureServerURL) {
     return `${featureServerURL}/layers?f=json`;
     // should return single layer(?)
@@ -369,11 +384,20 @@ export class EsriService extends AbstractSystem {
     //   .geometryType   "esriGeometryPoint" or "esriGeometryPolygon" ?
   }
 
-  _tileURL(ds, extent, page) {
-    page = page || 0;
+  /**
+   * _tileURL
+   * Returns the URL used to get available data on a given dataset and tile.
+   * @param   {Object}  ds - the dataset to fetch data for
+   * @param   {Object}  tile - the tile to fetch the data for
+   * @param   {number}  page - what page of data to fetch (zero-based)
+   * @return  {string}  The url to fetch the data
+   */
+  _tileURL(ds, tile, page = 0) {
     const layerID = ds.layer.id;
     const maxRecordCount = ds.layer.maxRecordCount || 2000;
+    const extent = tile.wgs84Extent;
     const resultOffset = maxRecordCount * page;
+
     const params = {
       f: 'geojson',
       outfields: '*',
@@ -387,13 +411,22 @@ export class EsriService extends AbstractSystem {
   }
 
 
-
+  /**
+   * _loadTilePage
+   * Get available data for a given dataset from it's feature server
+   * @param   {Object}  ds - the dataset to fetch data for
+   * @param   {Object}  tile - the tile to fetch the data for
+   * @param   {number}  page - what page of data to fetch (zero-based)
+   * @return  {string}  The url to fetch data from
+   */
   _loadTilePage(ds, tile, page) {
     const cache = ds.cache;
-    if (cache.loaded[tile.id]) return;
+    const tileID = tile.id;
+    if (cache.loaded.has(tileID)) return;
 
     const controller = new AbortController();
-    const url = this._tileURL(ds, tile.wgs84Extent, page);
+    cache.inflight.set(tileID, controller);
+    const url = this._tileURL(ds, tile, page);
 
     fetch(url, { signal: controller.signal })
       .then(utilFetchResponse)
@@ -409,10 +442,13 @@ export class EsriService extends AbstractSystem {
       })
       .then(hasMorePages => {
         if (hasMorePages) {
+          // Assumption: It's unusual to see multiple pages per z14 tile,
+          // (2000 features/page) so the recursion here should be ok.
           this._loadTilePage(ds, tile, ++page);
+
         } else {
-          cache.loaded[tile.id] = true;
-          delete cache.inflight[tile.id];
+          // Only consider it loaded when all pages are loaded.
+          cache.loaded.set(tileID, tile);
 
           const gfx = this.context.systems.gfx;
           gfx.deferredRedraw();
@@ -422,41 +458,59 @@ export class EsriService extends AbstractSystem {
       .catch(e => {
         if (e.name === 'AbortError') return;
         console.error(e);  // eslint-disable-line
+      })
+      .finally(() => {
+        cache.inflight.delete(tileID);
       });
-
-    cache.inflight[tile.id] = controller;
   }
 
 
-  _parseTile(dataset, tile, geojson, callback) {
+  /**
+   * _parseTile
+   * Parse the results from a tiled data fetch.
+   * @param  {Object}    ds - the dataset we fetched
+   * @param  {Object}    tile - the tile we fetched
+   * @param  {Object}    geojson - the result GeoJSON data
+   * @param  {function}  callback - errback-style callback function to call with results
+   */
+  _parseTile(ds, tile, geojson, callback) {
     if (!geojson) return callback({ message: 'No GeoJSON', status: -1 });
 
-    // expect a FeatureCollection with `features` array
+    // Expect a FeatureCollection with `features` array
     let results = [];
     for (const f of geojson.features ?? []) {
-      const entities = this._parseFeature(f, dataset);
-      if (entities) results.push.apply(results, entities);
+      const entities = this._parseFeature(ds, f);
+      if (entities) {
+        results.push.apply(results, entities);
+      }
     }
 
     callback(null, results);
   }
 
 
-  _parseFeature(feature, dataset) {
+  /**
+   * _parseFeature
+   * Parse a single GeoJSON feature
+   * @param   {Object}  ds - the dataset we fetched
+   * @param   {Object}  feature - the GeoJSON feature that we fetched
+   * @return  {Array<OsmEntity>?}  An array of OSMEntities for that feature, or `null` if we skipped it
+   */
+  _parseFeature(ds, feature) {
     const context = this.context;
     const geom = feature.geometry;
     const properties = feature.properties;
     if (!geom || !properties) return null;
 
-    const featureID = properties[dataset.layer.idfield] || properties.OBJECTID || properties.FID || properties.id;
+    const featureID = properties[ds.layer.idfield] || properties.OBJECTID || properties.FID || properties.id;
     if (!featureID) return null;
 
     // skip if we've seen this feature already on another tile
-    if (dataset.cache.seen[featureID]) return null;
-    dataset.cache.seen[featureID] = true;
+    if (ds.cache.seen.has(featureID)) return null;
+    ds.cache.seen.add(featureID);
 
-    const id = `${dataset.id}-${featureID}`;
-    const metadata = { __fbid__: id, __service__: 'esri', __datasetid__: dataset.id };
+    const id = `${ds.id}-${featureID}`;
+    const metadata = { __fbid__: id, __service__: 'esri', __datasetid__: ds.id };
     let entities = [];
     let nodemap = new Map();
 
@@ -482,8 +536,8 @@ export class EsriService extends AbstractSystem {
         const nodelist = parseCoordinates(ring);
         if (nodelist.length < 3) continue;
 
-        const first = nodelist[0];
-        const last = nodelist[nodelist.length - 1];
+        const first = nodelist.at(0);
+        const last = nodelist.at(-1);
         if (first !== last) nodelist.push(first);   // sanity check, ensure rings are closed
 
         const w = new OsmWay(context, { nodes: nodelist });
@@ -506,8 +560,8 @@ export class EsriService extends AbstractSystem {
 
       return entities;
     }
-    // no Multitypes for now (maybe not needed)
 
+    // no Multitypes for now (maybe not needed)
     function parseCoordinates(coords) {
       let nodelist = [];
       for (const coord of coords) {
@@ -526,7 +580,7 @@ export class EsriService extends AbstractSystem {
     function parseTags(properties) {
       let tags = {};
       for (const prop of Object.keys(properties)) {
-        const k = clean(dataset.layer.tagmap[prop]);
+        const k = clean(ds.layer.tagmap[prop]);
         const v = clean(properties[prop]);
         if (k && v) {
           tags[k] = v;
@@ -535,7 +589,7 @@ export class EsriService extends AbstractSystem {
 
       // Since ESRI had to split the massive google open buildings dataset into multiple countries,
       // They asked us to aggregate them all under the same 'Google Open Buildings' dataset - Rapid#1300
-      let name = `${dataset.name}`;
+      let name = `${ds.name}`;
       if (name.startsWith('Google_Buildings_for')) {
         name = 'Google_Open_Buildings';
       }
@@ -548,6 +602,5 @@ export class EsriService extends AbstractSystem {
       return val ? val.toString().trim() : null;
     }
   }
-
 
 }

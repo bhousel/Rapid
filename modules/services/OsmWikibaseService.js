@@ -15,15 +15,15 @@ export class OsmWikibaseService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
     this.id = 'osmwikibase';
     this.apibase = 'https://wiki.openstreetmap.org/w/api.php';
 
-    this._inflight = {};
     this._cache = {};
+    this._inflight = new Map();        // Map<url, AbortController>
     this._localeIDs = { en: false };   // cache false to prevent repeated failed requests
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -40,7 +40,7 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return Promise.resolve();
@@ -50,7 +50,7 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -61,23 +61,27 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     this._debouncedRequest.cancel();
-    Object.values(this._inflight).forEach(controller => controller.abort());
-    this._inflight = {};
+
+    for (const controller of this._inflight.values()) {
+      controller.abort();
+    }
+    this._inflight.clear();
 
     return Promise.resolve();
   }
 
 
   /**
+   * claimToValue
    * Get the best value for the property, or undefined if not found
-   * @param entity object from wikibase
-   * @param   property  string e.g. 'P4' for image
-   * @param   langCode  string e.g. 'fr' for French
-   * @return  the requested value, or undefined
+   * @param   {Object}  entity - entity object from wikibase
+   * @param   {string}  property - string e.g. 'P4' for image
+   * @param   {string}  langCode - string e.g. 'fr' for French
+   * @return  {string}  The requested value, or undefined
    */
   claimToValue(entity, property, langCode) {
     if (!entity.claims[property]) return undefined;
@@ -107,10 +111,11 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
+   * monolingualClaimToValueObj
    * Convert monolingual property into a key-value object (language -> value)
-   * @param   entity    object from wikibase
-   * @param   property  string e.g. 'P31' for monolingual wiki page title
-   * @return  the requested object, or undefined
+   * @param   {Object}  entity - entity object from wikibase
+   * @param   {string}  property - string e.g. 'P31' for monolingual wiki page title
+   * @return  The requested object, or undefined
    */
   monolingualClaimToValueObj(entity, property) {
     if (!entity?.claims[property]) return undefined;
@@ -126,9 +131,9 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * toSitelink
    * Generate a sitelink for the given key/value pair
-   * @param   key
-   * @param   value
-   * @return  sitelink
+   * @param   {string}  key
+   * @param   {string}  value
+   * @return  {string}  sitelink
    */
   toSitelink(key, value) {
     let result = value ? `Tag:${key}=${value}` : `Key:${key}`;
@@ -144,8 +149,8 @@ export class OsmWikibaseService extends AbstractSystem {
    *   value: 'string',
    *   langCodes: ['string']
    * }
-   * @param   params
-   * @param   callback
+   * @param  {Object}    params
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   getEntity(params, callback) {
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
@@ -270,11 +275,12 @@ export class OsmWikibaseService extends AbstractSystem {
    *   imageURL:     'string',
    *   wiki:         { title: 'string', text: 'string', url: 'string' }
    * }
-   * @param   params
-   * @param   callback
+   * @param  {Object}    params
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   getDocs(params, callback) {
-    const langCodes = this.context.systems.l10n.localeCodes().map(code => code.toLowerCase());
+    const l10n = this.context.systems.l10n;
+    const langCodes = l10n.localeCodes().map(code => code.toLowerCase());
     params.langCodes = langCodes;
 
     this.getEntity(params, (err, data) => {
@@ -365,28 +371,41 @@ export class OsmWikibaseService extends AbstractSystem {
   }
 
 
-  // Makes it easier to unit test
+  /**
+   * addLocale
+   * Add a locale to the cache (for unit testing)
+   * @param  {string}  langCode
+   * @param  {string}  qid
+   */
   addLocale(langCode, qid) {
     this._localeIDs[langCode] = qid;
   }
 
 
+  /**
+   * _request
+   * Perform a request
+   * @param  {string}    url - the URL to request
+   * @param  {function}  callback - errback-style callback function to call with results
+   */
   _request(url, callback) {
-    if (this._inflight[url]) return;
+    if (this._inflight.has(url)) return;
 
     const controller = new AbortController();
-    this._inflight[url] = controller;
+    this._inflight.set(url, controller);
 
     fetch(url, { signal: controller.signal })
       .then(utilFetchResponse)
       .then(result => {
-        delete this._inflight[url];
         if (callback) callback(null, result);
       })
       .catch(err => {
-        delete this._inflight[url];
         if (err.name === 'AbortError') return;
+        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         if (callback) callback(err.message);
+      })
+      .finally(() => {
+        this._inflight.delete(url);
       });
   }
 

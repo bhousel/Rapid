@@ -45,7 +45,7 @@ export class TaginfoService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -83,7 +83,7 @@ export class TaginfoService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return Promise.resolve();
@@ -93,7 +93,7 @@ export class TaginfoService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     if (this._startPromise) return this._startPromise;
@@ -136,7 +136,7 @@ export class TaginfoService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     this._debouncedRequest.cancel();
@@ -149,8 +149,8 @@ export class TaginfoService extends AbstractSystem {
 
   /**
    * keys
-   * @param  params
-   * @param  callback
+   * @param  {Object}    params
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   keys(params, callback) {
     const langCode = this.context.systems.l10n.languageCode();
@@ -180,8 +180,8 @@ export class TaginfoService extends AbstractSystem {
 
   /**
    * multikeys
-   * @param  params
-   * @param  callback
+   * @param  {Object}    params
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   multikeys(params, callback) {
     const langCode = this.context.systems.l10n.languageCode();
@@ -212,8 +212,8 @@ export class TaginfoService extends AbstractSystem {
 
   /**
    * values
-   * @param  params
-   * @param  callback
+   * @param  {Object}    params
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   values(params, callback) {
     // Exclude popular keys from values lookups.. see iD#3955
@@ -257,8 +257,8 @@ export class TaginfoService extends AbstractSystem {
 
   /**
    * roles
-   * @param  params
-   * @param  callback
+   * @param  {Object}    params
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   roles(params, callback) {
     const langCode = this.context.systems.l10n.languageCode();
@@ -287,6 +287,11 @@ export class TaginfoService extends AbstractSystem {
   }
 
 
+  /**
+   * docs
+   * @param  {Object}    params
+   * @param  {function}  callback - errback-style callback function to call with results
+   */
   docs(params, callback) {
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
     params = this._clean(this._setSort(params));

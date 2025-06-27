@@ -25,7 +25,7 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -33,21 +33,20 @@ export class OsmoseService extends AbstractSystem {
     this.autoStart = false;
     this._startPromise = null;
 
-    // persistent data - loaded at init
-    this._osmoseColors = new Map();    // Map (itemType -> hex color)
-    this._osmoseStrings = new Map();   // Map (locale -> Object containing strings)
+    // persistent data - loaded at start
+    this._osmoseColors = new Map();    // Map<itemType, hex color>
+    this._osmoseStrings = new Map();   // Map<locale, Object containing strings>
     this._osmoseData = { icons: {}, types: [] };
 
-    this._cache = null;   // cache gets replaced on init/reset
+    this._cache = {};
     this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
-    this._lastv = null;
   }
 
 
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return this.resetAsync();
@@ -57,7 +56,7 @@ export class OsmoseService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     if (this._startPromise) return this._startPromise;
@@ -83,22 +82,23 @@ export class OsmoseService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
-    if (this._cache) {
-      Object.values(this._cache.inflightTile).forEach(controller => this._abortRequest(controller));
+    if (this._cache.inflightTile) {
+      for (const controller of this._cache.inflightTile.values()) {
+        controller.abort();
+      }
     }
     this._cache = {
-      issues: new Map(),    // Map<itemID, Marker>
-      loadedTile: {},
-      inflightTile: {},
-      inflightPost: {},
-      closed: {},
-      rbush: new RBush()
+      issues: new Map(),          // Map<itemID, Marker>
+      loadedTile:    new Map(),   // Map<tileID, Tile>
+      inflightTile:  new Map(),   // Map<tileID, AbortController>
+      inflightPost:  new Map(),   // Map<dataID, AbortController>
+      closed:        {},
+      rbush:         new RBush(),
+      lastv:         null         // viewport version last time we fetched data
     };
-
-    this._lastv = null;
 
     return Promise.resolve();
   }
@@ -107,7 +107,7 @@ export class OsmoseService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @return  {Array}  Array of data
+   * @return  {Array<Marker>}  Array of data
    */
   getData() {
     const extent = this.context.viewport.visibleExtent();
@@ -120,82 +120,101 @@ export class OsmoseService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view
    */
   loadTiles() {
+    const cache = this._cache;
+
     const viewport = this.context.viewport;
-    if (this._lastv === viewport.v) return;  // exit early if the view is unchanged
-    this._lastv = viewport.v;
+    if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
+    cache.lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    this._abortUnwantedRequests(this._cache, tiles);
+    for (const [tileID, controller] of cache.inflightTile) {
+      const isNeeded = tiles.some(tile => tile.id === tileID);
+      if (!isNeeded) {
+        controller.abort();
+      }
+    }
 
     // Issue new requests..
     for (const tile of tiles) {
-      if (this._cache.loadedTile[tile.id] || this._cache.inflightTile[tile.id]) continue;
+      const tileID = tile.id;
+      if (cache.loadedTile.has(tileID) || cache.loadedTile.has(tileID)) continue;
 
       const [x, y, z] = tile.xyz;
       const params = { item: this._osmoseData.types };   // Only request the types that we support
       const url = `${OSMOSE_API}/issues/${z}/${x}/${y}.json?` + utilQsString(params);
 
       const controller = new AbortController();
-      this._cache.inflightTile[tile.id] = controller;
+      cache.inflightTile.set(tileID, controller);
 
       fetch(url, { signal: controller.signal })
         .then(utilFetchResponse)
-        .then(data => {
-          this._cache.loadedTile[tile.id] = true;
-
-          for (const feature of (data.features ?? [])) {
-            // Osmose issues are uniquely identified by a unique
-            // `item` and `class` combination (both integer values)
-            const { item, class: cl, uuid: id } = feature.properties;
-            const itemType = `${item}-${cl}`;
-            const iconID = this._osmoseData.icons[itemType];
-
-            // Filter out unsupported issue types (some are too specific or advanced)
-            if (!iconID) continue;
-
-            const props = {
-              id: id,
-              class: cl,
-              item: item,
-              type: itemType,
-              iconID: iconID,
-              serviceID: this.id,
-              loc: this._preventCoincident(this._cache.rbush, feature.geometry.coordinates)
-            };
-
-            // Assigning `elems` here prevents UI detail requests
-            if (item === 8300 || item === 8360) {
-              props.elems = [];
-            }
-
-            const d = new Marker(this.context, props);
-            this._cache.issues.set(d.id, d);
-            this._cache.rbush.insert(this._encodeIssueRBush(d));
-          }
-
-          const gfx = this.context.systems.gfx;
-          gfx.deferredRedraw();
-          this.emit('loadedData');
-        })
+        .then(response => this._gotTile(tile, response))
         .catch(err => {
           if (err.name === 'AbortError') return;    // ok
-          this._cache.loadedTile[tile.id] = true;   // don't retry
+          cache.loadedTile.set(tileID, tile);      // don't retry
+          if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         })
         .finally(() => {
-          delete this._cache.inflightTile[tile.id];
+          cache.inflightTile.delete(tileID);
         });
     }
   }
 
 
   /**
+   * _gotTile
+   * Parse the response from the tile fetch
+   * @param  {Object}  tile - Tile data
+   * @param  {Object}  response - Response data
+   */
+  _gotTile(tile, response) {
+    const cache = this._cache;
+    cache.loadedTile.set(tile.id, tile);
+
+    for (const feature of (response.features ?? [])) {
+      // Osmose issues are uniquely identified by a unique
+      // `item` and `class` combination (both integer values)
+      const { item, class: cl, uuid: id } = feature.properties;
+      const itemType = `${item}-${cl}`;
+      const iconID = this._osmoseData.icons[itemType];
+
+      // Filter out unsupported issue types (some are too specific or advanced)
+      if (!iconID) continue;
+
+      const props = {
+        id: id,
+        class: cl,
+        item: item,
+        type: itemType,
+        iconID: iconID,
+        serviceID: this.id,
+        loc: this._preventCoincident(this._cache.rbush, feature.geometry.coordinates)
+      };
+
+      // Assigning `elems` here prevents UI detail requests
+      if (item === 8300 || item === 8360) {
+        props.elems = [];
+      }
+
+      const d = new Marker(this.context, props);
+      cache.issues.set(d.id, d);
+      cache.rbush.insert(this._encodeIssueRBush(d));
+    }
+
+    const gfx = this.context.systems.gfx;
+    gfx.deferredRedraw();
+    this.emit('loadedData');
+  }
+
+
+  /**
    * loadIssueDetailAsync
    * Fetch additional issue details when needed.
-   * @param   {Marker}  issue
-   * @return  {Promise} Promise resolved once the data has been fetched
+   * @param   {Marker}   issue
+   * @return  {Promise}  Promise resolved once the data has been fetched
    */
   loadIssueDetailAsync(issue) {
     // Issue details only need to be fetched once
@@ -237,8 +256,8 @@ export class OsmoseService extends AbstractSystem {
   /**
    * getColor
    * Get the color associated with this issue type
-   * @param   itemInt
-   * @return  hex color
+   * @param   {number}  itemInt
+   * @return  {number}  hex color
    */
   getColor(itemInt) {
     return this._osmoseColors.get(itemInt) ?? 0xffffff;
@@ -258,55 +277,59 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * postUpdate
-   * @param   {Marker}    issue
-   * @param   {function}  callback
+   * Called to change some properies (status, comments) about the Osmose data item.
+   * Will send the update to the Osmose API and refresh the local data cache.
+   * @param  {Marker}    item
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   postUpdate(issue, callback) {
+    const cache = this._cache;
     const issueID = issue.id;
     const status = issue.props.newStatus;
     const item = issue.props.item;
 
-    if (this._cache.inflightPost[issueID]) {
+    if (cache.inflightPost.has(issueID)) {
       return callback({ message: 'Issue update already inflight', status: -2 }, issue);
     }
 
     // UI sets the status to either 'done' or 'false'
     const url = `${OSMOSE_API}/issue/${issueID}/${status}`;
     const controller = new AbortController();
+    cache.inflightPost.set(issueID, controller);
 
-    const after = () => {
-      delete this._cache.inflightPost[issueID];
-
-      this.removeItem(issue);
-      if (issue.newStatus === 'done') {
-        // Keep track of the number of issues closed per `item` to tag the changeset
-        if (!(item in this._cache.closed)) {
-          this._cache.closed[item] = 0;
-        }
-        this._cache.closed[item] += 1;
-      }
-      if (callback) callback(null, issue);
-    };
-
-    this._cache.inflightPost[issueID] = controller;
-
+    let gotErr;
     fetch(url, { signal: controller.signal })
-      .then(after)
       .catch(err => {
-        delete this._cache.inflightPost[issueID];
-        if (callback) callback(err.message);
+        gotErr = err;  // capture any error but continue to `finally` block.
+      })
+      .finally(() => {
+        cache.inflightPost.delete(issueID);
+
+        this.removeItem(issue);
+
+        if (status === 'done') {
+          // Keep track of the number of issues closed per `item` to tag the changeset
+          if (!(item in this._cache.closed)) {
+            this._cache.closed[item] = 0;
+          }
+          this._cache.closed[item] += 1;
+        }
+
+        if (callback) {
+          callback(gotErr?.message, issue);
+        }
       });
   }
 
 
   /**
    * getError
-   * Get a issue from cache
-   * @param   {string}  issueID
-   * @return  {Marker}  the issue
+   * Get item with given id from cache
+   * @param   {string}   itemID
+   * @return  {Marker?}  the cached item, or `undefined` if not found
    */
-  getError(issueID) {
-    return this._cache.issues.get(issueID);
+  getError(itemID) {
+    return this._cache.issues.get(itemID);
   }
 
 
@@ -350,36 +373,32 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * itemURL
-   * Returns the url to link to details about an item
-   * @param  {Marker}  item
-   * @return {string}  the url
+   * Returns the URL to link to details about an item
+   * @param   {Marker}  item
+   * @return  {string}  the url
    */
   itemURL(item) {
     return `https://osmose.openstreetmap.fr/en/error/${item.id}`;
   }
 
 
-  _abortRequest(controller) {
-    if (controller) {
-      controller.abort();
-    }
-  }
-
-  _abortUnwantedRequests(cache, tiles) {
-    Object.keys(cache.inflightTile).forEach(k => {
-      const wanted = tiles.find(tile => k === tile.id);
-      if (!wanted) {
-        this._abortRequest(cache.inflightTile[k]);
-        delete cache.inflightTile[k];
-      }
-    });
-  }
-
+  /**
+   * _encodeIssueRBush
+   * Convert a Marker to a Box Object for use with RBush.
+   * @param   {Marker}  d - the item to encode
+   * @return  {Object}  Box Object for use with RBush
+   */
   _encodeIssueRBush(d) {
     return { minX: d.loc[0], minY: d.loc[1], maxX: d.loc[0], maxY: d.loc[1], data: d };
   }
 
-  // Replace or remove data from the rbush spatial index
+
+  /**
+   * _updateRBush
+   * Replace or remove data from the rbush spatial index.
+   * @param  {Marker}   item - the item to replace or remove
+   * @param  {boolean}  replace - if `true` replace the item with the given new item
+   */
   _updateRBush(item, replace) {
     this._cache.rbush.remove(item, (a, b) => a.data.id === b.data.id);
     if (replace) {

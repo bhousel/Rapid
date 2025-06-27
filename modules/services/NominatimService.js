@@ -15,7 +15,7 @@ export class NominatimService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -35,7 +35,7 @@ export class NominatimService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return Promise.resolve();
@@ -45,7 +45,7 @@ export class NominatimService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -56,7 +56,7 @@ export class NominatimService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     Object.values(this._inflight).forEach(controller => controller.abort());
@@ -68,8 +68,9 @@ export class NominatimService extends AbstractSystem {
 
   /**
    * countryCode
-   * @param  loc      [lon,lat]
-   * @param  callback
+   * Get the country code for the given location.
+   * @param  {Array<number>}  loc - location to lookup [lon,lat]
+   * @param  {function}       callback - errback-style callback function to call with results
    */
   countryCode(loc, callback) {
     this.reverse(loc, (err, result) => {
@@ -86,8 +87,9 @@ export class NominatimService extends AbstractSystem {
 
   /**
    * reverse
-   * @param  loc      [lon,lat]
-   * @param  callback
+   * Reverse Geocode:  Get the address for the given location.
+   * @param  {Array<number>}  loc - location to lookup [lon,lat]
+   * @param  {function}       callback - errback-style callback function to call with results
    */
   reverse(loc, callback) {
     const cached = this._nominatimCache.search(
@@ -133,8 +135,9 @@ export class NominatimService extends AbstractSystem {
 
   /**
    * search
-   * @param  val
-   * @param  callback
+   * Search nominatum for things with the given name
+   * @param  {string}    val - value to search for
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   search(val, callback) {
     const searchVal = encodeURIComponent(val);

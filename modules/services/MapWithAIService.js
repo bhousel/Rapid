@@ -22,7 +22,7 @@ export class MapWithAIService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -41,7 +41,7 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return this.resetAsync()
@@ -72,7 +72,7 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -83,7 +83,7 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * getAvailableDatasets
    * Called by `RapidSystem` to get the datasets that this service provides.
-   * @return {Array<RapidDataset>}  The datasets this service provides
+   * @return  {Array<RapidDataset>}  The datasets this service provides
    */
   getAvailableDatasets() {
     const context = this.context;
@@ -162,7 +162,7 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     for (const handle of this._deferred) {
@@ -207,7 +207,7 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * loadTiles
    * Schedule any data requests needed to cover the current map view
-   * @param   {string}  datasetID - datasetID to load tiles for
+   * @param  {string}  datasetID - datasetID to load tiles for
    */
   loadTiles(datasetID) {
     if (this._paused) return;

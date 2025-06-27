@@ -45,8 +45,8 @@ export class KartaviewService extends AbstractSystem {
       .translateExtent([[0, 0], [320, 240]])
       .scaleExtent([1, 15]);
 
-    this._hires = false;
     this._cache = {};
+    this._hires = false;
     this._startPromise = null;
     this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
 

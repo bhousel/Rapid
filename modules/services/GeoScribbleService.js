@@ -110,7 +110,7 @@ export class GeoScribbleService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     for (const [tileID, controller] of cache.inflight) {
-      const isNeeded = tiles.find(tile => tile.id === tileID);
+      const isNeeded = tiles.some(tile => tile.id === tileID);
       if (!isNeeded) {
         controller.abort();
       }

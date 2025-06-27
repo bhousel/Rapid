@@ -19,7 +19,7 @@ export class OvertureService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -34,7 +34,7 @@ export class OvertureService extends AbstractSystem {
   /**
    * _loadS3CatalogAsync
    * Load and parse the overture catalog data
-   * @return {Promise} Promise resolved when the data has been loaded
+   * @return  {Promise}  Promise resolved when the data has been loaded
    */
   _loadS3CatalogAsync() {
     return fetch(PMTILES_ROOT_URL + PMTILES_CATALOG_PATH)
@@ -56,7 +56,7 @@ export class OvertureService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -70,7 +70,7 @@ export class OvertureService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -83,7 +83,7 @@ export class OvertureService extends AbstractSystem {
   /**
    * getAvailableDatasets
    * Called by `RapidSystem` to get the datasets that this service provides.
-   * @return {Array<RapidDataset>}  The datasets this service provides
+   * @return  {Array<RapidDataset>}  The datasets this service provides
    */
   getAvailableDatasets() {
     // just this one for now
@@ -107,7 +107,7 @@ export class OvertureService extends AbstractSystem {
   /**
    * loadTiles
    * Use the vector tile service to schedule any data requests needed to cover the current map view
-   * @param   {string}  template - template to load tiles for
+   * @param  {string}  template - template to load tiles for
    */
   loadTiles(datasetID) {
     const vtService = this.context.services.vectortile;
@@ -122,6 +122,12 @@ export class OvertureService extends AbstractSystem {
   }
 
 
+  /**
+   * getData
+   * Get already loaded data that appears in the current map view
+   * @param   {string}          datasetID - datasetID to get data for
+   * @return  {Array<GeoJSON>}  Array of data
+   */
   getData(datasetID) {
     const vtService = this.context.services.vectortile;
 

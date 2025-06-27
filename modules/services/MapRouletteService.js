@@ -33,7 +33,7 @@ export class MapRouletteService extends AbstractSystem {
     this._initPromise = null;
     this._challengeIDs = new Set();  // Set<string> - if we want to filter only a specific challengeID
 
-    this._cache = null;   // cache gets replaced on init/reset
+    this._cache = {};
     this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -45,7 +45,7 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -86,7 +86,7 @@ export class MapRouletteService extends AbstractSystem {
    * @return {Promise} Promise resolved when this component has completed resetting
    */
   resetAsync() {
-    if (this._cache) {
+    if (this._cache.inflight) {
       for (const controller of this._cache.inflight) {
         controller.abort();
       }
@@ -94,12 +94,12 @@ export class MapRouletteService extends AbstractSystem {
 
     this._cache = {
       lastv: null,
-      tasks: new Map(),             // Map (taskID -> Task)
-      challenges: new Map(),        // Map (challengeID -> Challenge)
-      tileRequest: new Map(),       // Map (tileID -> { status, controller, url })
-      challengeRequest: new Map(),  // Map (challengeID -> { status, controller, url })
-      inflight: new Map(),          // Map (url -> controller)
-      closed: [],                   // Array ({ challengeID, taskID })
+      tasks: new Map(),             // Map<taskID, Marker>
+      challenges: new Map(),        // Map<challengeID, Object>
+      tileRequest: new Map(),       // Map<tileID, { status, controller, url }>
+      challengeRequest: new Map(),  // Map<challengeID, { status, controller, url }>
+      inflight: new Map(),          // Map<url, controller>
+      closed: [],                   // Array<{ challengeID, taskID }>
       rbush: new RBush()
     };
 
@@ -137,7 +137,7 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @return  {Array}  Array of data
+   * @return  {Array<Marker>}  Array of data
    */
   getData() {
     const extent = this.context.viewport.visibleExtent();
@@ -155,8 +155,8 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * getTask
-   * @param   {string}  taskID
-   * @return  {Task?}   the task with that id, or `undefined` if not found
+   * @param   {string}   taskID
+   * @return  {Marker?}  The task with that id, or `undefined` if not found
    */
   getTask(taskID) {
     return this._cache.tasks.get(taskID);
@@ -165,8 +165,8 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * getChallenge
-   * @param   {string}  challengeID
-   * @return  {Task?}   the task with that id, or `undefined` if not found
+   * @param   {string}   challengeID
+   * @return  {Object?}  The challenge with that id, or `undefined` if not found
    */
   getChallenge(challengeID) {
     return this._cache.challenges.get(challengeID);
@@ -187,7 +187,16 @@ export class MapRouletteService extends AbstractSystem {
 
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
-    this._abortUnwantedRequests(tiles);
+
+    // Abort inflight requests that are no longer needed..
+    for (const [tileID, request] of cache.tileRequest) {
+      if (request.status !== 'inflight') continue;
+      const isNeeded = tiles.some(tile => tile.id === tileID);
+      if (!isNeeded) {
+        request.controller.abort();
+        cache.inflight.delete(request.url);
+      }
+    }
 
     // Issue new requests..
     for (const tile of tiles) {
@@ -199,7 +208,7 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * loadTile
    * Schedule any data requests needed to cover the current map view
-   * @param {object}  tile - Tile to load
+   * @param  {Tile}  tile - Tile to load
    */
   loadTile(tile) {
     const cache = this._cache;
@@ -296,8 +305,8 @@ export class MapRouletteService extends AbstractSystem {
    * loadTaskDetailAsync
    * This loads the challenge instructions and adds it to an existing task.
    * @see https://maproulette.org/docs/swagger-ui/index.html#/Challenge/read
-   * @param  {Marker}  task
-   * @return {Promise}
+   * @param   {Marker}  task
+   * @return  {Promise}
    */
   loadTaskDetailAsync(task) {
     if (task.props.description !== undefined) return Promise.resolve(task);  // already done
@@ -322,8 +331,8 @@ export class MapRouletteService extends AbstractSystem {
    * This loads the task features geojson and adds it to an existing task.
    * Those properties are used to replace the Mustache tags in the challenge.instruction/.description.
    * @see https://maproulette.org/docs/swagger-ui/index.html#/Task/read
-   * @param   {Marker}  task
-   * @return  {Promise}
+   * @param   {Marker}   task
+   * @return  {Promise}  Promise resolved when we've fetched the task details
    */
   loadTaskFeaturesAsync(task) {
     if (task.props.taskFeatures !== undefined) return Promise.resolve(task);  // already done
@@ -438,8 +447,8 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * getError
    * Get a Task from cache
-   * @param  {string}   taskID
-   * @return {Marker?}  Task
+   * @param   {string}   taskID - the taskID to get
+   * @return  {Marker?}  The Task, or `undefined` if it wasn't found
    */
   getError(taskID) {
     return this._cache.tasks.get(taskID);
@@ -449,8 +458,8 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * replaceTask
    * Replace a single Task in the cache
-   * @param   {Marker}  task to replace
-   * @return  {Marker?} the task, or `null` if it couldn't be replaced
+   * @param   {Marker}   task - The task to replace
+   * @return  {Marker?}  The Task, or `undefined` if it couldn't be replaced
    */
   replaceTask(task) {
     if (!(task instanceof Marker) || !task.id) return;
@@ -578,7 +587,7 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * itemURL
-   * Returns the url to link to task about a challenge
+   * Returns the URL for user to visit for information about the task and challenge.
    * @param   {Marker}  task
    * @return  {string}  the url
    */
@@ -587,37 +596,36 @@ export class MapRouletteService extends AbstractSystem {
   }
 
 
-  _abortUnwantedRequests(tiles) {
-    const cache = this._cache;
-    for (const [tileID, request] of cache.tileRequest) {
-      if (request.status !== 'inflight') continue;
-      const wanted = tiles.find(tile => tile.id === tileID);
-      if (!wanted) {
-        request.controller.abort();
-        cache.inflight.delete(request.url);
-      }
-    }
-  }
-
-
+  /**
+   * _encodeIssueRBush
+   * Convert a Marker to a Box Object for use with RBush.
+   * @param   {Marker}  d - the item to encode
+   * @return  {Object}  Box Object for use with RBush
+   */
   _encodeIssueRBush(d) {
     return { minX: d.loc[0], minY: d.loc[1], maxX: d.loc[0], maxY: d.loc[1], data: d };
   }
 
 
-  // Replace or remove data from the rbush spatial index
-  _updateRBush(task, replace) {
-    this._cache.rbush.remove(task, (a, b) => a.data.id === b.data.id);
+  /**
+   * _updateRBush
+   * Replace or remove data from the rbush spatial index.
+   * @param   {Marker}   item - the item to replace or remove
+   * @param   {boolean}  replace - if `true` replace the item with the given new item
+   */
+  _updateRBush(item, replace) {
+    this._cache.rbush.remove(item, (a, b) => a.data.id === b.data.id);
     if (replace) {
-      this._cache.rbush.insert(task);
+      this._cache.rbush.insert(item);
     }
   }
+
 
   /**
    * _cacheTask
    * Store the given task in the cache
-   * @param  {Object}  props - the task properties
-   * @return {Marker}  The task
+   * @param   {Object}  props - the task properties
+   * @return  {Marker}  The task
    */
   _cacheTask(props) {
     const cache = this._cache;

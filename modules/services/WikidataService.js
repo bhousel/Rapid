@@ -15,20 +15,20 @@ export class WikidataService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
     this.id = 'wikidata';
 
-    this._cache = new Map();  // Map(qid -> entitydata)
+    this._cache = new Map();  // Map<qid, entitydata>
   }
 
 
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return Promise.resolve();
@@ -38,7 +38,7 @@ export class WikidataService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -49,7 +49,7 @@ export class WikidataService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     this._cache.clear();
@@ -60,8 +60,8 @@ export class WikidataService extends AbstractSystem {
   /**
    * itemsForSearchQuery
    * Search for Wikidata items matching the query
-   * @param  query
-   * @param  callback
+   * @param  {string}    query - string to search for
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   itemsForSearchQuery(query, callback) {
     if (!query) {
@@ -99,10 +99,10 @@ export class WikidataService extends AbstractSystem {
   /**
    * itemsByTitle
    * Given a Wikipedia language and article title,
-   * retrieve an array of corresponding Wikidata entities.
-   * @param  lang
-   * @param  title
-   * @param  callback
+   *  retrieve an array of corresponding Wikidata entities.
+   * @param  {string}    lang - language code
+   * @param  {string}    title - article title
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   itemsByTitle(lang, title, callback) {
     if (!title) {
@@ -151,8 +151,8 @@ export class WikidataService extends AbstractSystem {
 
   /**
    * entityByQID
-   * @param  qid
-   * @param  callback
+   * @param  {string}    qid - qid to query
+   * @param  {function}  callback - errback-style callback function to call with results
    */
   entityByQID(qid, callback) {
     if (!qid) {
@@ -207,10 +207,9 @@ export class WikidataService extends AbstractSystem {
    *   imageURL:     'string',
    *   wiki:         { title: 'string', text: 'string', url: 'string' }
    * }
-   *
-   * @param  params
-   * @param  callback
-   */
+   * @param  {Object}    params
+   * @param  {function}  callback - errback-style callback function to call with results
+  */
   getDocs(params, callback) {
     const langs = this.languagesToQuery();
 

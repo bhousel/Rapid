@@ -39,10 +39,10 @@ export class StreetsideService extends AbstractSystem {
     this._loadPromise = null;
     this._startPromise = null;
 
+    this._cache = {};
     this._hires = false;
     this._resolution = 512;    // higher numbers are slower - 512, 1024, 2048, 4096
     this._currScene = 0;
-    this._cache = {};
     this._viewer = null;
     this._nextSequenceID = 0;
     this._waitingForPhotoID = null;
@@ -493,7 +493,7 @@ export class StreetsideService extends AbstractSystem {
   /**
    * _loadAssetsAsync
    * Load the Pannellum JS and CSS files into the document head
-   * @return {Promise} Promise resolved when both files have been loaded
+   * @return  {Promise}  Promise resolved when both files have been loaded
    */
   _loadAssetsAsync() {
     if (this._loadPromise) return this._loadPromise;
