@@ -58,7 +58,7 @@ export class KeepRightService extends AbstractSystem {
    */
   constructor(context) {
     super(context);
-    this.id = 'keepRight';
+    this.id = 'keepright';
     this.autoStart = false;
 
     // persistent data - loaded at init

@@ -64,31 +64,34 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
   }
 
 
-  filterDetections(detections) {
+  /**
+   * filterMarkers
+   * @param  {Array<Marker>}  markers - all markers
+   * @return {Array<Marker>}  markers with filtering applied
+   */
+  filterMarkers(markers) {
     const photos = this.context.systems.photos;
     const fromDate = photos.fromDate;
+    const fromTimestamp = fromDate && new Date(fromDate).getTime();
     const toDate = photos.toDate;
+    const toTimestamp = toDate && new Date(toDate).getTime();
 
-    if (fromDate) {
-      const fromTimestamp = new Date(fromDate).getTime();
-      detections = detections
-        .filter(detection => new Date(detection.last_seen_at).getTime() >= fromTimestamp);
-    }
-    if (toDate) {
-      const toTimestamp = new Date(toDate).getTime();
-      detections = detections
-        .filter(detection => new Date(detection.first_seen_at).getTime() >= toTimestamp);
-    }
+    return markers.filter(marker => {
+      const props = marker.props;
+      const timestamp = new Date(props.first_seen_at).getTime();
+      if (fromTimestamp && fromTimestamp > timestamp) return false;
+      if (toTimestamp && toTimestamp < timestamp) return false;
 
-    return detections;
+      return true;
+    });
   }
 
 
   /**
    * renderMarkers
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   renderMarkers(frame, viewport, zoom) {
     const context = this.context;
@@ -98,21 +101,27 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     const container = context.container();
     const parentContainer = this.scene.groups.get('qa');
 
-    let items = mapillary.getData('signs');
-    items = this.filterDetections(items);
+    let markers = mapillary.getData('signs');
+    markers = this.filterMarkers(markers);
 
-    for (const d of items) {
-      const featureID = `${this.layerID}-${d.id}`;
+    for (const d of markers) {
+      const dataID = d.id;
+      const part = d.geoms.parts[0];
+
+      // Check that this part has coordinates and is a Point
+      if (!part.world || part.type !== 'Point') continue;
+
+      const featureID = `${this.layerID}-sign-${dataID}`;
       let feature = this.features.get(featureID);
 
       if (!feature) {
         // Some values we don't have icons for, check first - Rapid#1518
-        const hasIcon = container.selectAll(`#rapid-defs #${d.value}`).size();
+        const hasIcon = container.selectAll(`#rapid-defs #${d.props.value}`).size();
 
         let style;
         if (hasIcon) {
           style = {
-            markerName: d.value
+            markerName: d.props.value
           };
         } else {
           style = {
@@ -123,10 +132,10 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
         }
 
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(d.loc);
         feature.style = style;
         feature.parentContainer = parentContainer;
-        feature.setData(d.id, d);
+        feature.setCoords(part.world);
+        feature.setData(dataID, d);
 
         const marker = feature.marker;
         const ICONSIZE = 24;
@@ -144,12 +153,11 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     const mapillary = this.context.services.mapillary;
     if (!this.enabled || !mapillary?.started || zoom < MINZOOM) return;
 

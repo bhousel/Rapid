@@ -67,21 +67,22 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
 
   /**
-   * filterDetections
-   * @param  {Array<detection>}  detections - all detections
-   * @return {Array<detection>}  detections with filtering applied
+   * filterMarkers
+   * @param  {Array<Marker>}  markers - all markers
+   * @return {Array<Marker>}  markers with filtering applied
    */
-  filterDetections(detections) {
+  filterMarkers(markers) {
     const photos = this.context.systems.photos;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
     const toDate = photos.toDate;
     const toTimestamp = toDate && new Date(toDate).getTime();
 
-    return detections.filter(detection => {
-      const detectionTimestamp = new Date(detection.first_seen_at).getTime();
-      if (fromTimestamp && fromTimestamp > detectionTimestamp) return false;
-      if (toTimestamp && toTimestamp < detectionTimestamp) return false;
+    return markers.filter(marker => {
+      const props = marker.props;
+      const timestamp = new Date(props.first_seen_at).getTime();
+      if (fromTimestamp && fromTimestamp > timestamp) return false;
+      if (toTimestamp && toTimestamp < timestamp) return false;
 
       return true;
     });
@@ -90,9 +91,9 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
   /**
    * renderMarkers
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   renderMarkers(frame, viewport, zoom) {
     const context = this.context;
@@ -103,17 +104,23 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
     const parentContainer = this.scene.groups.get('qa');
 
-    let items = mapillary.getData('detections');
-    items = this.filterDetections(items);
+    let markers = mapillary.getData('detections');
+    markers = this.filterMarkers(markers);
 
-    for (const d of items) {
-      const featureID = `${this.layerID}-${d.id}`;
+    for (const d of markers) {
+      const dataID = d.id;
+      const part = d.geoms.parts[0];
+
+      // Check that this part has coordinates and is a Point
+      if (!part.world || part.type !== 'Point') continue;
+
+      const featureID = `${this.layerID}-detection-${dataID}`;
       let feature = this.features.get(featureID);
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(d.loc);
         feature.parentContainer = parentContainer;
+        feature.setCoords(part.world);
         feature.setData(d.id, d);
       }
 
@@ -121,7 +128,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
       if (feature.dirty) {
         const isSelected = feature.hasClass('selectdetection');
-        const presetID = mapillary.getDetectionPresetID(d.value);
+        const presetID = mapillary.getDetectionPresetID(d.props.value);
         const preset = presetID && presets.item(presetID);
 
         const style = {
@@ -144,12 +151,11 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     const mapillary = this.context.services.mapillary;
     if (!this.enabled || !mapillary?.started || zoom < MINZOOM) return;
 

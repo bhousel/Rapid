@@ -60,7 +60,7 @@ const discard = [
   /^openseamap$/,
   /^opensnowmap-overlay$/,
 
-  /^geoscribble/,              // 'GeoScribble' overlays (we built a service for this instead)
+  /^geoscribble/,              // 'geoscribble' overlays (we built a service for this instead)
   /^osmim-/,                   // low zoom osmim imagery
   /^US-TIGER-Roads-201\d/,     // older than 2020
   /^Waymarked_Trails/,         // Waymarked Trails *

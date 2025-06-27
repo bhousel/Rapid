@@ -33,7 +33,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * Whether the Layer's service exists
    */
   get supported() {
-    return !!this.context.services.geoScribble;
+    return !!this.context.services.geoscribble;
   }
 
 
@@ -55,9 +55,9 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
     const context = this.context;
     const gfx = context.systems.gfx;
-    const geoScribble = context.services.geoScribble;
-    if (val && geoScribble) {
-      geoScribble.startAsync()
+    const service = context.services.geoscribble;
+    if (val && service) {
+      service.startAsync()
         .then(() => gfx.immediateRedraw());
     }
   }
@@ -74,7 +74,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
     // Remove any existing containers
     for (const child of groupContainer.children) {
-      if (child.label.startsWith(this.layerID + '-')) {   // 'geoScribble-*'
+      if (child.label.startsWith(this.layerID + '-')) {   // 'geoscribble-*'
         groupContainer.removeChild(child);
         child.destroy({ children: true });  // recursive
       }
@@ -100,10 +100,10 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   render(frame, viewport, zoom) {
     if (!this.enabled) return;
 
-    const geoScribble = this.context.services.geoScribble;
-    geoScribble.loadTiles();
+    const service = this.context.services.geoscribble;
+    service.loadTiles();
 
-    const geoData = geoScribble.getData();
+    const geoData = service.getData();
 
     // Determine which renderer(s) to use for each feature
     // No polygons will be returned by the service, so we don't need to consider those types.

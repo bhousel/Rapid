@@ -11,7 +11,6 @@ import { GeometryPart } from './GeometryPart.js';
  * The geometry data should be passed to `setData()` as a GeoJSON object.
  *
  * Properties you can access:
- *   `origData`      Original GeoJSON data (in WGS84 lon/lat)
  *   `origExtent`    Original Extent bounding box (in WGS84 lon/lat)
  *   `extent`        Projected extent (in world coordinates x/y)
  *   `parts`         Array of GeometryParts
@@ -20,11 +19,10 @@ export class Geometry {
 
   /**
    * @constructor
-   * @param  {AbstractData} feature - The data feature that owns this Geometry
+   * @param  {Context}  context - Global shared application context
    */
-  constructor(feature) {
-    this.feature = feature;
-    this.context = feature.context;
+  constructor(context) {
+    this.context = context;
 
     this.parts = [];  // Array<GeometryPart>
     this.reset();
@@ -45,17 +43,13 @@ export class Geometry {
   /**
    * clone
    * Returns a clone of this Geometry object
-   * It clones both the calculated extents as well as the Geometries in the collection.
-   * @param  {AbstractData} feature - The data feature that will own the clone Geometry
-   * @return {Geometry}
+   * It clones both the calculated extents as well as the GeometryParts in the collection.
+   * @return  {Geometry}
    */
-  clone(feature) {
-    const copy = new Geometry(feature);
+  clone() {
+    const copy = new Geometry(this.context);
 
     copy.dirty = this.dirty;
-
-    // someday: check perf?  JSON.parse(JSON.stringify()) may still beat structuredClone for Array data
-    copy.origData = globalThis.structuredClone(this.origData);
     copy.origExtent = new Extent(this.origExtent);
     copy.extent = new Extent(this.extent);
 
@@ -76,7 +70,6 @@ export class Geometry {
 
     // Original data - These are in WGS84 coordinates
     // ([0,0] is Null Island)
-    this.origData = null;    // GeoJSON data
     this.origExtent = null;  // extent (bounding box)
 
     // Projected data - These are in world coordinates
@@ -91,16 +84,15 @@ export class Geometry {
 
   /**
    * setData
-   * This setter can accept all types of GeoJSON data.
+   * This method can accept all types of GeoJSON data.
    * It will automatically break multitypes and collections into parts
    *  and create separate GeometryPart elements for each part.
    * If there is any existing data, it is first removed.
-   * @param {GeoJSON} geojson - GeoJSON data
+   * @param  {GeoJSON}  geojson - source GeoJSON data
    */
   setData(geojson) {
     this.destroy();
 
-    this.origData = globalThis.structuredClone(geojson);
     const geojsonParts = this._geojsonToParts(geojson);
     if (!geojsonParts.length) return; // do nothing if we found no usable parts
 
@@ -109,7 +101,7 @@ export class Geometry {
     let isValid = false;
 
     for (const geojsonPart of geojsonParts) {
-      const part = new GeometryPart(this.feature);
+      const part = new GeometryPart(this.context);
       part.setData(geojsonPart);
       if (!part.orig || !part.world) continue;  // if the GeometryPart was invalid, skip it
 
@@ -128,21 +120,10 @@ export class Geometry {
 
 
   /**
-   * geojson
-   * The original data format is GeoJSON, this is just a convenience getter.
-   * @return {GeoJSON}
-   * @readonly
-   */
-  get geojson() {
-    return this.origData;
-  }
-
-
-  /**
    * _geojsonToParts
    * Break arbitrary GeoJSON into Geometry parts.
    * This will recurse down through the collection types if needed.
-   * @return {Array<GeoJSON>}  An array of singular GeoJSON geometries
+   * @return  {Array<Object>}  An array of singular GeoJSON geometries
    */
   _geojsonToParts(geojson = {}, parts = [], depth = 0) {
     if (depth > 4) return;  // limit recursion

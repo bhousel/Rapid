@@ -24,7 +24,7 @@ export class SelectMode extends AbstractMode {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -36,8 +36,7 @@ export class SelectMode extends AbstractMode {
 
   /**
    * enter
-   * Expects a `selection` property in the options argument as a `Map(datumID -> datum)`
-   *
+   * Expects a `selection` property in the options argument as a `Map<datumID, datum>`
    * @param  `options`  Optional `Object` of options passed to the new mode
    */
   enter(options = {}) {
@@ -88,22 +87,24 @@ export class SelectMode extends AbstractMode {
       let layerID = null;
 
       // hacky - improve?
-      if (datum instanceof Marker) {         // in most cases the `service` is the layerID
+      if (datum instanceof Marker && datum.type === 'detection') {  // A detection (object or sign)
+        if (datum.serviceID === 'mapillary' && datum.props.object_type === 'point') {
+          layerID = 'mapillary-detections';
+        } else if (datum.serviceID === 'mapillary' && datum.props.object_type === 'traffic_sign') {
+          layerID = 'mapillary-signs';
+        }
+      } else if (datum instanceof Marker) {  // in most cases the `service` is the layerID
         const serviceID = datum.serviceID;   // 'keepright', 'osmose', etc.
         layerID = serviceID === 'osm' ? 'notes' : serviceID;
-        if (layerID === 'osm') layerID = 'notes';
+        if (layerID === 'osm') {
+          layerID = 'notes';
+        }
       } else if (datum.props.__fbid__) {      // a Rapid feature
         layerID = 'rapid';
       } else if (datum.overture) {  // Overture data
         layerID = 'rapid';
       } else if (datum instanceof GeoJSON) {  // custom data
         layerID = 'custom-data';
-      } else if (datum.type === 'detection') {   // A detection (object or sign)
-        if (datum.service === 'mapillary' && datum.object_type === 'point') {
-          layerID = 'mapillary-detections';
-        } else if (datum.service === 'mapillary' && datum.object_type === 'traffic_sign') {
-          layerID = 'mapillary-signs';
-        }
       }
 
       if (layerID) {
@@ -129,12 +130,12 @@ export class SelectMode extends AbstractMode {
           this._selectedData.set(datumID, note);  // update selectedData after a change happens?
         });
 
-    } else if (datum instanceof Marker && datum.serviceID === 'keepRight') {
+    } else if (datum instanceof Marker && datum.serviceID === 'keepright') {
       sidebarContent = uiKeepRightEditor(context).error(datum);
       sidebarContent
         .on('change', () => {
           gfx.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
-          const keepright = context.services.keepRight;
+          const keepright = context.services.keepright;
           const error = keepright?.getError(datumID);
           if (!(error instanceof Marker)) return;  // or - go to browse mode?
           Sidebar.show(sidebarContent.error(error));
@@ -167,10 +168,10 @@ export class SelectMode extends AbstractMode {
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
 
-    } else if (datum.type === 'detection') {
+    } else if (datum instanceof Marker && datum.type === 'detection') {
       sidebarContent = uiDetectionInspector(context).datum(datum);
-      const serviceID = datum.service;
-      const type = (datum.object_type === 'traffic_sign') ? 'signs' : 'detections';
+      const serviceID = datum.serviceID;
+      const type = (datum.props.object_type === 'traffic_sign') ? 'signs' : 'detections';
       const layerID = `${serviceID}-${type}`;    // e.g. 'mapillary-signs' or 'mapillary-detections'
       photos.selectDetection(layerID, datum.id);
 

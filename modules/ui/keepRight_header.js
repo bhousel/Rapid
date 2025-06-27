@@ -24,7 +24,7 @@ export function uiKeepRightHeader(context) {
 
   function render($selection) {
     let iconFill = 0xffffff;
-    const keepright = context.services.keepRight;
+    const keepright = context.services.keepright;
     if (keepright) {
       iconFill = keepright.getColor(_marker?.props.parentIssueType);
     }

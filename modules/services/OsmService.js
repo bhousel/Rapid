@@ -29,7 +29,7 @@ export class OsmService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -1767,7 +1767,8 @@ export class OsmService extends AbstractSystem {
     const props = {
       id: uid,
       loc: this._getLoc(attrs),
-      serviceID: this.id
+      serviceID: this.id,
+      type: 'note'
     };
 
     // if notes are coincident, move them apart slightly
@@ -1788,9 +1789,9 @@ export class OsmService extends AbstractSystem {
 
       // if the element is comments, parse the comments
       if (nodeName === 'comments') {
-        props[nodeName] = this._parseComments(node.childNodes);
+        props.comments = this._parseComments(node.childNodes);
       } else {
-        props[nodeName] = node.textContent;
+        props.comments = node.textContent;
       }
     }
 

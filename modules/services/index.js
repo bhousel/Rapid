@@ -43,9 +43,9 @@ export const services = {
 };
 
 services.available.set('esri', EsriService);
-services.available.set('geoScribble', GeoScribbleService);
+services.available.set('geoscribble', GeoScribbleService);
 services.available.set('kartaview', KartaviewService);
-services.available.set('keepRight', KeepRightService);
+services.available.set('keepright', KeepRightService);
 services.available.set('mapillary', MapillaryService);
 services.available.set('maproulette', MapRouletteService);
 services.available.set('mapwithai', MapWithAIService);

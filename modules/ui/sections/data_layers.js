@@ -50,7 +50,7 @@ export function uiSectionDataLayers(context) {
     if (e)  e.preventDefault();
 
     const allLayerIDs = [
-      'osm', 'notes', 'rapid', 'maproulette', 'keepRight', 'osmose', 'geoScribble',
+      'osm', 'notes', 'rapid', 'maproulette', 'keepright', 'osmose', 'geoscribble',
       'custom-data', 'mapillary', 'streetside', 'kartaview'
     ];
 
@@ -214,7 +214,7 @@ export function uiSectionDataLayers(context) {
 
 
   function drawQAItems(selection) {
-    const qaKeys = ['maproulette', 'keepRight', 'osmose', 'geoScribble'];
+    const qaKeys = ['maproulette', 'keepright', 'osmose', 'geoscribble'];
     const qaLayers = qaKeys.map(layerID => scene.layers.get(layerID)).filter(Boolean);
     const maproulette = context.services.maproulette;
 

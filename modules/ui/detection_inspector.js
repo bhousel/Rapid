@@ -12,7 +12,7 @@ export function uiDetectionInspector(context) {
   const DetectionHeader = uiDetectionHeader(context);
   const ViewOn = new UiViewOn(context);
 
-  let _detection;
+  let _marker;
 
 
   function render(selection) {
@@ -50,13 +50,13 @@ export function uiDetectionInspector(context) {
       .append('div')
       .attr('class', 'modal-section qa-editor')
       .merge($details)
-      .call(DetectionHeader.datum(_detection))
-      .call(DetectionDetails.datum(_detection));
+      .call(DetectionHeader.datum(_marker))
+      .call(DetectionDetails.datum(_marker));
 
 
     // add .sidebar-footer
-    const service = context.services[_detection.service];
-    const imageID = _detection.bestImageID || photos.currPhotoID;
+    const service = context.services[_marker.props.serviceID];
+    const imageID = _marker.props.bestImageID || photos.currPhotoID;
 
     if (service && imageID) {
       ViewOn.stringID = 'mapillary.view_on_mapillary';
@@ -78,8 +78,8 @@ export function uiDetectionInspector(context) {
 
 
   render.datum = function(val) {
-    if (!arguments.length) return _detection;
-    _detection = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

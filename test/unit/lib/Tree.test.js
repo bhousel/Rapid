@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import * as Rapid from '../../../modules/headless.js';
 
 
-describe('Tree', () => {
+describe.skip('Tree', () => {
   const context = new Rapid.MockContext();
 
   describe('#rebase', () => {

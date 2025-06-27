@@ -5,6 +5,7 @@ import Protobuf from 'pbf';
 import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
+import { Marker, GeoJSON } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 const accessToken = 'MLY|3376030635833192|f13ab0bdf6b2f7b99e0d8bd5868e1d88';
@@ -40,7 +41,7 @@ export class MapillaryService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -50,50 +51,24 @@ export class MapillaryService extends AbstractSystem {
     this._loadPromise = null;
     this._startPromise = null;
 
-    this._showing = null;
     this._selectedImageID = null;
     this._cache = {};
 
     this._viewer = null;
     this._viewerFilter = ['all'];
-    this._keydown = this._keydown.bind(this);
     this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
 
     // Make sure the event handlers have `this` bound correctly
+    this._keydown = this._keydown.bind(this);
     this.navigateForward = this.navigateForward.bind(this);
     this.navigateBackward = this.navigateBackward.bind(this);
   }
 
 
   /**
-   * _keydown
-   * Handler for keydown events on the window, but only if the photo viewer is visible.
-   * @param  `e`  A DOM KeyboardEvent
-   */
-  _keydown(e) {
-    // Ignore keypresses unless we actually have a Mapillary photo showing
-    const photos = this.context.systems.photos;
-    if (!this.viewerShowing || photos.currPhotoLayerID !== 'mapillary') return;
-
-    // Only allow key navigation if the user doesn't have something
-    // more important focused - like a input, textarea, menu, etc.
-    // and only allow key nav if we're showing the viewer and have the body or the map clicked
-    const activeElement = document.activeElement?.tagName ?? 'BODY';
-    const mapillaryViewerClass = document.activeElement?.className.startsWith('mapillary');
-    if (activeElement !== 'BODY' && !mapillaryViewerClass) return;
-
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-      this.navigateBackward();
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
-      this.navigateForward();
-    }
-  }
-
-
-  /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return this.resetAsync();
@@ -103,7 +78,7 @@ export class MapillaryService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     if (this._startPromise) return this._startPromise;
@@ -150,7 +125,7 @@ export class MapillaryService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     if (this._cache?.inflight) {
@@ -160,11 +135,11 @@ export class MapillaryService extends AbstractSystem {
     }
 
     this._cache = {
-      images:        { lastv: null, data: new Map(), rbush: new RBush() },
-      detections:    { lastv: null, data: new Map(), rbush: new RBush() },
+      images:        { lastv: null, data: new Map(), rbush: new RBush() }, // Map<imageID, Marker>
+      detections:    { lastv: null, data: new Map(), rbush: new RBush() }, // Map<detectionID, Marker>
       signs:         { lastv: null  /* signs are now stored in `detections` cache */ },
-      sequences:     { data: new Map() },   // Map<sequenceID, Array<LineStrings>>
-      segmentations: { data: new Map() },
+      sequences:     { data: new Map() },   // Map<sequenceID, GeoJSON>
+      segmentations: { data: new Map() },   // Map<segmentationID, Object>
       inflight: new Map(),  // Map<url, {tileID, promise, controller}>
       loaded:   new Set()   // Set<url>
     };
@@ -197,8 +172,8 @@ export class MapillaryService extends AbstractSystem {
   /**
    * getImage
    * Return an image from the cache.
-   * @param   {string}  imageID - imageID to get
-   * @return  {Object?} The image, or `undefined` if not found
+   * @param   {string}   imageID - imageID to get
+   * @return  {Marker?}  The image, or `undefined` if not found
    */
   getImage(imageID) {
     return this._cache.images.data.get(imageID);
@@ -208,8 +183,8 @@ export class MapillaryService extends AbstractSystem {
   /**
    * getSequence
    * Return a sequence from the cache.
-   * @param   {string}  sequenceID - sequenceID to get
-   * @return  {Object?} The sequence, or `undefined` if not found
+   * @param   {string}    sequenceID - sequenceID to get
+   * @return  {GeoJSON?}  The sequence, or `undefined` if not found
    */
   getSequence(sequenceID) {
     return this._cache.sequences.data.get(sequenceID);
@@ -219,8 +194,8 @@ export class MapillaryService extends AbstractSystem {
   /**
    * getDetection
    * Return a detection from the cache.
-   * @param   {string}  detectionID - detectionID to get
-   * @return  {Object?} The detection, or `undefined` if not found
+   * @param   {string}   detectionID - detectionID to get
+   * @return  {Marker?}  The detection, or `undefined` if not found
    */
   getDetection(detectionID) {
     return this._cache.detections.data.get(detectionID);
@@ -231,21 +206,22 @@ export class MapillaryService extends AbstractSystem {
    * getData
    * Get already loaded data that appears in the current map view
    * @param   {string}  datasetID - one of 'images', 'signs', or 'detections'
-   * @return  {Array}
+   * @return  {Array<Marker>}
    */
   getData(datasetID) {
     if (!['images', 'signs', 'detections'].includes(datasetID)) return [];
 
+    const cache = this._cache;
     const extent = this.context.viewport.visibleExtent();
     if (datasetID === 'images') {
-      return this._cache.images.rbush.search(extent.bbox())
+      return cache.images.rbush.search(extent.bbox())
         .map(d => d.data);
 
     } else {  // both signs and detections are now stored in the `detections` cache
       const type = (datasetID === 'signs') ? 'traffic_sign' : 'point';
-      return this._cache.detections.rbush.search(extent.bbox())
+      return cache.detections.rbush.search(extent.bbox())
         .map(d => d.data)
-        .filter(d => d.object_type === type);
+        .filter(d => d.props.object_type === type);
     }
   }
 
@@ -253,16 +229,17 @@ export class MapillaryService extends AbstractSystem {
   /**
    * getSequences
    * Get already loaded sequence data that appears in the current map view
-   * @return  {Array<FeatureCollection>}
+   * @return  {Array<GeoJSON>}
    */
   getSequences() {
+    const cache = this._cache;
     const extent = this.context.viewport.visibleExtent();
-    const results = new Map();  // Map(sequenceID -> Array of LineStrings)
+    const results = new Map();  // Map<sequenceID, GeoJSON>
 
-    for (const box of this._cache.images.rbush.search(extent.bbox())) {
-      const sequenceID = box.data.sequenceID;
+    for (const box of cache.images.rbush.search(extent.bbox())) {
+      const sequenceID = box.data.props.sequenceID;
       if (!sequenceID) continue;  // no sequence for this image
-      const sequence = this._cache.sequences.data.get(sequenceID);
+      const sequence = cache.sequences.data.get(sequenceID);
       if (!sequence) continue;  // sequence not ready
 
       if (!results.has(sequenceID)) {
@@ -409,10 +386,6 @@ export class MapillaryService extends AbstractSystem {
     );
   }
 
-  get viewerShowing()  {
-    return this._showing;
-  }
-
 
   /**
    * showViewer
@@ -432,8 +405,6 @@ export class MapillaryService extends AbstractSystem {
       $viewer
         .selectAll('.photo-wrapper.mly-wrapper')
         .classed('hide', false);
-
-      this._showing = true;
 
       this._viewer.resize();
     }
@@ -458,7 +429,6 @@ export class MapillaryService extends AbstractSystem {
       .selectAll('.photo-wrapper')
       .classed('hide', true);
 
-    this._showing = false;
     this._selectedImageID = null;
     this.emit('imageChanged');
   }
@@ -559,6 +529,36 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
+   * _keydown
+   * Handler for keydown events on the window, but only if the photo viewer is visible.
+   * @param  {KeyboardEvent}  e - A DOM KeyboardEvent
+   */
+  _keydown(e) {
+    const context = this.context;
+    const eventManager = context.systems.gfx.events;
+    const photos = context.systems.photos;
+
+    // Ignore keypresses unless we actually have a Mapillary photo showing
+    if (!photos.isViewerShowing() || photos.currPhotoLayerID !== 'mapillary') return;
+    // Ignore modified keypresses (user might be panning or rotating)
+    if (eventManager.modifierKeys.size) return;
+
+    // Only allow key navigation if the user doesn't have something
+    // more important focused - like a input, textarea, menu, etc.
+    // and only allow key nav if we're showing the viewer and have the body or the map clicked
+    const activeElement = document.activeElement?.tagName ?? 'BODY';
+    const mapillaryViewerClass = document.activeElement?.className.startsWith('mapillary');
+    if (activeElement !== 'BODY' && !mapillaryViewerClass) return;
+
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      this.navigateBackward();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      this.navigateForward();
+    }
+  }
+
+
+  /**
    * _updatePhotoFooter
    * Update the photo attribution section of the image viewer
    * @param  {string} imageID - the new imageID
@@ -571,22 +571,22 @@ export class MapillaryService extends AbstractSystem {
     const image = this._cache.images.data.get(imageID);
     if (!image) return;
 
-    if (image.captured_by) {
+    if (image.props.captured_by) {
       $attribution
         .append('span')
         .attr('class', 'captured_by')
-        .text(image.captured_by);
+        .text(image.props.captured_by);
 
       $attribution
         .append('span')
         .text('|');
     }
 
-    if (image.captured_at) {
+    if (image.props.captured_at) {
       $attribution
         .append('span')
         .attr('class', 'captured_at')
-        .text(_localeDateString(image.captured_at));
+        .text(_localeDateString(image.props.captured_at));
 
       $attribution
         .append('span')
@@ -825,17 +825,17 @@ export class MapillaryService extends AbstractSystem {
         const sequenceID = feature.properties.id.toString();
         let sequence = cache.data.get(sequenceID);
         if (!sequence) {
-          sequence = {
-            type:     'FeatureCollection',
-            service:  'mapillary',
-            id:       sequenceID,     // not strictly spec, but should be
-            v:        0,
-            features: []
-          };
+          sequence = new GeoJSON(this.context, {
+            type:      'FeatureCollection',
+            serviceID: this.id,
+            id:        sequenceID,     // not strictly spec, but should be
+            features:  []
+          });
           cache.data.set(sequenceID, sequence);
         }
-        sequence.features.push(feature);
-        sequence.v++;
+        sequence.props.features.push(feature);  // updating it in-place, hope this is ok.
+        sequence.geoms.setData(sequence.props); // rebuild the geometry, hope this is ok.
+        sequence.touch();
       }
     }
 
@@ -877,7 +877,7 @@ export class MapillaryService extends AbstractSystem {
   _loadDetectionAsync(detectionID) {
     // Is data is cached already and includes the `images` Array?  If so, resolve immediately.
     const detection = this._cache.detections.data.get(detectionID);
-    if (Array.isArray(detection?.images)) {
+    if (Array.isArray(detection?.props?.images)) {
       return Promise.resolve(detection);
     }
 
@@ -930,8 +930,8 @@ export class MapillaryService extends AbstractSystem {
    * @return {Promise}  Promise settled with the segmentation details
    */
   _loadImageSegmentationsAsync(image) {
-    if (image.segmentationIDs) {
-      return Promise.resolve(image.segmentationIDs);
+    if (image.props.segmentationIDs) {
+      return Promise.resolve(image.props.segmentationIDs);
     }
 
     // Not cached, load it..
@@ -947,7 +947,8 @@ export class MapillaryService extends AbstractSystem {
         }
 
         const cache = this._cache.segmentations;
-        image.segmentationIDs = new Set();
+        const segmentationIDs = new Set();
+        image.updateSelf({ segmentationIDs: segmentationIDs });
 
         for (const d of response.data || []) {
           const segmentationID = d.id.toString();
@@ -963,11 +964,11 @@ export class MapillaryService extends AbstractSystem {
 
           // Add segmentation to image..
           if (segmentation) {
-            image.segmentationIDs.add(segmentationID);
+            segmentationIDs.add(segmentationID);
           }
         }
 
-        return image.segmentationIDs;
+        return segmentationIDs;
       })
       .catch(err => {
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
@@ -986,8 +987,8 @@ export class MapillaryService extends AbstractSystem {
    * @return {Promise}  Promise settled with the segmentation details
    */
   _loadDetectionSegmentationsAsync(detection) {
-    if (detection.segmentationIDs) {
-      return Promise.resolve(detection.segmentationIDs);
+    if (detection.props.segmentationIDs) {
+      return Promise.resolve(detection.props.segmentationIDs);
     }
 
     // Not cached, load it..
@@ -1003,7 +1004,8 @@ export class MapillaryService extends AbstractSystem {
         }
 
         const cache = this._cache.segmentations;
-        detection.segmentationIDs = new Set();
+        const segmentationIDs = new Set();
+        detection.updateSelf({ segmentationIDs: segmentationIDs });
 
         for (const d of response.data || []) {
           const segmentationID = d.id.toString();
@@ -1019,11 +1021,11 @@ export class MapillaryService extends AbstractSystem {
 
           // Add segmentation to detection..
           if (segmentation) {
-            detection.segmentationIDs.add(segmentationID);
+            segmentationIDs.add(segmentationID);
           }
         }
 
-        return detection.segmentationIDs;
+        return segmentationIDs;
       })
       .catch(err => {
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
@@ -1154,17 +1156,17 @@ export class MapillaryService extends AbstractSystem {
    * Store the given image in the caches
    * @param  {Object}  cache - the cache to use
    * @param  {Object}  props - the image properties
-   * @return {Object}  The image
+   * @return {Marker}  The image
    */
   _cacheImage(cache, props) {
     let image = cache.data.get(props.id);
     if (!image) {
-      image = {
-        type:    'photo',
-        service: 'mapillary',
-        id:      props.id,
-        loc:     props.loc
-      };
+      image = new Marker(this.context, {
+        type:      'photo',
+        serviceID: this.id,
+        id:        props.id,
+        loc:       props.loc
+      });
 
       cache.data.set(image.id, image);
 
@@ -1176,11 +1178,16 @@ export class MapillaryService extends AbstractSystem {
     const caIsNumber = (!isNaN(props.ca) && isFinite(props.ca));
 
     // Update whatever additional props we were passed..
-    if (props.sequenceID)   image.sequenceID  = props.sequenceID;
-    if (props.captured_at)  image.captured_at = props.captured_at;
-    if (props.captured_by)  image.captured_by = props.captured_by;
-    if (caIsNumber)         image.ca          = props.ca;
-    if (props.isPano)       image.isPano      = props.isPano;
+    const setProps = {};
+    if (props.sequenceID)   setProps.sequenceID  = props.sequenceID;
+    if (props.captured_at)  setProps.captured_at = props.captured_at;
+    if (props.captured_by)  setProps.captured_by = props.captured_by;
+    if (caIsNumber)         setProps.ca          = props.ca;
+    if (props.isPano)       setProps.isPano      = props.isPano;
+
+    if (Object.keys(setProps).length) {
+      image.updateSelf(setProps);
+    }
 
     return image;
   }
@@ -1191,17 +1198,17 @@ export class MapillaryService extends AbstractSystem {
    * Store the given detection in the caches
    * @param  {Object}  cache - the cache to use
    * @param  {Object}  props - the detection properties
-   * @return {Object}  The detection
+   * @return {Marker}  The detection
    */
   _cacheDetection(cache, props) {
     let detection = cache.data.get(props.id);
     if (!detection) {
-      detection = {
+      detection = new Marker(this.context, {
         type:        'detection',
-        service:     'mapillary',
+        serviceID:   this.id,
         id:          props.id,
         object_type: props.object_type   // 'point' or 'traffic_sign'
-      };
+      });
 
       cache.data.set(detection.id, detection);
     }
@@ -1210,7 +1217,10 @@ export class MapillaryService extends AbstractSystem {
     // (see Rapid#1557 - sometimes we don't have this!)
     if (!detection.loc && props.loc) {
       const loc = this._preventCoincident(cache.rbush, props.loc);
-      detection.loc = loc;
+      // detection.loc = loc;
+      detection.updateSelf({ loc: loc });
+      // Should really have happened in the constructor, but unfortunately we need to redo it
+      detection.geoms.setData(detection.asGeoJSON());
 
       const [x, y] = loc;
       cache.rbush.insert({ minX: x, minY: y, maxX: x, maxY: y, data: detection });
@@ -1220,28 +1230,35 @@ export class MapillaryService extends AbstractSystem {
     // Allow 0, but not things like NaN, null, Infinity
     const dirIsNumber = (!isNaN(props.aligned_direction) && isFinite(props.aligned_direction));
 
-    if (props.images)         detection.images             = props.images;
-    if (props.first_seen_at)  detection.first_seen_at      = props.first_seen_at;
-    if (props.last_seen_at)   detection.last_seen_at       = props.last_seen_at;
-    if (props.value)          detection.value              = props.value;
-    if (dirIsNumber)          detection.aligned_direction  = props.aligned_direction;
+    const setProps = {};
+    if (props.images)         setProps.images             = props.images;
+    if (props.first_seen_at)  setProps.first_seen_at      = props.first_seen_at;
+    if (props.last_seen_at)   setProps.last_seen_at       = props.last_seen_at;
+    if (props.value)          setProps.value              = props.value;
+    if (dirIsNumber)          setProps.aligned_direction  = props.aligned_direction;
 
     // If we haven't locked in the bestImageID yet, try here..
     // This requires a location and an Array of images..
-    if (!detection.bestImageID && detection.loc && detection.images) {
+    const nearImages = detection.props.images || props.images;
+    if (!detection.props.bestImageID && detection.loc && nearImages) {
       let minDist = Infinity;
       let bestImageID = null;
 
-      for (const image of detection.images) {
+      for (const image of nearImages) {
         const dist = geoSphericalDistance(detection.loc, image.geometry.coordinates);
         if (dist < minDist) {
           minDist = dist;
           bestImageID = image.id;
         }
       }
-      detection.bestImageID = bestImageID;
-     }
+      if (bestImageID) {
+        setProps.bestImageID = bestImageID;
+      }
+    }
 
+    if (Object.keys(setProps).length) {
+      detection.updateSelf(setProps);
+    }
     return detection;
   }
 

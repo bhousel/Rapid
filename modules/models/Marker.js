@@ -89,7 +89,7 @@ export class Marker extends AbstractData {
   /**
    * isNew
    * In the old QAItem class we had some OSM-like code to consider negative ids as new.
-   * Instead we'll just set an isNew property for a marker that didn't arrive with an id.
+   * Instead we'll just set an isNew property for new markers.
    * @return  {boolean}
    * @readonly
    */

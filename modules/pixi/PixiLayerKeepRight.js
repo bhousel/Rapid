@@ -25,7 +25,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
    * Whether the Layer's service exists
    */
   get supported() {
-    return !!this.context.services.keepRight;
+    return !!this.context.services.keepright;
   }
 
 
@@ -47,7 +47,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
     const context = this.context;
     const gfx = context.systems.gfx;
-    const keepRight = context.services.keepRight;
+    const keepRight = context.services.keepright;
     if (val && keepRight) {
       keepRight.startAsync()
         .then(() => gfx.immediateRedraw());
@@ -71,7 +71,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   renderMarkers(frame, viewport, zoom) {
-    const keepRight = this.context.services.keepRight;
+    const keepRight = this.context.services.keepright;
     if (!keepRight?.started) return;
 
     const parentContainer = this.scene.groups.get('qa');
@@ -115,7 +115,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
    * @param  zoom       Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-    const keepRight = this.context.services.keepRight;
+    const keepRight = this.context.services.keepright;
     if (!this.enabled || !keepRight?.started || zoom < MINZOOM) return;
 
     keepRight.loadTiles();

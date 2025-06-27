@@ -22,7 +22,7 @@ export class PhotoSystem extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`   Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -51,7 +51,7 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -85,7 +85,7 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -96,7 +96,7 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();
@@ -106,8 +106,8 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * _hashchange
    * Respond to any changes appearing in the url hash
-   * @param  currParams   Map(key -> value) of the current hash parameters
-   * @param  prevParams   Map(key -> value) of the previous hash parameters
+   * @param  {Map<string, string>}  currParams - The current hash parameters
+   * @param  {Map<string, string>}  prevParams - The previous hash parameters
    */
   _hashchange(currParams, prevParams) {
     const scene = this.context.systems.gfx.scene;
@@ -509,7 +509,7 @@ export class PhotoSystem extends AbstractSystem {
           }
 
           // Highlight any images that show this detection..
-          const highlightPhotoIDs = (detection.images ?? []).map(image => image.id);
+          const highlightPhotoIDs = (detection.props.images ?? []).map(image => image.id);
           for (const photoID of highlightPhotoIDs) {
             scene.setClass('highlightphoto', photoLayerID, photoID);
           }
@@ -522,7 +522,7 @@ export class PhotoSystem extends AbstractSystem {
           if (this._currPhotoLayerID === photoLayerID && highlightPhotoIDs.includes(this._currPhotoID)) {
             bestPhotoID = this._currPhotoID;
           } else {
-            bestPhotoID = detection.bestImageID;
+            bestPhotoID = detection.props.bestImageID;
           }
 
           // If we are changing the selected photo to a new photo,

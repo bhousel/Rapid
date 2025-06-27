@@ -1,5 +1,4 @@
 describe('StreetsideService', () => {
-  let _streetside;
 
   class MockGfxSystem {
     constructor()     {}
@@ -9,25 +8,35 @@ describe('StreetsideService', () => {
 
   class MockContext {
     constructor() {
-      this.systems = {
-        gfx: new MockGfxSystem()
-      };
       this.viewport = new Rapid.sdk.Viewport();
       this.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       this.viewport.dimensions = [64, 64];
+
+      this.sequences = {};
+      this.systems = {
+        gfx: new MockGfxSystem()
+      };
     }
-    deferredRedraw() { }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
+    }
   }
 
 
+  const context = new MockContext();
+  let _streetside;
+
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    _streetside = new Rapid.StreetsideService(new MockContext());
+    _streetside = new Rapid.StreetsideService(context);
     return _streetside.initAsync();
   });
 
   afterEach(() => {
     fetchMock.removeRoutes().clearHistory();
+    // some tests move the viewport - move it back
+    context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
   });
 
 
@@ -133,19 +142,24 @@ describe('StreetsideService', () => {
   describe('#getImages', () => {
     it('returns images in the visible map area', () => {
       const bubbles = [
-        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: { type: 'photo', id: '1', loc: [10, 0], ca: 90, pr: undefined, ne: '2', isPano: true } },
-        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: { type: 'photo', id: '2', loc: [10, 0], ca: 90, pr: '1', ne: '3', isPano: true } },
-        { minX: 10, minY: 1, maxX: 10, maxY: 1, data: { type: 'photo', id: '3', loc: [10, 1], ca: 90, pr: '2', ne: undefined, isPano: true } }
+        new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10, 0], ca: 90, pr: undefined, ne: '2', isPano: true }),
+        new Rapid.Marker(context, { type: 'photo', id: '2', loc: [10, 0], ca: 90, pr: '1', ne: '3', isPano: true }),
+        new Rapid.Marker(context, { type: 'photo', id: '3', loc: [10, 1], ca: 90, pr: '2', ne: undefined, isPano: true })
+      ];
+      const boxes = [
+        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: bubbles[0] },
+        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: bubbles[1] },
+        { minX: 10, minY: 1, maxX: 10, maxY: 1, data: bubbles[2] }
       ];
 
       const cache = _streetside._cache;
-      cache.rbush.load(bubbles);
+      for (const d of bubbles) {
+        cache.bubbles.set(d.id, d);
+      }
+      cache.rbush.load(boxes);
 
       const result = _streetside.getImages();
-      expect(result).to.deep.eql([
-        { type: 'photo', id: '1', loc: [10, 0], ca: 90, pr: undefined, ne: '2', isPano: true },
-        { type: 'photo', id: '2', loc: [10, 0], ca: 90, pr: '1', ne: '3', isPano: true }
-      ]);
+      expect(result).to.deep.eql([bubbles[0], bubbles[1]]);
     });
   });
 
@@ -153,22 +167,41 @@ describe('StreetsideService', () => {
   describe('#getSequences', () => {
     it('returns sequence linestrings in the visible map area', () => {
       const bubbles = [
-        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: { type: 'photo', id: '1', loc: [10, 0], ca: 90, pr: undefined, ne: '2', isPano: true } },
-        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: { type: 'photo', id: '2', loc: [10, 0], ca: 90, pr: '1', ne: '3', isPano: true } },
-        { minX: 10, minY: 1, maxX: 10, maxY: 1, data: { type: 'photo', id: '3', loc: [10, 1], ca: 90, pr: '2', ne: undefined, isPano: true } }
+        new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10, 0], ca: 90, pr: undefined, ne: '2', isPano: true }),
+        new Rapid.Marker(context, { type: 'photo', id: '2', loc: [10, 0], ca: 90, pr: '1', ne: '3', isPano: true }),
+        new Rapid.Marker(context, { type: 'photo', id: '3', loc: [10, 1], ca: 90, pr: '2', ne: undefined, isPano: true })
+      ];
+      const boxes = [
+        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: bubbles[0] },
+        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: bubbles[1] },
+        { minX: 10, minY: 1, maxX: 10, maxY: 1, data: bubbles[2] }
       ];
 
-      const sequence = {
-        type: 'sequence',
+      const sequence = new Rapid.GeoJSON(context, {
+        type: 'Feature',
         id: 's1',
-        v: 1,
-        bubbleIDs: bubbles.map(d => d.data.id),
-        coordinates: bubbles.map(d => d.data.loc)
-      };
+        serviceID:  'streetside',
+        properties: {
+          type:       'sequence',
+          serviceID:  'streetside',
+          id:         's1',
+          bubbleIDs:  bubbles.map(d => d.id),
+          isPano:     true
+        },
+        geometry: {
+          type: 'LineString',
+          coordinates: bubbles.map(d => d.loc)
+        }
+      });
+
 
       const cache = _streetside._cache;
-      cache.rbush.load(bubbles);
+      for (const d of bubbles) {
+        cache.bubbles.set(d.id, d);
+      }
+      cache.rbush.load(boxes);
       cache.sequences.set('s1', sequence);
+
       cache.bubbleHasSequences.set('1', ['s1']);
       cache.bubbleHasSequences.set('2', ['s1']);
       cache.bubbleHasSequences.set('3', ['s1']);

@@ -1,7 +1,7 @@
 
 export function uiDetectionDetails(context) {
   const l10n = context.systems.l10n;
-  let _detection;
+  let _marker;
 
 
   function _localeDateString(s) {
@@ -17,7 +17,7 @@ export function uiDetectionDetails(context) {
 
   function render(selection) {
     const $details = selection.selectAll('.sidebar-details')
-      .data(_detection ? [_detection] : [], d => d.key);
+      .data(_marker ? [_marker] : [], d => d.key);
 
     $details.exit()
       .remove();
@@ -45,7 +45,7 @@ export function uiDetectionDetails(context) {
 
     $$type
       .append('span')
-      .text(d => d.value);
+      .text(d => d.props.value);
 
     const $$firstseen = $$description
       .attr('class', 'qa-details-item')
@@ -57,7 +57,7 @@ export function uiDetectionDetails(context) {
 
     $$firstseen
       .append('span')
-      .text(d => d.first_seen_at ? _localeDateString(d.first_seen_at) : l10n.t('inspector.unknown'));
+      .text(d => d.props.first_seen_at ? _localeDateString(d.props.first_seen_at) : l10n.t('inspector.unknown'));
 
     const $$lastseen = $$description
       .attr('class', 'qa-details-item')
@@ -69,14 +69,14 @@ export function uiDetectionDetails(context) {
 
     $$lastseen
       .append('span')
-      .text(d => d.last_seen_at ? _localeDateString(d.last_seen_at) : l10n.t('inspector.unknown'));
+      .text(d => d.props.last_seen_at ? _localeDateString(d.props.last_seen_at) : l10n.t('inspector.unknown'));
 
   }
 
 
   render.datum = function(val) {
-    if (!arguments.length) return _detection;
-    _detection = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

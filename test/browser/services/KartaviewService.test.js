@@ -1,5 +1,4 @@
 describe('KartaviewService', () => {
-  let _kartaview;
 
   class MockGfxSystem {
     constructor()     {}
@@ -9,26 +8,35 @@ describe('KartaviewService', () => {
 
   class MockContext {
     constructor() {
-      this.systems = {
-        gfx: new MockGfxSystem()
-      };
-
       this.viewport = new Rapid.sdk.Viewport();
       this.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       this.viewport.dimensions = [64, 64];
+
+      this.sequences = {};
+      this.systems = {
+        gfx: new MockGfxSystem()
+      };
     }
-    container() { return null; }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
+    }
   }
 
 
+  const context = new MockContext();
+  let _kartaview;
+
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    _kartaview = new Rapid.KartaviewService(new MockContext());
+    _kartaview = new Rapid.KartaviewService(context);
     return _kartaview.initAsync();
   });
 
   afterEach(() => {
     fetchMock.removeRoutes().clearHistory();
+    // some tests move the viewport - move it back
+    context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
   });
 
 
@@ -161,18 +169,21 @@ describe('KartaviewService', () => {
   describe('#getImages', () => {
     it('returns images in the visible map area', () => {
       const photos = [
-        { type: 'photo', id: '0', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 0 },
-        { type: 'photo', id: '1', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 1 },
-        { type: 'photo', id: '2', loc: [10,1], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 2 }
+        new Rapid.Marker(context, { type: 'photo', id: '0', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 0 }),
+        new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 1 }),
+        new Rapid.Marker(context, { type: 'photo', id: '2', loc: [10,1], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 2 })
       ];
-
       const boxes = [
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: photos[0] },
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: photos[1] },
         { minX: 10, minY: 1, maxX: 10, maxY: 1, data: photos[2] }
       ];
 
-      _kartaview._cache.rbush.load(boxes);
+      const cache = _kartaview._cache;
+      for (const d of photos) {
+        cache.images.set(d.id, d);
+      }
+      cache.rbush.load(boxes);
 
       const result = _kartaview.getImages();
       expect(result).to.deep.eql([photos[0], photos[1]]);
@@ -183,42 +194,43 @@ describe('KartaviewService', () => {
   describe('#getSequences', () => {
     it('returns sequence linestrings in the visible map area', () => {
       const photos = [
-        { type: 'photo', id: '0', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 0 },
-        { type: 'photo', id: '1', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 1 },
-        { type: 'photo', id: '2', loc: [10,1], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 2 }
+        new Rapid.Marker(context, { type: 'photo', id: '0', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 0 }),
+        new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 1 }),
+        new Rapid.Marker(context, { type: 'photo', id: '2', loc: [10,1], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 2 })
       ];
-
-      const sequence = {
-        type: 'sequence',
-        id: '100',
-        rotation: 0,
-        isPano: false,
-        images: [ photos[0], photos[1], photos[2] ],
-        v: 1
-      };
-
       const boxes = [
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: photos[0] },
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: photos[1] },
         { minX: 10, minY: 1, maxX: 10, maxY: 1, data: photos[2] }
       ];
 
-      _kartaview._cache.rbush.load(boxes);
-      _kartaview._cache.sequences = new Map().set(sequence.id, sequence);
-      const result = _kartaview.getSequences();
-
-      expect(result).to.deep.eql([{
-        type: 'LineString',
-        coordinates: [[10,0], [10,0], [10,1]],
+      const sequence = new Rapid.GeoJSON(context, {
+        type: 'Feature',
+        id: '100',
         properties: {
           type: 'sequence',
+          serviceID: 'kartaview',
           id: '100',
-          v: 1,
+          rotation: 0,
           isPano: false,
-          captured_at: undefined,
-          captured_by: undefined
+          images: [ photos[0], photos[1], photos[2] ],
+          v: 1
+        },
+        geometry: {
+          type: 'LineString',
+          coordinates: [ [10,0], [10,0], [10,1] ],
         }
-      }]);
+      });
+
+      const cache = _kartaview._cache;
+      for (const d of photos) {
+        cache.images.set(d.id, d);
+      }
+      cache.rbush.load(boxes);
+      cache.sequences.set(sequence.id, sequence);
+
+      const result = _kartaview.getSequences();
+      expect(result).to.deep.eql([sequence]);
     });
   });
 

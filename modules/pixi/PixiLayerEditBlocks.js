@@ -97,7 +97,6 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * @param  {Array<GeoJSON>}  blocks   -  Array of block data visible in the view
    */
   renderEditBlocks(frame, viewport, zoom, blocks) {
-    const locations = this.context.systems.locations;
     const parentContainer = this.scene.groups.get('blocks');
     const blockStyle = {
       requireFill: true,    // no partial fill option - must fill fully

@@ -237,50 +237,50 @@ export class UiSidebar {
     // Hovering on Geo Data (vector tile, geojson, etc..)
     if (datum instanceof GeoJSON) {
       this.show(this.DataEditor.datum(datum));
+
     // Hovering on Rapid data..
     } else if (datum?.props?.__fbid__) {
       this.RapidInspector.datum = datum;
       this.show(this.RapidInspector.render);
+
     // Hovering on Overture data..
     } else if (datum?.overture) {
       this.OvertureInspector.datum = datum;
       this.show(this.OvertureInspector.render);
+
     // Hovering on Mapillary detection..
-    } else if (datum?.type === 'detection') {
+    } else if (datum instanceof Marker && datum?.type === 'detection') {
       this.show(this.DetectionInspector.datum(datum));
 
-    // Hovering on OSM Note..
     } else if (datum instanceof Marker && datum.serviceID === 'osm') {
       if (context.mode?.id === 'drag-note') return;
-
       const service = context.services.osm;
       if (service) {
         datum = service.getNote(datum.id);   // marker may contain stale data - get latest
       }
-
       this.show(this.NoteEditor.note(datum));
 
-    // Hovering on other QA Item..
-    } else if (datum instanceof Marker && datum.serviceID !== 'osm') {
-      const service = context.services[datum.serviceID];
-      let Component;
-
+    } else if (datum instanceof Marker && datum.serviceID === 'keepright') {
+      const service = context.services.keepright;
       if (service) {
         datum = service.getError(datum.id);  // marker may contain stale data - get latest
-
-        if (service.id === 'keepRight') {
-          Component = this.KeepRightEditor;
-        } else if (service.id === 'osmose') {
-          Component = this.OsmoseEditor;
-        } else if (service.id === 'maproulette') {
-          Component = this.MapRouletteEditor;
-          this.MapRouletteMenu.error(datum);
-        }
       }
+      this.show(this.KeepRightEditor.error(datum));
 
-      if (Component) {
-        this.show(Component.error(datum));
+    } else if (datum instanceof Marker && datum.serviceID === 'osmose') {
+      const service = context.services.osmose;
+      if (service) {
+        datum = service.getError(datum.id);  // marker may contain stale data - get latest
       }
+      this.show(this.OsmoseEditor.error(datum));
+
+    } else if (datum instanceof Marker && datum.serviceID === 'maproulette') {
+      const service = context.services.maproulette;
+      if (service) {
+        datum = service.getError(datum.id);  // marker may contain stale data - get latest
+      }
+      this.MapRouletteMenu.error(datum);
+      this.show(this.MapRouletteEditor.error(datum));
     }
 
     // ^ That covers all the custom content we can hover over.

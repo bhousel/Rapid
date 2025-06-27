@@ -29,7 +29,7 @@ export class UploaderSystem extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`   Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);

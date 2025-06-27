@@ -272,7 +272,7 @@ export function uiCommit(context) {
         tags['closed:note'] = context.cleanTagValue(osmClosed.join(';'));
       }
     }
-    const keepright = context.services.keepRight;
+    const keepright = context.services.keepright;
     if (keepright) {
       const krClosed = keepright.getClosedIDs();
       if (krClosed.length) {

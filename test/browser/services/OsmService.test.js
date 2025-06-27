@@ -13,14 +13,15 @@ describe('OsmService', () => {
 
   class MockContext {
     constructor() {
+      this.viewport = new Rapid.sdk.Viewport();
+      this.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
+      this.viewport.dimensions = [64, 64];
+
       this.sequences = {};
       this.systems = {
         gfx:       new MockGfxSystem(),
         locations: new MockLocationSystem()
       };
-      this.viewport = new Rapid.sdk.Viewport();
-      this.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
-      this.viewport.dimensions = [64, 64];
     }
     next(which) {
       let num = this.sequences[which] || 0;

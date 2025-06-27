@@ -124,11 +124,11 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * filterImages
-   * @param  {Array<image>}  images - all images
-   * @return {Array<image>}  images with filtering applied
+   * filterMarkers
+   * @param  {Array<Marker>}  markers - all markers
+   * @return {Array<Marker>}  markers with filtering applied
    */
-  filterImages(images) {
+  filterMarkers(markers) {
     const photos = this.context.systems.photos;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -138,17 +138,18 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     const showFlatPhotos = photos.showsPhotoType('flat');
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
-    return images.filter(image => {
-      if (image.id === photos.currPhotoID) return true;  // always show current image - Rapid#1512
+    return markers.filter(marker => {
+      const props = marker.props;
+      if (marker.id === photos.currPhotoID) return true;  // always show current image - Rapid#1512
 
-      if (!showFlatPhotos && !image.isPano) return false;
-      if (!showPanoramicPhotos && image.isPano) return false;
+      if (!showFlatPhotos && !props.isPano) return false;
+      if (!showPanoramicPhotos && props.isPano) return false;
 
-      const imageTimestamp = new Date(image.captured_at).getTime();
-      if (fromTimestamp && fromTimestamp > imageTimestamp) return false;
-      if (toTimestamp && toTimestamp < imageTimestamp) return false;
+      const timestamp = new Date(props.captured_at).getTime();
+      if (fromTimestamp && fromTimestamp > timestamp) return false;
+      if (toTimestamp && toTimestamp < timestamp) return false;
 
-      if (usernames && !usernames.includes(image.captured_by)) return false;
+      if (usernames && !usernames.includes(props.captured_by)) return false;
 
       return true;
     });
@@ -157,8 +158,8 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
   /**
    * filterSequences
-   * @param  {Array<sequence>}  sequences - all sequences
-   * @return {Array<sequence>}  sequences with filtering applied
+   * @param  {Array<GeoJSON>}  sequences - all sequences
+   * @return {Array<GeoJSON>}  sequences with filtering applied
    */
   filterSequences(sequences) {
     const photos = this.context.systems.photos;
@@ -171,14 +172,15 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
     return sequences.filter(seq => {
-      if (!showFlatPhotos && !seq.isPano) return false;
-      if (!showPanoramicPhotos && seq.isPano) return false;
+      const props = seq.properties;
+      if (!showFlatPhotos && !props.isPano) return false;
+      if (!showPanoramicPhotos && props.isPano) return false;
 
-      const sequenceTimestamp = new Date(seq.captured_at).getTime();
-      if (fromTimestamp && fromTimestamp > sequenceTimestamp) return false;
-      if (toTimestamp && toTimestamp < sequenceTimestamp) return false;
+      const timestamp = new Date(props.captured_at).getTime();
+      if (fromTimestamp && fromTimestamp > timestamp) return false;
+      if (toTimestamp && toTimestamp < timestamp) return false;
 
-      if (usernames && !usernames.includes(seq.captured_by)) return false;
+      if (usernames && !usernames.includes(props.captured_by)) return false;
 
       return true;
     });
@@ -187,26 +189,31 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
   /**
    * renderMarkers
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   renderMarkers(frame, viewport, zoom) {
     const streetside = this.context.services.streetside;
     if (!streetside?.started) return;
 
     const parentContainer = this.scene.groups.get('streetview');
-    let images = streetside.getImages();
+    let markers = streetside.getImages();
     let sequences = streetside.getSequences();
 
     sequences = this.filterSequences(sequences);
-    images = this.filterImages(images);
+    markers = this.filterMarkers(markers);
 
     // render sequences
-    for (const sequence of sequences) {
-      const dataID =  sequence.id;
+    for (const d of sequences) {
+      const dataID = d.id;
+      const version = d.v || 0;
+      const part = d.geoms.parts[0];
+
+      // Check that this part has coordinates and is a LineString
+      if (!part.world || part.type !== 'LineString') continue;
+
       const featureID = `${this.layerID}-sequence-${dataID}`;
-      const sequenceVersion = sequence.v || 0;
       let feature = this.features.get(featureID);
 
       if (!feature) {
@@ -217,12 +224,12 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       }
 
       // If sequence has changed, update data and coordinates.
-      if (feature.v !== sequenceVersion) {
-        feature.v = sequenceVersion;
-        feature.geometry.setCoords(sequence.coordinates);
-        feature.setData(dataID, sequence);
+      if (feature.v !== version) {
+        feature.v = version;
+        feature.setData(dataID, d);
+        feature.setCoords(part.world);
         feature.clearChildData(dataID);
-        sequence.bubbleIDs.forEach(bubbleID => feature.addChildData(dataID, bubbleID));
+        d.properties.bubbleIDs.forEach(bubbleID => feature.addChildData(dataID, bubbleID));
       }
 
       this.syncFeatureClasses(feature);
@@ -231,15 +238,20 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     }
 
     // render markers
-    for (const d of images) {
+    for (const d of markers) {
       const dataID = d.id;
+      const part = d.geoms.parts[0];
+
+      // Check that this part has coordinates and is a Point
+      if (!part.world || part.type !== 'Point') continue;
+
       const featureID = `${this.layerID}-photo-${dataID}`;
       let feature = this.features.get(featureID);
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(d.loc);
         feature.parentContainer = parentContainer;
+        feature.setCoords(part.world);
         feature.setData(dataID, d);
       }
 
@@ -254,7 +266,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
           const yaw = viewer?.getYaw() ?? 0;
           const fov = viewer?.getHfov() ?? 45;
 
-          style.viewfieldAngles = [d.ca + yaw];
+          style.viewfieldAngles = [d.props.ca + yaw];
           style.viewfieldName = 'viewfield';
           style.viewfieldAlpha = 1;
           style.viewfieldTint = SELECTED;
@@ -264,8 +276,8 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
           style.fovLength = fovLengthInterp(fov);
 
         } else {
-          style.viewfieldAngles = Number.isFinite(d.ca) ? [d.ca] : [];  // ca = camera angle
-          style.viewfieldName = d.isPano ? 'pano' : 'viewfield';
+          style.viewfieldAngles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
+          style.viewfieldName = d.props.isPano ? 'pano' : 'viewfield';
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
             style.viewfieldAlpha = 1;
@@ -286,12 +298,11 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     const streetside = this.context.services.streetside;
     if (!this.enabled || !streetside?.started || zoom < MINZOOM) return;
 

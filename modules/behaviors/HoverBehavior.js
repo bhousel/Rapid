@@ -18,7 +18,7 @@ export class HoverBehavior extends AbstractBehavior {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);

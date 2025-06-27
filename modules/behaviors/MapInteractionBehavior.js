@@ -22,7 +22,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -116,11 +116,11 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
     const context = this.context;
     const map = context.systems.map;
+    const photos = context.systems.photos;
     const viewport = context.viewport;
     const EASE = 100;  // milliseconds
 
-    // IF the mapillary image viewer is showing, don't do this handler.
-    if (context.services.mapillary.viewerShowing) return;
+    // Skip if user is manipulating an OSM feature.
     if (context.mode?.id === 'select-osm') return;
 
     // rotate
@@ -142,6 +142,10 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
     // pan
     } else {
+      // Skip if user has a photo showing in the viewer.
+      // We allow them to use arrow keys to move forward/backward in the sequence
+      if (photos.isViewerShowing()) return;
+
       const PAN_AMOUNT = 80;   // in pixels
       const [w, h] = viewport.dimensions;
       const panMore = (e.altKey || e.metaKey || e.ctrlKey);  // pan more if modifier down

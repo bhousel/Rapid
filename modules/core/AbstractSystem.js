@@ -51,7 +51,7 @@ export class AbstractSystem extends EventEmitter {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super();
@@ -86,7 +86,7 @@ export class AbstractSystem extends EventEmitter {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     for (const id of this.dependencies) {
@@ -101,7 +101,7 @@ export class AbstractSystem extends EventEmitter {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -112,7 +112,7 @@ export class AbstractSystem extends EventEmitter {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state.
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();

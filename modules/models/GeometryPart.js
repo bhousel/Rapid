@@ -6,15 +6,15 @@ import polylabel from '@mapbox/polylabel';
 /**
  * GeometryPart
  * Wrapper for both original and projected geometry data.
- * This class deals with singular elements only: 'Point', 'LineString', 'Polygon'
+ * This class deals with singular geometry elements only: 'Point', 'LineString', 'Polygon'
  *
  * Previously this code lived in `PixiGeometry` where it applied only to rendered features,
- * and worked with screen coordinates.  Now it works with all features and with world coordinates.
+ * and worked with screen coordinates.  Now it works with all data elements and with world coordinates.
  *
  * The geometry data should be passed to `setData()` as a GeoJSON geometry object.
  *
  * Properties you can access:
- *   `orig.data`      Original GeoJSON data (in WGS84 lon/lat)
+ *   `orig.geojson`   Original GeoJSON Geometry data (in WGS84 lon/lat)
  *   `orig.coords`    Original coordinate data (in WGS84 lon/lat)
  *   `orig.extent`    Original Extent bounding box (in WGS84 lon/lat)
  *   `world.coords`   Projected coordinate data
@@ -30,11 +30,10 @@ export class GeometryPart {
 
   /**
    * @constructor
-   * @param  {AbstractData} feature - The data feature that owns this GeometryPart
+   * @param  {Context}  context - Global shared application context
    */
-  constructor(feature) {
-    this.feature = feature;
-    this.context = feature.context;
+  constructor(context) {
+    this.context = context;
     this.reset();
   }
 
@@ -52,11 +51,10 @@ export class GeometryPart {
   /**
    * clone
    * Returns a clone of this GeometryPart object
-   * @param  {AbstractData} feature - The data feature that will own the clone GeometryPart
    * @return {GeometryPart}
    */
   clone() {
-    const copy = new GeometryPart(this.feature);
+    const copy = new GeometryPart(this.context);
 
     for (const obj of ['orig', 'world']) {
       const src = this[obj];
@@ -91,31 +89,21 @@ export class GeometryPart {
 
 
   /**
-   * geojson
-   * The original data format is GeoJSON, this is just a convenience getter.
-   * @return {GeoJSON}
-   * @readonly
-   */
-  get geojson() {
-    return this.orig?.data;
-  }
-
-  /**
    * type
    * The original data format is GeoJSON, this is just a convenience getter.
-   * @return {string} One of 'Point', 'LineString', 'Polygon'
+   * @return  {string}  One of 'Point', 'LineString', 'Polygon'
    * @readonly
    */
   get type() {
-    return this.orig?.data?.type;
+    return this.orig?.geojson?.type;
   }
 
 
   /**
    * setData
-   * This setter accepts singular GeoJSON geometries only:  'Point', 'LineString', and 'Polygon'
+   * This setter accepts singular GeoJSON Geometries only:  'Point', 'LineString', and 'Polygon'
    * If there is any existing data, it is first removed.
-   * @param {GeoJSON} geojson - GeoJSON geometry data
+   * @param  {GeoJSON}  geojson - GeoJSON geometry data
    */
   setData(geojson = {}) {
     this.destroy();
@@ -125,8 +113,8 @@ export class GeometryPart {
     if (!(/^(Point|LineString|Polygon)$/.test(type)) || !coords) return;  // do nothing
 
     const orig = this.orig = {};
-    orig.data = globalThis.structuredClone(geojson);
-    orig.coords = orig.data.coordinates;
+    orig.geojson = globalThis.structuredClone(geojson);
+    orig.coords = orig.geojson.coordinates;
 
     // Determine extent (bounds)
     if (type === 'Point') {
@@ -145,12 +133,13 @@ export class GeometryPart {
 
   /**
    * updateWorld
+   * This projects original source data in WGS84 coordinates.
    */
   updateWorld() {
     if (!this.orig || this.world) return;  // can't do it, or done already
 
     const viewport = this.context.viewport;
-    const origCoords = this.orig.data.coordinates;
+    const origCoords = this.orig.coords;
 
     // Reset all projected properties
     const world = this.world = {};

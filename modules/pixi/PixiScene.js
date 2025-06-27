@@ -69,7 +69,7 @@ export class PixiScene extends EventEmitter {
     // Create Layers
     [
       new PixiLayerBackgroundTiles(this, 'background'),
-      new PixiLayerGeoScribble(this, 'geoScribble'),
+      new PixiLayerGeoScribble(this, 'geoscribble'),
       new PixiLayerOsm(this, 'osm'),
       new PixiLayerRapid(this, 'rapid'),
       new PixiLayerRapidOverlay(this, 'rapidoverlay'),
@@ -80,7 +80,7 @@ export class PixiScene extends EventEmitter {
       new PixiLayerCustomData(this, 'custom-data'),
       new PixiLayerMapRoulette(this, 'maproulette'),
       new PixiLayerOsmNotes(this, 'notes'),
-      new PixiLayerKeepRight(this, 'keepRight'),
+      new PixiLayerKeepRight(this, 'keepright'),
       new PixiLayerOsmose(this, 'osmose'),
 
       new PixiLayerMapillaryPhotos(this, 'mapillary'),

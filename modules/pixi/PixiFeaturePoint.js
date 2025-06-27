@@ -294,31 +294,31 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       return;
     }
 
-    // Recalculate hitArea, grow it if too small
-    const MINSIZE = 20;
     // In v8, getLocalBounds now returns a Bounds, not a Rectangle.
     // The Rectangle is wrapped within the bounds object.
     const rect = this.marker.getLocalBounds().rectangle.clone();
 
+    // getLocalBounds apparently doesn't take scale into account?
+    // This only seems to matter when we adjust the marker size manually
+    // (The Mapillary Signs layer does this)
+    const scale = this.marker.scale;
+    if (scale.x !== 1) {
+      rect.width *= scale.x;
+      rect.x *= scale.x;
+    }
+    if (scale.y !== 1) {
+      rect.height *= scale.y;
+      rect.y *= scale.y;
+    }
+
+    // Make sure the rectangle is at least as big as MINSIZE x MINSIZE
+    const MINSIZE = 20;
+    rect.enlarge(new PIXI.Rectangle(-MINSIZE / 2, -MINSIZE / 2, MINSIZE, MINSIZE));
+    rect.pad(4); // then pad a bit more
+
     if (this._isCircular) {
-      let radius = rect.width / 2;
-      if (radius < MINSIZE / 2) {
-        radius = MINSIZE / 2;
-      }
-      radius = radius + 2;  // then pad a bit more
-
-      const circle = new PIXI.Circle(0, 0, radius);
-      this.container.hitArea = circle;
-
+      this.container.hitArea = new PIXI.Circle(0, 0, rect.width / 2);
     } else {
-      if (rect.width < MINSIZE) {
-        rect.pad((MINSIZE - rect.width) / 2, 0);
-      }
-      if (rect.height < MINSIZE) {
-        rect.pad(0, (MINSIZE - rect.height) / 2);
-      }
-      rect.pad(4); // then pad a bit more
-
       this.container.hitArea = rect;
     }
   }

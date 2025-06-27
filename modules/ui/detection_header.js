@@ -4,14 +4,14 @@ import { uiIcon } from './icon.js';
 export function uiDetectionHeader(context) {
   const l10n = context.systems.l10n;
   const presets = context.systems.presets;
-  let _detection;
+  let _marker;
 
 
   function getTitle(d) {
-    if (d.object_type === 'traffic_sign') {
+    if (d.props.object_type === 'traffic_sign') {
       return l10n.t('mapillary_signs.traffic_sign');
     } else {
-      const stringID = d.value.replace(/--/g, '.');
+      const stringID = d.props.value.replace(/--/g, '.');
       return l10n.t(`mapillary_detections.${stringID}`, { default: l10n.t('inspector.unknown') });
     }
   }
@@ -21,11 +21,11 @@ export function uiDetectionHeader(context) {
     if (!d) return;
 
     let iconName;
-    if (d.object_type === 'traffic_sign') {
-      iconName = d.value;
+    if (d.props.object_type === 'traffic_sign') {
+      iconName = d.props.value;
     } else {
-      const service = context.services[d.service];
-      const presetID = service && service.getDetectionPresetID(d.value);
+      const service = context.services[d.props.serviceID];
+      const presetID = service && service.getDetectionPresetID(d.props.value);
       const preset = presetID && presets.item(presetID);
       iconName = preset?.icon || 'fas-question';
     }
@@ -40,7 +40,7 @@ export function uiDetectionHeader(context) {
 
   function render(selection) {
     const $header = selection.selectAll('.qa-header')
-      .data(_detection ? [_detection] : [], d => d.key);
+      .data(_marker ? [_marker] : [], d => d.key);
 
     $header.exit()
       .remove();
@@ -53,7 +53,7 @@ export function uiDetectionHeader(context) {
       .append('div')
       .attr('class', 'qa-header-icon')
       .append('div')
-      .attr('class', d => `qaItem ${d.service}`)
+      .attr('class', d => `qaItem ${d.props.serviceID}`)
       .call(addIcon);
 
     $$header
@@ -64,8 +64,8 @@ export function uiDetectionHeader(context) {
 
 
   render.datum = function(val) {
-    if (!arguments.length) return _detection;
-    _detection = val;
+    if (!arguments.length) return _marker;
+    _marker = val;
     return render;
   };
 

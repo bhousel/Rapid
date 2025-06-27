@@ -39,13 +39,13 @@ export class AbstractData {
       const other = otherOrContext;
       this.context = other.context;
       this.props = globalThis.structuredClone(other.props);
-      this.geoms = other.geoms.clone(this);
+      this.geoms = other.geoms.clone();
 
     } else {
       const context = otherOrContext;
       this.context = context;
       this.props = {};
-      this.geoms = new Geometry(this);
+      this.geoms = new Geometry(context);
     }
 
     Object.assign(this.props, props);  // override with passed in props

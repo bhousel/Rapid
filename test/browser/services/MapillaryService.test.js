@@ -1,5 +1,4 @@
 describe('MapillaryService', () => {
-  let _mapillary;
 
   class MockGfxSystem {
     constructor()     {}
@@ -9,20 +8,28 @@ describe('MapillaryService', () => {
 
   class MockContext {
     constructor() {
-      this.systems = {
-        gfx: new MockGfxSystem()
-      };
-
       this.viewport = new Rapid.sdk.Viewport();
       this.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       this.viewport.dimensions = [64, 64];
+
+      this.sequences = {};
+      this.systems = {
+        gfx: new MockGfxSystem()
+      };
+    }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
     }
   }
 
 
+  const context = new MockContext();
+  let _mapillary;
+
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    _mapillary = new Rapid.MapillaryService(new MockContext());
+    _mapillary = new Rapid.MapillaryService(context);
 
     // Mock function for retrieving tile data.. The original expects a protobuffer vector tile.
     _mapillary._loadTileDataToCache = () => { };
@@ -32,6 +39,8 @@ describe('MapillaryService', () => {
 
   afterEach(() => {
     fetchMock.removeRoutes().clearHistory();
+    // some tests move the viewport - move it back
+    context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
   });
 
 
@@ -62,9 +71,9 @@ describe('MapillaryService', () => {
   describe('#getData', () => {
     it('returns images in the visible map area', () => {
       const data = [
-        { type: 'photo', id: 'photo0', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' },
-        { type: 'photo', id: 'photo1', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' },
-        { type: 'photo', id: 'photo2', loc: [10,1], ca: 90, isPano: false, sequenceID: 'seq1' }
+        new Rapid.Marker(context, { type: 'photo', id: 'photo0', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' }),
+        new Rapid.Marker(context, { type: 'photo', id: 'photo1', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' }),
+        new Rapid.Marker(context, { type: 'photo', id: 'photo2', loc: [10,1], ca: 90, isPano: false, sequenceID: 'seq1' })
       ];
       const boxes = [
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: data[0] },
@@ -85,9 +94,9 @@ describe('MapillaryService', () => {
 
     it('returns detections in the visible map area', () => {
       const data = [
-        { type: 'detection', id: 'detect0', loc: [10,0], object_type: 'point' },
-        { type: 'detection', id: 'detect1', loc: [10,0], object_type: 'point' },
-        { type: 'detection', id: 'detect2', loc: [10,1], object_type: 'point' }
+        new Rapid.Marker(context, { type: 'detection', id: 'detect0', loc: [10,0], object_type: 'point' }),
+        new Rapid.Marker(context, { type: 'detection', id: 'detect1', loc: [10,0], object_type: 'point' }),
+        new Rapid.Marker(context, { type: 'detection', id: 'detect2', loc: [10,1], object_type: 'point' })
       ];
       const boxes = [
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: data[0] },
@@ -108,9 +117,9 @@ describe('MapillaryService', () => {
 
     it('returns signs in the visible map area', () => {
       const data = [
-        { type: 'detection', id: 'sign0', loc: [10,0], object_type: 'traffic_sign' },
-        { type: 'detection', id: 'sign1', loc: [10,0], object_type: 'traffic_sign' },
-        { type: 'detection', id: 'sign2', loc: [10,1], object_type: 'traffic_sign' }
+        new Rapid.Marker(context, { type: 'detection', id: 'sign0', loc: [10,0], object_type: 'traffic_sign' }),
+        new Rapid.Marker(context, { type: 'detection', id: 'sign1', loc: [10,0], object_type: 'traffic_sign' }),
+        new Rapid.Marker(context, { type: 'detection', id: 'sign2', loc: [10,1], object_type: 'traffic_sign' })
       ];
       const boxes = [
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: data[0] },
@@ -134,31 +143,30 @@ describe('MapillaryService', () => {
   describe('#getSequences', () => {
     it('returns sequence linestrings in the visible map area', () => {
       const data = [
-        { type: 'photo', id: 'photo0', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' },
-        { type: 'photo', id: 'photo1', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' },
-        { type: 'photo', id: 'photo2', loc: [10,1], ca: 90, isPano: false, sequenceID: 'seq1' }
+        new Rapid.Marker(context, { type: 'photo', id: 'photo0', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' }),
+        new Rapid.Marker(context, { type: 'photo', id: 'photo1', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' }),
+        new Rapid.Marker(context, { type: 'photo', id: 'photo2', loc: [10,1], ca: 90, isPano: false, sequenceID: 'seq1' })
       ];
       const boxes = [
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: data[0] },
         { minX: 10, minY: 0, maxX: 10, maxY: 0, data: data[1] },
         { minX: 10, minY: 1, maxX: 10, maxY: 1, data: data[2] }
       ];
-      const sequence = {
+      const sequence = new Rapid.GeoJSON(context, {
         type: 'FeatureCollection',
         id: 'seq1',
-        v: 1,
         features: [{
           type: 'Feature',
+          properties: {
+            id: 'seq1',
+            isPano: false
+          },
           geometry: {
             type: 'LineString',
             coordinates: [[10,0], [10,0], [10,1]],
-            properties: {
-              id: 'seq1',
-              isPano: false
-            }
           }
         }]
-      };
+      });
 
       const cache = _mapillary._cache;
       for (const d of data) {

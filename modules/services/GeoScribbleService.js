@@ -30,7 +30,7 @@ export class GeoScribbleService extends AbstractSystem {
    */
   constructor(context) {
     super(context);
-    this.id = 'geoScribble';
+    this.id = 'geoscribble';
     this.autoStart = false;
 
     this._cache = {};

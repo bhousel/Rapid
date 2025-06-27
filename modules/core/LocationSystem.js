@@ -49,7 +49,7 @@ export class LocationSystem extends AbstractSystem {
 
     // BLOCKED REGIONS
     this._blocks = [{
-      block: true,
+      type: 'block',
       locationSet: { include: ['Q7835', 'ua'] },
       text: 'Editing has been blocked in this region per request of the OSM Ukrainian community.',
       url: 'https://wiki.openstreetmap.org/wiki/Russian%E2%80%93Ukrainian_war'

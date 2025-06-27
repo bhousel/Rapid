@@ -21,11 +21,12 @@ export class GeoJSON extends AbstractData {
    */
   constructor(otherOrContext, props = {}) {
     super(otherOrContext, props);
-    this.geoms.setData(props);
 
     if (!this.props.id) {  // no ID provided - generate one
       this.props.id = 'geojson-' + this.context.next('geojson');
     }
+
+    this.geoms.setData(props);
   }
 
   /**

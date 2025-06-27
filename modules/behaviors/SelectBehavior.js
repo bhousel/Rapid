@@ -25,7 +25,7 @@ export class SelectBehavior extends AbstractBehavior {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -176,10 +176,13 @@ export class SelectBehavior extends AbstractBehavior {
   _pointerdown(e) {
     if (this.lastDown) return;  // a pointer is already down
 
-    this.context.systems.ui.closeEditMenu();
+    const context = this.context;
+    const ui = context.systems.ui;
+
+    ui.closeEditMenu();
     this._showsMenu = false;
 
-    this.context.systems.ui.closeMapRouletteMenu();
+    ui.closeMapRouletteMenu();
     this._showsMapRouletteMenu = false;
 
     const down = this._getEventData(e);
@@ -347,29 +350,32 @@ export class SelectBehavior extends AbstractBehavior {
       dataID = data.id;
     }
 
-    // Clicked on nothing
-    if (!data) {
+    // Clicked on nothing, or an edit block polygon..
+    if (!data || data.type === 'block') {
       if (context.mode?.id !== 'browse' && !this._multiSelection.size && !isMultiselect) {
         context.enter('browse');
       }
       return;
-    }
+
+    // Clicked on a photo..
+    } else if (data.type === 'photo') {
+      const layerID = target.layerID;
+      photos.selectPhoto(layerID, dataID);
+      return;
 
     // Clicked a non-OSM feature..
-    if (
+    } else if (
       data.props.__fbid__ ||      // Clicked a Rapid feature..
       data.overture ||            // Clicked an Overture feature..
       data instanceof GeoJSON ||  // Clicked Custom Data (e.g. gpx track)..
-      data instanceof Marker ||   // Clicked a Marker (OSM Note, KeepRight, Osmose, Maproulette)..
-      data.type === 'detection'   // Clicked on an object detection / traffic sign..
+      data instanceof Marker      // Clicked a Marker (OSM Note, KeepRight, Osmose, Maproulette)..
     ) {
       const selection = new Map().set(dataID, data);
       context.enter('select', { selection: selection });
       return;
-    }
 
     // Clicked an OSM feature..
-    if (data instanceof OsmEntity) {
+    } else if (data instanceof OsmEntity) {
       let selectedIDs = context.selectedIDs();
 
       if (!isMultiselect) {
@@ -390,14 +396,6 @@ export class SelectBehavior extends AbstractBehavior {
           context.enter('select-osm', { selection: { osm: selectedIDs }} );
         }
       }
-      return;
-    }
-
-    // Clicked on a photo..
-    // (this highlights the photo but does not actually alter the selection)
-    if (data.type === 'photo') {
-      const layerID = target.layerID;
-      photos.selectPhoto(layerID, dataID);
       return;
     }
   }

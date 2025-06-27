@@ -153,11 +153,11 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * filterImages
-   * @param  {Array<image>}  images - all images
-   * @return {Array<image>}  images with filtering applied
+   * filterMarkers
+   * @param  {Array<Marker>}  markers - all markers
+   * @return {Array<Marker>}  markers with filtering applied
    */
-  filterImages(images) {
+  filterMarkers(markers) {
     const photos = this.context.systems.photos;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -167,17 +167,18 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     const showFlatPhotos = photos.showsPhotoType('flat');
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
-    return images.filter(image => {
-      if (image.id === photos.currPhotoID) return true;  // always show current image - Rapid#1512
+    return markers.filter(marker => {
+      const props = marker.props;
+      if (marker.id === photos.currPhotoID) return true;  // always show current image - Rapid#1512
 
-      if (!showFlatPhotos && !image.isPano) return false;
-      if (!showPanoramicPhotos && image.isPano) return false;
+      if (!showFlatPhotos && !props.isPano) return false;
+      if (!showPanoramicPhotos && props.isPano) return false;
 
-      const imageTimestamp = new Date(image.captured_at).getTime();
-      if (fromTimestamp && fromTimestamp > imageTimestamp) return false;
-      if (toTimestamp && toTimestamp < imageTimestamp) return false;
+      const timestamp = new Date(props.captured_at).getTime();
+      if (fromTimestamp && fromTimestamp > timestamp) return false;
+      if (toTimestamp && toTimestamp < timestamp) return false;
 
-      if (usernames && !usernames.includes(image.captured_by)) return false;
+      if (usernames && !usernames.includes(props.captured_by)) return false;
 
       return true;
     });
@@ -189,8 +190,8 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * Note - a 'sequence' is now a FeatureCollection containing a LineString or MultiLineString, post Rapid#776
    * This is because we can get multiple linestrings for sequences that cross a vector tile boundary.
    * We just look at the first item in the features Array to determine whether to keep/filter the sequence.
-   * @param  {Array<FeatureCollection>}  sequences - all sequences
-   * @return {Array<FeatureCollection>}  sequences with filtering applied
+   * @param  {Array<GeoJSON>}  sequences - all sequences
+   * @return {Array<GeoJSON>}  sequences with filtering applied
    */
   filterSequences(sequences) {
     const photos = this.context.systems.photos;
@@ -203,16 +204,18 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
     return sequences.filter(sequence => {
-      const seq = sequence.features[0];  // Can contain multiple GeoJSON features, use the first one
+      const seq = sequence.props.features[0];  // Expect a FeatureCollection, use the first feature
       if (!seq) return false;
-      if (!showFlatPhotos && !seq.properties.is_pano) return false;
-      if (!showPanoramicPhotos && seq.properties.is_pano) return false;
 
-      const sequenceTimestamp = new Date(seq.properties.captured_at).getTime();
-      if (fromTimestamp && fromTimestamp > sequenceTimestamp) return false;
-      if (toTimestamp && toTimestamp < sequenceTimestamp) return false;
+      const props = seq.properties;
+      if (!showFlatPhotos && !props.is_pano) return false;
+      if (!showPanoramicPhotos && props.is_pano) return false;
 
-      if (usernames && !usernames.includes(seq.properties.captured_by)) return false;
+      const timestamp = new Date(props.captured_at).getTime();
+      if (fromTimestamp && fromTimestamp > timestamp) return false;
+      if (toTimestamp && toTimestamp < timestamp) return false;
+
+      if (usernames && !usernames.includes(props.captured_by)) return false;
 
       return true;
     });
@@ -221,9 +224,9 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
   /**
    * renderMarkers
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   renderMarkers(frame, viewport, zoom) {
     const mapillary = this.context.services.mapillary;
@@ -234,60 +237,64 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
     const parentContainer = this.scene.groups.get('streetview');
     let sequences = mapillary.getSequences();
-    let images = mapillary.getData('images');
+    let markers = mapillary.getData('images');
 
     sequences = this.filterSequences(sequences);
-    images = this.filterImages(images);
+    markers = this.filterMarkers(markers);
 
-    // render sequences, they are actually FeatureCollections
-    for (const fc of sequences) {
-      const sequenceID = fc.id;
-      const version = fc.v || 0;
+    // render sequences
+    for (const d of sequences) {
+      const dataID = d.id;
+      const version = d.v || 0;
+      const parts = d.geoms.parts;
 
-      for (let i = 0; i < fc.features.length; ++i) {
-        const d = fc.features[i];
-        const parts = (d.geometry.type === 'LineString') ? [d.geometry.coordinates]
-          : (d.geometry.type === 'MultiLineString') ? d.geometry.coordinates : [];
+      for (let i = 0; i < parts.length; ++i) {
+        // Check that this part has coordinates and is a LineString
+        const part = parts[i];
+        if (!part.world || part.type !== 'LineString') continue;
 
-        for (let j = 0; j < parts.length; ++j) {
-          const coords = parts[j];
-          const featureID = `${this.layerID}-sequence-${sequenceID}-${i}-${j}`;
-          let feature = this.features.get(featureID);
+        const featureID = `${this.layerID}-sequence-${dataID}-${i}`;
+        let feature = this.features.get(featureID);
 
-          if (!feature) {
-            feature = new PixiFeatureLine(this, featureID);
-            feature.style = LINESTYLE;
-            feature.parentContainer = parentContainer;
-            feature.container.zIndex = -100;  // beneath the markers (which should be [-90..90])
-          }
-
-          // If data has changed.. Replace it.
-          if (feature.v !== version) {
-            feature.v = version;
-            feature.geometry.setCoords(coords);
-            feature.setData(sequenceID, d);
-          }
-
-          this.syncFeatureClasses(feature);
-          feature.update(viewport, zoom);
-          this.retainFeature(feature, frame);
+        if (!feature) {
+          feature = new PixiFeatureLine(this, featureID);
+          feature.style = LINESTYLE;
+          feature.parentContainer = parentContainer;
+          feature.container.zIndex = -100;  // beneath the markers (which should be [-90..90])
         }
+
+        // If data has changed.. Replace it.
+        if (feature.v !== version) {
+          feature.v = version;
+          feature.setCoords(part.world);
+          feature.setData(dataID, d);
+        }
+
+        this.syncFeatureClasses(feature);
+        feature.update(viewport, zoom);
+        this.retainFeature(feature, frame);
       }
     }
 
     // render markers
-    for (const d of images) {
-      const featureID = `${this.layerID}-photo-${d.id}`;
+    for (const d of markers) {
+      const dataID = d.id;
+      const part = d.geoms.parts[0];
+
+      // Check that this part has coordinates and is a Point
+      if (!part.world || part.type !== 'Point') continue;
+
+      const featureID = `${this.layerID}-photo-${dataID}`;
       let feature = this.features.get(featureID);
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(d.loc);
         feature.parentContainer = parentContainer;
-        feature.setData(d.id, d);
+        feature.setCoords(part.world);
+        feature.setData(dataID, d);
 
-        if (d.sequenceID) {
-          feature.addChildData(d.sequenceID, d.id);
+        if (d.props.sequenceID) {
+          feature.addChildData(d.props.sequenceID, dataID);
         }
       }
 
@@ -298,7 +305,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         const style = Object.assign({}, MARKERSTYLE);
 
         if (feature.hasClass('selectphoto')) {  // selected photo style
-          style.viewfieldAngles = [this._viewerBearing ?? d.ca];
+          style.viewfieldAngles = [this._viewerBearing ?? d.props.ca];
           style.viewfieldName = 'viewfield';
           style.viewfieldAlpha = 1;
           style.viewfieldTint = SELECTED;
@@ -308,8 +315,8 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
           style.fovLength = fovLengthInterp(this._viewerFov ?? 55);
 
         } else {
-          style.viewfieldAngles = Number.isFinite(d.ca) ? [d.ca] : [];  // ca = camera angle
-          style.viewfieldName = d.isPano ? 'pano' : 'viewfield';
+          style.viewfieldAngles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
+          style.viewfieldName = d.props.isPano ? 'pano' : 'viewfield';
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
             style.viewfieldAlpha = 1;
@@ -331,12 +338,11 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     const mapillary = this.context.services.mapillary;
     if (!this.enabled || !mapillary?.started || zoom < MINZOOM) return;
 

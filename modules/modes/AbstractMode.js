@@ -12,13 +12,13 @@ import { EventEmitter } from 'pixi.js';
  *   `id`           `String` identifier for the mode (e.g. 'browse')
  *   `active`       `true` if the mode is active, `false` if not.
  *   `operations`   `Array` of operations allowed on the right-click edit menu
- *   `selectedData` `Map(dataID -> data)` containing selected data
+ *   `selectedData` `Map<dataID, data>` containing selected data
  */
 export class AbstractMode extends EventEmitter {
 
   /**
    * @constructor
-   * @param  `context`   Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super();

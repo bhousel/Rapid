@@ -860,7 +860,7 @@
       "show_more": "Show More",
       "view_on_osm": "View on openstreetmap.org",
       "view_on_osmose": "View on osmose.openstreetmap.fr",
-      "view_on_keepRight": "View on keepright.at",
+      "view_on_keepright": "View on keepright.at",
       "view_on_maproulette": "View on maproulette.org",
       "feature_type": "Feature Type",
       "fields": "Fields",
@@ -1031,7 +1031,7 @@
             "title": "Jump to nearby task"
           }
         },
-        "keepRight": {
+        "keepright": {
           "tooltip": "Data issues detected by keepright.at",
           "title": "KeepRight Issues"
         },
@@ -1039,7 +1039,7 @@
           "tooltip": "Data issues detected by osmose.openstreetmap.fr",
           "title": "Osmose Issues"
         },
-        "geoScribble": {
+        "geoscribble": {
           "tooltip": "Freehand annotations done by EveryDoor users",
           "title": "GeoScribble Annotations"
         },

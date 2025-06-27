@@ -85,11 +85,11 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
-   * filterImages
-   * @param  {Array<image>}  images - all images
-   * @return {Array<image>}  images with filtering applied
+   * filterMarkers
+   * @param  {Array<Marker>}  markers - all markers
+   * @return {Array<Marker>}  markers with filtering applied
    */
-  filterImages(images) {
+  filterMarkers(markers) {
     const photos = this.context.systems.photos;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -99,17 +99,18 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     const showFlatPhotos = photos.showsPhotoType('flat');
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
-    return images.filter(image => {
-      if (image.id === photos.currPhotoID) return true;  // always show current image - Rapid#1512
+    return markers.filter(marker => {
+      const props = marker.props;
+      if (marker.id === photos.currPhotoID) return true;  // always show current image - Rapid#1512
 
-      if (!showFlatPhotos && !image.isPano) return false;
-      if (!showPanoramicPhotos && image.isPano) return false;
+      if (!showFlatPhotos && !props.isPano) return false;
+      if (!showPanoramicPhotos && props.isPano) return false;
 
-      const imageTimestamp = new Date(image.captured_at).getTime();
-      if (fromTimestamp && fromTimestamp > imageTimestamp) return false;
-      if (toTimestamp && toTimestamp < imageTimestamp) return false;
+      const timestamp = new Date(props.captured_at).getTime();
+      if (fromTimestamp && fromTimestamp > timestamp) return false;
+      if (toTimestamp && toTimestamp < timestamp) return false;
 
-      if (usernames && !usernames.includes(image.captured_by)) return false;
+      if (usernames && !usernames.includes(props.captured_by)) return false;
 
       return true;
     });
@@ -119,8 +120,8 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
   /**
    * filterSequences
    * Each sequence is represented as a GeoJSON LineString.
-   * @param  {Array<sequence>}  sequences - all sequences
-   * @return {Array<sequence>}  sequences with filtering applied
+   * @param  {Array<GeoJSON>}  sequences - all sequences
+   * @return {Array<GeoJSON>}  sequences with filtering applied
    */
   filterSequences(sequences) {
     const photos = this.context.systems.photos;
@@ -133,14 +134,15 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
     return sequences.filter(seq => {
-      if (!showFlatPhotos && !seq.properties.is_pano) return false;
-      if (!showPanoramicPhotos && seq.properties.is_pano) return false;
+      const props = seq.properties;
+      if (!showFlatPhotos && !props.isPano) return false;
+      if (!showPanoramicPhotos && props.isPano) return false;
 
-      const sequenceTimestamp = new Date(seq.properties.captured_at).getTime();
-      if (fromTimestamp && fromTimestamp > sequenceTimestamp) return false;
-      if (toTimestamp && toTimestamp < sequenceTimestamp) return false;
+      const timestamp = new Date(props.captured_at).getTime();
+      if (fromTimestamp && fromTimestamp > timestamp) return false;
+      if (toTimestamp && toTimestamp < timestamp) return false;
 
-      if (usernames && !usernames.includes(seq.properties.captured_by)) return false;
+      if (usernames && !usernames.includes(props.captured_by)) return false;
 
       return true;
     });
@@ -149,25 +151,31 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
   /**
    * renderMarkers
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   renderMarkers(frame, viewport, zoom) {
     const kartaview = this.context.services.kartaview;
     if (!kartaview?.started) return;
 
     const parentContainer = this.scene.groups.get('streetview');
-    let images = kartaview.getImages();
+    let markers = kartaview.getImages();
     let sequences = kartaview.getSequences();
 
     sequences = this.filterSequences(sequences);
-    images = this.filterImages(images);
+    markers = this.filterMarkers(markers);
 
     // render sequences
     for (const d of sequences) {
-      const featureID = `${this.layerID}-sequence-${d.properties.id}`;
-      const sequenceVersion = d.properties.v || 0;
+      const dataID = d.id;
+      const version = d.v || 0;
+      const part = d.geoms.parts[0];
+
+      // Check that this part has coordinates and is a LineString
+      if (!part.world || part.type !== 'LineString') continue;
+
+      const featureID = `${this.layerID}-sequence-${dataID}`;
       let feature = this.features.get(featureID);
 
       if (!feature) {
@@ -178,10 +186,10 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       }
 
       // If sequence data has changed, replace it.
-      if (feature.v !== sequenceVersion) {
-        feature.v = sequenceVersion;
-        feature.geometry.setCoords(d.coordinates);
-        feature.setData(d.properties.id, d);
+      if (feature.v !== version) {
+        feature.v = version;
+        feature.setCoords(part.world);
+        feature.setData(dataID, d);
       }
 
       this.syncFeatureClasses(feature);
@@ -190,18 +198,24 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     }
 
     // render markers
-    for (const d of images) {
-      const featureID = `${this.layerID}-photo-${d.id}`;
+    for (const d of markers) {
+      const dataID = d.id;
+      const part = d.geoms.parts[0];
+
+      // Check that this part has coordinates and is a Point
+      if (!part.world || part.type !== 'Point') continue;
+
+      const featureID = `${this.layerID}-photo-${dataID}`;
       let feature = this.features.get(featureID);
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry.setCoords(d.loc);
         feature.parentContainer = parentContainer;
-        feature.setData(d.id, d);
+        feature.setCoords(part.world);
+        feature.setData(dataID, d);
 
-        if (d.sequenceID) {
-          feature.addChildData(d.sequenceID, d.id);
+        if (d.props.sequenceID) {
+          feature.addChildData(d.props.sequenceID, dataID);
         }
       }
 
@@ -213,8 +227,8 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 // todo handle pano
         if (feature.hasClass('selectphoto')) {  // selected photo style
-          // style.viewfieldAngles = [this._viewerCompassAngle ?? d.ca];
-          style.viewfieldAngles = Number.isFinite(d.ca) ? [d.ca] : [];
+          // style.viewfieldAngles = [this._viewerCompassAngle ?? d.props.ca];
+          style.viewfieldAngles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];
           style.viewfieldName = 'viewfield';
           style.viewfieldAlpha = 1;
           style.viewfieldTint = SELECTED;
@@ -224,8 +238,8 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
           //style.fovLength = fovLengthInterp(this._viewerZoom);
 
         } else {
-          style.viewfieldAngles = Number.isFinite(d.ca) ? [d.ca] : [];  // ca = camera angle
-          style.viewfieldName = d.isPano ? 'pano' : 'viewfield';
+          style.viewfieldAngles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
+          style.viewfieldName = d.props.isPano ? 'pano' : 'viewfield';
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
             style.viewfieldAlpha = 1;
@@ -246,12 +260,11 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  frame     Integer frame being rendered
+   * @param  viewport  Pixi viewport to use for rendering
+   * @param  zoom      Effective zoom to use for rendering
    */
   render(frame, viewport, zoom) {
-return; // not yet
     const kartaview = this.context.services.kartaview;
     if (!this.enabled || !kartaview?.started || zoom < MINZOOM) return;
 

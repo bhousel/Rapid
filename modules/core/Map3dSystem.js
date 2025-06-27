@@ -17,7 +17,7 @@ export class Map3dSystem extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  `context`   Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     super(context);
@@ -333,8 +333,8 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _hashchange
    * Respond to any changes appearing in the url hash
-   * @param  currParams   Map(key -> value) of the current hash parameters
-   * @param  prevParams   Map(key -> value) of the previous hash parameters
+   * @param  {Map<string, string>}  currParams - The current hash parameters
+   * @param  {Map<string, string>}  prevParams - The previous hash parameters
    */
   _hashchange(currParams, prevParams) {
     // map3d

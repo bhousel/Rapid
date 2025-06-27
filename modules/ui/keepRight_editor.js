@@ -10,7 +10,7 @@ import { utilNoAuto, utilRebind } from '../util/index.js';
 
 export function uiKeepRightEditor(context) {
   const l10n = context.systems.l10n;
-  const keepright = context.services.keepRight;
+  const keepright = context.services.keepright;
   const dispatch = d3_dispatch('change');
   const qaDetails = uiKeepRightDetails(context);
   const qaHeader = uiKeepRightHeader(context);
@@ -57,7 +57,7 @@ export function uiKeepRightEditor(context) {
       .call(keepRightSaveSection);
 
 
-    ViewOn.stringID = 'inspector.view_on_keepRight';
+    ViewOn.stringID = 'inspector.view_on_keepright';
     ViewOn.url = keepright.issueURL(_marker);
 
     const $footer = $selection.selectAll('.sidebar-footer')
