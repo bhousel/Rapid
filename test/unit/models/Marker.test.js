@@ -11,7 +11,9 @@ describe('Marker', () => {
       const marker = new Rapid.Marker(context);
       assert.instanceOf(marker, Rapid.Marker);
       assert.ok(marker.id, 'should have an id');
-      assert.isTrue(marker.geoms.dirty, 'no loc property');
+      const geoms = marker.geoms;
+      assert.lengthOf(geoms.parts, 0);
+      assert.isNotOk(geoms.world, 'no loc property');
     });
 
     it('constructs a Marker with props', () => {
@@ -24,7 +26,9 @@ describe('Marker', () => {
       assert.instanceOf(marker, Rapid.Marker);
       assert.equal(marker.id, 'test1');
       assert.deepEqual(marker.loc, [0, 0]);
-      assert.isFalse(marker.geoms.dirty);
+      const geoms = marker.geoms;
+      assert.lengthOf(geoms.parts, 1);
+      assert.isOk(geoms.world);
     });
   });
 

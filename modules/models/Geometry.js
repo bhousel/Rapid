@@ -11,9 +11,9 @@ import { GeometryPart } from './GeometryPart.js';
  * The geometry data should be passed to `setData()` as a GeoJSON object.
  *
  * Properties you can access:
- *   `origExtent`    Original Extent bounding box (in WGS84 lon/lat)
- *   `extent`        Projected extent (in world coordinates x/y)
- *   `parts`         Array of GeometryParts
+ *   `orig.extent`    Original Extent bounding box (in WGS84 lon/lat)
+ *   `world.extent`   Projected Extent
+ *   `parts`          Array of GeometryParts
  */
 export class Geometry {
 
@@ -41,6 +41,25 @@ export class Geometry {
 
 
   /**
+   * reset
+   * Remove all stored data
+   */
+  reset() {
+    // Original data, in WGS84 coordinates
+    // ([0,0] is Null Island)
+    this.orig = null;
+
+    // Projected data, in world coordinates
+    // ([0,0] is the top left corner of a 256x256 Web Mercator world)
+    this.world = null;
+
+    for (const part of this.parts) {
+      part.reset();
+    }
+  }
+
+
+  /**
    * clone
    * Returns a clone of this Geometry object
    * It clones both the calculated extents as well as the GeometryParts in the collection.
@@ -49,36 +68,24 @@ export class Geometry {
   clone() {
     const copy = new Geometry(this.context);
 
-    copy.dirty = this.dirty;
-    copy.origExtent = new Extent(this.origExtent);
-    copy.extent = new Extent(this.extent);
+    for (const obj of ['orig', 'world']) {
+      const src = this[obj];
+      if (!src) continue;
+
+      for (const [k, v] of Object.entries(src)) {
+        if (v instanceof Extent) {
+          copy[k] = new Extent(v);
+        } else {
+          copy[k] = globalThis.structuredClone(v);
+        }
+      }
+    }
 
     for (const part of this.parts) {
       copy.parts.push(part.clone(this.context));
     }
 
     return copy;
-  }
-
-
-  /**
-   * reset
-   * Remove all stored data
-   */
-  reset() {
-    this.dirty = true;
-
-    // Original data - These are in WGS84 coordinates
-    // ([0,0] is Null Island)
-    this.origExtent = null;  // extent (bounding box)
-
-    // Projected data - These are in world coordinates
-    // ([0,0] is the top left corner of a 256x256 Web Mercator world)
-    this.extent = null;      // extent (bounding box)
-
-    for (const part of this.parts) {
-      part.reset();
-    }
   }
 
 
@@ -97,7 +104,7 @@ export class Geometry {
     if (!geojsonParts.length) return; // do nothing if we found no usable parts
 
     const origExtent = new Extent();
-    const extent = new Extent();
+    const worldExtent = new Extent();
     let isValid = false;
 
     for (const geojsonPart of geojsonParts) {
@@ -107,14 +114,13 @@ export class Geometry {
 
       this.parts.push(part);
       origExtent.extendSelf(part.orig.extent);
-      extent.extendSelf(part.world.extent);
+      worldExtent.extendSelf(part.world.extent);
       isValid = true;
     }
 
-    if (isValid) {   // at least one part is valid
-      this.origExtent = origExtent;
-      this.extent = extent;
-      this.dirty = false;
+    if (isValid) {   // At least one part was found to be valid
+      this.orig  = { extent: origExtent };
+      this.world = { extent: worldExtent };
     }
   }
 

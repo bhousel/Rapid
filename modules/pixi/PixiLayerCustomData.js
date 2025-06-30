@@ -528,7 +528,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       for (const feature of features) {
         const d = new GeoJSON(this.context, feature);
         this._geoData.push(d);
-        this._geoDataExtent.extendSelf(d.geoms.origExtent);
+        const extent = d.extent();
+        if (extent) {
+          this._geoDataExtent.extendSelf(extent);
+        }
       }
 
       this.fitZoom();

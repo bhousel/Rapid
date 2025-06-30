@@ -117,7 +117,7 @@ export class AbstractData {
    * @return  {Extent}  Extent representing the data element's bounding box, or `null`
    */
   extent() {
-    return this.geoms.origExtent;
+    return this.geoms.orig?.extent;
   }
 
   /**
@@ -129,7 +129,7 @@ export class AbstractData {
    * @return  {boolean}  `true` if it intersects, `false` if not
    */
   intersects(other) {
-    const extent = this.geoms.origExtent;
+    const extent = this.geoms.orig?.extent;
     return extent?.intersects(other) ?? false;
   }
 

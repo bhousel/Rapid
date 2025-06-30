@@ -49,6 +49,21 @@ export class GeometryPart {
 
 
   /**
+   * reset
+   * Remove all stored data
+   */
+  reset() {
+    // Original data, in WGS84 coordinates
+    // ([0,0] is Null Island)
+    this.orig = null;
+
+    // Projected data, in world coordinates
+    // ([0,0] is the top left corner of a 256x256 Web Mercator world)
+    this.world = null;
+  }
+
+
+  /**
    * clone
    * Returns a clone of this GeometryPart object
    * @return {GeometryPart}
@@ -70,21 +85,6 @@ export class GeometryPart {
     }
 
     return copy;
-  }
-
-
-  /**
-   * reset
-   * Remove all stored data
-   */
-  reset() {
-    // Original data, in WGS84 coordinates
-    // ([0,0] is Null Island)
-    this.orig = null;
-
-    // Projected data in world coordinates
-    // ([0,0] is the top left corner of a 256x256 Web Mercator world)
-    this.world = null;
   }
 
 
@@ -140,12 +140,13 @@ export class GeometryPart {
 
     const viewport = this.context.viewport;
     const origCoords = this.orig.coords;
+    const type = this.type;
 
     // Reset all projected properties
     const world = this.world = {};
 
     // Points are simple, just project once.
-    if (this.type === 'Point') {
+    if (type === 'Point') {
       world.coords = viewport.wgs84ToWorld(origCoords);
       world.extent = new Extent(world.coords);
       world.centroid = world.coords;
@@ -157,7 +158,7 @@ export class GeometryPart {
     // Project the coordinate data..
     // Preallocate Arrays to avoid garbage collection formerly caused by excessive Array.push()
     world.extent = new Extent();
-    const origRings = (this.type === 'LineString') ? [origCoords] : origCoords;
+    const origRings = (type === 'LineString') ? [origCoords] : origCoords;
     const projRings = new Array(origRings.length);
 
     for (let i = 0; i < origRings.length; i++) {
@@ -175,7 +176,7 @@ export class GeometryPart {
     }
 
     // Assign outer and holes
-    if (this.type === 'LineString') {
+    if (type === 'LineString') {
       world.coords = projRings[0];
       world.outer = projRings[0];
       world.holes = null;
@@ -209,7 +210,7 @@ export class GeometryPart {
       }
 
       // Pole of Inaccessability (for polygons)
-      if (world.type === 'LineString') {
+      if (type === 'LineString') {
         world.poi = world.centroid;
       } else {
         world.poi = polylabel(world.coords);   // it expects outer + rings
