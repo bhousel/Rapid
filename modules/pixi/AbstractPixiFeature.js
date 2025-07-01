@@ -22,7 +22,6 @@ import { PixiGeometryPart } from './PixiGeometryPart.js';
  *   `v`                 Version of the Feature, can be used to detect changes
  *   `lod`               Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full)
  *   `halo`              A PIXI.DisplayObject() that contains the graphics for the Feature's halo (if it has one)
- *   `sceneBounds`       PIXI.Rectangle() where 0,0 is the origin of the scene
  */
 export class AbstractPixiFeature {
 
@@ -66,10 +65,6 @@ export class AbstractPixiFeature {
     // pseudoclasses, @see `AbstractPixiLayer.syncFeatureClasses()`
     this._classes = new Set();
 
-    // We will manage our own bounds for now because we can probably do this
-    // faster than Pixi's built in bounds calculations.
-    this.sceneBounds = new PIXI.Rectangle();   // where 0,0 is the origin of the scene
-
     this.layer.addFeature(this);
     this.scene.addFeature(this);
   }
@@ -108,8 +103,6 @@ export class AbstractPixiFeature {
 
     this._dataID = null;
     this._data = null;
-
-    this.sceneBounds = null;
   }
 
 

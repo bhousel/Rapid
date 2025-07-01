@@ -550,7 +550,7 @@ this.placeRopeLabel(feature, labelObj, coords);
    * @param  labelObj  a PIXI.Sprite, PIXI.Text, or PIXI.BitmapText to use as the label
    */
   placeTextLabel(feature, labelObj) {
-    if (!feature || !feature.sceneBounds) return;
+    if (!feature) return;
 
     const featureID = feature.id;
     const container = feature.container;

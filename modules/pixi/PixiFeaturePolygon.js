@@ -193,13 +193,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
           shapeType: (cornersInSSR ? 'square' : 'circle')
         };
       }
-
-      // Calculate bounds
-      const [minX, minY] = screen.extent.min;
-      this.sceneBounds.x = minX;
-      this.sceneBounds.y = minY;
-      this.sceneBounds.width = screen.width;
-      this.sceneBounds.height = screen.height;
     }
 
 

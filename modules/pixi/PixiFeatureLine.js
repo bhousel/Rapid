@@ -94,13 +94,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
       screen = geom.screen;
       if (!screen) return;  // can't render anything without screen coords
-
-      // Calculate bounds
-      const [minX, minY] = screen.extent.min;
-      this.sceneBounds.x = minX;
-      this.sceneBounds.y = minY;
-      this.sceneBounds.width = screen.width;
-      this.sceneBounds.height = screen.height;
     }
 
     //
