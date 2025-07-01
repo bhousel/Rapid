@@ -188,7 +188,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       // If sequence data has changed, replace it.
       if (feature.v !== version) {
         feature.v = version;
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.setData(dataID, d);
       }
 
@@ -211,7 +211,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.setData(dataID, d);
 
         if (d.props.sequenceID) {

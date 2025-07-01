@@ -28,8 +28,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this.areaContainer = null;
     this.lineContainer = null;
 
-    this._resolved = new Map();  // Map <entityID, GeoJSON feature>
-
 // experiment for benchmarking
 //    this._alreadyDownloaded = false;
 //    this._saveCannedData = false;
@@ -104,8 +102,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    */
   reset() {
     super.reset();
-
-    this._resolved.clear();  // cached geojson features
 
     const groupContainer = this.scene.groups.get('basemap');
 
@@ -218,8 +214,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const renderedFeatureIDs = this._dataHasFeature.get(dataID) ?? new Set();
       let tooSmall = false;
       for (const featureID of renderedFeatureIDs) {
-        const geom = this.features.get(featureID)?.geometry;
-        if (!geom || geom.type === 'point') continue;  // lines, polygons only (i.e. ignore virtual poi if any)
+        const geom = this.features.get(featureID)?.geom;
+        if (!geom || geom.type === 'Point') continue;  // lines, polygons only (i.e. ignore virtual poi if any)
         if (geom.width < 25 && geom.height < 25) {
           tooSmall = true;
           break;
@@ -298,35 +294,17 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     for (const [entityID, entity] of entities) {
       const version = entity.v || 0;
-
-//      // Cache GeoJSON resolution, as we expect the rewind and asGeoJSON calls to be kinda slow.
-//      let geojson = this._resolved.get(entityID);
-//      if (geojson?.v !== version) {  // bust cache if the entity has a new version
-//        geojson = null;
-//      }
-//      if (!geojson) {
-//        geojson = geojsonRewind(entity.asGeoJSON(graph), true);
-//        geojson.v = version;
-//        this._resolved.set(entityID, geojson);
-//      }
-//
-//      const parts = (geojson.type === 'Polygon') ? [geojson.coordinates]
-//        : (geojson.type === 'MultiPolygon') ? geojson.coordinates : [];
-
       const parts = entity.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
-//        const coords = parts[i];
         const part = parts[i];
-        if (!part.world) continue;  // invalid?
-        // const coords = part.origCoords;
-        // if (!coords) continue;
+        if (!part.world || part.type !== 'Polygon') continue;  // invalid?
 
         const featureID = `${this.layerID}-${entityID}-${i}`;
         let feature = this.features.get(featureID);
 
         // If feature existed before as a different type, recreate it.
-        if (feature && feature.type !== 'polygon') {
+        if (feature && feature.type !== 'Polygon') {
           feature.destroy();
           feature = null;
         }
@@ -339,9 +317,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         // If data has changed.. Replace data and parent-child links.
         if (feature.v !== version) {
           feature.v = version;
-//          feature.geometry.setCoords(coords);
-          feature.setCoords(part.world);
-          // const area = feature.geometry.origExtent.area();   // estimate area from extent for speed
+          feature.setCoords(part);
           const area = part.world.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
@@ -394,8 +370,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
           if (poiFeature.v !== version) {
             poiFeature.v = version;
-            // poiFeature.geometry.setCoords(feature.geometry.origPoi);  // pole of inaccessability
-            poiFeature.setCoords({ coords: part.world.poi });
+            const source = { type: 'Point', world: { coords: part.world.poi } };
+            poiFeature.setCoords(source);
             poiFeature.setData(entityID, entity);
           }
 
@@ -449,40 +425,22 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const zindex = getzIndex(entity.tags);
       const version = entity.v || 0;
 
-//      // Cache GeoJSON resolution, as we expect the asGeoJSON call to be kinda slow.
-//      let geojson = this._resolved.get(entityID);
-//      if (geojson?.v !== version) {  // bust cache if the entity has a new version
-//        geojson = null;
-//      }
-//      if (!geojson) {
-//        geojson = entity.asGeoJSON(graph);
-//        geojson.v = version;
-//        if (geojson.type === 'LineString' && entity.tags.oneway === '-1') {
-//          geojson.coordinates.reverse();
-//        }
-//        this._resolved.set(entityID, geojson);
-//      }
-//
-//      const parts = (geojson.type === 'LineString') ? [[geojson.coordinates]]
-//        : (geojson.type === 'Polygon') ? [geojson.coordinates]
-//        : (geojson.type === 'MultiPolygon') ? geojson.coordinates : [];
-
       const parts = entity.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
         const part = parts[i];
         if (!part.world) continue;  // invalid?
+
         const rings = (part.type === 'LineString') ? [part.world.coords]
           : (part.type === 'Polygon') ? part.world.coords
           : [];
 
         for (let j = 0; j < rings.length; ++j) {
-          // const coords = rings[j];
           const featureID = `${this.layerID}-${entityID}-${i}-${j}`;
           let feature = this.features.get(featureID);
 
           // If feature existed before as a different type, recreate it.
-          if (feature && feature.type !== 'line') {
+          if (feature && feature.type !== 'LineString') {
             feature.destroy();
             feature = null;
           }
@@ -494,8 +452,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           // If data has changed.. Replace data and parent-child links.
           if (feature.v !== version) {
             feature.v = version;
-            // feature.geometry.setCoords(coords);
-            feature.setCoords(part.world);
+            feature.setCoords(part);
             feature.parentContainer = levelContainer;    // Change layer stacking if necessary
             feature.container.zIndex = zindex;
 
@@ -607,7 +564,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       let feature = this.features.get(featureID);
 
       // If feature existed before as a different type, recreate it.
-      if (feature && feature.type !== 'point') {
+      if (feature && feature.type !== 'Point') {
         feature.destroy();
         feature = null;
       }
@@ -619,9 +576,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       // If data has changed, replace it.
       if (feature.v !== version) {
         feature.v = version;
-        // feature.geometry.setCoords(node.loc);
         const part = node.geoms.parts[0];
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.setData(nodeID, node);
       }
 
@@ -694,7 +650,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       let feature = this.features.get(featureID);
 
       // If feature existed before as a different type, recreate it.
-      if (feature && feature.type !== 'point') {
+      if (feature && feature.type !== 'Point') {
         feature.destroy();
         feature = null;
       }
@@ -707,9 +663,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       // If data has changed, replace it.
       if (feature.v !== version) {
         feature.v = version;
-        // feature.geometry.setCoords(node.loc);
         const part = node.geoms.parts[0];
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.setData(nodeID, node);
       }
 
@@ -845,8 +800,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const v = _midpointVersion(midpoint);
       if (feature.v !== v) {
         feature.v = v;
-        // feature.geometry.setCoords(midpoint.loc);
-        feature.setCoords({ coords: midpoint.world });
+        const source = { type: 'Point', world: { coords: midpoint.world } };
+        feature.setCoords(source);
 
         // Remember to apply rotation - it needs to go on the marker,
         // because the container automatically rotates to be face up.

@@ -94,7 +94,7 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.style = style;
         feature.parentContainer = parentContainer;
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.setData(d.id, d);
       }
 

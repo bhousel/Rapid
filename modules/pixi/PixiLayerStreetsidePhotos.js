@@ -227,7 +227,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       if (feature.v !== version) {
         feature.v = version;
         feature.setData(dataID, d);
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.clearChildData(dataID);
         d.properties.bubbleIDs.forEach(bubbleID => feature.addChildData(dataID, bubbleID));
       }
@@ -251,7 +251,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.setData(dataID, d);
       }
 

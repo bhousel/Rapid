@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { PixiGeometry } from './PixiGeometry.js';
+import { PixiGeometryPart } from './PixiGeometryPart.js';
 
 
 /**
@@ -8,10 +8,10 @@ import { PixiGeometry } from './PixiGeometry.js';
  *
  * Properties you can access:
  *   `id`                Unique string to use for the name of this Feature
- *   `type`              String describing what kind of Feature this is ('point', 'line', 'polygon')
+ *   `type`              String describing what kind of Feature this is ('Point', 'LineString', 'Polygon')
  *   `container`         PIXI.Container() that contains all the graphics needed to draw the Feature
  *   `parentContainer`   PIXI.Container() for the parent - this Feature's container will be added to it.
- *   `geometry`          PixiGeometry() class containing all the information about the geometry
+ *   `geom`              PixiGeometryPart() class containing all the information about the geometry
  *   `style`             Object containing style info
  *   `label`             String containing the Feature's label (if any)
  *   `data`              Data bound to this Feature (like `__data__` from the D3.js days)
@@ -32,7 +32,6 @@ export class AbstractPixiFeature {
    * @param  {string}  featureID - Unique string to use for the name of this Feature
    */
   constructor(layer, featureID) {
-    this.type = 'unknown';
     this.layer = layer;
     this.scene = layer.scene;
     this.gfx = layer.gfx;
@@ -55,7 +54,7 @@ export class AbstractPixiFeature {
     this.lod = 2;   // full detail
     this.halo = null;
 
-    this.geometry = new PixiGeometry();
+    this.geom = new PixiGeometryPart();
     this._style = null;
     this._styleDirty = true;
     this._label = null;
@@ -102,8 +101,8 @@ export class AbstractPixiFeature {
       this.halo = null;
     }
 
-    this.geometry.destroy();
-    this.geometry = null;
+    this.geom.destroy();
+    this.geom = null;
     this._style = null;
     this._label = null;
 
@@ -126,7 +125,7 @@ export class AbstractPixiFeature {
   update(viewport, zoom) {
     if (!this.dirty) return;  // nothing to do
 
-    this.geometry.update(viewport, zoom);
+    this.geom.update(viewport, zoom);
     this._styleDirty = false;
     // The labeling code will decide what to do with the `_labelDirty` flag
   }
@@ -148,6 +147,15 @@ export class AbstractPixiFeature {
    */
   get id() {
     return this.featureID;
+  }
+
+  /**
+   * Feature type
+   * Pull from the GeometryPart - should be one of 'Point', 'LineString', or 'Polygon'
+   * @readonly
+   */
+  get type() {
+    return this.geom.type;
   }
 
   /**
@@ -188,10 +196,10 @@ export class AbstractPixiFeature {
    */
   get dirty() {
     // The labeling code will decide what to do with the `_labelDirty` flag
-    return this.geometry.dirty || this._styleDirty;
+    return this.geom.dirty || this._styleDirty;
   }
   set dirty(val) {
-    this.geometry.dirty = val;
+    this.geom.dirty = val;
     this._styleDirty = val;
     this._labelDirty = val;
   }
@@ -325,11 +333,11 @@ export class AbstractPixiFeature {
 
   /**
    * setCoords
-   * This sets the coordinate data to render
-   * @param  {Object}  world - object containing world coordinate data
+   * This sets the coordinate data to be rendered.
+   * @param  {GeometryPart|Object}  source - A GeometryPart, or something that can be turned into one.
    */
-  setCoords(world) {
-    this.geometry.setCoords(world);
+  setCoords(source) {
+    this.geom.setData(source);
   }
 
   /**

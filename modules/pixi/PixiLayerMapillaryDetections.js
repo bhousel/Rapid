@@ -120,7 +120,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.setData(d.id, d);
       }
 

@@ -77,15 +77,16 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     const parentContainer = this.scene.groups.get('qa');
     const notes = osm.getNotes();
 
-    for (const note of notes) {
-      const part = note.geoms.parts[0];
+    for (const d of notes) {
+      const dataID = d.id;
+      const version = d.v || 0;
+      const part = d.geoms.parts[0];
       if (!part?.world || part?.type !== 'Point') continue;
 
-      const featureID = `${this.layerID}-${note.id}`;
-      const version = note.v || 0;
+      const featureID = `${this.layerID}-${dataID}`;
+      let feature = this.features.get(featureID);
 
       // Create feature if necessary..
-      let feature = this.features.get(featureID);
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
@@ -94,8 +95,8 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
       // If data has changed, replace it..
       if (feature.v !== version) {
         feature.v = version;
-        feature.setCoords(part.world);
-        feature.setData(note.id, note);
+        feature.setCoords(part);
+        feature.setData(dataID, d);
       }
 
       this.syncFeatureClasses(feature);
@@ -103,11 +104,11 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
       if (feature.dirty) {
         let color = 0xff3300;  // open (red)
         let iconName = 'rapid-icon-close';
-        if (note.props.status === 'closed') {
+        if (d.props.status === 'closed') {
           color = 0x55dd00;  // closed (green)
           iconName = 'rapid-icon-apply';
         }
-        if (note.isNew) {
+        if (d.isNew) {
           color = 0xffee00;  // new (yellow)
           iconName = 'rapid-icon-plus';
         }

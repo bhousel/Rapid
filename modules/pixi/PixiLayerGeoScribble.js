@@ -172,7 +172,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         let feature = this.features.get(featureID);
 
         // If feature existed before as a different type, recreate it.
-        if (feature && feature.type !== 'line') {
+        if (feature && feature.type !== 'LineString') {
           feature.destroy();
           feature = null;
         }
@@ -187,7 +187,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (feature.v !== version) {
           feature.v = version;
           feature.label = d.properties.text;
-          feature.setCoords(part.world);
+          feature.setCoords(part);
           feature.setData(dataID, d);
         }
 
@@ -230,7 +230,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         let feature = this.features.get(featureID);
 
         // If feature existed before as a different type, recreate it.
-        if (feature && feature.type !== 'point') {
+        if (feature && feature.type !== 'Point') {
           feature.destroy();
           feature = null;
         }
@@ -245,7 +245,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (feature.v !== version) {
           feature.v = version;
           feature.label = d.properties.text;
-          feature.setCoords(part.world);
+          feature.setCoords(part);
           feature.setData(dataID, d);
         }
 

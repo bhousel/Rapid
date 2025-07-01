@@ -13,7 +13,7 @@ const SIDED_SPACING = 30;
  * PixiFeatureLine
  *
  * Properties you can access:
- *   `geometry`   PixiGeometry() class containing all the information about the geometry
+ *   `geom`       PixiGeometryPart() class containing all the information about the geometry
  *   `points`     Array of projected points in scene coordinates
  *   `style`      Object containing styling data
  *   `container`  PIXI.Container containing the display objects used to draw the line
@@ -32,7 +32,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   constructor(layer, featureID) {
     super(layer, featureID);
 
-    this.type = 'line';
     this._bufferdata = null;
 
     const casing = new PIXI.Graphics();
@@ -83,35 +82,39 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const isWireframe = this.context.systems.map.wireframeMode;
     const textureManager = this.gfx.textures;
     const container = this.container;
+    const geom = this.geom;
     const style = this._style;
+    let screen;
 
     //
     // GEOMETRY
     //
-    if (this.geometry.dirty) {
-      this.geometry.update(viewport, zoom);
+    if (geom.dirty) {
+      geom.update(viewport, zoom);
+
+      screen = geom.screen;
+      if (!screen) return;  // can't render anything without screen coords
 
       // Calculate bounds
-      const [minX, minY] = this.geometry.screen.extent.min;
-      const [maxX, maxY] = this.geometry.screen.extent.max;
-      const [w, h] = [maxX - minX, maxY - minY];
+      const [minX, minY] = screen.extent.min;
       this.sceneBounds.x = minX;
       this.sceneBounds.y = minY;
-      this.sceneBounds.width = w;
-      this.sceneBounds.height = h;
+      this.sceneBounds.width = screen.width;
+      this.sceneBounds.height = screen.height;
     }
 
     //
     // STYLE
     //
     if (this._styleDirty) {
-      const {width, height} = this.sceneBounds;
+      screen = geom.screen;
+      if (!screen) return;  // can't render anything without screen coords
 
       // Apply effectiveZoom style adjustments
       let showMarkers = true;
 
       // Cull really tiny shapes
-      if (width < 4 && height < 4) {  // so tiny
+      if (screen.width < 4 && screen.height < 4) {  // so tiny
         this.lod = 0;  // off
         this.visible = false;
         this.stroke.renderable = false;
@@ -158,7 +161,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         lineMarkers.removeChildren();
 
         if (oneway) {
-          const segments = getLineSegments(this.geometry.screen.coords, ONEWAY_SPACING, false, true);  /* sided = false, limited = true */
+          const segments = getLineSegments(screen.coords, ONEWAY_SPACING, false, true);  /* sided = false, limited = true */
 
           segments.forEach(segment => {
             segment.coords.forEach(([x, y]) => {
@@ -177,7 +180,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         }
 
         if (sided) {
-          const segments = getLineSegments(this.geometry.screen.coords, SIDED_SPACING, true, true);  /* sided = true, limited = true */
+          const segments = getLineSegments(screen.coords, SIDED_SPACING, true, true);  /* sided = true, limited = true */
 
           segments.forEach(segment => {
             segment.coords.forEach(([x, y]) => {
@@ -226,7 +229,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
           cap: 'butt',
           join: 'bevel'
         };
-        this._bufferdata = lineToPoly(this.geometry.screen.flatCoords, bufferStyle);
+        this._bufferdata = lineToPoly(screen.flatCoords, bufferStyle);
         this.container.hitArea = new PIXI.Polygon(this._bufferdata.perimeter);
       } else {
         this._bufferdata = null;
@@ -238,10 +241,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
     if (this.casing.renderable) {
-      this.updateGraphic('casing', this.casing, this.geometry.screen.coords, style, zoom, isWireframe);
+      this.updateGraphic('casing', this.casing, screen.coords, style, zoom, isWireframe);
     }
     if (this.stroke.renderable) {
-      this.updateGraphic('stroke', this.stroke, this.geometry.screen.coords, style, zoom, isWireframe);
+      this.updateGraphic('stroke', this.stroke, screen.coords, style, zoom, isWireframe);
     }
 
     this.updateHalo();

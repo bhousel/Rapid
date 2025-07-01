@@ -278,11 +278,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       for (const [featureID, feature] of this.scene.features) {
         // If the feature can be labeled, and hasn't yet been, add it to the list for placement.
         if (feature.label && feature.visible && !this._labelBoxes.has(featureID)) {
-          if (feature.type === 'point') {
+          if (feature.type === 'Point') {
             points.push(feature);
-          } else if (feature.type === 'line') {
+          } else if (feature.type === 'LineString') {
             lines.push(feature);
-          } else if (feature.type === 'polygon') {
+          } else if (feature.type === 'Polygon') {
             polygons.push(feature);
           }
         }
@@ -432,8 +432,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param  features  The features to place point labels on
    */
   labelPoints(features) {
-    // features.sort((a, b) => b.geometry.origCoords[1] - a.geometry.origCoords[1]);
-    features.sort((a, b) => a.geometry.screen.coords[1] - b.geometry.screen.coords[1]);
+    features.sort((a, b) => a.geom.screen.coords[1] - b.geom.screen.coords[1]);
 
     for (const feature of features) {
       if (this._labelBoxes.has(feature.id)) continue;  // processed it already
@@ -483,7 +482,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     for (const feature of features) {
       const featureID = feature.id;
-      const screen = feature.geometry.screen;
+      const screen = feature.geom.screen;
 
       if (this._labelBoxes.has(featureID)) continue;  // processed it already
       this._labelBoxes.set(featureID, []);
@@ -508,7 +507,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   labelPolygons(features) {
     for (const feature of features) {
       const featureID = feature.id;
-      const screen = feature.geometry.screen;
+      const screen = feature.geom.screen;
 
       if (this._labelBoxes.has(featureID)) continue;  // processed it already
       this._labelBoxes.set(featureID, []);

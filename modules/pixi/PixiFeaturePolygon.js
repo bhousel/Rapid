@@ -13,7 +13,7 @@ const PARTIALFILLWIDTH = 32;
  * PixiFeaturePolygon
  *
  * Properties you can access:
- *   `geometry`   PixiGeometry() class containing all the information about the geometry
+ *   `geom`       PixiGeometryPart() class containing all the information about the geometry
  *   `style`      Object containing styling data
  *   `container`  PIXI.Container containing the display objects used to draw the polygon
  *   `lowRes`     PIXI.Sprite for a replacement graphic to display at low resolution
@@ -33,7 +33,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   constructor(layer, featureID) {
     super(layer, featureID);
 
-    this.type = 'polygon';
     this._ssrdata = null;
     this._bufferdata = null;
     this._vertexCount = 0;  // we will watch these for Rapid#1636
@@ -135,18 +134,23 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const storage = context.systems.storage;
     const isWireframeMode = context.systems.map.wireframeMode;
     const bearing = context.viewport.transform.rotation;
+    const geom = this.geom;
+    let screen;
 
     //
     // GEOMETRY
     //
-    if (this.geometry.dirty) {
-      this.geometry.update(viewport, zoom);
+    if (geom.dirty) {
+      geom.update(viewport, zoom);
+
+      screen = geom.screen;
+      if (!screen) return;  // can't render anything without screen coords
 
       // Redo ssr (move more of this into PixiGeometry later)
       this._ssrdata = null;
 
       // We use the SSR to approximate a low resolution polygon at low zooms
-      if (this.geometry.screen.ssr?.poly) {
+      if (screen.ssr?.poly) {
         // Calculate axes of symmetry to determine width, height
         // The shape's surrounding rectangle has 2 axes of symmetry.
         //
@@ -159,7 +163,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         //        \/ q1
         //        3
 
-        const poly = this.geometry.screen.ssr.poly;
+        const poly = screen.ssr.poly;
         const p1 = [(poly[0][0] + poly[1][0]) / 2, (poly[0][1] + poly[1][1]) / 2 ];
         const q1 = [(poly[2][0] + poly[3][0]) / 2, (poly[2][1] + poly[3][1]) / 2 ];
         const p2 = [(poly[3][0] + poly[0][0]) / 2, (poly[3][1] + poly[0][1]) / 2 ];
@@ -172,7 +176,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         // Are the SSR corners part of the shape?
         const EPSILON = 0.1;
         let c0in, c1in, c2in, c3in;
-        this.geometry.screen.outer.forEach(point => {
+        screen.outer.forEach(point => {
           if (!c0in) c0in = vecEqual(point, poly[0], EPSILON);
           if (!c1in) c1in = vecEqual(point, poly[1], EPSILON);
           if (!c2in) c2in = vecEqual(point, poly[2], EPSILON);
@@ -181,29 +185,33 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         const cornersInSSR = c0in || c1in || c2in || c3in;
 
         this._ssrdata = {
-          screenSSR: this.geometry.screen.ssr,
-          worldSSR: this.geometry.world.ssr,
+          screenSSR: geom.screen.ssr,
+          worldSSR: geom.world.ssr,
           worldAxis1: axis1.map(coord => viewport.screenToWorld(coord)),
           worldAxis2: axis2.map(coord => viewport.screenToWorld(coord)),
           worldCenter: viewport.screenToWorld(center),
           shapeType: (cornersInSSR ? 'square' : 'circle')
         };
       }
-    }
 
-    // Calculate bounds
-    const [minX, minY] = this.geometry.screen.extent.min;
-    const [maxX, maxY] = this.geometry.screen.extent.max;
-    const [w, h] = [maxX - minX, maxY - minY];
-    this.sceneBounds.x = minX;
-    this.sceneBounds.y = minY;
-    this.sceneBounds.width = w;
-    this.sceneBounds.height = h;
+      // Calculate bounds
+      const [minX, minY] = screen.extent.min;
+      this.sceneBounds.x = minX;
+      this.sceneBounds.y = minY;
+      this.sceneBounds.width = screen.width;
+      this.sceneBounds.height = screen.height;
+    }
 
 
     //
     // STYLE
     //
+    screen = geom.screen;
+    if (!screen) return;  // can't render anything without screen coords
+
+    const w = screen.width;
+    const h = screen.height;
+
     const style = this._style;
     const textureManager = this.gfx.textures;
     const color = style.fill.color ?? 0xaaaaaa;
@@ -287,7 +295,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     //
     // redraw the shapes
     //
-    const rings = this.geometry.screen.flatCoords || [];  // outer, followed by holes if any
+    const rings = screen.flatCoords || [];  // outer, followed by holes if any
     this._bufferdata = null;
 
     // STROKES
@@ -404,7 +412,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         // We will investigate this more, but for now if we detect this condition, just recreate the Mesh.
 
         // console.log('id: ' + this.featureID
-        //  + ' coords: ' + this.geometry.outer.length
+        //  + ' coords: ' + this.geom.outer.length
         //  + ' indices: ' + gpuContext.geometryData.indices.length
         //  + ' vertices: ' + gpuContext.geometryData.vertices.length
         // );

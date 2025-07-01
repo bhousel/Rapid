@@ -9,7 +9,7 @@ import { DashLine } from './lib/DashLine.js';
  * PixiFeaturePoint
  *
  * Properties you can access:
- *   `geometry`    PixiGeometry() class containing all the information about the geometry
+ *   `geom`        PixiGeometryPart() class containing all the information about the geometry
  *   `style`       Object containing styling data
  *   `container`   PIXI.Container containing the display objects used to draw the point
  *   `marker`      PIXI.Sprite for the marker
@@ -28,8 +28,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   constructor(layer, featureID) {
     super(layer, featureID);
 
-    this.type = 'point';
-    this._viewfieldCount = 0;   // to watch for change in # of viewfield sprites
+    this._viewfieldCount = 0;     // to watch for change in # of viewfield sprites
     this._viewfieldName = null;   // to watch for change in viewfield texture
 
     this._isCircular = false;   // set true to use a circular halo and hit area
@@ -107,17 +106,18 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * @param  {number}    zoom     - Effective zoom to use for rendering
    */
   updateGeometry(viewport, zoom) {
-    if (!this.geometry.dirty) return;
+    if (!this.geom.dirty) return;
 
     // Reproject
-    this.geometry.update(viewport, zoom);
+    this.geom.update(viewport, zoom);
+    const screen = this.geom.screen;
+    if (!screen) return;  // can't render anything without screen coords
 
-    const [x, y] = this.geometry.screen.coords;
+    const [x, y] = screen.coords;
     this.container.position.set(x, y);
 
     // sort markers by latitude ascending
     // sort markers with viewfields above markers without viewfields
-    // const z = -this.geometry.origCoords[1];  // latitude
     const z = y;  // use y coord as the z-index
     this.container.zIndex = (this._viewfieldCount > 0) ? (z + 1000) : z;
   }
@@ -131,6 +131,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   updateStyle(viewport, zoom) {
     if (!this._styleDirty) return;
 
+    const screen = this.geom.screen;
+    if (!screen) return;  // can't render anything without screen coords
+
     const context = this.context;
     const wireframeMode = context.systems.map.wireframeMode;
     const textureManager = this.gfx.textures;
@@ -139,8 +142,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     const marker = this.marker;
     const icon = this.icon;
-    const z = this.geometry.screen.coords[1];  // use y coord as the z-index
-    // const latitude = this.geometry.origCoords[1];
+    const z = screen.coords[1];  // use y coord as the z-index
 
     // Apply anti-rotation to keep the icons and markers facing up.
     // (However viewfields container _should_ include the bearing, and will below)

@@ -1,8 +1,10 @@
 import { Extent } from '@rapid-sdk/math';
 
+import { GeometryPart } from '../models/GeometryPart.js';
+
 
 /**
- * PixiGeometry
+ * PixiGeometryPart
  * Wrapper for projected geometry in screen coordinates used by Pixi.
  * This now wraps the core GeometryPart class that works in world coordinates,
  *  so these computations are relatively quick.
@@ -24,12 +26,14 @@ import { Extent } from '@rapid-sdk/math';
  *   `screen.height`      Height of projected shape, in pixels
  *   `screen.lod`         Level of detail for the geometry (0 = off, 1 = simplified, 2 = full)
  */
-export class PixiGeometry {
+export class PixiGeometryPart {
 
   /**
    * @constructor
+   * @param  {Context}  context - Global shared application context
    */
-  constructor() {
+  constructor(context) {
+    this.context = context;
     this.reset();
   }
 
@@ -49,7 +53,8 @@ export class PixiGeometry {
    * Remove all stored data
    */
   reset() {
-    this.dirty = true;
+    this.dirty = true;  // if `true`, the screen coordinates need recomputation.
+    this._source = null;  // the source GeometryPart
 
     // Projected data in world coordinates
     // ([0,0] is the top left corner of a 256x256 Web Mercator world)
@@ -69,11 +74,12 @@ export class PixiGeometry {
     if (!this.dirty || !this.world) return;  // nothing to do
 
     this.dirty = false;
+    const type = this.type;
     const world = this.world;
     const screen = this.screen = {};
 
     // Points are simple, just project once.
-    if (this.type === 'Point') {
+    if (type === 'Point') {
       screen.coords = viewport.worldToScreen(world.coords);
       screen.extent = new Extent(screen.coords);
       screen.centroid = screen.coords;
@@ -106,7 +112,7 @@ export class PixiGeometry {
     // Reproject the coordinate data..
     // Generate both normal coordinate rings and flattened rings at the same time to avoid extra iterations.
     // Preallocate Arrays to avoid garbage collection formerly caused by excessive Array.push()
-    const rings = (this.type === 'LineString') ? [world.coords] : world.coords;
+    const rings = (type === 'LineString') ? [world.coords] : world.coords;
     const projRings = new Array(rings.length);
     const projFlatRings = new Array(rings.length);
 
@@ -124,7 +130,7 @@ export class PixiGeometry {
     }
 
     // Assign outer and holes
-    if (this.type === 'LineString') {
+    if (type === 'LineString') {
       screen.coords = projRings[0];
       screen.flatCoords = projFlatRings[0];
       screen.outer = projRings[0];
@@ -159,57 +165,38 @@ export class PixiGeometry {
 
 
   /**
-   * setCoords
-   * The `coords` must be passed as an Object containing world coordinate data,
-   * either precomputed as feature's GeometryPart, or generated on the fly
-   * from a point like a midpoint.
-   *
-   * The passed object must contain a property called `coords`, which will be checked:
-   *
-   * 'Point' - Single coordinate
-   *    [lon, lat]
-   *
-   * 'LineString' - Array of coordinates
-   *    [ [lon, lat], [lon, lat],  … ]
-   *
-   * 'Polygon' - Array of Arrays
-   *    [
-   *      [ [lon, lat], [lon, lat], … ],   // outer ring
-   *      [ [lon, lat], [lon, lat], … ],   // inner rings
-   *      …
-   *    ]
-   *
-   * @param {Object} world - An Object containing "world" coordinate data
-   *
+   * type
+   * The original data format lives in the source GeometryPart, this is just a convenience getter.
+   * @return  {string}  One of 'Point', 'LineString', 'Polygon'
+   * @readonly
    */
-  setCoords(world) {
-    this.destroy();
-
-    const coords = world.coords;
-    const type = this._inferType(coords);
-    if (!type) return;  // do nothing if data is missing
-
-    this.type = type;
-    this.world = globalThis.structuredClone(world);
+  get type() {
+    return this._source?.type;
   }
 
 
   /**
-   * _inferType
-   * Determines what kind of geometry we were passed.
-   * @param   {Array<*>}  arr - Geometry `Array` (contents depends on the Feature type)
-   * @return  {string?}   'Point', 'LineString', 'Polygon' or null
+   * setData
+   * The source coordinate data must be passed as either:
+   * - A GeometryPart (or something like one, with a `type` and `world` props)
+   * - A GeoJSON singular geometry that can be turned into a GeometryPart.
+   * If there is any existing data, it is first removed.
+   * @param  {GeometryPart|Object}  source - A GeometryPart, or something that can be turned into one.
    */
-  _inferType(data) {
-    const a = Array.isArray(data) && data[0];
-    if (typeof a === 'number') return 'Point';
+  setData(source = {}) {
+    this.destroy();
 
-    const b = Array.isArray(a) && a[0];
-    if (typeof b === 'number') return 'LineString';
-
-    const c = Array.isArray(b) && b[0];
-    if (typeof c === 'number') return 'Polygon';
-
-    return null;
+    if (source.world && source.type) {   // A GeometryPart, or something that looks like one.
+      this._source = source;
+      this.world = source.world;
+    } else {    // Can this source be turned into a GeometryPart?
+      const part = new GeometryPart(this.context);
+      part.setData(source);
+      if (part.world) {
+        this._source = part;
+        this.world = part.world;
+      }
+    }
   }
+
 }

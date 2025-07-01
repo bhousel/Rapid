@@ -25,8 +25,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     super(scene, layerID);
     this.enabled = true;     // Rapid features should be enabled by default
 
-    this._resolved = new Map();  // Map<entityID, GeoJSON feature>
-
 //// shader experiment:
 //this._uniforms = {
 // u_resolution: [300.0, 300.0],
@@ -158,7 +156,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    */
   reset() {
     super.reset();
-    this._resolved.clear();  // cached geojson features
 
     const groupContainer = this.scene.groups.get('basemap');
 
@@ -346,13 +343,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
         if (!feature) {
           if (!part.world) continue;  // invalid?
-          // const coords = part.origCoords;
-          // if (!coords) continue;
 
           feature = new PixiFeaturePolygon(this, featureID);
-          // feature.geometry.setCoords(coords);
-          feature.setCoords(part.world);
-          // const area = feature.geometry.origExtent.area();   // estimate area from extent for speed
+          feature.setCoords(part);
           const area = part.world.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
@@ -376,59 +369,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         this.retainFeature(feature, frame);
       }
     }
-
-//     for (const entity of data.polygons) {
-//       // Cache GeoJSON resolution, as we expect the rewind and asGeoJSON calls to be kinda slow.
-//       // This is ok because the rapid features won't change once loaded.
-//       let geojson = this._resolved.get(entity.id);
-//       if (!geojson) {
-//         geojson = geojsonRewind(entity.asGeoJSON(graph), true);
-//         this._resolved.set(entity.id, geojson);
-//       }
-
-//       const parts = (geojson.type === 'Polygon') ? [geojson.coordinates]
-//         : (geojson.type === 'MultiPolygon') ? geojson.coordinates : [];
-
-//       for (let i = 0; i < parts.length; ++i) {
-//         const coords = parts[i];
-//         const featureID = `${this.layerID}-${dataset.id}-${entity.id}-${i}`;
-//         let feature = this.features.get(featureID);
-
-//         if (!feature) {
-//           feature = new PixiFeaturePolygon(this, featureID);
-
-//           feature.geometry.setCoords(coords);
-//           const area = feature.geometry.origExtent.area();   // estimate area from extent for speed
-//           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
-
-//           feature.parentContainer = parentContainer;
-//           feature.rapidFeature = true;
-//           feature.setData(entity.id, entity);
-// // shader experiment:
-// // check https://github.com/pixijs/pixijs/discussions/7728 for some discussion
-// // we are fighting with the batch system which is unfortunate
-// // feature.fill.geometry.isBatchable = () => { return false; };
-// // feature.fill.shader = this._customshader;
-
-// // also custom `.shader` dont work on sprites at all, and so we'd have to switch to meshes maybe?
-//         }
-
-//         this.syncFeatureClasses(feature);
-
-//         if (feature.dirty) {
-//           const style = {
-//             labelTint: color,
-//             fill: { width: 2, color: color, alpha: 0.3 },
-//             // fill: { width: 2, color: color, alpha: 1, pattern: 'stripe' }
-//           };
-//           feature.style = style;
-//           feature.label = l10n.displayName(entity.tags);
-//           feature.update(viewport, zoom);
-//         }
-
-//         this.retainFeature(feature, frame);
-//       }
-//     }
   }
 
 
@@ -447,16 +387,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
         if (!feature) {
           if (!part.world) continue;  // invalid?
-          // const coords = part.origCoords;
-          // if (!coords) continue;
-
-          // if (entity.tags.oneway === '-1') {
-          //   coords.reverse();
-          // }
 
           feature = new PixiFeatureLine(this, featureID);
-//          feature.geometry.setCoords(coords);
-          feature.setCoords(part.world);
+          feature.setCoords(part);
           feature.parentContainer = parentContainer;
           feature.rapidFeature = true;
           feature.setData(entity.id, entity);
@@ -479,41 +412,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         this.retainFeature(feature, frame);
       }
     }
-
-    // for (const entity of data.lines) {
-    //   const featureID = `${this.layerID}-${dataset.id}-${entity.id}`;
-    //   let feature = this.features.get(featureID);
-
-    //   if (!feature) {
-    //     const geojson = entity.asGeoJSON(graph);
-    //     const coords = geojson.coordinates;
-    //     if (entity.tags.oneway === '-1') {
-    //       coords.reverse();
-    //     }
-
-    //     feature = new PixiFeatureLine(this, featureID);
-    //     feature.geometry.setCoords(coords);
-    //     feature.parentContainer = parentContainer;
-    //     feature.rapidFeature = true;
-    //     feature.setData(entity.id, entity);
-    //   }
-
-    //   this.syncFeatureClasses(feature);
-
-    //   if (feature.dirty) {
-    //     const style = {
-    //       labelTint: color,
-    //       casing: { width: 5, color: 0x444444 },
-    //       stroke: { width: 3, color: color },
-    //     };
-    //     style.lineMarkerName = entity.isOneWay() ? 'oneway' : '';
-    //     feature.style = style;
-    //     feature.label = l10n.displayName(entity.tags);
-    //     feature.update(viewport, zoom);
-    //   }
-
-    //   this.retainFeature(feature, frame);
-    // }
   }
 
 
@@ -545,8 +443,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (!part.world) continue;  // invalid?
 
         feature = new PixiFeaturePoint(this, featureID);
-        // feature.geometry.setCoords(entity.loc || entity.geojson.geometry.coordinates);
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.parentContainer = parentContainer;
         feature.rapidFeature = true;
         feature.setData(entity.id, entity);
@@ -585,8 +482,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (!part.world) continue;  // invalid?
 
         feature = new PixiFeaturePoint(this, featureID);
-        // feature.geometry.setCoords(entity.loc);
-        feature.setCoords(part.world);
+        feature.setCoords(part);
         feature.parentContainer = parentContainer;
         feature.rapidFeature = true;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive
