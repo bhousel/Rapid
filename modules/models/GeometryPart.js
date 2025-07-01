@@ -20,7 +20,6 @@ import polylabel from '@mapbox/polylabel';
  *   `world.coords`   Projected coordinate data
  *   `world.extent`   Projected Extent
  *   `world.outer`    Projected outer ring, Array of coordinate pairs [ [x,y], [x,y], … ]
- *   `world.holes`    Projected hole rings, Array of Array of coordinate pairs [ [ [x,y], [x,y], … ] ]
  *   `world.hull`     Projected convex hull, Array of coordinate pairs [ [x,y], [x,y], … ]
  *   `world.centroid` Projected centroid, [x, y]
  *   `world.poi`      Projected pole of inaccessability, [x, y]
@@ -175,15 +174,12 @@ export class GeometryPart {
       }
     }
 
-    // Assign outer and holes
     if (type === 'LineString') {
       world.coords = projRings[0];
       world.outer = projRings[0];
-      world.holes = null;
-    } else {  // polygon
+    } else {   // Polygon
       world.coords = projRings;
       world.outer = projRings[0];
-      world.holes = projRings.slice(1);
     }
 
     // Calculate hull, centroid, poi, ssr if possible

@@ -146,7 +146,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       screen = geom.screen;
       if (!screen) return;  // can't render anything without screen coords
 
-      // Redo ssr (move more of this into PixiGeometry later)
+      // Redo ssr (move more of this into PixiGeometryPart later)
       this._ssrdata = null;
 
       // We use the SSR to approximate a low resolution polygon at low zooms
@@ -176,7 +176,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         // Are the SSR corners part of the shape?
         const EPSILON = 0.1;
         let c0in, c1in, c2in, c3in;
-        screen.outer.forEach(point => {
+        const outer = screen.coords[0];
+        outer.forEach(point => {
           if (!c0in) c0in = vecEqual(point, poly[0], EPSILON);
           if (!c1in) c1in = vecEqual(point, poly[1], EPSILON);
           if (!c2in) c2in = vecEqual(point, poly[2], EPSILON);
@@ -403,7 +404,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         // There is a crash in the Pixi MeshPipe code that occurs when we create a mesh and then
         //  change its vertices from >200 to <200 or vice versa.
         // We will investigate this more, but for now if we detect this condition, just recreate the Mesh.
-
+// probably fixed now, or just supply uvs
+// see https://github.com/pixijs/pixijs/issues/11207
         // console.log('id: ' + this.featureID
         //  + ' coords: ' + this.geom.outer.length
         //  + ' indices: ' + gpuContext.geometryData.indices.length

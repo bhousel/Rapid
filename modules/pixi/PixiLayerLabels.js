@@ -513,7 +513,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       this._labelBoxes.set(featureID, []);
 
       if (!feature.label) continue;      // no label
-      if (!screen.flatOuter) continue;   // no points
+      if (!screen.flatCoords) continue;   // no points
       if (!feature.container.visible || !feature.container.renderable) continue;  // not visible
       if (screen.width < 600 && screen.height < 600) continue;  // too small
 
@@ -528,7 +528,8 @@ const hitStyle = {
   join: 'bevel',
   cap: 'butt'
 };
-const bufferdata = lineToPoly(screen.flatOuter, hitStyle);
+const outerRing = screen.flatCoords[0];
+const bufferdata = lineToPoly(outerRing, hitStyle);
 if (!bufferdata.inner) continue;
 let coords = new Array(bufferdata.inner.length / 2);  // un-flatten :(
 for (let i = 0; i < bufferdata.inner.length / 2; ++i) {

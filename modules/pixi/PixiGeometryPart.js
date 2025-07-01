@@ -15,12 +15,6 @@ import { GeometryPart } from '../models/GeometryPart.js';
  *   `screen.coords`      Projected coordinate data
  *   `screen.flatCoords`  Projected coordinate data, flat Array how Pixi wants it [ x,y, x,y, … ]
  *   `screen.extent`      Projected extent
- *   `screen.outer`       Projected outer ring, Array of coordinate pairs [ [x,y], [x,y], … ]
- *   `screen.flatOuter`   Projected outer ring, flat Array how Pixi wants it [ x,y, x,y, … ]
- *   `screen.holes`       Projected hole rings, Array of Array of coordinate pairs [ [ [x,y], [x,y], … ] ]
- *   `screen.flatHoles`   Projected hole rings, Array of flat Array how Pixi wants it [ [ x,y, x,y, … ] ]
- *   `screen.centroid`    Projected centroid, [x, y]
- *   `screen.poi`         Projected pole of inaccessability, [x, y]
  *   `screen.ssr`         Projected smallest surrounding rectangle data (angle, poly)
  *   `screen.width`       Width of projected shape, in pixels
  *   `screen.height`      Height of projected shape, in pixels
@@ -108,7 +102,6 @@ export class PixiGeometryPart {
       return;
     }
 
-
     // Reproject the coordinate data..
     // Generate both normal coordinate rings and flattened rings at the same time to avoid extra iterations.
     // Preallocate Arrays to avoid garbage collection formerly caused by excessive Array.push()
@@ -129,30 +122,15 @@ export class PixiGeometryPart {
       }
     }
 
-    // Assign outer and holes
     if (type === 'LineString') {
       screen.coords = projRings[0];
       screen.flatCoords = projFlatRings[0];
-      screen.outer = projRings[0];
-      screen.flatOuter = projFlatRings[0];
-      screen.holes = null;
-      screen.flatHoles = null;
-    } else {
+    } else {  // Polygon
       screen.coords = projRings;
       screen.flatCoords = projFlatRings;
-      screen.outer = projRings[0];
-      screen.flatOuter = projFlatRings[0];
-      screen.holes = projRings.slice(1);
-      screen.flatHoles = projFlatRings.slice(1);
     }
 
-    // Calculate centroid, poi, ssr if possible
-    if (world.centroid) {
-      screen.centroid = viewport.worldToScreen(world.centroid);
-    }
-    if (world.poi) {
-      screen.poi = viewport.worldToScreen(world.poi);
-    }
+    // Calculate ssr if possible
     if (world.ssr) {
       screen.ssr = {
         poly: world.ssr.poly.map(coord => viewport.worldToScreen(coord)),
