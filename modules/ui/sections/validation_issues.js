@@ -94,8 +94,8 @@ export function uiSectionValidationIssues(context, severity) {
       .append('button')
       .attr('class', 'issue-label')
       .on('click',     (d3_event, d) => validator.focusIssue(d))
-      .on('mouseover', (d3_event, d) => utilHighlightEntities(d.entityIds, true, context))
-      .on('mouseout',  (d3_event, d) => utilHighlightEntities(d.entityIds, false, context));
+      .on('mouseover', (d3_event, d) => utilHighlightEntities(context, d.entityIds, true))
+      .on('mouseout',  (d3_event, d) => utilHighlightEntities(context, d.entityIds, false));
 
     const textEnter = labelsEnter
       .append('span')
@@ -179,7 +179,7 @@ export function uiSectionValidationIssues(context, severity) {
       d3_event.stopPropagation();
     }
 
-    utilHighlightEntities(issue.entityIds, false, context);  // unhighlight
+    utilHighlightEntities(context, issue.entityIds, false);  // unhighlight
     editor.perform(issue.autoArgs[0]);   // autoArgs = [action, annotation]
     editor.commit({ annotation: issue.autoArgs[1], selectedIDs: issue.entityIds });
   }

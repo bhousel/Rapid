@@ -5,7 +5,7 @@ import { Extent, numWrap } from '@rapid-sdk/math';
 import { JXON } from '../util/jxon.js';
 import { OsmChangeset } from '../models/OsmChangeset.js';
 import { uiIcon } from './icon.js';
-import { utilKeybinding, utilRebind } from '../util/index.js';
+import { utilHighlightEntities, utilKeybinding, utilRebind } from '../util/index.js';
 
 
 export function uiConflicts(context) {
@@ -285,21 +285,17 @@ export function uiConflicts(context) {
 
 
   function showEntityID(id, extent) {
-// todo replace legacy surface css class .hover
-//    context.surface().selectAll('.hover')
-//      .classed('hover', false);
+    utilHighlightEntities(context, false, false);   // unhighlight
 
     const graph = editor.staging.graph;
     const entity = graph.hasEntity(id);
     if (entity) {
       if (extent) {
-          map.trimmedExtent(extent);
+        map.trimmedExtent(extent);
       } else {
-          map.fitEntitiesEase(entity);
+        map.fitEntitiesEase(entity);
       }
-// todo replace legacy surface css class .hover
-//      context.surface().selectAll(utilEntityOrMemberSelector([entity.id], graph))
-//        .classed('hover', true);
+      utilHighlightEntities(context, [id], true);
     }
   }
 

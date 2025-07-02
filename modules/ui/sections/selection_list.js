@@ -73,8 +73,8 @@ export function uiSectionSelectionList(context) {
       .attr('class', 'feature-list-item')
       .each((d, i, nodes) => {
         d3_select(nodes[i])
-          .on('mouseover', () => utilHighlightEntities([d.id], true, context))
-          .on('mouseout', () => utilHighlightEntities([d.id], false, context));
+          .on('mouseover', () => utilHighlightEntities(context, [d.id], true))
+          .on('mouseout', () => utilHighlightEntities(context, [d.id], false));
       });
 
     let label = enter

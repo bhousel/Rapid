@@ -71,15 +71,15 @@ export function uiKeepRightDetails(context) {
         // Add click handler
         $link
           .on('mouseenter', () => {
-            utilHighlightEntities([entityID], true, context);
+            utilHighlightEntities(context, [entityID], true);
           })
           .on('mouseleave', () => {
-            utilHighlightEntities([entityID], false, context);
+            utilHighlightEntities(context, [entityID], false);
           })
           .on('click', d3_event => {
             d3_event.preventDefault();
 
-            utilHighlightEntities([entityID], false, context);
+            utilHighlightEntities(context, [entityID], false);
 
             scene.enableLayers('osm');  // make sure osm layer is even on
             map.centerZoomEase(_marker.loc, 20);

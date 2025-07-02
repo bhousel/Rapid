@@ -235,16 +235,16 @@ export function uiMapRouletteDetails(context) {
       $selection.selectAll('.highlight-link')
         .on('mouseover', function () {
           const osmId = transformId(d3_select(this).attr('data-osm-id'));
-          utilHighlightEntities([osmId], true, context);
+          utilHighlightEntities(context, [osmId], true);
         })
         .on('mouseout', function() {
           const osmId = transformId(d3_select(this).attr('data-osm-id'));
-          utilHighlightEntities([osmId], false, context);
+          utilHighlightEntities(context, [osmId], false);
         })
         .on('click', function(d3_event) {
           d3_event.preventDefault();
           const osmId = transformId(d3_select(this).attr('data-osm-id'));
-          utilHighlightEntities([osmId], false, context);
+          utilHighlightEntities(context, [osmId], false);
           highlightFeature(osmId);
         });
     }).catch(e => {

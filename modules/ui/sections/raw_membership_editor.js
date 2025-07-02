@@ -39,10 +39,10 @@ export function uiSectionRawMembershipEditor(context) {
         .minItems(1)
         .fetcher(fetchNearbyRelations)
         .itemsMouseEnter(function(d3_event, d) {
-            if (d.relation) utilHighlightEntities([d.relation.id], true, context);
+            if (d.relation) utilHighlightEntities(context, [d.relation.id], true);
         })
         .itemsMouseLeave(function(d3_event, d) {
-            if (d.relation) utilHighlightEntities([d.relation.id], false, context);
+            if (d.relation) utilHighlightEntities(context, [d.relation.id], false);
         });
     var _inChange = false;
     var _entityIDs = [];
@@ -118,7 +118,7 @@ export function uiSectionRawMembershipEditor(context) {
         d3_event.preventDefault();
 
         // remove the hover-highlight styling
-        utilHighlightEntities([d.relation.id], false, context);
+        utilHighlightEntities(context, [d.relation.id], false);
 
         context.enter('select-osm', { selection: { osm: [d.relation.id] }} );
     }
@@ -132,7 +132,7 @@ export function uiSectionRawMembershipEditor(context) {
         map.fitEntitiesEase(entity);
 
         // highlight the relation in case it wasn't previously on-screen
-        utilHighlightEntities([d.relation.id], true, context);
+        utilHighlightEntities(context, [d.relation.id], true);
     }
 
 
@@ -217,7 +217,7 @@ export function uiSectionRawMembershipEditor(context) {
         if (d === 0) return;   // called on newrow (shouldn't happen)
 
         // remove the hover-highlight styling
-        utilHighlightEntities([d.relation.id], false, context);
+        utilHighlightEntities(context, [d.relation.id], false);
 
         var indexes = d.members.map(function(member) {
             return member.index;
@@ -343,10 +343,10 @@ export function uiSectionRawMembershipEditor(context) {
         // highlight the relation in the map while hovering on the list item
         itemsEnter
             .on('mouseover', function(d3_event, d) {
-                utilHighlightEntities([d.relation.id], true, context);
+                utilHighlightEntities(context, [d.relation.id], true);
             })
             .on('mouseout', function(d3_event, d) {
-                utilHighlightEntities([d.relation.id], false, context);
+                utilHighlightEntities(context, [d.relation.id], false);
             });
 
         var labelEnter = itemsEnter
@@ -528,7 +528,7 @@ export function uiSectionRawMembershipEditor(context) {
                 return;
             }
             // remove hover-higlighting
-            if (d.relation) utilHighlightEntities([d.relation.id], false, context);
+            if (d.relation) utilHighlightEntities(context, [d.relation.id], false);
 
             var role = context.cleanRelationRole(list.selectAll('.member-row-new .member-role').property('value'));
             addMembership(d, role);

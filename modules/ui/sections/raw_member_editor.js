@@ -64,7 +64,7 @@ export function uiSectionRawMemberEditor(context) {
     map.fitEntitiesEase(entity);
 
     // highlight the feature in case it wasn't previously on-screen
-    utilHighlightEntities([d.id], true, context);
+    utilHighlightEntities(context, [d.id], true);
   }
 
 
@@ -72,7 +72,7 @@ export function uiSectionRawMemberEditor(context) {
     d3_event.preventDefault();
 
     // remove the hover-highlight styling
-    utilHighlightEntities([d.id], false, context);
+    utilHighlightEntities(context, [d.id], false);
 
     const graph = editor.staging.graph;
     const entity = graph.entity(d.id);
@@ -102,7 +102,7 @@ export function uiSectionRawMemberEditor(context) {
 
 
   function deleteMember(d3_event, d) {
-    utilHighlightEntities([d.id], false, context);  // remove the hover-highlight styling
+    utilHighlightEntities(context, [d.id], false);  // remove the hover-highlight styling
 
     editor.perform(actionDeleteMember(d.relation.id, d.index));
     editor.commit({
@@ -173,8 +173,8 @@ export function uiSectionRawMemberEditor(context) {
 
         if (d.member) {    // if the child has been loaded
           item
-            .on('mouseover', () => utilHighlightEntities([d.id], true, context))
-            .on('mouseout', () => utilHighlightEntities([d.id], false, context));
+            .on('mouseover', () => utilHighlightEntities(context, [d.id], true))
+            .on('mouseout', () => utilHighlightEntities(context, [d.id], false));
 
           let labelLink = label
             .append('span')

@@ -5,12 +5,15 @@ import { actionDiscardTags } from '../../actions/discard_tags.js';
 import { OsmChangeset } from '../../models/OsmChangeset.js';
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
+import { utilHighlightEntities } from '../../util/index.js';
 
 
 export function uiSectionChanges(context) {
   const assets = context.systems.assets;
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const map = context.systems.map;
+  const presets = context.systems.presets;
 
   let _discardTags = {};
   assets.loadAssetAsync('tagging_discarded')
@@ -52,8 +55,8 @@ export function uiSectionChanges(context) {
 
     let buttons = itemsEnter
       .append('button')
-      .on('mouseover', mouseover)
-      .on('mouseout', mouseout)
+      .on('mouseover', (e, d) => utilHighlightEntities(context, [d.entity.id], true))
+      .on('mouseout', () => utilHighlightEntities(context, false, false))
       .on('click', click);
 
     buttons
@@ -72,7 +75,7 @@ export function uiSectionChanges(context) {
       .append('strong')
       .attr('class', 'entity-type')
       .text(d => {
-        const matched = context.systems.presets.match(d.entity, d.graph);
+        const matched = presets.match(d.entity, d.graph);
         return (matched && matched.name()) || l10n.displayType(d.entity.id);
       });
 
@@ -93,7 +96,7 @@ export function uiSectionChanges(context) {
 
 
     // Download changeset link
-    let changeset = new OsmChangeset().update({ id: undefined });
+    const changeset = new OsmChangeset(context).update({ id: undefined });
     const changes = editor.changes(actionDiscardTags(editor.difference(), _discardTags));
 
     delete changeset.id;  // Export without chnageset_id
@@ -118,25 +121,10 @@ export function uiSectionChanges(context) {
       .append('span')
       .text(l10n.t('commit.download_changes'));
 
-
-    function mouseover(d) {
-// todo replace legacy surface css class .hover
-//      if (d.entity) {
-//        context.surface().selectAll(
-//          utilEntityOrMemberSelector([d.entity.id], editor.staging.graph)
-//        ).classed('hover', true);
-//      }
-    }
-
-    function mouseout() {
-//      context.surface().selectAll('.hover')
-//        .classed('hover', false);
-    }
-
     function click(d3_event, change) {
       if (change.changeType !== 'deleted') {
-        let entity = change.entity;
-        context.systems.map.fitEntitiesEase(entity);
+        const entity = change.entity;
+        map.fitEntitiesEase(entity);
 //        context.surface().selectAll(utilEntityOrMemberSelector([entity.id], editor.staging.graph))
 //          .classed('hover', true);
       }

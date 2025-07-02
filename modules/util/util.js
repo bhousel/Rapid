@@ -78,7 +78,7 @@ export function geojsonExtent(geojson) {
 
 
 // Adds or removes highlight styling for the specified entities
-export function utilHighlightEntities(entityIDs, highlighted, context) {
+export function utilHighlightEntities(context, entityIDs, highlighted) {
   const editor = context.systems.editor;
   const gfx = context.systems.gfx;
 

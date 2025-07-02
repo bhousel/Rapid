@@ -63,11 +63,11 @@ export function uiSectionEntityIssues(context) {
       .on('mouseover.highlight', function(d3_event, d) {
         // don't hover-highlight the selected entity
         const otherIDs = d.entityIds.filter(id => !_entityIDs.includes(id));
-        utilHighlightEntities(otherIDs, true, context);
+        utilHighlightEntities(context, otherIDs, true);
       })
       .on('mouseout.highlight', function(d3_event, d) {
         const otherIDs = d.entityIds.filter(id => !_entityIDs.includes(id));
-        utilHighlightEntities(otherIDs, false, context);
+        utilHighlightEntities(context, otherIDs, false);
       });
 
     let labelsEnter = itemsEnter
@@ -185,11 +185,11 @@ export function uiSectionEntityIssues(context) {
         if (d.issue.dateLastRanFix && new Date() - d.issue.dateLastRanFix < 1000) return;
         d.issue.dateLastRanFix = new Date();
 
-        utilHighlightEntities(d.issue.entityIds.concat(d.entityIds), false, context);  // remove hover-highlighting
+        utilHighlightEntities(context, d.issue.entityIds.concat(d.entityIds), false);  // remove hover-highlighting
         d.onClick();
       })
-      .on('mouseover.highlight', (d3_event, d) => utilHighlightEntities(d.issue.entityIds, true, context))
-      .on('mouseout.highlight', (d3_event, d) => utilHighlightEntities(d.issue.entityIds, false, context));
+      .on('mouseover.highlight', (d3_event, d) => utilHighlightEntities(context, d.issue.entityIds, true))
+      .on('mouseout.highlight', (d3_event, d) => utilHighlightEntities(context, d.issue.entityIds, false));
 
     buttons
       .each((d, i, nodes) => {

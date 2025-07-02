@@ -325,7 +325,7 @@ export class UiFeatureList {
    */
   _mouseover(e, d) {
     if (!d.id || d.id === -1) return;
-    utilHighlightEntities([d.id], true, this.context);
+    utilHighlightEntities(this.context, [d.id], true);
   }
 
 
@@ -337,7 +337,7 @@ export class UiFeatureList {
    */
   _mouseout(e, d) {
     if (!d.id || d.id === -1) return;
-    utilHighlightEntities([d.id], false, this.context);
+    utilHighlightEntities(this.context, [d.id], false);
   }
 
 
@@ -358,7 +358,7 @@ export class UiFeatureList {
       map.centerZoomEase([d.location[1], d.location[0]], 19);
 
     } else if (d.id !== -1) {  // looks like an OSM Entity
-      utilHighlightEntities([d.id], false, context);
+      utilHighlightEntities(context, [d.id], false);
       map.selectEntityID(d.id, true);   // select and fit, download first if necessary
 
     } else if (d.noteID) {  // looks like an OSM Note

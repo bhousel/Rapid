@@ -99,11 +99,11 @@ export function uiEditMenu(context) {
       })
       .on('mouseenter.highlight', function(d3_event, d) {
         if (!d.relatedEntityIds || d3_select(this).classed('disabled')) return;
-        utilHighlightEntities(d.relatedEntityIds(), true, context);
+        utilHighlightEntities(context, d.relatedEntityIds(), true);
       })
       .on('mouseleave.highlight', function(d3_event, d) {
         if (!d.relatedEntityIds) return;
-        utilHighlightEntities(d.relatedEntityIds(), false, context);
+        utilHighlightEntities(context, d.relatedEntityIds(), false);
       });
 
     // create placeholder icon, label, tooltip
@@ -169,7 +169,7 @@ export function uiEditMenu(context) {
       d3_event.stopPropagation();
 
       if (operation.relatedEntityIds) {
-        utilHighlightEntities(operation.relatedEntityIds(), false, context);
+        utilHighlightEntities(context, operation.relatedEntityIds(), false);
       }
 
       if (operation.disabled()) {
