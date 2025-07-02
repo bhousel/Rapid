@@ -177,6 +177,7 @@ export class UiBackgroundCard extends AbstractUiCard {
 
     const context = this.context;
     const imagery = context.systems.imagery;
+    const gfx = context.systems.gfx;
     const l10n = context.systems.l10n;
     const viewport = context.viewport;
     const $content = this.$wrap.selectAll('.card-content');
@@ -194,7 +195,7 @@ export class UiBackgroundCard extends AbstractUiCard {
     // Look for a loaded tile that covers the center of the viewport.
     const centerLoc = viewport.centerLoc();
     const centerExtent = new Extent(centerLoc);
-    const layer = context.scene().layers.get('background');
+    const layer = gfx.scene.layers.get('background');
     const tileMap = layer?._tileMaps.get(sourceID);
     let tileCoord, tileZoom;
 

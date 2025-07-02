@@ -47,6 +47,7 @@ export function uiIntro(context, skipToRapid) {
   const mapwithai = context.services.mapwithai;
   const osm = context.services.osm;
   const rapid = context.systems.rapid;
+  const scene = context.systems.gfx.scene;
   const storage = context.systems.storage;
   const urlhash = context.systems.urlhash;
   const ui = context.systems.ui;
@@ -119,12 +120,12 @@ export function uiIntro(context, skipToRapid) {
     };
 
     // Remember which layers were enabled before, enable only certain ones in the walkthrough.
-    for (const [layerID, layer] of context.scene().layers) {
+    for (const [layerID, layer] of scene.layers) {
       if (layer.enabled) {
         _original.layersEnabled.add(layerID);
       }
     }
-    context.scene().onlyLayers(['background', 'osm', 'labels']);
+    scene.onlyLayers(['background', 'osm', 'labels']);
 
     // Show only a fake walkthrough dataset
     rapid.removeDatasets(rapid._addedDatasetIDs);
@@ -254,7 +255,7 @@ export function uiIntro(context, skipToRapid) {
     _navwrap.remove();
 
     // Restore Map State
-    for (const [layerID, layer] of context.scene().layers) {
+    for (const [layerID, layer] of scene.layers) {
       layer.enabled = _original.layersEnabled.has(layerID);
     }
     imagery.baseLayerSource(_original.baseLayer);

@@ -302,7 +302,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this.labelContainer.visible = true;
     this.renderObjects();
 
-    if (this.context.getDebug('label')) {
+    const showDebug = this.context.getDebug('label');
+    if (showDebug) {
       this.debugContainer.visible = true;
       this.renderDebug();
     } else {
@@ -355,6 +356,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    *  destroy the label and flag the feature as labeldirty for relabeling
    */
   gatherAvoids() {
+    const showDebug = this.context.getDebug('label');
+
     // Gather the containers that have avoidable stuff on them.
     const avoidContainers = [];
 
@@ -381,7 +384,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (labelBoxes.length) {
       this._labelRBush.load(labelBoxes);
     }
-    if (debugBoxes.length) {
+    if (showDebug && debugBoxes.length) {
       this._debugRBush.load(debugBoxes);
     }
 
@@ -419,20 +422,22 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       this._cacheBox(avoidBox);
       labelBoxes.push(avoidBox);
 
-      const debugBox = {
-        type: 'debug',
-        id: avoidBox.id + '-debug',
-        featureID: featureID,
-        tint: 0xff0000,   // red (avoid)
-        objectID: null,
-        minX: avoidBox.minX,
-        minY: avoidBox.minY,
-        maxX: avoidBox.maxX,
-        maxY: avoidBox.maxY
-      };
+      if (showDebug) {
+        const debugBox = {
+          type: 'debug',
+          id: avoidBox.id + '-debug',
+          featureID: featureID,
+          tint: 0xff0000,   // red (avoid)
+          objectID: null,
+          minX: avoidBox.minX,
+          minY: avoidBox.minY,
+          maxX: avoidBox.maxX,
+          maxY: avoidBox.maxY
+        };
 
-      this._cacheBox(debugBox);
-      debugBoxes.push(debugBox);
+        this._cacheBox(debugBox);
+        debugBoxes.push(debugBox);
+      }
 
       // If there is already a label where this avoid box is, we will need to redo that label.
       // This is somewhat common that a label will be placed somewhere, then as more map loads,
@@ -598,6 +603,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   placeTextLabel(feature, labelObj) {
     if (!feature) return;
 
+    const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
     const container = feature.container;
     if (!container.visible || !container.renderable) return;
@@ -704,6 +710,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       // Create a new Label placeholder, and insert the box
       // into the rbush so nothing else gets placed there.
       if (!this._labelRBush.collides(labelBox)) {
+//        picked = placementID;
         const label = new Label(featureID, 'text', {
           str: feature.label,
           labelObj: labelObj,
@@ -717,21 +724,22 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         this._cacheBox(labelBox);
         this._labelRBush.insert(labelBox);
 
-        const debugBox = {
-          type: 'debug',
-          id: labelBox.id + '-debug',
-          featureID: featureID,
-          tint: 0x00ff00,   // green (ok)
-          objectID: null,
-          minX: labelBox.minX,
-          minY: labelBox.minY,
-          maxX: labelBox.maxX,
-          maxY: labelBox.maxY
-        };
+        if (showDebug) {
+          const debugBox = {
+            type: 'debug',
+            id: labelBox.id + '-debug',
+            featureID: featureID,
+            tint: 0x00ff00,   // green (ok)
+            objectID: null,
+            minX: labelBox.minX,
+            minY: labelBox.minY,
+            maxX: labelBox.maxX,
+            maxY: labelBox.maxY
+          };
 
-        this._cacheBox(debugBox);
-        this._debugRBush.insert(debugBox);
-//        picked = placementID;
+          this._cacheBox(debugBox);
+          this._debugRBush.insert(debugBox);
+        }
         break;
       }
     }
@@ -755,6 +763,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (!feature || !labelObj || !screenCoords) return;
     if (!feature.container.visible || !feature.container.renderable) return;
 
+    const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
 
     // `l` = label, these bounds are in "local" coordinates to the label,
@@ -871,8 +880,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           }
         }
 
-        this._cacheBox(debugBox);
-        debugBoxes.push(debugBox);
+        if (showDebug) {
+          this._cacheBox(debugBox);
+          debugBoxes.push(debugBox);
+        }
       });
     });
 
@@ -929,7 +940,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (labelBoxes.length) {
       this._labelRBush.load(labelBoxes);
     }
-    if (debugBoxes.length) {
+    if (showDebug && debugBoxes.length) {
       this._debugRBush.load(debugBoxes);
     }
 

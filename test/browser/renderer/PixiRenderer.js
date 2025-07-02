@@ -6,7 +6,7 @@ describe('PixiRenderer', () => {
   let graphEntities;
   let viewport;
   let zoom;
-  let content;
+  let $container;
 
   // Converts a list of json OSM entities to osm objects
   function jsonToOSM(renderData) {
@@ -53,23 +53,24 @@ describe('PixiRenderer', () => {
 
 
   beforeEach(() => {
-    content = d3.select('body').append('div');
-    context = Rapid.coreContext().assetPath('../dist/').init().container(content);
+    $container = d3.select('body').append('div');
+    context = Rapid.coreContext().assetPath('../dist/').init().container($container);
 
     const editor = context.systems.editor;
     const graph = editor.staging.graph;
     graph.rebase(graphEntities, [graph], false);
     map = context.systems.map;
-    content.call(map);
+    $container.call(map);
   });
 
 
-  afterEach(() => content.remove());
+  afterEach(() => $container.remove());
 
 
   describe('#osmRenderer', () => {
     it('renders the canned data scene', () => {
-      const osmLayer = context.scene().layers.get('osm');
+      const layers = context.systems.gfx.scene.layers;
+      const osmLayer = layers.get('osm');
       osmLayer.drawPoints(timestamp, viewport, zoom, renderData.points);
       osmLayer.drawVertices(timestamp, viewport, zoom, renderData.vertices);
       osmLayer.drawLines(timestamp, viewport, zoom, renderData.lines);

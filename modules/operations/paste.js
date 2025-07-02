@@ -8,6 +8,7 @@ import { utilCmd } from '../util/cmd.js';
 // see also `PasteBehavior`
 export function operationPaste(context) {
   const editor = context.systems.editor;
+  const gfx = context.systems.gfx;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
 
@@ -18,7 +19,7 @@ export function operationPaste(context) {
     if (!copyIDs.length) return;   // Nothing to copy..
 
     // Prevent paste if the pasted object would be invisible (see iD#10000)
-    const osmLayer = context.scene().layers.get('osm');
+    const osmLayer = gfx.scene.layers.get('osm');
     if (!osmLayer?.enabled) return;
 
     const action = actionCopyEntities(copyIDs, copyGraph);

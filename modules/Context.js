@@ -147,12 +147,6 @@ export class Context extends EventEmitter {
       return filters.hasHiddenConnections(entity, graph);
     };
 
-    // GraphicsSystem
-    const gfx = this.systems.gfx;
-    this.deferredRedraw = gfx.deferredRedraw;
-    this.immediateRedraw = gfx.immediateRedraw;
-    this.scene = () => gfx.scene;
-
     // MapSystem
     //const map = this.systems.map;
     this.editable = () => {
@@ -459,7 +453,11 @@ export class Context extends EventEmitter {
   }
   setDebug(flag, val = true) {
     this._debugFlags[flag] = val;
-    this.systems.gfx?.immediateRedraw();
+    const gfx = this.systems.gfx;
+    if (gfx && gfx.scene) {
+      gfx.scene.dirtyScene();
+      gfx.immediateRedraw();
+    }
   }
 
 

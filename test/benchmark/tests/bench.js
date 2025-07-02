@@ -55,7 +55,7 @@ content.call(map);
 
 
 function renderTest() {
-  const scene = context.scene();
+  const scene = context.systems.gfx.scene;
   const layer = scene.layers.get('osm');
   layer.drawPoints(timestamp, viewport, zoom, renderData.points);
   layer.drawVertices(timestamp, viewport, zoom, renderData.vertices);

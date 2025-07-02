@@ -163,7 +163,8 @@ export class UiDrawModesTool {
 
 
   osmEnabled() {
-    return this.context.scene().layers.get('osm')?.enabled;
+    const layers = this.context.systems.gfx.scene.layers;
+    return layers.get('osm')?.enabled;
   }
 
   osmEditable() {
@@ -171,7 +172,8 @@ export class UiDrawModesTool {
   }
 
   notesEnabled() {
-    return this.context.scene().layers.get('notes')?.enabled;
+    const layers = this.context.systems.gfx.scene.layers;
+    return layers.get('notes')?.enabled;
   }
 
   notesEditable() {

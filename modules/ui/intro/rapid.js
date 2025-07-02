@@ -13,6 +13,7 @@ export function uiIntroRapid(context, curtain) {
   const l10n = context.systems.l10n;
   const map = context.systems.map;
   const rapid = context.systems.rapid;
+  const scene = context.systems.gfx.scene;
   const ui = context.systems.ui;
 
   const tulipLaneID = 'w-516';
@@ -57,7 +58,7 @@ export function uiIntroRapid(context, curtain) {
     editor.restoreCheckpoint('initial');
 
     // Make sure Rapid data is on..
-    context.scene().enableLayers('rapid');
+    scene.enableLayers('rapid');
     rapid.enableDatasets('rapid_intro_graph');
 
     const loc = tulipLaneExtent.center();
@@ -109,7 +110,7 @@ export function uiIntroRapid(context, curtain) {
     ui.togglePanes();   // close issue pane
 
     // Make sure Rapid data is on..
-    context.scene().enableLayers('rapid');
+    scene.enableLayers('rapid');
     rapid.enableDatasets('rapid_intro_graph');
 
     return new Promise((resolve, reject) => {
@@ -278,7 +279,7 @@ export function uiIntroRapid(context, curtain) {
     editor.restoreCheckpoint('initial');
 
     // Make sure Rapid data is on..
-    context.scene().enableLayers('rapid');
+    scene.enableLayers('rapid');
     rapid.enableDatasets('rapid_intro_graph');
 
     const loc = tulipLaneExtent.center();
@@ -350,7 +351,7 @@ export function uiIntroRapid(context, curtain) {
 
 
   chapter.enter = () => {
-    context.scene().enableLayers('rapid');
+    scene.enableLayers('rapid');
     _chapterCancelled = false;
     _rejectStep = null;
     _onModeChange = null;
@@ -371,7 +372,7 @@ export function uiIntroRapid(context, curtain) {
 
   chapter.exit = () => {
     // Make sure Rapid data is off..
-    context.scene().disableLayers('rapid');
+    scene.disableLayers('rapid');
     rapid.disableDatasets('rapid_intro_graph');
 
     _chapterCancelled = true;

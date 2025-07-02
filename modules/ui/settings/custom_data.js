@@ -7,6 +7,7 @@ import { utilNoAuto, utilRebind } from '../../util/index.js';
 
 export function uiSettingsCustomData(context) {
   const l10n = context.systems.l10n;
+  const scene = context.systems.gfx.scene;
   const storage = context.systems.storage;
   const urlhash = context.systems.urlhash;
   const dispatch = d3_dispatch('change');
@@ -19,7 +20,7 @@ export function uiSettingsCustomData(context) {
   ];
 
   function render(selection) {
-    const dataLayer = context.scene().layers.get('custom-data');
+    const dataLayer = scene.layers.get('custom-data');
 
     // Keep separate copies of original and current settings
     // Take initial values from urlhash first, localstorage second

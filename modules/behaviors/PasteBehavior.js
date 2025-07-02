@@ -85,7 +85,7 @@ export class PasteBehavior extends AbstractBehavior {
     if (!copyIDs.length) return;   // Nothing to copy..
 
     // Prevent paste if the pasted object would be invisible (see iD#10000)
-    const osmLayer = context.scene().layers.get('osm');
+    const osmLayer = gfx.scene.layers.get('osm');
     if (!osmLayer?.enabled) return;
 
     // Ignore it if we are not over the canvas

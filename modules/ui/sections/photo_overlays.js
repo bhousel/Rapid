@@ -26,7 +26,7 @@ import { utilGetSetValue, utilNoAuto } from '../../util/index.js';
 export function uiSectionPhotoOverlays(context) {
   const l10n = context.systems.l10n;
   const photos = context.systems.photos;
-  const scene = context.scene();
+  const scene = context.systems.gfx.scene;
 
   const section = uiSection(context, 'photo-overlays')
     .label(l10n.t('photo_overlays.title'))

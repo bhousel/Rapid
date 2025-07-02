@@ -154,11 +154,12 @@ export class MapillaryService extends AbstractSystem {
    * @return  {string}  The url
    */
   imageURL(imageID) {
-    const scene = this.context.scene();
+    const gfx = this.context.systems.gfx;
+    const layers = gfx.scene.layers;
 
     // are either of these layers enabled?
-    const detectionsLayer = scene.layers.get('mapillary-detections');
-    const signsLayer = scene.layers.get('mapillary-signs');
+    const detectionsLayer = layers.get('mapillary-detections');
+    const signsLayer = layers.get('mapillary-signs');
 
     let extras = '';
     if (detectionsLayer?.enabled)  extras += '&mapFeature=all';
@@ -618,12 +619,13 @@ export class MapillaryService extends AbstractSystem {
    * @return {Boolean}  `true` if they should be shown, `false` if not
    */
   _shouldShowSegmentations() {
-    const scene = this.context.scene();
+    const gfx = this.context.systems.gfx;
+    const layers = gfx.scene.layers;
 
     // are either of these layers enabled?
     const layerIDs = ['mapillary-detections', 'mapillary-signs'];
     return layerIDs.some(layerID => {
-      const layer = scene.layers.get(layerID);
+      const layer = layers.get(layerID);
       return layer && layer.enabled;
     });
   }
