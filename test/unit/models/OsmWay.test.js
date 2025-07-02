@@ -166,8 +166,6 @@ describe('OsmWay', () => {
       const node = new Rapid.OsmNode(context, {loc: [0, 0]});
       const way = new Rapid.OsmWay(context, {nodes: [node.id]});
       const graph = new Rapid.Graph([node, way]);
-//TODO: must compute extent first!
-way.extent(graph);
       const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
       assert.equal(result, true);
     });
@@ -176,8 +174,6 @@ way.extent(graph);
       const node = new Rapid.OsmNode(context, {loc: [6, 6]});
       const way = new Rapid.OsmWay(context, {nodes: [node.id]});
       const graph = new Rapid.Graph([node, way]);
-//TODO: must compute extent first!
-way.extent(graph);
       const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
       assert.equal(result, false);
     });

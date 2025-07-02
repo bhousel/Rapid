@@ -1,14 +1,13 @@
 import { selection } from 'd3-selection';
 import {
-  DEG2RAD, RAD2DEG, TAU, Extent, Viewport, geoMetersToLon,
-  numClamp, numWrap, vecAdd, vecRotate, vecSubtract
+  DEG2RAD, RAD2DEG, TAU, Extent, geoMetersToLon,
+  numClamp, numWrap, vecRotate, vecSubtract
 } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
 import { Marker } from '../models/Marker.js';
 import { utilTotalExtent } from '../util/index.js';
 
-const TILESIZE = 256;
 const MIN_Z = 2;
 const MAX_Z = 24;
 
@@ -147,8 +146,6 @@ export class MapSystem extends AbstractSystem {
             // Reposition the map if we've jumped to a different place.
             const t0 = context.viewport.transform.props;
             const t1 = edit.transform;
-//worldcoordinates
-            // if (t1 && (t0.x !== t1.x || t0.y !== t1.y || t0.k !== t1.k || t0.r !== t1.r)) {
             if (t1 && (t0.x !== t1.x || t0.y !== t1.y || t0.z !== t1.z || t0.r !== t1.r)) {
               this.transformEase(t1);
             }
@@ -590,18 +587,6 @@ export class MapSystem extends AbstractSystem {
       return this;
     }
 
-//worldcoordinates
-    // const k2 = geoZoomToScale(z2, TILESIZE);
-    // const view2 = new Viewport(t1, view1.dimensions);
-    // view2.transform.scale = k2;
-    // const view2 = new Viewport(t1, view1.dimensions);
-    // view2.transform.zoom = z2;
-
-    // let xy = view2.transform.translation;
-    // const point = view2.project(loc2);
-    // const delta = vecSubtract(center, point);
-    // xy = vecAdd(xy, delta);
-
     const world = view.wgs84ToWorld(loc2);
 
     // convert that coordinate back to screen coordinate at z2
@@ -609,7 +594,6 @@ export class MapSystem extends AbstractSystem {
     const x2 = -((world[0]-128) * k2) + center[0];
     const y2 = -((world[1]-128) * k2) + center[1];
 
-    // return this.transform({ x: xy[0], y: xy[1], k: k2, r: r2 }, duration);
     return this.transform({ x: x2, y: y2, z: z2, r: r2 }, duration);
   }
 
@@ -646,32 +630,12 @@ export class MapSystem extends AbstractSystem {
       return Promise.resolve(t1);
     }
 
-//worldcoordinates
-    // const k2 = geoZoomToScale(z2, TILESIZE);
-    // const view2 = new Viewport(t1, view1.dimensions);
-    // view2.transform.scale = k2;
-    // const view2 = new Viewport(t1, view1.dimensions);
-    // view2.transform.zoom = z2;
-
-    // let xy = view2.transform.translation;
-    // const point = view2.project(loc2);
-    // const delta = vecSubtract(center, point);
-    // xy = vecAdd(xy, delta);
-
     const world = view.wgs84ToWorld(loc2);
-
-    // worldtoscreen
-//    const point: Vec2 = [
-//      ((world[0] - 128) * scale) + x,
-//      ((world[1] - 128) * scale) + y
-//    ];
-
     // convert that coordinate back to screen coordinate at z2
     const k2 = Math.pow(2, z2);
     const x2 = -((world[0]-128) * k2) + center[0];
     const y2 = -((world[1]-128) * k2) + center[1];
 
-    // return this.setTransformAsync({ x: xy[0], y: xy[1], k: k2, r: r2 }, duration);
     return this.setTransformAsync({ x: x2, y: y2, z: z2, r: r2 }, duration);
   }
 
@@ -718,8 +682,6 @@ export class MapSystem extends AbstractSystem {
   pan(delta, duration = 0) {
     const t = this.context.viewport.transform;
     const [dx, dy] = vecRotate(delta, -t.r, [0, 0]);   // remove any rotation
-//worldcoordinates
-//    return this.transform({ x: t.x + dx, y: t.y + dy, k: t.k, r: t.r }, duration);
     return this.transform({ x: t.x + dx, y: t.y + dy, z: t.z, r: t.r }, duration);
   }
 

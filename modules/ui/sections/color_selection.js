@@ -4,8 +4,10 @@ import { uiSection } from '../section.js';
 import { utilNoAuto } from '../../util/index.js';
 
 
+// This was an experiment that is currently commented out and won't work.
+// We'd need to replace the "ColorSystem" with something more permanent.
 export function uiSectionColorSelection(context) {
-  const colors = context.systems.colors;  // todo: replace
+  const colors = context.systems.colors;
   const gfx = context.systems.gfx;
   const l10n = context.systems.l10n;
 

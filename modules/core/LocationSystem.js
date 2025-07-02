@@ -227,7 +227,7 @@ export class LocationSystem extends AbstractSystem {
       return data;
 
     } catch (err) {
-      console.error(err);
+      console.error(err);   // eslint-disable-line no-console
       obj.locationSet = { include: ['Q2'] };  // default worldwide
       obj.locationSetID = '+[Q2]';
       return this._resolved.get('+[Q2]');  // was resolved in the constructor so it should return something.

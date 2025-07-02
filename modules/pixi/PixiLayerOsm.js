@@ -1,5 +1,4 @@
 import * as PIXI from 'pixi.js';
-import geojsonRewind from '@mapbox/geojson-rewind';
 import { vecAngle, vecLength, vecInterp } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.js';
