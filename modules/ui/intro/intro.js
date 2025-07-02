@@ -78,12 +78,12 @@ export function uiIntro(context, skipToRapid) {
 
       for (const [id, data] of Object.entries(rapidData)) {
         if (!_rapidGraph[id]) {
-          _rapidGraph[id] = createOsmFeature(localize(context, data));
+          _rapidGraph[id] = createOsmFeature(context, localize(context, data));
         }
       }
       for (const [id, data] of Object.entries(introData)) {
         if (!_introGraph[id]) {
-          _introGraph[id] = createOsmFeature(localize(context, data));
+          _introGraph[id] = createOsmFeature(context, localize(context, data));
         }
       }
 
