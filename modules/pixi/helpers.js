@@ -3,12 +3,13 @@ import { vecAdd, vecAngle, vecEqual, vecLength } from '@rapid-sdk/math';
 
 
 /**
-* Generates a polygon from a line. Intended for use to create custom hit areas for our ways.
-* @param width the width of the polygon in pixels (deviation from either side of the line))
-* @param {Array<points>} A list of point coord pairs that denote the line.
-* @returns {PIXI.Polygon} The polygon encasing the line with specified width.
-* method pilfered from https://jsfiddle.net/bigtimebuddy/xspmq8au/
-*/
+ * lineToPolygon
+ * Generates a polygon from a line. Intended for use to create custom hit areas for our ways.
+ * @see https://jsfiddle.net/bigtimebuddy/xspmq8au/
+ * @param   {number}        width  - Width of the polygon in pixels (deviation from either side of the line)
+ * @param   {Array<Vec2>}   points - Array of [x,y] coordinates that make up the line.
+ * @return  {PIXI.Polygon}  The polygon encasing the line with specified width.
+ */
 export function lineToPolygon(width, points) {
   const numPoints = points.length / 2;
   const output = new Array(points.length * 2);
@@ -40,9 +41,9 @@ export function lineToPolygon(width, points) {
     output[(output.length - 1) - j - 1] = x - deltaX;
     output[(output.length - 1) - j] = y - deltaY;
   }
+
   // close the shape
   output.push(output[0], output[1]);
-
   return new PIXI.Polygon(output);
 }
 
@@ -50,10 +51,9 @@ export function lineToPolygon(width, points) {
 /**
  * lineToPoly
  * Use Pixi's built-in line builder to convert a line with some width into a polygon.
- * https://github.com/pixijs/pixijs/blob/dev/packages/graphics/src/utils/buildLine.ts
- *
- * @param  flatPoints  `Array` of [ x,y, x,y, … ] points that make up the line
- * @param  lineStyle   `Object` suitable to use as a lineStyle (important options are alignment and width)
+ * @see https://github.com/pixijs/pixijs/blob/dev/packages/graphics/src/utils/buildLine.ts
+ * @param  {Array<number>}  flatPoints - `Array` of [ x,y, x,y, … ] points that make up the line
+ * @param  {Object}         lineStyle  - `Object` suitable to use as a lineStyle (important options are alignment and width)
  */
 export function lineToPoly(flatPoints, lineStyle = {}) {
   const EPSILON = 1e-4;
@@ -272,11 +272,19 @@ export function lineToPoly(flatPoints, lineStyle = {}) {
 
 /**
  * getLineSegments
- * @param   points    the series of Vec[2] arrays delineating each waypoint
- * @param   spacing   Number indicating the distance between segments (arrows, sided arrows, etc)
- * @param   isSided    optional Boolean, applying a 'sided' style to the line, arrows will be drawn perpendicular to the line segments.
- * @param   isLimited  optional Boolean, whether to limit the number (temporary, see below)
- * @returns Array of segment Objects
+ * This walks a line and breaks it up into segments containing coordinates at given spacing that share a heading.
+ * It is used to position oneway arrows, or sided markers, or cover a line in bounding boxes for labeling purposes.
+ * For example:
+ *
+ *   a --- b       [{ coords: [>,>,>,>], angle: 0     },
+ *         |   ->   { coords: [v,v],     angle: -PI/2 },
+ *   d --- c        { coords: [<,<,<,<], angle: PI    }]
+ *
+ * @param   {Array<Vec2>}  points    - Array of [x,y] coordinates that make up the line.
+ * @param   {number}       spacing   - Distance between segments in pixels (arrows, sided arrows, etc)
+ * @param   {boolean?}     isSided   - If applying a 'sided' style to the line, arrows will be drawn perpendicular to the line segments.
+ * @param   {boolean?}     isLimited - Whether to limit the number (temporary, see below)
+ * @return  {Array<*>}     Array of segment Objects in the format { coords: Array<Vec2>, angle: number }
  */
 export function getLineSegments(points, spacing, isSided = false, isLimited = false) {
   const SIDEDOFFSET = 7;
@@ -342,24 +350,27 @@ if (isLimited && (span >= spacing * 100)) {
 }
 
 
-export function flatCoordsToPoints(coords) {
-  const points = new Array(coords.length / 2);
-  for (let i = 0; i < coords.length; i += 2) {
-    points[i / 2] = new PIXI.Point(coords[i], coords[i + 1]);
-  }
-  return points;
-}
-
-
-export function getDebugBBox(x, y, width, height, color, alpha, name) {
+/**
+ * getDebugBBox
+ * Returns a PIXI.Sprite that covers the given box, used for debugging.
+ * @param   {number}       x  - left of the box
+ * @param   {number}       y  - top of the box
+ * @param   {number}       w  - width of the box
+ * @param   {number}       h  - height of the box
+ * @param   {number}       tint - tint of the box (number, or something Pixi accepts as a color)
+ * @param   {number?}      alpha - alpha of the box
+ * @param   {string?}      label - name of the box, optional
+ * @return  {PIXI.Sprite}  Sprite for the box
+ */
+export function getDebugBBox(x, y, w, h, tint, alpha, label) {
   const sprite = new PIXI.Sprite({ texture: PIXI.Texture.WHITE });
   sprite.eventMode = 'none';
-  sprite.anchor.set(0, 0);  // top, left
+  sprite.anchor.set(0, 0);   // left, top
   sprite.position.set(x, y);
-  sprite.width = width;
-  sprite.height = height;
-  sprite.tint = color || 0xffff33;  // yellow
-  sprite.alpha = alpha || 0.75;
-  if (name) sprite.label = name;
+  sprite.width = w;
+  sprite.height = h;
+  sprite.tint = tint ?? 0xffff33;  // yellow
+  sprite.alpha = alpha ?? 0.65;
+  if (label) sprite.label = label;
   return sprite;
 }

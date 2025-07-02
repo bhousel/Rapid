@@ -163,9 +163,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
               arrow.sortableChildren = false;
               arrow.anchor.set(0.5, 0.5); // middle, middle
               arrow.position.set(x, y);
-              //segments with directional 'sides' get rotated 90 degrees
               arrow.rotation = segment.angle;
-              // arrow.rotation = segment.angle;
               arrow.tint = style.lineMarkerTint;
               lineMarkers.addChild(arrow);
             });
