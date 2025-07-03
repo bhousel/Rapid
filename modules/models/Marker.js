@@ -27,7 +27,7 @@ export class Marker extends AbstractData {
       this.props.id = 'marker-' + this.context.next('marker');
     }
 
-    this.geoms.setData(this.asGeoJSON());
+    this.updateGeometry();
   }
 
   /**
@@ -41,6 +41,17 @@ export class Marker extends AbstractData {
    */
   update(props) {
     return new Marker(this, props).touch();
+  }
+
+  /**
+   * updateGeometry
+   * Forces a recomputation of the internal geometry data.
+   * @return  {Marker}  this same Marker
+   * @abstract
+   */
+  updateGeometry() {
+    this.geoms.setData(this.asGeoJSON());
+    return this;
   }
 
   /**

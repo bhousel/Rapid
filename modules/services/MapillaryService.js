@@ -835,8 +835,7 @@ export class MapillaryService extends AbstractSystem {
           cache.data.set(sequenceID, sequence);
         }
         sequence.props.features.push(feature);  // updating it in-place, hope this is ok.
-        sequence.geoms.setData(sequence.props); // rebuild the geometry, hope this is ok.
-        sequence.touch();
+        sequence.updateGeometry().touch();
       }
     }
 
@@ -1217,11 +1216,10 @@ export class MapillaryService extends AbstractSystem {
     // If we haven't locked in the location yet, try here..
     // (see Rapid#1557 - sometimes we don't have this!)
     if (!detection.loc && props.loc) {
+      // Marker `loc` should really have been set at construction time, but unfortunately we need to redo it
       const loc = this._preventCoincident(cache.rbush, props.loc);
-      // detection.loc = loc;
       detection.updateSelf({ loc: loc });
-      // Should really have happened in the constructor, but unfortunately we need to redo it
-      detection.geoms.setData(detection.asGeoJSON());
+      detection.updateGeometry();
 
       const [x, y] = loc;
       cache.rbush.insert({ minX: x, minY: y, maxX: x, maxY: y, data: detection });

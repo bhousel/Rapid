@@ -9,9 +9,10 @@ import { OsmEntity } from './OsmEntity.js';
  * @see https://wiki.openstreetmap.org/wiki/Node
  *
  * Properties you can access:
- *   `props`  - Object containing Feature properties (inherited from `AbstractData`)
- *   `tags`   - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
- *   `loc`    - Accessor for the `geometry`, used to get WGS84 coords
+ *   `geoms`   Geometry object (inherited from `AbstractData`)
+ *   `props`   Properties object (inherited from `AbstractData`)
+ *   `tags`    Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ *   `loc`     Accessor for the `loc` property, used to get WGS84 coordinate for this Node
  */
 export class OsmNode extends OsmEntity {
 
@@ -62,7 +63,6 @@ export class OsmNode extends OsmEntity {
    * @return  {OsmNode}  this same OsmNode
    */
   updateGeometry() {
-    // should we prevent it from being called again?
     this.geoms.setData(this.asGeoJSON());
     return this;
   }

@@ -520,8 +520,7 @@ export class KartaviewService extends AbstractSystem {
           const geojson = sequence.props;
           const images = geojson.properties.images;
           geojson.geometry.coordinates = images.map(i => i.loc).filter(Boolean);
-          sequence.geoms.setData(geojson);
-          sequence.touch();
+          sequence.updateGeometry().touch();
         }
 
         const gfx = context.systems.gfx;
@@ -598,8 +597,7 @@ export class KartaviewService extends AbstractSystem {
         const geojson = sequence.props;
         const images = geojson.properties.images;
         geojson.geometry.coordinates = images.map(i => i.loc).filter(Boolean);
-        sequence.geoms.setData(geojson);
-        sequence.touch();
+        sequence.updateGeometry().touch();
 
         const gfx = context.systems.gfx;
         gfx.deferredRedraw();

@@ -18,9 +18,10 @@ function noRepeatNodes(node, i, arr) {
  * @see https://wiki.openstreetmap.org/wiki/Way
  *
  * Properties you can access:
- *   `props`  - Object containing Feature properties (inherited from `AbstractData`)
- *   `tags`   - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
- *   `nodes`  - Accessor for the nodes, an Array of node ids
+ *   `geoms`   Geometry object (inherited from `AbstractData`)
+ *   `props`   Properties object (inherited from `AbstractData`)
+ *   `tags`    Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ *   `nodes`   Accessor for the `nodes` property, an Array of node ids
  */
 export class OsmWay extends OsmEntity {
 
@@ -74,7 +75,6 @@ export class OsmWay extends OsmEntity {
    * @return  {OsmWay}  this same OsmWay
    */
   updateGeometry(graph) {
-    // should we prevent it from being called again?
     this.geoms.setData(this.asGeoJSON(graph));
     return this;
   }

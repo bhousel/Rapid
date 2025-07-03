@@ -26,7 +26,7 @@ export class GeoJSON extends AbstractData {
       this.props.id = 'geojson-' + this.context.next('geojson');
     }
 
-    this.geoms.setData(props);
+    this.updateGeometry();
   }
 
   /**
@@ -36,10 +36,21 @@ export class GeoJSON extends AbstractData {
    *  pass in the properties to change, and you'll get a new data element.
    * The new data element will have an updated `v` internal version number.
    * @param   {Object}   props - the updated properties
-   * @return  {GeoJSON}  a new GeoJSON
+   * @return  {GeoJSON}  a new GeoJSON data element
    */
   update(props) {
     return new GeoJSON(this, props).touch();
+  }
+
+  /**
+   * updateGeometry
+   * Forces a recomputation of the internal geometry data.
+   * @return  {GeoJSON}  this same data element
+   * @abstract
+   */
+  updateGeometry() {
+    this.geoms.setData(this.props);
+    return this;
   }
 
   /**

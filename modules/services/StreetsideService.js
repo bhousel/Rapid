@@ -902,8 +902,7 @@ export class StreetsideService extends AbstractSystem {
 
       // Update geometry in-place.. hope this is ok.
       sequence.props.geometry.coordinates = bubbles.map(bubble => bubble.loc);
-      sequence.geoms.setData(sequence.props);
-      sequence.touch();
+      sequence.updateGeometry().touch();
     }
   }
 
