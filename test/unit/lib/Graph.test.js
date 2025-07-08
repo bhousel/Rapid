@@ -461,45 +461,60 @@ describe('Graph', () => {
   });
 
   describe('#update', () => {
-    it('returns a new graph if self is frozen', () => {
+    it('returns a new Graph', () => {
       const graph = new Rapid.Graph();
       const result = graph.update();
       assert.ok(result instanceof Rapid.Graph);
       assert.notEqual(result, graph);
     });
 
-    it('returns self if self is not frozen', () => {
-      const graph = new Rapid.Graph([], true);
-      const result = graph.update();
+    it('doesn\'t modify self', () => {
+      const node = new Rapid.OsmNode(context);
+      const graph = new Rapid.Graph([node]);
+      graph.update(function (graph) { graph.remove(node); });
+      assert.equal(graph.hasEntity(node.id), node);
+    });
+
+    it('executes all of the given functions', () => {
+      const a = new Rapid.OsmNode(context);
+      const b = new Rapid.OsmNode(context);
+      const graph = new Rapid.Graph([a]);
+      const result = graph.update(
+        function (graph) { graph.remove(a); },
+        function (graph) { graph.replace(b); }
+      );
+
+      assert.equal(result.hasEntity(a.id), undefined);
+      assert.equal(result.hasEntity(b.id), b);
+    });
+  });
+
+  describe('#updateSelf', () => {
+    it('returns self', () => {
+      const graph = new Rapid.Graph();
+      const result = graph.updateSelf();
       assert.ok(result instanceof Rapid.Graph);
       assert.equal(result, graph);
     });
 
-    it('doesn\'t modify self is self is frozen', () => {
+    it('modifies self', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
-      graph.update(function (graph) { graph.remove(node); });
-      assert.equal(graph.entity(node.id), node);
-    });
-
-    it('modifies self is self is not frozen', () => {
-      const node = new Rapid.OsmNode(context);
-      const graph = new Rapid.Graph([node], true);
-      graph.update(function (graph) { graph.remove(node); });
+      graph.updateSelf(function (graph) { graph.remove(node); });
       assert.equal(graph.hasEntity(node.id), undefined);
     });
 
     it('executes all of the given functions', () => {
       const a = new Rapid.OsmNode(context);
       const b = new Rapid.OsmNode(context);
-      let graph = new Rapid.Graph([a]);
-      graph = graph.update(
+      const graph = new Rapid.Graph([a]);
+      graph.updateSelf(
         function (graph) { graph.remove(a); },
         function (graph) { graph.replace(b); }
       );
 
       assert.equal(graph.hasEntity(a.id), undefined);
-      assert.equal(graph.entity(b.id), b);
+      assert.equal(graph.hasEntity(b.id), b);
     });
   });
 

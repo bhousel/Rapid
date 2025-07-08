@@ -15,7 +15,6 @@ describe('actionRotate', () => {
   };
 
   it('rotates nodes around a pivot point', () => {
-    // Define your nodes and graph
     const nodeA = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
     const nodeB = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
     const graph = new Rapid.Graph([nodeA, nodeB]);
@@ -24,11 +23,13 @@ describe('actionRotate', () => {
 
     const result = Rapid.actionRotate([nodeA.id, nodeB.id], pivot, angle, viewport)(graph);
     assert.ok(result instanceof Rapid.Graph);
-    assert.ok(result.hasEntity(nodeA.id));
-    assert.ok(result.hasEntity(nodeB.id));
-    assert.ok(closeTo(result.entity(nodeA.id).loc[0], 0));
-    assert.ok(closeTo(result.entity(nodeA.id).loc[1], 0));
-    assert.ok(closeTo(result.entity(nodeB.id).loc[0], 0));
-    assert.ok(closeTo(result.entity(nodeB.id).loc[1], 1));
+    const resultA = result.hasEntity(nodeA.id);
+    const resultB = result.hasEntity(nodeB.id);
+    assert.ok(resultA instanceof Rapid.OsmNode);
+    assert.ok(resultB instanceof Rapid.OsmNode);
+    assert.ok(closeTo(resultA.loc[0], 0));
+    assert.ok(closeTo(resultA.loc[1], 0));
+    assert.ok(closeTo(resultB.loc[0], 0));
+    assert.ok(closeTo(resultB.loc[1], 1));
   });
 });

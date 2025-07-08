@@ -171,7 +171,7 @@ export class UploaderSystem extends AbstractSystem {
     const graph = editor.staging.graph;
 
     this._localGraph = graph;
-    this._remoteGraph = new Graph(editor.base.graph, true);
+    this._remoteGraph = new Graph(editor.base.graph);
 
     // Gather entityIDs to check
     // We will load these from the OSM API into the `remoteGraph`
@@ -223,7 +223,7 @@ export class UploaderSystem extends AbstractSystem {
     let loadMoreIDs = new Set();
 
     for (const entity of result.data) {
-      this._remoteGraph.replace(entity);
+      this._remoteGraph.replaceSelf(entity);
       this._loadedIDs.add(entity.id);
       this._toLoadIDs.delete(entity.id);
 

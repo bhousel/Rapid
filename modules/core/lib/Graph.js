@@ -6,15 +6,15 @@
  *  Each graph contains a base state (uneditied) and local state (edited).
  *  The graph also contains all the caches and methods needed to manage OSM topology.
  *  (parentWays, childNodes, parentRels)
+ *  Graphs are intended to be immutable - the `update()` method will return a new Graph.
  */
 export class Graph {
 
   /**
    * @constructor
-   * @param {Graph|Array<Entity>} other?   - Predecessor Graph, or Array of entities to load into new Graph.
-   * @param {boolean}             mutable? - Do updates affect this Graph or return a new Graph
+   * @param  {Graph|Array<Entity>}  other?   - Predecessor Graph, or Array of entities to load into new Graph.
    */
-  constructor(other, mutable) {
+  constructor(other) {
     this._transients = new Map();   // Map<entityID, Map<k,v>>
     this._childNodes = new Map();   // Map<entityID, Array<Entity>>
 
@@ -42,8 +42,6 @@ export class Graph {
 
       this.rebase(other || [], [this]);   // seed with Entities, if provided
     }
-
-    this._frozen = !mutable;
   }
 
 
@@ -432,6 +430,24 @@ _getParents(entity, toUpdate, seen) {
 
 
   /**
+   * replaceSelf
+   * Replace an Entity in this Graph
+   * @param   {Entity}  entity - The Entity to replace
+   * @return  {Graph}   This same Graph
+   */
+  replaceSelf(replacement) {
+    const entityID = replacement.id;
+    const current = this.hasEntity(entityID);
+    if (current === replacement) return this;  // no change
+
+    return this.updateSelf(function() {
+      this._updateCalculated(current, replacement);
+      this._local.entities.set(entityID, replacement);
+    });
+  }
+
+
+  /**
    * remove
    * Remove an Entity from this Graph
    * @param   {Entity}  entity - The Entity to remove
@@ -452,7 +468,7 @@ _getParents(entity, toUpdate, seen) {
   /**
    * revert
    * Revert an Entity back to whatever state it had in the base graph
-   * @param   {Entity}  entityID - The entityID of the Entity to revert
+   * @param   {string}  entityID - The entityID of the Entity to revert
    * @return  {Graph}   A new Graph
    */
   revert(entityID) {
@@ -469,22 +485,47 @@ _getParents(entity, toUpdate, seen) {
 
   /**
    * update
-   * Applies the given list of function arguments to the Graph, and returns a new Graph
+   * Applies the given functions to the Graph, and returns a new Graph.
+   * Graphs are intended to be immutable.
    * @param   {...function}  args - Functions to apply to the graph to update it
    * @return  {Graph}        A new Graph
    */
   update(...args) {
-    const graph = this._frozen ? new Graph(this, true) : this;
+    if (this._mutate) {
+      return this.updateSelf(...args);
+
+    } else {
+      const graph = new Graph(this);
+      graph._mutate = true;
+
+      for (const fn of args) {
+        fn.call(graph, graph);
+      }
+      graph._mutate = false;
+      return graph;
+    }
+  }
+
+
+  /**
+   * updateSelf
+   * Applies the given functions to the Graph, and returns this same Graph.
+   * Like `update` but it modifies the current Graph in-place.
+   * `updateSelf` is slightly more performant for situations where you don't need
+   * immutability and don't mind mutating the Graph.
+   * @param   {...function}  args - Functions to apply to the graph to update it
+   * @return  {Graph}        this same Graph
+   */
+  updateSelf(...args) {
+    const was = this._mutate;
+    this._mutate = true;
 
     for (const fn of args) {
-      fn.call(graph, graph);
+      fn.call(this, this);
     }
 
-    if (this._frozen) {
-      graph._frozen = true;
-    }
-
-    return graph;
+    this._mutate = was;
+    return this;
   }
 
 

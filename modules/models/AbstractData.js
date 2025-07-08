@@ -67,7 +67,7 @@ export class AbstractData {
   /**
    * update
    * Update the data element's properties and return a new data element.
-   * data elements are intended to be immutable.  To modify a data element,
+   * Data elements are intended to be immutable.  To modify a data element,
    *  pass in the properties to change, and you'll get a new data element.
    * The new data element will have an updated `v` internal version number.
    * @param   {Object}        props - the updated properties
