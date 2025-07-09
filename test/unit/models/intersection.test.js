@@ -70,7 +70,7 @@ describe('osmIntersection', () => {
   });
 
 
-  describe('#turns', () => {
+  describe('turns', () => {
     it('permits turns onto a way forward', () => {
       // u ==== * ---> w
       const graph = new Rapid.Graph([

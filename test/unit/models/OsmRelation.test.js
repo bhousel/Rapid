@@ -35,7 +35,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#copy', () => {
+  describe('copy', () => {
     it('returns a new Relation', () => {
       const r = new Rapid.OsmRelation(context, { id: 'r' });
       const result = r.copy(null, {});
@@ -126,7 +126,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#extent', () => {
+  describe('extent', () => {
     it('returns the minimal extent containing the extents of all members', () => {
       const a = new Rapid.OsmNode(context, { loc: [0, 0] });
       const b = new Rapid.OsmNode(context, { loc: [5, 10] });
@@ -154,7 +154,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#geometry', () => {
+  describe('geometry', () => {
     it('returns \'area\' for multipolygons', () => {
       assert.equal(new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' } }).geometry(new Rapid.Graph()), 'area');
     });
@@ -166,7 +166,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#isDegenerate', () => {
+  describe('isDegenerate', () => {
     it('returns true for a relation without members', () => {
       assert.equal(new Rapid.OsmRelation(context).isDegenerate(), true);
     });
@@ -178,7 +178,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#memberByRole', () => {
+  describe('memberByRole', () => {
     it('returns the first member with the given role', () => {
       const r = new Rapid.OsmRelation(context, {
         members: [
@@ -196,7 +196,7 @@ describe('OsmRelation', () => {
     });
   });
 
-  describe('#memberById', () => {
+  describe('memberById', () => {
     it('returns the first member with the given id', () => {
       const r = new Rapid.OsmRelation(context, {
         members: [
@@ -214,7 +214,7 @@ describe('OsmRelation', () => {
     });
   });
 
-  describe('#hasFromViaTo', () => {
+  describe('hasFromViaTo', () => {
     it('returns true if there is a from, via, and to', () => {
       const r = new Rapid.OsmRelation(context, {
         id: 'r',
@@ -299,7 +299,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#isRestriction', () => {
+  describe('isRestriction', () => {
     it('returns true for \'restriction\' type', () => {
       assert.equal(new Rapid.OsmRelation(context, { tags: { type: 'restriction' } }).isRestriction(), true);
     });
@@ -317,7 +317,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#isValidRestriction', () => {
+  describe('isValidRestriction', () => {
     it('not a restriction', () => {
       const r = new Rapid.OsmRelation(context, { id: 'r', tags: { type: 'multipolygon' } });
       const graph = new Rapid.Graph([r]);
@@ -471,14 +471,14 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#indexedMembers', () => {
+  describe('indexedMembers', () => {
     it('returns an array of members extended with indexes', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ id: '1' }, { id: '3' }] });
       assert.deepEqual(r.indexedMembers(), [{ id: '1', index: 0 }, { id: '3', index: 1 }]);
     });
   });
 
-  describe('#addMember', () => {
+  describe('addMember', () => {
     it('adds a member at the end of the relation', () => {
       const r = new Rapid.OsmRelation(context);
       assert.deepEqual(r.addMember({ id: '1' }).members, [{ id: '1' }]);
@@ -504,7 +504,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#updateMember', () => {
+  describe('updateMember', () => {
     it('updates the properties of the relation member at the specified index', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ role: 'forward' }] });
       assert.deepEqual(r.updateMember({ role: 'backward' }, 0).members, [{ role: 'backward' }]);
@@ -512,7 +512,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#removeMember', () => {
+  describe('removeMember', () => {
     it('removes the member at the specified index', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] });
       assert.deepEqual(r.removeMember(1).members, [{ id: 'a' }, { id: 'c' }]);
@@ -520,7 +520,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#removeMembersWithID', () => {
+  describe('removeMembersWithID', () => {
     it('removes members with the given ID', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ id: 'a' }, { id: 'b' }, { id: 'a' }] });
       assert.deepEqual(r.removeMembersWithID('a').members, [{ id: 'b' }]);
@@ -528,7 +528,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#replaceMember', () => {
+  describe('replaceMember', () => {
     it('returns self if self does not contain needle', () => {
       const r = new Rapid.OsmRelation(context, { members: [] });
       assert.equal(r.replaceMember({ id: 'a' }, { id: 'b' }), r);
@@ -576,7 +576,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#asJXON', () => {
+  describe('asJXON', () => {
     it('converts a relation to jxon', function() {
       const relation = new Rapid.OsmRelation(context, { id: 'r-1', members: [{ id: 'w1', role: 'forward', type: 'way' }], tags: { type: 'route' } });
       assert.deepEqual(relation.asJXON(), {
@@ -596,7 +596,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#asGeoJSON', () => {
+  describe('asGeoJSON', () => {
     //
     //  3
     //  |\
@@ -787,7 +787,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('#multipolygon', () => {
+  describe('multipolygon', () => {
     it('single polygon consisting of a single way', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
       const b = new Rapid.OsmNode(context, { loc: [3, 3] });

@@ -74,7 +74,7 @@ export class AbstractData {
    * @return  {AbstractData}  a new data element
    * @abstract
    */
-  update(props) {
+  update(props = {}) {
     throw new Error(`Do not call 'update' on AbstractData`);
   }
 
@@ -92,8 +92,8 @@ export class AbstractData {
    * @param   {Object}        props - the updated properties
    * @return  {AbstractData}  this same data element
    */
-  updateSelf(props) {
-    this.props = Object.assign(this.props, props);
+  updateSelf(props = {}) {
+    Object.assign(this.props, globalThis.structuredClone(props));  // override with passed in props
     this.touch();
     return this;
   }

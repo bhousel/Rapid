@@ -23,74 +23,128 @@ describe('createOsmFeature', () => {
 });
 
 
+// This is an abstract class that shouldn't be instantiated in normal sitations.
 describe('OsmEntity', () => {
-  describe('.id', () => {
-    it('generates unique IDs', () => {
-      const a = new Rapid.OsmNode(context);
-      const b = new Rapid.OsmNode(context);
-      assert.notEqual(a.id, b.id);
+
+  describe('constructor', () => {
+    it('constructs an OsmEntity from a context', () => {
+      const a = new Rapid.OsmEntity(context);
+      assert.instanceOf(a, Rapid.OsmEntity);
+      assert.strictEqual(a.context, context);
+      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.isObject(a.props);
+      assert.deepEqual(a.tags, {});
     });
 
-    describe('.fromOSM', () => {
-      it('returns a ID string unique across entity types', () => {
-        assert.equal(Rapid.OsmEntity.fromOSM('node', '1'), 'n1');
-      });
+    it('constructs an OsmEntity from a context, with props', () => {
+      const props = { id: '1', tags: { building: 'yes' } };
+      const a = new Rapid.OsmEntity(context, props);
+      assert.instanceOf(a, Rapid.OsmEntity);
+      assert.strictEqual(a.context, context);
+      assert.instanceOf(a.geoms, Rapid.Geometry);
+      // `a.props` will be deep clone of props, possibly with other properties ('id') added.
+      assert.deepInclude(a.props, props);
+      assert.notStrictEqual(a.props, props);  // cloned, not ===
+      assert.strictEqual(a.id, '1');
+      assert.deepEqual(a.tags, { building: 'yes' });
     });
 
-    describe('.toOSM', () => {
-      it('reverses fromOSM', () => {
-        const id = Rapid.OsmEntity.fromOSM('node', '1');
-        assert.equal(Rapid.OsmEntity.toOSM(id), '1');
-      });
-    });
-  });
-
-  describe('#copy', () => {
-    it('returns a new Entity', () => {
-      const source = new Rapid.OsmEntity(context, { id: 'x' });
-      const result = source.copy(null, {});
-      assert.ok(result instanceof Rapid.OsmEntity);
-      assert.notStrictEqual(source, result);
+    it('constructs an OsmEntity from another OsmEntity', () => {
+      const a = new Rapid.OsmEntity(context);
+      const b = new Rapid.OsmEntity(a);
+      assert.instanceOf(b, Rapid.OsmEntity);
+      assert.strictEqual(b.context, context);
+      assert.instanceOf(b.geoms, Rapid.Geometry);
+      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.notStrictEqual(b.props, a.props);  // cloned, not ===
+      assert.isObject(b.props);
+      assert.deepEqual(b.tags, {});
     });
 
-    it('adds the new Entity to memo object', () => {
-      const source = new Rapid.OsmEntity(context, { id: 'x' });
-      const copies = {};
-      const result = source.copy(null, copies);
-      assert.strictEqual(Object.keys(copies).length, 1);
-      assert.strictEqual(copies.x, result);
-    });
-
-    it('returns an existing copy in memo object', () => {
-      const source = new Rapid.OsmEntity(context, { id: 'x' });
-      const copies = {};
-      const result1 = source.copy(null, copies);
-      const result2 = source.copy(null, copies);
-      assert.strictEqual(Object.keys(copies).length, 1);
-      assert.strictEqual(result1, result2);
-    });
-
-    it('resets \'id\', \'user\', \'version\', and \'v\' properties', () => {
-      const source = new Rapid.OsmEntity(context, { id: 'x', user: 'user', version: 10, v: 100 });
-      const copies = {};
-      const result = source.copy(null, copies);
-      assert.strictEqual(result.props.id, undefined);
-      assert.strictEqual(result.props.user, undefined);
-      assert.strictEqual(result.props.version, undefined);
-      assert.strictEqual(result.props.v, undefined);
-    });
-
-    it('copies tags', () => {
-      const source = new Rapid.OsmEntity(context, { id: 'x', tags: { foo: 'foo' }});
-      const copies = {};
-      const result = source.copy(null, copies);
-      assert.deepEqual(result.tags, source.tags);
-      assert.notStrictEqual(result.tags, source.tags);
+    it('constructs an OsmEntity from another OsmEntity, with props', () => {
+      const aprops = { id: '1', tags: { building: 'yes' } };
+      const bprops = { foo: 'bar' };
+      const a = new Rapid.OsmEntity(context, aprops);
+      const b = new Rapid.OsmEntity(a, bprops);
+      assert.instanceOf(b, Rapid.OsmEntity);
+      assert.strictEqual(b.context, context);
+      assert.instanceOf(b.geoms, Rapid.Geometry);
+      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.notStrictEqual(b.props, a.props);  // cloned, not ===
+      assert.deepInclude(b.props, { id: '1', tags: { building: 'yes' }, foo: 'bar' });
     });
   });
 
+  describe('destroy', () => {
+    it('destroys and frees the data', () => {
+      const a = new Rapid.OsmEntity(context);
+      a.destroy();
+      assert.isNull(a.geoms);
+      assert.isNull(a.props);
+    });
+  });
 
-  describe('#update', () => {
+  describe('update', () => {
+    it('returns a new OsmEntity', () => {
+      const a = new Rapid.OsmEntity(context);
+      const b = a.update({});
+      assert.instanceOf(b, Rapid.OsmEntity);
+      assert.notStrictEqual(b, a);
+    });
+
+    it('updates the specified properties', () => {
+      const a = new Rapid.OsmEntity(context);
+      const aprops = a.props;
+      const update = { tags: { building: 'yes' } };
+      const b = a.update(update);
+      assert.instanceOf(b, Rapid.OsmEntity);
+      assert.notStrictEqual(b, a);
+      const bprops = b.props;
+      assert.notStrictEqual(bprops, aprops);   // new object, not ===
+      assert.notStrictEqual(bprops, update);   // cloned, not ===
+      assert.deepInclude(bprops, update);      // will also include a `v`
+    });
+
+    it('defaults to empty props argument', () => {
+      const a = new Rapid.OsmEntity(context);
+      const aprops = a.props;
+      const b = a.update();
+      assert.instanceOf(b, Rapid.OsmEntity);
+      assert.notStrictEqual(b, a);
+      const bprops = b.props;
+      assert.notStrictEqual(bprops, aprops);   // new object, not ===
+    });
+
+    it('preserves existing properties', () => {
+      const a = new Rapid.OsmEntity(context, { id: '1' });
+      const aprops = a.props;
+      const update = { tags: { building: 'yes' } };
+      const b = a.update(update);
+      assert.instanceOf(b, Rapid.OsmEntity);
+      assert.notStrictEqual(b, a);
+      const bprops = b.props;
+      assert.notStrictEqual(bprops, aprops);   // new object, not ===
+      assert.notStrictEqual(bprops, update);   // cloned, not ===
+      assert.deepInclude(bprops, { id: '1', tags: { building: 'yes' } });  // will also include a `v`
+    });
+
+    it('doesn\'t copy prototype properties', () => {
+      const a = new Rapid.OsmEntity(context);
+      const aprops = a.props;
+      const update = { tags: { building: 'yes' } };
+      const b = a.update(update);
+      assert.doesNotHaveAnyKeys(b.props, ['constructor', '__proto__', 'toString']);
+    });
+
+    it('updates v', () => {
+      const a = new Rapid.OsmEntity(context);
+      const v1 = a.v;
+      const b = a.update({});
+      assert.isAbove(b.v, v1);
+    });
+  });
+
+  describe('update', () => {
     it('returns a new Entity', () => {
       const a = new Rapid.OsmEntity(context);
       const b = a.update({});
@@ -135,52 +189,8 @@ describe('OsmEntity', () => {
   });
 
 
-  describe('#updateSelf', () => {
-    it('returns the same Entity', () => {
-      const a = new Rapid.OsmEntity(context);
-      const b = a.updateSelf({});
-      assert.ok(b instanceof Rapid.OsmEntity);
-      assert.strictEqual(a, b);
-    });
-
-    it('updates the specified properties', () => {
-      const tags = { foo: 'bar' };
-      const result = new Rapid.OsmEntity(context).updateSelf({ tags: tags });
-      assert.deepEqual(result.tags, tags);
-    });
-
-    it('preserves existing properties', () => {
-      const result = new Rapid.OsmEntity(context, { id: 'w1' }).updateSelf({});
-      assert.strictEqual(result.id, 'w1');
-    });
-
-    it('doesn\'t modify the input', () => {
-      const props = { tags: { foo: 'bar' }};
-      new Rapid.OsmEntity(context).updateSelf(props);
-      assert.deepEqual(props, { tags: { foo: 'bar' }});
-    });
-
-    it('doesn\'t copy prototype properties', () => {
-      const result = new Rapid.OsmEntity(context).updateSelf({});
-      assert.ok(!result.hasOwnProperty('updateSelf'));
-    });
-
-    it('sets v if undefined', () => {
-      const a = new Rapid.OsmEntity(context);
-      const b = a.updateSelf({});
-      assert.equal(typeof b.v, 'number');
-    });
-
-    it('updates v if already defined', () => {
-      const a = new Rapid.OsmEntity(context, { v: 100 });
-      const b = a.updateSelf({});
-      assert.equal(typeof b.v, 'number');
-      assert.notEqual(b.v, 100);
-    });
-  });
-
-  describe('#asGeoJSON', () => {
-    it('Returns an unlocated GeoJSON Feature', () => {
+  describe('asGeoJSON', () => {
+    it('returns a GeoJSON Feature with null geometry', () => {
       const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' }});
       const result = a.asGeoJSON();
       const expected = {
@@ -189,168 +199,317 @@ describe('OsmEntity', () => {
         properties: { amenity: 'cafe' },
         geometry: null
       };
-
       assert.deepEqual(result, expected);
     });
   });
 
-  describe('#touch', () => {
-    it('updates v in place', () => {
-      const a = new Rapid.OsmEntity(context);
-      const av = a.v;
-      assert.equal(typeof av, 'number');
-      assert.equal(av, 0);
-
-      const b = a.touch();
-      const bv = b.v;
-      assert.equal(a, b);
-      assert.equal(typeof bv, 'number');
-      assert.notEqual(av, bv);
+  describe('asJSON', () => {
+    it('returns a JSON representation of the OsmEntity', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' }});
+      const result = a.asJSON();
+      assert.deepEqual(result, a.props);  // it's just the props
     });
   });
 
-  describe('#mergeTags', () => {
+  describe('asJXON', () => {
+    it('throws when calling OsmEntity.asJXON', () => {
+      const a = new Rapid.OsmEntity(context);
+      assert.throws(() => a.asJXON(), /do not call/i);
+    });
+  });
+
+  describe('updateGeometry', () => {
+    it('updates the geometry', () => {
+      const a = new Rapid.OsmEntity(context);
+      let geoms = a.geoms;
+      assert.lengthOf(geoms.parts, 0);
+      assert.isNull(geoms.orig);
+      assert.isNull(geoms.world);
+
+      // generic OsmEntity has no geometry, so nothing will happen
+      a.updateGeometry();
+
+      geoms = a.geoms;
+      assert.lengthOf(geoms.parts, 0);
+      assert.isNull(geoms.orig);
+      assert.isNull(geoms.world);
+    });
+  });
+
+  describe('extent', () => {
+    it('doesn\'t return an extent', () => {
+      const a = new Rapid.OsmEntity(context);
+      assert.isNotOk(a.extent());
+    });
+  });
+
+  describe('intersects', () => {
+    it('doesn\'t intersect anything', () => {
+      const a = new Rapid.OsmEntity(context);
+      const extent = new Rapid.sdk.Extent([-180, -90], [180, 90]);
+      assert.isFalse(a.intersects(extent));
+    });
+  });
+
+  describe('touch', () => {
+    it('updates v in place', () => {
+      const a = new Rapid.OsmEntity(context);
+      const v1 = a.v;
+      a.touch();
+      assert.isAbove(a.v, v1);
+    });
+  });
+
+  describe('visible', () => {
+    it('gets visible', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' }, visible: false });
+      assert.isFalse(a.visible);
+    });
+
+    it('gets true if no visible', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' } });
+      assert.isTrue(a.visible);
+    });
+
+    it('sets visible', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' }, visible: true });
+      a.visible = false;
+      assert.isFalse(a.props.visible);
+      assert.isFalse(a.visible);
+    });
+  });
+
+  describe('version', () => {
+    it('gets version', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' }, version: '5' });
+      assert.strictEqual(a.props.version, '5');
+      assert.strictEqual(a.version, '5');
+    });
+
+    it('gets undefined if no version', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' } });
+      assert.isUndefined(a.version);
+    });
+
+    it('sets version', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' } });
+      a.version = '5';
+      assert.strictEqual(a.props.version, '5');
+      assert.strictEqual(a.version, '5');
+    });
+  });
+
+
+  describe('.id', () => {
+    it('generates unique IDs', () => {
+      const a = new Rapid.OsmNode(context);
+      const b = new Rapid.OsmNode(context);
+      assert.notEqual(a.id, b.id);
+    });
+
+    describe('.fromOSM', () => {
+      it('returns a ID string unique across entity types', () => {
+        assert.equal(Rapid.OsmEntity.fromOSM('node', '1'), 'n1');
+      });
+    });
+
+    describe('.toOSM', () => {
+      it('reverses fromOSM', () => {
+        const id = Rapid.OsmEntity.fromOSM('node', '1');
+        assert.equal(Rapid.OsmEntity.toOSM(id), '1');
+      });
+    });
+  });
+
+  describe('copy', () => {
+    it('returns a new Entity', () => {
+      const source = new Rapid.OsmEntity(context, { id: 'x' });
+      const result = source.copy(null, {});
+      assert.ok(result instanceof Rapid.OsmEntity);
+      assert.notStrictEqual(source, result);
+    });
+
+    it('adds the new Entity to memo object', () => {
+      const source = new Rapid.OsmEntity(context, { id: 'x' });
+      const copies = {};
+      const result = source.copy(null, copies);
+      assert.strictEqual(Object.keys(copies).length, 1);
+      assert.strictEqual(copies.x, result);
+    });
+
+    it('returns an existing copy in memo object', () => {
+      const source = new Rapid.OsmEntity(context, { id: 'x' });
+      const copies = {};
+      const result1 = source.copy(null, copies);
+      const result2 = source.copy(null, copies);
+      assert.strictEqual(Object.keys(copies).length, 1);
+      assert.strictEqual(result1, result2);
+    });
+
+    it('resets \'id\', \'user\', \'version\', and \'v\' properties', () => {
+      const source = new Rapid.OsmEntity(context, { id: 'x', user: 'user', version: 10, v: 100 });
+      const copies = {};
+      const result = source.copy(null, copies);
+      assert.isUndefined(result.props.id);
+      assert.isUndefined(result.props.user);
+      assert.isUndefined(result.props.version);
+      assert.isUndefined(result.props.v);
+    });
+
+    it('copies tags', () => {
+      const source = new Rapid.OsmEntity(context, { id: 'x', tags: { foo: 'foo' }});
+      const copies = {};
+      const result = source.copy(null, copies);
+      assert.deepEqual(result.tags, source.tags);
+      assert.notStrictEqual(result.tags, source.tags);
+    });
+  });
+
+
+  describe('mergeTags', () => {
     it('returns self if unchanged', () => {
-      const a = new Rapid.OsmWay(context, {tags: {a: 'a'}});
-      const b = a.mergeTags({a: 'a'});
+      const a = new Rapid.OsmWay(context, { tags: { a: 'a' }});
+      const b = a.mergeTags({ a: 'a' });
       assert.equal(a, b);
     });
 
     it('returns a new Entity if changed', () => {
-      const a = new Rapid.OsmWay(context, {tags: {a: 'a'}});
-      const b = a.mergeTags({a: 'b'});
+      const a = new Rapid.OsmWay(context, { tags: { a: 'a' }});
+      const b = a.mergeTags({ a: 'b' });
       assert.ok(b instanceof Rapid.OsmWay);
       assert.notEqual(a, b);
     });
 
     it('merges tags', () => {
-      const a = new Rapid.OsmWay(context, {tags: {a: 'a'}});
-      const b = a.mergeTags({b: 'b'});
-      assert.deepEqual(b.tags, {a: 'a', b: 'b'});
+      const a = new Rapid.OsmWay(context, { tags: { a: 'a' }});
+      const b = a.mergeTags({ b: 'b' });
+      assert.deepEqual(b.tags, { a: 'a', b: 'b' });
     });
 
     it('combines non-conflicting tags', () => {
-      const a = new Rapid.OsmWay(context, {tags: {a: 'a'}});
-      const b = a.mergeTags({a: 'a'});
-      assert.deepEqual(b.tags, {a: 'a'});
+      const a = new Rapid.OsmWay(context, { tags: { a: 'a' }});
+      const b = a.mergeTags({ a: 'a' });
+      assert.deepEqual(b.tags, { a: 'a' });
     });
 
     it('combines conflicting tags with semicolons', () => {
-      const a = new Rapid.OsmWay(context, {tags: {a: 'a'}});
-      const b = a.mergeTags({a: 'b'});
-      assert.deepEqual(b.tags, {a: 'a;b'});
+      const a = new Rapid.OsmWay(context, { tags: { a: 'a' }});
+      const b = a.mergeTags({ a: 'b' });
+      assert.deepEqual(b.tags, { a: 'a;b' });
     });
 
     it('combines combined tags', () => {
-      const a = new Rapid.OsmWay(context, {tags: {a: 'a;b'}});
-      const b = new Rapid.OsmWay(context, {tags: {a: 'b'}});
-      assert.deepEqual(a.mergeTags(b.tags).tags, {a: 'a;b'});
-      assert.deepEqual(b.mergeTags(a.tags).tags, {a: 'b;a'});
+      const a = new Rapid.OsmWay(context, { tags: { a: 'a;b' }});
+      const b = new Rapid.OsmWay(context, { tags: { a: 'b' }});
+      assert.deepEqual(a.mergeTags(b.tags).tags, { a: 'a;b' });
+      assert.deepEqual(b.mergeTags(a.tags).tags, { a: 'b;a' });
     });
 
     it('combines combined tags with whitespace', () => {
-      const a = new Rapid.OsmWay(context, {tags: {a: 'a; b'}});
-      const b = new Rapid.OsmWay(context, {tags: {a: 'b'}});
-      assert.deepEqual(a.mergeTags(b.tags).tags, {a: 'a;b'});
-      assert.deepEqual(b.mergeTags(a.tags).tags, {a: 'b;a'});
+      const a = new Rapid.OsmWay(context, { tags: { a: 'a;    b' }});
+      const b = new Rapid.OsmWay(context, { tags: { a: 'b' }});
+      assert.deepEqual(a.mergeTags(b.tags).tags, { a: 'a;b' });
+      assert.deepEqual(b.mergeTags(a.tags).tags, { a: 'b;a' });
     });
 
     it('does NOT combine building tags for new tag: building=yes', () => {
-      const a = new Rapid.OsmWay(context, {tags: {building: 'residential'}});
-      const b = a.mergeTags({building: 'yes'});
-      assert.deepEqual(b.tags, {building: 'residential'});
+      const a = new Rapid.OsmWay(context, { tags: { building: 'residential' }});
+      const b = a.mergeTags({ building: 'yes' });
+      assert.deepEqual(b.tags, { building: 'residential' });
     });
 
     it('does combine building tags if existing tag is building=yes', () => {
-      const a = new Rapid.OsmWay(context, {tags: {building: 'yes'}});
-      const b = a.mergeTags({building: 'residential'});
-      assert.deepEqual(b.tags, {building: 'residential'});
+      const a = new Rapid.OsmWay(context, { tags: { building: 'yes' }});
+      const b = a.mergeTags({ building: 'residential' });
+      assert.deepEqual(b.tags, { building: 'residential' });
     });
 
     it('keeps the existing building tag if the new tag is not building=yes', () => {
-      const a = new Rapid.OsmWay(context, {tags: {building: 'residential'}});
-      const b = a.mergeTags({building: 'house'});
-      assert.deepEqual(b.tags, {building: 'residential'});
+      const a = new Rapid.OsmWay(context, { tags: { building: 'residential' }});
+      const b = a.mergeTags({ building: 'house' });
+      assert.deepEqual(b.tags, { building: 'residential' });
     });
   });
 
 
-  describe('#osmId', () => {
+  describe('osmId', () => {
     it('returns an OSM ID as a string', () => {
-      assert.equal(new Rapid.OsmWay(context, {id: 'w1234'}).osmId(), '1234');
-      assert.equal(new Rapid.OsmNode(context, {id: 'n1234'}).osmId(), '1234');
-      assert.equal(new Rapid.OsmRelation(context, {id: 'r1234'}).osmId(), '1234');
-      assert.equal(new Rapid.OsmChangeset(context, {id: 'c1234'}).osmId(), '1234');
+      assert.equal(new Rapid.OsmWay(context, { id: 'w1234' }).osmId(), '1234');
+      assert.equal(new Rapid.OsmNode(context, { id: 'n1234' }).osmId(), '1234');
+      assert.equal(new Rapid.OsmRelation(context, { id: 'r1234' }).osmId(), '1234');
+      assert.equal(new Rapid.OsmChangeset(context, { id: 'c1234' }).osmId(), '1234');
     });
   });
 
 
-  describe('#hasNonGeometryTags', () => {
+  describe('hasNonGeometryTags', () => {
     it('returns false for an entity without tags', () => {
       const node = new Rapid.OsmNode(context);
-      assert.equal(node.hasNonGeometryTags(), false);
+      assert.isFalse(node.hasNonGeometryTags());
     });
 
     it('returns true for an entity with tags', () => {
-      const node = new Rapid.OsmNode(context, {tags: {foo: 'bar'}});
-      assert.equal(node.hasNonGeometryTags(), true);
+      const node = new Rapid.OsmNode(context, { tags: { foo: 'bar' }});
+      assert.isTrue(node.hasNonGeometryTags());
     });
 
     it('returns false for an entity with only an area=yes tag', () => {
-      const node = new Rapid.OsmNode(context, {tags: {area: 'yes'}});
-      assert.equal(node.hasNonGeometryTags(), false);
+      const node = new Rapid.OsmNode(context, { tags: { area: 'yes'}});
+      assert.isFalse(node.hasNonGeometryTags());
     });
   });
 
 
-  describe('#hasParentRelations', () => {
+  describe('hasParentRelations', () => {
     it('returns true for an entity that is a relation member', () => {
       const node = new Rapid.OsmNode(context);
       const relation = new Rapid.OsmRelation(context, {members: [{id: node.id}]});
       const graph = new Rapid.Graph([node, relation]);
-      assert.equal(node.hasParentRelations(graph), true);
+      assert.isTrue(node.hasParentRelations(graph));
     });
 
     it('returns false for an entity that is not a relation member', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
-      assert.equal(node.hasParentRelations(graph), false);
+      assert.isFalse(node.hasParentRelations(graph));
     });
   });
 
 
-  describe('#hasInterestingTags', () => {
+  describe('hasInterestingTags', () => {
     it('returns false if the entity has no tags', () => {
       const e = new Rapid.OsmEntity(context);
-      assert.equal(e.hasInterestingTags(), false);
+      assert.isFalse(e.hasInterestingTags());
     });
 
     it('returns true if the entity has tags other than \'attribution\', \'created_by\', \'source\', \'odbl\' and tiger tags', () => {
-      const e = new Rapid.OsmEntity(context, {tags: {foo: 'bar'}});
-      assert.equal(e.hasInterestingTags(), true);
+      const e = new Rapid.OsmEntity(context, { tags: { foo: 'bar' }});
+      assert.isTrue(e.hasInterestingTags());
     });
 
     it('return false if the entity has only uninteresting tags', () => {
-      const e = new Rapid.OsmEntity(context, {tags: {source: 'Bing'}});
-      assert.equal(e.hasInterestingTags(), false);
+      const e = new Rapid.OsmEntity(context, { tags: { source: 'Bing' }});
+      assert.isFalse(e.hasInterestingTags());
     });
 
     it('return false if the entity has only tiger tags', () => {
-      const e = new Rapid.OsmEntity(context, {tags: {'tiger:source': 'blah', 'tiger:foo': 'bar'}});
-      assert.equal(e.hasInterestingTags(), false);
+      const e = new Rapid.OsmEntity(context, { tags: { 'tiger:source': 'blah', 'tiger:foo': 'bar' }});
+      assert.isFalse(e.hasInterestingTags());
     });
   });
 
 
-  describe('#isHighwayIntersection', () => {
+  describe('isHighwayIntersection', () => {
     it('returns false', () => {
-      assert.equal(new Rapid.OsmEntity(context).isHighwayIntersection(), false);
+      const e = new Rapid.OsmEntity(context);
+      assert.isFalse(e.isHighwayIntersection());
     });
   });
 
-  describe('#isDegenerate', () => {
+  describe('isDegenerate', () => {
     it('returns true', () => {
-      assert.equal(new Rapid.OsmEntity(context).isDegenerate(), true);
+      const e = new Rapid.OsmEntity(context);
+      assert.isTrue(e.isDegenerate());
     });
   });
 

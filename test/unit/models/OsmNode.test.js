@@ -25,7 +25,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#asGeoJSON', () => {
+  describe('asGeoJSON', () => {
     it('converts to a GeoJSON Point Feature', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { amenity: 'cafe' }, loc: [1, 2] });
       const result = n1.asGeoJSON();
@@ -57,7 +57,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#asJXON', () => {
+  describe('asJXON', () => {
     it('converts a node to jxon', () => {
       const node = new Rapid.OsmNode(context, { id: 'n-1', loc: [-77, 38], tags: { amenity: 'cafe' } });
       assert.deepEqual(node.asJXON(), {
@@ -78,7 +78,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#extent', () => {
+  describe('extent', () => {
     it('returns a point extent', () => {
       const node = new Rapid.OsmNode(context, { loc: [5, 10] });
       const extent = node.extent();
@@ -87,7 +87,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#intersects', () => {
+  describe('intersects', () => {
     it('returns true for a node within the given extent', () => {
       const node = new Rapid.OsmNode(context, { loc: [0, 0] });
       const extent = new Rapid.sdk.Extent([-5, -5], [5, 5]);
@@ -103,7 +103,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#geometry', () => {
+  describe('geometry', () => {
     it('returns \'vertex\' if the node is a member of any way', () => {
       const node = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node.id] });
@@ -120,7 +120,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#isEndpoint', () => {
+  describe('isEndpoint', () => {
     it('returns true for a node at an endpoint along a linear way', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const n2 = new Rapid.OsmNode(context, { id: 'n2' });
@@ -146,7 +146,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#isConnected', () => {
+  describe('isConnected', () => {
     it('returns true for a node with multiple parent ways, at least one interesting', () => {
       const node = new Rapid.OsmNode(context);
       const w1 = new Rapid.OsmWay(context, { nodes: [node.id] });
@@ -203,7 +203,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#isIntersection', () => {
+  describe('isIntersection', () => {
     it('returns true for a node shared by more than one highway', () => {
       const node = new Rapid.OsmNode(context);
       const w1 = new Rapid.OsmWay(context, { nodes: [node.id], tags: { highway: 'residential' } });
@@ -223,7 +223,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#isHighwayIntersection', () => {
+  describe('isHighwayIntersection', () => {
     it('returns true for a node shared by more than one highway', () => {
       const node = new Rapid.OsmNode(context);
       const w1 = new Rapid.OsmWay(context, { nodes: [node.id], tags: { highway: 'residential' } });
@@ -243,7 +243,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#isDegenerate', () => {
+  describe('isDegenerate', () => {
     it('returns true if node has invalid loc', () => {
       assert.ok(new Rapid.OsmNode(context).isDegenerate(), 'no loc');
       assert.ok(new Rapid.OsmNode(context, { loc: '' }).isDegenerate(), 'empty string loc');
@@ -271,7 +271,7 @@ describe('OsmNode', () => {
   });
 
 
-  describe('#directions', () => {
+  describe('directions', () => {
     const viewport = {
       project: val => val,
       unproject: val => val

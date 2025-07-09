@@ -45,7 +45,7 @@ describe('OsmWay', () => {
     });
   });
 
-  describe('#copy', () => {
+  describe('copy', () => {
     it('returns a new Way', () => {
       const w = new Rapid.OsmWay(context, { id: 'w' });
       const result = w.copy(null, {});
@@ -102,21 +102,21 @@ describe('OsmWay', () => {
     });
   });
 
-  describe('#first', () => {
+  describe('first', () => {
     it('returns the first node', () => {
       let way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c'] });
       assert.equal(way.first(), 'a');
     });
   });
 
-  describe('#last', () => {
+  describe('last', () => {
     it('returns the last node', () => {
       let way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c'] });
       assert.equal(way.last(), 'c');
     });
   });
 
-  describe('#contains', () => {
+  describe('contains', () => {
     it('returns true if the way contains the given node', () => {
       let way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c'] });
       assert.ok(way.contains('b'));
@@ -130,7 +130,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#affix', () => {
+  describe('affix', () => {
     it('returns \'prefix\' if the way starts with the given node', () => {
       let way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c'] });
       assert.equal(way.affix('a'), 'prefix');
@@ -150,7 +150,7 @@ describe('OsmWay', () => {
     });
   });
 
-  describe('#extent', () => {
+  describe('extent', () => {
     it('returns the minimal Extent containing all member nodes', () => {
       const node1 = new Rapid.OsmNode(context, { loc: [0, 0] });
       const node2 = new Rapid.OsmNode(context, { loc: [5, 10] });
@@ -161,7 +161,7 @@ describe('OsmWay', () => {
     });
   });
 
-  describe('#intersects', () => {
+  describe('intersects', () => {
     it('returns true for a way with a node within the given extent', () => {
       const node = new Rapid.OsmNode(context, {loc: [0, 0]});
       const way = new Rapid.OsmWay(context, {nodes: [node.id]});
@@ -180,7 +180,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#isClosed', () => {
+  describe('isClosed', () => {
     it('returns false when the way contains no nodes', () => {
       const way = new Rapid.OsmWay(context);
       assert.equal(way.isClosed(), false);
@@ -212,7 +212,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#isConvex', () => {
+  describe('isConvex', () => {
     it('returns true for convex ways', () => {
       //    d -- e
       //    |     \
@@ -277,7 +277,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#layer', () => {
+  describe('layer', () => {
     it('returns 0 when the way has no tags', () => {
       const way = new Rapid.OsmWay(context);
       assert.equal(way.layer(), 0);
@@ -379,7 +379,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#isOneWay', () => {
+  describe('isOneWay', () => {
     it('returns false when the way has no tags', () => {
       const way = new Rapid.OsmWay(context);
       assert.equal(way.isOneWay(), false);
@@ -475,7 +475,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#sidednessIdentifier', () => {
+  describe('sidednessIdentifier', () => {
     it('returns tag when the tag has implied sidedness', () => {
       let way = new Rapid.OsmWay(context, { tags: { natural: 'cliff' } });
       assert.equal(way.sidednessIdentifier(), 'natural');
@@ -513,7 +513,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#isSided', () => {
+  describe('isSided', () => {
     it('returns false when the way has no tags', () => {
       const way = new Rapid.OsmWay(context);
       assert.equal(way.isSided(), false);
@@ -593,7 +593,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#isArea', () => {
+  describe('isArea', () => {
     it('returns false when the way has no tags', () => {
       const way = new Rapid.OsmWay(context);
       assert.equal(way.isArea(), false);
@@ -655,7 +655,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#isDegenerate', () => {
+  describe('isDegenerate', () => {
     it('returns true for a linear way with zero or one nodes', () => {
       let way = new Rapid.OsmWay(context, { nodes: [] });
       assert.equal(way.isDegenerate(), true);
@@ -699,7 +699,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#areAdjacent', () => {
+  describe('areAdjacent', () => {
     it('returns false for nodes not in the way', () => {
       const way = new Rapid.OsmWay(context);
       assert.equal(way.areAdjacent('a', 'b'), false);
@@ -729,7 +729,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#geometry', () => {
+  describe('geometry', () => {
     it('returns \'line\' when the way is not an area', () => {
       const graph = new Rapid.Graph();
       let way = new Rapid.OsmWay(context);
@@ -745,7 +745,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#close', () => {
+  describe('close', () => {
     it('returns self for empty way', () => {
       const w = new Rapid.OsmWay(context);
       assert.deepEqual(w.close(), w);
@@ -781,7 +781,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#unclose', () => {
+  describe('unclose', () => {
     it('returns self for empty way', () => {
       const w = new Rapid.OsmWay(context);
       assert.deepEqual(w.unclose(), w);
@@ -823,7 +823,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#addNode', () => {
+  describe('addNode', () => {
     it('adds a node to an empty way', () => {
       const w = new Rapid.OsmWay(context);
       assert.deepEqual(w.addNode('a').nodes, ['a']);
@@ -984,7 +984,7 @@ describe('OsmWay', () => {
 
 
 
-  describe('#updateNode', () => {
+  describe('updateNode', () => {
     it('throws RangeError if empty way', () => {
       const w = new Rapid.OsmWay(context);
       assert.throws(() => w.updateNode('d', 0), RangeError, /out of range 0\.\.-1/);
@@ -1138,7 +1138,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#replaceNode', () => {
+  describe('replaceNode', () => {
     it('replaces a node', () => {
       const w1 = new Rapid.OsmWay(context, { nodes: 'a'.split('') });
       assert.equal(w1.replaceNode('a', 'b').nodes.join(''), 'b', 'single replace, single node');
@@ -1203,7 +1203,7 @@ describe('OsmWay', () => {
     });
   });
 
-  describe('#removeNode', () => {
+  describe('removeNode', () => {
     it('removes a node', () => {
       const w1 = new Rapid.OsmWay(context, { nodes: 'a'.split('') });
       assert.equal(w1.removeNode('a').nodes.join(''), '', 'single remove, single node');
@@ -1265,7 +1265,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#asJXON', () => {
+  describe('asJXON', () => {
     it('converts a way to jxon', () => {
       const node = new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n1', 'n2'], tags: { highway: 'residential' } });
       assert.deepEqual(node.asJXON(), {
@@ -1285,7 +1285,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#asGeoJSON', () => {
+  describe('asGeoJSON', () => {
     it('converts a line to a GeoJSON LineString feature', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 2] });
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 4] });
@@ -1344,7 +1344,7 @@ describe('OsmWay', () => {
   });
 
 
-  describe('#area', () => {
+  describe('area', () => {
     it('returns a relative measure of area', () => {
       const graph = new Rapid.Graph([
         new Rapid.OsmNode(context, { id: 'a', loc: [-0.0002, 0.0001] }),

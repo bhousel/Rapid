@@ -18,7 +18,7 @@ describe('GeoJSON', () => {
 
     it('clones the original GeoJSON data into props', () => {
       const data = new Rapid.GeoJSON(context, sample.point);
-      // props will be a clone of sample.point, but with an `id` property added
+      // `data.props` will be deep clone of props, possibly with other properties ('id') added.
       assert.deepInclude(data.props, sample.point);
       assert.notStrictEqual(data.props, sample.point);
     });
@@ -159,12 +159,20 @@ describe('GeoJSON', () => {
     });
   });
 
+  describe('destroy', () => {
+    it('destroys and frees the data', () => {
+      const data = new Rapid.GeoJSON(context, sample.point);
+      data.destroy();
+      assert.isNull(data.geoms);
+      assert.isNull(data.props);
+    });
+  });
 
   describe('#update', () => {
     it('returns a new GeoJSON element', () => {
       const a = new Rapid.GeoJSON(context, sample.point);
       const b = a.update({});
-      assert.ok(b instanceof Rapid.GeoJSON);
+      assert.instanceOf(b, Rapid.GeoJSON);
       assert.notStrictEqual(a, b);
     });
 
@@ -183,7 +191,7 @@ describe('GeoJSON', () => {
     it('doesn\'t copy prototype properties', () => {
       const props = { crs: 'epsg:3857' };
       const result = new Rapid.GeoJSON(context, sample.point).update(props);
-      assert.ok(!result.props.hasOwnProperty('update'));
+      assert.isNotOk(result.props.hasOwnProperty('update'));
     });
 
     it('updates v', () => {
@@ -199,7 +207,7 @@ describe('GeoJSON', () => {
     it('returns the same GeoJSON element', () => {
       const a = new Rapid.GeoJSON(context, sample.point);
       const b = a.updateSelf({});
-      assert.ok(b instanceof Rapid.GeoJSON);
+      assert.instanceOf(b, Rapid.GeoJSON);
       assert.strictEqual(a, b);
     });
 
@@ -218,7 +226,7 @@ describe('GeoJSON', () => {
     it('doesn\'t copy prototype properties', () => {
       const props = { crs: 'epsg:3857' };
       const result = new Rapid.GeoJSON(context, sample.point).updateSelf(props);
-      assert.ok(!result.props.hasOwnProperty('update'));
+      assert.isNotOk(result.props.hasOwnProperty('update'));
     });
 
     it('updates v', () => {

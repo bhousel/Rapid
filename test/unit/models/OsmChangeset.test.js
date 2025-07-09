@@ -7,29 +7,130 @@ describe('OsmChangeset', () => {
   const context = new Rapid.MockContext();
 
   describe('constructor', () => {
-    it('constructs a changeset', () => {
-      const changeset = new Rapid.OsmChangeset(context);
-      assert.ok(changeset instanceof Rapid.OsmChangeset);
-      assert.equal(changeset.type, 'changeset');
-      assert.deepEqual(changeset.tags, {});
+    it('constructs an OsmChangeset from a context', () => {
+      const a = new Rapid.OsmChangeset(context);
+      assert.instanceOf(a, Rapid.OsmChangeset);
+      assert.strictEqual(a.context, context);
+      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.isObject(a.props);
+      assert.ok(a.id, 'an id should be generated');
+      assert.strictEqual(a.type, 'changeset');
+      assert.deepEqual(a.tags, {});
     });
 
-    it('constructs a changeset with provided tags', () => {
-      const changeset = new Rapid.OsmChangeset(context, { tags: { foo: 'bar' }});
-      assert.ok(changeset instanceof Rapid.OsmChangeset);
-      assert.equal(changeset.type, 'changeset');
-      assert.deepEqual(changeset.tags, { foo: 'bar' });
+    it('constructs an OsmChangeset from a context, with props', () => {
+      const props = { id: 'c1', tags: { comment: 'hello' } };
+      const a = new Rapid.OsmChangeset(context, props);
+      assert.instanceOf(a, Rapid.OsmChangeset);
+      assert.strictEqual(a.context, context);
+      assert.instanceOf(a.geoms, Rapid.Geometry);
+      // `a.props` will be deep clone of props, possibly with other properties ('id') added.
+      assert.deepInclude(a.props, props);
+      assert.notStrictEqual(a.props, props);  // cloned, not ===
+      assert.strictEqual(a.id, 'c1');
+      assert.strictEqual(a.type, 'changeset');
+      assert.deepEqual(a.tags, { comment: 'hello' });
+    });
+
+    it('constructs an OsmChangeset from another OsmChangeset', () => {
+      const a = new Rapid.OsmChangeset(context);
+      const b = new Rapid.OsmChangeset(a);
+      assert.instanceOf(b, Rapid.OsmChangeset);
+      assert.strictEqual(b.context, context);
+      assert.instanceOf(b.geoms, Rapid.Geometry);
+      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.notStrictEqual(b.props, a.props);  // cloned, not ===
+      assert.isObject(b.props);
+      assert.strictEqual(b.type, a.type);
+      assert.strictEqual(b.id, a.id, 'an id should be generated');
+    });
+
+    it('constructs an OsmChangeset from another OsmChangeset, with props', () => {
+      const aprops = { id: 'c1', tags: { comment: 'hello' } };
+      const bprops = { foo: 'bar' };
+      const a = new Rapid.OsmChangeset(context, aprops);
+      const b = new Rapid.OsmChangeset(a, bprops);
+      assert.instanceOf(b, Rapid.OsmChangeset);
+      assert.strictEqual(b.context, context);
+      assert.instanceOf(b.geoms, Rapid.Geometry);
+      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.notStrictEqual(b.props, a.props);  // cloned, not ===
+      assert.strictEqual(b.id, a.id);
+      assert.strictEqual(b.type, a.type);
+      assert.deepInclude(b.props, { id: 'c1', tags: { comment: 'hello' }, foo: 'bar' });
     });
   });
 
-  describe('#asGeoJSON', () => {
-    it('Returns an unlocated GeoJSON Feature', () => {
-      const c1 = new Rapid.OsmChangeset(context, { id: 'c1', tags: { foo: 'bar' }});
+
+  describe('update', () => {
+    it('returns a new changeset', () => {
+      const a = new Rapid.OsmChangeset(context);
+      const b = a.update({});
+      assert.instanceOf(b, Rapid.OsmChangeset);
+      assert.notStrictEqual(b, a);
+    });
+
+    it('updates the specified properties', () => {
+      const a = new Rapid.OsmChangeset(context);
+      const aprops = a.props;
+      const update = { tags: { comment: 'hello' } };
+      const b = a.update(update);
+      assert.instanceOf(b, Rapid.OsmChangeset);
+      assert.notStrictEqual(b, a);
+      const bprops = b.props;
+      assert.notStrictEqual(bprops, aprops);   // new object, not ===
+      assert.notStrictEqual(bprops, update);   // cloned, not ===
+      assert.deepInclude(bprops, update);      // will also include a `v`
+    });
+
+    it('defaults to empty props argument', () => {
+      const a = new Rapid.OsmChangeset(context);
+      const aprops = a.props;
+      const b = a.update();
+      assert.instanceOf(b, Rapid.OsmChangeset);
+      assert.notStrictEqual(b, a);
+      const bprops = b.props;
+      assert.notStrictEqual(bprops, aprops);   // new object, not ===
+    });
+
+    it('preserves existing properties', () => {
+      const a = new Rapid.OsmChangeset(context, { id: 'c1' });
+      const aprops = a.props;
+      const update = { tags: { comment: 'hello' } };
+      const b = a.update(update);
+      assert.instanceOf(b, Rapid.OsmChangeset);
+      assert.notStrictEqual(b, a);
+      const bprops = b.props;
+      assert.notStrictEqual(bprops, aprops);   // new object, not ===
+      assert.notStrictEqual(bprops, update);   // cloned, not ===
+      assert.deepInclude(bprops, { id: 'c1', tags: { comment: 'hello' } });  // will also include a `v`
+    });
+
+    it('doesn\'t copy prototype properties', () => {
+      const a = new Rapid.OsmChangeset(context);
+      const aprops = a.props;
+      const update = { tags: { comment: 'hello' } };
+      const b = a.update(update);
+      assert.doesNotHaveAnyKeys(b.props, ['constructor', '__proto__', 'toString']);
+    });
+
+    it('updates v', () => {
+      const a = new Rapid.OsmChangeset(context);
+      const v1 = a.v;
+      const b = a.update({});
+      assert.isAbove(b.v, v1);
+    });
+  });
+
+
+  describe('asGeoJSON', () => {
+    it('returns an unlocated GeoJSON Feature', () => {
+      const c1 = new Rapid.OsmChangeset(context, { id: 'c1', tags: { comment: 'hello' }});
       const result = c1.asGeoJSON();
       const expected = {
         type: 'Feature',
         id: 'c1',
-        properties: { foo: 'bar' },
+        properties: { comment: 'hello' },
         geometry: null
       };
 
@@ -37,7 +138,7 @@ describe('OsmChangeset', () => {
     });
   });
 
-  describe('#asJXON', () => {
+  describe('asJXON', () => {
     it('converts a changeset to jxon', () => {
       const expected = {
         osm: {
@@ -55,8 +156,14 @@ describe('OsmChangeset', () => {
     });
   });
 
+  describe('geometry', () => {
+    it(`returns 'changeset'`, () => {
+      const a = new Rapid.OsmChangeset(context);
+      assert.deepEqual(a.geometry(), 'changeset');
+    });
+  });
 
-  describe('#osmChangeJXON', () => {
+  describe('osmChangeJXON', () => {
     it('converts change data to JXON', () => {
       const expected = {
         osmChange: {
