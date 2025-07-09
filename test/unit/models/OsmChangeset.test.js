@@ -23,10 +23,16 @@ describe('OsmChangeset', () => {
   });
 
   describe('#asGeoJSON', () => {
-    it('not supported', () => {
+    it('Returns an unlocated GeoJSON Feature', () => {
       const c1 = new Rapid.OsmChangeset(context, { id: 'c1', tags: { foo: 'bar' }});
       const result = c1.asGeoJSON();
-      const expected = {};
+      const expected = {
+        type: 'Feature',
+        id: 'c1',
+        properties: { foo: 'bar' },
+        geometry: null
+      };
+
       assert.deepEqual(result, expected);
     });
   });

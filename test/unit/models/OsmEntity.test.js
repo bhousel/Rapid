@@ -179,6 +179,20 @@ describe('OsmEntity', () => {
     });
   });
 
+  describe('#asGeoJSON', () => {
+    it('Returns an unlocated GeoJSON Feature', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' }});
+      const result = a.asGeoJSON();
+      const expected = {
+        type: 'Feature',
+        id: 'a',
+        properties: { amenity: 'cafe' },
+        geometry: null
+      };
+
+      assert.deepEqual(result, expected);
+    });
+  });
 
   describe('#touch', () => {
     it('updates v in place', () => {

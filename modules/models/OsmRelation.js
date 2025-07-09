@@ -60,18 +60,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * updateGeometry
-   * Relations require a Graph in order to get the member information.
-   * This should be called after the Graph has been updated and is consistent.
-   * @param   {Graph}        graph - the Graph that holds the information needed
-   * @return  {OsmRelation}  this same OsmRelation
-   */
-  updateGeometry(graph) {
-    this.geoms.setData(this.asGeoJSON(graph));
-    return this;
-  }
-
-  /**
    * asGeoJSON
    * Returns a GeoJSON representation of the OsmRelation.
    * Relations are represented by either:

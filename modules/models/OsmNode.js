@@ -56,18 +56,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * updateGeometry
-   * Nodes are simple because they represent a single coordinate.
-   * We can update it as soon as the Node is constructed, and the Graph is not needed.
-   * @param   {Graph}    graph - Unused for OsmNode
-   * @return  {OsmNode}  this same OsmNode
-   */
-  updateGeometry() {
-    this.geoms.setData(this.asGeoJSON());
-    return this;
-  }
-
-  /**
    * asGeoJSON
    * Returns a GeoJSON representation of the OsmNode.
    * Nodes are represented by a Feature with a Point geometry.
@@ -75,20 +63,22 @@ export class OsmNode extends OsmEntity {
    * @return  {Object}  GeoJSON representation of the OsmNode
    */
   asGeoJSON() {
+    let geometry = null;
+
     const coords = this.loc;
     if (Array.isArray(coords) && coords.length >= 2) {
-      return {
-        type: 'Feature',
-        id: this.id,
-        properties: this.tags,
-        geometry: {
-          type: 'Point',
-          coordinates: coords
-        }
+      geometry = {
+        type: 'Point',
+        coordinates: coords
       };
-    } else {
-      return {};
     }
+
+    return {
+      type: 'Feature',
+      id: this.id,
+      properties: this.tags,
+      geometry: geometry
+    };
   }
 
   /**

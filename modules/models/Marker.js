@@ -61,20 +61,22 @@ export class Marker extends AbstractData {
    * @return  {Object}  GeoJSON representation of the Marker
    */
   asGeoJSON() {
+    let geometry = null;
+
     const coords = this.loc;
     if (Array.isArray(coords) && coords.length >= 2) {
-      return {
-        type: 'Feature',
-        id: this.id,
-        properties: this.props,
-        geometry: {
-          type: 'Point',
-          coordinates: coords
-        }
+      geometry = {
+        type: 'Point',
+        coordinates: coords
       };
-    } else {
-      return {};
     }
+
+    return {
+      type: 'Feature',
+      id: this.id,
+      properties: this.props,
+      geometry: geometry
+    };
   }
 
   /**

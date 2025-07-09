@@ -68,18 +68,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * updateGeometry
-   * Ways require a Graph in order to get the childNode information.
-   * This should be called after the Graph has been updated and is consistent.
-   * @param   {Graph}   graph - the Graph that holds the information needed
-   * @return  {OsmWay}  this same OsmWay
-   */
-  updateGeometry(graph) {
-    this.geoms.setData(this.asGeoJSON(graph));
-    return this;
-  }
-
-  /**
    * asGeoJSON
    * Returns a GeoJSON representation of the OsmWay.
    * Ways are represented by a Feature with either LineString or a Polygon geometry.
@@ -88,6 +76,8 @@ export class OsmWay extends OsmEntity {
    */
   asGeoJSON(graph) {
     return graph.transient(this, 'geojson', () => {
+
+      let geometry = null;
       const coords = [];
       for (const nodeID of this.nodes) {
         const node = graph.hasEntity(nodeID);
@@ -98,29 +88,24 @@ export class OsmWay extends OsmEntity {
 
       if (coords.length) {
         if (this.isArea() && this.isClosed()) {
-          return {
-            type: 'Feature',
-            id: this.id,
-            properties: this.tags,
-            geometry: {
-              type: 'Polygon',
-              coordinates: [coords]
-            }
+          geometry = {
+            type: 'Polygon',
+            coordinates: [coords]
           };
         } else {
-          return {
-            type: 'Feature',
-            id: this.id,
-            properties: this.tags,
-            geometry: {
-              type: 'LineString',
-              coordinates: coords
-            }
+          geometry = {
+            type: 'LineString',
+            coordinates: coords
           };
         }
-      } else {
-        return {};
       }
+
+      return {
+        type: 'Feature',
+        id: this.id,
+        properties: this.tags,
+        geometry: geometry
+      };
 
     });
   }

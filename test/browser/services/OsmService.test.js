@@ -679,19 +679,21 @@ describe('OsmService', () => {
           tile: { loaded: new Set(['1,2,16', '3,4,16']) }
         };
         _osm.caches(obj);
-        expect(_osm.caches().tile.loaded.has('1,2,16')).to.eql(true);
-        expect(_osm.caches().tile.loaded.size).to.eql(2);
+        const result = _osm.caches();
+        expect(result.tile.loaded.has('1,2,16')).to.eql(true);
+        expect(result.tile.loaded.size).to.eql(2);
       });
 
       it('sets/gets a note', () => {
-        const note = new Rapid.Marker(context, { id: '1', loc: [0, 0], serviceID: 'osm' });
+        const note1 = new Rapid.Marker(context, { id: '1', loc: [0, 0], serviceID: 'osm' });
         const note2 = new Rapid.Marker(context, { id: '2', loc: [0, 0], serviceID: 'osm' });
         const obj = {
-          note: { note: { '1': note, '2': note2 } }
+          note: { note: { '1': note1, '2': note2 } }
         };
         _osm.caches(obj);
-        expect(_osm.caches().note.note[note.id]).to.deep.equal(note);
-        expect(Object.keys(_osm.caches().note.note).length).to.eql(2);
+        const result = _osm.caches();
+        expect(result.note.note[note1.id]).to.deep.equal(note1);
+        expect(Object.keys(result.note.note).length).to.eql(2);
       });
 
       it('sets/gets a user', () => {
@@ -701,8 +703,9 @@ describe('OsmService', () => {
           user: { user: { '1': user, '2': user2 } }
         };
         _osm.caches(obj);
-        expect(_osm.caches().user.user[user.id]).to.eql(user);
-        expect(Object.keys(_osm.caches().user.user).length).to.eql(2);
+        const result = _osm.caches();
+        expect(result.user.user[user.id]).to.eql(user);
+        expect(Object.keys(result.user.user).length).to.eql(2);
       });
     });
   });

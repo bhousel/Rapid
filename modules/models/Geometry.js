@@ -72,11 +72,12 @@ export class Geometry {
       const src = this[obj];
       if (!src) continue;
 
+      const dst = copy[obj] = {};
       for (const [k, v] of Object.entries(src)) {
         if (v instanceof Extent) {
-          copy[k] = new Extent(v);
+          dst[k] = new Extent(v);
         } else {
-          copy[k] = globalThis.structuredClone(v);
+          dst[k] = globalThis.structuredClone(v);
         }
       }
     }
@@ -97,7 +98,7 @@ export class Geometry {
    * If there is any existing data, it is first removed.
    * @param  {GeoJSON}  geojson - source GeoJSON data
    */
-  setData(geojson) {
+  setData(geojson = {}) {
     this.destroy();
 
     const geojsonParts = this._geojsonToParts(geojson);
@@ -129,10 +130,14 @@ export class Geometry {
    * _geojsonToParts
    * Break arbitrary GeoJSON into Geometry parts.
    * This will recurse down through the collection types if needed.
-   * @return  {Array<Object>}  An array of singular GeoJSON geometries
+   * @param   {GeoJSON?}        geojson - source GeoJSON data
+   * @param   {Array<Object>}   parts - collected GeoJSON single geometry parts (Point, LineString, or Polygon)
+   * @param   {number}          depth - recursion depth
+   * @return  {Array<Object>}   An array of singular GeoJSON geometries
    */
-  _geojsonToParts(geojson = {}, parts = [], depth = 0) {
-    if (depth > 4) return;  // limit recursion
+  _geojsonToParts(geojson, parts = [], depth = 0) {
+    if (!geojson?.type) return parts;
+    if (depth > 4) return parts;  // limit recursion
 
     if (geojson.type === 'Feature') {
       this._geojsonToParts(geojson.geometry, parts, depth + 1);

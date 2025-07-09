@@ -74,11 +74,12 @@ export class GeometryPart {
       const src = this[obj];
       if (!src) continue;
 
+      const dst = copy[obj] = {};
       for (const [k, v] of Object.entries(src)) {
         if (v instanceof Extent) {
-          copy[k] = new Extent(v);
+          dst[k] = new Extent(v);
         } else {
-          copy[k] = globalThis.structuredClone(v);
+          dst[k] = globalThis.structuredClone(v);
         }
       }
     }

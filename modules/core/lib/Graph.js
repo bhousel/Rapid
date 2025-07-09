@@ -17,6 +17,7 @@ export class Graph {
   constructor(other) {
     this._transients = new Map();   // Map<entityID, Map<k,v>>
     this._childNodes = new Map();   // Map<entityID, Array<Entity>>
+    this._affectedIDs = new Set();  // Set<entityID> affected by recent graph updates
 
     // A Graph derived from a predecessor Graph
     if (other instanceof Graph) {
@@ -225,31 +226,172 @@ export class Graph {
 
 
   /**
+   * replace
+   * Replace an Entity in this Graph
+   * @param   {Entity}  entity - The Entity to replace
+   * @return  {Graph}   A new Graph
+   */
+  replace(replacement) {
+    const entityID = replacement.id;
+    const current = this.hasEntity(entityID);
+    if (current === replacement) return this;  // no change
+
+    return this.update(function() {
+      this._local.entities.set(entityID, replacement);
+      this._updateCaches(current, replacement);
+    });
+  }
+
+
+  /**
+   * replaceSelf
+   * Replace an Entity in this Graph
+   * @param   {Entity}  entity - The Entity to replace
+   * @return  {Graph}   This same Graph
+   */
+  replaceSelf(replacement) {
+    const entityID = replacement.id;
+    const current = this.hasEntity(entityID);
+    if (current === replacement) return this;  // no change
+
+    return this.updateSelf(function() {
+      this._local.entities.set(entityID, replacement);
+      this._updateCaches(current, replacement);
+    });
+  }
+
+
+  /**
+   * remove
+   * Remove an Entity from this Graph
+   * @param   {Entity}  entity - The Entity to remove
+   * @return  {Graph}   A new Graph
+   */
+  remove(entity) {
+    const entityID = entity.id;
+    const current = this.hasEntity(entityID);
+    if (!current) return this;  // not in the graph
+
+    return this.update(function() {
+      this._local.entities.set(entityID, undefined);
+      this._updateCaches(current, undefined);
+    });
+  }
+
+
+  /**
+   * revert
+   * Revert an Entity back to whatever state it had in the base graph
+   * @param   {string}  entityID - The entityID of the Entity to revert
+   * @return  {Graph}   A new Graph
+   */
+  revert(entityID) {
+    const original = this._base.entities.get(entityID);
+    const current = this.hasEntity(entityID);
+    if (current === original) return this;   // no change
+
+    return this.update(function() {
+      this._local.entities.delete(entityID);
+      this._updateCaches(current, original);
+    });
+  }
+
+
+  /**
+   * update
+   * Applies the given functions to the Graph, and returns a new Graph.
+   * Graphs are intended to be immutable.
+   * @param   {...function}  args - Functions to apply to the graph to update it
+   * @return  {Graph}        A new Graph
+   */
+  update(...args) {
+    if (this._mutate) {
+      return this.updateSelf(...args);
+
+    } else {
+      const graph = new Graph(this);
+      graph._mutate = true;
+
+      for (const fn of args) {
+        fn.call(graph, graph);
+      }
+      graph._updateAffected();
+
+      graph._mutate = false;
+      return graph;
+    }
+  }
+
+
+  /**
+   * updateSelf
+   * Applies the given functions to the Graph, and returns this same Graph.
+   * Like `update` but it modifies the current Graph in-place.
+   * `updateSelf` is slightly more performant for situations where you don't need
+   * immutability and don't mind mutating the Graph.
+   * @param   {...function}  args - Functions to apply to the graph to update it
+   * @return  {Graph}        this same Graph
+   */
+  updateSelf(...args) {
+    const was = this._mutate;
+    this._mutate = true;
+
+    for (const fn of args) {
+      fn.call(this, this);
+    }
+    this._updateAffected();
+
+    this._mutate = was;
+    return this;
+  }
+
+
+  /**
+   * load
+   * Loads new Entities into the local Graph, obliterating any existing Entities.
+   * Unlike other Graph methods that return a new Graph, `load` mutates in-place.
+   * Used when restoring history or entering/leaving walkthrough.
+   * This basically does the same thing as `replace`/`remove`, but without creating a new Graph.
+   * @param   {Object<entityID, Entity>}  entities -  Entities to load into the Graph
+   * @return  {Graph}  this Graph
+   */
+  load(entities) {
+    for (const [entityID, entity] of Object.entries(entities)) {
+      const current = this.hasEntity(entityID);
+      const replacement = entity || undefined;
+      this._local.entities.set(entityID, replacement);
+      this._updateCaches(current, replacement);
+    }
+    this._updateAffected();
+
+    return this;
+  }
+
+
+  /**
    * rebase
-   * Rebase merges new Entities into the base graph.
-   * Unlike other Graph methods that return a new Graph, rebase mutates in place.
-   * This is because it is used during to merge newly downloaded data into an existing stack of edits.
-   * To external consumers of the Graph, it should appear as if the Graph always contained the newly downloaded data.
+   * Loads new Entities into the base graph.
+   * Unlike other Graph methods that return a new Graph, `rebase` mutates in-place.
+   * Used during to merge newly downloaded data into an existing stack of edits.
+   * To external observers, it should appear as if the Graph always contained the newly downloaded data.
    * NOTE: It is probably important to call this ordered: Nodes, Ways, Relations
    * @param  {Array<Entity>}  entities - Entities to add to the base Graph
    * @param  {Array<Graph>}   stack - Stack of graphs that need updates after this rebase
-   * @param  {boolean}        force - If `true`, always update, if `false` skip entities that we've seen already
+   * @param  {boolean}        force - If `true`, always update, if `false` skip Entities that we've seen already
    */
   rebase(entities, stack, force) {
     const base = this._base;
     const head = stack[stack.length - 1]._local.entities;
     const restoreIDs = new Set();
-
-// need to force update any parent geometry when new children appear?
-const newEntities = new Set();
+    const newIDs = new Set();
 
     for (const entity of entities) {
       if (!entity.visible || (!force && base.entities.has(entity.id))) continue;
 
       // Merge data into the base graph
       base.entities.set(entity.id, entity);
-      this._updateCalculated(undefined, entity, base.parentWays, base.parentRels);
-newEntities.add(entity);
+      this._updateCaches(undefined, entity, base.parentWays, base.parentRels);
+      newIDs.add(entity.id);
 
       // A weird thing we have to watch out for..
       // Sometimes an edit can remove a node, then we download more information and realize
@@ -272,90 +414,25 @@ newEntities.add(entity);
           local.delete(id);
         }
       }
-      graph._updateRebased(newEntities);
+
+      graph._updateRebased();
+
+      // update geometries for new IDs
+      graph._affectedIDs = new Set(newIDs);
+      graph._updateAffected();
     }
   }
 
 
   /**
-   * _updateRebased
-   * Internal function - Update a graph following a `rebase` (base graph has changed).
-   * Check local `parentWays` and `parentRels` caches and make sure they
-   * are consistent with the data in the base caches.
-   * @param {Array<Entity>}  newEntities - the new Entities  If they have parents the parents need their geometry updated.
-   */
-  _updateRebased(newEntities) {
-    const base = this._base;
-    const local = this._local;
-
-    for (const [childID, parentWayIDs] of local.parentWays) {  // for all this.parentWays we've cached
-      const baseWayIDs = base.parentWays.get(childID);         // compare to base.parentWays
-      if (!baseWayIDs) continue;
-      for (const wayID of baseWayIDs) {
-        if (!local.entities.has(wayID)) {  // if the Way hasn't been edited
-          parentWayIDs.add(wayID);         // update `this.parentWays` cache
-        }
-      }
-    }
-
-    for (const [childID, parentRelIDs] of local.parentRels) {  // for all this.parentRels we've cached
-      const baseRelIDs = base.parentRels.get(childID);         // compare to base.parentRels
-      if (!baseRelIDs) continue;
-      for (const relID of baseRelIDs) {
-        if (!local.entities.has(relID)) {  // if the Relation hasn't been edited
-          parentRelIDs.add(relID);         // update `this.parentRels` cache
-        }
-      }
-    }
-
-// Note that clearing the transients used to fix the "newEntities" problem,
-// because this is where the calculated extents used to live.
-    this._transients = new Map();
-
-// force update the geometries?
-const toUpdate = new Map();
-for (const entity of newEntities) {
-  this._getParents(entity, toUpdate);
-}
-for (const entity of toUpdate.values()) {
-  entity.updateGeometry(this);
-}
-
-    // this._childNodes is not updated, under the assumption that
-    // ways are always downloaded with their child nodes.
-  }
-
-
-
-// borrowed from Tree._includeParents, we may need it here.
-_getParents(entity, toUpdate, seen) {
-  const entityID = entity.id;
-  if (!seen) seen = new Set();
-
-  if (seen.has(entityID)) return;
-  seen.add(entityID);
-
-  for (const way of this.parentWays(entity)) {
-    toUpdate.set(way.id, way);
-    this._getParents(way, toUpdate, seen);
-  }
-
-  for (const relation of this.parentRelations(entity)) {
-    toUpdate.set(relation.id, relation);
-    this._getParents(relation, toUpdate, seen);
-  }
-}
-
-
-  /**
-   * _updateCalculated
+   * _updateCaches
    * Internal function, used to update internal caches after an Entity update
    * @param  {Entity}                previous?     The previous Entity
    * @param  {Entity}                current?      The current Entity
    * @param  {Map<entityID,Entity>}  parentWays?   parentWays Map() to update (defaults to `this._local.parentWays`)
    * @param  {Map<entityID,Entity>}  parentRels?   parentRels Map() to update (defaults to `this._local.parentRels`)
    */
-  _updateCalculated(previous, current, parentWays, parentRels) {
+  _updateCaches(previous, current, parentWays, parentRels) {
     const base = this._base;
     const local = this._local;
     parentWays = parentWays || local.parentWays;
@@ -363,6 +440,9 @@ _getParents(entity, toUpdate, seen) {
 
     const entity = current ?? previous;
     if (!entity) return;   // Either current or previous must be set
+
+    // This entity and any of its parents might need a geometry update.
+    this._affectedIDs.add(entity.id);
 
     if (entity.type === 'way') {  // Update parentWays
       const prevNodes = new Set(previous?.nodes);
@@ -401,151 +481,92 @@ _getParents(entity, toUpdate, seen) {
         parentRels.set(childID, parentIDs);
       }
     }
-
-    // Caches for the new Entity should be consistent, so we can compute its geometry.
-    // Don't need to do this for nodes, because their geometry is just stored in `loc`
-    // which was set in their constructor.
-    if (current && (current.type === 'way' || current.type === 'relation')) {
-      current.updateGeometry(this);
-    }
   }
 
 
   /**
-   * replace
-   * Replace an Entity in this Graph
-   * @param   {Entity}  entity - The Entity to replace
-   * @return  {Graph}   A new Graph
+   * _updateRebased
+   * Internal function, used to update a graph following a `rebase` (base graph has changed).
+   * Check local `parentWays` and `parentRels` caches and make sure they are consistent
+   *  with the data in the base caches.
    */
-  replace(replacement) {
-    const entityID = replacement.id;
-    const current = this.hasEntity(entityID);
-    if (current === replacement) return this;  // no change
+  _updateRebased() {
+    const base = this._base;
+    const local = this._local;
 
-    return this.update(function() {
-      this._updateCalculated(current, replacement);
-      this._local.entities.set(entityID, replacement);
-    });
-  }
-
-
-  /**
-   * replaceSelf
-   * Replace an Entity in this Graph
-   * @param   {Entity}  entity - The Entity to replace
-   * @return  {Graph}   This same Graph
-   */
-  replaceSelf(replacement) {
-    const entityID = replacement.id;
-    const current = this.hasEntity(entityID);
-    if (current === replacement) return this;  // no change
-
-    return this.updateSelf(function() {
-      this._updateCalculated(current, replacement);
-      this._local.entities.set(entityID, replacement);
-    });
-  }
-
-
-  /**
-   * remove
-   * Remove an Entity from this Graph
-   * @param   {Entity}  entity - The Entity to remove
-   * @return  {Graph}   A new Graph
-   */
-  remove(entity) {
-    const entityID = entity.id;
-    const current = this.hasEntity(entityID);
-    if (!current) return this;  // not in the graph
-
-    return this.update(function() {
-      this._updateCalculated(current, undefined);
-      this._local.entities.set(entityID, undefined);
-    });
-  }
-
-
-  /**
-   * revert
-   * Revert an Entity back to whatever state it had in the base graph
-   * @param   {string}  entityID - The entityID of the Entity to revert
-   * @return  {Graph}   A new Graph
-   */
-  revert(entityID) {
-    const original = this._base.entities.get(entityID);
-    const current = this.hasEntity(entityID);
-    if (current === original) return this;   // no change
-
-    return this.update(function() {
-      this._updateCalculated(current, original);
-      this._local.entities.delete(entityID);
-    });
-  }
-
-
-  /**
-   * update
-   * Applies the given functions to the Graph, and returns a new Graph.
-   * Graphs are intended to be immutable.
-   * @param   {...function}  args - Functions to apply to the graph to update it
-   * @return  {Graph}        A new Graph
-   */
-  update(...args) {
-    if (this._mutate) {
-      return this.updateSelf(...args);
-
-    } else {
-      const graph = new Graph(this);
-      graph._mutate = true;
-
-      for (const fn of args) {
-        fn.call(graph, graph);
+    for (const [childID, parentWayIDs] of local.parentWays) {  // for all this.parentWays we've cached
+      const baseWayIDs = base.parentWays.get(childID);         // compare to base.parentWays
+      if (!baseWayIDs) continue;
+      for (const wayID of baseWayIDs) {
+        if (!local.entities.has(wayID)) {  // if the Way hasn't been edited
+          parentWayIDs.add(wayID);         // update `this.parentWays` cache
+        }
       }
-      graph._mutate = false;
-      return graph;
     }
+
+    for (const [childID, parentRelIDs] of local.parentRels) {  // for all this.parentRels we've cached
+      const baseRelIDs = base.parentRels.get(childID);         // compare to base.parentRels
+      if (!baseRelIDs) continue;
+      for (const relID of baseRelIDs) {
+        if (!local.entities.has(relID)) {  // if the Relation hasn't been edited
+          parentRelIDs.add(relID);         // update `this.parentRels` cache
+        }
+      }
+    }
+
+    this._transients = new Map();
+
+    // this._childNodes is not updated, under the assumption that
+    // ways are always downloaded with their child nodes.
   }
 
 
   /**
-   * updateSelf
-   * Applies the given functions to the Graph, and returns this same Graph.
-   * Like `update` but it modifies the current Graph in-place.
-   * `updateSelf` is slightly more performant for situations where you don't need
-   * immutability and don't mind mutating the Graph.
-   * @param   {...function}  args - Functions to apply to the graph to update it
-   * @return  {Graph}        this same Graph
+   * _updateAffected
+   * Internal function, used to update Entity geometries affected by recent graph changes.
+   * This needs to be called after all `_updateCaches` calls have finished.
    */
-  updateSelf(...args) {
-    const was = this._mutate;
-    this._mutate = true;
+  _updateAffected() {
+    const toUpdate = new Set();
+    const seenIDs = new Set();
 
-    for (const fn of args) {
-      fn.call(this, this);
+    // Include any affected Entities, and their parent Entities.
+    for (const affectedID of this._affectedIDs) {
+      const entity = this.hasEntity(affectedID);
+      if (!entity) continue;
+
+      toUpdate.add(entity);
+      this._getParents(entity, toUpdate, seenIDs);
     }
 
-    this._mutate = was;
-    return this;
+    // Update geometry
+    for (const entity of toUpdate) {
+      if (entity.type === 'node') continue;   // nodes don't need this
+      entity.updateGeometry(this);
+    }
+
+    this._affectedIDs.clear();
   }
 
 
-  /**
-   * load
-   * Loads new Entities into the local Graph, obliterating any existing Entities.
-   * Used when restoring history or entering/leaving walkthrough.
-   * This basically does the same thing as `replace`/`remove`, but without creating a new Graph.
-   * @param   {Object<entityID, Entity>} entities -  Entities to load into the Graph
-   * @return  {Graph}  this Graph
-   */
-  load(entities) {
-    for (const [entityID, entity] of Object.entries(entities)) {
-      const current = this.hasEntity(entityID);
-      const replacement = entity || undefined;
-      this._updateCalculated(current, replacement);
-      this._local.entities.set(entityID, replacement);
+  // borrowed from Tree._includeParents
+  _getParents(entity, toUpdate, seenIDs) {
+    const entityID = entity.id;
+    if (!seenIDs) seenIDs = new Set();
+
+    if (seenIDs.has(entityID)) return;
+    seenIDs.add(entityID);
+
+    for (const way of this.parentWays(entity)) {
+      toUpdate.add(way);
+      this._getParents(way, toUpdate, seenIDs);
     }
 
-    return this;
+    for (const relation of this.parentRelations(entity)) {
+      toUpdate.add(relation);
+      this._getParents(relation, toUpdate, seenIDs);
+    }
   }
+
 
 }

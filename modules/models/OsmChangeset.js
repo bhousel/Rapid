@@ -42,21 +42,18 @@ export class OsmChangeset extends OsmEntity {
   }
 
   /**
-   * updateGeometry
-   * Changeset geometry not currently supported, but we could support it eventually.
-   * @return  {OsmChangeset}   this same OsmChangeset
-   */
-  updateGeometry(graph) {
-    return this;
-  }
-
-  /**
    * asGeoJSON
-   * GeoJSON not currently supported, but we could support it eventually
+   * Returns a GeoJSON representation of the OsmChangeset.
+   * (This currently returns an unlocated Feature, but we could return a bounding box or something)
    * @return  {Object}  An empty object
    */
   asGeoJSON() {
-    return {};
+    return {
+      type: 'Feature',
+      id: this.id,
+      properties: this.tags,
+      geometry: null
+    };
   }
 
   /**

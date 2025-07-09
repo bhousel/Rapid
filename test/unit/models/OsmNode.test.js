@@ -25,6 +25,59 @@ describe('OsmNode', () => {
   });
 
 
+  describe('#asGeoJSON', () => {
+    it('converts to a GeoJSON Point Feature', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { amenity: 'cafe' }, loc: [1, 2] });
+      const result = n1.asGeoJSON();
+      const expected = {
+        type: 'Feature',
+        id: 'n1',
+        properties: { amenity: 'cafe' },
+        geometry: {
+          type: 'Point',
+          coordinates: [1, 2]
+        }
+      };
+
+      assert.deepEqual(result, expected);
+    });
+
+    it('Handles GeoJSON Point Feature with missing location', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { amenity: 'cafe' }, loc: null });
+      const result = n1.asGeoJSON();
+      const expected = {
+        type: 'Feature',
+        id: 'n1',
+        properties: { amenity: 'cafe' },
+        geometry: null
+      };
+
+      assert.deepEqual(result, expected);
+    });
+  });
+
+
+  describe('#asJXON', () => {
+    it('converts a node to jxon', () => {
+      const node = new Rapid.OsmNode(context, { id: 'n-1', loc: [-77, 38], tags: { amenity: 'cafe' } });
+      assert.deepEqual(node.asJXON(), {
+        node: {
+          '@id': '-1',
+          '@lon': -77,
+          '@lat': 38,
+          '@version': 0,
+          tag: [{ keyAttributes: { k: 'amenity', v: 'cafe' } }]
+        }
+      });
+    });
+
+
+    it('includes changeset if provided', () => {
+      assert.equal(new Rapid.OsmNode(context, { loc: [0, 0] }).asJXON('1234').node['@changeset'], '1234');
+    });
+  });
+
+
   describe('#extent', () => {
     it('returns a point extent', () => {
       const node = new Rapid.OsmNode(context, { loc: [5, 10] });
@@ -691,43 +744,4 @@ describe('OsmNode', () => {
 
   });
 
-
-  describe('#asJXON', () => {
-    it('converts a node to jxon', () => {
-      const node = new Rapid.OsmNode(context, { id: 'n-1', loc: [-77, 38], tags: { amenity: 'cafe' } });
-      assert.deepEqual(node.asJXON(), {
-        node: {
-          '@id': '-1',
-          '@lon': -77,
-          '@lat': 38,
-          '@version': 0,
-          tag: [{ keyAttributes: { k: 'amenity', v: 'cafe' } }]
-        }
-      });
-    });
-
-
-    it('includes changeset if provided', () => {
-      assert.equal(new Rapid.OsmNode(context, { loc: [0, 0] }).asJXON('1234').node['@changeset'], '1234');
-    });
-  });
-
-
-  describe('#asGeoJSON', () => {
-    it('converts to a GeoJSON Point feature', () => {
-      const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { amenity: 'cafe' }, loc: [1, 2] });
-      const result = n1.asGeoJSON();
-      const expected = {
-        type: 'Feature',
-        id: 'n1',
-        properties: { amenity: 'cafe' },
-        geometry: {
-          type: 'Point',
-          coordinates: [1, 2]
-        }
-      };
-
-      assert.deepEqual(result, expected);
-    });
-  });
 });

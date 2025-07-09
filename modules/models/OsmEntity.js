@@ -58,23 +58,30 @@ export class OsmEntity extends AbstractData {
    * Nodes are easy because they represent a single coordinate.
    * But the other data types require topology information from a Graph.
    * This function allows the calling code to setup the geometry once the Graph is ready.
-   * @param   {Graph}     graph - the Graph that holds the information needed
-   * @return  {OsmEntity} this same OsmEntity
+   * @param   {Graph}      graph - the Graph that holds the information needed
+   * @return  {OsmEntity}  this same OsmEntity
    * @abstract
    */
   updateGeometry(graph) {
-    throw new Error(`Do not call 'updateGeometry' on OsmEntity`);
+    this.geoms.setData(this.asGeoJSON(graph));
+    return this;
   }
 
   /**
    * asGeoJSON
    * Returns a GeoJSON representation of this data element.
+   * (For generic OsmEntity, this currently returns an unlocated Feature)
    * @param   {Graph?}  graph - optional param, used only for some OSM Entities
    * @return  {Object}  GeoJSON representation of this data element
    * @abstract
    */
-  asGeoJSON(graph) {
-    throw new Error(`Do not call 'asGeoJSON' on OSMEntity`);
+  asGeoJSON() {
+    return {
+      type: 'Feature',
+      id: this.id,
+      properties: this.tags,
+      geometry: null
+    };
   }
 
   /**
