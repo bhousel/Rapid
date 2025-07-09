@@ -48,7 +48,7 @@ export class AbstractData {
       this.geoms = new Geometry(context);
     }
 
-    Object.assign(this.props, props);  // override with passed in props
+    Object.assign(this.props, globalThis.structuredClone(props));  // override with passed in props
   }
 
 

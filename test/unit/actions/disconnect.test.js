@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -30,7 +30,7 @@ describe('actionDisconnect', () => {
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c']);
     assert.deepEqual(result.entity('|').nodes, ['d', '*']);
   });
@@ -59,7 +59,7 @@ describe('actionDisconnect', () => {
     ]);
 
     const result = Rapid.actionDisconnect('b', '*').limitWays(['-'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', '*']);
     assert.deepEqual(result.entity('=').nodes, ['b', 'c']);
     assert.deepEqual(result.entity('|').nodes, ['d', 'b']);
@@ -90,7 +90,7 @@ describe('actionDisconnect', () => {
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('=').nodes, ['a', 'b']);
     assert.deepEqual(result.entity('-').nodes, ['*', 'c', 'd', 'e', '*']);   // still closed
   });
@@ -117,7 +117,7 @@ describe('actionDisconnect', () => {
     ]);
 
     const result = Rapid.actionDisconnect('a', '*')(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('w').nodes, ['a', 'b', 'c', '*']);
   });
 
@@ -146,7 +146,7 @@ describe('actionDisconnect', () => {
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('w').nodes, ['a', 'b', 'c', 'd', 'e', '*', 'a']);  // still closed
   });
 
@@ -179,7 +179,7 @@ describe('actionDisconnect', () => {
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('w1').nodes, ['a', 'b', 'c', 'a']);  // still closed
     assert.deepEqual(result.entity('w2').nodes, ['*', 'd', 'e', '*']);  // still closed
   });
@@ -213,7 +213,7 @@ describe('actionDisconnect', () => {
     ]);
 
     const result = Rapid.actionDisconnect('b', '*')(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('w1').nodes, ['b', 'c', 'a', 'b']);  // still closed
     assert.deepEqual(result.entity('w2').nodes, ['*', 'd', 'e', '*']);  // still closed
   });
@@ -234,18 +234,16 @@ describe('actionDisconnect', () => {
     const result = Rapid.actionDisconnect('b', '*')(graph);
     assert.ok(result instanceof Rapid.Graph);
 
-// why?? I would expect it to make copies (the test even says "copies")
-    // Immutable loc => should be shared by identity.
-    // expect(graph.entity('b').loc).to.equal(loc);
-    // expect(graph.entity('*').loc).to.equal(loc);
-    assert.equal(result.entity('b').loc, loc);
-    assert.equal(result.entity('*').loc, loc);
+    const resultB = result.hasEntity('b');
+    const resultStar = result.hasEntity('*');
+    assert.instanceOf(resultB, Rapid.OsmNode);
+    assert.instanceOf(resultStar, Rapid.OsmNode);
 
-    // Immutable tags => should be shared by identity.
-    // expect(graph.entity('b').tags).to.equal(tags);
-    // expect(graph.entity('*').tags).to.equal(tags);
-    assert.equal(result.entity('b').tags, tags);
-    assert.equal(result.entity('*').tags, tags);
+    assert.deepEqual(resultB.loc, resultStar.loc);
+    assert.notStrictEqual(resultB.loc, resultStar.loc);
+
+    assert.deepEqual(resultB.tags, resultStar.tags);
+    assert.notStrictEqual(resultB.tags, resultStar.tags);
   });
 
 
@@ -268,7 +266,7 @@ describe('actionDisconnect', () => {
         new Rapid.OsmWay(context, {id: 'w', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
       const disabled = Rapid.actionDisconnect('a').disabled(graph);
-      assert.ok(!disabled);
+      assert.notOk(disabled);
     });
 
     it('returns not_connected for the closing node in a closed area', () => {
@@ -299,7 +297,7 @@ describe('actionDisconnect', () => {
         new Rapid.OsmWay(context, {id: 'w', nodes: ['a', 'b', 'c', 'd', 'e', 'b', 'a'], tags: {area: 'yes'}})
       ]);
       const disabled = Rapid.actionDisconnect('b').disabled(graph);
-      assert.ok(!disabled);
+      assert.notOk(disabled);
     });
 
     it('returns falsy for a node shared by two or more ways', () => {
@@ -315,7 +313,7 @@ describe('actionDisconnect', () => {
         new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'b']})
       ]);
       const disabled = Rapid.actionDisconnect('b').disabled(graph);
-      assert.ok(!disabled);
+      assert.notOk(disabled);
     });
 
     it('returns falsy for an intersection of two ways with way specified by limitWays', () => {
@@ -332,7 +330,7 @@ describe('actionDisconnect', () => {
         new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'b']})
       ]);
       const disabled = Rapid.actionDisconnect('b').limitWays(['-']).disabled(graph);
-      assert.ok(!disabled);
+      assert.notOk(disabled);
     });
 
 
@@ -366,7 +364,7 @@ describe('actionDisconnect', () => {
         new Rapid.OsmRelation(context, {id: 'r', members: [{ id: '-' }, { id: '=' }]})
       ]);
       const disabled = Rapid.actionDisconnect('b').limitWays(['|']).disabled(graph);
-      assert.ok(!disabled);
+      assert.notOk(disabled);
     });
   });
 });

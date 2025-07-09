@@ -65,7 +65,7 @@ export class GeometryPart {
   /**
    * clone
    * Returns a clone of this GeometryPart object
-   * @return {GeometryPart}
+   * @return  {GeometryPart}  A new GeometryPart
    */
   clone() {
     const copy = new GeometryPart(this.context);
@@ -103,7 +103,7 @@ export class GeometryPart {
    * setData
    * This setter accepts singular GeoJSON Geometries only:  'Point', 'LineString', and 'Polygon'
    * If there is any existing data, it is first removed.
-   * @param  {GeoJSON}  geojson - GeoJSON geometry data
+   * @param  {Object}  geojson - GeoJSON geometry data
    */
   setData(geojson = {}) {
     this.destroy();

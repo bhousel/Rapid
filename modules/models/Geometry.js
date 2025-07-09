@@ -36,7 +36,6 @@ export class Geometry {
    */
   destroy() {
     this.reset();
-    this.parts = [];
   }
 
 
@@ -56,6 +55,7 @@ export class Geometry {
     for (const part of this.parts) {
       part.reset();
     }
+    this.parts = [];
   }
 
 
@@ -63,11 +63,10 @@ export class Geometry {
    * clone
    * Returns a clone of this Geometry object
    * It clones both the calculated extents as well as the GeometryParts in the collection.
-   * @return  {Geometry}
+   * @return  {Geometry}  A new Geometry
    */
   clone() {
     const copy = new Geometry(this.context);
-
     for (const obj of ['orig', 'world']) {
       const src = this[obj];
       if (!src) continue;
@@ -76,8 +75,10 @@ export class Geometry {
       for (const [k, v] of Object.entries(src)) {
         if (v instanceof Extent) {
           dst[k] = new Extent(v);
+/* c8 ignore start */
         } else {
           dst[k] = globalThis.structuredClone(v);
+/* c8 ignore end */
         }
       }
     }
@@ -96,7 +97,7 @@ export class Geometry {
    * It will automatically break multitypes and collections into parts
    *  and create separate GeometryPart elements for each part.
    * If there is any existing data, it is first removed.
-   * @param  {GeoJSON}  geojson - source GeoJSON data
+   * @param  {Object}  geojson - source GeoJSON data
    */
   setData(geojson = {}) {
     this.destroy();
@@ -130,7 +131,7 @@ export class Geometry {
    * _geojsonToParts
    * Break arbitrary GeoJSON into Geometry parts.
    * This will recurse down through the collection types if needed.
-   * @param   {GeoJSON?}        geojson - source GeoJSON data
+   * @param   {Object?}         geojson - source GeoJSON data
    * @param   {Array<Object>}   parts - collected GeoJSON single geometry parts (Point, LineString, or Polygon)
    * @param   {number}          depth - recursion depth
    * @return  {Array<Object>}   An array of singular GeoJSON geometries
