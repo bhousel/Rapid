@@ -220,8 +220,8 @@ export class OsmNode extends OsmEntity {
 //        results.push( (vecAngle(a, b) * 180 / Math.PI) + 90 );
 // using world coords - no projection!
         // +90 because vecAngle returns angle from X axis, not Y (north)
-        const a = this.geoms.parts[0].world.coords;
-        const b = (graph.entity(nodeID).geoms.parts[0].world.coords);
+        const a = this.geoms.parts[0]?.world?.coords ?? null;
+        const b = graph.entity(nodeID).geoms.parts[0]?.world?.coords ?? null;
         if (a === null || b === null) continue;
         results.push((vecAngle(a, b) * RAD2DEG) + 90);
       }
@@ -230,10 +230,6 @@ export class OsmNode extends OsmEntity {
     return utilArrayUniq(results).sort((a, b) => a - b);
   }
 
-
-  isCrossing() {
-    return this.tags.highway === 'crossing' || this.tags.railway?.includes('crossing');
-  }
 
   isEndpoint(graph) {
     return graph.transient(this, 'isEndpoint', () => {

@@ -8,7 +8,7 @@ describe('AbstractData', () => {
   const context = new Rapid.MockContext();
 
   describe('constructor', () => {
-    it('constructs AbstractData from a context', () => {
+    it('constructs an AbstractData from a context', () => {
       const a = new Rapid.AbstractData(context);
       assert.instanceOf(a, Rapid.AbstractData);
       assert.strictEqual(a.context, context);
@@ -16,18 +16,17 @@ describe('AbstractData', () => {
       assert.isObject(a.props);
     });
 
-    it('constructs AbstractData from a context, with props', () => {
-      const props = { foo: 'bar' };
-      const a = new Rapid.AbstractData(context, props);
+    it('constructs an AbstractData from a context, with props', () => {
+      const orig = { hello: 'world' };
+      const a = new Rapid.AbstractData(context, orig);
       assert.instanceOf(a, Rapid.AbstractData);
       assert.strictEqual(a.context, context);
       assert.instanceOf(a.geoms, Rapid.Geometry);
-      // `a.props` will be deep clone of props, possibly with other properties ('id') added.
-      assert.deepInclude(a.props, props);
-      assert.notStrictEqual(a.props, props);  // cloned, not ===
+      assert.notStrictEqual(a.props, orig);  // cloned, not ===
+      assert.deepInclude(a.props, orig);
     });
 
-    it('constructs AbstractData from another AbstractData', () => {
+    it('constructs an AbstractData from another AbstractData', () => {
       const a = new Rapid.AbstractData(context);
       const b = new Rapid.AbstractData(a);
       assert.instanceOf(b, Rapid.AbstractData);
@@ -38,17 +37,18 @@ describe('AbstractData', () => {
       assert.isObject(b.props);
     });
 
-    it('constructs AbstractData from another AbstractData, with props', () => {
-      const aprops = { foo: 'bar' };
-      const bprops = { hello: 'world' };
-      const a = new Rapid.AbstractData(context, aprops);
-      const b = new Rapid.AbstractData(a, bprops);
+    it('constructs an AbstractData from another AbstractData, with props', () => {
+      const orig = { hello: 'world' };
+      const a = new Rapid.AbstractData(context, orig);
+      const update = { foo: 'bar' };
+      const b = new Rapid.AbstractData(a, update);
       assert.instanceOf(b, Rapid.AbstractData);
       assert.strictEqual(b.context, context);
       assert.instanceOf(b.geoms, Rapid.Geometry);
       assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
-      assert.deepInclude(b.props, { foo: 'bar', hello: 'world' });
+      assert.deepInclude(b.props, orig);
+      assert.deepInclude(b.props, update);
     });
   });
 
@@ -77,37 +77,32 @@ describe('AbstractData', () => {
 
     it('updates the specified properties', () => {
       const a = new Rapid.AbstractData(context);
-      const aprops = a.props;
       const update = { foo: 'bar' };
       const b = a.updateSelf(update);
-      const bprops = b.props;
-      assert.strictEqual(bprops, aprops);      // same props object, ===
-      assert.notStrictEqual(bprops, update);   // cloned, not ===
-      assert.deepInclude(bprops, update);      // will also include a `v`
+      assert.strictEqual(b.props, a.props);     // same object, ===
+      assert.notStrictEqual(b.props, update);   // cloned, not ===
+      assert.deepInclude(b.props, update);
     });
 
     it('defaults to empty props argument', () => {
       const a = new Rapid.AbstractData(context);
-      const aprops = a.props;
       const b = a.updateSelf();
-      const bprops = b.props;
-      assert.strictEqual(bprops, aprops);      // same props object, ===
+      assert.strictEqual(b.props, a.props);   // same object, ===
     });
 
     it('preserves existing properties', () => {
-      const a = new Rapid.AbstractData(context, { foo: 'bar' });
-      const aprops = a.props;
-      const update = { hello: 'world' };
+      const orig = { hello: 'world' };
+      const a = new Rapid.AbstractData(context, orig);
+      const update = { foo: 'bar' };
       const b = a.updateSelf(update);
-      const bprops = b.props;
-      assert.strictEqual(bprops, aprops);      // same props object, ===
-      assert.notStrictEqual(bprops, update);   // cloned, not ===
-      assert.deepInclude(bprops, { foo: 'bar', hello: 'world' });  // will also include a `v`
+      assert.strictEqual(b.props, a.props);    // same object, ===
+      assert.notStrictEqual(b.props, update);  // cloned, not ===
+      assert.deepInclude(b.props, orig);
+      assert.deepInclude(b.props, update);
     });
 
     it('doesn\'t copy prototype properties', () => {
       const a = new Rapid.AbstractData(context);
-      const aprops = a.props;
       const update = { foo: 'bar' };
       const b = a.updateSelf(update);
       assert.doesNotHaveAnyKeys(b.props, ['constructor', '__proto__', 'toString']);

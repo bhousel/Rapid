@@ -575,8 +575,7 @@ export class OsmWay extends OsmEntity {
 
   area(graph) {
     return graph.transient(this, 'area', () => {
-      let nodes = graph.childNodes(this);
-
+      const nodes = graph.childNodes(this);
       const json = {
         type: 'Polygon',
         coordinates: [ nodes.map(n => n.loc) ]

@@ -99,7 +99,7 @@ export class OsmRelation extends OsmEntity {
           const entity = graph.hasEntity(member.id);
           if (!entity) continue;
 
-          const child = entity.asGeoJSON(graph, seen) || {};
+          const child = entity.asGeoJSON(graph, seen);
           if (!Object.keys(child).length) continue;  // skip if empty
 
           child.role = member.role;  // `role` here is not GeoJSON spec

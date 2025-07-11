@@ -39,12 +39,24 @@ export function validationCrossingWays(context) {
   ]);
 
 
+
+  /**
+   * isCrossingNode
+   * This returns true if the given node contains crossing tags.
+   * @param   {Object}  tags - the tags to check
+   * @return  {boolean} `true` if there is a crossing, `false` if not
+   */
+  function isCrossingNode(tags) {
+    return tags.highway === 'crossing' || tags.railway?.includes('crossing');
+  }
+
+
   /**
    * isCrossingWay
    * Is the way tagged with something that would indicate that it is a crossing,
    *   for example `highway=footway`+`footway=crossing` ?
-   * @param   {Object}   tags - tags to check
-   * @return  {boolean}  `true` if the way is tagged as a crossing
+   * @param   {Object}  tags - the tags to check
+   * @return  {boolean} `true` if there is a crossing, `false` if not
    */
   function isCrossingWay(tags) {
     for (const k of pathVals) {
@@ -808,7 +820,7 @@ export function validationCrossingWays(context) {
         if (closest && closest.distance < mergeThresholdInMeters) {
           const closeNode = edgeNodes[closest.index];
           // Reuse the close node if it has no interesting tags or if it is already a crossing - iD#8326
-          if (!closeNode.hasInterestingTags() || closeNode.isCrossing()) {
+          if (!closeNode.hasInterestingTags() || isCrossingNode(closeNode.tags)) {
             canReuse = true;
             mergeNodeIDs.push(closeNode.id);
           }

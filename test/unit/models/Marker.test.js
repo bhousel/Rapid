@@ -17,14 +17,13 @@ describe('Marker', () => {
     });
 
     it('constructs a Marker from a context, with props', () => {
-      const props = { id: 'note1', loc: [0, 0] };
-      const a = new Rapid.Marker(context, props);
+      const orig = { id: 'note1', loc: [0, 0] };
+      const a = new Rapid.Marker(context, orig);
       assert.instanceOf(a, Rapid.Marker);
       assert.strictEqual(a.context, context);
       assert.instanceOf(a.geoms, Rapid.Geometry);
-      // `a.props` will be deep clone of props, possibly with other properties ('id') added.
-      assert.deepInclude(a.props, props);
-      assert.notStrictEqual(a.props, props);  // cloned, not ===
+      assert.notStrictEqual(a.props, orig);  // cloned, not ===
+      assert.deepInclude(a.props, orig);
       assert.strictEqual(a.id, 'note1');
     });
 
@@ -41,25 +40,18 @@ describe('Marker', () => {
     });
 
     it('constructs a Marker from another Marker, with props', () => {
-      const aprops = { id: 'note1', loc: [0, 0] };
-      const bprops = { serviceID: 'osm' };
-      const a = new Rapid.Marker(context, aprops);
-      const b = new Rapid.Marker(a, bprops);
+      const orig = { id: 'note1', loc: [0, 0] };
+      const a = new Rapid.Marker(context, orig);
+      const update = { serviceID: 'osm' };
+      const b = new Rapid.Marker(a, update);
       assert.instanceOf(b, Rapid.Marker);
       assert.strictEqual(b.context, context);
       assert.instanceOf(b.geoms, Rapid.Geometry);
       assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
-      assert.deepInclude(b.props, { id: 'note1', loc: [0, 0], serviceID: 'osm' });
-    });
-  });
-
-  describe('destroy', () => {
-    it('destroys and frees the data', () => {
-      const a = new Rapid.Marker(context);
-      a.destroy();
-      assert.isNull(a.geoms);
-      assert.isNull(a.props);
+      assert.deepInclude(b.props, orig);
+      assert.deepInclude(b.props, update);
+      assert.strictEqual(a.id, 'note1');
     });
   });
 
@@ -73,44 +65,33 @@ describe('Marker', () => {
 
     it('updates the specified properties', () => {
       const a = new Rapid.Marker(context);
-      const aprops = a.props;
       const update = { serviceID: 'osm' };
       const b = a.update(update);
-      assert.instanceOf(b, Rapid.Marker);
-      assert.notStrictEqual(b, a);
-      const bprops = b.props;
-      assert.notStrictEqual(bprops, aprops);   // new object, not ===
-      assert.notStrictEqual(bprops, update);   // cloned, not ===
-      assert.deepInclude(bprops, update);      // will also include a `v`
+      assert.notStrictEqual(b.props, a.props);  // new object, not ===
+      assert.notStrictEqual(b.props, update);   // cloned, not ===
+      assert.deepInclude(b.props, update);
     });
 
     it('defaults to empty props argument', () => {
       const a = new Rapid.Marker(context);
-      const aprops = a.props;
       const b = a.update();
-      assert.instanceOf(b, Rapid.Marker);
-      assert.notStrictEqual(b, a);
-      const bprops = b.props;
-      assert.notStrictEqual(bprops, aprops);   // new object, not ===
+      assert.notStrictEqual(b.props, a.props);  // new object, not ===
     });
 
     it('preserves existing properties', () => {
-      const a = new Rapid.Marker(context, { id: 'note1', loc: [0, 0] });
-      const aprops = a.props;
+      const orig = { id: 'note1', loc: [0, 0] };
+      const a = new Rapid.Marker(context, orig);
       const update = { serviceID: 'osm' };
       const b = a.update(update);
-      assert.instanceOf(b, Rapid.Marker);
-      assert.notStrictEqual(b, a);
-      const bprops = b.props;
-      assert.notStrictEqual(bprops, aprops);   // new object, not ===
-      assert.notStrictEqual(bprops, update);   // cloned, not ===
-      assert.deepInclude(bprops, { id: 'note1', loc: [0, 0], serviceID: 'osm' });  // will also include a `v`
+      assert.notStrictEqual(b.props, a.props);   // new object, not ===
+      assert.notStrictEqual(b.props, update);    // cloned, not ===
+      assert.deepInclude(b.props, orig);
+      assert.deepInclude(b.props, update);
     });
 
     it('doesn\'t copy prototype properties', () => {
       const a = new Rapid.Marker(context);
-      const aprops = a.props;
-      const update = { foo: 'bar' };
+      const update = { serviceID: 'osm' };
       const b = a.update(update);
       assert.doesNotHaveAnyKeys(b.props, ['constructor', '__proto__', 'toString']);
     });

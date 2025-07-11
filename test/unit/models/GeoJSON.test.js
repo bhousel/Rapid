@@ -159,15 +159,6 @@ describe('GeoJSON', () => {
     });
   });
 
-  describe('destroy', () => {
-    it('destroys and frees the data', () => {
-      const data = new Rapid.GeoJSON(context, sample.point);
-      data.destroy();
-      assert.isNull(data.geoms);
-      assert.isNull(data.props);
-    });
-  });
-
   describe('#update', () => {
     it('returns a new GeoJSON element', () => {
       const a = new Rapid.GeoJSON(context, sample.point);
@@ -177,21 +168,22 @@ describe('GeoJSON', () => {
     });
 
     it('updates the specified props', () => {
-      const props = { crs: 'epsg:3857' };
-      const result = new Rapid.GeoJSON(context, sample.point).update(props);
-      assert.deepEqual(result.props.crs, props.crs);
+      const orig = { crs: 'epsg:3857' };
+      const result = new Rapid.GeoJSON(context, sample.point).update(orig);
+      assert.deepInclude(result.props, orig);
     });
 
     it('preserves existing properties', () => {
-      const props = { crs: 'epsg:3857' };
-      const result = new Rapid.GeoJSON(context, sample.point).update(props);
-      assert.deepEqual(result.props.properties.foo, 'bar');  // sample point contains this property
+      const orig = { crs: 'epsg:3857' };
+      const result = new Rapid.GeoJSON(context, sample.point).update(orig);
+      assert.deepInclude(result.props, orig);
+      assert.deepInclude(result.props.properties, { foo: 'bar'});  // sample point contains this property
     });
 
     it('doesn\'t copy prototype properties', () => {
       const props = { crs: 'epsg:3857' };
       const result = new Rapid.GeoJSON(context, sample.point).update(props);
-      assert.isNotOk(result.props.hasOwnProperty('update'));
+      assert.doesNotHaveAnyKeys(result.props, ['constructor', '__proto__', 'toString']);
     });
 
     it('updates v', () => {
@@ -202,40 +194,6 @@ describe('GeoJSON', () => {
     });
   });
 
-
-  describe('#updateSelf', () => {
-    it('returns the same GeoJSON element', () => {
-      const a = new Rapid.GeoJSON(context, sample.point);
-      const b = a.updateSelf({});
-      assert.instanceOf(b, Rapid.GeoJSON);
-      assert.strictEqual(a, b);
-    });
-
-    it('updates the specified properties', () => {
-      const props = { crs: 'epsg:3857' };
-      const result = new Rapid.GeoJSON(context, sample.point).updateSelf(props);
-      assert.deepEqual(result.props.crs, props.crs);
-    });
-
-    it('preserves existing properties', () => {
-      const props = { crs: 'epsg:3857' };
-      const result = new Rapid.GeoJSON(context, sample.point).updateSelf(props);
-      assert.deepEqual(result.props.properties.foo, 'bar');  // sample point contains this property
-    });
-
-    it('doesn\'t copy prototype properties', () => {
-      const props = { crs: 'epsg:3857' };
-      const result = new Rapid.GeoJSON(context, sample.point).updateSelf(props);
-      assert.isNotOk(result.props.hasOwnProperty('update'));
-    });
-
-    it('updates v', () => {
-      const a = new Rapid.GeoJSON(context, sample.point);
-      const v1 = a.v;
-      a.updateSelf({});
-      assert.isAbove(a.v, v1);
-    });
-  });
 
   describe('#asGeoJSON', () => {
     it('returns the originally cloned GeoJSON data, stored in props', () => {

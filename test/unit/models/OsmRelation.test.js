@@ -7,30 +7,118 @@ describe('OsmRelation', () => {
   const context = new Rapid.MockContext();
 
   describe('constructor', () => {
-    it('constructs a Relation', () => {
-      const relation = new Rapid.OsmRelation(context);
-      assert(relation instanceof Rapid.OsmRelation);
-      assert.equal(relation.type, 'relation');
+    it('constructs an OsmRelation from a context', () => {
+      const a = new Rapid.OsmRelation(context);
+      assert.instanceOf(a, Rapid.OsmRelation);
+      assert.strictEqual(a.context, context);
+      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.isObject(a.props);
     });
 
-    it('defaults members to an empty array', () => {
-      const relation = new Rapid.OsmRelation(context);
-      assert.deepEqual(relation.members, []);
+    it('generates an empty tags object, if unset', () => {
+      const a = new Rapid.OsmRelation(context);
+      assert.deepEqual(a.props.tags, {});
     });
 
-    it('sets members as specified', () => {
-      const relation = new Rapid.OsmRelation(context, { members: ['n-1'] });
-      assert.deepEqual(relation.members, ['n-1']);
+    it('generates an empty members Array, if unset', () => {
+      const a = new Rapid.OsmRelation(context);
+      assert.deepEqual(a.props.members, []);
     });
 
-    it('defaults tags to an empty object', () => {
-      const relation = new Rapid.OsmRelation(context);
-      assert.deepEqual(relation.tags, {});
+    it('generates an id string, if unset', () => {
+      const a = new Rapid.OsmRelation(context);
+      assert.match(a.props.id, /^r-/);
     });
 
-    it('sets tags as specified', () => {
-      const relation = new Rapid.OsmRelation(context, { tags: { foo: 'bar' } });
-      assert.deepEqual(relation.tags, { foo: 'bar' });
+    it('constructs an OsmRelation from a context, with props', () => {
+      const orig = { id: 'r1', members: [{ id: 'w1', role: 'outer' }], tags: { type: 'multipolygon' } };
+      const a = new Rapid.OsmRelation(context, orig);
+      assert.instanceOf(a, Rapid.OsmRelation);
+      assert.strictEqual(a.context, context);
+      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.notStrictEqual(a.props, orig);  // cloned, not ===
+    });
+
+    it('constructs an OsmRelation from another OsmRelation', () => {
+      const a = new Rapid.OsmRelation(context);
+      const b = new Rapid.OsmRelation(a);
+      assert.instanceOf(b, Rapid.OsmRelation);
+      assert.strictEqual(b.context, context);
+      assert.instanceOf(b.geoms, Rapid.Geometry);
+      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.notStrictEqual(b.props, a.props);  // cloned, not ===
+      assert.isObject(b.props);
+    });
+
+    it('constructs an OsmRelation from another OsmRelation, with props', () => {
+      const orig = { id: 'r1', members: [{ id: 'w1', role: 'outer' }], tags: { type: 'multipolygon' } };
+      const a = new Rapid.OsmRelation(context, orig);
+      const update = { foo: 'bar' };
+      const b = new Rapid.OsmRelation(a, update);
+      assert.instanceOf(b, Rapid.OsmRelation);
+      assert.strictEqual(b.context, context);
+      assert.instanceOf(b.geoms, Rapid.Geometry);
+      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.notStrictEqual(b.props, a.props);  // cloned, not ===
+      assert.deepInclude(b.props, orig);
+      assert.deepInclude(b.props, update);
+    });
+  });
+
+  describe('members', () => {
+    it('gets members', () => {
+      const orig = { id: 'r1', members: [{ id: 'w1', role: 'outer' }], tags: { type: 'multipolygon' } };
+      const r = new Rapid.OsmRelation(context, orig);
+      assert.deepEqual(r.members, [{ id: 'w1', role: 'outer' }]);
+    });
+  });
+
+  describe('update', () => {
+    it('returns a new OsmRelation', () => {
+      const a = new Rapid.OsmRelation(context);
+      const b = a.update({});
+      assert.instanceOf(b, Rapid.OsmRelation);
+      assert.notStrictEqual(b, a);
+    });
+
+    it('updates the specified properties', () => {
+      const a = new Rapid.OsmRelation(context);
+      const update = { foo: 'bar' };
+      const b = a.update(update);
+      assert.notStrictEqual(b.props, a.props);  // new object, not ===
+      assert.notStrictEqual(b.props, update);   // cloned, not ===
+      assert.deepInclude(b.props, update);
+    });
+
+    it('defaults to empty props argument', () => {
+      const a = new Rapid.OsmRelation(context);
+      const b = a.update();
+      assert.notStrictEqual(b.props, a.props);  // new object, not ===
+    });
+
+    it('preserves existing properties', () => {
+      const orig = { id: 'r1', members: [{ id: 'w1', role: 'outer' }], tags: { type: 'multipolygon' } };
+      const a = new Rapid.OsmRelation(context, orig);
+      const update = { foo: 'bar' };
+      const b = a.update(update);
+      assert.notStrictEqual(b.props, a.props);   // new object, not ===
+      assert.notStrictEqual(b.props, update);    // cloned, not ===
+      assert.deepInclude(b.props, orig);
+      assert.deepInclude(b.props, update);
+    });
+
+    it('doesn\'t copy prototype properties', () => {
+      const a = new Rapid.OsmRelation(context);
+      const update = { tags: { amenity: 'cafe' } };
+      const b = a.update(update);
+      assert.doesNotHaveAnyKeys(b.props, ['constructor', '__proto__', 'toString']);
+    });
+
+    it('updates v', () => {
+      const a = new Rapid.OsmRelation(context);
+      const v1 = a.v;
+      const b = a.update({});
+      assert.isAbove(b.v, v1);
     });
   });
 
@@ -43,7 +131,6 @@ describe('OsmRelation', () => {
       assert.notEqual(result, r);
     });
 
-
     it('adds the new Relation to input object', () => {
       const r = new Rapid.OsmRelation(context, { id: 'r' });
       const copies = {};
@@ -51,7 +138,6 @@ describe('OsmRelation', () => {
       assert.equal(Object.keys(copies).length, 1);
       assert.equal(copies.r, result);
     });
-
 
     it('returns an existing copy in input object', () => {
       const r = new Rapid.OsmRelation(context, { id: 'r' });
@@ -61,7 +147,6 @@ describe('OsmRelation', () => {
       assert.equal(Object.keys(copies).length, 1);
       assert.equal(result1, result2);
     });
-
 
     it('deep copies members', () => {
       const a = new Rapid.OsmNode(context, { id: 'a' });
@@ -82,7 +167,6 @@ describe('OsmRelation', () => {
       assert.equal(result.members[0].role, r.members[0].role);
     });
 
-
     it('deep copies non-tree relation graphs without duplicating children', () => {
       const w = new Rapid.OsmWay(context, { id: 'w' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'r2' }, { id: 'w' }] });
@@ -100,7 +184,6 @@ describe('OsmRelation', () => {
       assert.equal(copies.r2.members[0].id, copies.w.id);
     });
 
-
     it('deep copies cyclical relation graphs without issue', () => {
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'r2' }] });
       const r2 = new Rapid.OsmRelation(context, { id: 'r2', members: [{ id: 'r1' }] });
@@ -112,7 +195,6 @@ describe('OsmRelation', () => {
       assert.equal(copies.r1.members[0].id, copies.r2.id);
       assert.equal(copies.r2.members[0].id, copies.r1.id);
     });
-
 
     it('deep copies self-referencing relations without issue', () => {
       const r = new Rapid.OsmRelation(context, { id: 'r', members: [{ id: 'r' }] });
@@ -135,7 +217,6 @@ describe('OsmRelation', () => {
       assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [5, 10]));
     });
 
-
     it('returns the known extent of incomplete relations', () => {
       const a = new Rapid.OsmNode(context, { loc: [0, 0] });
       const b = new Rapid.OsmNode(context, { loc: [5, 10] });
@@ -144,36 +225,39 @@ describe('OsmRelation', () => {
       assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [0, 0]));
     });
 
-
     it('does not error on self-referencing relations', () => {
       let r = new Rapid.OsmRelation(context);
       r = r.addMember({ id: r.id });
       const graph = new Rapid.Graph([r]);
-      assert.equal(r.extent(graph), null);
+      assert.isNotOk(r.extent(graph));
     });
   });
 
 
   describe('geometry', () => {
     it('returns \'area\' for multipolygons', () => {
-      assert.equal(new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' } }).geometry(new Rapid.Graph()), 'area');
+      const r = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }});
+      const graph = new Rapid.Graph([r]);
+      assert.strictEqual(r.geometry(graph), 'area');
     });
 
-
     it('returns \'relation\' for other relations', () => {
-      assert.equal(new Rapid.OsmRelation(context).geometry(new Rapid.Graph()), 'relation');
+      const r = new Rapid.OsmRelation(context, { tags: { type: 'site' }});
+      const graph = new Rapid.Graph([r]);
+      assert.strictEqual(r.geometry(graph), 'relation');
     });
   });
 
 
   describe('isDegenerate', () => {
     it('returns true for a relation without members', () => {
-      assert.equal(new Rapid.OsmRelation(context).isDegenerate(), true);
+      const r = new Rapid.OsmRelation(context);
+      assert.isTrue(r.isDegenerate());
     });
 
-
     it('returns false for a relation with members', () => {
-      assert.equal(new Rapid.OsmRelation(context, { members: [{ id: 'a', role: 'inner' }] }).isDegenerate(), false);
+      const r = new Rapid.OsmRelation(context, { members: [{ id: 'a', role: 'inner' }] });
+      assert.isFalse(r.isDegenerate());
     });
   });
 
@@ -190,9 +274,8 @@ describe('OsmRelation', () => {
       assert.deepEqual(r.memberByRole('outer'), { id: 'b', role: 'outer', index: 1 });
     });
 
-
     it('returns undefined if no members have the given role', () => {
-      assert.equal(new Rapid.OsmRelation(context).memberByRole('outer'), undefined);
+      assert.isUndefined(new Rapid.OsmRelation(context).memberByRole('outer'));
     });
   });
 
@@ -208,9 +291,8 @@ describe('OsmRelation', () => {
       assert.deepEqual(r.memberById('b'), { id: 'b', role: 'outer', index: 1 });
     });
 
-
     it('returns undefined if no members have the given role', () => {
-      assert.equal(new Rapid.OsmRelation(context).memberById('b'), undefined);
+      assert.isUndefined(new Rapid.OsmRelation(context).memberById('b'));
     });
   });
 
@@ -225,9 +307,8 @@ describe('OsmRelation', () => {
           { role: 'to', id: 't', type: 'way' }
         ]
       });
-      assert.equal(r.hasFromViaTo(), true);
+      assert.isTrue(r.hasFromViaTo());
     });
-
 
     it('returns true if there are extra froms, vias, tos', () => {
       const r = new Rapid.OsmRelation(context, {
@@ -242,9 +323,8 @@ describe('OsmRelation', () => {
           { role: 'to', id: 't2', type: 'way' }
         ]
       });
-      assert.equal(r.hasFromViaTo(), true);
+      assert.isTrue(r.hasFromViaTo());
     });
-
 
     it('returns false if from missing', () => {
       const r = new Rapid.OsmRelation(context, {
@@ -255,7 +335,7 @@ describe('OsmRelation', () => {
           { role: 'to', id: 't', type: 'way' }
         ]
       });
-      assert.equal(r.hasFromViaTo(), false);
+      assert.isFalse(r.hasFromViaTo());
     });
 
 
@@ -268,7 +348,7 @@ describe('OsmRelation', () => {
           { role: 'to', id: 't', type: 'way' }
         ]
       });
-      assert.equal(r.hasFromViaTo(), false);
+      assert.isFalse(r.hasFromViaTo());
     });
 
 
@@ -281,7 +361,7 @@ describe('OsmRelation', () => {
           { role: 'via', id: 'v', type: 'node' }
         ]
       });
-      assert.equal(r.hasFromViaTo(), false);
+      assert.isFalse(r.hasFromViaTo());
     });
 
 
@@ -294,25 +374,27 @@ describe('OsmRelation', () => {
           { role: 'outer', id: 'o', type: 'way' }
         ]
       });
-      assert.equal(r.hasFromViaTo(), false);
+      assert.isFalse(r.hasFromViaTo());
     });
   });
 
 
   describe('isRestriction', () => {
     it('returns true for \'restriction\' type', () => {
-      assert.equal(new Rapid.OsmRelation(context, { tags: { type: 'restriction' } }).isRestriction(), true);
+      const r = new Rapid.OsmRelation(context, { tags: { type: 'restriction' }});
+      assert.isTrue(r.isRestriction());
     });
-
 
     it('returns true for \'restriction:type\' types', () => {
-      assert.equal(new Rapid.OsmRelation(context, { tags: { type: 'restriction:bus' } }).isRestriction(), true);
+      const r = new Rapid.OsmRelation(context, { tags: { type: 'restriction:bus' }});
+      assert.isTrue(r.isRestriction());
     });
 
-
     it('returns false otherwise', () => {
-      assert.equal(new Rapid.OsmRelation(context).isRestriction(), false);
-      assert.equal(new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' } }).isRestriction(), false);
+      const r1 = new Rapid.OsmRelation(context);
+      assert.isFalse(r1.isRestriction());
+      const r2 = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' } });
+      assert.isFalse(r2.isRestriction());
     });
   });
 
@@ -321,9 +403,8 @@ describe('OsmRelation', () => {
     it('not a restriction', () => {
       const r = new Rapid.OsmRelation(context, { id: 'r', tags: { type: 'multipolygon' } });
       const graph = new Rapid.Graph([r]);
-      assert.equal(r.isValidRestriction(graph), false);
+      assert.isFalse(r.isValidRestriction(graph));
     });
-
 
     it('typical restriction (from way, via node, to way) is valid', () => {
       const f = new Rapid.OsmWay(context, { id: 'f' });
@@ -339,10 +420,57 @@ describe('OsmRelation', () => {
         ]
       });
       const graph = new Rapid.Graph([f, v, t, r]);
-
-      assert.equal(r.isValidRestriction(graph), true);
+      assert.isTrue(r.isValidRestriction(graph));
     });
 
+    it('from not a way is invalid', () => {
+      const f = new Rapid.OsmNode(context, { id: 'f' });
+      const v = new Rapid.OsmNode(context, { id: 'v' });
+      const t = new Rapid.OsmWay(context, { id: 't' });
+      const r = new Rapid.OsmRelation(context, {
+        id: 'r',
+        tags: { type: 'restriction', restriction: 'no_left_turn' },
+        members: [
+          { role: 'from', id: 'f', type: 'node' },
+          { role: 'via', id: 'v', type: 'node' },
+          { role: 'to', id: 't', type: 'way' },
+        ]
+      });
+      const graph = new Rapid.Graph([f, v, t, r]);
+      assert.isFalse(r.isValidRestriction(graph));
+    });
+
+    it('to not a way is invalid', () => {
+      const f = new Rapid.OsmWay(context, { id: 'f' });
+      const v = new Rapid.OsmNode(context, { id: 'v' });
+      const t = new Rapid.OsmNode(context, { id: 't' });
+      const r = new Rapid.OsmRelation(context, {
+        id: 'r',
+        tags: { type: 'restriction', restriction: 'no_left_turn' },
+        members: [
+          { role: 'from', id: 'f', type: 'way' },
+          { role: 'via', id: 'v', type: 'node' },
+          { role: 'to', id: 't', type: 'node' },
+        ]
+      });
+      const graph = new Rapid.Graph([f, v, t, r]);
+      assert.isFalse(r.isValidRestriction(graph));
+    });
+
+    it('via missing is invalid', () => {
+      const f = new Rapid.OsmWay(context, { id: 'f' });
+      const t = new Rapid.OsmWay(context, { id: 't' });
+      const r = new Rapid.OsmRelation(context, {
+        id: 'r',
+        tags: { type: 'restriction', restriction: 'no_left_turn' },
+        members: [
+          { role: 'from', id: 'f', type: 'way' },
+          { role: 'to', id: 't', type: 'way' },
+        ]
+      });
+      const graph = new Rapid.Graph([f, t, r]);
+      assert.isFalse(r.isValidRestriction(graph));
+    });
 
     it('multiple froms, normal restriction is invalid', () => {
       const f1 = new Rapid.OsmWay(context, { id: 'f1' });
@@ -360,10 +488,8 @@ describe('OsmRelation', () => {
         ]
       });
       const graph = new Rapid.Graph([f1, f2, v, t, r]);
-
-      assert.equal(r.isValidRestriction(graph), false);
+      assert.isFalse(r.isValidRestriction(graph));
     });
-
 
     it('multiple froms, no_entry restriction is valid', () => {
       const f1 = new Rapid.OsmWay(context, { id: 'f1' });
@@ -381,10 +507,8 @@ describe('OsmRelation', () => {
         ]
       });
       const graph = new Rapid.Graph([f1, f2, v, t, r]);
-
-      assert.equal(r.isValidRestriction(graph), true);
+      assert.isTrue(r.isValidRestriction(graph));
     });
-
 
     it('multiple tos, normal restriction is invalid', () => {
       const f = new Rapid.OsmWay(context, { id: 'f' });
@@ -402,10 +526,8 @@ describe('OsmRelation', () => {
         ]
       });
       const graph = new Rapid.Graph([f, v, t1, t2, r]);
-
-      assert.equal(r.isValidRestriction(graph), false);
+      assert.isFalse(r.isValidRestriction(graph));
     });
-
 
     it('multiple tos, no_exit restriction is valid', () => {
       const f = new Rapid.OsmWay(context, { id: 'f' });
@@ -423,10 +545,8 @@ describe('OsmRelation', () => {
         ]
       });
       const graph = new Rapid.Graph([f, v, t1, t2, r]);
-
-      assert.equal(r.isValidRestriction(graph), true);
+      assert.isTrue(r.isValidRestriction(graph));
     });
-
 
     it('multiple vias, with some as node is invalid', () => {
       const f = new Rapid.OsmWay(context, { id: 'f' });
@@ -444,10 +564,8 @@ describe('OsmRelation', () => {
         ]
       });
       const graph = new Rapid.Graph([f, v1, v2, t, r]);
-
-      assert.equal(r.isValidRestriction(graph), false);
+      assert.isFalse(r.isValidRestriction(graph));
     });
-
 
     it('multiple vias, with all as way is valid', () => {
       const f = new Rapid.OsmWay(context, { id: 'f' });
@@ -465,8 +583,7 @@ describe('OsmRelation', () => {
         ]
       });
       const graph = new Rapid.Graph([f, v1, v2, t, r]);
-
-      assert.equal(r.isValidRestriction(graph), true);
+      assert.isTrue(r.isValidRestriction(graph));
     });
   });
 
@@ -484,18 +601,15 @@ describe('OsmRelation', () => {
       assert.deepEqual(r.addMember({ id: '1' }).members, [{ id: '1' }]);
     });
 
-
     it('adds a member at index 0', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ id: '1' }] });
       assert.deepEqual(r.addMember({ id: '2' }, 0).members, [{ id: '2' }, { id: '1' }]);
     });
 
-
     it('adds a member at a positive index', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ id: '1' }, { id: '3' }] });
       assert.deepEqual(r.addMember({ id: '2' }, 1).members, [{ id: '1' }, { id: '2' }, { id: '3' }]);
     });
-
 
     it('adds a member at a negative index', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ id: '1' }, { id: '3' }] });
@@ -534,24 +648,20 @@ describe('OsmRelation', () => {
       assert.equal(r.replaceMember({ id: 'a' }, { id: 'b' }), r);
     });
 
-
     it('replaces a member which doesn\'t already exist', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ id: 'a', role: 'a' }] });
       assert.deepEqual(r.replaceMember({ id: 'a' }, { id: 'b', type: 'node' }).members, [{ id: 'b', role: 'a', type: 'node' }]);
     });
-
 
     it('preserves the existing role', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ id: 'a', role: 'a', type: 'node' }] });
       assert.deepEqual(r.replaceMember({ id: 'a' }, { id: 'b', type: 'node' }).members, [{ id: 'b', role: 'a', type: 'node' }]);
     });
 
-
     it('uses the replacement type', () => {
       const r = new Rapid.OsmRelation(context, { members: [{ id: 'a', role: 'a', type: 'node' }] });
       assert.deepEqual(r.replaceMember({ id: 'a' }, { id: 'b', type: 'way' }).members, [{ id: 'b', role: 'a', type: 'way' }]);
     });
-
 
     it('removes members if replacing them would produce duplicates', () => {
       const r = new Rapid.OsmRelation(context, {
@@ -577,7 +687,7 @@ describe('OsmRelation', () => {
 
 
   describe('asJXON', () => {
-    it('converts a relation to jxon', function() {
+    it('converts a relation to jxon', () => {
       const relation = new Rapid.OsmRelation(context, { id: 'r-1', members: [{ id: 'w1', role: 'forward', type: 'way' }], tags: { type: 'route' } });
       assert.deepEqual(relation.asJXON(), {
         relation: {
@@ -589,9 +699,8 @@ describe('OsmRelation', () => {
       });
     });
 
-
-    it('includes changeset if provided', function() {
-      assert.equal(new Rapid.OsmRelation(context).asJXON('1234').relation['@changeset'], '1234');
+    it('includes changeset if provided', () => {
+      assert.strictEqual(new Rapid.OsmRelation(context).asJXON('1234').relation['@changeset'], '1234');
     });
   });
 
@@ -787,6 +896,35 @@ describe('OsmRelation', () => {
   });
 
 
+  describe('area', () => {
+    it('returns an area', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0, 1] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [1, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1'] });
+      const r1 = new Rapid.OsmRelation(context, { members: [{ id: 'w1', type: 'way' }] });
+      const g = new Rapid.Graph([n1, n2, n3, w1, r1]);
+      assert.isFinite(r1.area(g));
+    });
+  });
+
+
+  describe('isComplete', () => {
+    it('returns true if all members are in the graph', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1', type: 'node' }] });
+      const g = new Rapid.Graph([n1, r1]);
+      assert.isTrue(r1.isComplete(g));
+    });
+
+    it('returns false if not all members are in the graph', () => {
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1', type: 'node' }] });
+      const g = new Rapid.Graph([r1]);
+      assert.isFalse(r1.isComplete(g));
+    });
+  });
+
+
   describe('multipolygon', () => {
     it('single polygon consisting of a single way', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
@@ -802,7 +940,6 @@ describe('OsmRelation', () => {
         ]
       ]);
     });
-
 
     it('single polygon consisting of multiple ways', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
@@ -820,7 +957,6 @@ describe('OsmRelation', () => {
       ]);
     });
 
-
     it('single polygon consisting of multiple ways, one needing reversal', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
       const b = new Rapid.OsmNode(context, { loc: [3, 3] });
@@ -836,7 +972,6 @@ describe('OsmRelation', () => {
         ]
       ]);
     });
-
 
     it('multiple polygons consisting of single ways', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
@@ -860,7 +995,6 @@ describe('OsmRelation', () => {
       ]);
     });
 
-
     it('invalid geometry: unclosed ring consisting of a single way', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
       const b = new Rapid.OsmNode(context, { loc: [3, 3] });
@@ -875,7 +1009,6 @@ describe('OsmRelation', () => {
         ]
       ]);
     });
-
 
     it('invalid geometry: unclosed ring consisting of multiple ways', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
@@ -892,7 +1025,6 @@ describe('OsmRelation', () => {
         ]
       ]);
     });
-
 
     it('invalid geometry: unclosed ring consisting of multiple ways, alternate order', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
@@ -911,7 +1043,6 @@ describe('OsmRelation', () => {
       ]);
     });
 
-
     it('invalid geometry: unclosed ring consisting of multiple ways, one needing reversal', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
       const b = new Rapid.OsmNode(context, { loc: [2, 2] });
@@ -929,7 +1060,6 @@ describe('OsmRelation', () => {
       ]);
     });
 
-
     it('invalid geometry: unclosed ring consisting of multiple ways, one needing reversal, alternate order', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
       const b = new Rapid.OsmNode(context, { loc: [2, 2] });
@@ -946,7 +1076,6 @@ describe('OsmRelation', () => {
         ]
       ]);
     });
-
 
     it('single polygon with single single-way inner', () => {
       const a = new Rapid.OsmNode(context, { loc: [0, 0] });
@@ -972,7 +1101,6 @@ describe('OsmRelation', () => {
         ]
       ]);
     });
-
 
     it('single polygon with single multi-way inner', () => {
       const a = new Rapid.OsmNode(context, { loc: [0, 0] });
@@ -1000,7 +1128,6 @@ describe('OsmRelation', () => {
         ]
       ]);
     });
-
 
     it('single polygon with multiple single-way inners', () => {
       const a = new Rapid.OsmNode(context, { loc: [0, 0] });
@@ -1032,7 +1159,6 @@ describe('OsmRelation', () => {
         ]
       ]);
     });
-
 
     it('multiple polygons with single single-way inner', () => {
       const a = new Rapid.OsmNode(context, { loc: [0, 0] });
@@ -1067,7 +1193,6 @@ describe('OsmRelation', () => {
       ]);
     });
 
-
     it('invalid geometry: unmatched inner', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
       const b = new Rapid.OsmNode(context, { loc: [2, 2] });
@@ -1082,7 +1207,6 @@ describe('OsmRelation', () => {
         ]
       ]);
     });
-
 
     it('incomplete relation', () => {
       const a = new Rapid.OsmNode(context, { loc: [1, 1] });
@@ -1109,7 +1233,6 @@ describe('OsmRelation', () => {
       assert.ok(Rapid.OsmRelation.creationOrder(a, b) > 0);
       assert.ok(Rapid.OsmRelation.creationOrder(b, a) < 0);
     });
-
 
     it('orders new relations newest-first', () => {
       const a = new Rapid.OsmRelation(context, { id: 'r-1' });
