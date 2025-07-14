@@ -55,7 +55,7 @@ export class AbstractData {
   /**
    * destroy
    * Every data element should have a destroy function that frees all the resources
-   * Do not use the Feature after calling `destroy()`.
+   * Do not use the data element after calling `destroy()`.
    * @abstract
    */
   destroy() {
@@ -149,8 +149,8 @@ export class AbstractData {
    * touch
    * Bump internal version number in place (typically, forcing a rerender)
    * Note that this version number always increases and is shared by all data elements.
-   * We did it this way to avoid situations where you undo a feature
-   *  to a previous version and then increment it back to the same version.
+   * We did it this way to avoid situations where you undo to a previous version
+   *  you don't want it to increment it back to the same version and appear unchanged.
    * @see Rapid@9ac2776a
    * @return  {AbstractData}  this data element
    */
@@ -165,36 +165,30 @@ export class AbstractData {
    * The meaning of this type is data-dependant.  For OSM data it will be something like
    *  'node', 'way', 'relation', but for other data may be unset.
    * @return  {string}  string describing what kind of data element this is
+   * @readonly
    */
   get type() {
     return this.props.type ?? '';
-  }
-  set type(val) {
-    this.props.type = val;
   }
 
   /**
    * id
    * Unique string to identify this data element (elsewhere, referred to as the `dataID`)
    * @return  {string}
+   * @readonly
    */
   get id() {
     return this.props.id ?? '';
-  }
-  set id(val) {
-    this.props.id = val;
   }
 
   /**
    * v
    * Internal version of the data element, can be used to detect changes.
    * @return  {number}
+   * @readonly
    */
   get v() {
     return this.props.v || 0;
-  }
-  set v(val) {
-    this.props.v = val;
   }
 
   /**

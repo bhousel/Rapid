@@ -165,13 +165,6 @@ describe('AbstractData', () => {
       const a = new Rapid.AbstractData(context);
       assert.strictEqual(a.type, '');
     });
-
-    it('sets type', () => {
-      const a = new Rapid.AbstractData(context, { type: 'node' });
-      a.type = 'way';
-      assert.strictEqual(a.props.type, 'way');
-      assert.strictEqual(a.type, 'way');
-    });
   });
 
   describe('id', () => {
@@ -185,13 +178,6 @@ describe('AbstractData', () => {
       const a = new Rapid.AbstractData(context);
       assert.strictEqual(a.id, '');
     });
-
-    it('sets id', () => {
-      const a = new Rapid.AbstractData(context, { id: '10' });
-      a.id = '5';
-      assert.strictEqual(a.props.id, '5');
-      assert.strictEqual(a.id, '5');
-    });
   });
 
   describe('v', () => {
@@ -204,13 +190,6 @@ describe('AbstractData', () => {
     it('gets 0 if no v', () => {
       const a = new Rapid.AbstractData(context);
       assert.strictEqual(a.v, 0);
-    });
-
-    it('sets v', () => {
-      const a = new Rapid.AbstractData(context, { v: 10 });
-      a.v = 5;
-      assert.strictEqual(a.props.v, 5);
-      assert.strictEqual(a.v, 5);
     });
   });
 
