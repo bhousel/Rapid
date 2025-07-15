@@ -14,8 +14,8 @@ export class Difference {
 
   /**
    * @constructor
-   * @param  {Graph}  base - Base Graph
-   * @param  {Graph}  head - Head Graph
+   * @param  {Graph?}  base - Base Graph
+   * @param  {Graph}   head - Head Graph
    */
   constructor(base, head) {
     this._base = base;
@@ -23,15 +23,19 @@ export class Difference {
     this._changes = new Map();   // Map<entityID, Object>
     this.didChange = {};         // 'addition', 'deletion', 'geometry', 'properties'
 
+    if (!head) return;           // no head graph, no difference
     if (base === head) return;   // same Graph, no difference
 
     // Gather affected ids
-    const ids = new Set([...head.local.entities.keys(), ...base.local.entities.keys()]);
+    let ids = new Set(head.local.entities.keys());
+    if (base) {                               // Note:  Maps are "Set-like"
+      ids = ids.union(base.local.entities);   // keys() will be invoked automatially
+    }
 
     // Check each id to determine whether it has changed from base -> head..
     for (const id of ids) {
       const h = head.hasEntity(id);
-      const b = base.hasEntity(id);
+      const b = base?.hasEntity(id);
       if (h === b) continue;  // no change
 
       const type = h?.type || b?.type;
@@ -134,7 +138,10 @@ export class Difference {
   /**
    * summary
    * Generates a difference "summary" in a format like what is presented on the
-   * pre-save commit component, with list items like "created", "modified", "deleted".
+   *  pre-save commit component, with list items like "created", "modified", "deleted".
+   * The difference summary is used to present a more "human" difference regarding verticies.
+   * For exmaple, when changing a way, the user might add/delete/move uninteresting child nodes,
+   *  but the summary difference presents it as only the way being modified.
    * @return  {Map<entityID, Object>  Returns a summary of changes
    */
   summary() {
