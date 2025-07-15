@@ -198,7 +198,7 @@ export class AbstractData {
    * @readonly
    */
   get key() {
-    return `${this.props.id}v${this.props.v}`;
+    return `${this.id}v${this.v}`;
   }
 
 }

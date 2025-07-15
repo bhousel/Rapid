@@ -28,12 +28,12 @@ export class ValidationIssue {
   }
 
 
-  extent(resolver) {
+  extent(graph) {
     if (this.loc) {
       return new Extent(this.loc);
     }
     if (this.entityIds && this.entityIds.length) {
-      return utilTotalExtent(this.entityIds, resolver);
+      return utilTotalExtent(this.entityIds, graph);
     }
     return null;
   }

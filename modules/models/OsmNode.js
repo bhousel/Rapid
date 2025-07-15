@@ -108,7 +108,7 @@ export class OsmNode extends OsmEntity {
 
 
   geometry(graph) {
-    return graph.transient(this, 'geometry', function() {
+    return this.transient('geometry', () => {
       return graph.isPoi(this) ? 'point' : 'vertex';
     });
   }
@@ -232,7 +232,7 @@ export class OsmNode extends OsmEntity {
 
 
   isEndpoint(graph) {
-    return graph.transient(this, 'isEndpoint', () => {
+    return this.transient('isEndpoint', () => {
       const id = this.id;
       return graph.parentWays(this).filter(parent => {
         return !parent.isClosed() && !!parent.affix(id);
@@ -241,7 +241,7 @@ export class OsmNode extends OsmEntity {
   }
 
   isConnected(graph) {
-    return graph.transient(this, 'isConnected', () => {
+    return this.transient('isConnected', () => {
       const parents = graph.parentWays(this);
 
       if (parents.length > 1) {  // vertex is connected to multiple parent ways
@@ -263,7 +263,7 @@ export class OsmNode extends OsmEntity {
 
 
   parentIntersectionWays(graph) {
-    return graph.transient(this, 'parentIntersectionWays', () => {
+    return this.transient('parentIntersectionWays', () => {
       return graph.parentWays(this).filter(parent => {
         return (parent.tags.highway ||
           parent.tags.waterway ||
@@ -281,7 +281,7 @@ export class OsmNode extends OsmEntity {
 
 
   isHighwayIntersection(graph) {
-    return graph.transient(this, 'isHighwayIntersection', () => {
+    return this.transient('isHighwayIntersection', () => {
       return graph.parentWays(this).filter(parent => {
         return parent.tags.highway && parent.geometry(graph) === 'line';
       }).length > 1;
@@ -290,7 +290,7 @@ export class OsmNode extends OsmEntity {
 
 
   isOnAddressLine(graph) {
-    return graph.transient(this, 'isOnAddressLine', () => {
+    return this.transient('isOnAddressLine', () => {
       return graph.parentWays(this).filter(parent => {
         return parent.tags.hasOwnProperty('addr:interpolation') && parent.geometry(graph) === 'line';
       }).length > 0;

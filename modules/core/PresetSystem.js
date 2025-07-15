@@ -275,17 +275,17 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
   /**
    * match
    * @param   entity
-   * @param   resolver
+   * @param   graph
    * @return  Preset that best matches
    */
-  match(entity, resolver) {
-    return resolver.transient(entity, 'presetMatch', () => {
-      let geometry = entity.geometry(resolver);
+  match(entity, graph) {
+    return entity.transient('presetMatch', () => {
+      let geometry = entity.geometry(graph);
       // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
-      if (geometry === 'vertex' && entity.isOnAddressLine(resolver)) {
+      if (geometry === 'vertex' && entity.isOnAddressLine(graph)) {
         geometry = 'point';
       }
-      const entityExtent = entity.extent(resolver);
+      const entityExtent = entity.extent(graph);
       return this.matchTags(entity.tags, geometry, entityExtent?.center());
     });
   }
@@ -355,16 +355,16 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
   /**
    * allowsVertex
    * @param   entity
-   * @param   resolver
+   * @param   graph
    * @return  `true` if this entity can be a vertex, `false` if not
    */
-  allowsVertex(entity, resolver) {
+  allowsVertex(entity, graph) {
     if (entity.type !== 'node') return false;
     if (Object.keys(entity.tags).length === 0) return true;
 
-    return resolver.transient(entity, 'vertexMatch', () => {
+    return entity.transient('vertexMatch', () => {
       // address lines allow vertices to act as standalone points
-      if (entity.isOnAddressLine(resolver)) return true;
+      if (entity.isOnAddressLine(graph)) return true;
 
       const geometries = osmNodeGeometriesForTags(entity.tags);
       if (geometries.vertex) return true;

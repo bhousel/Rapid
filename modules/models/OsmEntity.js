@@ -29,6 +29,20 @@ export class OsmEntity extends AbstractData {
   constructor(otherOrContext, props = {}) {
     super(otherOrContext, props);
 
+    // "transients" are a cache where we memoize expensive calculations.
+    // They previously lived in the Graph, however we churn through Graphs
+    // pretty frequently, so they now live with the OsmEntities themselves.
+    // The transients cache is shared between entities that copy from other entities.
+    // For this to work, the Entity must be touched if there is a meaningful
+    // change in the Graph that will cause the computed property to change.
+    if (otherOrContext instanceof AbstractData) {  // copy other
+      const other = otherOrContext;
+      this._transients = other._transients;
+
+    } else {
+      this._transients = new Map();  // Map<entityKey, Map<k,v>>
+    }
+
     // Idea: Store tags in a proto-less object to avoid collisions with
     //  reserved words in JavaScript objects, see iD#3044
     // Good idea, but this won't survive `structuredClone` or other
@@ -37,6 +51,17 @@ export class OsmEntity extends AbstractData {
       // this.props.tags = Object.create(null);
       this.props.tags = {};
     }
+  }
+
+  /**
+   * destroy
+   * Every data element should have a destroy function that frees all the resources
+   * Do not use the data element after calling `destroy()`.
+   * @abstract
+   */
+  destroy() {
+    super.destroy();
+    this._transients = null;
   }
 
   /**
@@ -125,6 +150,30 @@ export class OsmEntity extends AbstractData {
     const copy = new Type(this, { id: undefined, user: undefined, version: undefined, v: undefined });
     memo[this.id] = copy;
     return copy;
+  }
+
+  /**
+   * transient
+   * Stores a computed property for this Entity.
+   * We're essentially implementating "memoization" for the provided function.
+   * @param   {string}    k - String cache key to lookup the computed value (e.g. 'extent')
+   * @param   {function}  fn  - Function that performs the computation
+   * @return  {*}         The result of the function call
+   */
+  transient(k, fn) {
+    const entityKey = this.key;
+    let cache = this._transients.get(entityKey);
+    if (!cache) {
+      cache = new Map();   // Map<entityKey, Map<k,v>>
+      this._transients.set(entityKey, cache);
+    }
+
+    let v = cache.get(k);
+    if (v !== undefined) return v;  // return cached
+
+    v = fn();   // compute value
+    cache.set(k, v);
+    return v;
   }
 
   /**

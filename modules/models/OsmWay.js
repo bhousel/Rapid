@@ -75,7 +75,7 @@ export class OsmWay extends OsmEntity {
    * @return  {Object}  GeoJSON representation of the OsmWay
    */
   asGeoJSON(graph) {
-    return graph.transient(this, 'geojson', () => {
+    return this.transient('geojson', () => {
 
       let geometry = null;
       const coords = [];
@@ -369,7 +369,7 @@ export class OsmWay extends OsmEntity {
 
 
   geometry(graph) {
-    return graph.transient(this, 'geometry', () => {
+    return this.transient('geometry', () => {
       return this.isArea() ? 'area' : 'line';
     });
   }
@@ -387,7 +387,7 @@ export class OsmWay extends OsmEntity {
       );
     }
 
-    return graph.transient(this, 'segments', () => {
+    return this.transient('segments', () => {
       const segments = [];
       for (let i = 0; i < this.nodes.length - 1; i++) {
         segments.push({
@@ -574,7 +574,7 @@ export class OsmWay extends OsmEntity {
 
 
   area(graph) {
-    return graph.transient(this, 'area', () => {
+    return this.transient('area', () => {
       const nodes = graph.childNodes(this);
       const json = {
         type: 'Polygon',

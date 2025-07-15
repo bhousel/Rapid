@@ -15,7 +15,6 @@ export class Graph {
    * @param  {Graph|Array<Entity>}  other?   - Predecessor Graph, or Array of entities to load into new Graph.
    */
   constructor(other) {
-    this._transients = new Map();   // Map<entityID, Map<k,v>>
     this._childNodes = new Map();   // Map<entityID, Array<Entity>>
     this._affectedIDs = new Set();  // Set<entityID> affected by recent graph updates
 
@@ -92,33 +91,6 @@ export class Graph {
       throw new Error(`Entity ${entityID} not found`);
     }
     return entity;
-  }
-
-
-  /**
-   * transient
-   * Stores a computed property for the given Entity in the graph itself,
-   * to avoid frequent and expensive recomputation.  We're essentially
-   * implementating "memoization" for the provided function.
-   * @param   {Entity}    entity - The Entity to compute a value for
-   * @param   {string}    key - String cache key to lookup the computed value (e.g. 'extent')
-   * @param   {function}  fn  - Function that performs the computation, will be passed `entity`
-   * @return  {*}         The result of the function call
-   */
-  transient(entity, key, fn) {
-    const entityID = entity.id;
-    let cache = this._transients.get(entityID);
-    if (!cache) {
-      cache = new Map();
-      this._transients.set(entityID, cache);
-    }
-
-    let val = cache.get(key);
-    if (val !== undefined) return val;  // return cached
-
-    val = fn.call(entity);   // compute value
-    cache.set(key, val);
-    return val;
   }
 
 
@@ -513,8 +485,6 @@ export class Graph {
         }
       }
     }
-
-    this._transients = new Map();
 
     // this._childNodes is not updated, under the assumption that
     // ways are always downloaded with their child nodes.

@@ -163,7 +163,7 @@ describe('OsmWay', () => {
       const w = new Rapid.OsmWay(context, { id: 'w', nodes: ['a', 'b'] });
       const graph = new Rapid.Graph([a, b, w]);
       const copies = {};
-      const result = w.copy(graph, copies);
+      w.copy(graph, copies);
       assert.hasAllKeys(copies, ['a', 'b', 'w']);
 
       const copya = copies.a;
@@ -185,7 +185,7 @@ describe('OsmWay', () => {
       const w = new Rapid.OsmWay(context, { id: 'w', nodes: ['a', 'a'] });
       const graph = new Rapid.Graph([a, w]);
       const copies = {};
-      const result = w.copy(graph, copies);
+      w.copy(graph, copies);
       assert.hasAllKeys(copies, ['a', 'w']);
 
       const copya = copies.a;

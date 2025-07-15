@@ -219,6 +219,9 @@ describe('PresetSystem', () => {
       expect(matched.id).to.eql('point');   // no surfshop preset yet, matches fallback point
       presets.merge(presetData);
 
+      // todo: need to touch the entity now, due to change in how transients work.
+      // may need to rethink how this works.
+      surfShop.touch();
       matched = presets.match(surfShop, new Rapid.Graph([surfShop]));
       expect(matched.id).to.eql('amenity/shop/surf');
     });

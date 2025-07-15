@@ -70,7 +70,7 @@ export class OsmRelation extends OsmEntity {
    * @return  {Object}       GeoJSON representation of the OsmRelation
    */
   asGeoJSON(graph, seen) {
-    return graph.transient(this, 'geojson', () => {
+    return this.transient('geojson', () => {
 
       if (this.isMultipolygon()) {
         return {
@@ -192,7 +192,7 @@ export class OsmRelation extends OsmEntity {
 
 
   geometry(graph) {
-    return graph.transient(this, 'geometry', () => {
+    return this.transient('geometry', () => {
       return this.isMultipolygon() ? 'area' : 'relation';
     });
   }
@@ -310,7 +310,7 @@ export class OsmRelation extends OsmEntity {
   }
 
   area(graph) {
-    return graph.transient(this, 'area', () => {
+    return this.transient('area', () => {
       return d3_geoArea(this.asGeoJSON(graph));
     });
   }

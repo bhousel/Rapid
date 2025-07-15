@@ -223,23 +223,6 @@ describe('Graph', () => {
       assert.ok(parents.includes(r2));
       assert.ok(parents.includes(r3));
     });
-
-    it('invalidates transients', () => {
-      const n = new Rapid.OsmNode(context, { id: 'n' });
-      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n'] });
-      const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n'] });
-      const graph = new Rapid.Graph([n, w1]);
-
-      function numParents(entity) {
-        return graph.transient(entity, 'numParents', () => {
-          return graph.parentWays(entity).length;
-        });
-      }
-
-      assert.equal(numParents(n), 1);
-      graph.rebase([w2], [graph]);
-      assert.equal(numParents(n), 2);
-    });
   });
 
   describe('#remove', () => {

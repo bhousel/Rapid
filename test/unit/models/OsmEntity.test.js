@@ -76,6 +76,14 @@ describe('OsmEntity', () => {
     });
   });
 
+  describe('destroy', () => {
+    it('destroys and frees the data', () => {
+      const a = new Rapid.OsmEntity(context);
+      a.destroy();
+      assert.isNull(a._transients);
+    });
+  });
+
   describe('update', () => {
     it('returns a new OsmEntity', () => {
       const a = new Rapid.OsmEntity(context);
@@ -194,6 +202,16 @@ describe('OsmEntity', () => {
       const v1 = a.v;
       a.touch();
       assert.isAbove(a.v, v1);
+    });
+  });
+
+  describe('transient', () => {
+    it('sets/gets transient values', () => {
+      const a = new Rapid.OsmEntity(context);
+      const obj = {};
+      a.transient('test', () => obj);  // set
+      const v = a.transient('test');   // get
+      assert.strictEqual(v, obj);
     });
   });
 
