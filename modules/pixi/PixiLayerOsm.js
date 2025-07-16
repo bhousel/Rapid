@@ -612,7 +612,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           markerStyle.labelTint = 0xdddddd;
           markerStyle.markerTint = 0xdddddd;
         }
-        if (graph.isShared(node)) {     // shared nodes / junctions are more grey
+        if (node.isShared(graph)) {     // shared nodes / junctions are more grey
           markerStyle.iconTint = 0x111111;
           markerStyle.labelTint = 0xbbbbbb;
           markerStyle.markerTint = 0xbbbbbb;

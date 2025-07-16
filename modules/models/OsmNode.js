@@ -109,7 +109,8 @@ export class OsmNode extends OsmEntity {
 
   geometry(graph) {
     return this.transient('geometry', () => {
-      return graph.isPoi(this) ? 'point' : 'vertex';
+      const parents = graph.parentWays(this);
+      return parents.length === 0 ? 'point' : 'vertex';
     });
   }
 
@@ -257,6 +258,34 @@ export class OsmNode extends OsmEntity {
         return nodes.indexOf(this.id) !== nodes.lastIndexOf(this.id);
       }
 
+      return false;
+    });
+  }
+
+  /**
+   * isShared
+   * Returns `true` if this node has multiple connections:
+   *  - a Node with multiple parents, OR
+   *  - a Node connected to a single parent in multiple places.
+   * @param   {Graph}    graph - The graph for this node
+   * @return  {boolean}  `true` if this node has multiple connections
+   */
+  isShared(graph) {
+    return this.transient('isShared', () => {
+      const parents = graph.parentWays(this);
+
+      if (parents.length === 0) return false;  // no parents
+      if (parents.length > 1) return true;     // multiple parents
+
+      // single parent
+      const parent = parents[0];
+
+      // If parent is a closed loop, don't count the last node in the nodelist as doubly connected
+      const end = parent.isClosed() ? parent.nodes.length - 1 : parent.nodes.length;
+      for (let i = 0, count = 0; i < end; i++) {
+        if (this.id === parent.nodes[i]) count++;
+        if (count > 1) return true;
+      }
       return false;
     });
   }

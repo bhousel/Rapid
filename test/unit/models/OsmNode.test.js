@@ -293,6 +293,41 @@ describe('OsmNode', () => {
   });
 
 
+  describe('isShared', () => {
+    it('returns false a node with no parents', () => {
+      const n = new Rapid.OsmNode(context);
+      const graph = new Rapid.Graph([n]);
+      assert.isFalse(n.isShared(graph));
+    });
+
+    it('returns true a node with multiple parents', () => {
+      const n = new Rapid.OsmNode(context);
+      const w1 = new Rapid.OsmWay(context, { nodes: [n.id] });
+      const w2 = new Rapid.OsmWay(context, { nodes: [n.id] });
+      const graph = new Rapid.Graph([n, w1, w2]);
+      assert.isTrue(n.isShared(graph));
+    });
+
+    it('returns true for a self-intersecting node on a single parent way', () => {
+      const a = new Rapid.OsmNode(context, { id: 'a' });
+      const b = new Rapid.OsmNode(context, { id: 'b' });
+      const c = new Rapid.OsmNode(context, { id: 'c' });
+      const w = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'b'] });
+      const graph = new Rapid.Graph([a, b, c, w]);
+      assert.isTrue(b.isShared(graph));
+    });
+
+    it('returns false for the connecting node of a closed way', () => {
+      const a = new Rapid.OsmNode(context, { id: 'a' });
+      const b = new Rapid.OsmNode(context, { id: 'b' });
+      const c = new Rapid.OsmNode(context, { id: 'c' });
+      const w = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'a'] });
+      const graph = new Rapid.Graph([a, b, c, w]);
+      assert.isFalse(a.isShared(graph));
+    });
+  });
+
+
   describe('parentIntersectionWays', () => {
     it('returns a parent highway', () => {
       const n = new Rapid.OsmNode(context);

@@ -562,10 +562,11 @@ export class FilterSystem extends AbstractSystem {
       connections = this.getParents(entity, graph, entity.geometry(graph));
     }
 
-    // Gather ways connected to child nodes..
-    connections = childNodes.reduce((result, e) => {
-      return graph.isShared(e) ? utilArrayUnion(result, graph.parentWays(e)) : result;
-    }, connections);
+    // Gather other parentWays connected to this entity's childnodes..
+    for (const child of childNodes) {
+      const parents = graph.parentWays(child);
+      connections = utilArrayUnion(connections, parents);
+    }
 
     return connections.some(other => this.isHidden(other, graph, other.geometry(graph)));
   }
