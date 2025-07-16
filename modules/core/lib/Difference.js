@@ -22,6 +22,8 @@ export class Difference {
     this._head = head;
     this._changes = new Map();   // Map<entityID, Object>
     this.didChange = {};         // 'addition', 'deletion', 'geometry', 'properties'
+    this._summary = null;
+    this._complete = null;
 
     if (!head) return;           // no head graph, no difference
     if (base === head) return;   // same Graph, no difference
@@ -139,12 +141,24 @@ export class Difference {
    * summary
    * Generates a difference "summary" in a format like what is presented on the
    *  pre-save commit component, with list items like "created", "modified", "deleted".
+   *
    * The difference summary is used to present a more "human" difference regarding verticies.
    * For exmaple, when changing a way, the user might add/delete/move uninteresting child nodes,
    *  but the summary difference presents it as only the way being modified.
+   *
+   * Returns a result about the Entities that changed:
+   *  {
+   *    entityID: {
+   *      entity:      The Entity that changed
+   *      graph:       The Graph it can be found in (head or base)
+   *      changeType:  String, one of 'created', 'modified', or 'deleted'
+   *    }
+   *  }
    * @return  {Map<entityID, Object>  Returns a summary of changes
    */
   summary() {
+    if (this._summary) return this._summary;  // done already
+
     const base = this._base;
     const head = this._head;
     const result = new Map();  // Map<entityID, change detail>
@@ -154,10 +168,10 @@ export class Difference {
       const b = change.base;
 
       if (h && h.geometry(head) !== 'vertex') {
-        _addEntity(h, head, b ? 'modified' : 'created');
+        result.set(h.id, { entity: h, graph: head, changeType: (b ? 'modified' : 'created') });
 
       } else if (b && b.geometry(base) !== 'vertex') {
-        _addEntity(b, base, 'deleted');
+        result.set(b.id, { entity: b, graph: base, changeType: 'deleted' });
 
       } else if (b && h) {  // modified vertex
         const moved = !deepEqual(b.loc, h.loc);
@@ -165,38 +179,36 @@ export class Difference {
         if (moved) {
           for (const parent of head.parentWays(h)) {
             if (result.has(parent.id)) continue;
-            _addEntity(parent, head, 'modified');
+            result.set(parent.id, { entity: parent, graph: head, changeType: 'modified' });
           }
         }
         if (retagged || (moved && h.hasInterestingTags())) {
-          _addEntity(h, head, 'modified');
+          result.set(h.id, { entity: h, graph: head, changeType: 'modified' });
         }
 
       } else if (h && h.hasInterestingTags()) {  // created vertex
-        _addEntity(h, head, 'created');
+        result.set(h.id, { entity: h, graph: head, changeType: 'created' });
 
       } else if (b && b.hasInterestingTags()) {  // deleted vertex
-        _addEntity(b, base, 'deleted');
+        result.set(b.id, { entity: b, graph: base, changeType: 'deleted' });
       }
     }
 
+    this._summary = result;
     return result;
-
-
-    function _addEntity(entity, graph, changeType) {
-      result.set(entity.id, { entity: entity, graph: graph, changeType: changeType });
-    }
   }
 
 
   /**
    * complete
    * Returns complete set of Entities affected by the changes in this difference.
-   * This is used to know which entities need redraw or revalidation
-   * Recurses up to include all ancestor Entities in the result.
-   * @return  {Map<entityID, Entity>   Returns the complete set of entities affected by the change
+   * This is used to know which Entities need redraw or revalidation.
+   * Recurses up to include all ancestor Entities in the result, parentWays and parentRelations.
+   * @return  {Map<entityID, Entity>  Returns the complete set of entities affected by the change
    */
   complete() {
+    if (this._complete) return this._complete;  // done already
+
     const head = this._head;
     const result = new Map();  // Map<entityID, Entity>
 
@@ -225,18 +237,19 @@ export class Difference {
         }
       }
 
-      _addParents(head.parentWays(entity), result);
-      _addParents(head.parentRelations(entity), result);
+      _gatherParents(head.parentWays(entity), result);
+      _gatherParents(head.parentRelations(entity), result);
     }
 
+    this._complete = result;
     return result;
 
 
-    function _addParents(parents) {
+    function _gatherParents(parents) {
       for (const parent of parents) {
         if (result.has(parent.id)) continue;
         result.set(parent.id, parent);
-        _addParents(head.parentRelations(parent));  // recurse up to parent relations
+        _gatherParents(head.parentRelations(parent));  // recurse up to parent relations
       }
     }
   }

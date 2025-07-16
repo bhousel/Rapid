@@ -46,8 +46,8 @@ export class ValidationSystem extends AbstractSystem {
     this._ignoredIssueIDs = new Set();
     this._resolvedIssueIDs = new Set();
     this._completeDiff = new Map();  // complete diff base -> head of what the user changed
-    this._deferredRIC = new Map();   // Deferred `requestIdleCallback` - Map(handle -> Promise.reject)
-    this._deferredST = new Set();    // Deferred `setTimeout` - Set(handles)
+    this._deferredRIC = new Map();   // Deferred `requestIdleCallback` - Map<handle, Promise.reject>
+    this._deferredST = new Set();    // Deferred `setTimeout` - Set<handles>
     this._errorOverrides = [];
     this._warningOverrides = [];
     this._disableOverrides = [];
@@ -63,7 +63,7 @@ export class ValidationSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -830,14 +830,14 @@ class ValidationCache {
     this.queuePromise = null;
     this.queuedEntityIDs = new Set();
     this.provisionalEntityIDs = new Set();
-    this.issues = new Map();          // Map(issueID -> ValidationIssue)
-    this.entityIssueIDs = new Map();  // Map(entityID -> Set(issueID))
+    this.issues = new Map();          // Map<issueID, ValidationIssue>
+    this.entityIssueIDs = new Map();  // Map<entityID, Set<issueID>>
 
     // A RBush spatial index that stores 'boxes'.
     // The boxes mark regions where the involved entities may need to be rechecked
     // by being part of a impossible oneway or disconnected way routing island.
     this.recheckRBush = new RBush();
-    this.recheckBoxes = new Map();   // Map(issueID -> Box)
+    this.recheckBoxes = new Map();   // Map<issueID, Box>
   }
 
 
