@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -10,29 +10,29 @@ describe('Graph', () => {
     it('accepts an entities Array', () => {
       const entity = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([entity]);
-      assert.ok(graph instanceof Rapid.Graph);
-      assert.equal(graph.entity(entity.id), entity);
+      assert.instanceOf(graph, Rapid.Graph);
+      assert.strictEqual(graph.entity(entity.id), entity);
     });
 
     it('accepts a Graph', () => {
       const entity = new Rapid.OsmNode(context);
       const graph1 = new Rapid.Graph([entity]);
       const graph2 = new Rapid.Graph(graph1);
-      assert.equal(graph2.entity(entity.id), entity);
+      assert.strictEqual(graph2.entity(entity.id), entity);
     });
 
     it('shallow copies other\'s entities', () => {
       const entity = new Rapid.OsmNode(context);
       const graph1 = new Rapid.Graph([entity]);
       const graph2 = new Rapid.Graph(graph1);
-      assert.notEqual(graph1.local, graph2.local);
-      assert.notEqual(graph1.local.entities, graph2.local.entities);
+      assert.notStrictEqual(graph1.local, graph2.local);
+      assert.notStrictEqual(graph1.local.entities, graph2.local.entities);
     });
 
     it('shares base data among chain of Graphs', () => {
       const graph1 = new Rapid.Graph();
       const graph2 = new Rapid.Graph(graph1);
-      assert.equal(graph1.base, graph2.base);
+      assert.strictEqual(graph1.base, graph2.base);
     });
   });
 
@@ -40,11 +40,12 @@ describe('Graph', () => {
     it('returns the entity when present', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
-      assert.equal(graph.hasEntity(node.id), node);
+      assert.strictEqual(graph.hasEntity(node.id), node);
     });
 
     it('returns undefined when the entity is not present', () => {
-      assert.equal(new Rapid.Graph().hasEntity('1'), undefined);
+      const graph = new Rapid.Graph();
+      assert.isUndefined(graph.hasEntity('1'));
     });
   });
 
@@ -52,7 +53,7 @@ describe('Graph', () => {
     it('returns the entity when present', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
-      assert.equal(graph.entity(node.id), node);
+      assert.strictEqual(graph.entity(node.id), node);
     });
 
     it('throws when the entity is not present', () => {
@@ -65,21 +66,21 @@ describe('Graph', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const graph = new Rapid.Graph([node]);
       graph.rebase([], [graph]);
-      assert.equal(graph.entity('n'), node);
+      assert.strictEqual(graph.entity('n'), node);
     });
 
     it('includes new entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const graph = new Rapid.Graph();
       graph.rebase([node], [graph]);
-      assert.equal(graph.entity('n'), node);
+      assert.strictEqual(graph.entity('n'), node);
     });
 
     it('doesn\'t rebase deleted entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n', visible: false });
       const graph = new Rapid.Graph();
       graph.rebase([node], [graph]);
-      assert.ok(!graph.hasEntity('n'));
+      assert.isUndefined(graph.hasEntity('n'));
     });
 
     it('gives precedence to existing entities', () => {
@@ -87,7 +88,7 @@ describe('Graph', () => {
       const b = new Rapid.OsmNode(context, { id: 'n' });
       const graph = new Rapid.Graph([a]);
       graph.rebase([b], [graph]);
-      assert.equal(graph.entity('n'), a);
+      assert.strictEqual(graph.entity('n'), a);
     });
 
     it('gives precedence to new entities when force = true', () => {
@@ -95,7 +96,7 @@ describe('Graph', () => {
       const b = new Rapid.OsmNode(context, { id: 'n' });
       const graph = new Rapid.Graph([a]);
       graph.rebase([b], [graph], true);
-      assert.equal(graph.entity('n'), b);
+      assert.strictEqual(graph.entity('n'), b);
     });
 
     it('inherits entities from base', () => {
@@ -113,7 +114,7 @@ describe('Graph', () => {
       graph.rebase([w2], [graph]);
 
       const parents = graph.parentWays(n);
-      assert.ok(parents instanceof Array);
+      assert.instanceOf(parents, Array);
       assert.ok(parents.includes(w1));
       assert.ok(parents.includes(w2));
       assert.ok(!graph.local.parentWays.has('n'));
@@ -138,10 +139,8 @@ describe('Graph', () => {
       graph.rebase([w3], [graph, graph2]);
 
       const parents = graph2.parentWays(n);
-      assert.ok(parents instanceof Array);
-      assert.ok(parents.includes(w1));
-      assert.ok(parents.includes(w2));
-      assert.ok(parents.includes(w3));
+      assert.instanceOf(parents, Array);
+      assert.sameMembers(parents, [w1, w2, w3]);
     });
 
     it('avoids re-adding a modified way as a parent way', () => {
@@ -171,7 +170,7 @@ describe('Graph', () => {
       const graph = new Rapid.Graph([n, w1]);
       const graph2 = graph.remove(n);
       graph.rebase([n, w2], [graph, graph2]);
-      assert.equal(graph2.entity('n'), n);
+      assert.strictEqual(graph2.entity('n'), n);
     });
 
     it('updates parentRelations', () => {
@@ -182,9 +181,8 @@ describe('Graph', () => {
       graph.rebase([r2], [graph]);
 
       const parents = graph.parentRelations(n);
-      assert.ok(parents instanceof Array);
-      assert.ok(parents.includes(r1));
-      assert.ok(parents.includes(r2));
+      assert.instanceOf(parents, Array);
+      assert.sameMembers(parents, [r1, r2]);
       assert.ok(!graph.local.parentRels.has('n'));
       assert.ok(graph.base.parentRels.has('n'));
     });
@@ -218,10 +216,8 @@ describe('Graph', () => {
       graph.rebase([r3], [graph, graph2]);
 
       const parents = graph2.parentRelations(n);
-      assert.ok(parents instanceof Array);
-      assert.ok(parents.includes(r1));
-      assert.ok(parents.includes(r2));
-      assert.ok(parents.includes(r3));
+      assert.instanceOf(parents, Array);
+      assert.sameMembers(parents, [r1, r2, r3]);
     });
   });
 
@@ -230,35 +226,38 @@ describe('Graph', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
       const result = graph.remove(node);
-      assert.ok(result instanceof Rapid.Graph);
-      assert.notEqual(result, graph);
+      assert.instanceOf(result, Rapid.Graph);
+      assert.notStrictEqual(result, graph);
     });
 
     it('doesn\'t modify the receiver', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
       graph.remove(node);
-      assert.equal(graph.entity(node.id), node);
+      assert.strictEqual(graph.entity(node.id), node);
     });
 
     it('removes the entity from the result', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
-      assert.equal(graph.remove(node).hasEntity(node.id), undefined);
+      const result = graph.remove(node);
+      assert.isUndefined(result.hasEntity(node.id));
     });
 
     it('removes the entity as a parentWay', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const w1 = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'] });
       const graph = new Rapid.Graph([node, w1]);
-      assert.deepEqual(graph.remove(w1).parentWays(node), []);
+      const result = graph.remove(w1);
+      assert.deepEqual(result.parentWays(node), []);
     });
 
     it('removes the entity as a parentRelation', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const r1 = new Rapid.OsmRelation(context, { id: 'w', members: [{ id: 'n' }] });
       const graph = new Rapid.Graph([node, r1]);
-      assert.deepEqual(graph.remove(r1).parentRelations(node), []);
+      const result = graph.remove(r1);
+      assert.deepEqual(result.parentRelations(node), []);
     });
   });
 
@@ -266,29 +265,30 @@ describe('Graph', () => {
     it('is a no-op if the replacement is identical to the existing entity', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
-      assert.equal(graph.replace(node), graph);
+      assert.strictEqual(graph.replace(node), graph);
     });
 
     it('returns a new graph', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
       const result = graph.replace(node.update());
-      assert.ok(result instanceof Rapid.Graph);
-      assert.notEqual(result, graph);
+      assert.instanceOf(result, Rapid.Graph);
+      assert.notStrictEqual(result, graph);
     });
 
     it('doesn\'t modify the receiver', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
       graph.replace(node);
-      assert.equal(graph.entity(node.id), node);
+      assert.strictEqual(graph.entity(node.id), node);
     });
 
     it('replaces the entity in the result', () => {
       const node1 = new Rapid.OsmNode(context);
       const node2 = node1.update({});
       const graph = new Rapid.Graph([node1]);
-      assert.equal(graph.replace(node2).entity(node2.id), node2);
+      const result = graph.replace(node2);
+      assert.strictEqual(result.entity(node2.id), node2);
     });
 
     it('adds parentWays', () => {
@@ -296,8 +296,7 @@ describe('Graph', () => {
       const w1 = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'] });
       const graph = new Rapid.Graph([node]);
       const result = graph.replace(w1);
-      const parents = result.parentWays(node);
-      assert.ok(parents.includes(w1));
+      assert.deepEqual(result.parentWays(node), [w1]);
     });
 
     it('removes parentWays', () => {
@@ -312,7 +311,8 @@ describe('Graph', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const w1 = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'] });
       const graph = new Rapid.Graph([node, w1]);
-      assert.deepEqual(graph.replace(w1).parentWays(node), [w1]);
+      const result = graph.replace(w1);
+      assert.deepEqual(result.parentWays(node), [w1]);
     });
 
     it('adds parentRelations', () => {
@@ -320,8 +320,7 @@ describe('Graph', () => {
       const r1 = new Rapid.OsmRelation(context, { id: 'r', members: [{ id: 'n'}] });
       const graph = new Rapid.Graph([node]);
       const result = graph.replace(r1);
-      const parents = result.parentRelations(node);
-      assert.ok(parents.includes(r1));
+      assert.deepEqual(result.parentRelations(node), [r1]);
     });
 
     it('removes parentRelations', () => {
@@ -336,7 +335,8 @@ describe('Graph', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r', members: [{ id: 'n'}] });
       const graph = new Rapid.Graph([node, r1]);
-      assert.deepEqual(graph.replace(r1).parentRelations(node), [r1]);
+      const result = graph.replace(r1);
+      assert.deepEqual(result.parentRelations(node), [r1]);
     });
   });
 
@@ -344,7 +344,7 @@ describe('Graph', () => {
     it('is a no-op if the head entity is identical to the base entity', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const graph = new Rapid.Graph([n1]);
-      assert.equal(graph.revert('n'), graph);
+      assert.strictEqual(graph.revert('n'), graph);
     });
 
     it('returns a new graph', () => {
@@ -352,8 +352,8 @@ describe('Graph', () => {
       const n2 = n1.update({});
       const graph = new Rapid.Graph([n1]).replace(n2);
       const result = graph.revert('n');
-      assert.ok(result instanceof Rapid.Graph);
-      assert.notEqual(result, graph);
+      assert.instanceOf(result, Rapid.Graph);
+      assert.notStrictEqual(result, graph);
     });
 
     it('doesn\'t modify the receiver', () => {
@@ -361,85 +361,85 @@ describe('Graph', () => {
       const n2 = n1.update({});
       const graph = new Rapid.Graph([n1]).replace(n2);
       graph.revert('n');
-      assert.equal(graph.hasEntity('n'), n2);
+      assert.strictEqual(graph.hasEntity('n'), n2);
     });
 
     it('removes a new entity', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
-      let graph = new Rapid.Graph().replace(n1);
-      graph = graph.revert('n');
-      assert.equal(graph.hasEntity('n'), undefined);
+      const graph = new Rapid.Graph().replace(n1);
+      const result = graph.revert('n');
+      assert.isUndefined(result.hasEntity('n'));
     });
 
     it('reverts an updated entity to the base version', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const n2 = n1.update({});
-      let graph = new Rapid.Graph([n1]).replace(n2);
-      graph = graph.revert('n');
-      assert.equal(graph.hasEntity('n'), n1);
+      const graph = new Rapid.Graph([n1]).replace(n2);
+      const result = graph.revert('n');
+      assert.strictEqual(result.hasEntity('n'), n1);
     });
 
     it('restores a deleted entity', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
-      let graph = new Rapid.Graph([n1]).remove(n1);
-      graph = graph.revert('n');
-      assert.equal(graph.hasEntity('n'), n1);
+      const graph = new Rapid.Graph([n1]).remove(n1);
+      const result = graph.revert('n');
+      assert.strictEqual(result.hasEntity('n'), n1);
     });
 
     it('removes new parentWays', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const w1 = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'] });
-      let graph = new Rapid.Graph().replace(n1).replace(w1);
-      graph = graph.revert('w');
-      assert.equal(graph.hasEntity('n'), n1);
-      assert.deepEqual(graph.parentWays(n1), []);
+      const graph = new Rapid.Graph().replace(n1).replace(w1);
+      const result = graph.revert('w');
+      assert.strictEqual(result.hasEntity('n'), n1);
+      assert.deepEqual(result.parentWays(n1), []);
     });
 
     it('removes new parentRelations', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r', members: [{ id: 'n'}] });
-      let graph = new Rapid.Graph().replace(n1).replace(r1);
-      graph = graph.revert('r');
-      assert.equal(graph.hasEntity('n'), n1);
-      assert.deepEqual(graph.parentRelations(n1), []);
+      const graph = new Rapid.Graph().replace(n1).replace(r1);
+      const result = graph.revert('r');
+      assert.strictEqual(result.hasEntity('n'), n1);
+      assert.deepEqual(result.parentRelations(n1), []);
     });
 
     it('reverts updated parentWays', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const w1 = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'] });
       const w2 = w1.removeNode('n');
-      let graph = new Rapid.Graph([n1, w1]).replace(w2);
-      graph = graph.revert('w');
-      assert.equal(graph.hasEntity('n'), n1);
-      assert.deepEqual(graph.parentWays(n1), [w1]);
+      const graph = new Rapid.Graph([n1, w1]).replace(w2);
+      const result = graph.revert('w');
+      assert.strictEqual(result.hasEntity('n'), n1);
+      assert.deepEqual(result.parentWays(n1), [w1]);
     });
 
     it('reverts updated parentRelations', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r', members: [{ id: 'n'}] });
       const r2 = r1.removeMembersWithID('n');
-      let graph = new Rapid.Graph([n1, r1]).replace(r2);
-      graph = graph.revert('r');
-      assert.equal(graph.hasEntity('n'), n1);
-      assert.deepEqual(graph.parentRelations(n1), [r1]);
+      const graph = new Rapid.Graph([n1, r1]).replace(r2);
+      const result = graph.revert('r');
+      assert.strictEqual(result.hasEntity('n'), n1);
+      assert.deepEqual(result.parentRelations(n1), [r1]);
     });
 
     it('restores deleted parentWays', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const w1 = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'] });
-      let graph = new Rapid.Graph([n1, w1]).remove(w1);
-      graph = graph.revert('w');
-      assert.equal(graph.hasEntity('n'), n1);
-      assert.deepEqual(graph.parentWays(n1), [w1]);
+      const graph = new Rapid.Graph([n1, w1]).remove(w1);
+      const result = graph.revert('w');
+      assert.strictEqual(result.hasEntity('n'), n1);
+      assert.deepEqual(result.parentWays(n1), [w1]);
     });
 
     it('restores deleted parentRelations', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r', members: [{ id: 'n'}] });
-      let graph = new Rapid.Graph([n1, r1]).remove(r1);
-      graph = graph.revert('r');
-      assert.equal(graph.hasEntity('n'), n1);
-      assert.deepEqual(graph.parentRelations(n1), [r1]);
+      const graph = new Rapid.Graph([n1, r1]).remove(r1);
+      const result = graph.revert('r');
+      assert.strictEqual(result.hasEntity('n'), n1);
+      assert.deepEqual(result.parentRelations(n1), [r1]);
     });
   });
 
@@ -447,15 +447,15 @@ describe('Graph', () => {
     it('returns a new Graph', () => {
       const graph = new Rapid.Graph();
       const result = graph.update();
-      assert.ok(result instanceof Rapid.Graph);
-      assert.notEqual(result, graph);
+      assert.instanceOf(result, Rapid.Graph);
+      assert.notStrictEqual(result, graph);
     });
 
     it('doesn\'t modify self', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
       graph.update(function (graph) { graph.remove(node); });
-      assert.equal(graph.hasEntity(node.id), node);
+      assert.strictEqual(graph.hasEntity(node.id), node);
     });
 
     it('executes all of the given functions', () => {
@@ -467,8 +467,8 @@ describe('Graph', () => {
         function (graph) { graph.replace(b); }
       );
 
-      assert.equal(result.hasEntity(a.id), undefined);
-      assert.equal(result.hasEntity(b.id), b);
+      assert.isUndefined(result.hasEntity(a.id));
+      assert.strictEqual(result.hasEntity(b.id), b);
     });
   });
 
@@ -476,15 +476,15 @@ describe('Graph', () => {
     it('returns self', () => {
       const graph = new Rapid.Graph();
       const result = graph.updateSelf();
-      assert.ok(result instanceof Rapid.Graph);
-      assert.equal(result, graph);
+      assert.instanceOf(result, Rapid.Graph);
+      assert.strictEqual(result, graph);
     });
 
     it('modifies self', () => {
       const node = new Rapid.OsmNode(context);
       const graph = new Rapid.Graph([node]);
       graph.updateSelf(function (graph) { graph.remove(node); });
-      assert.equal(graph.hasEntity(node.id), undefined);
+      assert.isUndefined(graph.hasEntity(node.id));
     });
 
     it('executes all of the given functions', () => {
@@ -496,8 +496,8 @@ describe('Graph', () => {
         function (graph) { graph.replace(b); }
       );
 
-      assert.equal(graph.hasEntity(a.id), undefined);
-      assert.equal(graph.hasEntity(b.id), b);
+      assert.isUndefined(graph.hasEntity(a.id));
+      assert.strictEqual(graph.hasEntity(b.id), b);
     });
   });
 

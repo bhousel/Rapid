@@ -1,3 +1,4 @@
+import { Difference } from './Difference.js';
 
 
 /**
@@ -16,10 +17,11 @@ export class Graph {
    */
   constructor(other) {
     this._childNodes = new Map();   // Map<entityID, Array<Entity>>
-    this._affectedIDs = new Set();  // Set<entityID> affected by recent graph updates
+//    this._affectedIDs = new Set();  // Set<entityID> affected by recent graph updates
 
     // A Graph derived from a predecessor Graph
     if (other instanceof Graph) {
+      this._previous = other;
       this._base = other._base;     // Base data is shared among the chain of Graphs
       this._local = {               // Local data is a clone of the predecessor data
         entities: new Map(other._local.entities),       // shallow clone
@@ -29,6 +31,7 @@ export class Graph {
 
      // A fresh Graph
      } else {
+      this._previous = null;
       this._base = {
         entities: new Map(),    // Map<entityID, Entity>
         parentWays: new Map(),  // Map<entityID, Set<entityIDs>>
@@ -224,9 +227,9 @@ export class Graph {
 
   /**
    * update
-   * Applies the given functions to the Graph, and returns a new Graph.
+   * Creates a new Graph, applies the given functions, and returns the new Graph.
    * Graphs are intended to be immutable.
-   * @param   {...function}  args - Functions to apply to the graph to update it
+   * @param   {...function}  args - Functions to apply to the Graph to update it
    * @return  {Graph}        A new Graph
    */
   update(...args) {
@@ -240,7 +243,11 @@ export class Graph {
       for (const fn of args) {
         fn.call(graph, graph);
       }
-      graph._updateAffected();
+
+// what changed?
+const diff = new Difference(graph._previous, graph);  // graph._previous === this ?
+const ids = [...diff.complete().keys()];
+graph._updateAffected(ids);
 
       graph._mutate = false;
       return graph;
@@ -264,7 +271,7 @@ export class Graph {
     for (const fn of args) {
       fn.call(this, this);
     }
-    this._updateAffected();
+//    this._updateAffected();
 
     this._mutate = was;
     return this;
@@ -287,7 +294,11 @@ export class Graph {
       this._local.entities.set(entityID, replacement);
       this._updateCaches(current, replacement);
     }
-    this._updateAffected();
+//    this._updateAffected();
+// what changed?
+const diff = new Difference(this._previous, this);
+const ids = [...diff.complete().keys()];
+this._updateAffected(ids);
 
     return this;
   }
@@ -336,15 +347,15 @@ export class Graph {
       // Restore deleted nodes that were discovered to belong to a parentWay.
       for (const id of restoreIDs) {
         if (local.has(id) && local.get(id) === undefined) {  // was deleted
-          local.delete(id);
+          local.delete(id);  // "delete the delete", aka restore.
         }
       }
 
       graph._updateRebased();
 
-      // update geometries for new IDs
-      graph._affectedIDs = new Set(newIDs);
-      graph._updateAffected();
+//      // update geometries for new IDs
+//      graph._affectedIDs = new Set(newIDs);
+      graph._updateAffected(newIDs);
     }
   }
 
@@ -367,7 +378,7 @@ export class Graph {
     if (!entity) return;   // Either current or previous must be set
 
     // This entity and any of its parents might need a geometry update.
-    this._affectedIDs.add(entity.id);
+//    this._affectedIDs.add(entity.id);
 
     if (entity.type === 'way') {  // Update parentWays
       const prevNodes = new Set(previous?.nodes);
@@ -449,47 +460,56 @@ export class Graph {
    * Internal function, used to update Entity geometries affected by recent graph changes.
    * This needs to be called after all `_updateCaches` calls have finished.
    */
-  _updateAffected() {
-    const toUpdate = new Set();
-    const seenIDs = new Set();
+  _updateAffected(entityIDs) {
 
-    // Include any affected Entities, and their parent Entities.
-    for (const affectedID of this._affectedIDs) {
-      const entity = this.hasEntity(affectedID);
-      if (!entity) continue;
-
-      toUpdate.add(entity);
-      this._getParents(entity, toUpdate, seenIDs);
-    }
-
-    // Update geometry
-    for (const entity of toUpdate) {
+    for (const entityID of entityIDs) {
+      const entity = this.hasEntity(entityID);
+      if (!entity) continue;                  // entity was deleted
       if (entity.type === 'node') continue;   // nodes don't need this
       entity.updateGeometry(this);
     }
 
-    this._affectedIDs.clear();
+//    const toUpdate = new Set();
+//    const seenIDs = new Set();
+//
+//    // Include any affected Entities, and their parent Entities.
+//    for (const affectedID of this._affectedIDs) {
+//      const entity = this.hasEntity(affectedID);
+//      if (!entity) continue;
+//
+//      toUpdate.add(entity);
+//      this._getParents(entity, toUpdate, seenIDs);
+//    }
+//
+//    // Update geometry
+//    for (const entity of toUpdate.values()) {
+//      if (!entity) continue;                  // entity was deleted
+//      if (entity.type === 'node') continue;   // nodes don't need this
+//      entity.updateGeometry(this);
+//    }
+//
+//    this._affectedIDs.clear();
   }
 
 
-  // borrowed from Tree._includeParents
-  _getParents(entity, toUpdate, seenIDs) {
-    const entityID = entity.id;
-    if (!seenIDs) seenIDs = new Set();
-
-    if (seenIDs.has(entityID)) return;
-    seenIDs.add(entityID);
-
-    for (const way of this.parentWays(entity)) {
-      toUpdate.add(way);
-      this._getParents(way, toUpdate, seenIDs);
-    }
-
-    for (const relation of this.parentRelations(entity)) {
-      toUpdate.add(relation);
-      this._getParents(relation, toUpdate, seenIDs);
-    }
-  }
+//  // borrowed from Tree._includeParents
+//  _getParents(entity, toUpdate, seenIDs) {
+//    const entityID = entity.id;
+//    if (!seenIDs) seenIDs = new Set();
+//
+//    if (seenIDs.has(entityID)) return;
+//    seenIDs.add(entityID);
+//
+//    for (const way of this.parentWays(entity)) {
+//      toUpdate.add(way);
+//      this._getParents(way, toUpdate, seenIDs);
+//    }
+//
+//    for (const relation of this.parentRelations(entity)) {
+//      toUpdate.add(relation);
+//      this._getParents(relation, toUpdate, seenIDs);
+//    }
+//  }
 
 
 }
