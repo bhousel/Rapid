@@ -28,7 +28,7 @@
  */
 export function actionUpgradeTags(entityID, oldTags, replaceTags) {
 
-  return function(graph) {
+  return graph => {
     const entity = graph.entity(entityID);
     const tags = Object.assign({}, entity.tags);      // shallow copy
     let transferValue;
@@ -81,7 +81,7 @@ export function actionUpgradeTags(entityID, oldTags, replaceTags) {
       }
     }
 
-    graph = graph.replace(entity.update({ tags: tags }));
-    return graph;
+    graph.replace(entity.update({ tags: tags }));
+    return graph.commit();
   };
 }

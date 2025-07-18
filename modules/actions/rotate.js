@@ -3,12 +3,12 @@ import { utilGetAllNodes } from '@rapid-sdk/util';
 
 
 export function actionRotate(entityIDs, pivot, angle, viewport) {
-  return function(graph) {
+  return graph => {
     const nodes = utilGetAllNodes(entityIDs, graph);
-    for (const node of utilGetAllNodes(entityIDs, graph)) {
+    for (const node of nodes) {
       const point = vecRotate(viewport.project(node.loc), angle, pivot);
-      graph = graph.replace(node.move(viewport.unproject(point)));
+      graph.replace(node.move(viewport.unproject(point)));
     }
-    return graph;
+    return graph.commit();
   };
 }

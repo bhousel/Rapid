@@ -11,10 +11,6 @@ import { actionDeleteWay } from './delete_way.js';
 //
 // This is the inverse of `actionDisconnect`.
 //
-// Reference:
-//   https://github.com/openstreetmap/potlatch2/blob/master/net/systemeD/halcyon/connection/actions/MergeNodesAction.as
-//   https://github.com/openstreetmap/josm/blob/mirror/src/org/openstreetmap/josm/actions/MergeNodesAction.java
-//
 export function actionConnect(nodeIDs) {
     var action = function(graph) {
         var survivor;
@@ -57,7 +53,7 @@ export function actionConnect(nodeIDs) {
             }
         }
 
-        return graph;
+        return graph.commit();
     };
 
 

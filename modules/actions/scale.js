@@ -2,13 +2,11 @@ import { utilGetAllNodes } from '@rapid-sdk/util';
 
 
 export function actionScale(entityIDs, pivotLoc, scaleFactor, viewport) {
-  return function(graph) {
-    let point, radial;
-
+  return graph => {
     const nodes = utilGetAllNodes(entityIDs, graph);
     for (const node of nodes) {
-      point = viewport.project(node.loc);
-      radial = [
+      let point = viewport.project(node.loc);
+      let radial = [
         point[0] - pivotLoc[0],
         point[1] - pivotLoc[1]
       ];
@@ -17,8 +15,9 @@ export function actionScale(entityIDs, pivotLoc, scaleFactor, viewport) {
         pivotLoc[1] + (scaleFactor * radial[1])
       ];
 
-      graph = graph.replace(node.move(viewport.unproject(point)));
+      graph.replace(node.move(viewport.unproject(point)));
     }
-    return graph;
+
+    return graph.commit();
   };
 }

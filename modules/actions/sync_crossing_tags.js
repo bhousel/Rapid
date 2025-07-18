@@ -46,12 +46,12 @@ export function actionSyncCrossingTags(entityID) {
     const geometry = entity.geometry(graph);
 
     if (entity.type === 'way' && geometry === 'line') {
-      graph = syncParentToChildren(entity, graph);
+      syncParentToChildren(entity, graph);
     } else if (entity.type === 'node' && geometry === 'vertex') {
-      graph = syncChildToParents(entity, graph);
+      syncChildToParents(entity, graph);
     }
 
-    return graph;
+    return graph.commit();
   };
 
 
@@ -117,7 +117,6 @@ export function actionSyncCrossingTags(entityID) {
    * @param   {Node}    child - The child  Node with the tags that have changed.
    * @param   {Graph}   graph - The input Graph
    * @param   {string?} skipChildID - Optional, if the change originated from `syncChildToParents`, skip the original child nodeID
-   * @return  {Graph}   The modified output Graph
    */
   function syncParentToChildren(parent, graph, skipChildID) {
     let parentTags = Object.assign({}, parent.tags);  // copy
@@ -135,10 +134,10 @@ export function actionSyncCrossingTags(entityID) {
       }
     }
     parent = parent.update({ tags: parentTags });
-    graph = graph.replace(parent);
+    graph.replace(parent);
 
     // Exit if one of these isn't true.
-    if (!(isCrossingWay || isNotCrossable)) return graph;
+    if (!(isCrossingWay || isNotCrossable)) return;
 
     // Gather relevant crossing tags from the parent way, these are the tags that will be synced.
     // (If the parent is not a crossing, we'll be gathering `undefined`, this is expected)
@@ -219,10 +218,8 @@ export function actionSyncCrossingTags(entityID) {
         delete childTags.highway;
       }
 
-      graph = graph.replace(child.update({ tags: childTags }));
+      graph.replace(child.update({ tags: childTags }));
     }
-
-    return graph;
   }
 
 
@@ -232,7 +229,6 @@ export function actionSyncCrossingTags(entityID) {
    *  (and other children along those ways)
    * @param   {Node}   child - The child  Node with the tags that have changed.
    * @param   {Graph}  graph - The input Graph
-   * @return  {Graph}  The modified output Graph
    */
   function syncChildToParents(child, graph) {
     const parentWays = graph.parentWays(child);
@@ -253,10 +249,10 @@ export function actionSyncCrossingTags(entityID) {
     }
 
     child = child.update({ tags: childTags });
-    graph = graph.replace(child);
+    graph.replace(child);
 
     // Exit if not a crossing (maybe curb ramp or barrier or some other thing - nothing to sync to parent)
-    if (!isCrossingNode) return graph;
+    if (!isCrossingNode) return;
 
     // Gather relevant crossing tags from the child way, these are the tags that will be synced.
     const syncTags = {};
@@ -287,15 +283,13 @@ export function actionSyncCrossingTags(entityID) {
       // Unlike in `syncParentToChildren` - we won't adjust the `footway=crossing` tag of the parent way here.
       // The parent way might be a sidewalk that just stretches all the way across the intersection.
       parent = parent.update({ tags: parentTags });
-      graph = graph.replace(parent);
+      graph.replace(parent);
 
       // We should sync these tags to any other sibling crossing nodes along the same parent.
       if (isCrossingNode) {
-        graph = syncParentToChildren(parent, graph, child.id);  // but skip this child that initiated the change
+        syncParentToChildren(parent, graph, child.id);  // but skip this child that initiated the change
       }
     }
-
-    return graph;
   }
 
 

@@ -127,12 +127,17 @@ export function actionMergeRemoteChanges(id, options = {}) {
 
 
   function updateChildren(updates, graph) {
-    for (const entity of updates.replacements) {
-      graph = graph.replace(entity);
+    if (updates.replacements.length) {
+      for (const entity of updates.replacements) {
+        graph.replace(entity);
+      }
+      graph = graph.commit();
     }
+
     if (updates.removeIDs.length) {
       graph = actionDeleteMultiple(updates.removeIDs)(graph);
     }
+
     return graph;
   }
 
@@ -148,6 +153,7 @@ export function actionMergeRemoteChanges(id, options = {}) {
     _conflicts.push(
       localize('merge_remote_changes.conflict.memberlist', { user: formatUser(remote.user) })
     );
+
     return target;
   }
 
@@ -222,7 +228,7 @@ export function actionMergeRemoteChanges(id, options = {}) {
           target = mergeChildren(target, utilArrayUniq(local.nodes), updates, graph);
           graph = updateChildren(updates, graph);
         }
-        return graph.replace(target);
+        return graph.replace(target).commit();
 
       } else {
         _conflicts.push(

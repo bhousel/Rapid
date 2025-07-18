@@ -1,17 +1,15 @@
 import { actionDeleteRelation } from './delete_relation.js';
 
 
-export function actionDeleteMember(relationId, memberIndex) {
-    return function(graph) {
-        var relation = graph.entity(relationId)
-            .removeMember(memberIndex);
+export function actionDeleteMember(relationID, index) {
+  return graph => {
+    const relation = graph.entity(relationID).removeMember(index);
+    graph.replace(relation);
 
-        graph = graph.replace(relation);
-
-        if (relation.isDegenerate()) {
-            graph = actionDeleteRelation(relation.id)(graph);
-        }
-
-        return graph;
-    };
+    if (relation.isDegenerate()) {
+      return actionDeleteRelation(relation.id)(graph);
+    } else {
+      return graph.commit();
+    }
+  };
 }

@@ -1,5 +1,5 @@
-export function actionMoveMember(relationId, fromIndex, toIndex) {
-    return function(graph) {
-        return graph.replace(graph.entity(relationId).moveMember(fromIndex, toIndex));
-    };
+export function actionMoveMember(relationID, fromIndex, toIndex) {
+  return graph => {
+    return graph.replace(graph.entity(relationID).moveMember(fromIndex, toIndex)).commit();
+  };
 }

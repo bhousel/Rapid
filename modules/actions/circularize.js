@@ -82,7 +82,7 @@ export function actionCircularize(wayId, viewport, maxAngle) {
             node = keyNodes[i];
             origNode = origNodes[node.id];
             node = node.move(vecInterp(origNode.loc, loc, t));
-            graph = graph.replace(node);
+            graph = graph.replace(node).commit();
 
             // figure out the between delta angle we want to match to
             startAngle = Math.atan2(keyPoints[i][1] - centroid[1], keyPoints[i][0] - centroid[0]);
@@ -113,7 +113,7 @@ export function actionCircularize(wayId, viewport, maxAngle) {
                 nearNodes[node.id] = angle;
 
                 node = node.move(vecInterp(origNode.loc, loc, t));
-                graph = graph.replace(node);
+                graph = graph.replace(node).commit();
             }
 
             // add new in between nodes if necessary
@@ -136,7 +136,7 @@ export function actionCircularize(wayId, viewport, maxAngle) {
                 }
 
                 node = new OsmNode(way.context, { loc: vecInterp(origNode.loc, loc, t) });
-                graph = graph.replace(node);
+                graph = graph.replace(node).commit();
 
                 nodes.splice(endNodeIndex + j, 0, node);
                 inBetweenNodes.push(node.id);
@@ -170,7 +170,7 @@ export function actionCircularize(wayId, viewport, maxAngle) {
                         for (k = 0; k < inBetweenNodes.length; k++) {
                             sharedWay = sharedWay.addNode(inBetweenNodes[k], insertAt + k);
                         }
-                        graph = graph.replace(sharedWay);
+                        graph = graph.replace(sharedWay).commit();
                     }
                 }
             }
@@ -182,7 +182,7 @@ export function actionCircularize(wayId, viewport, maxAngle) {
         ids.push(ids[0]);
 
         way = way.update({nodes: ids});
-        graph = graph.replace(way);
+        graph = graph.replace(way).commit();
 
         return graph;
     };
@@ -215,7 +215,7 @@ export function actionCircularize(wayId, viewport, maxAngle) {
             for (j = 1; j < indexRange; j++) {
                 var point = vecInterp(hull[i], hull[i+1], j / indexRange);
                 var node = nodes[(j + startIndex) % nodes.length].move(viewport.unproject(point));
-                graph = graph.replace(node);
+                graph = graph.replace(node).commit();
             }
         }
         return graph;

@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -9,9 +9,10 @@ describe('actionCopyEntities', () => {
   it('copies a node', () => {
     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const base = new Rapid.Graph([n1]);
+    const stage = new Rapid.Graph(base);
 
-    const head = Rapid.actionCopyEntities(['n1'], base)(base);
-    assert.ok(head instanceof Rapid.Graph);
+    const head = Rapid.actionCopyEntities(['n1'], stage)(stage);
+    assert.instanceOf(head, Rapid.Graph);
     assert.ok(head.hasEntity('n1'));
 
     const diff = new Rapid.Difference(base, head);
@@ -25,9 +26,10 @@ describe('actionCopyEntities', () => {
     const n2 = new Rapid.OsmNode(context, {id: 'n2'});
     const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1', 'n2']});
     const base = new Rapid.Graph([n1, n2, w1]);
+    const stage = new Rapid.Graph(base);
 
-    const head = Rapid.actionCopyEntities(['w1'], base)(base);
-    assert.ok(head instanceof Rapid.Graph);
+    const head = Rapid.actionCopyEntities(['w1'], stage)(stage);
+    assert.instanceOf(head, Rapid.Graph);
     assert.ok(head.hasEntity('w1'));
 
     const diff = new Rapid.Difference(base, head);
@@ -41,8 +43,10 @@ describe('actionCopyEntities', () => {
       new Rapid.OsmNode(context, {id: 'n1'}),
       new Rapid.OsmNode(context, {id: 'n2'})
     ]);
-    const head = Rapid.actionCopyEntities(['n1', 'n2'], base)(base);
-    assert.ok(head instanceof Rapid.Graph);
+    const stage = new Rapid.Graph(base);
+    const head = Rapid.actionCopyEntities(['n1', 'n2'], stage)(stage);
+
+    assert.instanceOf(head, Rapid.Graph);
     assert.ok(head.hasEntity('n1'));
     assert.ok(head.hasEntity('n2'));
 
@@ -60,9 +64,10 @@ describe('actionCopyEntities', () => {
       new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1', 'n2']}),
       new Rapid.OsmWay(context, {id: 'w2', nodes: ['n2', 'n3']})
     ]);
-    const action = Rapid.actionCopyEntities(['w1', 'w2'], base);
-    const head = action(base);
-    assert.ok(head instanceof Rapid.Graph);
+    const stage = new Rapid.Graph(base);
+    const action = Rapid.actionCopyEntities(['w1', 'w2'], stage);
+    const head = action(stage);
+    assert.instanceOf(head, Rapid.Graph);
 
     const diff = new Rapid.Difference(base, head);
     const created = diff.created();
@@ -84,7 +89,7 @@ describe('actionCopyEntities', () => {
     const action = Rapid.actionCopyEntities(['n1'], old);
     const head = action(base);
 
-    assert.ok(head instanceof Rapid.Graph);
+    assert.instanceOf(head, Rapid.Graph);
     assert.ok(!head.hasEntity('n1'));
 
     const copies = action.copies();

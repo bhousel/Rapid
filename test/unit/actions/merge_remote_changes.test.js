@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -65,7 +65,11 @@ describe('actionMergeRemoteChanges', () => {
 
 
   function makeGraph(entities) {
-    return entities.reduce((graph, entity) => graph.replace(entity), new Rapid.Graph(base));
+    const staging = new Rapid.Graph(base);
+    for (const entity of entities) {
+      staging.replace(entity);
+    }
+    return staging.commit();
   }
 
 
@@ -85,7 +89,7 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.equal(result, localGraph);
+        assert.strictEqual(result, localGraph);
       });
 
       it('doesn\'t merge tags if conflict (local change, remote delete)', () => {
@@ -102,7 +106,7 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.equal(result, localGraph);
+        assert.strictEqual(result, localGraph);
       });
 
       it('doesn\'t merge tags if conflict (local delete, remote change)', () => {
@@ -119,7 +123,7 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.equal(result, localGraph);
+        assert.strictEqual(result, localGraph);
       });
 
       it('doesn\'t merge tags if conflict (local add, remote add)', () => {
@@ -136,7 +140,7 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.equal(result, localGraph);
+        assert.strictEqual(result, localGraph);
       });
 
       it('merges tags if no conflict (remote delete)', () => {
@@ -154,10 +158,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const n = result.entity('n1');
-        assert.equal(n.version, '2');
+        assert.strictEqual(n.version, '2');
         assert.deepEqual(n.tags, mergedTags);
       });
 
@@ -176,10 +180,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const n = result.entity('n1');
-        assert.equal(n.version, '2');
+        assert.strictEqual(n.version, '2');
         assert.deepEqual(n.tags, mergedTags);
       });
     });
@@ -201,7 +205,7 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.equal(result, localGraph);
+        assert.strictEqual(result, localGraph);
       });
 
       it('merges nodes if location is same', () => {
@@ -221,10 +225,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const n = result.entity('n1');
-        assert.equal(n.version, '2');
+        assert.strictEqual(n.version, '2');
         assert.deepEqual(n.tags, mergedTags);
         assert.deepEqual(n.loc, [2, 2]);
       });
@@ -246,10 +250,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const w = result.entity('w10');
-        assert.equal(w.version, '2');
+        assert.strictEqual(w.version, '2');
         assert.deepEqual(w.tags, mergedTags);
       });
 
@@ -270,14 +274,14 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const w = result.entity('w10');
-        assert.equal(w.version, '2');
+        assert.strictEqual(w.version, '2');
         assert.deepEqual(w.tags, mergedTags);
         assert.deepEqual(w.nodes, remoteNodes);
-        assert.equal(result.hasEntity('n31'), n31);  // remote node added to local
-        assert.equal(result.hasEntity('n32'), n32);  // remote node added to local
+        assert.strictEqual(result.hasEntity('n31'), n31);  // remote node added to local
+        assert.strictEqual(result.hasEntity('n32'), n32);  // remote node added to local
       });
 
       it('merges ways if nodelist changed only locally', () => {
@@ -297,10 +301,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const w = result.entity('w10');
-        assert.equal(w.version, '2');
+        assert.strictEqual(w.version, '2');
         assert.deepEqual(w.tags, mergedTags);
         assert.deepEqual(w.nodes, localNodes);
       });
@@ -323,14 +327,14 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const w = result.entity('w10');
-        assert.equal(w.version, '2');
+        assert.strictEqual(w.version, '2');
         assert.deepEqual(w.tags, mergedTags);
         assert.deepEqual(w.nodes, mergedNodes);
-        assert.equal(result.hasEntity('n32'), n32);  // remote node added to local
-        assert.equal(result.hasEntity('n33'), n33);  // remote node added to local
+        assert.strictEqual(result.hasEntity('n32'), n32);  // remote node added to local
+        assert.strictEqual(result.hasEntity('n33'), n33);  // remote node added to local
       });
 
       it('doesn\'t merge ways if nodelist changes overlap', () => {
@@ -349,7 +353,7 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.equal(result, localGraph);
+        assert.strictEqual(result, localGraph);
       });
 
       it('merges ways if childNode location is same', () => {
@@ -366,10 +370,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const n = result.entity('n10');
-        assert.equal(n.version, '2');
+        assert.strictEqual(n.version, '2');
         assert.deepEqual(n.loc, remoteLoc);
       });
 
@@ -387,7 +391,7 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.equal(result, localGraph);
+        assert.strictEqual(result, localGraph);
       });
     });
 
@@ -408,7 +412,7 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('r', opts);
         const result = action(localGraph);
-        assert.equal(result, localGraph);
+        assert.strictEqual(result, localGraph);
       });
 
       it('merges relations if members are same and changed tags don\'t conflict', () => {
@@ -428,10 +432,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('r', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const r = result.entity('r');
-        assert.equal(r.version, '2');
+        assert.strictEqual(r.version, '2');
         assert.deepEqual(r.tags, mergedTags);
       });
     });
@@ -452,7 +456,7 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.equal(result, localGraph);
+        assert.strictEqual(result, localGraph);
 
         const conflicts = action.conflicts();
         assert.ok(conflicts instanceof Array);
@@ -481,10 +485,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const n = result.entity('n1');
-        assert.equal(n.version, '2');
+        assert.strictEqual(n.version, '2');
         assert.deepEqual(n.tags, localTags);
         assert.deepEqual(n.loc, localLoc);
       });
@@ -506,10 +510,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('n1', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const n = result.entity('n1');
-        assert.equal(n.version, '2');
+        assert.strictEqual(n.version, '2');
         assert.deepEqual(n.tags, remoteTags);
         assert.deepEqual(n.loc, remoteLoc);
       });
@@ -533,10 +537,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const w = result.entity('w10');
-        assert.equal(w.version, '2');
+        assert.strictEqual(w.version, '2');
         assert.deepEqual(w.tags, localTags);
         assert.deepEqual(w.nodes, localNodes);
       });
@@ -558,14 +562,14 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const w = result.entity('w10');
-        assert.equal(w.version, '2');
+        assert.strictEqual(w.version, '2');
         assert.deepEqual(w.tags, remoteTags);
         assert.deepEqual(w.nodes, remoteNodes);
-        assert.equal(result.hasEntity('n32'), n32);  // remote node added to local
-        assert.equal(result.hasEntity('n33'), n33);  // remote node added to local
+        assert.strictEqual(result.hasEntity('n32'), n32);  // remote node added to local
+        assert.strictEqual(result.hasEntity('n33'), n33);  // remote node added to local
       });
 
       it('merges way childNodes with \'force_local\' option', () => {
@@ -583,10 +587,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const n = result.entity('n10');
-        assert.equal(n.version, '2');
+        assert.strictEqual(n.version, '2');
         assert.deepEqual(n.loc, localLoc);
       });
 
@@ -605,10 +609,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const n = result.entity('n10');
-        assert.equal(n.version, '2');
+        assert.strictEqual(n.version, '2');
         assert.deepEqual(n.loc, remoteLoc);
       });
 
@@ -628,10 +632,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('w10', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         assert.deepEqual(result.entity('w10').nodes, remoteNodes);
-        assert.equal(result.hasEntity('n30'), localn30);
+        assert.strictEqual(result.hasEntity('n30'), localn30);
         assert.ok(!result.hasEntity('n31'));
       });
     });
@@ -654,10 +658,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('r', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const r = result.entity('r');
-        assert.equal(r.version, '2');
+        assert.strictEqual(r.version, '2');
         assert.deepEqual(r.tags, localTags);
         assert.deepEqual(r.members, localMembers);
       });
@@ -679,10 +683,10 @@ describe('actionMergeRemoteChanges', () => {
         };
         const action = Rapid.actionMergeRemoteChanges('r', opts);
         const result = action(localGraph);
-        assert.ok(result instanceof Rapid.Graph);
+        assert.instanceOf(result, Rapid.Graph);
 
         const r = result.entity('r');
-        assert.equal(r.version, '2');
+        assert.strictEqual(r.version, '2');
         assert.deepEqual(r.tags, remoteTags);
         assert.deepEqual(r.members, remoteMembers);
       });

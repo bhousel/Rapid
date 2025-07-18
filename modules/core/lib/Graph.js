@@ -159,15 +159,19 @@ export class Graph {
    * @param   {Entity}  entity - The Entity to replace
    * @return  {Graph}   A new Graph
    */
-  replace(replacement) {
-    const entityID = replacement.id;
+  replace(entity) {
+    const entityID = entity.id;
     const current = this.hasEntity(entityID);
-    if (current === replacement) return this;  // no change
+    if (current === entity) return this;  // no change
 
-    return this.update(function() {
-      this._local.entities.set(entityID, replacement);
-      this._updateCaches(current, replacement);
-    });
+    this._local.entities.set(entityID, entity);
+    this._updateCaches(current, entity);
+    return this;
+
+//    return this.update(function() {
+//      this._local.entities.set(entityID, replacement);
+//      this._updateCaches(current, replacement);
+//    });
   }
 
 
@@ -177,15 +181,16 @@ export class Graph {
    * @param   {Entity}  entity - The Entity to replace
    * @return  {Graph}   This same Graph
    */
-  replaceSelf(replacement) {
-    const entityID = replacement.id;
-    const current = this.hasEntity(entityID);
-    if (current === replacement) return this;  // no change
-
-    return this.updateSelf(function() {
-      this._local.entities.set(entityID, replacement);
-      this._updateCaches(current, replacement);
-    });
+  replaceSelf(entity) {
+    return this.replace(entity);
+//    const entityID = replacement.id;
+//    const current = this.hasEntity(entityID);
+//    if (current === replacement) return this;  // no change
+//
+//    return this.updateSelf(function() {
+//      this._local.entities.set(entityID, replacement);
+//      this._updateCaches(current, replacement);
+//    });
   }
 
 
@@ -200,10 +205,14 @@ export class Graph {
     const current = this.hasEntity(entityID);
     if (!current) return this;  // not in the graph
 
-    return this.update(function() {
-      this._local.entities.set(entityID, undefined);
-      this._updateCaches(current, undefined);
-    });
+    this._local.entities.set(entityID, undefined);
+    this._updateCaches(current, undefined);
+    return this;
+
+//    return this.update(function() {
+//      this._local.entities.set(entityID, undefined);
+//      this._updateCaches(current, undefined);
+//    });
   }
 
 
@@ -218,10 +227,28 @@ export class Graph {
     const current = this.hasEntity(entityID);
     if (current === original) return this;   // no change
 
-    return this.update(function() {
-      this._local.entities.delete(entityID);
-      this._updateCaches(current, original);
-    });
+    this._local.entities.delete(entityID);
+    this._updateCaches(current, original);
+    return this;
+
+//    return this.update(function() {
+//      this._local.entities.delete(entityID);
+//      this._updateCaches(current, original);
+//    });
+  }
+
+
+  /**
+   * commit
+   * Updates any Entities affected by the work in progress, and returns a new Graph.
+   * @return  {Graph}  A new Graph
+   */
+  commit() {
+    const prev = this._previous;
+    const diff = new Difference(prev, this);
+    const ids = [...diff.complete().keys()];
+    this._updateAffected(ids);
+    return new Graph(this);
   }
 
 

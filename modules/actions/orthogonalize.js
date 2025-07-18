@@ -1,247 +1,242 @@
 import {
-  vecAdd, vecEqual, vecInterp, vecLength, vecNormalize, vecProject, vecScale, vecSubtract
+  DEG2RAD, vecAdd, vecEqual, vecInterp, vecLength,
+  vecNormalize, vecProject, vecScale, vecSubtract
 } from '@rapid-sdk/math';
 
+import { Graph } from '../core/lib/Graph.js';
 import { actionDeleteNode } from './delete_node.js';
 import { geoOrthoNormalizedDotProduct, geoOrthoCalcScore, geoOrthoCanOrthogonalize } from '../geo/index.js';
 
 
 export function actionOrthogonalize(wayID, viewport, vertexID, degThresh, ep) {
-    var epsilon = ep || 1e-4;
-    var threshold = degThresh || 13;  // degrees within right or straight to alter
+  const epsilon = ep || 1e-4;
+  const threshold = degThresh || 13;  // degrees within right or straight to alter
 
-    // We test normalized dot products so we can compare as cos(angle)
-    var lowerThreshold = Math.cos((90 - threshold) * Math.PI / 180);
-    var upperThreshold = Math.cos(threshold * Math.PI / 180);
+  // We test normalized dot products so we can compare as cos(angle)
+  const lowerThreshold = Math.cos((90 - threshold) * DEG2RAD);
+  const upperThreshold = Math.cos(threshold * DEG2RAD);
 
 
-    var action = function(graph, t) {
-        if (t === null || !isFinite(t)) t = 1;
-        t = Math.min(Math.max(+t, 0), 1);
+  var action = function(graph, t) {
+    if (t === null || !isFinite(t)) t = 1;
+    t = Math.min(Math.max(+t, 0), 1);
 
-        var way = graph.entity(wayID);
-        way = way.removeNode('');   // sanity check - remove any consecutive duplicates
+    let way = graph.entity(wayID);
+    way = way.removeNode('');   // sanity check - remove any consecutive duplicates
 
-        if (way.tags.nonsquare) {
-            var tags = Object.assign({}, way.tags);
-            // since we're squaring, remove indication that this is physically unsquare
-            delete tags.nonsquare;
-            way = way.update({tags: tags});
+    // since we're squaring, remove indication that this is physically unsquare
+    if (way.tags.nonsquare) {
+      const tags = Object.assign({}, way.tags);  // shallow copy
+      delete tags.nonsquare;
+      way = way.update({ tags: tags });
+    }
+
+    graph.replace(way);
+
+    const isClosed = way.isClosed();
+    let nodes = graph.childNodes(way).slice();  // shallow copy
+    if (isClosed) nodes.pop();
+
+    if (vertexID !== undefined) {
+      nodes = nodeSubset(nodes, vertexID, isClosed);
+      if (nodes.length !== 3) return graph.commit();
+    }
+
+    // note: all geometry functions here use the unclosed node/point/coord list
+    let nodeCount = {};
+    let points = [];
+    let corner = { i: 0, dotp: 1 };
+    let node, point, loc, score, motions, i, j;
+
+    for (const node of nodes) {
+      nodeCount[node.id] = (nodeCount[node.id] || 0) + 1;
+      points.push({ id: node.id, coord: viewport.project(node.loc) });
+    }
+
+    if (points.length === 3) {   // move only one vertex for right triangle
+      for (i = 0; i < 1000; i++) {
+        motions = points.map(calcMotion);
+        points[corner.i].coord = vecAdd(points[corner.i].coord, motions[corner.i]);
+        score = corner.dotp;
+        if (score < epsilon) break;
+      }
+
+      node = graph.entity(nodes[corner.i].id);
+      loc = viewport.unproject(points[corner.i].coord);
+      graph.replace(node.move(vecInterp(node.loc, loc, t)));
+
+    } else {
+      const straights = [];
+      const simplified = [];
+
+      // Remove points from nearly straight sections..
+      // This produces a simplified shape to orthogonalize
+      for (i = 0; i < points.length; i++) {
+        point = points[i];
+        let dotp = 0;
+        if (isClosed || (i > 0 && i < points.length - 1)) {
+          const a = points[(i - 1 + points.length) % points.length];
+          const b = points[(i + 1) % points.length];
+          dotp = Math.abs(geoOrthoNormalizedDotProduct(a.coord, b.coord, point.coord));
         }
 
-        graph = graph.replace(way);
-
-        var isClosed = way.isClosed();
-        var nodes = graph.childNodes(way).slice();  // shallow copy
-        if (isClosed) nodes.pop();
-
-        if (vertexID !== undefined) {
-            nodes = nodeSubset(nodes, vertexID, isClosed);
-            if (nodes.length !== 3) return graph;
+        if (dotp > upperThreshold) {
+          straights.push(point);
+        } else {
+          simplified.push(point);
         }
+      }
 
-        // note: all geometry functions here use the unclosed node/point/coord list
+      // Orthogonalize the simplified shape
+      const originalPoints = clonePoints(simplified);
+      let bestPoints = clonePoints(simplified);
 
-        var nodeCount = {};
-        var points = [];
-        var corner = { i: 0, dotp: 1 };
-        var node, point, loc, score, motions, i, j;
+      score = Infinity;
+      for (i = 0; i < 1000; i++) {
+        motions = simplified.map(calcMotion);
 
-        for (i = 0; i < nodes.length; i++) {
-            node = nodes[i];
-            nodeCount[node.id] = (nodeCount[node.id] || 0) + 1;
-            points.push({ id: node.id, coord: viewport.project(node.loc) });
+        for (j = 0; j < motions.length; j++) {
+          simplified[j].coord = vecAdd(simplified[j].coord, motions[j]);
         }
+        const newScore = geoOrthoCalcScore(simplified, isClosed, epsilon, threshold);
+        if (newScore < score) {
+          bestPoints = clonePoints(simplified);
+          score = newScore;
+        }
+        if (score < epsilon) break;
+      }
 
+      const bestCoords = bestPoints.map(p => p.coord);
+      if (isClosed) bestCoords.push(bestCoords[0]);
 
-        if (points.length === 3) {   // move only one vertex for right triangle
-            for (i = 0; i < 1000; i++) {
-                motions = points.map(calcMotion);
+      // move the nodes that should move
+      for (i = 0; i < bestPoints.length; i++) {
+        point = bestPoints[i];
+        if (!vecEqual(originalPoints[i].coord, point.coord)) {
+          node = graph.entity(point.id);
+          loc = viewport.unproject(point.coord);
+          graph.replace(node.move(vecInterp(node.loc, loc, t)));
+        }
+      }
 
-                points[corner.i].coord = vecAdd(points[corner.i].coord, motions[corner.i]);
-                score = corner.dotp;
-                if (score < epsilon) {
-                    break;
-                }
-            }
+      // move the nodes along straight segments
+      for (i = 0; i < straights.length; i++) {
+        point = straights[i];
+        if (nodeCount[point.id] > 1) continue;   // skip self-intersections
 
-            node = graph.entity(nodes[corner.i].id);
-            loc = viewport.unproject(points[corner.i].coord);
-            graph = graph.replace(node.move(vecInterp(node.loc, loc, t)));
+        node = graph.entity(point.id);
+
+        if (t === 1 &&
+          graph.parentWays(node).length === 1 &&
+          graph.parentRelations(node).length === 0 &&
+          !node.hasInterestingTags()
+        ) {
+          // remove uninteresting points..
+          graph = actionDeleteNode(node.id)(graph);
 
         } else {
-            var straights = [];
-            var simplified = [];
-
-            // Remove points from nearly straight sections..
-            // This produces a simplified shape to orthogonalize
-            for (i = 0; i < points.length; i++) {
-                point = points[i];
-                var dotp = 0;
-                if (isClosed || (i > 0 && i < points.length - 1)) {
-                    var a = points[(i - 1 + points.length) % points.length];
-                    var b = points[(i + 1) % points.length];
-                    dotp = Math.abs(geoOrthoNormalizedDotProduct(a.coord, b.coord, point.coord));
-                }
-
-                if (dotp > upperThreshold) {
-                    straights.push(point);
-                } else {
-                    simplified.push(point);
-                }
-            }
-
-            // Orthogonalize the simplified shape
-            var bestPoints = clonePoints(simplified);
-            var originalPoints = clonePoints(simplified);
-
-            score = Infinity;
-            for (i = 0; i < 1000; i++) {
-                motions = simplified.map(calcMotion);
-
-                for (j = 0; j < motions.length; j++) {
-                    simplified[j].coord = vecAdd(simplified[j].coord, motions[j]);
-                }
-                var newScore = geoOrthoCalcScore(simplified, isClosed, epsilon, threshold);
-                if (newScore < score) {
-                    bestPoints = clonePoints(simplified);
-                    score = newScore;
-                }
-                if (score < epsilon) {
-                    break;
-                }
-            }
-
-            var bestCoords = bestPoints.map(function(p) { return p.coord; });
-            if (isClosed) bestCoords.push(bestCoords[0]);
-
-            // move the nodes that should move
-            for (i = 0; i < bestPoints.length; i++) {
-                point = bestPoints[i];
-                if (!vecEqual(originalPoints[i].coord, point.coord)) {
-                    node = graph.entity(point.id);
-                    loc = viewport.unproject(point.coord);
-                    graph = graph.replace(node.move(vecInterp(node.loc, loc, t)));
-                }
-            }
-
-            // move the nodes along straight segments
-            for (i = 0; i < straights.length; i++) {
-                point = straights[i];
-                if (nodeCount[point.id] > 1) continue;   // skip self-intersections
-
-                node = graph.entity(point.id);
-
-                if (t === 1 &&
-                    graph.parentWays(node).length === 1 &&
-                    graph.parentRelations(node).length === 0 &&
-                    !node.hasInterestingTags()
-                ) {
-                    // remove uninteresting points..
-                    graph = actionDeleteNode(node.id)(graph);
-
-                } else {
-                    // move interesting points to the nearest edge..
-                    var choice = vecProject(point.coord, bestCoords);
-                    if (choice) {
-                        loc = viewport.unproject(choice.target);
-                        graph = graph.replace(node.move(vecInterp(node.loc, loc, t)));
-                    }
-                }
-            }
+          // move interesting points to the nearest edge..
+          const choice = vecProject(point.coord, bestCoords);
+          if (choice) {
+            loc = viewport.unproject(choice.target);
+            graph.replace(node.move(vecInterp(node.loc, loc, t)));
+          }
         }
+      }
+    }
 
-        return graph;
-
-
-        function clonePoints(array) {
-            return array.map(function(p) {
-                return { id: p.id, coord: [p.coord[0], p.coord[1]] };
-            });
-        }
+    return graph.commit();
 
 
-        function calcMotion(point, i, array) {
-            // don't try to move the endpoints of a non-closed way.
-            if (!isClosed && (i === 0 || i === array.length - 1)) return [0, 0];
-            // don't try to move a node that appears more than once (self intersection)
-            if (nodeCount[array[i].id] > 1) return [0, 0];
-
-            var a = array[(i - 1 + array.length) % array.length].coord;
-            var origin = point.coord;
-            var b = array[(i + 1) % array.length].coord;
-            var p = vecSubtract(a, origin);
-            var q = vecSubtract(b, origin);
-
-            var scale = 2 * Math.min(vecLength(p), vecLength(q));
-            p = vecNormalize(p);
-            q = vecNormalize(q);
-
-            var dotp = (p[0] * q[0] + p[1] * q[1]);
-            var val = Math.abs(dotp);
-
-            if (val < lowerThreshold) {  // nearly orthogonal
-                corner.i = i;
-                corner.dotp = val;
-                var vec = vecNormalize(vecAdd(p, q));
-                return vecScale(vec, 0.1 * dotp * scale);
-            }
-
-            return [0, 0];   // do nothing
-        }
-    };
-
-
-    // if we are only orthogonalizing one vertex,
-    // get that vertex and the previous and next
-    function nodeSubset(nodes, vertexID, isClosed) {
-        var first = isClosed ? 0 : 1;
-        var last = isClosed ? nodes.length : nodes.length - 1;
-
-        for (var i = first; i < last; i++) {
-            if (nodes[i].id === vertexID) {
-                return [
-                    nodes[(i - 1 + nodes.length) % nodes.length],
-                    nodes[i],
-                    nodes[(i + 1) % nodes.length]
-                ];
-            }
-        }
-
-        return [];
+    function clonePoints(arr) {
+      return arr.map(p => {
+        return { id: p.id, coord: [p.coord[0], p.coord[1]] };
+      });
     }
 
 
-    action.disabled = function(graph) {
-        var way = graph.entity(wayID);
-        way = way.removeNode('');  // sanity check - remove any consecutive duplicates
-        graph = graph.replace(way);
+    function calcMotion(point, i, arr) {
+      // don't try to move the endpoints of a non-closed way.
+      if (!isClosed && (i === 0 || i === arr.length - 1)) return [0, 0];
+      // don't try to move a node that appears more than once (self intersection)
+      if (nodeCount[arr[i].id] > 1) return [0, 0];
 
-        var isClosed = way.isClosed();
-        var nodes = graph.childNodes(way).slice();  // shallow copy
-        if (isClosed) nodes.pop();
+      const a = arr[(i - 1 + arr.length) % arr.length].coord;
+      const origin = point.coord;
+      const b = arr[(i + 1) % arr.length].coord;
+      let p = vecSubtract(a, origin);
+      let q = vecSubtract(b, origin);
 
-        var allowStraightAngles = false;
-        if (vertexID !== undefined) {
-            allowStraightAngles = true;
-            nodes = nodeSubset(nodes, vertexID, isClosed);
-            if (nodes.length !== 3) return 'end_vertex';
-        }
+      const scale = 2 * Math.min(vecLength(p), vecLength(q));
+      p = vecNormalize(p);
+      q = vecNormalize(q);
 
-        var coords = nodes.map(function(n) { return viewport.project(n.loc); });
-        var score = geoOrthoCanOrthogonalize(coords, isClosed, epsilon, threshold, allowStraightAngles);
+      const dotp = (p[0] * q[0] + p[1] * q[1]);
+      const val = Math.abs(dotp);
 
-        if (score === null) {
-            return 'not_squarish';
-        } else if (score === 0) {
-            return 'square_enough';
-        } else {
-            return false;
-        }
-    };
+      if (val < lowerThreshold) {  // nearly orthogonal
+        corner.i = i;
+        corner.dotp = val;
+        const vec = vecNormalize(vecAdd(p, q));
+        return vecScale(vec, 0.1 * dotp * scale);
+      }
+
+      return [0, 0];   // do nothing
+    }
+  };
 
 
-    action.transitionable = true;
+  // if we are only orthogonalizing one vertex,
+  // get that vertex and the previous and next
+  function nodeSubset(nodes, vertexID, isClosed) {
+    const first = isClosed ? 0 : 1;
+    const last = isClosed ? nodes.length : nodes.length - 1;
 
-    return action;
+    for (let i = first; i < last; i++) {
+      if (nodes[i].id === vertexID) {
+        return [
+          nodes[(i - 1 + nodes.length) % nodes.length],
+          nodes[i],
+          nodes[(i + 1) % nodes.length]
+        ];
+      }
+    }
+
+    return [];
+  }
+
+
+  action.disabled = function(graph) {
+    let way = graph.entity(wayID);
+    let g = new Graph(graph);    // make a copy
+    way = way.removeNode('');    // sanity check - remove any consecutive duplicates
+    g.replace(way);
+
+    const isClosed = way.isClosed();
+    let nodes = g.childNodes(way).slice();  // shallow copy
+    if (isClosed) nodes.pop();
+
+    let allowStraightAngles = false;
+    if (vertexID !== undefined) {
+      allowStraightAngles = true;
+      nodes = nodeSubset(nodes, vertexID, isClosed);
+      if (nodes.length !== 3) return 'end_vertex';
+    }
+
+    const coords = nodes.map(n => viewport.project(n.loc));
+    const score = geoOrthoCanOrthogonalize(coords, isClosed, epsilon, threshold, allowStraightAngles);
+
+    if (score === null) {
+      return 'not_squarish';
+    } else if (score === 0) {
+      return 'square_enough';
+    } else {
+      return false;
+    }
+  };
+
+
+  action.transitionable = true;
+
+  return action;
 }

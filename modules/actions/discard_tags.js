@@ -1,11 +1,10 @@
 
-export function actionDiscardTags(difference, discardTags) {
-  discardTags = discardTags || {};
-
-  return (graph) => {
+export function actionDiscardTags(difference, discardTags = {}) {
+  return graph => {
     difference.modified().forEach(checkTags);
     difference.created().forEach(checkTags);
-    return graph;
+    return graph.commit();
+
 
     function checkTags(entity) {
       const keys = Object.keys(entity.tags);
@@ -21,7 +20,7 @@ export function actionDiscardTags(difference, discardTags) {
         }
       }
       if (didDiscard) {
-        graph = graph.replace(entity.update({ tags: tags }));
+        graph.replace(entity.update({ tags: tags }));
       }
     }
 

@@ -2,34 +2,31 @@ import { actionDeleteRelation } from './delete_relation.js';
 import { actionDeleteWay } from './delete_way.js';
 
 
-// https://github.com/openstreetmap/potlatch2/blob/master/net/systemeD/halcyon/connection/actions/DeleteNodeAction.as
-export function actionDeleteNode(nodeId) {
-    var action = function(graph) {
-        var node = graph.entity(nodeId);
+export function actionDeleteNode(nodeID) {
 
-        graph.parentWays(node)
-            .forEach(function(parent) {
-                parent = parent.removeNode(nodeId);
-                graph = graph.replace(parent);
+  return graph => {
+    var node = graph.entity(nodeID);
 
-                if (parent.isDegenerate()) {
-                    graph = actionDeleteWay(parent.id)(graph);
-                }
-            });
+    graph.parentWays(node)
+      .forEach(parent => {
+        parent = parent.removeNode(nodeID);
+        graph.replace(parent);
 
-        graph.parentRelations(node)
-            .forEach(function(parent) {
-                parent = parent.removeMembersWithID(nodeId);
-                graph = graph.replace(parent);
+        if (parent.isDegenerate()) {
+          graph = actionDeleteWay(parent.id)(graph);
+        }
+      });
 
-                if (parent.isDegenerate()) {
-                    graph = actionDeleteRelation(parent.id)(graph);
-                }
-            });
+    graph.parentRelations(node)
+      .forEach(parent => {
+        parent = parent.removeMembersWithID(nodeID);
+        graph.replace(parent);
 
-        return graph.remove(node);
-    };
+        if (parent.isDegenerate()) {
+          graph = actionDeleteRelation(parent.id)(graph);
+        }
+      });
 
-
-    return action;
+    return graph.remove(node).commit();
+  };
 }

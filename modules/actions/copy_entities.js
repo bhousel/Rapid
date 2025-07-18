@@ -7,10 +7,10 @@ export function actionCopyEntities(ids, fromGraph) {
     }
 
     for (var id in _copies) {
-      graph = graph.replace(_copies[id]);
+      graph.replace(_copies[id]);
     }
 
-    return graph;
+    return graph.commit();
   };
 
 

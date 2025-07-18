@@ -19,7 +19,7 @@ import { OsmRelation } from '../models/OsmRelation.js';
 //
 export function actionRestrictTurn(turn, restrictionType, restrictionID) {
 
-  return function(graph) {
+  return graph => {
     const fromWay = graph.entity(turn.from.way);
     const toWay = graph.entity(turn.to.way);
     const viaNode = turn.via.node && graph.entity(turn.via.node);
@@ -50,6 +50,6 @@ export function actionRestrictTurn(turn, restrictionType, restrictionID) {
       members: members
     });
 
-    return graph.replace(relation);
+    return graph.replace(relation).commit();
   };
 }

@@ -1,4 +1,4 @@
-import { vecAdd, vecScale } from '@rapid-sdk/math';
+import { vecEqual, vecAdd, vecScale } from '@rapid-sdk/math';
 
 import { actionConnect } from './connect.js';
 
@@ -10,54 +10,65 @@ import { actionConnect } from './connect.js';
 
 export function actionMergeNodes(nodeIDs, loc) {
 
-    // If there is a single "interesting" node, use that as the location.
-    // Otherwise return the average location of all the nodes.
-    function chooseLoc(graph) {
-        if (!nodeIDs.length) return null;
-        var sum = [0,0];
-        var interestingCount = 0;
-        var interestingLoc;
+  // If there are "interesting" nodes, average those only.
+  // Otherwise average whatever nodes we are passed.
+  function _chooseLoc(graph) {
+    if (!nodeIDs.length) return null;
 
-        for (var i = 0; i < nodeIDs.length; i++) {
-            var node = graph.entity(nodeIDs[i]);
-            if (node.hasInterestingTags()) {
-                interestingLoc = (++interestingCount === 1) ? node.loc : null;
-            }
-            sum = vecAdd(sum, node.loc);
-        }
+    let boringSum = [0,0];
+    let boringCount = 0;
+    let interestingSum = [0,0];
+    let interestingCount = 0;
 
-        return interestingLoc || vecScale(sum, 1 / nodeIDs.length);
+    for (const nodeID of nodeIDs) {
+      const node = graph.entity(nodeID);
+      if (node.hasInterestingTags()) {
+        interestingSum = vecAdd(interestingSum, node.loc);
+        interestingCount++;
+      } else {
+        boringSum = vecAdd(boringSum, node.loc);
+        boringCount++;
+      }
     }
 
-
-    var action = function(graph) {
-        if (nodeIDs.length < 2) return graph;
-        var toLoc = loc;
-        if (!toLoc) {
-            toLoc = chooseLoc(graph);
-        }
-
-        for (var i = 0; i < nodeIDs.length; i++) {
-            var node = graph.entity(nodeIDs[i]);
-            if (node.loc !== toLoc) {
-                graph = graph.replace(node.move(toLoc));
-            }
-        }
-
-        return actionConnect(nodeIDs)(graph);
-    };
+    if (interestingCount) {
+      return vecScale(interestingSum, 1 / interestingCount);
+    } else {
+      return vecScale(boringSum, 1 / boringCount);
+    }
+  }
 
 
-    action.disabled = function(graph) {
-        if (nodeIDs.length < 2) return 'not_eligible';
+  const action = graph => {
+    if (nodeIDs.length < 2) return graph;
 
-        for (var i = 0; i < nodeIDs.length; i++) {
-            var entity = graph.entity(nodeIDs[i]);
-            if (entity.type !== 'node') return 'not_eligible';
-        }
+    let toLoc = loc;
+    if (!toLoc) {
+      toLoc = _chooseLoc(graph);
+    }
 
-        return actionConnect(nodeIDs).disabled(graph);
-    };
+    for (const nodeID of nodeIDs) {
+      const node = graph.entity(nodeID);
+      if (!vecEqual(node.loc, toLoc)) {
+        graph.replace(node.move(toLoc));
+      }
+    }
 
-    return action;
+    graph = graph.commit();
+    return actionConnect(nodeIDs)(graph);
+  };
+
+
+  action.disabled = function(graph) {
+    if (nodeIDs.length < 2) return 'not_eligible';
+
+    for (const nodeID of nodeIDs) {
+      const entity = graph.entity(nodeID);
+      if (entity.type !== 'node') return 'not_eligible';
+    }
+
+    return actionConnect(nodeIDs).disabled(graph);
+  };
+
+  return action;
 }

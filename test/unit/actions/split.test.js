@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -18,7 +18,7 @@ describe('actionSplit', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c'] })
       ]);
 
-      assert.equal(!Rapid.actionSplit('b').disabled(graph), true);
+      assert.isNotOk(Rapid.actionSplit('b').disabled(graph));
     });
 
     it('returns falsy for an intersection of two ways', () => {
@@ -39,7 +39,7 @@ describe('actionSplit', () => {
         new Rapid.OsmWay(context, { id: '|', nodes: ['c', '*', 'd'] })
       ]);
 
-      assert.equal(!Rapid.actionSplit('*').disabled(graph), true);
+      assert.isNotOk(Rapid.actionSplit('*').disabled(graph));
     });
 
     it('returns falsy for an intersection of two ways with parent way specified', () => {
@@ -60,7 +60,7 @@ describe('actionSplit', () => {
         new Rapid.OsmWay(context, { id: '|', nodes: ['c', '*', 'd'] })
       ]);
 
-      assert.equal(!Rapid.actionSplit('*').limitWays(['-']).disabled(graph), true);
+      assert.isNotOk(Rapid.actionSplit('*').limitWays(['-']).disabled(graph));
     });
 
     it('returns falsy for a self-intersection', () => {
@@ -79,7 +79,7 @@ describe('actionSplit', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'a', 'd'] })
       ]);
 
-      assert.equal(!Rapid.actionSplit('a').disabled(graph), true);
+      assert.isNotOk(Rapid.actionSplit('a').disabled(graph));
     });
 
     it('returns \'not_eligible\' for the first node of a single way', () => {
@@ -91,7 +91,7 @@ describe('actionSplit', () => {
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] })
       ]);
-      assert.equal(Rapid.actionSplit('a').disabled(graph), 'not_eligible');
+      assert.strictEqual(Rapid.actionSplit('a').disabled(graph), 'not_eligible');
     });
 
     it('returns \'not_eligible\' for the last node of a single way', () => {
@@ -103,7 +103,7 @@ describe('actionSplit', () => {
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] })
       ]);
-      assert.equal(Rapid.actionSplit('b').disabled(graph), 'not_eligible');
+      assert.strictEqual(Rapid.actionSplit('b').disabled(graph), 'not_eligible');
     });
 
     it('returns \'not_eligible\' for an intersection of two ways with non-parent way specified', () => {
@@ -124,7 +124,7 @@ describe('actionSplit', () => {
         new Rapid.OsmWay(context, { id: '|', nodes: ['c', '*', 'd'] })
       ]);
 
-      assert.equal(Rapid.actionSplit('*').limitWays(['-', '=']).disabled(graph), 'not_eligible');
+      assert.strictEqual(Rapid.actionSplit('*').limitWays(['-', '=']).disabled(graph), 'not_eligible');
     });
   });
 
@@ -206,17 +206,17 @@ describe('actionSplit', () => {
         new Rapid.OsmWay(context, { id: '|', nodes: ['c', '*', 'd'] })
       ]);
 
-      const g1 = Rapid.actionSplit('*', ['=']).limitWays(['-'])(graph);
+      const g1 = Rapid.actionSplit('*', ['=']).limitWays(['-'])(new Rapid.Graph(graph));
       assert.deepEqual(g1.entity('-').nodes, ['a', '*']);
       assert.deepEqual(g1.entity('=').nodes, ['*', 'b']);
       assert.deepEqual(g1.entity('|').nodes, ['c', '*', 'd']);
 
-      const g2 = Rapid.actionSplit('*', ['¦']).limitWays(['|'])(graph);
+      const g2 = Rapid.actionSplit('*', ['¦']).limitWays(['|'])(new Rapid.Graph(graph));
       assert.deepEqual(g2.entity('-').nodes, ['a', '*', 'b']);
       assert.deepEqual(g2.entity('|').nodes, ['c', '*']);
       assert.deepEqual(g2.entity('¦').nodes, ['*', 'd']);
 
-      const g3 = Rapid.actionSplit('*', ['=', '¦']).limitWays(['-', '|'])(graph);
+      const g3 = Rapid.actionSplit('*', ['=', '¦']).limitWays(['-', '|'])(new Rapid.Graph(graph));
       assert.deepEqual(g3.entity('-').nodes, ['a', '*']);
       assert.deepEqual(g3.entity('=').nodes, ['*', 'b']);
       assert.deepEqual(g3.entity('|').nodes, ['c', '*']);
@@ -247,19 +247,19 @@ describe('actionSplit', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
 
-      const g1 = Rapid.actionSplit('a', ['='])(graph);
+      const g1 = Rapid.actionSplit('a', ['='])(new Rapid.Graph(graph));
       assert.deepEqual(g1.entity('-').nodes, ['c', 'd', 'a']);
       assert.deepEqual(g1.entity('=').nodes, ['a', 'b', 'c']);
 
-      const g2 = Rapid.actionSplit('b', ['='])(graph);
+      const g2 = Rapid.actionSplit('b', ['='])(new Rapid.Graph(graph));
       assert.deepEqual(g2.entity('-').nodes, ['b', 'c', 'd']);
       assert.deepEqual(g2.entity('=').nodes, ['d', 'a', 'b']);
 
-      const g3 = Rapid.actionSplit('c', ['='])(graph);
+      const g3 = Rapid.actionSplit('c', ['='])(new Rapid.Graph(graph));
       assert.deepEqual(g3.entity('-').nodes, ['c', 'd', 'a']);
       assert.deepEqual(g3.entity('=').nodes, ['a', 'b', 'c']);
 
-      const g4 = Rapid.actionSplit('d', ['='])(graph);
+      const g4 = Rapid.actionSplit('d', ['='])(new Rapid.Graph(graph));
       assert.deepEqual(g4.entity('-').nodes, ['b', 'c', 'd']);
       assert.deepEqual(g4.entity('=').nodes, ['d', 'a', 'b']);
     });
@@ -755,7 +755,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['-', '#', '*', '~', '#', '*', '=']
         //
-        let graph = hat1a;
+        let graph = new Rapid.Graph(hat1a);
         graph = Rapid.actionSplit('c', ['*'])(graph);
         assert.deepEqual(graph.entity('#').nodes, ['b', 'c']);
         assert.deepEqual(graph.entity('*').nodes, ['c', 'd']);
@@ -771,7 +771,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['-', '~', '*', '#', '~', '=']
         //
-        let graph = hat1b;
+        let graph = new Rapid.Graph(hat1b);
         graph = Rapid.actionSplit('c', ['*'])(graph);
 
         assert.deepEqual(graph.entity('#').nodes, ['b', 'c']);
@@ -788,7 +788,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['-', '*', '#', '~', '*', '#', '=']
         //
-        let graph = hat2;
+        let graph = new Rapid.Graph(hat2);
         graph = Rapid.actionSplit('c', ['*'])(graph);
 
         assert.deepEqual(graph.entity('#').nodes, ['d', 'c']);
@@ -805,7 +805,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['-', '*', '#', '~', '*', '#', '=']
         //
-        let graph = hat3;
+        let graph = new Rapid.Graph(hat3);
         graph = Rapid.actionSplit('c', ['*'])(graph);
 
         assert.deepEqual(graph.entity('#').nodes, ['d', 'c']);
@@ -822,7 +822,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['-', '*', '#', '~', '*', '#', '=']
         //
-        let graph = hat4;
+        let graph = new Rapid.Graph(hat4);
         graph = Rapid.actionSplit('c', ['*'])(graph);
 
         assert.deepEqual(graph.entity('#').nodes, ['b', 'c']);
@@ -839,7 +839,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['-', '#', '*', '~', '#', '*', '=']
         //
-        let graph = hat5;
+        let graph = new Rapid.Graph(hat5);
         graph = Rapid.actionSplit('c', ['*'])(graph);
 
         assert.deepEqual(graph.entity('#').nodes, ['b', 'c']);
@@ -952,7 +952,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['~', '-', '=', '~']
         //
-        let graph = spoon1;
+        let graph = new Rapid.Graph(spoon1);
         graph = Rapid.actionSplit('d', ['='])(graph);
 
         assert.deepEqual(graph.entity('-').nodes, ['d', 'a', 'b']);
@@ -970,7 +970,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['~', '-', '=', '~']
         //
-        let graph = spoon2;
+        let graph = new Rapid.Graph(spoon2);
         graph = Rapid.actionSplit('d', ['='])(graph);
 
         assert.deepEqual(graph.entity('-').nodes, ['b', 'a', 'd']);
@@ -988,7 +988,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['~', '-', '=', '~']
         //
-        let graph = spoon3;
+        let graph = new Rapid.Graph(spoon3);
         graph = Rapid.actionSplit('d', ['='])(graph);
 
         assert.deepEqual(graph.entity('-').nodes, ['d', 'a', 'b']);
@@ -1006,7 +1006,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['~', '-', '=', '~']
         //
-        let graph = spoon4;
+        let graph = new Rapid.Graph(spoon4);
         graph = Rapid.actionSplit('d', ['='])(graph);
 
         assert.deepEqual(graph.entity('-').nodes, ['b', 'a', 'd']);
@@ -1024,7 +1024,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['=', '~', '-', '~', '=']
         //
-        let graph = spoon1;
+        let graph = new Rapid.Graph(spoon1);
         graph = Rapid.actionSplit('e', ['='])(graph);
 
         assert.deepEqual(graph.entity('-').nodes, ['d', 'a', 'b', 'c', 'd']);
@@ -1042,7 +1042,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['=', '~', '-', '~', '=']
         //
-        let graph = spoon2;
+        let graph = new Rapid.Graph(spoon2);
         graph = Rapid.actionSplit('e', ['='])(graph);
 
         assert.deepEqual(graph.entity('-').nodes, ['d', 'c', 'b', 'a', 'd']);
@@ -1060,7 +1060,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['~', '=', '-', '=', '~']
         //
-        let graph = spoon3;
+        let graph = new Rapid.Graph(spoon3);
         graph = Rapid.actionSplit('e', ['='])(graph);
 
         assert.deepEqual(graph.entity('-').nodes, ['d', 'a', 'b', 'c', 'd']);
@@ -1078,7 +1078,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['~', '=', '-', '=', '~']
         //
-        let graph = spoon4;
+        let graph = new Rapid.Graph(spoon4);
         graph = Rapid.actionSplit('e', ['='])(graph);
 
         assert.deepEqual(graph.entity('-').nodes, ['d', 'c', 'b', 'a', 'd']);
@@ -1114,7 +1114,7 @@ describe('actionSplit', () => {
         graph = Rapid.actionSplit('a', ['='])(graph);
         assert.deepEqual(graph.entity('-').tags, {});
         assert.deepEqual(graph.entity('=').tags, {});
-        assert.equal(graph.parentRelations(graph.entity('-')).length, 1, 'graph.entity("-") has one parent relation');
+        assert.strictEqual(graph.parentRelations(graph.entity('-')).length, 1, 'graph.entity("-") has one parent relation');
 
         const relation = graph.parentRelations(graph.entity('-'))[0];
         assert.deepEqual(relation.tags, { type: 'multipolygon', area: 'yes' });
@@ -1141,7 +1141,7 @@ describe('actionSplit', () => {
 //        assert.deepEqual(graph.entity('-').nodes, ['b', 'c'], 'graph.entity("-").nodes should be ["b", "c"]');
 //        assert.deepEqual(graph.entity('~').nodes, ['a', 'b'], 'graph.entity("~").nodes should be ["a", "b"]');
         assert.deepEqual(graph.entity('=').nodes, ['a', 'b', 'c', 'a'], 'graph.entity("=").nodes should be ["a", "b", "c", "a"]');
-        assert.equal(graph.parentRelations(graph.entity('=')).length, 0, 'graph.entity("=") should have no parent relations');
+        assert.strictEqual(graph.parentRelations(graph.entity('=')).length, 0, 'graph.entity("=") should have no parent relations');
       });
 
       it('converts simple multipolygon to a proper multipolygon', () => {

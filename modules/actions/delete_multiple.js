@@ -4,23 +4,19 @@ import { actionDeleteWay } from './delete_way.js';
 
 
 export function actionDeleteMultiple(ids) {
-    var actions = {
-        way: actionDeleteWay,
-        node: actionDeleteNode,
-        relation: actionDeleteRelation
-    };
+  const actions = {
+    way: actionDeleteWay,
+    node: actionDeleteNode,
+    relation: actionDeleteRelation
+  };
 
+  return graph => {
+    ids.forEach(function(id) {
+      if (graph.hasEntity(id)) { // It may have been deleted already.
+        graph = actions[graph.entity(id).type](id)(graph);
+      }
+    });
 
-    var action = function(graph) {
-        ids.forEach(function(id) {
-            if (graph.hasEntity(id)) { // It may have been deleted already.
-                graph = actions[graph.entity(id).type](id)(graph);
-            }
-        });
-
-        return graph;
-    };
-
-
-    return action;
+    return graph;
+  };
 }

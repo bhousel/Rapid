@@ -7,7 +7,5 @@ import { actionDeleteRelation } from './delete_relation.js';
 // see osm/intersection.js, pathToTurn()
 //
 export function actionUnrestrictTurn(turn) {
-    return function(graph) {
-        return actionDeleteRelation(turn.restrictionID)(graph);
-    };
+  return graph => actionDeleteRelation(turn.restrictionID)(graph);
 }

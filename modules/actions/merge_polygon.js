@@ -10,7 +10,7 @@ export function actionMergePolygon(ids, newRelationID) {
     const entities = ids.map(id => graph.entity(id));
     const context = entities[0]?.context; // grab a context from any
 
-    const geometryGroups = utilArrayGroupBy(entities, function(entity) {
+    const geometryGroups = utilArrayGroupBy(entities, entity => {
       if (entity.type === 'way' && entity.isClosed()) {
         return 'closedWay';
       } else if (entity.type === 'relation' && entity.isMultipolygon()) {
@@ -27,7 +27,7 @@ export function actionMergePolygon(ids, newRelationID) {
   }
 
 
-  const action = function(graph) {
+  const action = graph => {
     const entities = gatherEntityData(graph);
 
     // An array representing all the polygons that are part of the multipolygon.
@@ -35,7 +35,8 @@ export function actionMergePolygon(ids, newRelationID) {
     // locs property which is an array of the locations forming the polygon.
     let polygons = entities.multipolygon.reduce(function(polygons, m) {
       return polygons.concat(osmJoinWays(m.members, graph));
-    }, []).concat(entities.closedWay.map(function(d) {
+    }, [])
+    .concat(entities.closedWay.map(d => {
       const member = [{id: d.id}];
       member.nodes = graph.childNodes(d);
       return member;
@@ -96,7 +97,7 @@ export function actionMergePolygon(ids, newRelationID) {
 
     entities.multipolygon.slice(1).forEach(m => {
       relation = relation.mergeTags(m.tags);
-      graph = graph.remove(m);
+      graph.remove(m);
     });
 
     entities.closedWay.forEach(way => {
@@ -105,14 +106,16 @@ export function actionMergePolygon(ids, newRelationID) {
       }
       if (members.some(isThisOuter)) {
         relation = relation.mergeTags(way.tags);
-        graph = graph.replace(way.update({ tags: {} }));
+        graph.replace(way.update({ tags: {} }));
       }
     });
 
-    return graph.replace(relation.update({
+    relation = relation.update({
       members: members,
       tags: utilObjectOmit(relation.tags, ['area'])
-    }));
+    });
+
+    return graph.replace(relation).commit();
   };
 
 
@@ -122,14 +125,14 @@ export function actionMergePolygon(ids, newRelationID) {
       entities.closedWay.length + entities.multipolygon.length < 2) {
       return 'not_eligible';
     }
-    if (!entities.multipolygon.every(function(r) { return r.isComplete(graph); })) {
+    if (!entities.multipolygon.every(r => r.isComplete(graph))) {
       return 'incomplete_relation';
     }
 
     if (!entities.multipolygon.length) {
       let sharedMultipolygons = [];
       entities.closedWay.forEach(function(way, i) {
-        const parentMultipolygons = graph.parentRelations(way).filter(relation => relation.isMultipolygon());
+        const parentMultipolygons = graph.parentRelations(way).filter(r => r.isMultipolygon());
 
         if (i === 0) {
           sharedMultipolygons = parentMultipolygons;
@@ -137,8 +140,8 @@ export function actionMergePolygon(ids, newRelationID) {
           sharedMultipolygons = utilArrayIntersection(sharedMultipolygons, parentMultipolygons);
         }
       });
-      sharedMultipolygons = sharedMultipolygons.filter(relation => {
-        return relation.members.length === entities.closedWay.length;
+      sharedMultipolygons = sharedMultipolygons.filter(r => {
+        return r.members.length === entities.closedWay.length;
       });
       if (sharedMultipolygons.length) {
         // don't create a new multipolygon if it'd be redundant
@@ -146,7 +149,7 @@ export function actionMergePolygon(ids, newRelationID) {
       }
 
     } else if (entities.closedWay.some(way => {
-        const parentMultipolygons = graph.parentRelations(way).filter(relation => relation.isMultipolygon());
+        const parentMultipolygons = graph.parentRelations(way).filter(r => r.isMultipolygon());
         return utilArrayIntersection(parentMultipolygons, entities.multipolygon).length;
       })) {
       // don't add a way to a multipolygon again if it's already a member

@@ -4,7 +4,7 @@ import { OsmNode } from '../models/OsmNode.js';
 export function actionExtract(entityID, viewport) {
   let _extractedNodeID;
 
-  let action = function(graph) {
+  let action = graph => {
     const entity = graph.entity(entityID);
     if (entity.type === 'node') {
       return _extractFromNode(entity, graph);
@@ -19,15 +19,15 @@ export function actionExtract(entityID, viewport) {
 
     // Create a new node to replace the one we will detach
     const replacement = new OsmNode(node.context, { loc: node.loc });
-    graph = graph.replace(replacement);
+    graph.replace(replacement);
 
     for (const parentWay of graph.parentWays(node)) {
-      graph = graph.replace(parentWay.replaceNode(entityID, replacement.id));
+      graph.replace(parentWay.replaceNode(entityID, replacement.id));
     }
     for (const parentRelation of graph.parentRelations(node)) {
-      graph = graph.replace(parentRelation.replaceMember(node, replacement));
+      graph.replace(parentRelation.replaceMember(node, replacement));
     }
-    return graph;
+    return graph.commit();
   }
 
 
@@ -79,10 +79,11 @@ export function actionExtract(entityID, viewport) {
     }
 
     const replacement = new OsmNode(entity.context, { loc: extractLoc, tags: extractTags });
-    graph = graph.replace(replacement);
+    graph.replace(replacement);
     _extractedNodeID = replacement.id;
 
-    return graph.replace(entity.update({ tags: entityTags }));
+    graph.replace(entity.update({ tags: entityTags }));
+    return graph.commit();
   }
 
 
