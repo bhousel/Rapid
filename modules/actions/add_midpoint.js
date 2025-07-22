@@ -3,7 +3,7 @@ import { utilArrayIntersection } from '@rapid-sdk/util';
 
 
 export function actionAddMidpoint(midpoint, node) {
-  return function(graph) {
+  return graph => {
     graph = graph.replace(node.move(midpoint.loc)).commit();
 
     const parents = utilArrayIntersection(

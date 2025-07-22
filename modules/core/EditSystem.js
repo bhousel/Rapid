@@ -114,7 +114,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -154,7 +154,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -165,7 +165,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     const prevIndex = this._index;
@@ -188,7 +188,6 @@ export class EditSystem extends AbstractSystem {
   _reset() {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
     this.deferredBackup.cancel();
-
 
     // Create a new Base Graph / Base Edit.
     const baseGraph = new Graph();
@@ -218,7 +217,7 @@ export class EditSystem extends AbstractSystem {
    * base
    * The `base` edit is the initial edit in the history.  It contains the Base Graph.
    * It will not contain any actual user edits, sources, annotation.
-   * @return {Edit} The initial Edit containing the Base Graph
+   * @return  {Edit}  The initial Edit containing the Base Graph
    */
   get base() {
     return this._history[0];
@@ -230,7 +229,7 @@ export class EditSystem extends AbstractSystem {
    * The `stable` edit is suitable for validation or backups.
    * Before the user edits anything, `_index === 0`, so the `stable === base`.
    * Note that "future" redo history can continue past the `stable` edit, if the user has undone.
-   * @return {Edit} The latest accepted Edit in the history
+   * @return  {Edit}  The latest accepted Edit in the history
    */
   get stable() {
     return this._history[this._index];
@@ -241,7 +240,7 @@ export class EditSystem extends AbstractSystem {
    * The `staging` edit will be a placeholder work-in-progress edit in the chain immediately
    * following the `stable` edit.  The user may be drawing a feature or editing tags.
    * The `staging` edit has not been added to the history yet.
-   * @return {Edit} The `staging` work-in-progress Edit
+   * @return  {Edit}  The `staging` work-in-progress Edit
    */
   get staging() {
     return this._staging;
@@ -250,7 +249,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * tree
    * The tree is a spatial index that keeps itself in sync with the `staging` graph.
-   * @return {Tree} The Tree (spatial index)
+   * @return  {Tree}  The Tree (spatial index)
    */
   get tree() {
     return this._tree;
@@ -259,7 +258,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * history
    * A shallow copy of the history.
-   * @return {Array} A shallow copy of the history
+   * @return  {Array<Edit>}  A shallow copy of the history
    */
   get history() {
     return this._history.slice();
@@ -268,7 +267,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * index
    * Index pointing to the current `stable` Edit
-   * @return {number} Index pointing to the current `stable` Edit
+   * @return  {number} Index pointing to the current `stable` Edit
    */
   get index() {
     return this._index;
@@ -277,7 +276,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * hasWorkInProgress
    * Is there work in progress in the `staging` edit?
-   * @return {boolean}  `true` if there is work in progress in the `staging` edit.
+   * @return  {boolean}  `true` if there is work in progress in the `staging` edit.
    */
   get hasWorkInProgress() {
     return this._hasWorkInProgress;
@@ -297,7 +296,7 @@ export class EditSystem extends AbstractSystem {
   perform(...args) {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
     this._perform(args, 1);
-    return this._updateChanges();   // only one place in the code uses this return - split operation?
+    return this._emitChanges();   // only one place in the code uses this return - split operation?
   }
 
 
@@ -322,7 +321,7 @@ export class EditSystem extends AbstractSystem {
 
     if (!action.transitionable) {
       this._perform([action], 1);
-      this._updateChanges();
+      this._emitChanges();
       return Promise.resolve();
     }
 
@@ -338,7 +337,7 @@ export class EditSystem extends AbstractSystem {
             if (t < 1) {
               this._replaceStaging();
               this._perform([action], t);
-              this._updateChanges();
+              this._emitChanges();
             }
           };
         })
@@ -346,12 +345,12 @@ export class EditSystem extends AbstractSystem {
           this._inTransition = true;
           this._replaceStaging();
           this._perform([action], 0);
-          this._updateChanges();
+          this._emitChanges();
         })
         .on('end interrupt', () => {
           this._replaceStaging();
           this._perform([action], 1);
-          this._updateChanges();
+          this._emitChanges();
           this._inTransition = false;
           resolve();
         });
@@ -369,7 +368,7 @@ export class EditSystem extends AbstractSystem {
 
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
     this._replaceStaging();
-    return this._updateChanges();
+    return this._emitChanges();
   }
 
 
@@ -419,7 +418,7 @@ export class EditSystem extends AbstractSystem {
     // (At this point `stable` === `staging`)
 
     this._replaceStaging();
-    this._updateChanges();
+    this._emitChanges();
   }
 
 
@@ -476,7 +475,7 @@ export class EditSystem extends AbstractSystem {
     // (At this point `stable` === `staging`)
 
     this._replaceStaging();
-    this._updateChanges();
+    this._emitChanges();
   }
 
 
@@ -518,7 +517,7 @@ export class EditSystem extends AbstractSystem {
 
     if (this._index !== prevIndex) {
       this._replaceStaging();
-      this._updateChanges();
+      this._emitChanges();
       this.emit('historyjump', prevIndex, this._index);
     }
   }
@@ -554,7 +553,7 @@ export class EditSystem extends AbstractSystem {
 
     if (this._index !== prevIndex) {
       this._replaceStaging();
-      this._updateChanges();
+      this._emitChanges();
       this.emit('historyjump', prevIndex, this._index);
     }
   }
@@ -596,7 +595,7 @@ export class EditSystem extends AbstractSystem {
       this._index = checkpoint.index;
 
       this._replaceStaging();
-      this._updateChanges();
+      this._emitChanges();
       this.emit('historyjump', prevIndex, this._index);
     }
   }
@@ -622,8 +621,8 @@ export class EditSystem extends AbstractSystem {
    *  storage, or loading specific entities from the OSM API.
    *  (Sorry, but this one is not like what `git merge` does.)
    *
-   *  @param  {Array}  entities - Entities to merge into the history (usually only the new ones)
-   *  @param  {Set}    seenIDs? - Optional set of all entity IDs on the tile (including previously seen ones)
+   *  @param  {Array<Entity>}  entities - Entities to merge into the history (usually only the new ones)
+   *  @param  {Set<string>}    seenIDs? - Optional set of all entity IDs on the tile (including previously seen ones)
    */
   merge(entities, seenIDs) {
     const baseGraph = this.base.graph;
@@ -684,7 +683,7 @@ export class EditSystem extends AbstractSystem {
    */
   endTransaction() {
     this._inTransaction = false;
-    return this._updateChanges();
+    return this._emitChanges();
   }
 
 
@@ -719,8 +718,8 @@ export class EditSystem extends AbstractSystem {
   /**
    * intersects
    * Returns the entities from the `staging` graph with bounding boxes overlapping the given `extent`.
-   * @prarm   {Extent}  extent - the extent to test
-   * @return  {Array}   Entities intersecting the given Extent
+   * @prarm   {Extent}         extent - the extent to test
+   * @return  {Array<Entity>}  Entities intersecting the given Extent
    */
   intersects(extent) {
     return this._tree.intersects(extent, this.staging.graph);
@@ -731,8 +730,8 @@ export class EditSystem extends AbstractSystem {
    * difference
    * Returns a `Difference` containing all edits from `base` -> `stable`
    * We use this pretty frequently, so it's cached in `this._fullDifference`
-   *  and recomputed by the `_updateChanges` function only when `stable` changes.
-   * @return {Difference} The total changes made by the user during their edit session
+   *  and recomputed by the `_emitChanges` function only when `stable` changes.
+   * @return  {Difference}  The total changes made by the user during their edit session
    */
   difference() {
     return this._fullDifference;
@@ -743,8 +742,8 @@ export class EditSystem extends AbstractSystem {
    * changes
    * This returns a summery of all changes made from `base` -> `stable`
    * Optionally includes a given action function to apply to the `stable` graph.
-   * @param  {Function?}  action - Optional action to apply to the `stable` graph
-   * @return {Object}     Object containing `modified`, `created`, `deleted` summary of changes
+   * @param   {Function?}  action - Optional action to apply to the `stable` graph
+   * @return  {Object}     Object containing `modified`, `created`, `deleted` summary of changes
    */
   changes(action) {
     let difference = this._fullDifference;
@@ -767,7 +766,7 @@ export class EditSystem extends AbstractSystem {
    * hasChanges
    * This counts meangful edits only (modified, created, deleted).
    * For example, we could perform a bunch of no-op edits and it would still return false.
-   * @return {boolean}  `true` if the user has made any meaningful edits
+   * @return  {boolean}  `true` if the user has made any meaningful edits
    */
   hasChanges() {
     return this._fullDifference.changes.size > 0;
@@ -778,7 +777,7 @@ export class EditSystem extends AbstractSystem {
    * sourcesUsed
    * This prepares the list of all sources used during the user's editing session.
    * This is called by `commit.js` when preparing the changeset before uploading.
-   * @return {Object}  Object of all sources used during the user's editing session
+   * @return  {Object}  Object of all sources used during the user's editing session
    */
   sourcesUsed() {
     const result = {
@@ -816,7 +815,7 @@ export class EditSystem extends AbstractSystem {
    *  5. This outputs stringified JSON to the browser console (it will be a lot!)
    *  6. Copy it to `data/intro_graph.json` and prettify it in your code editor
    *
-   * @returns {string} The stringified walkthrough data
+   * @returns  {string}  The stringified walkthrough data
    */
   toIntroGraph() {
     const nextID = { n: 0, r: 0, w: 0 };
@@ -1006,8 +1005,8 @@ export class EditSystem extends AbstractSystem {
    *  this function needs to be async, and should be chained after a `context.resetAsync()` to ensure
    *  that we are starting with a clean slate in regards to validation and rendering.
    *
-   * @param  {string}   json - Stringified JSON to parse
-   * @return {Promise}  Promise resolved when the restore process is complete
+   * @param   {string}   json - Stringified JSON to parse
+   * @return  {Promise}  Promise resolved when the restore process is complete
    */
   fromJSONAsync(json) {
     const context = this.context;
@@ -1173,7 +1172,7 @@ export class EditSystem extends AbstractSystem {
 
       // emit events
       this.emit('merge', baseEntityIDs);
-      this._updateChanges();
+      this._emitChanges();
       this.emit('historyjump', 0, this._index);  // send 0 in prevIndex, we are replacing history completely
     };
 
@@ -1271,7 +1270,7 @@ export class EditSystem extends AbstractSystem {
    * _backupKey
    * Generate a key used to store/retrieve backup edits.
    * It uses `window.location.origin` avoid conflicts with other instances of Rapid.
-   * @return {string}  The key used to store/retrieve backup edits in localStorage
+   * @return  {string}  The key used to store/retrieve backup edits in localStorage
    */
   _backupKey() {
     return 'Rapid_' + window.location.origin + '_saved_history';
@@ -1317,11 +1316,14 @@ export class EditSystem extends AbstractSystem {
    * _perform
    * Internal `_perform`, accepts both Actions array and eased time,
    * Performs the edits and emits no events.
-   * @param  {Array}    Array of Action functions to perform
-   * @param  {number?}  Eased time, should be in the range [0..1]
+   * @param  {Array<function>}  Array of Action functions to perform
+   * @param  {number?}          Eased time, should be in the range [0..1]
    */
   _perform(actions, t = 1) {
-    let graph = this._staging.graph;
+// for now, call commit() before performing work.
+// this sidesteps the issue where we mutate the staging graph, but then during
+// _emitChanges, the stagingDifference is missing some changes.
+    let graph = this._staging.graph.commit();
     for (const fn of actions) {
       if (typeof fn === 'function') {
         graph = fn(graph, t);
@@ -1345,11 +1347,11 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * _updateChanges
+   * _emitChanges
    * Recalculate the differences and emit `stablechange` and `stagingchange` events.
-   * @return {Difference}  Difference between before and after of `staging` Edit
+   * @return  {Difference}  Difference between before and after of `staging` Edit
    */
-  _updateChanges() {
+  _emitChanges() {
     if (this._inTransaction) return;
 
     const baseGraph = this.base.graph;

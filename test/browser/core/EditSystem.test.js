@@ -67,7 +67,7 @@ describe('EditSystem', () => {
   }
 
   function actionAddNode(nodeID) {
-    return (graph) => graph.replace(new Rapid.OsmNode(context, { id: nodeID }));
+    return (graph) => graph.replace(new Rapid.OsmNode(context, { id: nodeID })).commit();
   }
 
   function actionTransitionNoop() {

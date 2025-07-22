@@ -232,8 +232,8 @@ export function actionMove(moveIDs, tryDelta, viewport, cache) {
   //
   function unZorroIntersection(intersection, graph) {
     const vertex = graph.entity(intersection.nodeID);
-    const way1 = graph.entity(intersection.movedId);
-    const way2 = graph.entity(intersection.unmovedId);
+    let way1 = graph.entity(intersection.movedId);
+    let way2 = graph.entity(intersection.unmovedId);
     const isEP1 = intersection.movedIsEP;
     const isEP2 = intersection.unmovedIsEP;
 

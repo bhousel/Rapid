@@ -339,7 +339,7 @@ describe('Graph', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const v = n1.v;
       const graph = new Rapid.Graph([n1]);
-      const result = graph.remove(n1);
+      graph.remove(n1);
       assert.strictEqual(n1.v, v);
     });
 
@@ -405,7 +405,7 @@ describe('Graph', () => {
       const graph = new Rapid.Graph([n1]).replace(n1v2);
       const v1 = n1.v;
       const v2 = n1v2.v;
-      const result = graph.revert('n1');
+      graph.revert('n1');
       assert.strictEqual(n1.v, v1);
       assert.strictEqual(n1v2.v, v2);
     });
