@@ -1,5 +1,5 @@
 import { Extent, geomGetSmallestSurroundingRectangle, vecInterp } from '@rapid-sdk/math';
-import { polygonHull, polygonCentroid } from 'd3-polygon';
+import { polygonArea, polygonCentroid, polygonHull } from 'd3-polygon';
 import polylabel from '@mapbox/polylabel';
 
 
@@ -196,6 +196,14 @@ export class GeometryPart {
       world.poi = world.centroid;
 
     } else {   // > 2 coordinates...
+
+      // check area/winding?
+      world.area = polygonArea(world.outer);
+      // if (world.area < 0) {
+      //   world.area *= -1;
+      //   world.outer.reverse();
+      // }
+
       // Convex Hull
       world.hull = polygonHull(world.outer);
 

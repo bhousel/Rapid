@@ -1,37 +1,46 @@
 import { median } from 'd3-array';
-import { polygonArea, polygonHull, polygonCentroid } from 'd3-polygon';
-import { DEG2RAD, vecInterp, vecLength, vecLengthSquare } from '@rapid-sdk/math';
+import { DEG2RAD, vecAngle, vecInterp, vecLength, vecLengthSquare } from '@rapid-sdk/math';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { OsmNode } from '../models/OsmNode.js';
 
 
-export function actionCircularize(wayID, viewport, maxAngle) {
-  maxAngle = (maxAngle || 20) * DEG2RAD;
+export function actionCircularize(wayID, viewport, maxDegrees = 20) {
+  const maxAngle = maxDegrees * DEG2RAD;
 
 
   const action = (graph, t) => {
     if (t === null || !isFinite(t)) t = 1;
     t = Math.min(Math.max(+t, 0), 1);
 
-    var way = graph.entity(wayID);
-    var origNodes = {};
+    let way = graph.entity(wayID);
 
-    graph.childNodes(way).forEach(function(node) {
-      if (!origNodes[node.id]) origNodes[node.id] = node;
-    });
-
-    if (!way.isConvex(graph)) {
-      graph = action.makeConvex(graph);
+    const origNodes = new Map();
+    for (const node of graph.childNodes(way)) {
+      origNodes.set(node.id, node);
     }
+
+    // Before starting, make sure the shape is convex. see iD#2194
+    // What we probably really want to do is return a collection
+    //  of where the nodes want to move to, rather than moving them.
+    if (!way.isConvex(graph)) {
+      graph = _makeConvex(graph);
+      way = graph.entity(wayID);
+    }
+
+    // we already have the shape projected to world coordinates..
+    // we can do less work here.
+    const geom = way.geoms.parts[0]?.world;
+    const centroidW = geom?.centroid;
+    if (!centroidW) return graph;
+    const centroid = viewport.worldToScreen(centroidW);
 
     const nodes = utilArrayUniq(graph.childNodes(way));
     let keyNodes = nodes.filter(n => graph.parentWays(n).length > 1);
     let points = nodes.map(n => viewport.project(n.loc));
     let keyPoints = keyNodes.map(n => viewport.project(n.loc));
-    const centroid = (points.length === 2) ? vecInterp(points[0], points[1], 0.5) : polygonCentroid(points);
     const radius = median(points, p => vecLength(centroid, p));
-    const sign = polygonArea(points) > 0 ? 1 : -1;
+    const sign = geom.area > 0 ? 1 : -1;
     var ids, i, j, k;
 
     // we need at least two key nodes for the algorithm to work
@@ -77,7 +86,7 @@ export function actionCircularize(wayID, viewport, maxAngle) {
       ];
       loc = viewport.unproject(keyPoints[i]);
       node = keyNodes[i];
-      origNode = origNodes[node.id];
+      origNode = origNodes.get(node.id);
       node = node.move(vecInterp(origNode.loc, loc, t));
       graph = graph.replace(node).commit();
 
@@ -106,7 +115,7 @@ export function actionCircularize(wayID, viewport, maxAngle) {
         ]);
 
         node = nodes[(j + startNodeIndex) % nodes.length];
-        origNode = origNodes[node.id];
+        origNode = origNodes.get(node.id);
         nearNodes[node.id] = angle;
 
         node = node.move(vecInterp(origNode.loc, loc, t));
@@ -128,7 +137,7 @@ export function actionCircularize(wayID, viewport, maxAngle) {
           const dist = Math.abs(nearAngle - angle);
           if (dist < min) {
             min = dist;
-            origNode = origNodes[nodeID];
+            origNode = origNodes.get(nodeID);
           }
         }
 
@@ -182,94 +191,87 @@ export function actionCircularize(wayID, viewport, maxAngle) {
   };
 
 
-  action.makeConvex = graph => {
-    const way = graph.entity(wayID);
-    const nodes = utilArrayUniq(graph.childNodes(way));
-    const points = nodes.map(n => viewport.project(n.loc));
-    const sign = polygonArea(points) > 0 ? 1 : -1;
-    const hull = polygonHull(points);
-
-    // D3 convex hulls go counterclockwise..
-    if (sign === -1) {
-      nodes.reverse();
-      points.reverse();
-    }
-
-    for (let i = 0; i < hull.length - 1; i++) {
-      const startIndex = points.indexOf(hull[i]);
-      const endIndex = points.indexOf(hull[i+1]);
-      let indexRange = (endIndex - startIndex);
-
-      if (indexRange < 0) {
-        indexRange += nodes.length;
-      }
-
-      // move interior nodes to the surface of the convex hull..
-      for (let j = 1; j < indexRange; j++) {
-        const point = vecInterp(hull[i], hull[i+1], j / indexRange);
-        const node = nodes[(j + startIndex) % nodes.length].move(viewport.unproject(point));
-        graph.replace(node);
-      }
-    }
-
-    return graph.commit();
-  };
-
-
   action.disabled = graph => {
     const way = graph.entity(wayID);
+    const geom = way.geoms.parts[0]?.world;
+    const points = geom?.outer;
+    const hull = geom?.hull;
+    const centroid = geom?.centroid;
 
-    if (!way.isClosed()) {
+    if (!way.isClosed() || !points || !hull || !centroid) {
       return 'not_closed';
     }
 
-    // disable when already circular
-    const nodes = utilArrayUniq(graph.childNodes(way));
-    const points = nodes.map(n => viewport.project(n.loc));
-    const hull = polygonHull(points);
-    const epsilonAngle =  Math.PI / 180;
-    if (hull.length !== points.length || hull.length < 3) {
-      return false;
-    }
-    const centroid = polygonCentroid(points);
     const radius = vecLengthSquare(centroid, points[0]);
 
-    let i, actualPoint;
-
     // compare distances between centroid and points
-    for (i = 0; i < hull.length; i++){
-      actualPoint = hull[i];
-      const actualDist = vecLengthSquare(actualPoint, centroid);
-      const diff = Math.abs(actualDist - radius);
-      //compare distances with epsilon-error (5%)
-      if (diff > 0.05 * radius) {
+    for (const currPoint of hull) {
+      const currDist = vecLengthSquare(currPoint, centroid);
+      const diff = Math.abs(currDist - radius);
+      if (diff > 0.05 * radius) {   // compare distances with epsilon-error (5%)
         return false;
       }
     }
 
-    //check if central angles are smaller than maxAngle
-    for (i = 0; i < hull.length; i++){
-      actualPoint = hull[i];
+    // check if central angles are smaller than maxAngle
+    for (let i = 0; i < hull.length; i++) {
+      const currPoint = hull[i];
       const nextPoint = hull[(i+1) % hull.length];
-      const startAngle = Math.atan2(actualPoint[1] - centroid[1], actualPoint[0] - centroid[0]);
-      const endAngle = Math.atan2(nextPoint[1] - centroid[1], nextPoint[0] - centroid[0]);
+      const startAngle = vecAngle(centroid, currPoint);
+      const endAngle = vecAngle(centroid, nextPoint);
       let angle = endAngle - startAngle;
       if (angle < 0) {
         angle = -angle;
       }
-      if (angle > Math.PI){
+      if (angle > Math.PI) {
         angle = (2 * Math.PI - angle);
       }
 
-      if (angle > maxAngle + epsilonAngle) {
+      if (angle > maxAngle + (Math.PI / 180)) {
         return false;
       }
     }
+
     return 'already_circular';
   };
 
 
   action.transitionable = true;
+
+
+
+  /**
+   * _makeConvex
+   * This makes the given way convex.
+   * @param  {Graph}  starting graph
+   * @parem  {Graph}  ending graph
+   */
+  function _makeConvex(graph) {
+    const way = graph.entity(wayID);
+    const geom = way.geoms.parts[0]?.world;
+    const points = geom?.outer;
+    const hull = geom?.hull;
+    if (!points || !hull) return graph;
+
+    const nodes = utilArrayUniq(graph.childNodes(way));
+
+    for (let i = 0; i < hull.length - 1; i++) {
+      const startIndex = points.indexOf(hull[i]);
+      const endIndex = points.indexOf(hull[i+1]);
+      let indexRange = (endIndex - startIndex);
+      if (indexRange < 0) {
+        indexRange += nodes.length;
+      }
+      // move interior nodes to the surface of the convex hull..
+      for (let j = 1; j < indexRange; j++) {
+        const point = vecInterp(hull[i], hull[i+1], j / indexRange);
+        const node = nodes[(j + startIndex) % nodes.length].move(viewport.worldToWgs84(point));
+        graph.replace(node);
+      }
+    }
+
+    return graph.commit();
+  }
 
 
   return action;

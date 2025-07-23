@@ -1,13 +1,12 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('actionCircularize', () => {
   const context = new Rapid.MockContext();
-  // This makes our viewport operate like the d3 default of [480,250].
-  // https://github.com/d3/d3-geo#projection_translate
-  const viewport = new Rapid.sdk.Viewport({ x: 480, y: 250, k: 150 });
+  const viewport = context.viewport;
+
 
   function isCircular(id, graph) {
     const points = graph.childNodes(graph.entity(id)).map(node => viewport.project(node.loc));
@@ -16,22 +15,14 @@ describe('actionCircularize', () => {
     const estArea = Math.PI * radius * radius;
     const trueArea = Math.abs(Rapid.d3.polygonArea(points));
     const pctDiff = (estArea - trueArea) / estArea;
-
     return (pctDiff < 0.025);   // within 2.5% of circular area..
   }
 
-  function intersection(a, b) {
-    const seen = a.reduce(function (h, k) {
-      h[k] = true;
-      return h;
-    }, {});
 
-    return b.filter(function (k) {
-      const exists = seen[k];
-      delete seen[k];
-      return exists;
-    });
+  function intersection(a, b) {
+    return (new Set(a)).intersection(new Set(b));
   }
+
 
   function angle(point1, point2, center) {
     let vector1 = [point1[0] - center[0], point1[1] - center[1]];
@@ -47,10 +38,12 @@ describe('actionCircularize', () => {
     return 180 / Math.PI * Math.acos(vector1[0] * vector2[0] + vector1[1] * vector2[1]);
   }
 
+
   function area(id, graph) {
     const coords = graph.childNodes(graph.entity(id)).map(node => node.loc);
     return Rapid.d3.polygonArea(coords);
   }
+
 
   function closeTo(a, b, epsilon = 1e-2) {
     return Math.abs(a - b) < epsilon;
@@ -70,9 +63,9 @@ describe('actionCircularize', () => {
     ]);
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(isCircular('-', result));
-    assert.equal(result.entity('-').nodes.length, 20);
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isOk(isCircular('-', result));
+    assert.lengthOf(result.entity('-').nodes, 20);
   });
 
 
@@ -90,15 +83,11 @@ describe('actionCircularize', () => {
     ]);
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(isCircular('-', result));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isOk(isCircular('-', result));
 
     const nodes = result.entity('-').nodes;
-    assert.ok(nodes.includes('a'));
-    assert.ok(nodes.includes('b'));
-    assert.ok(nodes.includes('c'));
-    assert.ok(nodes.includes('d'));
-    assert.ok(nodes.includes('e'));
+    assert.includeMembers(nodes, ['a', 'b', 'c', 'd', 'e']);
   });
 
 
@@ -116,10 +105,10 @@ describe('actionCircularize', () => {
     ]);
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(isCircular('-', result));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isOk(isCircular('-', result));
     const dist = Rapid.sdk.vecLength(result.entity('d').loc, [2, -2]);
-    assert.ok(dist < 0.5);
+    assert.isOk(dist < 0.5);
   });
 
 
@@ -136,16 +125,16 @@ describe('actionCircularize', () => {
     ]);
 
     const result = Rapid.actionCircularize('-', viewport, 20)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(isCircular('-', result));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isOk(isCircular('-', result));
 
     const points = result.childNodes(result.entity('-')).map(node => viewport.project(node.loc));
     const centroid = Rapid.d3.polygonCentroid(points);
 
     for (let i = 0; i < points.length - 1; i++) {
-      assert.ok(angle(points.at(i), points.at(i+1), centroid) <= 20);
+      assert.isOk(angle(points.at(i), points.at(i+1), centroid) <= 20);
     }
-    assert.ok(angle(points.at(-2), points.at(0), centroid) <= 20);
+    assert.isOk(angle(points.at(-2), points.at(0), centroid) <= 20);
   });
 
 
@@ -161,12 +150,12 @@ describe('actionCircularize', () => {
       new Rapid.OsmWay(context, {id: '+', nodes: ['a', 'd', 'c', 'b', 'a']})
     ]);
 
-    assert.ok(area('+', graph) > 0);
+    assert.isOk(area('+', graph) > 0);
 
     const result = Rapid.actionCircularize('+', viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(isCircular('+', result));
-    assert.ok(area('+', result) > 0);
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isOk(isCircular('+', result));
+    assert.isOk(area('+', result) > 0);
   });
 
 
@@ -182,12 +171,12 @@ describe('actionCircularize', () => {
       new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
     ]);
 
-    assert.ok(area('-', graph) < 0);
+    assert.isOk(area('-', graph) < 0);
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(isCircular('-', result));
-    assert.ok(area('-', result) < 0);
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isOk(isCircular('-', result));
+    assert.isOk(area('-', result) < 0);
   });
 
 
@@ -214,18 +203,18 @@ describe('actionCircularize', () => {
     ]);
 
     const intersect1 = intersection(graph.entity('-').nodes, graph.entity('=').nodes);
-    assert.equal(intersect1.length, 3);
-    assert.equal(graph.entity('-').isConvex(graph), false);
-    assert.equal(graph.entity('=').isConvex(graph), true);
+    assert.lengthOf(intersect1, 3);
+    assert.isFalse(graph.entity('-').isConvex(graph));
+    assert.isTrue(graph.entity('=').isConvex(graph));
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(isCircular('-', result));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isOk(isCircular('-', result));
 
     const intersect2 = intersection(result.entity('-').nodes, result.entity('=').nodes);
-    assert.ok(intersect2.length > 3);
-    assert.equal(result.entity('-').isConvex(result), true);
-    assert.equal(result.entity('=').isConvex(result), false);
+    assert.isAbove(intersect2.size, 3);
+    assert.isTrue(result.entity('-').isConvex(result));
+    assert.isFalse(result.entity('=').isConvex(result));
   });
 
 
@@ -252,18 +241,18 @@ describe('actionCircularize', () => {
     ]);
 
     const intersect1 = intersection(graph.entity('-').nodes, graph.entity('=').nodes);
-    assert.equal(intersect1.length, 3);
-    assert.equal(graph.entity('-').isConvex(graph), false);
-    assert.equal(graph.entity('=').isConvex(graph), true);
+    assert.lengthOf(intersect1, 3);
+    assert.isFalse(graph.entity('-').isConvex(graph));
+    assert.isTrue(graph.entity('=').isConvex(graph));
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(isCircular('-', result));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isOk(isCircular('-', result));
 
     const intersect2 = intersection(result.entity('-').nodes, result.entity('=').nodes);
-    assert.ok(intersect2.length > 3);
-    assert.equal(result.entity('-').isConvex(result), true);
-    assert.equal(result.entity('=').isConvex(result), false);
+    assert.isAbove(intersect2.size, 3);
+    assert.isTrue(result.entity('-').isConvex(result));
+    assert.isFalse(result.entity('=').isConvex(result));
   });
 
 
@@ -288,13 +277,13 @@ describe('actionCircularize', () => {
       new Rapid.OsmWay(context, {id: '=', nodes: ['a', 'b', 'f', 'g', 'e', 'a']})
     ]);
 
-    assert.equal(graph.entity('-').isConvex(graph), false);
+    assert.isFalse(graph.entity('-').isConvex(graph));
 
     const result = Rapid.actionCircularize('-', viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(isCircular('-', result));
-    assert.equal(result.entity('-').isConvex(result), true);
-    assert.equal(result.entity('-').nodes.length, 20);
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isOk(isCircular('-', result));
+    assert.isTrue(result.entity('-').isConvex(result));
+    assert.lengthOf(result.entity('-').nodes, 20);
   });
 
 
@@ -309,7 +298,7 @@ describe('actionCircularize', () => {
       ]);
 
       const disabled = Rapid.actionCircularize('-', viewport).disabled(graph);
-      assert.equal(disabled, false);
+      assert.isFalse(disabled);
     });
 
 
@@ -324,14 +313,14 @@ describe('actionCircularize', () => {
 
       const result = Rapid.actionCircularize('-', viewport)(graph);
       const disabled = Rapid.actionCircularize('-', viewport).disabled(result);
-      assert.equal(disabled, 'already_circular');
+      assert.strictEqual(disabled, 'already_circular');
     });
   });
 
 
   describe('transitions', () => {
     it('is transitionable', () => {
-      assert.ok(Rapid.actionCircularize().transitionable);
+      assert.isOk(Rapid.actionCircularize().transitionable);
     });
 
     it('circularize at t = 0', () => {
@@ -343,9 +332,9 @@ describe('actionCircularize', () => {
         new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
       const result = Rapid.actionCircularize('-', viewport)(graph, 0);
-      assert.equal(isCircular('-', result), false);
-      assert.equal(result.entity('-').nodes.length, 20);
-      assert.ok(closeTo(area('-', result), -4));
+      assert.isFalse(isCircular('-', result));
+      assert.lengthOf(result.entity('-').nodes, 20);
+      assert.isOk(closeTo(area('-', result), -4));
     });
 
     it('circularize at t = 0.5', () => {
@@ -357,9 +346,9 @@ describe('actionCircularize', () => {
         new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
       const result = Rapid.actionCircularize('-', viewport)(graph, 0.5);
-      assert.equal(isCircular('-', result), false);
-      assert.equal(result.entity('-').nodes.length, 20);
-      assert.ok(closeTo(area('-', result), -4.812));
+      assert.isFalse(isCircular('-', result));
+      assert.lengthOf(result.entity('-').nodes, 20);
+      assert.isOk(closeTo(area('-', result), -4.812));
     });
 
     it('circularize at t = 1', () => {
@@ -371,9 +360,9 @@ describe('actionCircularize', () => {
         new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c', 'd', 'a']})
       ]);
       const result = Rapid.actionCircularize('-', viewport)(graph, 1);
-      assert.ok(isCircular('-', result));
-      assert.equal(result.entity('-').nodes.length, 20);
-      assert.ok(closeTo(area('-', result), -6.168));
+      assert.isOk(isCircular('-', result));
+      assert.lengthOf(result.entity('-').nodes, 20);
+      assert.isOk(closeTo(area('-', result), -6.168));
     });
   });
 
