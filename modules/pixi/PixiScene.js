@@ -19,13 +19,7 @@ import { PixiLayerRapid } from './PixiLayerRapid.js';
 import { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.js';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.js';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
-
-
-// Convert a single value, an Array of values, or a Set of values.
-function asSet(vals) {
-  if (vals instanceof Set) return vals;
-  return new Set(vals !== undefined && [].concat(vals));
-}
+import { utilIterable } from '../util/iterable.js';
 
 
 /**
@@ -170,10 +164,10 @@ export class PixiScene extends EventEmitter {
   /**
    * enableLayers
    * Enables the layers with the given layerIDs, other layers will not be affected
-   * @param  layerIDs  A `Set` or `Array` of layerIDs, or single `String` layerID
+   * @param  {OneOrMore<string>}  layerIDs - layerIDs to enable
    */
   enableLayers(layerIDs) {
-    for (const layerID of asSet(layerIDs)) {   // coax ids into a Set
+    for (const layerID of utilIterable(layerIDs)) {
       const layer = this.layers.get(layerID);
       if (layer) {
         layer.enabled = true;
@@ -186,10 +180,10 @@ export class PixiScene extends EventEmitter {
   /**
    * disableLayers
    * Disables the layers with the given layerIDs, other layers will not be affected
-   * @param  layerIDs  A `Set` or `Array` of layerIDs, or single `String` layerID
+   * @param  {OneOrMore<string>}  layerIDs - layerIDs to disable
    */
   disableLayers(layerIDs) {
-    for (const layerID of asSet(layerIDs)) {   // coax ids into a Set
+    for (const layerID of utilIterable(layerIDs)) {
       const layer = this.layers.get(layerID);
       if (layer) {
         layer.enabled = false;
@@ -202,10 +196,10 @@ export class PixiScene extends EventEmitter {
   /**
    * toggleLayers
    * Toggles the layers with the given layerIDs, other layers will not be affected
-   * @param  layerIDs  A `Set` or `Array` of layerIDs, or single `String` layerID
+   * @param  {OneOrMore<string>}  layerIDs - layerIDs to toggle
    */
   toggleLayers(layerIDs) {
-    for (const layerID of asSet(layerIDs)) {  // coax ids into a Set
+    for (const layerID of utilIterable(layerIDs)) {
       const layer = this.layers.get(layerID);
       if (layer) {
         layer.enabled = !layer.enabled;
@@ -218,10 +212,10 @@ export class PixiScene extends EventEmitter {
   /**
    * onlyLayers
    * LayerIDs in the given list will be enabled, all others will be disabled
-   * @param  layerIDs  A `Set` or `Array` of layerIDs, or single `String` layerID
+   * @param  {OneOrMore<string>}  layerIDs - layerIDs to keep enabled
    */
   onlyLayers(layerIDs) {
-    const toEnable = asSet(layerIDs);  // coax ids into a Set
+    const toEnable = new Set(utilIterable(layerIDs));
     for (const layer of this.layers.values()) {
       layer.enabled = toEnable.has(layer.id);
     }
@@ -303,7 +297,7 @@ export class PixiScene extends EventEmitter {
    * @param  layerIDs  A `Set` or `Array` of layerIDs, or single `String` layerID
    */
   dirtyLayers(layerIDs) {
-    for (const layerID of asSet(layerIDs)) {   // coax ids into a Set
+    for (const layerID of utilIterable(layerIDs)) {
       this.layers.get(layerID)?.dirtyLayer();
     }
   }
@@ -316,7 +310,7 @@ export class PixiScene extends EventEmitter {
    * @param  featureIDs  A `Set` or `Array` of featureIDs, or single `String` featureID
    */
   dirtyFeatures(featureIDs) {
-    for (const featureID of asSet(featureIDs)) {   // coax ids into a Set
+    for (const featureID of utilIterable(featureIDs)) {
       const feature = this.features.get(featureID);
       if (feature) {
         feature.dirty = true;

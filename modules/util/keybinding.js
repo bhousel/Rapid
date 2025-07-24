@@ -1,5 +1,6 @@
 import { select as d3_select } from 'd3-selection';
-import { utilArrayUniq } from '@rapid-sdk/util';
+
+import { utilIterable } from './iterable.js';
 
 
 export function utilKeybinding(namespace) {
@@ -128,83 +129,81 @@ export function utilKeybinding(namespace) {
     };
 
 
-    // Remove one or more keycode bindings.
-    keybinding.off = function(codes, capture) {
-        var arr = utilArrayUniq([].concat(codes));
-
-        for (var i = 0; i < arr.length; i++) {
-            var id = arr[i] + (capture ? '-capture' : '-bubble');
-            delete _keybindings[id];
-        }
-        return keybinding;
-    };
-
     // Add the trigger method to the returned object
     keybinding.trigger = function(event) {
-        var d3_event = {
-            type: event.type,
-            key: event.key,
-            keyCode: event.keyCode,
-            shiftKey: event.shiftKey,
-            ctrlKey: event.ctrlKey,
-            altKey: event.altKey,
-            metaKey: event.metaKey
-        };
-        testBindings(d3_event, false);
+      const d3_event = {
+        type: event.type,
+        key: event.key,
+        keyCode: event.keyCode,
+        shiftKey: event.shiftKey,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+        metaKey: event.metaKey
+      };
+      testBindings(d3_event, false);
 
-        return keybinding;
+      return keybinding;
     };
+
+
+    // Remove one or more keycode bindings.
+    keybinding.off = function(codes, capture) {
+      for (const code of utilIterable(codes)) {
+        const id = code + (capture ? '-capture' : '-bubble');
+        delete _keybindings[id];
+      }
+      return keybinding;
+    };
+
 
     // Add one or more keycode bindings.
     keybinding.on = function(codes, callback, capture) {
-        if (typeof callback !== 'function') {
-            return keybinding.off(codes, capture);
+      if (typeof callback !== 'function') {
+        return keybinding.off(codes, capture);
+      }
+
+      for (const code of utilIterable(codes)) {
+        const id = code + (capture ? '-capture' : '-bubble');
+        const binding = {
+          id: id,
+          capture: capture,
+          callback: callback,
+          event: {
+            key: undefined,  // preferred
+            keyCode: 0,      // fallback
+            modifiers: {
+              shiftKey: false,
+              ctrlKey: false,
+              altKey: false,
+              metaKey: false
+            }
+          }
+        };
+
+        if (_keybindings[id]) {
+          console.warn(`warning: duplicate keybinding for "${id}"`); // eslint-disable-line no-console
         }
 
-        var arr = utilArrayUniq([].concat(codes));
+        _keybindings[id] = binding;
 
-        for (var i = 0; i < arr.length; i++) {
-            var id = arr[i] + (capture ? '-capture' : '-bubble');
-            var binding = {
-                id: id,
-                capture: capture,
-                callback: callback,
-                event: {
-                    key: undefined,  // preferred
-                    keyCode: 0,      // fallback
-                    modifiers: {
-                        shiftKey: false,
-                        ctrlKey: false,
-                        altKey: false,
-                        metaKey: false
-                    }
-                }
-            };
+        const matches = code.toLowerCase().match(/(?:(?:[^+⇧⌃⌥⌘])+|[⇧⌃⌥⌘]|\+\+|^\+$)/g);
+        for (let j = 0; j < matches.length; j++) {
+          // Normalise matching errors
+          if (matches[j] === '++') matches[j] = '+';
 
-            if (_keybindings[id]) {
-                console.warn('warning: duplicate keybinding for "' + id + '"'); // eslint-disable-line no-console
+          if (matches[j] in utilKeybinding.modifierCodes) {
+            const prop = utilKeybinding.modifierProperties[utilKeybinding.modifierCodes[matches[j]]];
+            binding.event.modifiers[prop] = true;
+          } else {
+            binding.event.key = utilKeybinding.keys[matches[j]] || matches[j];
+            if (matches[j] in utilKeybinding.keyCodes) {
+              binding.event.keyCode = utilKeybinding.keyCodes[matches[j]];
             }
-
-            _keybindings[id] = binding;
-
-            var matches = arr[i].toLowerCase().match(/(?:(?:[^+⇧⌃⌥⌘])+|[⇧⌃⌥⌘]|\+\+|^\+$)/g);
-            for (var j = 0; j < matches.length; j++) {
-                // Normalise matching errors
-                if (matches[j] === '++') matches[j] = '+';
-
-                if (matches[j] in utilKeybinding.modifierCodes) {
-                    var prop = utilKeybinding.modifierProperties[utilKeybinding.modifierCodes[matches[j]]];
-                    binding.event.modifiers[prop] = true;
-                } else {
-                    binding.event.key = utilKeybinding.keys[matches[j]] || matches[j];
-                    if (matches[j] in utilKeybinding.keyCodes) {
-                        binding.event.keyCode = utilKeybinding.keyCodes[matches[j]];
-                    }
-                }
-            }
+          }
         }
+      }
 
-        return keybinding;
+      return keybinding;
     };
 
 

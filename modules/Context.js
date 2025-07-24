@@ -8,6 +8,7 @@ import { modes } from './modes/index.js';
 import { services } from './services/index.js';
 import { systems } from './core/index.js';
 
+import { utilIterable } from './util/iterable.js';
 import { utilKeybinding } from './util/keybinding.js';
 
 const MINZOOM = 15;
@@ -409,15 +410,13 @@ export class Context extends EventEmitter {
   /**
    * `enableBehaviors`
    * The given behaviorIDs will be enabled, all others will be disabled
-   * @param   `enableIDs`  `Array` or `Set` containing behaviorIDs to keep enabled
+   * @param  {OneOrMore<string>}  behaviorIDs - behaviorIDs to keep enabled
    */
-  enableBehaviors(enableIDs) {
-    if (!(enableIDs instanceof Set)) {
-      enableIDs = new Set([].concat(enableIDs));  // coax ids into a Set
-    }
+  enableBehaviors(behaviorIDs) {
+    const toEnable = new Set(utilIterable(behaviorIDs));
 
     for (const [behaviorID, behavior] of Object.entries(this.behaviors)) {
-      if (enableIDs.has(behaviorID)) {  // should be enabled
+      if (toEnable.has(behaviorID)) {  // should be enabled
         if (!behavior.enabled) {
           behavior.enable();
         }

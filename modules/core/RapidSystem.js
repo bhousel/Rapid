@@ -2,6 +2,7 @@ import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
+import { utilIterable } from '../util/iterable.js';
 
 const RAPID_MAGENTA = '#da26d3';
 const OVERTURE_CYAN = '#00ffff';
@@ -17,13 +18,6 @@ const RAPID_COLORS = [
   '#d3d3d3',  // lightgray
   '#faf0e6'   // linen
 ];
-
-
-// Convert a single value, an Array of values, or a Set of values.
-function asSet(vals) {
-  if (vals instanceof Set) return vals;
-  return new Set(vals !== undefined && [].concat(vals));
-}
 
 
 /**
@@ -165,11 +159,11 @@ export class RapidSystem extends AbstractSystem {
 
   /**
    * addDatasets
-   * Add datasets to the menu.  (Does not set their checked 'enabled' state.)
-   * @param  {Set|Array|string}  datasetIDs - Set or Array of datasetIDs to add, or a single string datasetID
+   * Add datasets to the menu.  (Does not set their checked 'enabled' state)
+   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to add
    */
   addDatasets(datasetIDs) {
-    for (const datasetID of asSet(datasetIDs)) {   // coax ids into a Set
+    for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.add(datasetID);
     }
     this._datasetsChanged();
@@ -179,10 +173,10 @@ export class RapidSystem extends AbstractSystem {
   /**
    * removeDatasets
    * Remove datasets from the menu. (Also unchecks their 'enabled' state)
-   * @param  {Set|Array|string}  datasetIDs - Set or Array of datasetIDs to remove, or a single string datasetID
+   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to remove
    */
   removeDatasets(datasetIDs) {
-    for (const datasetID of asSet(datasetIDs)) {   // coax ids into a Set
+    for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.delete(datasetID);
       this._enabledDatasetIDs.delete(datasetID);
     }
@@ -193,10 +187,10 @@ export class RapidSystem extends AbstractSystem {
   /**
    * enableDatasets
    * Checks the dataset as enabled. (Also ensures that the dataset is 'added' to the menu).
-   * @param  {Set|Array|string}  datasetIDs - Set or Array of datasetIDs to enable, or a single string datasetID
+   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to enable
    */
   enableDatasets(datasetIDs) {
-    for (const datasetID of asSet(datasetIDs)) {   // coax ids into a Set
+    for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.add(datasetID);
       this._enabledDatasetIDs.add(datasetID);
     }
@@ -207,10 +201,10 @@ export class RapidSystem extends AbstractSystem {
   /**
    * disableDatasets
    * Unchecks the dataset as disabled. (Does not affect whether the dataset is 'added' to the menu)
-   * @param  {Set|Array|string}  datasetIDs - Set or Array of datasetIDs to disable, or a single string datasetID
+   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to disable
    */
   disableDatasets(datasetIDs) {
-    for (const datasetID of asSet(datasetIDs)) {   // coax ids into a Set
+    for (const datasetID of utilIterable(datasetIDs)) {
       this._enabledDatasetIDs.delete(datasetID);
     }
     this._datasetsChanged();
@@ -220,10 +214,10 @@ export class RapidSystem extends AbstractSystem {
   /**
    * toggleDatasets
    * Toggles the given datasets enabled state, does not affect any other datasets.
-   * @param  {Set|Array|string}  datasetIDs - Set or Array of datasetIDs to toggle, or a single string datasetID
+   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to toggle
    */
   toggleDatasets(datasetIDs) {
-    for (const datasetID of asSet(datasetIDs)) {   // coax ids into a Set
+    for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.add(datasetID);  // it needs to be added to the menu
       if (this._enabledDatasetIDs.has(datasetID)) {
         this._enabledDatasetIDs.delete(datasetID);

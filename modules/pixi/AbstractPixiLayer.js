@@ -1,9 +1,4 @@
-
-// Convert a single value, an Array of values, or a Set of values.
-function asSet(vals) {
-  if (vals instanceof Set) return vals;
-  return new Set(vals !== undefined && [].concat(vals));
-}
+import { utilIterable } from '../util/iterable.js';
 
 
 /**
@@ -475,10 +470,10 @@ export class AbstractPixiLayer {
    * dirtyFeatures
    * Mark specific features features as `dirty`
    * During the next "app" pass, dirty features will be rebuilt.
-   * @param {Set<string>|Array<string>|string}  featureIDs - A `Set` or `Array` of featureIDs, or single `String` featureID
+   * @param  {OneOrMore<string>}  featureIDs - featureIDs to set dirty
    */
   dirtyFeatures(featureIDs) {
-    for (const featureID of asSet(featureIDs)) {   // coax ids into a Set
+    for (const featureID of utilIterable(featureIDs)) {
       const feature = this.features.get(featureID);
       if (feature) {
         feature.dirty = true;
@@ -490,10 +485,10 @@ export class AbstractPixiLayer {
    * dirtyData
    * Mark any features bound to a given dataID as `dirty`
    * During the next "app" pass, dirty features will be rebuilt.
-   * @param {Set<string>|Array<string>|string}  dataIDs - A `Set` or `Array` of dataIDs, or single `String` dataID
+   * @param  {OneOrMore<string>}  dataIDs - dataIDs to set dirty
    */
   dirtyData(dataIDs) {
-    for (const dataID of asSet(dataIDs)) {   // coax ids into a Set
+    for (const dataID of utilIterable(dataIDs)) {
       const featureIDs = this._dataHasFeature.get(dataID);
       if (featureIDs) {
         this.dirtyFeatures(featureIDs);
