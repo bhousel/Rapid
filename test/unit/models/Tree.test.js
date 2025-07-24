@@ -93,7 +93,7 @@ describe.skip('Tree', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 3] });
       const extent = new Rapid.sdk.Extent([0, 0], [2, 2]);
 
-      graph = graph.replace(n1).replace(n2);
+      graph = graph.replace([n1, n2]);
       assert.deepEqual(tree.intersects(extent, graph), [n1]);
     });
 
@@ -137,7 +137,7 @@ describe.skip('Tree', () => {
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
       const extent = new Rapid.sdk.Extent([0, 0], [2, 2]);
 
-      graph = graph.replace(n1).replace(w1);
+      graph = graph.replace([n1, w1]);
       assert.deepEqual(tree.intersects(extent, graph), [n1, w1]);
 
       graph = graph.replace(n1.move([3, 3]));
@@ -151,7 +151,7 @@ describe.skip('Tree', () => {
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ type: 'node', id: 'n1' }] });
       const extent = new Rapid.sdk.Extent([0, 0], [2, 2]);
 
-      graph = graph.replace(n1).replace(r1);
+      graph = graph.replace([n1, r1]);
       assert.deepEqual(tree.intersects(extent, graph), [n1, r1]);
 
       graph = graph.replace(n1.move([3, 3]));
@@ -166,7 +166,7 @@ describe.skip('Tree', () => {
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ type: 'multipolygon', id: 'w1' }] });
       const extent = new Rapid.sdk.Extent([0, 0], [2, 2]);
 
-      graph = graph.replace(n1).replace(w1).replace(r1);
+      graph = graph.replace([n1, w1, r1]);
       assert.deepEqual(tree.intersects(extent, graph), [n1, w1, r1]);
 
       graph = graph.replace(n1.move([3, 3]));
@@ -181,7 +181,7 @@ describe.skip('Tree', () => {
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
       const extent = new Rapid.sdk.Extent([0, 0], [2, 2]);
 
-      graph = graph.replace(n1).replace(n2).replace(w1);
+      graph = graph.replace([n1, n2, w1]);
       assert.deepEqual(tree.intersects(extent, graph), [n1, w1]);
 
       graph = graph.replace(w1.removeNode('n1'));
@@ -197,7 +197,7 @@ describe.skip('Tree', () => {
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
       const extent = new Rapid.sdk.Extent([0, 0], [4, 4]);
 
-      graph = graph.replace(n1).replace(n2).replace(w1);
+      graph = graph.replace([n1, n2, w1]);
       assert.deepEqual(tree.intersects(extent, graph), [n1, n2, w1]);
 
       graph = graph.replace(n1.move([1.1, 1.1])).replace(n2.move([2.1, 2.1]));

@@ -31,19 +31,19 @@ export function actionConnect(nodeIDs) {
 
             parents = graph.parentWays(node);
             for (j = 0; j < parents.length; j++) {
-                graph = graph.replace(parents[j].replaceNode(node.id, survivor.id));
+                graph.replace(parents[j].replaceNode(node.id, survivor.id));
             }
 
             parents = graph.parentRelations(node);
             for (j = 0; j < parents.length; j++) {
-                graph = graph.replace(parents[j].replaceMember(node, survivor));
+                graph.replace(parents[j].replaceMember(node, survivor));
             }
 
             survivor = survivor.mergeTags(node.tags);
             graph = actionDeleteNode(node.id)(graph);
         }
 
-        graph = graph.replace(survivor);
+        graph.replace(survivor);
 
         // find and delete any degenerate ways created by connecting adjacent vertices
         parents = graph.parentWays(survivor);

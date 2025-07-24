@@ -21,7 +21,7 @@ export function actionDeleteWay(wayID) {
 
         const node = graph.entity(nodeID);
         if (canDeleteNode(node, graph)) {
-          graph = graph.remove(node);
+          graph.remove(node);
         }
     });
 

@@ -278,11 +278,11 @@ describe('actionJoin', () => {
 
       r1 = r1.addMember({type: 'way', id: '-'});
       r2 = r2.addMember({type: 'way', id: '-'});
-      graph = graph.replace(r1).replace(r2);
+      graph = graph.replace([r1, r2]);
 
       r1 = r1.addMember({type: 'way', id: '='});
       r2 = r2.addMember({type: 'way', id: '='});
-      graph = graph.replace(r1).replace(r2);
+      graph = graph.replace([r1, r2]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
       assert.ok(!disabled);
@@ -309,11 +309,11 @@ describe('actionJoin', () => {
 
       r1 = r1.addMember({type: 'way', id: '-'});
       r2 = r2.addMember({type: 'way', id: '='});
-      graph = graph.replace(r1).replace(r2);
+      graph = graph.replace([r1, r2]);
 
       r1 = r1.addMember({type: 'way', id: '='});
       r2 = r2.addMember({type: 'way', id: '-'});
-      graph = graph.replace(r1).replace(r2);
+      graph = graph.replace([r1, r2]);
 
       const disabled = Rapid.actionJoin(['-', '=']).disabled(graph);
       assert.ok(!disabled);

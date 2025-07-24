@@ -57,7 +57,8 @@ describe('Graph', () => {
     });
 
     it('throws when the entity is not present', () => {
-      assert.throws(() => { Rapid.Graph(context).entity('1'); });
+      const graph = new Rapid.Graph(context);
+      assert.throws(() => graph.entity('1'), /not found/i);
     });
   });
 
@@ -253,6 +254,15 @@ describe('Graph', () => {
       assert.strictEqual(result.entity('n1'), n1v2);
     });
 
+    it('replaces multiple', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const graph = new Rapid.Graph(context);
+      const result = graph.replace([n1, n2]);
+      assert.strictEqual(result.entity('n1'), n1);
+      assert.strictEqual(result.entity('n2'), n2);
+    });
+
     it('adds parentWays', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const graph = new Rapid.Graph(context, [n1]);
@@ -329,6 +339,15 @@ describe('Graph', () => {
       assert.isUndefined(result.hasEntity('n1'));
     });
 
+    it('removes multiple', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const graph = new Rapid.Graph(context, [n1, n2]);
+      const result = graph.remove([n1, n2]);
+      assert.isUndefined(result.hasEntity('n1'));
+      assert.isUndefined(result.hasEntity('n2'));
+    });
+
     it('removes the entity as a parentWay', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
@@ -387,6 +406,17 @@ describe('Graph', () => {
       const graph = new Rapid.Graph(context, [n1]).replace(n1v2);
       const result = graph.revert('n1');
       assert.strictEqual(result.hasEntity('n1'), n1);
+    });
+
+    it('reverts multiple', () => {
+      const n1v1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2v1 = new Rapid.OsmNode(context, { id: 'n2' });
+      const n1v2 = n1v1.update({});
+      const n2v2 = n2v1.update({});
+      const graph = new Rapid.Graph(context, [n1v1, n2v1]).replace([n1v2, n2v2]);
+      const result = graph.revert(['n1', 'n2']);
+      assert.strictEqual(result.hasEntity('n1'), n1v1);
+      assert.strictEqual(result.hasEntity('n2'), n2v1);
     });
 
     it('restores a deleted entity', () => {

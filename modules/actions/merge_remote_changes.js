@@ -128,9 +128,7 @@ export function actionMergeRemoteChanges(id, options = {}) {
 
   function updateChildren(updates, graph) {
     if (updates.replacements.length) {
-      for (const entity of updates.replacements) {
-        graph.replace(entity);
-      }
+      graph.replace(updates.replacements);
       graph = graph.commit();
     }
 

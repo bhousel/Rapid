@@ -5,6 +5,7 @@ export { utilFunctor } from './util.js';
 export { utilGetDimensions } from './dimensions.js';
 export { utilGetSetValue } from './get_set_value.js';
 export { utilIsColorValid } from './util.js';
+export { utilIterable } from './iterable.js';
 export { utilHighlightEntities } from './util.js';
 export { utilKeybinding } from './keybinding.js';
 export { utilNoAuto } from './util.js';

@@ -1,4 +1,5 @@
 import { Difference } from './Difference.js';
+import { utilIterable } from '../util/iterable.js';
 
 
 /**
@@ -164,16 +165,18 @@ export class Graph {
   /**
    * replace
    * Replace an Entity in this Graph
-   * @param   {Entity}  entity - The Entity to replace
-   * @return  {Graph}   A new Graph
+   * @param   {OneOrMore<Entity>}  entities - entities to replace
+   * @return  {Graph}              this Graph
    */
-  replace(entity) {
-    const entityID = entity.id;
-    const current = this.hasEntity(entityID);
-    if (current === entity) return this;  // no change
+  replace(entities) {
+    for (const entity of utilIterable(entities)) {
+      const entityID = entity.id;
+      const current = this.hasEntity(entityID);
+      if (current === entity) return this;  // no change
 
-    this._local.entities.set(entityID, entity);
-    this._updateCaches(current, entity);
+      this._local.entities.set(entityID, entity);
+      this._updateCaches(current, entity);
+    }
     return this;
   }
 
@@ -181,16 +184,18 @@ export class Graph {
   /**
    * remove
    * Remove an Entity from this Graph
-   * @param   {Entity}  entity - The Entity to remove
-   * @return  {Graph}   A new Graph
+   * @param   {OneOrMore<Entity>}  entities - entities to replace
+   * @return  {Graph}              this Graph
    */
-  remove(entity) {
-    const entityID = entity.id;
-    const current = this.hasEntity(entityID);
-    if (!current) return this;  // not in the graph
+  remove(entities) {
+    for (const entity of utilIterable(entities)) {
+      const entityID = entity.id;
+      const current = this.hasEntity(entityID);
+      if (!current) return this;  // not in the graph
 
-    this._local.entities.set(entityID, undefined);
-    this._updateCaches(current, undefined);
+      this._local.entities.set(entityID, undefined);
+      this._updateCaches(current, undefined);
+    }
     return this;
   }
 
@@ -198,16 +203,18 @@ export class Graph {
   /**
    * revert
    * Revert an Entity back to whatever state it had in the base graph
-   * @param   {string}  entityID - The entityID of the Entity to revert
-   * @return  {Graph}   A new Graph
+   * @param   {OneOrMore<string>}  entityIDs - the entityIDs of the Entities to revert
+   * @return  {Graph}              this Graph
    */
-  revert(entityID) {
-    const original = this._base.entities.get(entityID);
-    const current = this.hasEntity(entityID);
-    if (current === original) return this;   // no change
+  revert(entityIDs) {
+    for (const entityID of utilIterable(entityIDs)) {
+      const original = this._base.entities.get(entityID);
+      const current = this.hasEntity(entityID);
+      if (current === original) return this;   // no change
 
-    this._local.entities.delete(entityID);
-    this._updateCaches(current, original);
+      this._local.entities.delete(entityID);
+      this._updateCaches(current, original);
+    }
     return this;
   }
 

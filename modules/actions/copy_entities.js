@@ -6,10 +6,7 @@ export function actionCopyEntities(ids, fromGraph) {
       fromGraph.entity(id).copy(fromGraph, _copies);
     }
 
-    for (var id in _copies) {
-      graph.replace(_copies[id]);
-    }
-
+    graph.replace(Object.values(_copies));
     return graph.commit();
   };
 
