@@ -54,7 +54,7 @@ describe('actionCircularize', () => {
     //    d ---- c
     //    |      |
     //    a ---- b
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
@@ -73,7 +73,7 @@ describe('actionCircularize', () => {
     //    d,e -- c
     //    |      |
     //    a ---- b
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
@@ -95,7 +95,7 @@ describe('actionCircularize', () => {
     //    b ---- a
     //    |      |
     //    c ---- d
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [2, 2]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [-2, 2]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [-2, -2]}),
@@ -116,7 +116,7 @@ describe('actionCircularize', () => {
     //    d ---- c
     //    |      |
     //    a ---- b
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
@@ -142,7 +142,7 @@ describe('actionCircularize', () => {
     //    d ---- c
     //    |      |
     //    a ---- b
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
@@ -163,7 +163,7 @@ describe('actionCircularize', () => {
     //    d ---- c
     //    |      |
     //    a ---- b
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
@@ -190,7 +190,7 @@ describe('actionCircularize', () => {
     //  a-b-c-d-e-a is counterclockwise
     //  a-b-f-g-e-a is clockwise
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [ 0,  0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [ 1,  2]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [-2,  2]}),
@@ -228,7 +228,7 @@ describe('actionCircularize', () => {
     //  a-b-c-d-e-a is counterclockwise
     //  a-e-g-f-b-a is counterclockwise
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [ 0,  0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [ 1,  2]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [-2,  2]}),
@@ -265,7 +265,7 @@ describe('actionCircularize', () => {
     //
     //  a-b-c-d-e-a is extremely concave and 'a' is to the left of centoid..
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [ 0,  0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [10,  2]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [-2,  2]}),
@@ -289,7 +289,7 @@ describe('actionCircularize', () => {
 
   describe('#disabled', () => {
     it('not disable circularize when its not circular', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
@@ -303,7 +303,7 @@ describe('actionCircularize', () => {
 
 
     it('disable circularize twice', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
@@ -324,7 +324,7 @@ describe('actionCircularize', () => {
     });
 
     it('circularize at t = 0', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
@@ -338,7 +338,7 @@ describe('actionCircularize', () => {
     });
 
     it('circularize at t = 0.5', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),
@@ -352,7 +352,7 @@ describe('actionCircularize', () => {
     });
 
     it('circularize at t = 1', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [2, 2]}),

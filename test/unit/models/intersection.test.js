@@ -10,7 +10,7 @@ describe('osmIntersection', () => {
   describe('highways', () => {
     // u ==== * ---> w
     it('excludes non-highways', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -22,7 +22,7 @@ describe('osmIntersection', () => {
     });
 
     it('excludes degenerate highways', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*'], tags: { highway: 'residential' } }),
@@ -34,7 +34,7 @@ describe('osmIntersection', () => {
     });
 
     it('excludes untagged lines', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -47,7 +47,7 @@ describe('osmIntersection', () => {
     });
 
     it('excludes area highways', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -58,7 +58,7 @@ describe('osmIntersection', () => {
     });
 
     it('auto-splits highways at the intersection', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -73,7 +73,7 @@ describe('osmIntersection', () => {
   describe('turns', () => {
     it('permits turns onto a way forward', () => {
       // u ==== * ---> w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -97,7 +97,7 @@ describe('osmIntersection', () => {
 
     it('permits turns onto a way backward', () => {
       // u ==== * <--- w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -125,7 +125,7 @@ describe('osmIntersection', () => {
       // u === *
       //       |
       //       x
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [1, 1] }),
@@ -158,7 +158,7 @@ describe('osmIntersection', () => {
       // u === *
       //       |
       //       x
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [1, 1] }),
@@ -187,7 +187,7 @@ describe('osmIntersection', () => {
 
     it('permits turns from a oneway forward', () => {
       // u ===> * ----w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -207,7 +207,7 @@ describe('osmIntersection', () => {
 
     it('permits turns from a reverse oneway backward', () => {
       // u <=== * ---- w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -227,7 +227,7 @@ describe('osmIntersection', () => {
 
     it('omits turns from a oneway backward', () => {
       // u <=== * ---- w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -241,7 +241,7 @@ describe('osmIntersection', () => {
 
     it('omits turns from a reverse oneway forward', () => {
       // u ===> * ---- w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -255,7 +255,7 @@ describe('osmIntersection', () => {
 
     it('permits turns onto a oneway forward', () => {
       // u ==== * ---> w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -279,7 +279,7 @@ describe('osmIntersection', () => {
 
     it('permits turns onto a reverse oneway backward', () => {
       // u ==== * <--- w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -303,7 +303,7 @@ describe('osmIntersection', () => {
 
     it('omits turns onto a oneway backward', () => {
       // u ==== * <--- w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -323,7 +323,7 @@ describe('osmIntersection', () => {
 
     it('omits turns onto a reverse oneway forward', () => {
       // u ==== * ---> w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -343,7 +343,7 @@ describe('osmIntersection', () => {
 
     it('restricts turns with a restriction relation', () => {
       // u ==== * ---> w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'w', loc: [2, 0] }),
@@ -380,7 +380,7 @@ describe('osmIntersection', () => {
       // u====*~~~~v
       //      |
       //      w
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'u', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'v', loc: [2, 0] }),
@@ -429,7 +429,7 @@ describe('osmIntersection', () => {
       //  |    |
       //  a -- * === u
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
@@ -463,7 +463,7 @@ describe('osmIntersection', () => {
       //  |    |
       //  a -- * === u
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
@@ -497,7 +497,7 @@ describe('osmIntersection', () => {
       //  |    |
       //  a -- * === u
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
@@ -527,7 +527,7 @@ describe('osmIntersection', () => {
       //  |    |
       //  a -- * === u
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
@@ -557,7 +557,7 @@ describe('osmIntersection', () => {
       //  |    |
       //  a -- * === u
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
@@ -591,7 +591,7 @@ describe('osmIntersection', () => {
       //  |    |
       //  a -- * === u
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
@@ -631,7 +631,7 @@ describe('osmIntersection', () => {
       //          \
       //           h
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
@@ -723,7 +723,7 @@ describe('osmIntersection', () => {
       //          \
       //           h
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
@@ -823,7 +823,7 @@ describe('osmIntersection', () => {
       //          \
       //           h
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
@@ -932,7 +932,7 @@ describe('osmIntersection', () => {
       //          \
       //           h
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
@@ -1085,7 +1085,7 @@ describe('osmIntersection', () => {
       //          \
       //           h
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] }),
@@ -1246,7 +1246,7 @@ describe('osmIntersection', () => {
       //         ‖
       //  d ~~~> e ≈≈≈> f
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 2] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 2] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -1472,7 +1472,7 @@ describe('osmIntersection', () => {
       //          /   \
       //   a --- b === c ~~~ d
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
@@ -1635,14 +1635,7 @@ describe('osmIntersection', () => {
 
 
 describe('osmInferRestriction', () => {
-  class MockContext {
-    constructor() {
-      this.sequences = {};
-      this.viewport = new Rapid.sdk.Viewport();
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
 
   it('infers the restriction type based on the turn angle', () => {
     //
@@ -1650,7 +1643,7 @@ describe('osmInferRestriction', () => {
     //        |
     //        x
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'u', loc: [-1, 0] }),
       new Rapid.OsmNode(context, { id: '*', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'w', loc: [1, 0] }),
@@ -1704,7 +1697,7 @@ describe('osmInferRestriction', () => {
     //  w2/   \w1        angle ≈22.6°
     //   /     \
     //  u       x
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'u', loc: [0, -5] }),
       new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
       new Rapid.OsmNode(context, { id: 'x', loc: [2, -5] }),
@@ -1726,7 +1719,7 @@ describe('osmInferRestriction', () => {
     //  w2/   \w1        angle ≈36.9°
     //   /     \         (no left turn)
     //  u       x
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'u', loc: [0, -3] }),
       new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
       new Rapid.OsmNode(context, { id: 'x', loc: [2, -3] }),
@@ -1748,7 +1741,7 @@ describe('osmInferRestriction', () => {
     //  w2/        \w1      angle ≈22.6°
     //   /          \       (no u turn)
     //  u            x
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'u', loc: [0, -5] }),
       new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
       new Rapid.OsmNode(context, { id: '+', loc: [2, 0] }),
@@ -1772,7 +1765,7 @@ describe('osmInferRestriction', () => {
     //  w2/        \w1      angle ≈36.9°
     //   /          \       (no u turn)
     //  u            x
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'u', loc: [0, -3] }),
       new Rapid.OsmNode(context, { id: '*', loc: [1, 0] }),
       new Rapid.OsmNode(context, { id: '+', loc: [2, 0] }),

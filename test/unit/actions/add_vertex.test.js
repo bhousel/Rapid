@@ -7,7 +7,7 @@ describe('actionAddVertex', () => {
 
   it('adds a vertex to the specified way at the specified index', () => {
     // Create a new graph with a way and a node
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
       new Rapid.OsmWay(context, { id: '-', nodes: ['a'] })
     ]);

@@ -7,7 +7,7 @@ describe('actionConnect', () => {
   const context = new Rapid.MockContext();
 
   it('chooses the first non-new node as the survivor', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b', version: '1'}),
       new Rapid.OsmNode(context, {id: 'c', version: '1'})
@@ -22,7 +22,7 @@ describe('actionConnect', () => {
 
 
   it('chooses the last node as the survivor when all are new', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'})
@@ -51,7 +51,7 @@ describe('actionConnect', () => {
     //       |
     //       d
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -77,7 +77,7 @@ describe('actionConnect', () => {
     //
     // Connect [a, d].
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -102,7 +102,7 @@ describe('actionConnect', () => {
     //
     // a --- c
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -129,7 +129,7 @@ describe('actionConnect', () => {
     //       |
     //       d
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -151,7 +151,7 @@ describe('actionConnect', () => {
     //
     // Connect [a, b]
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']})
@@ -166,7 +166,7 @@ describe('actionConnect', () => {
 
 
   it('merges tags to the surviving node', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', tags: {a: 'a'}}),
       new Rapid.OsmNode(context, {id: 'b', tags: {b: 'b'}}),
       new Rapid.OsmNode(context, {id: 'c', tags: {c: 'c'}})
@@ -179,7 +179,7 @@ describe('actionConnect', () => {
 
 
   it('merges memberships to the surviving node', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -199,7 +199,7 @@ describe('actionConnect', () => {
 
   describe('#disabled', () => {
     it('returns falsy when connecting members of the same relation and same roles', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -216,7 +216,7 @@ describe('actionConnect', () => {
 
 
     it('returns falsy when connecting members of different relation and different roles', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -231,7 +231,7 @@ describe('actionConnect', () => {
 
 
     it('returns \'relation\' when connecting members of the same relation but different roles', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -254,7 +254,7 @@ describe('actionConnect', () => {
       //        |                        VIA  'b'
       //        c                        TO   '|'
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, {id: 'a'}),
           new Rapid.OsmNode(context, {id: 'b'}),
           new Rapid.OsmNode(context, {id: 'c'}),
@@ -286,7 +286,7 @@ describe('actionConnect', () => {
       //              |            TO   '|'
       //              e
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -321,7 +321,7 @@ describe('actionConnect', () => {
       //              |            TO   '-'
       //  g === f === e
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -363,7 +363,7 @@ describe('actionConnect', () => {
       //              |            TO   '|'
       //              e
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -397,7 +397,7 @@ describe('actionConnect', () => {
       //              |            TO   '-'
       //              e
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -428,7 +428,7 @@ describe('actionConnect', () => {
       //              |            TO   '-'
       //  g === f === e
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -474,7 +474,7 @@ describe('actionConnect', () => {
       //        |            VIA  'b'
       //        c            TO   '|'
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -501,7 +501,7 @@ describe('actionConnect', () => {
       //        |            VIA  '|'
       //  d === c            TO   '-'
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),

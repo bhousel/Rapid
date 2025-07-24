@@ -21,7 +21,7 @@ describe('actionMergePolygon', () => {
   //
 
   beforeEach(() => {
-    graph = new Rapid.Graph([
+    graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n0', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'n1', loc: [5, 0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [5, 5] }),
@@ -101,7 +101,7 @@ describe('actionMergePolygon', () => {
 
 
   it('merges multipolygon tags', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'multipolygon', a: 'a' } }),
       new Rapid.OsmRelation(context, { id: 'r2', tags: { type: 'multipolygon', b: 'b' } })
     ]);
@@ -113,7 +113,7 @@ describe('actionMergePolygon', () => {
 
 
   it('merges tags from closed outer ways', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'], tags: { building: 'yes' } })
@@ -146,7 +146,7 @@ describe('actionMergePolygon', () => {
 
 
   it('does not merge tags from unclosed outer ways', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: { building: 'yes' } })
@@ -169,7 +169,7 @@ describe('actionMergePolygon', () => {
 
 
   it('does not merge tags from inner ways', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
       new Rapid.OsmNode(context, { id: 'n3', loc: [0.5, 0.5] }),
@@ -194,7 +194,7 @@ describe('actionMergePolygon', () => {
 
 
   it('does not copy area tags from ways', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'], tags: { area: 'yes' } })
@@ -250,7 +250,7 @@ describe('actionMergePolygon', () => {
 
 
   it('disables action when there are other entities', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] }),  // This is an 'other' entity
@@ -264,7 +264,7 @@ describe('actionMergePolygon', () => {
 
 
   it('disables action when there are less than two closedWay and multipolygon entities', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'] })  // This is a 'closedWay' entity
@@ -277,7 +277,7 @@ describe('actionMergePolygon', () => {
 
 
   it('disables action when creating a new multipolygon would be redundant', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'] }),  // This is a 'closedWay' entity
@@ -291,7 +291,7 @@ describe('actionMergePolygon', () => {
 
 
   it('disables action when a way is already a member of a multipolygon', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n1'] }),  // This is a 'closedWay' entity

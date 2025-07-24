@@ -7,7 +7,7 @@ describe('actionAddMember', () => {
 
   it('adds an member to a relation at the specified index', () => {
     const r = new Rapid.OsmRelation(context, {members: [{id: '1'}, {id: '3'}]});
-    const graph = new Rapid.Graph([r]);
+    const graph = new Rapid.Graph(context, [r]);
     const result = Rapid.actionAddMember(r.id, {id: '2'}, 1)(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.deepEqual(result.entity(r.id).members, [{id: '1'}, {id: '2'}, {id: '3'}]);
@@ -19,7 +19,7 @@ describe('actionAddMember', () => {
     }
 
     it('handles incomplete relations', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -38,7 +38,7 @@ describe('actionAddMember', () => {
     });
 
     it('adds the member to a relation with no members', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
@@ -53,7 +53,7 @@ describe('actionAddMember', () => {
     it('appends the member if the ways are not connecting', () => {
       // Before:  a ---> b
       // After:   a ---> b .. c ===> d
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -73,7 +73,7 @@ describe('actionAddMember', () => {
     it('appends the member if the way connects at end', () => {
       // Before:   a ---> b
       // After:    a ---> b ===> c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -92,7 +92,7 @@ describe('actionAddMember', () => {
     it('inserts the member if the way connects at beginning', () => {
       // Before:          b ---> c ~~~> d
       // After:    a ===> b ---> c ~~~> d
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -114,7 +114,7 @@ describe('actionAddMember', () => {
     it('inserts the member if the way connects in middle', () => {
       // Before:  a ---> b  ..  c ~~~> d
       // After:   a ---> b ===> c ~~~> d
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -136,7 +136,7 @@ describe('actionAddMember', () => {
     it('inserts the member multiple times if insertPair provided (middle)', () => {
       // Before:  a ---> b  ..  c ~~~> d <~~~ c  ..  b <--- a
       // After:   a ---> b ===> c ~~~> d <~~~ c <=== b <--- a
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -166,7 +166,7 @@ describe('actionAddMember', () => {
     it('inserts the member multiple times if insertPair provided (beginning/end)', () => {
       // Before:         b <=== c ~~~> d <~~~ c ===> b
       // After:   a <--- b <=== c ~~~> d <~~~ c ===> b ---> a
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -194,7 +194,7 @@ describe('actionAddMember', () => {
     });
 
     it('keeps stops and platforms ordered before node, way, relation (for PTv2 routes)', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),

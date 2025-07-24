@@ -27,21 +27,21 @@ describe('validationMissingTag', () => {
 
   it('ignores way with descriptive tags', () => {
     const w = new Rapid.OsmWay(context,  { tags: { leisure: 'park' }});
-    const g = new Rapid.Graph([w]);
+    const g = new Rapid.Graph(context, [w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('ignores multipolygon with descriptive tags', () => {
     const r = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon', leisure: 'park' }, members: [] });
-    const g = new Rapid.Graph([r]);
+    const g = new Rapid.Graph(context, [r]);
     const issues = validator(r, g);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('flags no tags', () => {
     const w = new Rapid.OsmWay(context);
-    const g = new Rapid.Graph([w]);
+    const g = new Rapid.Graph(context, [w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -53,7 +53,7 @@ describe('validationMissingTag', () => {
 
   it('flags no descriptive tags on a way', () => {
     const w = new Rapid.OsmWay(context, { tags: { name: 'Main Street', source: 'Bing' }});
-    const g = new Rapid.Graph([w]);
+    const g = new Rapid.Graph(context, [w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -65,7 +65,7 @@ describe('validationMissingTag', () => {
 
   it('flags no descriptive tags on multipolygon', () => {
     const r = new Rapid.OsmRelation(context, { tags: { name: 'City Park', source: 'Bing', type: 'multipolygon' }, members: [] });
-    const g = new Rapid.Graph([r]);
+    const g = new Rapid.Graph(context, [r]);
     const issues = validator(r, g);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -77,7 +77,7 @@ describe('validationMissingTag', () => {
 
   it('flags no type tag on relation', () => {
     const r = new Rapid.OsmRelation(context, { tags: { name: 'City Park', source: 'Bing', leisure: 'park' }, members: [] });
-    const g = new Rapid.Graph([r]);
+    const g = new Rapid.Graph(context, [r]);
     const issues = validator(r, g);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -89,14 +89,14 @@ describe('validationMissingTag', () => {
 
   it('ignores highway with classification', () => {
     const w = new Rapid.OsmWay(context, { tags: { highway: 'primary' }});
-    const g = new Rapid.Graph([w]);
+    const g = new Rapid.Graph(context, [w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('flags highway=road', () => {
     const w = new Rapid.OsmWay(context, { tags: { highway: 'road' }});
-    const g = new Rapid.Graph([w]);
+    const g = new Rapid.Graph(context, [w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];

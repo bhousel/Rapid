@@ -1,8 +1,12 @@
 describe('uiFieldLocalized', () => {
 
   class MockEditSystem {
-    constructor() {}
-    get staging() { return { graph: new Rapid.Graph() }; }
+    constructor(context) {
+      this.context = context;
+    }
+    get staging() {
+      return { graph: new Rapid.Graph(this.context) };
+    }
   }
 
   class MockLocalizationSystem {
@@ -23,6 +27,7 @@ describe('uiFieldLocalized', () => {
   class MockContext {
     constructor()   {
       this.viewport = new Rapid.sdk.Viewport();
+      this.sequences = {};
       this.services = {};
       this.systems = {
         assets:  new Rapid.AssetSystem(this),
@@ -33,6 +38,10 @@ describe('uiFieldLocalized', () => {
     cleanTagKey(val)   { return val; }
     cleanTagValue(val) { return val; }
     container()        { return selection; }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
+    }
   }
 
   const context = new MockContext();

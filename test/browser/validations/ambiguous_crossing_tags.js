@@ -40,7 +40,7 @@ describe('validationAmbiguousCrossingTags', () => {
   });
 
   beforeEach(() => {
-    graph = new Rapid.Graph();     // reset
+    graph = new Rapid.Graph(context);   // reset
   });
 
 
@@ -86,7 +86,7 @@ describe('validationAmbiguousCrossingTags', () => {
     const w2 = new Rapid.OsmWay(context, { id: 'w-2', nodes: ['n-3', 'n-5',  'n-4'], tags: w2Tags });
 
     const entities = [n1, n2, n3, n4, n5, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
   }
 
 

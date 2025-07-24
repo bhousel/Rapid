@@ -52,7 +52,7 @@ describe('PresetSystem', () => {
   describe('fallbacks', () => {
     it('has a fallback point preset', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const graph = new Rapid.Graph([node]);
+      const graph = new Rapid.Graph(context, [node]);
       const presets = new Rapid.PresetSystem(context);
       expect(presets.match(node, graph).id).to.eql('point');
     });
@@ -60,7 +60,7 @@ describe('PresetSystem', () => {
     it('has a fallback line preset', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const way = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'] });
-      const graph = new Rapid.Graph([node, way]);
+      const graph = new Rapid.Graph(context, [node, way]);
       const presets = new Rapid.PresetSystem(context);
       expect(presets.match(way, graph).id).to.eql('line');
     });
@@ -68,14 +68,14 @@ describe('PresetSystem', () => {
     it('has a fallback area preset', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const way = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'], tags: { area: 'yes' }});
-      const graph = new Rapid.Graph([node, way]);
+      const graph = new Rapid.Graph(context, [node, way]);
       const presets = new Rapid.PresetSystem(context);
       expect(presets.match(way, graph).id).to.eql('area');
     });
 
     it('has a fallback relation preset', () => {
       const relation = new Rapid.OsmRelation(context, { id: 'r' });
-      const graph = new Rapid.Graph([relation]);
+      const graph = new Rapid.Graph(context, [relation]);
       const presets = new Rapid.PresetSystem(context);
       expect(presets.match(relation, graph).id).to.eql('relation');
     });
@@ -95,7 +95,7 @@ describe('PresetSystem', () => {
       const presets = new Rapid.PresetSystem(context);
       return presets.initAsync().then(() => {
         const way = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
-        const graph = new Rapid.Graph([way]);
+        const graph = new Rapid.Graph(context, [way]);
         expect(presets.match(way, graph).id).to.eql('residential');
       });
     });
@@ -104,7 +104,7 @@ describe('PresetSystem', () => {
       const presets = new Rapid.PresetSystem(context);
       const point = new Rapid.OsmNode(context, );
       const line = new Rapid.OsmWay(context, { tags: { foo: 'bar' } });
-      const graph = new Rapid.Graph([point, line]);
+      const graph = new Rapid.Graph(context, [point, line]);
 
       return presets.initAsync().then(() => {
         expect(presets.match(point, graph).id).to.eql('point');
@@ -116,7 +116,7 @@ describe('PresetSystem', () => {
       const presets = new Rapid.PresetSystem(context);
       const point = new Rapid.OsmNode(context, { tags: { leisure: 'park' } });
       const line = new Rapid.OsmWay(context, { nodes: [point.id], tags: { 'highway': 'residential' } });
-      const graph = new Rapid.Graph([point, line]);
+      const graph = new Rapid.Graph(context, [point, line]);
 
       return presets.initAsync().then(() => {
         expect(presets.match(point, graph).id).to.eql('point');
@@ -127,7 +127,7 @@ describe('PresetSystem', () => {
       const presets = new Rapid.PresetSystem(context);
       const point = new Rapid.OsmNode(context, { tags: { leisure: 'park' } });
       const line = new Rapid.OsmWay(context, { nodes: [point.id], tags: { 'addr:interpolation': 'even' } });
-      const graph = new Rapid.Graph([point, line]);
+      const graph = new Rapid.Graph(context, [point, line]);
 
       return presets.initAsync().then(() => {
         expect(presets.match(point, graph).id).to.eql('park');
@@ -215,14 +215,14 @@ describe('PresetSystem', () => {
         }
       };
 
-      let matched = presets.match(surfShop, new Rapid.Graph([surfShop]));
+      let matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
       expect(matched.id).to.eql('point');   // no surfshop preset yet, matches fallback point
       presets.merge(presetData);
 
       // todo: need to touch the entity now, due to change in how transients work.
       // may need to rethink how this works.
       surfShop.touch();
-      matched = presets.match(surfShop, new Rapid.Graph([surfShop]));
+      matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
       expect(matched.id).to.eql('amenity/shop/surf');
     });
   });
@@ -263,7 +263,7 @@ describe('PresetSystem', () => {
     it('prefers building to multipolygon', () => {
       const presets = new Rapid.PresetSystem(context);
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon', building: 'yes' } });
-      const graph = new Rapid.Graph([relation]);
+      const graph = new Rapid.Graph(context, [relation]);
       return presets.initAsync().then(() => {
         const match = presets.match(relation, graph);
         expect(match.id).to.eql('building');
@@ -273,7 +273,7 @@ describe('PresetSystem', () => {
     it('prefers building to address', () => {
       const presets = new Rapid.PresetSystem(context);
       const way = new Rapid.OsmWay(context, { tags: { area: 'yes', building: 'yes', 'addr:housenumber': '1234' } });
-      const graph = new Rapid.Graph([way]);
+      const graph = new Rapid.Graph(context, [way]);
       return presets.initAsync().then(() => {
         const match = presets.match(way, graph);
         expect(match.id).to.eql('building');
@@ -283,7 +283,7 @@ describe('PresetSystem', () => {
     it('prefers pedestrian to area', () => {
       const presets = new Rapid.PresetSystem(context);
       const way = new Rapid.OsmWay(context, { tags: { area: 'yes', highway: 'pedestrian' } });
-      const graph = new Rapid.Graph([way]);
+      const graph = new Rapid.Graph(context, [way]);
       return presets.initAsync().then(() => {
         const match = presets.match(way, graph);
         expect(match.id).to.eql('highway/pedestrian_area');

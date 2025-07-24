@@ -10,7 +10,7 @@ describe('actionDeleteMultiple', () => {
     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const w1 = new Rapid.OsmWay(context, {id: 'w1'});
     const r1 = new Rapid.OsmRelation(context, {id: 'r1'});
-    const graph = new Rapid.Graph([n1, w1, r1]);
+    const graph = new Rapid.Graph(context, [n1, w1, r1]);
     const result = Rapid.actionDeleteMultiple(['n1', 'w1', 'r1'])(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('n1'));
@@ -22,7 +22,7 @@ describe('actionDeleteMultiple', () => {
   it('deletes a way and one of its nodes', () => {
     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1']});
-    const graph = new Rapid.Graph([n1, w1]);
+    const graph = new Rapid.Graph(context, [n1, w1]);
     const result = Rapid.actionDeleteMultiple(['w1', 'n1'])(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('w1'));
@@ -35,7 +35,7 @@ describe('actionDeleteMultiple', () => {
   //   it('returns the result of the first action that is disabled', () => {
   //     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
   //     const r1 = new Rapid.OsmRelation(context, {id: 'r1', members: [{id: 'w1'}]});  // 'w1' not downloaded
-  //     const graph = new Rapid.Graph([n1, r1]);
+  //     const graph = new Rapid.Graph(context, [n1, r1]);
   //     const action = Rapid.actionDeleteMultiple(['n1', 'r1']);
   //     expect(action.disabled(graph)).to.equal('incomplete_relation');
   //   });

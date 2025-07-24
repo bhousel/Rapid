@@ -1,4 +1,6 @@
 import { AbstractData } from './AbstractData.js';
+import { Difference } from './Difference.js';
+import { Graph } from './Graph.js';
 import { Geometry } from './Geometry.js';
 import { GeometryPart } from './GeometryPart.js';
 import { GeoJSON } from './GeoJSON.js';
@@ -8,18 +10,22 @@ import { OsmEntity } from './OsmEntity.js';
 import { OsmNode } from './OsmNode.js';
 import { OsmRelation } from './OsmRelation.js';
 import { OsmWay } from './OsmWay.js';
+import { Tree } from './Tree.js';
 
 export {
   AbstractData,
+  Difference,
   Geometry,
   GeometryPart,
   GeoJSON,
+  Graph,
   Marker,
   OsmChangeset,
   OsmEntity,
   OsmNode,
   OsmRelation,
-  OsmWay
+  OsmWay,
+  Tree
 };
 
 export {

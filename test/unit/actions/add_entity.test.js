@@ -6,8 +6,9 @@ describe('actionAddEntity', () => {
   const context = new Rapid.MockContext();
 
   it('adds an entity to the graph', t => {
+    const graph = new Rapid.Graph(context);
     const entity = new Rapid.OsmNode(context);
-    const result = Rapid.actionAddEntity(entity)(new Rapid.Graph());
+    const result = Rapid.actionAddEntity(entity)(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.equal(result.entity(entity.id), entity);
   });

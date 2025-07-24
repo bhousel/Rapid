@@ -33,8 +33,8 @@ describe('validationCrossingWays', () => {
   const validator = Rapid.validationCrossingWays(context);
 
   beforeEach(() => {
-    graph = new Rapid.Graph();     // reset
-    tree = new Rapid.Tree(graph);  // reset
+    graph = new Rapid.Graph(context);  // reset
+    tree = new Rapid.Tree(graph);      // reset
   });
 
 
@@ -74,7 +74,7 @@ describe('validationCrossingWays', () => {
     const w2 = new Rapid.OsmWay(context, { id: 'w-2', nodes: ['n-3', 'n-4'], tags: w2tags });
 
     const entities = [n1, n2, n3, n4, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -458,7 +458,7 @@ describe('validationCrossingWays', () => {
     const w2 = new Rapid.OsmWay(context, { id: 'w-2', nodes: ['n-3', 'n-4', 'n-5', 'n-6'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, n5, n6, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -514,7 +514,7 @@ describe('validationCrossingWays', () => {
     const r1 = new Rapid.OsmRelation(context, {id: 'r-1', members: [{ id: 'w-2', type: 'way' }, { id: 'w-3', type: 'way' }], tags: r1tags });
 
     const entities = [n1, n2, n3, n4, n5, n6, w1, w2, w3, r1];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }

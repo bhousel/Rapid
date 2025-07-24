@@ -9,7 +9,7 @@ describe('actionMoveNode', () => {
   it('changes a node\'s location', () => {
     const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
     const toLoc = [2, 3];
-    const graph = new Rapid.Graph([n1]);
+    const graph = new Rapid.Graph(context, [n1]);
 
     const result = Rapid.actionMoveNode('n1', toLoc)(graph);
     assert.ok(result instanceof Rapid.Graph);
@@ -26,7 +26,7 @@ describe('actionMoveNode', () => {
     it('move node at t = 0', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
       const toLoc = [2, 3];
-      const graph = new Rapid.Graph([n1]);
+      const graph = new Rapid.Graph(context, [n1]);
 
       const result = Rapid.actionMoveNode('n1', toLoc)(graph, 0);
       assert.ok(result instanceof Rapid.Graph);
@@ -37,7 +37,7 @@ describe('actionMoveNode', () => {
     it('move node at t = 0.5', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
       const toLoc = [2, 3];
-      const graph = new Rapid.Graph([n1]);
+      const graph = new Rapid.Graph(context, [n1]);
 
       const result = Rapid.actionMoveNode('n1', toLoc)(graph, 0.5);
       assert.ok(result instanceof Rapid.Graph);
@@ -48,7 +48,7 @@ describe('actionMoveNode', () => {
     it('move node at t = 1', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
       const toLoc = [2, 3];
-      const graph = new Rapid.Graph([n1]);
+      const graph = new Rapid.Graph(context, [n1]);
 
       const result = Rapid.actionMoveNode('n1', toLoc)(graph, 1);
       assert.ok(result instanceof Rapid.Graph);

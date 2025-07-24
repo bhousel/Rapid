@@ -26,7 +26,7 @@ describe('validationDisconnectedWay', () => {
   const validator = Rapid.validationDisconnectedWay(context);
 
   beforeEach(() => {
-    graph = new Rapid.Graph();     // reset
+    graph = new Rapid.Graph(context);   // reset
   });
 
 
@@ -52,7 +52,7 @@ describe('validationDisconnectedWay', () => {
   function createDisconnectedNode(n1tags = {}) {
     const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0], tags: n1tags });
     const entities = [n1];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
   }
 
   it('ignores non-routable node', () => {
@@ -85,7 +85,7 @@ describe('validationDisconnectedWay', () => {
     const w1 = new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n-1', 'n-2'], tags: w1tags });
 
     const entities = [n1, n2, w1];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
   }
 
   it('ignores non-routable way', () => {
@@ -130,7 +130,7 @@ describe('validationDisconnectedWay', () => {
     const w2 = new Rapid.OsmWay(context, { id: 'w-2', nodes: ['n-1', 'n-3'], tags: w2tags });
 
     const entities = [n1, n2, n3, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
   }
 
   it('flags highway connected only to service area', () => {

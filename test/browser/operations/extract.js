@@ -15,6 +15,7 @@ describe('operationExtract', () => {
   class MockContext {
     constructor() {
       this.viewport = new Rapid.sdk.Viewport();
+      this.sequences = {};
       this.systems = {
         editor:   new MockEditSystem(),
         l10n:     new MockLocalizationSystem(),
@@ -23,7 +24,12 @@ describe('operationExtract', () => {
       };
     }
     hasHiddenConnections()  { return false; }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
+    }
   }
+
 
   const context = new MockContext();
   let _graph;
@@ -36,7 +42,7 @@ describe('operationExtract', () => {
       // d - node with no tags, 2 parent ways
       // e - node with tags, no parent way
       // f - node with no tags, no parent way
-      _graph = new Rapid.Graph([
+      _graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0], tags: { 'name': 'fake' } }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 0], tags: { 'name': 'fake' } }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),
@@ -102,7 +108,7 @@ describe('operationExtract', () => {
 
   describe('disabled', () => {
     it('returns enabled for non-related node', () => {
-      _graph = new Rapid.Graph([
+      _graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 0], tags: { 'name': 'fake' } }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),
@@ -114,7 +120,7 @@ describe('operationExtract', () => {
     });
 
     it('returns enabled for non-restriction related node', () => {
-      _graph = new Rapid.Graph([
+      _graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 0], tags: { 'name': 'fake' } }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),
@@ -128,7 +134,7 @@ describe('operationExtract', () => {
     it('returns enabled for via node in restriction', () => {
       // https://wiki.openstreetmap.org/wiki/Relation:restriction indicates that
       // from and to roles are only appropriate for Ways
-      _graph = new Rapid.Graph([
+      _graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),
@@ -153,7 +159,7 @@ describe('operationExtract', () => {
     it('returns enabled for location_hint node in restriction', () => {
       // https://wiki.openstreetmap.org/wiki/Relation:restriction indicates that
       // from and to roles are only appropriate for Ways
-      _graph = new Rapid.Graph([
+      _graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 0] }),

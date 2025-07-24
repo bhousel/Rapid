@@ -55,6 +55,7 @@ describe('ValidationSystem', () => {
   class MockContext {
     constructor()   {
       this.viewport = new Rapid.sdk.Viewport();
+      this.sequences = {};
       this.systems = {
         assets:   new Rapid.AssetSystem(this),
         editor:   new Rapid.EditSystem(this),
@@ -71,6 +72,10 @@ describe('ValidationSystem', () => {
     }
     selectedIDs() { return []; }
     on() {}
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
+    }
   }
 
   const context = new MockContext();

@@ -15,18 +15,27 @@ describe('FilterSystem', () => {
   }
 
   class MockEditSystem {
-    constructor() {}
-    get staging() { return { graph: new Rapid.Graph() }; }
+    constructor(context) {
+      this.context = context;
+    }
+    get staging() {
+      return { graph: new Rapid.Graph(this.context) };
+    }
   }
 
   class MockContext {
     constructor()   {
       this.viewport = new Rapid.sdk.Viewport();
+      this.sequences = {};
       this.systems = {
-        editor:  new MockEditSystem(),
+        editor:  new MockEditSystem(this),
         storage: new MockStorageSystem(),
         urlhash: new MockUrlHashSystem()
       };
+    }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
     }
   }
 
@@ -90,7 +99,7 @@ describe('FilterSystem', () => {
 // so the counts are wrong
   describe.skip('#filterScene', () => {
     it('counts hidden features', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'point_bar', tags: { amenity: 'bar' }, version: 1}),
         new Rapid.OsmNode(context, {id: 'point_dock', tags: { waterway: 'dock' }, version: 1}),
         new Rapid.OsmNode(context, {id: 'point_rail_station', tags: { railway: 'station' }, version: 1}),
@@ -123,7 +132,7 @@ describe('FilterSystem', () => {
 
 
   describe('matching', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       // Points
       new Rapid.OsmNode(context, {id: 'point_bar', tags: {amenity: 'bar'}, version: 1}),
       new Rapid.OsmNode(context, {id: 'point_dock', tags: {waterway: 'dock'}, version: 1}),
@@ -546,7 +555,7 @@ describe('FilterSystem', () => {
       const a = new Rapid.OsmNode(context, {id: 'a', version: 1});
       const b = new Rapid.OsmNode(context, {id: 'b', version: 1});
       const w = new Rapid.OsmWay(context, {id: 'w', nodes: [a.id, b.id], tags: { highway: 'path' }, version: 1});
-      const graph = new Rapid.Graph([a, b, w]);
+      const graph = new Rapid.Graph(context, [a, b, w]);
       const geometry = a.geometry(graph);
 
       _filterSystem.disable('paths');
@@ -572,7 +581,7 @@ describe('FilterSystem', () => {
         ],
         version: 1
       });
-      const graph = new Rapid.Graph([outer, inner1, inner2, inner3, r]);
+      const graph = new Rapid.Graph(context, [outer, inner1, inner2, inner3, r]);
 
       _filterSystem.disable('landuse');
       expect(_filterSystem.isHidden(outer, graph, outer.geometry(graph))).to.equal('landuse');     // iD#2548
@@ -584,7 +593,7 @@ describe('FilterSystem', () => {
     it('hides only versioned entities', () => {
       const a = new Rapid.OsmNode(context, {id: 'a', version: 1});
       const b = new Rapid.OsmNode(context, {id: 'b'});
-      const graph = new Rapid.Graph([a, b]);
+      const graph = new Rapid.Graph(context, [a, b]);
       const ageo = a.geometry(graph);
       const bgeo = b.geometry(graph);
 
@@ -595,7 +604,7 @@ describe('FilterSystem', () => {
 
     it('shows a hidden entity if forceVisible', () => {
       const a = new Rapid.OsmNode(context, {id: 'a', version: 1});
-      const graph = new Rapid.Graph([a]);
+      const graph = new Rapid.Graph(context, [a]);
       const ageo = a.geometry(graph);
 
       _filterSystem.disable('points');

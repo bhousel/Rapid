@@ -13,7 +13,7 @@ describe('actionScale', () => {
   it('scales nodes around a pivot point', () => {
     const nodeA = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
     const nodeB = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
-    const graph = new Rapid.Graph([nodeA, nodeB]);
+    const graph = new Rapid.Graph(context, [nodeA, nodeB]);
     const pivot = [0, 0];
     const scale = 2;
 

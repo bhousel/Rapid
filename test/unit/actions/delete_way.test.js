@@ -8,7 +8,7 @@ describe('actionDeleteWay', () => {
 
   it('removes the way from the graph', () => {
     const w1 = new Rapid.OsmWay(context, {id: 'w1'});
-    const graph = new Rapid.Graph([w1]);
+    const graph = new Rapid.Graph(context, [w1]);
     const result = Rapid.actionDeleteWay('w1')(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('w1'));
@@ -18,7 +18,7 @@ describe('actionDeleteWay', () => {
     const w1 = new Rapid.OsmWay(context, {id: 'w1'});
     const w2 = new Rapid.OsmWay(context, {id: 'w2'});
     const r1 = new Rapid.OsmRelation(context, {id: 'r1', members: [{ id: 'w1' }, { id: 'w2' }]});
-    const graph = new Rapid.Graph([w1, w2, r1]);
+    const graph = new Rapid.Graph(context, [w1, w2, r1]);
     const result = Rapid.actionDeleteWay('w1')(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('w1'));
@@ -28,7 +28,7 @@ describe('actionDeleteWay', () => {
   it('deletes child nodes not referenced by another parent', () => {
     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1']});
-    const graph = new Rapid.Graph([n1, w1]);
+    const graph = new Rapid.Graph(context, [n1, w1]);
     const result = Rapid.actionDeleteWay('w1')(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('w1'));
@@ -39,7 +39,7 @@ describe('actionDeleteWay', () => {
     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1']});
     const w2 = new Rapid.OsmWay(context, {id: 'w2', nodes: ['n1']});
-    const graph = new Rapid.Graph([n1, w1, w2]);
+    const graph = new Rapid.Graph(context, [n1, w1, w2]);
     const result = Rapid.actionDeleteWay('w1')(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('w1'));
@@ -51,7 +51,7 @@ describe('actionDeleteWay', () => {
     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const n2 = new Rapid.OsmNode(context, {id: 'n2'});
     const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1', 'n2']});
-    const graph = new Rapid.Graph([n1, n2, w1]);
+    const graph = new Rapid.Graph(context, [n1, n2, w1]);
     const result = Rapid.actionDeleteWay('w1')(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('w1'));
@@ -64,7 +64,7 @@ describe('actionDeleteWay', () => {
     const n2 = new Rapid.OsmNode(context, {id: 'n2'});
     const n3 = new Rapid.OsmNode(context, {id: 'n3'});
     const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1']});
-    const graph = new Rapid.Graph([n1, n2, n3, w1]);
+    const graph = new Rapid.Graph(context, [n1, n2, n3, w1]);
     const result = Rapid.actionDeleteWay('w1')(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('w1'));
@@ -76,7 +76,7 @@ describe('actionDeleteWay', () => {
   it('does not delete child nodes with interesting tags', () => {
     const n1 = new Rapid.OsmNode(context, {id: 'n1', tags: { highway: 'traffic_signals' }});
     const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1']});
-    const graph = new Rapid.Graph([n1, w1]);
+    const graph = new Rapid.Graph(context, [n1, w1]);
     const result = Rapid.actionDeleteWay('w1')(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('w1'));
@@ -86,7 +86,7 @@ describe('actionDeleteWay', () => {
   it('deletes parent relations that become empty', () => {
     const w1 = new Rapid.OsmWay(context, {id: 'w1'});
     const r1 = new Rapid.OsmRelation(context, {id: 'r1', members: [{ id: 'w1' }]});
-    const graph = new Rapid.Graph([w1, r1]);
+    const graph = new Rapid.Graph(context, [w1, r1]);
     const result = Rapid.actionDeleteWay('w1')(graph);
     assert.ok(result instanceof Rapid.Graph);
     assert.ok(!result.hasEntity('w1'));
@@ -100,7 +100,7 @@ describe('actionDeleteWay', () => {
 //      const w2 = new Rapid.OsmWay(context, {id: 'w2'});
 //      const r1 = new Rapid.OsmRelation(context, {id: 'r1', members: [{id: 'w1'}], tags: {type: 'route'}});      // route
 //      const r2 = new Rapid.OsmRelation(context, {id: 'r2', members: [{id: 'w2'}], tags: {type: 'boundary'}});   // boundary
-//      const graph = new Rapid.Graph([w1, w2, r1, r2]);
+//      const graph = new Rapid.Graph(context, [w1, w2, r1, r2]);
 //      expect(Rapid.actionDeleteWay('r1').disabled(graph)).to.equal('part_of_relation');
 //      expect(Rapid.actionDeleteWay('r2').disabled(graph)).to.equal('part_of_relation');
 //    });
@@ -108,7 +108,7 @@ describe('actionDeleteWay', () => {
 //    it('returns \'part_of_relation\' for outer members of multipolygons', () => {
 //      const w1 = new Rapid.OsmWay(context, {id: 'w1'});
 //      const r1 = new Rapid.OsmRelation(context, {id: r1, members: [{id: 'w1', role: 'outer'}], tags: {type: 'multipolygon'}});
-//      const graph = new Rapid.Graph([w1, r1]);
+//      const graph = new Rapid.Graph(context, [w1, r1]);
 //      const action = Rapid.actionDeleteWay('w1');
 //      expect(action.disabled(graph)).to.equal('part_of_relation');
 //    });
@@ -116,7 +116,7 @@ describe('actionDeleteWay', () => {
 //    it('returns falsy for inner members of multipolygons', () => {
 //      const w1 = new Rapid.OsmWay(context, {id: 'w1'});
 //      const r1 = new Rapid.OsmRelation(context, {id: 'r1', members: [{id: 'w1', role: 'inner'}], tags: {type: 'multipolygon'}});
-//      const graph = new Rapid.Graph([w1, r1]);
+//      const graph = new Rapid.Graph(context, [w1, r1]);
 //      const action = Rapid.actionDeleteWay('w1');
 //      expect(action.disabled(graph)).not.ok;
 //    });

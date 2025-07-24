@@ -33,8 +33,8 @@ describe('validationCurbNodes', () => {
   const validator = Rapid.validationCurbNodes(context);
 
   beforeEach(() => {
-    graph = new Rapid.Graph();     // reset
-    tree = new Rapid.Tree(graph);  // reset
+    graph = new Rapid.Graph(context);  // reset
+    tree = new Rapid.Tree(graph);      // reset
   });
 
   function validate() {
@@ -63,7 +63,7 @@ describe('validationCurbNodes', () => {
     const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n5', 'n2'], tags: w1tags });
     const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n5', 'n4'], tags: w2tags });
     const entities = [n1, n2, n3, n4, n5, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }

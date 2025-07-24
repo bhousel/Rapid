@@ -3,8 +3,8 @@ import { Extent, Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { Graph, Tree, RapidDataset } from '../core/lib/index.js';
-import { OsmNode, OsmRelation, OsmWay } from '../models/index.js';
+import { RapidDataset } from '../core/lib/index.js';
+import { Graph, OsmNode, OsmRelation, OsmWay, Tree } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -78,7 +78,7 @@ export class EsriService extends AbstractSystem {
         controller.abort();
       }
 
-      ds.graph = new Graph();
+      ds.graph = new Graph(this.context);
       ds.tree = new Tree(ds.graph);
       ds.cache = {
         inflight:  new Map(),   // Map<tileID, AbortController>
@@ -281,7 +281,7 @@ export class EsriService extends AbstractSystem {
     if (this._datasets[ds.id]) return;  // unless we've seen it already
 
     this._datasets[ds.id] = ds;
-    ds.graph = new Graph();
+    ds.graph = new Graph(this.context);
     ds.tree = new Tree(ds.graph);
     ds.cache = {
       inflight:  new Map(),   // Map<tileID, AbortController>

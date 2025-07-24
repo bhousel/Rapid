@@ -10,7 +10,7 @@ describe('actionUnrestrictTurn', () => {
     //
     // u === * --- w
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'u' }),
       new Rapid.OsmNode(context, { id: '*' }),
       new Rapid.OsmNode(context, { id: 'w' }),

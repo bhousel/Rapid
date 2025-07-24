@@ -10,7 +10,7 @@ describe('actionSyncCrossingTags', () => {
     const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0], tags: { highway: 'crossing' } });
     const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
     const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'footway', footway: 'crossing' } });
-    const graph = new Rapid.Graph([n1, n2, w1]);
+    const graph = new Rapid.Graph(context, [n1, n2, w1]);
 
     const result = Rapid.actionSyncCrossingTags('w1')(graph);
     assert.ok(result instanceof Rapid.Graph);

@@ -11,7 +11,7 @@ describe('actionSplit', () => {
       //
       //  a ---> b ---> c         split at 'b' not disabled
       //
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -29,7 +29,7 @@ describe('actionSplit', () => {
       //         |
       //         d
       //
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-1, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
@@ -50,7 +50,7 @@ describe('actionSplit', () => {
       //         |
       //         d
       //
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-1, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
@@ -71,7 +71,7 @@ describe('actionSplit', () => {
       //  | /
       //  a -- b
       //
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 2] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [1, 2] }),
@@ -86,7 +86,7 @@ describe('actionSplit', () => {
       //
       //  a ---> b                split at 'a' disabled - 'not eligible'
       //
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] })
@@ -98,7 +98,7 @@ describe('actionSplit', () => {
       //
       //  a ---> b                split at 'b' disabled - 'not eligible'
       //
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] })
@@ -114,7 +114,7 @@ describe('actionSplit', () => {
       //         |                (there is no '=' here)
       //         d
       //
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-1, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
@@ -131,7 +131,7 @@ describe('actionSplit', () => {
 
   describe('ways', () => {
     it('creates a new way with the appropriate nodes', () => {
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -146,7 +146,7 @@ describe('actionSplit', () => {
 
     it('copies tags to the new way', () => {
       const tags = { highway: 'residential' };
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -160,7 +160,7 @@ describe('actionSplit', () => {
     });
 
     it('splits a way at a T-junction', () => {
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-1, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [1, 0] }),
@@ -177,7 +177,7 @@ describe('actionSplit', () => {
     });
 
     it('splits multiple ways at an intersection', () => {
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-1, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
@@ -196,7 +196,7 @@ describe('actionSplit', () => {
     });
 
     it('splits the specified ways at an intersection', () => {
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-1, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
@@ -224,7 +224,7 @@ describe('actionSplit', () => {
     });
 
     it('splits self-intersecting ways', () => {
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0, 2] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [-1, 0] }),
@@ -239,7 +239,7 @@ describe('actionSplit', () => {
     });
 
     it('splits a closed way at the given point and its antipode', () => {
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [1, 0] }),
@@ -282,7 +282,7 @@ describe('actionSplit', () => {
       //    a ---> b ===> c
       //    Relation: ['~', '-', '=']
       //
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -313,7 +313,7 @@ describe('actionSplit', () => {
         //    a ---> b ===> c
         //    Relation: ['-', '=']
         //
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -344,7 +344,7 @@ describe('actionSplit', () => {
         //    a ---> b ===> c ~~~> d
         //    Relation: ['-', '=', '~']
         //
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -374,7 +374,7 @@ describe('actionSplit', () => {
         //    a ---> b ===> c ~~~> d
         //    Relation: ['~', '=', '-']
         //
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -395,7 +395,7 @@ describe('actionSplit', () => {
       });
 
       it('reorders members as node, way, relation (for Public Transport routing)', () => {
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -435,7 +435,7 @@ describe('actionSplit', () => {
         //    a ---> b ===> c ~~~> d
         //    Relation: ['-', '=', '~', '~', '=', '-']
         //
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -467,7 +467,7 @@ describe('actionSplit', () => {
         //    a <=== b <--- c ~~~> d
         //    Relation: ['=', '-', '~', '~', '-', '=']
         //
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -499,7 +499,7 @@ describe('actionSplit', () => {
         //    a ---> b ===> c <~~~ d
         //    Relation: ['-', '=', '~', '~', '=', '-']
         //
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -531,7 +531,7 @@ describe('actionSplit', () => {
         //    a <=== b <--- c <~~~ d
         //    Relation: ['=', '-', '~', '~', '-', '=']
         //
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -570,7 +570,7 @@ describe('actionSplit', () => {
         //
         //    Relation: ['-', '#', '*', '~', '#', '*', '=']
         //
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           a, b, c, d, e,
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] }),
           new Rapid.OsmWay(context, { id: '#', nodes: ['b', 'c', 'd'] }),
@@ -598,7 +598,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['-', '#', '~', '#', '=']
       //
-      const hat1a = new Rapid.Graph([
+      const hat1a = new Rapid.Graph(context, [
         a, b, c, d, e,
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] }),
         new Rapid.OsmWay(context, { id: '#', nodes: ['b', 'c', 'd'] }),
@@ -624,7 +624,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['-', '~', '#', '~', '=']
       //
-      const hat1b = new Rapid.Graph([
+      const hat1b = new Rapid.Graph(context, [
         a, b, c, d, e,
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] }),
         new Rapid.OsmWay(context, { id: '#', nodes: ['b', 'c', 'd'] }),
@@ -650,7 +650,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['-', '#', '~', '#', '=']
       //
-      const hat2 = new Rapid.Graph([
+      const hat2 = new Rapid.Graph(context, [
         a, b, c, d, e,
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] }),
         new Rapid.OsmWay(context, { id: '#', nodes: ['d', 'c', 'b'] }),
@@ -676,7 +676,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['-', '#', '~', '#', '=']
       //
-      const hat3 = new Rapid.Graph([
+      const hat3 = new Rapid.Graph(context, [
         a, b, c, d, e,
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] }),
         new Rapid.OsmWay(context, { id: '#', nodes: ['d', 'c', 'b'] }),
@@ -702,7 +702,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['-', '#', '~', '#', '=']
       //
-      const hat4 = new Rapid.Graph([
+      const hat4 = new Rapid.Graph(context, [
         a, b, c, d, e,
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] }),
         new Rapid.OsmWay(context, { id: '#', nodes: ['b', 'c', 'd'] }),
@@ -728,7 +728,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['-', '#', '~', '#', '=']
       //
-      const hat5 = new Rapid.Graph([
+      const hat5 = new Rapid.Graph(context, [
         a, b, c, d, e,
         new Rapid.OsmWay(context, { id: '-', nodes: ['b', 'a'] }),
         new Rapid.OsmWay(context, { id: '#', nodes: ['b', 'c', 'd'] }),
@@ -865,7 +865,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['~', '-', '~']
       //
-      const spoon1 = new Rapid.Graph([
+      const spoon1 = new Rapid.Graph(context, [
         a, b, c, d, e, f,
         new Rapid.OsmWay(context, { id: '-', nodes: ['d', 'a', 'b', 'c', 'd'] }),
         new Rapid.OsmWay(context, { id: '~', nodes: ['d', 'e', 'f'] }),
@@ -887,7 +887,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['~', '-', '~']
       //
-      const spoon2 = new Rapid.Graph([
+      const spoon2 = new Rapid.Graph(context, [
         a, b, c, d, e, f,
         new Rapid.OsmWay(context, { id: '-', nodes: ['d', 'c', 'b', 'a', 'd'] }),
         new Rapid.OsmWay(context, { id: '~', nodes: ['d', 'e', 'f'] }),
@@ -908,7 +908,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['~', '-', '~']
       //
-      const spoon3 = new Rapid.Graph([
+      const spoon3 = new Rapid.Graph(context, [
         a, b, c, d, e, f,
         new Rapid.OsmWay(context, { id: '-', nodes: ['d', 'a', 'b', 'c', 'd'] }),
         new Rapid.OsmWay(context, { id: '~', nodes: ['f', 'e', 'd'] }),
@@ -929,7 +929,7 @@ describe('actionSplit', () => {
       //
       //    Relation: ['~', '-', '~']
       //
-      const spoon4 = new Rapid.Graph([
+      const spoon4 = new Rapid.Graph(context, [
         a, b, c, d, e, f,
         new Rapid.OsmWay(context, { id: '-', nodes: ['d', 'c', 'b', 'a', 'd'] }),
         new Rapid.OsmWay(context, { id: '~', nodes: ['f', 'e', 'd'] }),
@@ -1103,7 +1103,7 @@ describe('actionSplit', () => {
         //    ||     |
         //    d ==== c
         //
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [1, 0] }),
@@ -1125,7 +1125,7 @@ describe('actionSplit', () => {
       });
 
       it('splits only the line of a node shared by a line and an area', () => {
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [1, 0] }),
@@ -1145,7 +1145,7 @@ describe('actionSplit', () => {
       });
 
       it('converts simple multipolygon to a proper multipolygon', () => {
-        let graph = new Rapid.Graph([
+        let graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 1] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, 1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [1, 0] }),
@@ -1176,7 +1176,7 @@ describe('actionSplit', () => {
           //    a ----> b ====> c ~~~~ d
           // A restriction from ==== to ~~~~ via node c.
           //
-          let graph = new Rapid.Graph([
+          let graph = new Rapid.Graph(context, [
             new Rapid.OsmNode(context, { id: 'a' }),
             new Rapid.OsmNode(context, { id: 'b' }),
             new Rapid.OsmNode(context, { id: 'c' }),
@@ -1213,7 +1213,7 @@ describe('actionSplit', () => {
           //    a ----> b ====> c ~~~~ d
           // A restriction from ~~~~ to ==== via node c.
           //
-          let graph = new Rapid.Graph([
+          let graph = new Rapid.Graph(context, [
             new Rapid.OsmNode(context, { id: 'a' }),
             new Rapid.OsmNode(context, { id: 'b' }),
             new Rapid.OsmNode(context, { id: 'c' }),
@@ -1252,7 +1252,7 @@ describe('actionSplit', () => {
           //    a ----> b ====> c ~~~~ d
           // A restriction from ==== to ==== via node c.
           //
-          let graph = new Rapid.Graph([
+          let graph = new Rapid.Graph(context, [
             new Rapid.OsmNode(context, { id: 'a' }),
             new Rapid.OsmNode(context, { id: 'b' }),
             new Rapid.OsmNode(context, { id: 'c' }),
@@ -1299,7 +1299,7 @@ describe('actionSplit', () => {
           //
           // A restriction from ==== to ~~~~ via way |
           //
-          let graph = new Rapid.Graph([
+          let graph = new Rapid.Graph(context, [
             new Rapid.OsmNode(context, { id: 'a' }),
             new Rapid.OsmNode(context, { id: 'b' }),
             new Rapid.OsmNode(context, { id: 'c' }),
@@ -1348,7 +1348,7 @@ describe('actionSplit', () => {
           //
           // A restriction from ~~~~ to ==== via way |
           //
-          let graph = new Rapid.Graph([
+          let graph = new Rapid.Graph(context, [
             new Rapid.OsmNode(context, { id: 'a' }),
             new Rapid.OsmNode(context, { id: 'b' }),
             new Rapid.OsmNode(context, { id: 'c' }),
@@ -1397,7 +1397,7 @@ describe('actionSplit', () => {
           //
           // A restriction from | to ‖ via ways ----, ====
           //
-          let graph = new Rapid.Graph([
+          let graph = new Rapid.Graph(context, [
             new Rapid.OsmNode(context, { id: 'a' }),
             new Rapid.OsmNode(context, { id: 'b' }),
             new Rapid.OsmNode(context, { id: 'c' }),
@@ -1439,7 +1439,7 @@ describe('actionSplit', () => {
           //    a <==== b <---- c ~~~~ d
           // A restriction from ---- to ~~~~ via c.
           //
-          let graph = new Rapid.Graph([
+          let graph = new Rapid.Graph(context, [
             new Rapid.OsmNode(context, { id: 'a' }),
             new Rapid.OsmNode(context, { id: 'b' }),
             new Rapid.OsmNode(context, { id: 'c' }),

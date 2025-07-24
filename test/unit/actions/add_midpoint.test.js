@@ -10,7 +10,7 @@ describe('actionAddMidpoint', () => {
     const a = new Rapid.OsmNode(context);
     const b = new Rapid.OsmNode(context);
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
-    const graph = new Rapid.Graph([a, b]);
+    const graph = new Rapid.Graph(context, [a, b]);
     const result = Rapid.actionAddMidpoint(midpoint, node)(graph);
 
     assert.ok(result instanceof Rapid.Graph);
@@ -24,7 +24,7 @@ describe('actionAddMidpoint', () => {
     const w1 = new Rapid.OsmWay(context);
     const w2 = new Rapid.OsmWay(context, {nodes: [a.id, b.id]});
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
-    const graph = new Rapid.Graph([a, b, w1, w2]);
+    const graph = new Rapid.Graph(context, [a, b, w1, w2]);
     const result = Rapid.actionAddMidpoint(midpoint, node)(graph);
 
     assert.ok(result instanceof Rapid.Graph);
@@ -39,7 +39,7 @@ describe('actionAddMidpoint', () => {
     const w1 = new Rapid.OsmWay(context);
     const w2 = new Rapid.OsmWay(context, {nodes: [b.id, a.id]});
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
-    const graph = new Rapid.Graph([a, b, w1, w2]);
+    const graph = new Rapid.Graph(context, [a, b, w1, w2]);
     const result = Rapid.actionAddMidpoint(midpoint, node)(graph);
 
     assert.ok(result instanceof Rapid.Graph);
@@ -59,7 +59,7 @@ describe('actionAddMidpoint', () => {
     const c = new Rapid.OsmNode(context);
     const w = new Rapid.OsmWay(context, {nodes: [a.id, b.id, a.id]});
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
-    const graph = new Rapid.Graph([a, b, w]);
+    const graph = new Rapid.Graph(context, [a, b, w]);
     const result = Rapid.actionAddMidpoint(midpoint, c)(graph);
 
     assert.ok(result instanceof Rapid.Graph);

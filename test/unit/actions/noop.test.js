@@ -1,12 +1,14 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 describe('actionNoop', () => {
+  const context = new Rapid.MockContext();
+
   it('does nothing', () => {
-    const graph = new Rapid.Graph();
+    const graph = new Rapid.Graph(context);
     const result = Rapid.actionNoop()(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.equal(graph, result);
+    assert.instanceOf(result, Rapid.Graph);
+    assert.strictEqual(graph, result);
   });
 });

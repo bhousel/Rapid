@@ -17,7 +17,7 @@ describe('actionRotate', () => {
   it('rotates nodes around a pivot point', () => {
     const nodeA = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
     const nodeB = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
-    const graph = new Rapid.Graph([nodeA, nodeB]);
+    const graph = new Rapid.Graph(context, [nodeA, nodeB]);
     const pivot = [0, 0];
     const angle = Math.PI / 2;  // 90 degrees in radians
 

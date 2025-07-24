@@ -16,7 +16,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //    |     |
       //    a --- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -32,7 +32,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //    |     |
       //    a ---  b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -50,7 +50,7 @@ describe('actionOrthogonalize', () => {
       //    | \
       //    |   \
       //     b - c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
@@ -66,7 +66,7 @@ describe('actionOrthogonalize', () => {
       //    e - d - c
       //    |       |
       //    a ----- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -84,7 +84,7 @@ describe('actionOrthogonalize', () => {
       //    e - d - c
       //    |       |
       //    a ----- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -105,7 +105,7 @@ describe('actionOrthogonalize', () => {
       //    |     d - c
       //    |         |
       //    a -------- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [3.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 1] }),
@@ -128,7 +128,7 @@ describe('actionOrthogonalize', () => {
       //   e --- d - c
       //        |    |
       //        a -- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, -1] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, -1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
@@ -165,7 +165,7 @@ describe('actionOrthogonalize', () => {
       ];
 
       for (var i = 0; i < tests.length; i++) {
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: tests[i][0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: tests[i][1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: tests[i][2] }),
@@ -187,7 +187,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //          |
       //    a --- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -204,7 +204,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //          |
       //    a ---  b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -222,7 +222,7 @@ describe('actionOrthogonalize', () => {
       //    |
       //    |
       //     b - c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
@@ -238,7 +238,7 @@ describe('actionOrthogonalize', () => {
       //    e - d - c
       //            |
       //    a ----- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -256,7 +256,7 @@ describe('actionOrthogonalize', () => {
       //    e - d - c
       //            |
       //    a ----- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -277,7 +277,7 @@ describe('actionOrthogonalize', () => {
       //          d - c
       //              |
       //    a -------- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [3.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 1] }),
@@ -298,7 +298,7 @@ describe('actionOrthogonalize', () => {
       //   f -- g
       //   |    |
       //   e --- d - c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'd', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'e', loc: [-1, 0] }),
@@ -322,7 +322,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //    |     |
       //    a ---  b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -342,7 +342,7 @@ describe('actionOrthogonalize', () => {
       //    | \
       //    |   \
       //     b - c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
@@ -360,7 +360,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //          |
       //    a ---  b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -380,7 +380,7 @@ describe('actionOrthogonalize', () => {
       //    |
       //    |
       //     b - c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
@@ -403,7 +403,7 @@ describe('actionOrthogonalize', () => {
         //    d ---- c
         //    |      |
         //    a ---- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -419,7 +419,7 @@ describe('actionOrthogonalize', () => {
         //    d --- c
         //    |     |
         //    a ---- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -436,7 +436,7 @@ describe('actionOrthogonalize', () => {
         //    | \
         //    |   \
         //     b - c
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
@@ -451,7 +451,7 @@ describe('actionOrthogonalize', () => {
         //    e - d - c
         //    |       |
         //    a ----- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -470,7 +470,7 @@ describe('actionOrthogonalize', () => {
         //    f        c
         //     \      /
         //      a -- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [3, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -490,7 +490,7 @@ describe('actionOrthogonalize', () => {
         //   e --- d - c
         //        |    |
         //        a -- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, -1] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, -1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
@@ -512,7 +512,7 @@ describe('actionOrthogonalize', () => {
         //    d ---- c
         //           |
         //    a ---- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -528,7 +528,7 @@ describe('actionOrthogonalize', () => {
         //    d --- c
         //          |
         //    a ---  b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -545,7 +545,7 @@ describe('actionOrthogonalize', () => {
         //    |
         //    |
         //     b - c
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [0, 0.1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
@@ -560,7 +560,7 @@ describe('actionOrthogonalize', () => {
         //    e - d - c
         //            |
         //    a ----- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -579,7 +579,7 @@ describe('actionOrthogonalize', () => {
         //    f        c
         //            /
         //      a -- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [3, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -597,7 +597,7 @@ describe('actionOrthogonalize', () => {
         //   f -- g
         //   |    |
         //   e --- d - c
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
           new Rapid.OsmNode(context, { id: 'd', loc: [0.1, 0] }),
           new Rapid.OsmNode(context, { id: 'e', loc: [-1, 0] }),
@@ -617,7 +617,7 @@ describe('actionOrthogonalize', () => {
         //    d ---- c
         //           |
         //    a ---- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -633,7 +633,7 @@ describe('actionOrthogonalize', () => {
         //    d --- c
         //          |
         //    a ---  b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -650,7 +650,7 @@ describe('actionOrthogonalize', () => {
         //    |
         //    |
         //     b - c
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [0, 0.1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
@@ -667,7 +667,7 @@ describe('actionOrthogonalize', () => {
         //    f        c
         //            /
         //      a -- b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [3, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -694,7 +694,7 @@ describe('actionOrthogonalize', () => {
     //     |              |
     //     a -- b -- c -- d
     it('orthogonalize at t = 0', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
@@ -714,7 +714,7 @@ describe('actionOrthogonalize', () => {
     });
 
     it('orthogonalize at t = 0.5', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
@@ -734,7 +734,7 @@ describe('actionOrthogonalize', () => {
     });
 
     it('orthogonalize at t = 1', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),

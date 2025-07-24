@@ -4,7 +4,7 @@ import { AbstractSystem } from './AbstractSystem.js';
 import { actionDiscardTags } from '../actions/discard_tags.js';
 import { actionMergeRemoteChanges } from '../actions/merge_remote_changes.js';
 import { actionRevert } from '../actions/revert.js';
-import { Graph } from './lib/index.js';
+import { Graph } from '../models/Graph.js';
 
 
 
@@ -223,7 +223,7 @@ export class UploaderSystem extends AbstractSystem {
     let loadMoreIDs = new Set();
 
     for (const entity of result.data) {
-      this._remoteGraph.replaceSelf(entity);
+      this._remoteGraph.replace(entity);
       this._loadedIDs.add(entity.id);
       this._toLoadIDs.delete(entity.id);
 

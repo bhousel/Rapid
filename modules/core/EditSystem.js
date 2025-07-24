@@ -5,8 +5,8 @@ import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/u
 import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { Difference, Edit, Graph, Tree } from './lib/index.js';
-import { createOsmFeature } from '../models/index.js';
+import { Edit } from './lib/index.js';
+import { Difference, Graph, Tree, createOsmFeature } from '../models/index.js';
 import { uiLoading } from '../ui/loading.js';
 
 
@@ -190,7 +190,7 @@ export class EditSystem extends AbstractSystem {
     this.deferredBackup.cancel();
 
     // Create a new Base Graph / Base Edit.
-    const baseGraph = new Graph();
+    const baseGraph = new Graph(this.context);
     const base = new Edit({ graph: baseGraph });
     this._history = [ base ];
     this._index = 0;

@@ -9,7 +9,7 @@ describe('actionChangePreset', () => {
 
   it('changes from one preset\'s tags to another\'s', () => {
     const entity = new Rapid.OsmNode(context, { tags: { old: 'true' } });
-    const graph = new Rapid.Graph([entity]);
+    const graph = new Rapid.Graph(context, [entity]);
     const action = Rapid.actionChangePreset(entity.id, oldPreset, newPreset);
     const result = action(graph);
 
@@ -19,7 +19,7 @@ describe('actionChangePreset', () => {
 
   it('adds the tags of a new preset to an entity without an old preset', () => {
     const entity = new Rapid.OsmNode(context);
-    const graph = new Rapid.Graph([entity]);
+    const graph = new Rapid.Graph(context, [entity]);
     const action = Rapid.actionChangePreset(entity.id, null, newPreset);
     const result = action(graph);
 
@@ -29,7 +29,7 @@ describe('actionChangePreset', () => {
 
   it('removes the tags of an old preset from an entity without a new preset', () => {
     const entity = new Rapid.OsmNode(context, { tags: { old: 'true' } });
-    const graph = new Rapid.Graph([entity]);
+    const graph = new Rapid.Graph(context, [entity]);
     const action = Rapid.actionChangePreset(entity.id, oldPreset, null);
     const result = action(graph);
 

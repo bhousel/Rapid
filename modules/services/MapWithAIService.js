@@ -2,8 +2,8 @@ import { Tiler } from '@rapid-sdk/math';
 import { utilStringQs } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { Graph, Tree, RapidDataset } from '../core/lib/index.js';
-import { OsmEntity, OsmNode, OsmWay } from '../models/index.js';
+import { RapidDataset } from '../core/lib/index.js';
+import { Graph, OsmEntity, OsmNode, OsmWay, Tree } from '../models/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -48,7 +48,7 @@ export class MapWithAIService extends AbstractSystem {
       .then(() => {
         // allocate a special dataset for the rapid intro graph.
         const datasetID = 'rapid_intro_graph';
-        const graph = new Graph();
+        const graph = new Graph(this.context);
         const tree = new Tree(graph);
         const cache = {
           inflight: {},
@@ -175,7 +175,7 @@ export class MapWithAIService extends AbstractSystem {
         Object.values(ds.cache.inflight).forEach(controller => this._abortRequest(controller));
       }
       ds.lastv = null;
-      ds.graph = new Graph();
+      ds.graph = new Graph(this.context);
       ds.tree = new Tree(ds.graph);
       ds.cache = {
         inflight: {},
@@ -222,7 +222,7 @@ export class MapWithAIService extends AbstractSystem {
 
     } else {
       // as tile requests arrive, setup the resources needed to hold the results
-      graph = new Graph();
+      graph = new Graph(this.context);
       tree = new Tree(graph);
       cache = {
         inflight: {},

@@ -15,7 +15,7 @@ describe('actionMergeNodes', () => {
       //       |
       //       e
       //
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-2,  2] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [ 0,  2] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [ 2,  2] }),
@@ -32,7 +32,7 @@ describe('actionMergeNodes', () => {
 
 
   it('merges two isolated nodes, averaging loc', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [4, 4] })
     ]);
@@ -48,7 +48,7 @@ describe('actionMergeNodes', () => {
 
 
   it('merges two isolated nodes, merging tags, and keeping loc of the interesting node', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0], tags: { highway: 'traffic_signals' }}),
       new Rapid.OsmNode(context, { id: 'b', loc: [4, 4] })
     ]);
@@ -65,7 +65,7 @@ describe('actionMergeNodes', () => {
 
 
   it('merges two isolated nodes, merging tags, and averaging loc of both interesting nodes', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, -2], tags: { highway: 'traffic_signals' } }),
       new Rapid.OsmNode(context, { id: 'b', loc: [0,  2], tags: { crossing: 'marked' } })
     ]);
@@ -87,7 +87,7 @@ describe('actionMergeNodes', () => {
     //
     //  a -- b -- c       a ---- c
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [-2,  2] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [ 0,  2] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [ 2,  2] }),
@@ -115,7 +115,7 @@ describe('actionMergeNodes', () => {
     //       |                |
     //       e                e
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [-2,  2] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [ 0,  2] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [ 2,  2] }),
@@ -150,7 +150,7 @@ describe('actionMergeNodes', () => {
     //        ‖                ‖
     //        f                f
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [-2,  0] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [ 0,  0] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [ 0,  4] }),

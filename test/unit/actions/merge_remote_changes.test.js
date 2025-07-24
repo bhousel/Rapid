@@ -7,7 +7,7 @@ describe('actionMergeRemoteChanges', () => {
   const context = new Rapid.MockContext();
   const discardTags = { created_by: true };
 
-  const base = new Rapid.Graph([
+  const base = new Rapid.Graph(context, [
     new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1], version: '1', tags: { foo: 'foo' }}),
 
     new Rapid.OsmNode(context, { id: 'n10', loc: [ 10,  10], version: '1' }),

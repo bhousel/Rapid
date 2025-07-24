@@ -7,20 +7,21 @@ import { Difference } from './Difference.js';
  *  Each graph contains a base state (uneditied) and local state (edited).
  *  The graph also contains all the caches and methods needed to manage OSM topology.
  *  (parentWays, childNodes, parentRels)
- *  Graphs are intended to be immutable - the `update()` method will return a new Graph.
  */
 export class Graph {
 
   /**
    * @constructor
-   * @param  {Graph|Array<Entity>}  other?   - Predecessor Graph, or Array of entities to load into new Graph.
+   * @param  {Graph|Context}   otherOrContext - copy another Graph, or pass application context
+   * @param  {Array<Entity>?}  toLoad         - optional Array of entities to load into the new Graph.
    */
-  constructor(other) {
+  constructor(otherOrContext, toLoad) {
     this._childNodes = new Map();   // Map<entityID, Array<Entity>>
-//    this._affectedIDs = new Set();  // Set<entityID> affected by recent graph updates
 
     // A Graph derived from a predecessor Graph
-    if (other instanceof Graph) {
+    if (otherOrContext instanceof Graph) {  // copy other
+      const other = otherOrContext;
+      this.context = other.context;
       this._previous = other;
       this._base = other._base;     // Base data is shared among the chain of Graphs
       this._local = {               // Local data is a clone of the predecessor data
@@ -29,8 +30,10 @@ export class Graph {
         parentRels: new Map(other._local.parentRels)    // shallow clone
       };
 
-     // A fresh Graph
-     } else {
+    // A fresh Graph
+    } else {
+      const context = otherOrContext;
+      this.context = context;
       this._previous = null;
       this._base = {
         entities: new Map(),    // Map<entityID, Entity>
@@ -42,8 +45,13 @@ export class Graph {
         parentWays: new Map(),  // Map<entityID, Set<entityIDs>>
         parentRels: new Map()   // Map<entityID, Set<entityIDs>>
       };
+    }
 
-      this.rebase(other || [], [this]);   // seed with Entities, if provided
+    // generate an ID
+    this.id = 'g-' + this.context.next('graph');
+
+    if (toLoad) {
+      this.rebase(toLoad, [this]);   // seed with Entities, if provided
     }
   }
 
@@ -69,9 +77,9 @@ export class Graph {
 
   /**
    * hasEntity
-   * Gets an Entity, searches the local graph first, then the base graph.
+   * Gets an Entity, searches the local cache first, then the base cache.
    * @param   {string}   entityID - The entityID to lookup
-   * @return  {Entity?}  Entity from either local or base graph, or `undefined` if not found.
+   * @return  {Entity?}  Entity from either local or base cache, or `undefined` if not found.
    */
   hasEntity(entityID) {
     const base = this._base.entities;
@@ -82,10 +90,10 @@ export class Graph {
 
   /**
    * entity
-   * Gets an Entity, searches the local graph first, then the base graph.
+   * Gets an Entity, searches the local cache first, then the base cache.
    * (same as `hasEntity` but throws if not found)
    * @param   {string}  entityID - The entityID to lookup
-   * @return  {Entity}  Entity from either local or base graph
+   * @return  {Entity}  Entity from either local or base cache
    * @throws  Will throw if the entity is not found
    */
   entity(entityID) {
@@ -167,30 +175,6 @@ export class Graph {
     this._local.entities.set(entityID, entity);
     this._updateCaches(current, entity);
     return this;
-
-//    return this.update(function() {
-//      this._local.entities.set(entityID, replacement);
-//      this._updateCaches(current, replacement);
-//    });
-  }
-
-
-  /**
-   * replaceSelf
-   * Replace an Entity in this Graph
-   * @param   {Entity}  entity - The Entity to replace
-   * @return  {Graph}   This same Graph
-   */
-  replaceSelf(entity) {
-    return this.replace(entity);
-//    const entityID = replacement.id;
-//    const current = this.hasEntity(entityID);
-//    if (current === replacement) return this;  // no change
-//
-//    return this.updateSelf(function() {
-//      this._local.entities.set(entityID, replacement);
-//      this._updateCaches(current, replacement);
-//    });
   }
 
 
@@ -208,11 +192,6 @@ export class Graph {
     this._local.entities.set(entityID, undefined);
     this._updateCaches(current, undefined);
     return this;
-
-//    return this.update(function() {
-//      this._local.entities.set(entityID, undefined);
-//      this._updateCaches(current, undefined);
-//    });
   }
 
 
@@ -230,11 +209,6 @@ export class Graph {
     this._local.entities.delete(entityID);
     this._updateCaches(current, original);
     return this;
-
-//    return this.update(function() {
-//      this._local.entities.delete(entityID);
-//      this._updateCaches(current, original);
-//    });
   }
 
 
@@ -247,61 +221,8 @@ export class Graph {
     const prev = this._previous;
     const diff = new Difference(prev, this);
     const ids = [...diff.complete().keys()];
-    this._updateAffected(ids);
+    this._updateGeometries(ids);
     return new Graph(this);
-  }
-
-
-  /**
-   * update
-   * Creates a new Graph, applies the given functions, and returns the new Graph.
-   * Graphs are intended to be immutable.
-   * @param   {...function}  args - Functions to apply to the Graph to update it
-   * @return  {Graph}        A new Graph
-   */
-  update(...args) {
-    if (this._mutate) {
-      return this.updateSelf(...args);
-
-    } else {
-      const graph = new Graph(this);
-      graph._mutate = true;
-
-      for (const fn of args) {
-        fn.call(graph, graph);
-      }
-
-// what changed?
-const diff = new Difference(graph._previous, graph);  // graph._previous === this ?
-const ids = [...diff.complete().keys()];
-graph._updateAffected(ids);
-
-      graph._mutate = false;
-      return graph;
-    }
-  }
-
-
-  /**
-   * updateSelf
-   * Applies the given functions to the Graph, and returns this same Graph.
-   * Like `update` but it modifies the current Graph in-place.
-   * `updateSelf` is slightly more performant for situations where you don't need
-   * immutability and don't mind mutating the Graph.
-   * @param   {...function}  args - Functions to apply to the graph to update it
-   * @return  {Graph}        this same Graph
-   */
-  updateSelf(...args) {
-    const was = this._mutate;
-    this._mutate = true;
-
-    for (const fn of args) {
-      fn.call(this, this);
-    }
-//    this._updateAffected();
-
-    this._mutate = was;
-    return this;
   }
 
 
@@ -321,11 +242,10 @@ graph._updateAffected(ids);
       this._local.entities.set(entityID, replacement);
       this._updateCaches(current, replacement);
     }
-//    this._updateAffected();
 // what changed?
 const diff = new Difference(this._previous, this);
 const ids = [...diff.complete().keys()];
-this._updateAffected(ids);
+this._updateGeometries(ids);
 
     return this;
   }
@@ -379,10 +299,7 @@ this._updateAffected(ids);
       }
 
       graph._updateRebased();
-
-//      // update geometries for new IDs
-//      graph._affectedIDs = new Set(newIDs);
-      graph._updateAffected(newIDs);
+      graph._updateGeometries(newIDs);
     }
   }
 
@@ -403,9 +320,6 @@ this._updateAffected(ids);
 
     const entity = current ?? previous;
     if (!entity) return;   // Either current or previous must be set
-
-    // This entity and any of its parents might need a geometry update.
-//    this._affectedIDs.add(entity.id);
 
     if (entity.type === 'way') {  // Update parentWays
       const prevNodes = new Set(previous?.nodes);
@@ -483,60 +397,17 @@ this._updateAffected(ids);
 
 
   /**
-   * _updateAffected
+   * _updateGeometries
    * Internal function, used to update Entity geometries affected by recent graph changes.
    * This needs to be called after all `_updateCaches` calls have finished.
    */
-  _updateAffected(entityIDs) {
-
+  _updateGeometries(entityIDs) {
     for (const entityID of entityIDs) {
       const entity = this.hasEntity(entityID);
       if (!entity) continue;                  // entity was deleted
       if (entity.type === 'node') continue;   // nodes don't need this
       entity.updateGeometry(this);
     }
-
-//    const toUpdate = new Set();
-//    const seenIDs = new Set();
-//
-//    // Include any affected Entities, and their parent Entities.
-//    for (const affectedID of this._affectedIDs) {
-//      const entity = this.hasEntity(affectedID);
-//      if (!entity) continue;
-//
-//      toUpdate.add(entity);
-//      this._getParents(entity, toUpdate, seenIDs);
-//    }
-//
-//    // Update geometry
-//    for (const entity of toUpdate.values()) {
-//      if (!entity) continue;                  // entity was deleted
-//      if (entity.type === 'node') continue;   // nodes don't need this
-//      entity.updateGeometry(this);
-//    }
-//
-//    this._affectedIDs.clear();
   }
-
-
-//  // borrowed from Tree._includeParents
-//  _getParents(entity, toUpdate, seenIDs) {
-//    const entityID = entity.id;
-//    if (!seenIDs) seenIDs = new Set();
-//
-//    if (seenIDs.has(entityID)) return;
-//    seenIDs.add(entityID);
-//
-//    for (const way of this.parentWays(entity)) {
-//      toUpdate.add(way);
-//      this._getParents(way, toUpdate, seenIDs);
-//    }
-//
-//    for (const relation of this.parentRelations(entity)) {
-//      toUpdate.add(relation);
-//      this._getParents(relation, toUpdate, seenIDs);
-//    }
-//  }
-
 
 }

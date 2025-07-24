@@ -9,7 +9,7 @@ describe('Difference', () => {
   describe('constructor', () => {
     it('constructs a Difference between 2 Graphs', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const head = new Rapid.Graph(base).replace(node);
       const diff = new Rapid.Difference(base, head);
       assert.instanceOf(diff, Rapid.Difference);
@@ -19,7 +19,7 @@ describe('Difference', () => {
 
     it('constructs a create-only Difference if no base', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const head = new Rapid.Graph().replace(node);
+      const head = new Rapid.Graph(context).replace(node);
       const diff = new Rapid.Difference(null, head);
       assert.instanceOf(diff, Rapid.Difference);
       assert.instanceOf(diff.changes, Map);
@@ -27,7 +27,7 @@ describe('Difference', () => {
     });
 
     it('constructs an empty Difference if no head', () => {
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const diff = new Rapid.Difference(base);
       assert.instanceOf(diff, Rapid.Difference);
       assert.instanceOf(diff.changes, Map);
@@ -35,7 +35,7 @@ describe('Difference', () => {
     });
 
     it('constructs an empty Difference if base and head are the same', () => {
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const diff = new Rapid.Difference(base, base);
       assert.instanceOf(diff, Rapid.Difference);
       assert.instanceOf(diff.changes, Map);
@@ -46,7 +46,7 @@ describe('Difference', () => {
   describe('#changes', () => {
     it('includes created entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const head = new Rapid.Graph(base).replace(node);
       const diff = new Rapid.Difference(base, head);
       assert.instanceOf(diff.changes, Map);
@@ -55,7 +55,7 @@ describe('Difference', () => {
 
     it('includes undone created entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const head = new Rapid.Graph(base).replace(node);
       const diff = new Rapid.Difference(head, base);
       assert.instanceOf(diff.changes, Map);
@@ -65,7 +65,7 @@ describe('Difference', () => {
     it('includes modified entities', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const n2 = n1.update({ tags: { yes: 'no' } });
-      const base = new Rapid.Graph([n1]);
+      const base = new Rapid.Graph(context, [n1]);
       const head = new Rapid.Graph(base).replace(n2);
       const diff = new Rapid.Difference(base, head);
       assert.instanceOf(diff.changes, Map);
@@ -75,7 +75,7 @@ describe('Difference', () => {
     it('includes undone modified entities', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const n2 = n1.update({ tags: { yes: 'no' } });
-      const base = new Rapid.Graph([n1]);
+      const base = new Rapid.Graph(context, [n1]);
       const head = new Rapid.Graph(base).replace(n2);
       const diff = new Rapid.Difference(head, base);
       assert.instanceOf(diff.changes, Map);
@@ -85,7 +85,7 @@ describe('Difference', () => {
     it('doesn\'t include updated but identical entities', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const n2 = n1.update();
-      const base = new Rapid.Graph([n1]);
+      const base = new Rapid.Graph(context, [n1]);
       const head = new Rapid.Graph(base).replace(n2);
       const diff = new Rapid.Difference(base, head);
       assert.instanceOf(diff.changes, Map);
@@ -94,7 +94,7 @@ describe('Difference', () => {
 
     it('includes deleted entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const base = new Rapid.Graph([node]);
+      const base = new Rapid.Graph(context, [node]);
       const head = new Rapid.Graph(base).remove(node);
       const diff = new Rapid.Difference(base, head);
       assert.instanceOf(diff.changes, Map);
@@ -103,7 +103,7 @@ describe('Difference', () => {
 
     it('includes undone deleted entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const base = new Rapid.Graph([node]);
+      const base = new Rapid.Graph(context, [node]);
       const head = new Rapid.Graph(base).remove(node);
       const diff = new Rapid.Difference(head, base);
       assert.instanceOf(diff.changes, Map);
@@ -112,7 +112,7 @@ describe('Difference', () => {
 
     it('doesn\'t include created entities that were subsequently deleted', () => {
       const node = new Rapid.OsmNode(context, );
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const head = new Rapid.Graph(base).replace(node).remove(node);
       const diff = new Rapid.Difference(base, head);
       assert.instanceOf(diff.changes, Map);
@@ -121,7 +121,7 @@ describe('Difference', () => {
 
     it('doesn\'t include created entities that were subsequently reverted', () => {
       const node = new Rapid.OsmNode(context, { id: 'n-1' });
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const head = new Rapid.Graph(base).replace(node).revert('n-1');
       const diff = new Rapid.Difference(base, head);
       assert.instanceOf(diff.changes, Map);
@@ -131,7 +131,7 @@ describe('Difference', () => {
     it('doesn\'t include modified entities that were subsequently reverted', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const n2 = n1.update({ tags: { yes: 'no' } });
-      const base = new Rapid.Graph([n1]);
+      const base = new Rapid.Graph(context, [n1]);
       const head = new Rapid.Graph(base).replace(n2).revert('n');
       const diff = new Rapid.Difference(base, head);
       assert.instanceOf(diff.changes, Map);
@@ -140,7 +140,7 @@ describe('Difference', () => {
 
     it('doesn\'t include deleted entities that were subsequently reverted', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const base = new Rapid.Graph([node]);
+      const base = new Rapid.Graph(context, [node]);
       const head = new Rapid.Graph(base).remove(node).revert('n');
       const diff = new Rapid.Difference(base, head);
       assert.instanceOf(diff.changes, Map);
@@ -152,7 +152,7 @@ describe('Difference', () => {
   describe('#created', () => {
     it('returns an array of created entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const head = new Rapid.Graph(base).replace(node);
       const diff = new Rapid.Difference(base, head);
       assert.deepEqual(diff.created(), [node]);
@@ -163,7 +163,7 @@ describe('Difference', () => {
     it('returns an array of modified entities', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const n2 = n1.move([1, 2]);
-      const base = new Rapid.Graph([n1]);
+      const base = new Rapid.Graph(context, [n1]);
       const head = new Rapid.Graph(base).replace(n2);
       const diff = new Rapid.Difference(base, head);
       assert.deepEqual(diff.modified(), [n2]);
@@ -173,7 +173,7 @@ describe('Difference', () => {
   describe('#deleted', () => {
     it('returns an array of deleted entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const base = new Rapid.Graph([node]);
+      const base = new Rapid.Graph(context, [node]);
       const head = new Rapid.Graph(base).remove(node);
       const diff = new Rapid.Difference(base, head);
       assert.deepEqual(diff.deleted(), [node]);
@@ -181,7 +181,7 @@ describe('Difference', () => {
   });
 
   describe('#summary', () => {
-    const base = new Rapid.Graph([
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', tags: { crossing: 'marked' }}),
       new Rapid.OsmNode(context, { id: 'n2' }),
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2']})
@@ -340,7 +340,7 @@ describe('Difference', () => {
 
   describe('#complete', () => {
     it('includes created entities', () => {
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const head = new Rapid.Graph(base).replace(n1);
       const diff = new Rapid.Difference(base, head);
@@ -352,7 +352,7 @@ describe('Difference', () => {
 
     it('includes modified entities', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
-      const base = new Rapid.Graph([n1]);
+      const base = new Rapid.Graph(context, [n1]);
       const n1v2 = n1.move([1, 2]);
       const head = new Rapid.Graph(base).replace(n1v2);
       const diff = new Rapid.Difference(base, head);
@@ -364,7 +364,7 @@ describe('Difference', () => {
 
     it('includes deleted entities', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
-      const base = new Rapid.Graph([n1]);
+      const base = new Rapid.Graph(context, [n1]);
       const head = new Rapid.Graph(base).remove(n1);
       const diff = new Rapid.Difference(base, head);
       const complete = diff.complete();
@@ -377,7 +377,7 @@ describe('Difference', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const n2 = new Rapid.OsmNode(context, { id: 'n2' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1']});
-      const base = new Rapid.Graph([n1, n2, w1]);
+      const base = new Rapid.Graph(context, [n1, n2, w1]);
       const w1v2 = w1.addNode('n2');
       const head = new Rapid.Graph(base).replace(w1v2);
       const diff = new Rapid.Difference(base, head);
@@ -393,7 +393,7 @@ describe('Difference', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const n2 = new Rapid.OsmNode(context, { id: 'n2' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2']});
-      const base = new Rapid.Graph([n1, n2, w1]);
+      const base = new Rapid.Graph(context, [n1, n2, w1]);
       const w1v2 = w1.removeNode('n2');
       const head = new Rapid.Graph(base).replace(w1v2);
       const diff = new Rapid.Difference(base, head);
@@ -413,7 +413,7 @@ describe('Difference', () => {
         tags: { type: 'multipolygon' },
         members: [{ role: 'outer', id: 'w1', type: 'way' }, { role: '', id: 'w2', type: 'way' }]
       });
-      const base = new Rapid.Graph([w1, w2, r1]);
+      const base = new Rapid.Graph(context, [w1, w2, r1]);
       const r1v2 = r1.updateMember({ role: 'inner', id: 'w2', type: 'way' }, 1);
       const head = new Rapid.Graph(base).replace(r1v2);
       const diff = new Rapid.Difference(base, head);
@@ -432,7 +432,7 @@ describe('Difference', () => {
         tags: { type: 'multipolygon' },
         members: [{ role: 'outer', id: 'w1', type: 'way' }, { role: '', id: 'w2', type: 'way' }]
       });
-      const base = new Rapid.Graph([w1, r1]);  // w2 not downloaded
+      const base = new Rapid.Graph(context, [w1, r1]);  // w2 not downloaded
       const r1v2 = r1.updateMember({ role: 'inner', id: 'w2', type: 'way' }, 1);
       const head = new Rapid.Graph(base).replace(r1v2);
       const diff = new Rapid.Difference(base, head);
@@ -446,7 +446,7 @@ describe('Difference', () => {
     it('includes parent ways of modified nodes', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
-      const base = new Rapid.Graph([n1, w1]);
+      const base = new Rapid.Graph(context, [n1, w1]);
       const n1v2 = n1.move([1, 2]);
       const head = new Rapid.Graph(base).replace(n1v2);
       const diff = new Rapid.Difference(base, head);
@@ -460,7 +460,7 @@ describe('Difference', () => {
     it('includes parent relations of modified entities', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1' }] });
-      const base = new Rapid.Graph([n1, r1]);
+      const base = new Rapid.Graph(context, [n1, r1]);
       const n1v2 = n1.move([1, 2]);
       const head = new Rapid.Graph(base).replace(n1v2);
       const diff = new Rapid.Difference(base, head);
@@ -475,7 +475,7 @@ describe('Difference', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1' }] });
       const r2 = new Rapid.OsmRelation(context, { id: 'r2', members: [{ id: 'r1' }] });
-      const base = new Rapid.Graph([n1, r1, r2]);
+      const base = new Rapid.Graph(context, [n1, r1, r2]);
       const n1v2 = n1.move([1, 2]);
       const head = new Rapid.Graph(base).replace(n1v2);
       const diff = new Rapid.Difference(base, head);
@@ -491,7 +491,7 @@ describe('Difference', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'w1' }] });
-      const base = new Rapid.Graph([n1, w1, r1]);
+      const base = new Rapid.Graph(context, [n1, w1, r1]);
       const n1v2 = n1.move([1, 2]);
       const head = new Rapid.Graph(base).replace(n1v2);
       const diff = new Rapid.Difference(base, head);
@@ -507,7 +507,7 @@ describe('Difference', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1' }, { id: 'r2' }] });
       const r2 = new Rapid.OsmRelation(context, { id: 'r2', members: [{ id: 'r1' }] });
-      const base = new Rapid.Graph([n1, r1, r2]);
+      const base = new Rapid.Graph(context, [n1, r1, r2]);
       const n1v2 = n1.move([1, 2]);
       const head = new Rapid.Graph(base).replace(n1v2);
       const diff = new Rapid.Difference(base, head);

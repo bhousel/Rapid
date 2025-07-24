@@ -10,14 +10,14 @@ describe('actionReverse', () => {
     const node1 = new Rapid.OsmNode(context);
     const node2 = new Rapid.OsmNode(context);
     const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id] });
-    const graph = new Rapid.Graph([node1, node2, way]);
+    const graph = new Rapid.Graph(context, [node1, node2, way]);
     const result = Rapid.actionReverse(way.id)(graph);
     assert.deepEqual(result.entity(way.id).nodes, [node2.id, node1.id]);
   });
 
   it('preserves non-directional tags', () => {
     const way = new Rapid.OsmWay(context, { tags: { 'highway': 'residential' } });
-    const graph = new Rapid.Graph([way]);
+    const graph = new Rapid.Graph(context, [way]);
     const result = Rapid.actionReverse(way.id)(graph);
     assert.deepEqual(result.entity(way.id).tags, { 'highway': 'residential' });
   });
@@ -26,77 +26,77 @@ describe('actionReverse', () => {
   describe('reverses directional tags on nodes', () => {
     it('reverses relative directions', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'direction': 'forward' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'direction': 'backward' });
     });
 
     it('reverses relative directions for arbitrary direction tags', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'traffic_sign:direction': 'forward' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'traffic_sign:direction': 'backward' });
     });
 
     it('reverses absolute directions, cardinal compass points', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'direction': 'E' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'direction': 'W' });
     });
 
     it('reverses absolute directions, intercardinal compass points', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'direction': 'SE' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'direction': 'NW' });
     });
 
     it('reverses absolute directions, secondary intercardinal compass points', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'direction': 'NNE' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'direction': 'SSW' });
     });
 
     it('reverses absolute directions, 0 degrees', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'direction': '0' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'direction': '180' });
     });
 
     it('reverses absolute directions, positive degrees', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'direction': '85.5' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'direction': '265.5' });
     });
 
     it('reverses absolute directions, positive degrees > 360', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'direction': '385.5' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'direction': '205.5' });
     });
 
     it('reverses absolute directions, negative degrees', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'direction': '-85.5' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'direction': '94.5' });
     });
 
     it('preserves non-directional tags', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'traffic_sign': 'maxspeed' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'traffic_sign': 'maxspeed' });
     });
 
     it('preserves non-reversible direction tags', () => {
       const node1 = new Rapid.OsmNode(context, { tags: { 'direction': 'both' } });
-      const graph = new Rapid.Graph([node1]);
+      const graph = new Rapid.Graph(context, [node1]);
       const result = Rapid.actionReverse(node1.id)(graph);
       assert.deepEqual(result.entity(node1.id).tags, { 'direction': 'both' });
     });
@@ -106,13 +106,13 @@ describe('actionReverse', () => {
   describe('reverses oneway', () => {
     it('preserves oneway tags', () => {
       const way = new Rapid.OsmWay(context, { tags: { 'oneway': 'yes' } });
-      const graph = new Rapid.Graph([way]);
+      const graph = new Rapid.Graph(context, [way]);
       const result = Rapid.actionReverse(way.id)(graph);
       assert.deepEqual(result.entity(way.id).tags, { 'oneway': 'yes' });
     });
 
     it('reverses oneway tags if reverseOneway: true is provided', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'yes', tags: { oneway: 'yes' } }),
         new Rapid.OsmWay(context, { id: 'no', tags: { oneway: 'no' } }),
         new Rapid.OsmWay(context, { id: '1', tags: { oneway: '1' } }),
@@ -134,7 +134,7 @@ describe('actionReverse', () => {
     });
 
     it('ignores other oneway tags', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'alternating', tags: { oneway: 'alternating' } }),
         new Rapid.OsmWay(context, { id: 'reversible', tags: { oneway: 'reversible' } }),
         new Rapid.OsmWay(context, { id: 'dummy', tags: { oneway: 'dummy' } })
@@ -156,7 +156,7 @@ describe('actionReverse', () => {
   describe('reverses incline', () => {
     it('transforms incline=up ⟺ incline=down', () => {
       const w1 = new Rapid.OsmWay(context, { id: 'w1', tags: { 'incline': 'up' } });
-      const graph = new Rapid.Graph([w1]);
+      const graph = new Rapid.Graph(context, [w1]);
 
       let result = new Rapid.Graph(graph);
       result = Rapid.actionReverse('w1')(result);
@@ -169,7 +169,7 @@ describe('actionReverse', () => {
     it('negates numeric-valued incline tags', () => {
       const w1 = new Rapid.OsmWay(context, { id: 'w1', tags: { 'incline': '5%' } });
       const w2 = new Rapid.OsmWay(context, { id: 'w2', tags: { 'incline': '.8°' } });
-      const graph = new Rapid.Graph([w1, w2]);
+      const graph = new Rapid.Graph(context, [w1, w2]);
 
       let result = new Rapid.Graph(graph);
       result = Rapid.actionReverse('w1')(result);
@@ -187,7 +187,7 @@ describe('actionReverse', () => {
   describe('reverses directional keys on ways', () => {
     it('transforms *:right=* ⟺ *:left=*', () => {
       const way = new Rapid.OsmWay(context, { tags: { 'cycleway:right': 'lane' } });
-      const graph = new Rapid.Graph([way]);
+      const graph = new Rapid.Graph(context, [way]);
 
       let result = new Rapid.Graph(graph);
       result = Rapid.actionReverse(way.id)(result);
@@ -199,7 +199,7 @@ describe('actionReverse', () => {
 
     it('transforms *:right:*=* ⟺ *:left:*=*', () => {
       const way = new Rapid.OsmWay(context, { tags: { 'cycleway:right:surface': 'paved' } });
-      const graph = new Rapid.Graph([way]);
+      const graph = new Rapid.Graph(context, [way]);
 
       let result = new Rapid.Graph(graph);
       result = Rapid.actionReverse(way.id)(result);
@@ -211,7 +211,7 @@ describe('actionReverse', () => {
 
     it('transforms *:forward=* ⟺ *:backward=*', () => {
       const way = new Rapid.OsmWay(context, { tags: { 'maxspeed:forward': '25' } });
-      const graph = new Rapid.Graph([way]);
+      const graph = new Rapid.Graph(context, [way]);
 
       let result = new Rapid.Graph(graph);
       result = Rapid.actionReverse(way.id)(result);
@@ -223,7 +223,7 @@ describe('actionReverse', () => {
 
     it('transforms multiple directional tags', () => {
       const way = new Rapid.OsmWay(context, { tags: { 'maxspeed:forward': '25', 'maxspeed:backward': '30' } });
-      const graph = new Rapid.Graph([way]);
+      const graph = new Rapid.Graph(context, [way]);
 
       let result = new Rapid.Graph(graph);
       result = Rapid.actionReverse(way.id)(result);
@@ -234,7 +234,7 @@ describe('actionReverse', () => {
 
   describe('reverses directional values on ways', () => {
     it('transforms *=up ⟺ *=down', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'inclineU', tags: { incline: 'up' } }),
         new Rapid.OsmWay(context, { id: 'directionU', tags: { direction: 'up' } }),
         new Rapid.OsmWay(context, { id: 'inclineD', tags: { incline: 'down' } }),
@@ -256,7 +256,7 @@ describe('actionReverse', () => {
     });
 
     it('skips *=up ⟺ *=down for ignored tags', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'name', tags: { name: 'up' } }),
         new Rapid.OsmWay(context, { id: 'note', tags: { note: 'up' } }),
         new Rapid.OsmWay(context, { id: 'ref', tags: { ref: 'down' } }),
@@ -278,7 +278,7 @@ describe('actionReverse', () => {
     });
 
     it('transforms *=forward ⟺ *=backward', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'conveyingF', tags: { conveying: 'forward' } }),
         new Rapid.OsmWay(context, { id: 'directionF', tags: { direction: 'forward' } }),
         new Rapid.OsmWay(context, { id: 'priorityF', tags: { priority: 'forward' } }),
@@ -310,7 +310,7 @@ describe('actionReverse', () => {
     });
 
     it('drops "s" from forwards/backwards when reversing', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'conveyingF', tags: { conveying: 'forwards' } }),
         new Rapid.OsmWay(context, { id: 'conveyingB', tags: { conveying: 'backwards' } })
       ]);
@@ -323,7 +323,7 @@ describe('actionReverse', () => {
     });
 
     it('skips *=forward ⟺ *=backward for ignored tags', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'name', tags: { name: 'forward' } }),
         new Rapid.OsmWay(context, { id: 'note', tags: { note: 'forwards' } }),
         new Rapid.OsmWay(context, { id: 'ref', tags: { ref: 'backward' } }),
@@ -342,7 +342,7 @@ describe('actionReverse', () => {
     });
 
     it('transforms *=right ⟺ *=left', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'sidewalkR', tags: { sidewalk: 'right' } }),
         new Rapid.OsmWay(context, { id: 'sidewalkL', tags: { sidewalk: 'left' } })
       ]);
@@ -355,7 +355,7 @@ describe('actionReverse', () => {
     });
 
     it('skips *=right ⟺ *=left for ignored tags', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'name', tags: { name: 'right' } }),
         new Rapid.OsmWay(context, { id: 'note', tags: { note: 'right' } }),
         new Rapid.OsmWay(context, { id: 'ref', tags: { ref: 'left' } }),
@@ -377,7 +377,7 @@ describe('actionReverse', () => {
 
   describe('reverses relation roles', () => {
     it('transforms role=forward ⟺ role=backward in member relations', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'w1', nodes: [], tags: { highway: 'residential' } }),
         new Rapid.OsmRelation(context, { id: 'forward', members: [{ type: 'way', id: 'w1', role: 'forward' }] }),
         new Rapid.OsmRelation(context, { id: 'backward', members: [{ type: 'way', id: 'w1', role: 'backward' }] })
@@ -390,7 +390,7 @@ describe('actionReverse', () => {
     });
 
     it('drops "s" from forwards/backwards when reversing', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'w1', nodes: [], tags: { highway: 'residential' } }),
         new Rapid.OsmRelation(context, { id: 'forwards', members: [{ type: 'way', id: 'w1', role: 'forwards' }] }),
         new Rapid.OsmRelation(context, { id: 'backwards', members: [{ type: 'way', id: 'w1', role: 'backwards' }] })
@@ -403,7 +403,7 @@ describe('actionReverse', () => {
     });
 
     it('doesn\'t transform role=north ⟺ role=south in member relations', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'w1', nodes: [], tags: { highway: 'residential' } }),
         new Rapid.OsmRelation(context, { id: 'north', members: [{ type: 'way', id: 'w1', role: 'north' }] }),
         new Rapid.OsmRelation(context, { id: 'south', members: [{ type: 'way', id: 'w1', role: 'south' }] })
@@ -416,7 +416,7 @@ describe('actionReverse', () => {
     });
 
     it('doesn\'t transform role=east ⟺ role=west in member relations', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'w1', nodes: [], tags: { highway: 'residential' } }),
         new Rapid.OsmRelation(context, { id: 'east', members: [{ type: 'way', id: 'w1', role: 'east' }] }),
         new Rapid.OsmRelation(context, { id: 'west', members: [{ type: 'way', id: 'w1', role: 'west' }] })
@@ -429,7 +429,7 @@ describe('actionReverse', () => {
     });
 
     it('ignores directionless roles in member relations', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'w1', nodes: [], tags: { highway: 'residential' } }),
         new Rapid.OsmRelation(context, { id: 'ignore', members: [{ type: 'way', id: 'w1', role: 'ignore' }] }),
         new Rapid.OsmRelation(context, { id: 'empty', members: [{ type: 'way', id: 'w1', role: '' }] })
@@ -449,7 +449,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'direction': 'forward', 'highway': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags.direction, 'backward');
     });
@@ -459,7 +459,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'direction': 'backward', 'highway': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags.direction, 'forward');
     });
@@ -469,7 +469,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'direction': 'left', 'highway': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags.direction, 'right');
     });
@@ -479,7 +479,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'direction': 'right', 'highway': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags.direction, 'left');
     });
@@ -489,7 +489,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'highway': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.equal(target.tags.direction, undefined);
     });
@@ -499,7 +499,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'direction': 'empty', 'highway': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags.direction, 'empty');
     });
@@ -512,7 +512,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'traffic_sign:forward': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags['traffic_sign:backward'], 'stop');
     });
@@ -522,7 +522,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'traffic_sign:backward': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags['traffic_sign:forward'], 'stop');
     });
@@ -532,7 +532,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'traffic_sign:left': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags['traffic_sign:right'], 'stop');
     });
@@ -542,7 +542,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'traffic_sign:right': 'stop' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags['traffic_sign:left'], 'stop');
     });
@@ -552,7 +552,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'traffic_signals:direction': 'forward', 'highway': 'traffic_signals' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags['traffic_signals:direction'], 'backward');
     });
@@ -562,7 +562,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'traffic_signals:direction': 'backward', 'highway': 'traffic_signals' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags['traffic_signals:direction'], 'forward');
     });
@@ -572,7 +572,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'traffic_signals:direction': 'left', 'highway': 'traffic_signals' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags['traffic_signals:direction'], 'right');
     });
@@ -582,7 +582,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'traffic_signals:direction': 'right', 'highway': 'traffic_signals' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags['traffic_signals:direction'], 'left');
     });
@@ -592,7 +592,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'highway': 'traffic_signals' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.equal(target.tags['traffic_signals:direction'], undefined);
     });
@@ -602,7 +602,7 @@ describe('actionReverse', () => {
       const node2 = new Rapid.OsmNode(context, { tags: { 'traffic_signals:direction': 'empty', 'highway': 'traffic_signals' } });
       const node3 = new Rapid.OsmNode(context);
       const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id, node3.id] });
-      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph([node1, node2, node3, way]));
+      const graph = Rapid.actionReverse(way.id)(new Rapid.Graph(context, [node1, node2, node3, way]));
       const target = graph.entity(node2.id);
       assert.deepEqual(target.tags['traffic_signals:direction'], 'empty');
     });

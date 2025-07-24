@@ -20,7 +20,7 @@ describe('actionDisconnect', () => {
     //          |
     //          d
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -48,7 +48,7 @@ describe('actionDisconnect', () => {
     //             |
     //             d
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -79,7 +79,7 @@ describe('actionDisconnect', () => {
     //            |    |
     //            e -- d
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -109,7 +109,7 @@ describe('actionDisconnect', () => {
     //        |
     //  * --- c
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -136,7 +136,7 @@ describe('actionDisconnect', () => {
     //  |         |
     //  * -- e -- d
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -168,7 +168,7 @@ describe('actionDisconnect', () => {
     //    c         e
     // 2 areas: a-b-c-a  and  *-d-e-*
 
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -202,7 +202,7 @@ describe('actionDisconnect', () => {
     //    c         e
     // 2 areas: b-c-a-b  and  *-d-e-*
 
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -222,7 +222,7 @@ describe('actionDisconnect', () => {
   it('copies location and tags to the new nodes', () => {
     const tags = { highway: 'traffic_signals' };
     const loc = [1, 2];
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b', loc: loc, tags: tags}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -249,7 +249,7 @@ describe('actionDisconnect', () => {
 
   describe('#disabled', () => {
     it('returns \'not_connected\' for a node shared by less than two ways', () => {
-      const graph = new Rapid.Graph([new Rapid.OsmNode(context, {id: 'a'})]);
+      const graph = new Rapid.Graph(context, [new Rapid.OsmNode(context, {id: 'a'})]);
       const disabled = Rapid.actionDisconnect('a').disabled(graph);
       assert.equal(disabled, 'not_connected');
     });
@@ -258,7 +258,7 @@ describe('actionDisconnect', () => {
       //  a --- b
       //  |     |
       //  d --- c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -273,7 +273,7 @@ describe('actionDisconnect', () => {
       //  a --- b
       //  |     |
       //  d --- c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -288,7 +288,7 @@ describe('actionDisconnect', () => {
       //  a --- b --- c
       //        |     |
       //        e --- d
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -304,7 +304,7 @@ describe('actionDisconnect', () => {
       //  a --- b --- c
       //        |
       //        d
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -320,7 +320,7 @@ describe('actionDisconnect', () => {
       //  a --- b === c
       //        |
       //        d
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -337,7 +337,7 @@ describe('actionDisconnect', () => {
     it('returns \'relation\' for a node connecting any two members of the same relation', () => {
       // Covers restriction relations, routes, multipolygons.
       // a --- b === c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -353,7 +353,7 @@ describe('actionDisconnect', () => {
       //  a --- b === c
       //        |
       //        d
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),

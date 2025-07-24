@@ -161,7 +161,7 @@ describe('OsmWay', () => {
       const a = new Rapid.OsmNode(context, { id: 'a' });
       const b = new Rapid.OsmNode(context, { id: 'b' });
       const w = new Rapid.OsmWay(context, { id: 'w', nodes: ['a', 'b'] });
-      const graph = new Rapid.Graph([a, b, w]);
+      const graph = new Rapid.Graph(context, [a, b, w]);
       const copies = {};
       w.copy(graph, copies);
       assert.hasAllKeys(copies, ['a', 'b', 'w']);
@@ -183,7 +183,7 @@ describe('OsmWay', () => {
     it('creates only one copy of shared nodes', () => {
       const a = new Rapid.OsmNode(context, { id: 'a' });
       const w = new Rapid.OsmWay(context, { id: 'w', nodes: ['a', 'a'] });
-      const graph = new Rapid.Graph([a, w]);
+      const graph = new Rapid.Graph(context, [a, w]);
       const copies = {};
       w.copy(graph, copies);
       assert.hasAllKeys(copies, ['a', 'w']);
@@ -250,7 +250,7 @@ describe('OsmWay', () => {
       const node1 = new Rapid.OsmNode(context, { loc: [0, 0] });
       const node2 = new Rapid.OsmNode(context, { loc: [5, 10] });
       let way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id] });
-      const graph = new Rapid.Graph([node1, node2, way]);
+      const graph = new Rapid.Graph(context, [node1, node2, way]);
       const extent = way.extent(graph);
       assert.isOk(extent.equals(new Rapid.sdk.Extent([0, 0], [5, 10])));
     });
@@ -260,7 +260,7 @@ describe('OsmWay', () => {
     it('returns true for a way with a node within the given extent', () => {
       const node = new Rapid.OsmNode(context, {loc: [0, 0]});
       const way = new Rapid.OsmWay(context, {nodes: [node.id]});
-      const graph = new Rapid.Graph([node, way]);
+      const graph = new Rapid.Graph(context, [node, way]);
       const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
       assert.isTrue(result);
     });
@@ -268,7 +268,7 @@ describe('OsmWay', () => {
     it('returns false for way with no nodes within the given extent', () => {
       const node = new Rapid.OsmNode(context, {loc: [6, 6]});
       const way = new Rapid.OsmWay(context, {nodes: [node.id]});
-      const graph = new Rapid.Graph([node, way]);
+      const graph = new Rapid.Graph(context, [node, way]);
       const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
       assert.isFalse(result);
     });
@@ -310,7 +310,7 @@ describe('OsmWay', () => {
       //    |      a
       //    |     /
       //    c -- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0.0003, 0.0000] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.0002, -0.0002] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [-0.0002, -0.0002] }),
@@ -328,7 +328,7 @@ describe('OsmWay', () => {
       //    |  a
       //    |   \
       //    c -- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0.0000, 0.0000] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.0002, -0.0002] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [-0.0002, -0.0002] }),
@@ -346,7 +346,7 @@ describe('OsmWay', () => {
       //    |  a
       //    |   \
       //    c -- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0.0000, 0.0000] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.0002, -0.0002] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [-0.0002, -0.0002] }),
@@ -359,7 +359,7 @@ describe('OsmWay', () => {
 
 
     it('returns null for degenerate ways', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0.0000, 0.0000] }),
         new Rapid.OsmWay(context, { id: 'w', nodes: ['a', 'a'] })
       ]);
@@ -818,14 +818,14 @@ describe('OsmWay', () => {
 
   describe('geometry', () => {
     it('returns \'line\' when the way is not an area', () => {
-      const graph = new Rapid.Graph();
-      let way = new Rapid.OsmWay(context);
+      const graph = new Rapid.Graph(context);
+      const way = new Rapid.OsmWay(context);
       assert.strictEqual(way.geometry(graph), 'line');
     });
 
     it('returns \'area\' when the way is an area', () => {
-      const graph = new Rapid.Graph();
-      let way = new Rapid.OsmWay(context, { tags: { area: 'yes' } });
+      const graph = new Rapid.Graph(context);
+      const way = new Rapid.OsmWay(context, { tags: { area: 'yes' } });
       assert.strictEqual(way.geometry(graph), 'area');
     });
   });
@@ -836,7 +836,7 @@ describe('OsmWay', () => {
       //     a
       //      \
       //  c -- b
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0.0000, 0.0000] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.0002, -0.0002] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [-0.0002, -0.0002] }),
@@ -1339,7 +1339,7 @@ describe('OsmWay', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 2] });
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 4] });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', tags: { highway: 'residential' }, nodes: ['n1', 'n2'] });
-      const graph = new Rapid.Graph([n1, n2, w1]);
+      const graph = new Rapid.Graph(context, [n1, n2, w1]);
       const result = w1.asGeoJSON(graph);
       const expected = {
         type: 'Feature',
@@ -1358,7 +1358,7 @@ describe('OsmWay', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 4] });
       const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [1, 6] });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', tags: { area: 'yes' }, nodes: ['n1', 'n2', 'n3', 'n1'] });
-      const graph = new Rapid.Graph([n1, n2, n3, w1]);
+      const graph = new Rapid.Graph(context, [n1, n2, n3, w1]);
       const result = w1.asGeoJSON(graph);
       const expected = {
         type: 'Feature',
@@ -1377,7 +1377,7 @@ describe('OsmWay', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 4] });
       const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [1, 6] });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', tags: { area: 'yes' }, nodes: ['n1', 'n2', 'n3'] });
-      const graph = new Rapid.Graph([n1, n2, n3, w1]);
+      const graph = new Rapid.Graph(context, [n1, n2, n3, w1]);
       const result = w1.asGeoJSON(graph);
       const expected = {
         type: 'Feature',
@@ -1393,7 +1393,7 @@ describe('OsmWay', () => {
 
     it('handles Feature with missing geometry', () => {
       const w1 = new Rapid.OsmWay(context, { id: 'w1', tags: { highway: 'residential' }, nodes: [] });
-      const graph = new Rapid.Graph([w1]);
+      const graph = new Rapid.Graph(context, [w1]);
       const result = w1.asGeoJSON(graph);
       const expected = {
         type: 'Feature',
@@ -1428,7 +1428,7 @@ describe('OsmWay', () => {
 
   describe('area', () => {
     it('returns a relative measure of area', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-0.0002, 0.0001] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.0002, 0.0001] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0.0002, -0.0001] }),
@@ -1447,7 +1447,7 @@ describe('OsmWay', () => {
     });
 
     it('handles areas wound counterclockwise', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-0.0002, 0.0001] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.0002, 0.0001] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0.0002, -0.0001] }),
@@ -1466,7 +1466,7 @@ describe('OsmWay', () => {
     });
 
     it('treats unclosed areas as if they were closed', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-0.0002, 0.0001] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.0002, 0.0001] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0.0002, -0.0001] }),
@@ -1481,7 +1481,7 @@ describe('OsmWay', () => {
     });
 
     it('returns 0 for degenerate areas', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [-0.0002, 0.0001] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.0002, 0.0001] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0] }),

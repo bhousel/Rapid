@@ -8,7 +8,7 @@ describe.skip('Tree', () => {
 
   describe('#rebase', () => {
     it('adds entities to the tree', () => {
-      const graph = new Rapid.Graph();
+      const graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
 
@@ -20,7 +20,7 @@ describe.skip('Tree', () => {
     });
 
     it('is idempotent', () => {
-      const graph = new Rapid.Graph();
+      const graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const extent = new Rapid.sdk.Extent([0, 0], [2, 2]);
@@ -35,7 +35,7 @@ describe.skip('Tree', () => {
     });
 
     it('does not insert if entity has a modified version', () => {
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const tree = new Rapid.Tree(base);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const n1v1 = n1.update({ loc: [10, 10] });
@@ -54,7 +54,7 @@ describe.skip('Tree', () => {
     });
 
     it('does not error on self-referencing relations', () => {
-      const graph = new Rapid.Graph();
+      const graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       let r1 = new Rapid.OsmRelation(context, { id: 'r1' });
@@ -69,7 +69,7 @@ describe.skip('Tree', () => {
     });
 
     it('adjusts entities that are force-rebased', () => {
-      const graph = new Rapid.Graph();
+      const graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       let n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
 
@@ -87,7 +87,7 @@ describe.skip('Tree', () => {
 
   describe('#intersects', () => {
     it('includes entities within extent, excludes those without', () => {
-      let graph = new Rapid.Graph();
+      let graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 3] });
@@ -98,7 +98,7 @@ describe.skip('Tree', () => {
     });
 
     it('includes intersecting relations after incomplete members are loaded', () => {
-      const graph = new Rapid.Graph();
+      const graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{id: 'n1'}, {id: 'n2'}] });
@@ -116,7 +116,7 @@ describe.skip('Tree', () => {
 
     // This happens when local storage includes a changed way but not its nodes.
     it('includes intersecting ways after missing nodes are loaded', () => {
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const tree = new Rapid.Tree(base);
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
       const graph = base.replace(w1);
@@ -131,7 +131,7 @@ describe.skip('Tree', () => {
     });
 
     it('adjusts parent ways when a member node is moved', () => {
-      let graph = new Rapid.Graph();
+      let graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
@@ -145,7 +145,7 @@ describe.skip('Tree', () => {
     });
 
     it('adjusts parent relations when a member node is moved', () => {
-      let graph = new Rapid.Graph();
+      let graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ type: 'node', id: 'n1' }] });
@@ -159,7 +159,7 @@ describe.skip('Tree', () => {
     });
 
     it('adjusts parent relations of parent ways when a member node is moved', () => {
-      let graph = new Rapid.Graph();
+      let graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const w1 = new Rapid.OsmWay(context, { id: 'w', nodes: ['n1'] });
@@ -174,7 +174,7 @@ describe.skip('Tree', () => {
     });
 
     it('adjusts parent ways when a member node is removed', () => {
-      let graph = new Rapid.Graph();
+      let graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 3] });
@@ -190,7 +190,7 @@ describe.skip('Tree', () => {
 
     it('don\'t include parent way multiple times when multiple child nodes are moved', () => {
       // checks against the following regression: https://github.com/openstreetmap/iD/issues/1978
-      let graph = new Rapid.Graph();
+      let graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [3, 3] });
@@ -208,7 +208,7 @@ describe.skip('Tree', () => {
     });
 
     it('doesn\'t include removed entities', () => {
-      let graph = new Rapid.Graph();
+      let graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const extent = new Rapid.sdk.Extent([0, 0], [2, 2]);
@@ -221,7 +221,7 @@ describe.skip('Tree', () => {
     });
 
     it('doesn\'t include removed entities after rebase', () => {
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const tree = new Rapid.Tree(base);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const extent = new Rapid.sdk.Extent([0, 0], [2, 2]);
@@ -235,7 +235,7 @@ describe.skip('Tree', () => {
     });
 
     it('handles recursive relations', () => {
-      const base = new Rapid.Graph();
+      const base = new Rapid.Graph(context);
       const tree = new Rapid.Tree(base);
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{id: 'n1'}] });

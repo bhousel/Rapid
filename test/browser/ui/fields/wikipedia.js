@@ -46,7 +46,7 @@ describe('uiFieldWikipedia', () => {
 
   beforeEach(() => {
     entity = new Rapid.OsmNode(context, { id: 'n-1', tags: {} });
-    graph = new Rapid.Graph([entity]);
+    graph = new Rapid.Graph(context, [entity]);
 
     selection = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, 'wikipedia', {

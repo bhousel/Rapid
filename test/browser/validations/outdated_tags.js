@@ -30,14 +30,14 @@ describe('validationOutdatedTags', () => {
 
   it('has no errors on good tags', () => {
     const w = new Rapid.OsmWay(context, { tags: { highway: 'unclassified' }});
-    const g = new Rapid.Graph([w]);
+    const g = new Rapid.Graph(context, [w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(0);
   });
 
   it('flags deprecated tag with replacement', () => {
     const w = new Rapid.OsmWay(context, { tags: { highway: 'ford' }});
-    const g = new Rapid.Graph([w]);
+    const g = new Rapid.Graph(context, [w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -50,7 +50,7 @@ describe('validationOutdatedTags', () => {
 
   it('flags deprecated tag with no replacement', () => {
     const w = new Rapid.OsmWay(context, { tags: { highway: 'no' }});
-    const g = new Rapid.Graph([w]);
+    const g = new Rapid.Graph(context, [w]);
     const issues = validator(w, g);
     expect(issues).to.have.lengthOf(1);
     const issue = issues[0];
@@ -67,7 +67,7 @@ describe('validationOutdatedTags', () => {
       tags: { building: 'yes', type: 'multipolygon' },
       members: [{ id: w.id, role: 'outer' }]
     });
-    const g = new Rapid.Graph([w, r]);
+    const g = new Rapid.Graph(context, [w, r]);
     const wIssues = validator(w, g);
     const rIssues = validator(r, g);
     expect(wIssues).to.have.lengthOf(0);
@@ -80,7 +80,7 @@ describe('validationOutdatedTags', () => {
       tags: { type: 'multipolygon' },
       members: [{ id: w.id, role: 'outer' }]
     });
-    const g = new Rapid.Graph([w, r]);
+    const g = new Rapid.Graph(context, [w, r]);
     const wIssues = validator(w, g);
     const rIssues = validator(r, g);
     expect(rIssues).to.have.lengthOf(0);

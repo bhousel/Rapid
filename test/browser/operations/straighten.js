@@ -15,12 +15,17 @@ describe('operationStraighten', () => {
   class MockContext {
     constructor() {
       this.viewport = new Rapid.sdk.Viewport();
+      this.sequences = {};
       this.systems = {
         editor:  new MockEditSystem(),
         l10n:    new MockLocalizationSystem()
       };
     }
     hasHiddenConnections()  { return false; }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
+    }
   }
 
   const context = new MockContext();
@@ -34,7 +39,7 @@ describe('operationStraighten', () => {
       // w3 - way with 3 nodes connected to w2
       // w4 - way with 3 nodes connected to w3
       // w5 - way with 4 nodes not connected to any other nodes
-      _graph = new Rapid.Graph([
+      _graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'n1' }),
         new Rapid.OsmNode(context, { id: 'n2' }),
         new Rapid.OsmNode(context, { id: 'n2-1' }),

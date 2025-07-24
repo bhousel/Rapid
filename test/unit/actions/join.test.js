@@ -9,7 +9,7 @@ describe('actionJoin', () => {
   describe('#disabled', () => {
     it('returns falsy for ways that share an end/start node', () => {
       // a --> b ==> c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -23,7 +23,7 @@ describe('actionJoin', () => {
 
     it('returns falsy for ways that share a start/end node', () => {
       // a <-- b <== c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -37,7 +37,7 @@ describe('actionJoin', () => {
 
     it('returns falsy for ways that share a start/start node', () => {
       // a <-- b ==> c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -51,7 +51,7 @@ describe('actionJoin', () => {
 
     it('returns falsy for ways that share an end/end node', () => {
       // a --> b <== c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -65,7 +65,7 @@ describe('actionJoin', () => {
 
     it('returns falsy for more than two ways when connected, regardless of order', () => {
       // a --> b ==> c ~~> d
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -84,7 +84,7 @@ describe('actionJoin', () => {
     });
 
     it('returns \'not_eligible\' for non-line geometries', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]})
       ]);
 
@@ -96,7 +96,7 @@ describe('actionJoin', () => {
       // a -- b -- c
       //      |
       //      d
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -115,7 +115,7 @@ describe('actionJoin', () => {
         // from: -
         // to: =
         // via: b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
           new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
           new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -139,7 +139,7 @@ describe('actionJoin', () => {
         // from: -
         // to: |
         // via: b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
           new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
           new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -165,7 +165,7 @@ describe('actionJoin', () => {
         // from: -
         // to: |
         // via: a
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
           new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
           new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -193,7 +193,7 @@ describe('actionJoin', () => {
         // from: |
         // to: \
         // via: b
-        const graph = new Rapid.Graph([
+        const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
           new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
           new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -219,7 +219,7 @@ describe('actionJoin', () => {
       // a --> b ==> c
       // members: -
       // not member: =
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -240,7 +240,7 @@ describe('actionJoin', () => {
       //       d
       // members: -, =
       // not member: |
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -262,7 +262,7 @@ describe('actionJoin', () => {
       // a --> b ==> c
       // both '-' and '=' are members of r1, r2
       // r1, r2 are not restriction or connectivity relations
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -292,7 +292,7 @@ describe('actionJoin', () => {
       // a --> b ==> c
       // both '-' and '=' are members of r1, r2
       // r1, r2 are not restriction or connectivity relations
-      let graph = new Rapid.Graph([
+      let graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -326,7 +326,7 @@ describe('actionJoin', () => {
       //   |  /
       //   | /
       //   c
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0,10]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [5,5]}),
@@ -340,7 +340,7 @@ describe('actionJoin', () => {
     });
 
     it('returns \'conflicting_tags\' for two entities that have conflicting tags', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -353,7 +353,7 @@ describe('actionJoin', () => {
     });
 
     it('takes tag reversals into account when calculating conflicts', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -366,7 +366,7 @@ describe('actionJoin', () => {
     });
 
     it('returns falsy for exceptions to tag conflicts: missing tag', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -379,7 +379,7 @@ describe('actionJoin', () => {
     });
 
     it('returns falsy for exceptions to tag conflicts: uninteresting tag', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -396,7 +396,7 @@ describe('actionJoin', () => {
   it('joins a --> b ==> c', () => {
     // Expected result:
     // a --> b --> c
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -413,7 +413,7 @@ describe('actionJoin', () => {
   it('joins a <-- b <== c', () => {
     // Expected result:
     // a <-- b <-- c
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -430,7 +430,7 @@ describe('actionJoin', () => {
   it('joins a <-- b ==> c', () => {
     // Expected result:
     // a --> b --> c
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -449,7 +449,7 @@ describe('actionJoin', () => {
     // Expected result:
     // a --> b --> c
     // tags on === reversed
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -468,7 +468,7 @@ describe('actionJoin', () => {
     // Expected result:
     // a --> b --> c --> d --> e
     // tags on === reversed
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -494,7 +494,7 @@ describe('actionJoin', () => {
     // --- is new, === is existing, +++ is new
     // Expected result:
     // a ==> b ==> c ==> d
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -516,7 +516,7 @@ describe('actionJoin', () => {
     // ==> is existing, ++> is existing, --> is new
     // Expected result:
     // n1 ==> n2 ==> n3 ==> n4
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [0,0] }),
       new Rapid.OsmNode(context, { id: 'n2', loc: [2,0] }),
       new Rapid.OsmNode(context, { id: 'n3', loc: [4,0] }),
@@ -535,7 +535,7 @@ describe('actionJoin', () => {
   });
 
   it('merges tags', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -561,7 +561,7 @@ describe('actionJoin', () => {
     // a -----> b -----> c
     //   v v v    v v v
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -584,7 +584,7 @@ describe('actionJoin', () => {
     // a =====> b =====> c
     //   v v v    v v v
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -607,7 +607,7 @@ describe('actionJoin', () => {
     // a -----> b -----> c
     //   v v v    v v v
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -630,7 +630,7 @@ describe('actionJoin', () => {
     // a <===== b <===== c
     //    v v v    v v v
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -647,7 +647,7 @@ describe('actionJoin', () => {
 
 
   it('merges relations', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [2,0]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [4,0]}),
@@ -678,7 +678,7 @@ describe('actionJoin', () => {
     //    a ---> b ---> c ~~~~> d
     //    Relation: ['-', '~', '~', '-']
     //
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
@@ -722,7 +722,7 @@ describe('actionJoin', () => {
     // |#####|
     // |#####|
     // d <-- c
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [0,2]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [2,2]}),
@@ -757,7 +757,7 @@ describe('actionJoin', () => {
     // |# r #|
     // |#####|
     // d <-- c
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', loc: [0,0]}),
       new Rapid.OsmNode(context, {id: 'b', loc: [0,2]}),
       new Rapid.OsmNode(context, {id: 'c', loc: [2,2]}),

@@ -9,7 +9,7 @@ describe('actionRevert', () => {
   describe('basic', () => {
     it('removes a new entity', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n-1' });
-      const graph = new Rapid.Graph().replace(n1);
+      const graph = new Rapid.Graph(context).replace(n1);
       const result = Rapid.actionRevert('n-1')(graph);
       assert.ok(result instanceof Rapid.Graph);
       assert.equal(result.hasEntity('n-1'), undefined, 'n-1 removed');
@@ -18,7 +18,7 @@ describe('actionRevert', () => {
     it('reverts an updated entity', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const n1up = n1.update({});
-      const graph = new Rapid.Graph([n1]).replace(n1up);
+      const graph = new Rapid.Graph(context, [n1]).replace(n1up);
       const result = Rapid.actionRevert('n1')(graph);
       assert.ok(result instanceof Rapid.Graph);
       assert.equal(result.hasEntity('n1'), n1, 'n1 reverted');
@@ -26,7 +26,7 @@ describe('actionRevert', () => {
 
     it('restores a deleted entity', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
-      const graph = new Rapid.Graph([n1]).remove(n1);
+      const graph = new Rapid.Graph(context, [n1]).remove(n1);
       const result = Rapid.actionRevert('n1')(graph);
       assert.ok(result instanceof Rapid.Graph);
       assert.equal(result.hasEntity('n1'), n1);
@@ -41,7 +41,7 @@ describe('actionRevert', () => {
       const n3 = new Rapid.OsmNode(context, { id: 'n-3' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
       const w1up = w1.addNode('n-3', 2);
-      const graph = new Rapid.Graph([n1, n2, w1]).replace(n3).replace(w1up);
+      const graph = new Rapid.Graph(context, [n1, n2, w1]).replace(n3).replace(w1up);
       const result = Rapid.actionRevert('n-3')(graph);
       assert.ok(result instanceof Rapid.Graph);
 
@@ -60,7 +60,7 @@ describe('actionRevert', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n2' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
       const n1up = n1.update({});
-      const graph = new Rapid.Graph([n1, n2, w1]).replace(n1up);
+      const graph = new Rapid.Graph(context, [n1, n2, w1]).replace(n1up);
       const result = Rapid.actionRevert('n1')(graph);
       assert.ok(result instanceof Rapid.Graph);
 
@@ -79,7 +79,7 @@ describe('actionRevert', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n-2' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1' }] });
       const r1up = r1.addMember({ id: 'n-2' }, 1);
-      const graph = new Rapid.Graph([n1, r1]).replace(n2).replace(r1up);
+      const graph = new Rapid.Graph(context, [n1, r1]).replace(n2).replace(r1up);
       const result = Rapid.actionRevert('n-2')(graph);
       assert.ok(result instanceof Rapid.Graph);
 
@@ -96,7 +96,7 @@ describe('actionRevert', () => {
         n2 = new Rapid.OsmNode(context, { id: 'n2' }),
         r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1' }, { id: 'n2' }] }),
         n1up = n1.update({}),
-        graph = new Rapid.Graph([n1, n2, r1]).replace(n1up);
+        graph = new Rapid.Graph(context, [n1, n2, r1]).replace(n1up);
 
       const result = Rapid.actionRevert('n1')(graph);
       assert.ok(result instanceof Rapid.Graph);
@@ -115,7 +115,7 @@ describe('actionRevert', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const n2 = new Rapid.OsmNode(context, { id: 'n-2' });
       const w1 = new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n1', 'n-2'] });
-      const graph = new Rapid.Graph([n1]).replace(n2).replace(w1);
+      const graph = new Rapid.Graph(context, [n1]).replace(n2).replace(w1);
 
       const result = Rapid.actionRevert('w-1')(graph);
       assert.ok(result instanceof Rapid.Graph);
@@ -132,7 +132,7 @@ describe('actionRevert', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n-2' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
       const w1up = w1.addNode('n-2', 1);
-      const graph = new Rapid.Graph([n1, w1]).replace(n2).replace(w1up);
+      const graph = new Rapid.Graph(context, [n1, w1]).replace(n2).replace(w1up);
 
       const result = Rapid.actionRevert('w1')(graph);
       assert.ok(result instanceof Rapid.Graph);
@@ -149,7 +149,7 @@ describe('actionRevert', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n-2' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
       const w1up = w1.addNode('n-2', 1);
-      const graph = new Rapid.Graph([n1, w1]).replace(n2).replace(w1up).remove(w1up);
+      const graph = new Rapid.Graph(context, [n1, w1]).replace(n2).replace(w1up).remove(w1up);
 
       const result = Rapid.actionRevert('w1')(graph);
       assert.ok(result instanceof Rapid.Graph);
@@ -166,7 +166,7 @@ describe('actionRevert', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const n2 = new Rapid.OsmNode(context, { id: 'n-2' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r-1', members: [{ id: 'n1' }, { id: 'n-2' }] });
-      const graph = new Rapid.Graph([n1]).replace(n2).replace(r1);
+      const graph = new Rapid.Graph(context, [n1]).replace(n2).replace(r1);
 
       const result = Rapid.actionRevert('r-1')(graph);
       assert.ok(result instanceof Rapid.Graph);
@@ -183,7 +183,7 @@ describe('actionRevert', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n-2' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1' }] });
       const r1up = r1.addMember({ id: 'n-2' }, 1);
-      const graph = new Rapid.Graph([n1, r1]).replace(n2).replace(r1up);
+      const graph = new Rapid.Graph(context, [n1, r1]).replace(n2).replace(r1up);
 
       const result = Rapid.actionRevert('r1')(graph);
       assert.ok(result instanceof Rapid.Graph);
@@ -200,7 +200,7 @@ describe('actionRevert', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n-2' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1' }] });
       const r1up = r1.addMember({ id: 'n-2' }, 1);
-      const graph = new Rapid.Graph([n1, r1]).replace(n2).replace(r1up).remove(r1up);
+      const graph = new Rapid.Graph(context, [n1, r1]).replace(n2).replace(r1up).remove(r1up);
 
       const result = Rapid.actionRevert('r1')(graph);
       assert.ok(result instanceof Rapid.Graph);

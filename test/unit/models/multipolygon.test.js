@@ -10,55 +10,55 @@ describe('multipolygons', () => {
     it('returns the parent relation of a simple multipolygon outer', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
-      const graph = new Rapid.Graph([outer, relation]);
+      const graph = new Rapid.Graph(context, [outer, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), relation);
     });
 
     it('returns the parent relation of a simple multipolygon outer, assuming role outer if unspecified', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer.id }] });
-      const graph = new Rapid.Graph([outer, relation]);
+      const graph = new Rapid.Graph(context, [outer, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), relation);
     });
 
     it('returns false if entity is not a way', () => {
       const outer = new Rapid.OsmNode(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
-      const graph = new Rapid.Graph([outer, relation]);
+      const graph = new Rapid.Graph(context, [outer, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
     });
 
     it('returns false if entity does not have interesting tags', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'tiger:reviewed': 'no' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
-      const graph = new Rapid.Graph([outer, relation]);
+      const graph = new Rapid.Graph(context, [outer, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
     });
 
     it('returns false if entity does not have a parent relation', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
-      const graph = new Rapid.Graph([outer]);
+      const graph = new Rapid.Graph(context, [outer]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
     });
 
     it('returns false if the parent is not a multipolygon', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'route' }, members: [{ id: outer.id, role: 'outer' }] });
-      const graph = new Rapid.Graph([outer, relation]);
+      const graph = new Rapid.Graph(context, [outer, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
     });
 
     it('returns false if the parent has interesting tags', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { natural: 'wood', type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
-      const graph = new Rapid.Graph([outer, relation]);
+      const graph = new Rapid.Graph(context, [outer, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
     });
 
     it('returns the parent relation of a simple multipolygon outer, ignoring uninteresting parent tags', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { 'tiger:reviewed': 'no', type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
-      const graph = new Rapid.Graph([outer, relation]);
+      const graph = new Rapid.Graph(context, [outer, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), relation);
     });
 
@@ -66,7 +66,7 @@ describe('multipolygons', () => {
       const outer1 = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const outer2 = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer1.id, role: 'outer' }, { id: outer2.id, role: 'outer' }] });
-      const graph = new Rapid.Graph([outer1, outer2, relation]);
+      const graph = new Rapid.Graph(context, [outer1, outer2, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer1, graph), false);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer2, graph), false);
     });
@@ -75,7 +75,7 @@ describe('multipolygons', () => {
       const outer1 = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const outer2 = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer1.id }, { id: outer2.id }] });
-      const graph = new Rapid.Graph([outer1, outer2, relation]);
+      const graph = new Rapid.Graph(context, [outer1, outer2, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer1, graph), false);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer2, graph), false);
     });
@@ -83,7 +83,7 @@ describe('multipolygons', () => {
     it('returns false if the entity is not an outer', () => {
       const inner = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: inner.id, role: 'inner' }] });
-      const graph = new Rapid.Graph([inner, relation]);
+      const graph = new Rapid.Graph(context, [inner, relation]);
       assert.equal(Rapid.osmIsOldMultipolygonOuterMember(inner, graph), false);
     });
   });
@@ -100,7 +100,7 @@ describe('multipolygons', () => {
           { id: inner.id, role: 'inner' }
         ]
       });
-      const graph = new Rapid.Graph([inner, outer, relation]);
+      const graph = new Rapid.Graph(context, [inner, outer, relation]);
 
       assert.equal(Rapid.osmOldMultipolygonOuterMember(inner, graph), outer);
       assert.equal(Rapid.osmOldMultipolygonOuterMember(outer, graph), outer);
@@ -118,7 +118,7 @@ describe('multipolygons', () => {
           { id: inner.id, role: 'inner' }
         ]
       });
-      const graph = new Rapid.Graph([inner, outer1, outer2, relation]);
+      const graph = new Rapid.Graph(context, [inner, outer1, outer2, relation]);
 
       assert.ok(!Rapid.osmOldMultipolygonOuterMember(inner, graph));
       assert.ok(!Rapid.osmOldMultipolygonOuterMember(outer1, graph));
@@ -135,7 +135,7 @@ describe('multipolygons', () => {
           { id: 'w', role: 'inner' }
         ]
       });
-      const graph = new Rapid.Graph([way, relation]);
+      const graph = new Rapid.Graph(context, [way, relation]);
       assert.ok(!Rapid.osmOldMultipolygonOuterMember(way, graph));
     });
   });
@@ -150,7 +150,7 @@ describe('multipolygons', () => {
       const node = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
       const way = new Rapid.OsmWay(context, { id: '-', nodes: ['a'] });
       const member = { id: '-', type: 'way' };
-      const graph = new Rapid.Graph([node, way]);
+      const graph = new Rapid.Graph(context, [node, way]);
       const result = Rapid.osmJoinWays([member], graph);
 
       assert.ok(result instanceof Array);
@@ -172,7 +172,7 @@ describe('multipolygons', () => {
       const c = new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] });
       const w1 = new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] });
       const w2 = new Rapid.OsmWay(context, { id: '=', nodes: ['b', 'c'] });
-      const graph = new Rapid.Graph([a, b, c, w1, w2]);
+      const graph = new Rapid.Graph(context, [a, b, c, w1, w2]);
       const result = Rapid.osmJoinWays([w1, w2], graph);
 
       assert.ok(result instanceof Array);
@@ -195,7 +195,7 @@ describe('multipolygons', () => {
       const c = new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] });
       const w1 = new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] });
       const w2 = new Rapid.OsmWay(context, { id: '=', nodes: ['b', 'c'] });
-      const graph = new Rapid.Graph([a, b, c, w1, w2]);
+      const graph = new Rapid.Graph(context, [a, b, c, w1, w2]);
       const result = Rapid.osmJoinWays([w2, w1], graph);
 
       assert.ok(result instanceof Array);
@@ -226,7 +226,7 @@ describe('multipolygons', () => {
           { id: '=', type: 'way' }
         ]
       });
-      const graph = new Rapid.Graph([a, b, c, w1, w2, r]);
+      const graph = new Rapid.Graph(context, [a, b, c, w1, w2, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
       assert.ok(result instanceof Array);
@@ -257,7 +257,7 @@ describe('multipolygons', () => {
           { id: '-', type: 'way' }
         ]
       });
-      const graph = new Rapid.Graph([a, b, c, w1, w2, r]);
+      const graph = new Rapid.Graph(context, [a, b, c, w1, w2, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
       assert.ok(result instanceof Array);
@@ -293,7 +293,7 @@ describe('multipolygons', () => {
           { id: '=', type: 'way' }
         ]
       });
-      const graph = new Rapid.Graph([a, b, c, d, w1, w2, w3, r]);
+      const graph = new Rapid.Graph(context, [a, b, c, d, w1, w2, w3, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
       assert.ok(result instanceof Array);
@@ -322,7 +322,7 @@ describe('multipolygons', () => {
       const c = new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] });
       const w1 = new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] });
       const w2 = new Rapid.OsmWay(context, { id: '=', nodes: ['c', 'b'], tags: { 'oneway': 'yes', 'lanes:forward': 2 } });
-      const graph = new Rapid.Graph([a, b, c, w1, w2]);
+      const graph = new Rapid.Graph(context, [a, b, c, w1, w2]);
       const result = Rapid.osmJoinWays([w1, w2], graph);
 
       assert.ok(result instanceof Array);
@@ -362,7 +362,7 @@ describe('multipolygons', () => {
           { id: '=', type: 'way' }
         ]
       });
-      const graph = new Rapid.Graph([a, b, c, w1, w2, r]);
+      const graph = new Rapid.Graph(context, [a, b, c, w1, w2, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
       assert.ok(result instanceof Array);
@@ -381,7 +381,7 @@ describe('multipolygons', () => {
     it('ignores non-way members', () => {
       const node = new Rapid.OsmNode(context, { loc: [0, 0] });
       const member = { id: 'n', type: 'node' };
-      const graph = new Rapid.Graph([node]);
+      const graph = new Rapid.Graph(context, [node]);
       const result = Rapid.osmJoinWays([member], graph);
       assert.ok(result instanceof Array);
       assert.equal(result.length, 0);
@@ -389,7 +389,7 @@ describe('multipolygons', () => {
 
     it('ignores incomplete members', () => {
       const member = { id: 'w', type: 'way' };
-      const graph = new Rapid.Graph();
+      const graph = new Rapid.Graph(context);
       const result = Rapid.osmJoinWays([member], graph);
       assert.ok(result instanceof Array);
       assert.equal(result.length, 0);
@@ -411,7 +411,7 @@ describe('multipolygons', () => {
       const w2 = new Rapid.OsmWay(context, { id: '\\', nodes: ['b', 'c'] });
       const w3 = new Rapid.OsmWay(context, { id: '-', nodes: ['d', 'e'] });
       const w4 = new Rapid.OsmWay(context, { id: '=', nodes: ['e', 'f'] });
-      const graph = new Rapid.Graph([a, b, c, d, e, f, w1, w2, w3, w4]);
+      const graph = new Rapid.Graph(context, [a, b, c, d, e, f, w1, w2, w3, w4]);
       const result = Rapid.osmJoinWays([w1, w2, w3, w4], graph);
 
       assert.ok(result instanceof Array);
@@ -458,7 +458,7 @@ describe('multipolygons', () => {
           { id: '=', type: 'way' }
         ]
       });
-      const graph = new Rapid.Graph([a, b, c, d, e, f, w1, w2, w3, w4, r]);
+      const graph = new Rapid.Graph(context, [a, b, c, d, e, f, w1, w2, w3, w4, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
       assert.ok(result instanceof Array);
@@ -508,7 +508,7 @@ describe('multipolygons', () => {
           { id: '=', type: 'way' }
         ]
       });
-      const graph = new Rapid.Graph([a, b, c, d, e, w1, w2, w3, w4, w5, r]);
+      const graph = new Rapid.Graph(context, [a, b, c, d, e, w1, w2, w3, w4, w5, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
       assert.ok(result instanceof Array);

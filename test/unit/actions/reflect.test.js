@@ -16,7 +16,7 @@ describe('actionReflect', () => {
   };
 
   it('does not create or remove nodes', () => {
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -34,7 +34,7 @@ describe('actionReflect', () => {
     //    d -- c      a ---- b
     //   /     |  ->   \     |
     //  a ---- b        d -- c
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -65,7 +65,7 @@ describe('actionReflect', () => {
     //    d -- c      c -- d
     //   /     |  ->  |     \
     //  a ---- b      b ---- a
-    const graph = new Rapid.Graph([
+    const graph = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -99,7 +99,7 @@ describe('actionReflect', () => {
 
 
     it('reflect long at t = 0', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -127,7 +127,7 @@ describe('actionReflect', () => {
 
 
     it('reflect long at t = 0.5', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -154,7 +154,7 @@ describe('actionReflect', () => {
 
 
     it('reflect long at t = 1', () => {
-      const graph = new Rapid.Graph([
+      const graph = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),

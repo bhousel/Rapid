@@ -3,7 +3,7 @@ import { utilArrayChunk, utilArrayGroupBy } from '@rapid-sdk/util';
 import RBush from 'rbush';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { Difference } from './lib/Difference.js';
+import { Difference } from '../models/Difference.js';
 import * as Validations from '../validations/index.js';
 
 const RETRY = 5000;    // wait 5 sec before revalidating provisional entities

@@ -426,13 +426,13 @@ describe('OsmEntity', () => {
     it('returns true for an OsmEntity that is a relation member', () => {
       const node = new Rapid.OsmNode(context);
       const relation = new Rapid.OsmRelation(context, {members: [{id: node.id}]});
-      const graph = new Rapid.Graph([node, relation]);
+      const graph = new Rapid.Graph(context, [node, relation]);
       assert.isTrue(node.hasParentRelations(graph));
     });
 
     it('returns false for an OsmEntity that is not a relation member', () => {
       const node = new Rapid.OsmNode(context);
-      const graph = new Rapid.Graph([node]);
+      const graph = new Rapid.Graph(context, [node]);
       assert.isFalse(node.hasParentRelations(graph));
     });
   });

@@ -33,8 +33,8 @@ describe('validationAlmostJunction', () => {
   const validator = Rapid.validationAlmostJunction(context);
 
   beforeEach(() => {
-    graph = new Rapid.Graph();     // reset
-    tree = new Rapid.Tree(graph);  // reset
+    graph = new Rapid.Graph(context);  // reset
+    tree = new Rapid.Tree(graph);      // reset
   });
 
 
@@ -67,7 +67,7 @@ describe('validationAlmostJunction', () => {
     const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -85,7 +85,7 @@ describe('validationAlmostJunction', () => {
     const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -103,7 +103,7 @@ describe('validationAlmostJunction', () => {
     const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -121,7 +121,7 @@ describe('validationAlmostJunction', () => {
     const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -138,7 +138,7 @@ describe('validationAlmostJunction', () => {
     const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -156,7 +156,7 @@ describe('validationAlmostJunction', () => {
     const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'path' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -174,7 +174,7 @@ describe('validationAlmostJunction', () => {
     const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-3', 'n-4'], tags: { highway: 'path' }});
 
     const entities = [n1, n2, n3, n4, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -190,7 +190,7 @@ describe('validationAlmostJunction', () => {
     const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2', 'n-3', 'n-4', 'n-5'], tags: { highway: 'path' }});
 
     const entities = [n1, n2, n3, n4, n5, w1];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }
@@ -210,7 +210,7 @@ describe('validationAlmostJunction', () => {
     const w2 = new Rapid.OsmWay(context, {id: 'w-2', nodes: ['n-5', 'n-6'], tags: { highway: 'path' }});
 
     const entities = [n1, n2, n3, n4, n5, n6, w1, w2];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
     tree = new Rapid.Tree(graph);
     tree.rebase(entities, true);
   }

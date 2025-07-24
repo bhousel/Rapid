@@ -23,8 +23,8 @@ describe('validationMismatchedGeometry', () => {
 
   class MockContext {
     constructor() {
-      this.sequences = {};
       this.viewport = new Rapid.sdk.Viewport();
+      this.sequences = {};
       this.systems = {
         assets:     new Rapid.AssetSystem(this),
         l10n:       new MockLocalizationSystem(),
@@ -50,7 +50,7 @@ describe('validationMismatchedGeometry', () => {
   });
 
   beforeEach(() => {
-    graph = new Rapid.Graph();     // reset
+    graph = new Rapid.Graph(context);   // reset
     _savedAreaKeys = Rapid.osmAreaKeys;
 
     const testPresets = {
@@ -96,7 +96,7 @@ describe('validationMismatchedGeometry', () => {
   function createPoint(n1tags = {}) {
     const n1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0], tags: n1tags });
     const entities = [n1];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
   }
 
 
@@ -111,7 +111,7 @@ describe('validationMismatchedGeometry', () => {
     const n3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [2, 0] });
     const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2', 'n-3'], tags: w1tags });
     const entities = [n1, n2, n3, w1];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
   }
 
 
@@ -126,7 +126,7 @@ describe('validationMismatchedGeometry', () => {
     const n3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [2, 0] });
     const w1 = new Rapid.OsmWay(context, {id: 'w-1', nodes: ['n-1', 'n-2', 'n-3', 'n-1'], tags: w1tags });
     const entities = [n1, n2, n3, w1];
-    graph = new Rapid.Graph(entities);
+    graph = new Rapid.Graph(context, entities);
   }
 
 
