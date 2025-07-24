@@ -1,14 +1,6 @@
 import { Geometry } from './Geometry.js';
 
 
-// // Clone a {Map|Object} to a {Map}.
-// function toMap(src) {
-//   if (src instanceof Map) return new Map(src);
-//   if (src instanceof Object) return new Map(Object.entries(src));
-//   return new Map();
-// }
-
-
 /**
  * AbstractData is the base class from which all managed data elements inherit.
  * A data element is the internal representation of a piece of map data.

@@ -107,3 +107,21 @@ export function createOsmFeature(otherOrContext, props = {}) {
     }
   }
 }
+
+
+/**
+ *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
+ *  For example, `Map<nodeID, Node>` should be valid and treated as `Map<string, OsmNode>`.
+ *  (I don't know whether this really matters much - we don't actually parse the JSDoc.)
+ *
+ *  @typedef  {string}        entityID
+ *  @typedef  {string}        nodeID
+ *  @typedef  {string}        wayID
+ *  @typedef  {string}        relationID
+ *  @typedef  {string}        changesetID
+ *  @typedef  {OsmEntity}     Entity
+ *  @typedef  {OsmNode}       Node
+ *  @typedef  {OsmWay}        Way
+ *  @typedef  {OsmRelation}   Relation
+ *  @typedef  {OsmChagneset}  Changeset
+ */
