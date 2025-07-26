@@ -17,13 +17,14 @@ export class Graph {
    * @param  {Array<Entity>?}  toLoad         - optional Array of entities to load into the new Graph.
    */
   constructor(otherOrContext, toLoad) {
-    this._childNodes = new Map();   // Map<entityID, Array<Entity>>
+    this.id = '';  // put this first so debug inspect shows it first
 
     // A Graph derived from a predecessor Graph
     if (otherOrContext instanceof Graph) {  // copy other
       const other = otherOrContext;
       this.context = other.context;
       this._previous = other;
+
       this._base = other._base;     // Base data is shared among the chain of Graphs
       this._local = {               // Local data is a clone of the predecessor data
         entities: new Map(other._local.entities),       // shallow clone
@@ -36,6 +37,7 @@ export class Graph {
       const context = otherOrContext;
       this.context = context;
       this._previous = null;
+
       this._base = {
         entities: new Map(),    // Map<entityID, Entity>
         parentWays: new Map(),  // Map<entityID, Set<entityIDs>>
@@ -48,8 +50,8 @@ export class Graph {
       };
     }
 
-    // generate an ID
-    this.id = 'g-' + this.context.next('graph');
+    this.id = 'g-' + this.context.next('graph');   // generate an ID
+    this._childNodes = new Map();   // Map<entityID, Array<Entity>>
 
     if (toLoad) {
       this.rebase(toLoad, [this]);   // seed with Entities, if provided
@@ -225,11 +227,21 @@ export class Graph {
    * @return  {Graph}  A new Graph
    */
   commit() {
-    const prev = this._previous;
-    const diff = new Difference(prev, this);
+    // What changed between 'previous' and 'current'?
+    const diff = new Difference(this._previous, this);
     const ids = [...diff.complete().keys()];
     this._updateGeometries(ids);
+
+    // Replace 'previous' with a copy of the current graph.
+    // More changes can happen to this graph and `commit()` will detect them.
+    // This also allows the previous Graph to be garbage collected if it was temporary.
+    const snapshot = new Graph(this);
+    snapshot.id = this.id + '-snapshot';
+    snapshot._previous = null;
+    this._previous = snapshot;
+
     return new Graph(this);
+    // maybe don't need this now - calling code can make a `new Graph` if it wants to.
   }
 
 
@@ -249,11 +261,8 @@ export class Graph {
       this._local.entities.set(entityID, replacement);
       this._updateCaches(current, replacement);
     }
-// what changed?
-const diff = new Difference(this._previous, this);
-const ids = [...diff.complete().keys()];
-this._updateGeometries(ids);
 
+    this.commit();  // wastes a new graph - maybe dont need this.
     return this;
   }
 
@@ -306,8 +315,9 @@ this._updateGeometries(ids);
       }
 
       graph._updateRebased();
-      graph._updateGeometries(newIDs);
     }
+
+    this._updateGeometries(newIDs);
   }
 
 
