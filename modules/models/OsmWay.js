@@ -39,6 +39,7 @@ export class OsmWay extends OsmEntity {
     if (!this.props.id) {  // no ID provided - generate one
       this.props.id = 'w-' + this.context.next('way');
     }
+    this._id = this.props.id;  // for debugging
 
     if (!this.props.nodes) {
       this.props.nodes = [];

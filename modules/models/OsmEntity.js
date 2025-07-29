@@ -88,7 +88,8 @@ export class OsmEntity extends AbstractData {
    * @abstract
    */
   updateGeometry(graph) {
-    this.touch();
+    // this.touch();
+    this._transients.clear();
     this.geoms.setData(this.asGeoJSON(graph));
     return this;
   }

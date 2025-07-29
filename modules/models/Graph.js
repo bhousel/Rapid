@@ -3,83 +3,124 @@ import { utilIterable } from '../util/iterable.js';
 
 
 /**
- *  Graph
- *  A `Graph` is a special collection of OSM Entities.
- *  Each graph contains a base state (uneditied) and local state (edited).
- *  The graph also contains all the caches and methods needed to manage OSM topology.
- *  (parentWays, childNodes, parentRels)
+ * Graph
+ * A `Graph` is a special collection of OSM Entities.
+ * Each graph contains a base state (uneditied) and local state (edited).
+ * The graph also contains all the caches and methods needed to manage OSM topology.
  *
- *  In previous versions of the code, Graph was written in an immutable style,
- *  so that calls to `replace`/`remove`/`revert` would return a new Graph.
- *  This became a performance concern, so now Graphs are transactional.
- *  You can call these methods to update the topology, and then you should call `commit`
- *  once finished, to update any entities that rely on the graph.
+ * In previous versions of the code, Graph was written in an immutable style,
+ * so that calls to `replace`/`remove`/`revert` would return a new Graph.
+ * This became a performance concern, so now Graphs are transactional.
+ * You can call these methods anytme to make modifications to the Graph,
+ * but then you must call `commit` to update any Entities that rely on the Graph.
+ *
+ * Properties you can access:
+ *   `id`      Unique string to identify this Graph
+ *   `v`       Internal version of the Graph, can be used to detect changes
+ *   `props`   Properties object
  */
 export class Graph {
 
   /**
    * @constructor
-   * @param  {Graph|Context}   otherOrContext - copy another Graph, or pass application context
-   * @param  {Array<Entity>?}  toRebase       - optional base Entities to include in the new Graph.
+   * @param  {Graph|Context}          otherOrContext  - copy another Graph, or pass application context
+   * @param  {Array<Entity>|Object?}  propsOrEntities - optional properties or base Entities to include in the graph.
    */
-  constructor(otherOrContext, toRebase) {
-    this.id = '';  // put this first so debug inspect shows it first
+  constructor(otherOrContext, propsOrEntities = {}) {
+    this._id = '';  // put this first so debug inspect shows it first
 
     // A Graph derived from a predecessor Graph
     if (otherOrContext instanceof Graph) {  // copy other
       const other = otherOrContext;
       this.context = other.context;
-      this._previous = other;
+      this.props = {};
 
-      this._base = other._base;     // Base data is shared among the chain of Graphs
-      this._local = {               // Local data is a clone of the predecessor data
-        entities:   new Map(other._local.entities),    // shallow clone
-        parentWays: new Map(other._local.parentWays),  // shallow clone
-        parentRels: new Map(other._local.parentRels)   // shallow clone
+      this.previous = other;
+      this.base = other.base;     // Base data is shared among the chain of Graphs
+      this.local = {               // Local data is a clone of the predecessor data
+        entities:   new Map(other.local.entities),    // shallow clone
+        parentWays: new Map(other.local.parentWays),  // shallow clone
+        parentRels: new Map(other.local.parentRels)   // shallow clone
       };
 
     // A fresh Graph
     } else {
       const context = otherOrContext;
       this.context = context;
-      this._previous = null;
+      this.props = {};
 
-      this._base = {
+      this.previous = null;
+      this.base = {
         entities:   new Map(),  // Map<entityID, Entity>
         parentWays: new Map(),  // Map<entityID, Set<entityIDs>>
         parentRels: new Map()   // Map<entityID, Set<entityIDs>>
       };
-      this._local = {
+      this.local = {
         entities:   new Map(),  // Map<entityID, Entity>
         parentWays: new Map(),  // Map<entityID, Set<entityIDs>>
         parentRels: new Map()   // Map<entityID, Set<entityIDs>>
       };
-
-      if (toRebase) {
-        this.rebase(toRebase, [this]);   // seed with base Entities, if provided
-      }
     }
 
-    this.id = 'g-' + this.context.next('graph');   // generate an ID
+    // Deal with extra argument
+    if (Array.isArray(propsOrEntities)) {
+      const toRebase = propsOrEntities;
+      this.rebase(toRebase, [this]);   // seed with base Entities, if provided
+
+    } else {
+      const props = propsOrEntities;
+      Object.assign(this.props, globalThis.structuredClone(props));  // override with passed in props
+    }
+
+    if (!this.props.id) {  // no ID provided - generate one
+      this.props.id = 'g-' + this.context.next('graph');
+    }
+    this._id = this.props.id;  // for debugging
   }
 
 
   /**
-   * base
-   * @return  {Object}  Access to `_base` caches.
+   * id
+   * Unique string to identify this Graph.
+   * @return  {string}
    * @readonly
    */
-  get base() {
-    return this._base;
+  get id() {
+    return this.props.id ?? '';
   }
 
   /**
-   * local
-   * @return  {Object}  Access to `_local` caches.
+   * v
+   * Internal version of the Graph, can be used to detect changes.
+   * @return  {number}
    * @readonly
    */
-  get local() {
-    return this._local;
+  get v() {
+    return this.props.v || 0;
+  }
+
+  /**
+   * key
+   * The 'key' includes both the id and the version
+   * @return   {string}  The id and the version, for example "g1v0"
+   * @readonly
+   */
+  get key() {
+    return `${this.id}v${this.v}`;
+  }
+
+  /**
+   * touch
+   * Bump internal version number in place (typically, forcing a rerender)
+   * Note that this version number always increases and is shared by all data elements.
+   * We did it this way to avoid situations where you undo to a previous version
+   *  you don't want it to increment it back to the same version and appear unchanged.
+   * @see Rapid@9ac2776a
+   * @return  {Graph}  this Graph
+   */
+  touch() {
+    this.props.v = this.context.next('v');
+    return this;
   }
 
 
@@ -90,8 +131,8 @@ export class Graph {
    * @return  {Entity?}  Entity from either local or base cache, or `undefined` if not found.
    */
   hasEntity(entityID) {
-    const base = this._base.entities;
-    const local = this._local.entities;
+    const base = this.base.entities;
+    const local = this.local.entities;
     return local.has(entityID) ? local.get(entityID) : base.get(entityID);
   }
 
@@ -122,8 +163,8 @@ export class Graph {
    * @throws  Will throw if any parent Way is not found
    */
   parentWays(entity) {
-    const base = this._base.parentWays;
-    const local = this._local.parentWays;
+    const base = this.base.parentWays;
+    const local = this.local.parentWays;
     const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set();
     return Array.from(parentIDs).map(parentID => this.entity(parentID));
   }
@@ -138,8 +179,8 @@ export class Graph {
    * @throws  Will throw if any parent Relation is not found
    */
   parentRelations(entity) {
-    const base = this._base.parentRels;
-    const local = this._local.parentRels;
+    const base = this.base.parentRels;
+    const local = this.local.parentRels;
     const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set();
     return Array.from(parentIDs).map(parentID => this.entity(parentID));
   }
@@ -171,10 +212,10 @@ export class Graph {
       const current = this.hasEntity(entityID);
       if (current === entity) continue;  // no change
 
-      this._local.entities.set(entityID, entity);
+      this.local.entities.set(entityID, entity);
       this._updateCaches(current, entity);
     }
-    return this;
+    return this.touch();
   }
 
 
@@ -191,10 +232,10 @@ export class Graph {
       const current = this.hasEntity(entityID);
       if (!current) continue;  // not in the graph
 
-      this._local.entities.set(entityID, undefined);
+      this.local.entities.set(entityID, undefined);
       this._updateCaches(current, undefined);
     }
-    return this;
+    return this.touch();
   }
 
 
@@ -206,37 +247,48 @@ export class Graph {
    */
   revert(entityIDs) {
     for (const entityID of utilIterable(entityIDs)) {
-      const original = this._base.entities.get(entityID);
+      const original = this.base.entities.get(entityID);
       const current = this.hasEntity(entityID);
       if (current === original) continue;   // no change
 
-      this._local.entities.delete(entityID);
+      this.local.entities.delete(entityID);
       this._updateCaches(current, original);
     }
-    return this;
+    return this.touch();
   }
 
 
   /**
    * commit
-   * Updates any Entities affected by the work in progress, and returns a new Graph.
-   * @return  {Graph}  A new Graph
+   * Updates any Entities affected by the work in progress
+   * @return  {Graph}  this Graph
    */
   commit() {
     // What changed between 'previous' and 'current'?
-    const diff = new Difference(this._previous, this);
+    const diff = new Difference(this.previous, this);
     const ids = [...diff.complete().keys()];
     this._updateGeometries(ids);
 
     // Replace 'previous' with a copy of the current graph.
     // More changes can happen to this graph and `commit()` will detect them.
     // This also allows the previous Graph to be garbage collected if it was temporary.
-    const snapshot = new Graph(this);
-    snapshot.id = this.id + '-snapshot';
-    snapshot._previous = null;
-    this._previous = snapshot;
-
+    this.previous = this.snapshot();
     return this;
+  }
+
+
+  /**
+   * snapshot
+   * A Graph "snapshot" is a copy of the Graph that can be used to compute Differences.
+   * It's just a copy with a special `id` and with no `previous`.
+   * (The `previous = null` helps avoid leaking memory, we don't need to reference the previous Graph).
+   * @return  {Graph}  A new Graph
+   */
+  snapshot() {
+    const id = this.id + '-snapshot';
+    const snapshot = new Graph(this, { id: id });
+    snapshot.previous = null;
+    return snapshot;
   }
 
 
@@ -245,10 +297,18 @@ export class Graph {
    * Loads new Entities into the local Graph, obliterating any existing Entities.
    * Used when restoring history or entering/leaving walkthrough.
    * This is just a shortcut for doing a bunch of `replace`/`remove` calls.
+   * (The Entities passed in may be undefined, in the case of deletion)
    * @param   {Object<entityID, Entity>}  entities -  Entities to load into the Graph
    * @return  {Graph}  this Graph
    */
-  load(entities) {
+  load(entities = {}) {
+    const _loadOne = (entityID, entity) => {
+      const current = this.hasEntity(entityID);
+      const replacement = entity || undefined;
+      this.local.entities.set(entityID, replacement);
+      this._updateCaches(current, replacement);
+    };
+
     // we want to process the nodes first..
     for (const [entityID, entity] of Object.entries(entities)) {
       if (entity?.type === 'node') {
@@ -261,15 +321,7 @@ export class Graph {
       }
     }
 
-    this.commit();
-    return this;
-
-    function _loadOne(entityID, entity) {
-      const current = this.hasEntity(entityID);
-      const replacement = entity || undefined;
-      this._local.entities.set(entityID, replacement);
-      this._updateCaches(current, replacement);
-    }
+    return this.commit().touch();
   }
 
 
@@ -284,8 +336,8 @@ export class Graph {
    * @param  {boolean}            force - If `true`, always update, if `false` skip Entities that we've seen already
    */
   rebase(entities, stack, force) {
-    const base = this._base;
-    const head = stack[stack.length - 1]._local.entities;
+    const base = this.base;
+    const head = stack[stack.length - 1].local.entities;
     const restoreIDs = new Set();
     const newIDs = new Set();
 
@@ -312,14 +364,18 @@ export class Graph {
     }
 
     for (const graph of stack) {
-      const local = graph._local.entities;
+      const local = graph.local.entities;
+      let didChange = false;
       // Restore deleted nodes that were discovered to belong to a parentWay.
       for (const id of restoreIDs) {
         if (local.has(id) && local.get(id) === undefined) {  // was deleted
           local.delete(id);  // "delete the delete", aka restore.
+          didChange = true;
         }
       }
-
+      if (didChange) {
+        graph.touch();
+      }
       graph._updateRebased();
     }
 
@@ -335,8 +391,8 @@ export class Graph {
    * @parem  {Object}  caches?    - which caches to update, defaults to the local caches
    */
   _updateCaches(previous, current, caches) {
-    const base = this._base;
-    const local = this._local;
+    const base = this.base;
+    const local = this.local;
     const which = caches ?? local;
     const parentWays = which.parentWays;
     const parentRels = which.parentRels;
@@ -391,8 +447,8 @@ export class Graph {
    *  with the data in the base caches.
    */
   _updateRebased() {
-    const base = this._base;
-    const local = this._local;
+    const base = this.base;
+    const local = this.local;
 
     for (const [childID, parentWayIDs] of local.parentWays) {  // for all this.parentWays we've cached
       const baseWayIDs = base.parentWays.get(childID);         // compare to base.parentWays

@@ -26,6 +26,7 @@ export class Marker extends AbstractData {
     if (!this.props.id) {  // no ID provided - generate one
       this.props.id = 'marker-' + this.context.next('marker');
     }
+    this._id = this.props.id;  // for debugging
 
     this.updateGeometry();
   }

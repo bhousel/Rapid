@@ -13,23 +13,26 @@ describe('OsmChangeset', () => {
       assert.strictEqual(a.context, context);
       assert.instanceOf(a.geoms, Rapid.Geometry);
       assert.isObject(a.props);
-      assert.ok(a.id, 'an id should be generated');
-      assert.strictEqual(a.type, 'changeset');
-      assert.deepEqual(a.tags, {});
+    });
+
+    it('generates an empty tags object, if unset', () => {
+      const a = new Rapid.OsmChangeset(context);
+      assert.deepEqual(a.props.tags, {});
+    });
+
+    it('generates an id string, if unset', () => {
+      const a = new Rapid.OsmChangeset(context);
+      assert.match(a.props.id, /^c-/);
     });
 
     it('constructs an OsmChangeset from a context, with props', () => {
-      const props = { id: 'c1', tags: { comment: 'hello' } };
-      const a = new Rapid.OsmChangeset(context, props);
+      const orig = { id: 'c1', tags: { comment: 'hello' } };
+      const a = new Rapid.OsmChangeset(context, orig);
       assert.instanceOf(a, Rapid.OsmChangeset);
       assert.strictEqual(a.context, context);
       assert.instanceOf(a.geoms, Rapid.Geometry);
-      // `a.props` will be deep clone of props, possibly with other properties ('id') added.
-      assert.deepInclude(a.props, props);
-      assert.notStrictEqual(a.props, props);  // cloned, not ===
-      assert.strictEqual(a.id, 'c1');
-      assert.strictEqual(a.type, 'changeset');
-      assert.deepEqual(a.tags, { comment: 'hello' });
+      assert.notStrictEqual(a.props, orig);  // cloned, not ===
+      assert.deepInclude(a.props, orig);
     });
 
     it('constructs an OsmChangeset from another OsmChangeset', () => {
@@ -41,29 +44,26 @@ describe('OsmChangeset', () => {
       assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.isObject(b.props);
-      assert.strictEqual(b.type, a.type);
-      assert.strictEqual(b.id, a.id, 'an id should be generated');
     });
 
     it('constructs an OsmChangeset from another OsmChangeset, with props', () => {
-      const aprops = { id: 'c1', tags: { comment: 'hello' } };
-      const bprops = { foo: 'bar' };
-      const a = new Rapid.OsmChangeset(context, aprops);
-      const b = new Rapid.OsmChangeset(a, bprops);
+      const orig = { id: 'c1', tags: { comment: 'hello' } };
+      const a = new Rapid.OsmChangeset(context, orig);
+      const update = { foo: 'bar' };
+      const b = new Rapid.OsmChangeset(a, update);
       assert.instanceOf(b, Rapid.OsmChangeset);
       assert.strictEqual(b.context, context);
       assert.instanceOf(b.geoms, Rapid.Geometry);
       assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
-      assert.strictEqual(b.id, a.id);
-      assert.strictEqual(b.type, a.type);
-      assert.deepInclude(b.props, { id: 'c1', tags: { comment: 'hello' }, foo: 'bar' });
+      assert.deepInclude(b.props, orig);
+      assert.deepInclude(b.props, update);
     });
   });
 
 
   describe('update', () => {
-    it('returns a new changeset', () => {
+    it('returns a new OsmChangeset', () => {
       const a = new Rapid.OsmChangeset(context);
       const b = a.update({});
       assert.instanceOf(b, Rapid.OsmChangeset);
@@ -72,44 +72,33 @@ describe('OsmChangeset', () => {
 
     it('updates the specified properties', () => {
       const a = new Rapid.OsmChangeset(context);
-      const aprops = a.props;
-      const update = { tags: { comment: 'hello' } };
+      const update = { foo: 'bar' };
       const b = a.update(update);
-      assert.instanceOf(b, Rapid.OsmChangeset);
-      assert.notStrictEqual(b, a);
-      const bprops = b.props;
-      assert.notStrictEqual(bprops, aprops);   // new object, not ===
-      assert.notStrictEqual(bprops, update);   // cloned, not ===
-      assert.deepInclude(bprops, update);      // will also include a `v`
+      assert.notStrictEqual(b.props, a.props);  // new object, not ===
+      assert.notStrictEqual(b.props, update);   // cloned, not ===
+      assert.deepInclude(b.props, update);
     });
 
     it('defaults to empty props argument', () => {
       const a = new Rapid.OsmChangeset(context);
-      const aprops = a.props;
       const b = a.update();
-      assert.instanceOf(b, Rapid.OsmChangeset);
-      assert.notStrictEqual(b, a);
-      const bprops = b.props;
-      assert.notStrictEqual(bprops, aprops);   // new object, not ===
+      assert.notStrictEqual(b.props, a.props);  // new object, not ===
     });
 
     it('preserves existing properties', () => {
-      const a = new Rapid.OsmChangeset(context, { id: 'c1' });
-      const aprops = a.props;
-      const update = { tags: { comment: 'hello' } };
+      const orig = { id: 'c1', tags: { comment: 'hello' } };
+      const a = new Rapid.OsmChangeset(context, orig);
+      const update = { foo: 'bar' };
       const b = a.update(update);
-      assert.instanceOf(b, Rapid.OsmChangeset);
-      assert.notStrictEqual(b, a);
-      const bprops = b.props;
-      assert.notStrictEqual(bprops, aprops);   // new object, not ===
-      assert.notStrictEqual(bprops, update);   // cloned, not ===
-      assert.deepInclude(bprops, { id: 'c1', tags: { comment: 'hello' } });  // will also include a `v`
+      assert.notStrictEqual(b.props, a.props);   // new object, not ===
+      assert.notStrictEqual(b.props, update);    // cloned, not ===
+      assert.deepInclude(b.props, orig);
+      assert.deepInclude(b.props, update);
     });
 
     it('doesn\'t copy prototype properties', () => {
       const a = new Rapid.OsmChangeset(context);
-      const aprops = a.props;
-      const update = { tags: { comment: 'hello' } };
+      const update = { foo: 'bar' };
       const b = a.update(update);
       assert.doesNotHaveAnyKeys(b.props, ['constructor', '__proto__', 'toString']);
     });

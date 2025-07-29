@@ -19,7 +19,8 @@ export class Tree {
    * @param  {Graph}  graph - The "current" Graph of entities that this tree is tracking
    */
   constructor(graph) {
-    this._current = graph;
+    this._currentKey = graph.key;
+    this._currentSnapshot = graph.snapshot();
 
     this._entityRBush = new RBush();
     this._entityBoxes = new Map();     // Map<entityID, Box Object>
@@ -61,7 +62,7 @@ export class Tree {
    * @param  {Map<entityID, Entity>}  toUpdate - Entities to load into the tree
    */
   _loadEntities(toUpdate) {
-    const graph = this._current;
+    const graph = this._currentSnapshot;
 
     let eboxes = [];
     let sboxes = [];
@@ -111,7 +112,7 @@ export class Tree {
    * @param  {Set<entityID>?}         seen - to avoid infinite recursion
    */
   _includeParents(entity, toUpdate, seen) {
-    const graph = this._current;
+    const graph = this._currentSnapshot;
     const entityID = entity.id;
     if (!seen) seen = new Set();
 
@@ -143,11 +144,12 @@ export class Tree {
    * @param  {Graph}  graph - the Graph to set "current"
    */
   _setCurrentGraph(graph) {
-    if (graph === this._current) return;
+    if (graph.key === this._currentKey) return;
 
     // gather changes needed
-    const diff = new Difference(this._current, graph);
-    this._current = graph;
+    const diff = new Difference(this._currentSnapshot, graph);
+    this._currentKey = graph.key;
+    this._currentSnapshot = graph.snapshot();
 
     const changed = diff.didChange;
     if (!changed.addition && !changed.deletion && !changed.geometry) return;
@@ -186,7 +188,7 @@ export class Tree {
    * @param  {boolean?}       force - If `true`, replace an Entity, even if we've seen it already
    */
   rebase(entities, force) {
-    const graph = this._current;
+    const graph = this._currentSnapshot;
     const local = graph.local;
     const toUpdate = new Map();
 

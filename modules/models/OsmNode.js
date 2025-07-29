@@ -30,6 +30,7 @@ export class OsmNode extends OsmEntity {
     if (!this.props.id) {  // no ID provided - generate one
       this.props.id = 'n-' + this.context.next('node');
     }
+    this._id = this.props.id;  // for debugging
 
     this.updateGeometry();
   }

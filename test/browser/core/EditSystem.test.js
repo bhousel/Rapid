@@ -220,14 +220,16 @@ describe('EditSystem', () => {
 
     it('updates the staging graph only', () => {
       const staging = _editor.staging.graph;
+      const stagingKey = staging.key;
       const stable = _editor.stable.graph;
+      const stableKey = stable.key;
 
       _editor.perform(actionAddNode('n-1'));
       expect(_editor.base.graph.hasEntity('n-1')).to.be.not.ok;
       expect(_editor.stable.graph.hasEntity('n-1')).to.be.not.ok;
       expect(_editor.staging.graph.hasEntity('n-1')).to.be.ok;
-      expect(_editor.staging.graph).to.not.equal(staging);  // new staging
-      expect(_editor.stable.graph).to.equal(stable);        // same stable
+      expect(_editor.staging.graph.key).to.not.equal(stagingKey);  // staging changed
+      expect(_editor.stable.graph.key).to.equal(stableKey);        // same stable
     });
 
     it('emits an stagingchange event only', () => {

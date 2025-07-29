@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 import { utilTagDiff } from '@rapid-sdk/util';
 
 import { actionChangePreset, actionChangeTags, actionSyncCrossingTags } from '../actions/index.js';
-import { Difference, Graph } from '../models/index.js';
+import { Difference } from '../models/Difference.js';
 import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
 
 
@@ -65,10 +65,11 @@ export function validationAmbiguousCrossingTags(context) {
   function detectCrossingWayIssues(startWay, startGraph) {
     const wayID = startWay.id;
     const startPreset = presets.match(startWay, startGraph);
-    const copyGraph = new Graph(startGraph); // make a copy so difference will work
+    const snapshot = startGraph.snapshot();
+    const copyGraph = startGraph.snapshot();
     const action = actionUpdateCrossing(wayID);
     const endGraph = action(copyGraph);
-    const diff = new Difference(startGraph, endGraph);  // What changed?
+    const diff = new Difference(snapshot, endGraph);  // What changed?
     if (!diff.changes.size) return [];  // no updates needed
 
     // What does the original way look like after the changes?

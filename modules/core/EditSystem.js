@@ -99,9 +99,11 @@ export class EditSystem extends AbstractSystem {
     this._tree = null;
 
     this._backupStatus = true;
+    this._stableKey = null;
+    this._stableSnapshot = null;
+    this._stagingKey = null;
+    this._stagingSnapshot = null;
     this._fullDifference = null;
-    this._lastStableGraph = null;
-    this._lastStagingGraph = null;
 
     this._initPromise = null;
 
@@ -202,8 +204,10 @@ export class EditSystem extends AbstractSystem {
     this._hasWorkInProgress = false;
     this._tree = new Tree(currGraph);
 
-    this._lastStableGraph = baseGraph;
-    this._lastStagingGraph = currGraph;
+    this._stableKey = baseGraph.key;
+    this._stableSnapshot = baseGraph.snapshot();
+    this._stagingKey = currGraph.key;
+    this._stagingSnapshot = currGraph.snapshot();
     this._fullDifference = new Difference(baseGraph, baseGraph);
 
     this._backupStatus = true;
@@ -1320,9 +1324,7 @@ export class EditSystem extends AbstractSystem {
    * @param  {number?}          Eased time, should be in the range [0..1]
    */
   _perform(actions, t = 1) {
-// for now, call commit() before performing work.
-// this sidesteps the issue where we mutate the staging graph, but then during
-// _emitChanges, the stagingDifference is missing some changes.
+    // for now, call commit() before performing work.
     let graph = this._staging.graph.commit();
     for (const fn of actions) {
       if (typeof fn === 'function') {
@@ -1362,16 +1364,18 @@ export class EditSystem extends AbstractSystem {
     // Note: `this._hasWorkInProgress` is included here because in some cases the graph
     // won't actually change - for example an Action that exits early or "performs" a no-op.
     // We still want to generate an empty Difference and emit 'stagingchange' in these situations.
-    if (this._lastStagingGraph !== stagingGraph || this._hasWorkInProgress) {
-      stagingDifference = new Difference(this._lastStagingGraph, stagingGraph);
-      this._lastStagingGraph = stagingGraph;
+    if (this._stagingKey !== stagingGraph.key || this._hasWorkInProgress) {
+      stagingDifference = new Difference(this._stagingSnapshot, stagingGraph);
+      this._stagingKey = stagingGraph.key;
+      this._stagingSnapshot = stagingGraph.snapshot();
       this.emit('stagingchange', stagingDifference);
     }
 
-    if (this._lastStableGraph !== stableGraph) {
+    if (this._stableKey !== stableGraph.key) {
       this._fullDifference = new Difference(baseGraph, stableGraph);
-      const stableDifference = new Difference(this._lastStableGraph, stableGraph);
-      this._lastStableGraph = stableGraph;
+      const stableDifference = new Difference(this._stableSnapshot, stableGraph);
+      this._stableKey = stableGraph.key;
+      this._stableSnapshot = stableGraph.snapshot();
       this.emit('stablechange', stableDifference);
       this.deferredBackup();
     }

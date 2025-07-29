@@ -26,6 +26,7 @@ export class OsmChangeset extends OsmEntity {
     if (!this.props.id) {  // no ID provided - generate one
       this.props.id = 'c-' + this.context.next('changeset');
     }
+    this._id = this.props.id;  // for debugging
   }
 
   /**

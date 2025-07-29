@@ -27,6 +27,8 @@ export class AbstractData {
    * @param  {Object}                props  - Properties to assign to the data element
    */
   constructor(otherOrContext, props = {}) {
+    this._id = '';  // put this first so debug inspect shows it first
+
     if (otherOrContext instanceof AbstractData) {  // copy other
       const other = otherOrContext;
       this.context = other.context;
