@@ -133,7 +133,7 @@ export function actionMergeRemoteChanges(id, options = {}) {
     }
 
     if (updates.removeIDs.length) {
-      graph = actionDeleteMultiple(updates.removeIDs)(graph);
+      graph = actionDeleteMultiple(updates.removeIDs, false /* do not delete degenerate ways */)(graph);
     }
 
     return graph;
@@ -205,9 +205,9 @@ export function actionMergeRemoteChanges(id, options = {}) {
   //  `graph` must be a descendant of `localGraph` and may include
   //      some conflict resolution actions performed on it.
   //
-  //                  --- ... --- `localGraph` -- ... -- `graph`
+  //                  --> … --> `localGraph` --> … --> `graph`
   //                 /
-  //  `graph.base()` --- ... --- `remoteGraph`
+  //  `graph.base()` --> … --> `remoteGraph`
   //
   let action = function(graph) {
     const updates = { replacements: [], removeIDs: [] };
@@ -219,7 +219,7 @@ export function actionMergeRemoteChanges(id, options = {}) {
     // delete/undelete
     if (!remote.visible) {
       if (strategy === 'force_remote') {
-        return actionDeleteMultiple([id])(graph);
+        return actionDeleteMultiple([id], false /* do not delete degenerate ways */)(graph);
 
       } else if (strategy === 'force_local') {
         if (target.type === 'way') {

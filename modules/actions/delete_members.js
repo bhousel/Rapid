@@ -1,13 +1,13 @@
 import { actionDeleteMember } from './delete_member.js';
 
 
-export function actionDeleteMembers(relationID, memberIndexes) {
+export function actionDeleteMembers(relationID, memberIndexes, doDeleteDegenerate = true) {
   return graph => {
     // Remove the members in descending order so removals won't shift what members
     // are at the remaining indexes
     memberIndexes.sort((a, b) => b - a);
     for (var i in memberIndexes) {
-      graph = actionDeleteMember(relationID, memberIndexes[i])(graph);
+      graph = actionDeleteMember(relationID, memberIndexes[i], doDeleteDegenerate)(graph);
     }
     return graph;
   };

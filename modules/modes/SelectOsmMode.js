@@ -168,7 +168,7 @@ export class SelectOsmMode extends AbstractMode {
       (entity.members.length === 0 || (entity.members.length === 1 && !entity.members[0].role))
     ) {
       // The user added this relation but didn't edit it at all, so just delete it
-      editor.perform(actionDeleteRelation(entity.id, true));  // true = don't delete untagged members
+      editor.perform(actionDeleteRelation(entity.id, true, true));  // true = don't delete untagged members
       editor.commit({
         annotation: l10n.t('operations.delete.annotation.relation'),
         selectedIDs: [entity.id]

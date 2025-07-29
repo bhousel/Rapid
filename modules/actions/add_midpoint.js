@@ -12,7 +12,7 @@ export function actionAddMidpoint(midpoint, node) {
     );
 
     parents.forEach(way => {
-      for (var i = 0; i < way.nodes.length - 1; i++) {
+      for (let i = 0; i < way.nodes.length - 1; i++) {
         if (geomEdgeEqual([way.nodes[i], way.nodes[i + 1]], midpoint.edge)) {
           graph.replace(graph.entity(way.id).addNode(node.id, i + 1));
 

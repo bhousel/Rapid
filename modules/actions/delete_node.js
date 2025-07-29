@@ -2,31 +2,32 @@ import { actionDeleteRelation } from './delete_relation.js';
 import { actionDeleteWay } from './delete_way.js';
 
 
-export function actionDeleteNode(nodeID) {
+export function actionDeleteNode(nodeID, doDeleteDegenerate = true) {
 
   return graph => {
-    var node = graph.entity(nodeID);
+    const node = graph.entity(nodeID);
 
-    graph.parentWays(node)
-      .forEach(parent => {
-        parent = parent.removeNode(nodeID);
-        graph.replace(parent);
+    // remove node from parent relations
+    for (let relation of graph.parentRelations(node)) {
+      relation = relation.removeMembersWithID(nodeID);
+      graph.replace(relation);
 
-        if (parent.isDegenerate()) {
-          graph = actionDeleteWay(parent.id)(graph);
-        }
-      });
+      if (doDeleteDegenerate && relation.isDegenerate()) {
+        graph = actionDeleteRelation(relation.id, doDeleteDegenerate)(graph);
+      }
+    }
 
-    graph.parentRelations(node)
-      .forEach(parent => {
-        parent = parent.removeMembersWithID(nodeID);
-        graph.replace(parent);
+    // remove node from parent ways
+    for (let way of graph.parentWays(node)) {
+      way = way.removeNode(nodeID);
+      graph.replace(way);
 
-        if (parent.isDegenerate()) {
-          graph = actionDeleteRelation(parent.id)(graph);
-        }
-      });
+      if (doDeleteDegenerate && way.isDegenerate()) {
+        graph = actionDeleteWay(way.id, doDeleteDegenerate)(graph);
+      }
+    }
 
+    // remove node
     return graph.remove(node).commit();
   };
 }

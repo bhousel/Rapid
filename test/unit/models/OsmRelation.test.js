@@ -882,6 +882,7 @@ describe('OsmRelation', () => {
       const expected = {
         type: 'FeatureCollection',
         id: 'r1',
+        role: 'other',
         properties: { type: 'foo' },
         features: [{
           type: 'FeatureCollection',

@@ -99,7 +99,7 @@ export function actionJoin(ids, options = {}) {
 
       survivor = survivor.mergeTags(multipolygon.tags);
       graph.replace(survivor);
-      graph = actionDeleteRelation(multipolygon.id, true /* allow untagged members */)(graph);
+      graph = actionDeleteRelation(multipolygon.id, true, true /* allow untagged members */)(graph);
 
       const tags = Object.assign({}, survivor.tags);
       if (survivor.geometry(graph) !== 'area') {

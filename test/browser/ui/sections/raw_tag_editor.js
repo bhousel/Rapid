@@ -14,14 +14,18 @@ describe('uiSectionRawTagEditor', () => {
 
   class MockContext {
     constructor()   {
-      this.sequences = {};
       this.viewport = new Rapid.sdk.Viewport();
+      this.sequences = {};
       this.services = {};
       this.systems = {
         assets:   new Rapid.AssetSystem(this),
         l10n:     new MockLocalizationSystem(),
         storage:  new MockStorageSystem()
       };
+    }
+    next(which) {
+      let num = this.sequences[which] || 0;
+      return this.sequences[which] = ++num;
     }
     cleanTagKey(val)    { return val; }
     cleanTagValue(val)  { return val; }

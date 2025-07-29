@@ -2,29 +2,32 @@ import { osmNodeGeometriesForTags } from '../models/tags.js';
 import { actionDeleteRelation } from './delete_relation.js';
 
 
-export function actionDeleteWay(wayID) {
+export function actionDeleteWay(wayID, doDeleteDegenerate = true) {
   return graph => {
-    const way = graph.entity(wayID);
+    let way = graph.entity(wayID);
 
-    graph.parentRelations(way)
-      .forEach(parent => {
-        parent = parent.removeMembersWithID(wayID);
-        graph.replace(parent);
+    // remove way from parent relations
+    for (let parent of graph.parentRelations(way)) {
+      parent = parent.removeMembersWithID(wayID);
+      graph.replace(parent);
+      if (doDeleteDegenerate && parent.isDegenerate()) {
+        actionDeleteRelation(parent.id, doDeleteDegenerate)(graph);
+      }
+    }
 
-        if (parent.isDegenerate()) {
-          graph = actionDeleteRelation(parent.id)(graph);
-        }
-      });
+    // remove child nodes from this way
+    const nodeIDs = new Set(way.nodes);
+    way = way.update({ nodes: [] });
+    graph.replace(way);
 
-    (new Set(way.nodes)).forEach(nodeID => {
-        graph.replace(way.removeNode(nodeID));
+    for (const nodeID of nodeIDs) {
+      const node = graph.entity(nodeID);
+      if (canDeleteNode(node, graph)) {
+        graph.remove(node);
+      }
+    }
 
-        const node = graph.entity(nodeID);
-        if (canDeleteNode(node, graph)) {
-          graph.remove(node);
-        }
-    });
-
+    // remove way
     return graph.remove(way).commit();
   };
 

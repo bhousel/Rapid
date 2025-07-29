@@ -183,7 +183,7 @@ describe('actionConnect', () => {
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
-      new Rapid.OsmNode(context, {id: 'c'}),
+      new Rapid.OsmNode(context, {id: 'd'}),
       new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
       new Rapid.OsmWay(context, {id: '=', nodes: ['c', 'd']}),
       new Rapid.OsmRelation(context, {id: 'r1', members: [{id: 'b', role: 'r1', type: 'node'}]}),

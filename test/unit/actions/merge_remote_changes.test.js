@@ -66,9 +66,7 @@ describe('actionMergeRemoteChanges', () => {
 
   function makeGraph(entities) {
     const staging = new Rapid.Graph(base);
-    for (const entity of entities) {
-      staging.replace(entity);
-    }
+    staging.replace(entities);
     return staging.commit();
   }
 
