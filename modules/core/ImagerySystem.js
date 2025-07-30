@@ -36,7 +36,7 @@ export class ImagerySystem extends AbstractSystem {
     this._initPromise = null;
     this._imageryIndex = null;
     this._baseLayer = null;
-    this._overlayLayers = new Map();   // Map (sourceID -> source)
+    this._overlayLayers = new Map();   // Map<sourceID, ImagerySource>
     this._checkedBlocklists = [];
     this._isValid = true;    // todo, find a new way to check this, no d3 enter/update render anymore
 

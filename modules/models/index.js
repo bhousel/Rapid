@@ -114,11 +114,13 @@ export function createOsmFeature(otherOrContext, props = {}) {
  *  For example, `Map<nodeID, Node>` should be valid and treated as `Map<string, OsmNode>`.
  *  (I don't know whether this really matters much - we don't actually parse the JSDoc.)
  *
+ *  @typedef  {string}        dataID
  *  @typedef  {string}        entityID
  *  @typedef  {string}        nodeID
  *  @typedef  {string}        wayID
  *  @typedef  {string}        relationID
  *  @typedef  {string}        changesetID
+ *  @typedef  {AbstractData}  Data
  *  @typedef  {OsmEntity}     Entity
  *  @typedef  {OsmNode}       Node
  *  @typedef  {OsmWay}        Way

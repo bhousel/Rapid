@@ -46,7 +46,7 @@ export {
 
 // At init time, we will instantiate any that are in the 'available' collection.
 export const systems = {
-  available: new Map()   // Map (id -> System constructor)
+  available: new Map()   // Map<systemID, System constructor>
 };
 
 systems.available.set('assets', AssetSystem);
@@ -68,3 +68,9 @@ systems.available.set('ui', UiSystem);
 systems.available.set('uploader', UploaderSystem);
 systems.available.set('urlhash', UrlHashSystem);
 systems.available.set('validator', ValidationSystem);
+
+/**
+ *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
+ *  @typedef  {string}          systemID
+ *  @typedef  {AbstractSystem}  System
+ */

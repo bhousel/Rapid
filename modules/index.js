@@ -5,6 +5,7 @@ export * from './geo/index.js';
 export * from './models/index.js';
 export * from './modes/index.js';
 export * from './operations/index.js';
+export * from './pixi/index.js';
 export * from './services/index.js';
 export * from './ui/cards/index.js';
 export * from './ui/controls/index.js';

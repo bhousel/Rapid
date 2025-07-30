@@ -3,6 +3,7 @@ import { EventEmitter } from 'pixi.js';
 
 import { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.js';
 import { PixiLayerCustomData } from './PixiLayerCustomData.js';
+import { PixiLayerDebug } from './PixiLayerDebug.js';
 import { PixiLayerEditBlocks } from './PixiLayerEditBlocks.js';
 import { PixiLayerKartaPhotos } from './PixiLayerKartaPhotos.js';
 import { PixiLayerKeepRight } from './PixiLayerKeepRight.js';
@@ -63,7 +64,9 @@ export class PixiScene extends EventEmitter {
     // Create Layers
     [
       new PixiLayerBackgroundTiles(this, 'background'),
+      new PixiLayerDebug(this, 'debug'),
       new PixiLayerGeoScribble(this, 'geoscribble'),
+
       new PixiLayerOsm(this, 'osm'),
       new PixiLayerRapid(this, 'rapid'),
       new PixiLayerRapidOverlay(this, 'rapidoverlay'),
@@ -111,6 +114,7 @@ export class PixiScene extends EventEmitter {
     // their Features to, so that the scene can be sorted reasonably.
     [
       'background',   // Background imagery
+      'debug-under',  // Debug that appears under everything
       'basemap',      // Editable basemap (OSM/Rapid)
       'points',       // Editable points (OSM/Rapid)
       'streetview',   // Streetview imagery, sequences

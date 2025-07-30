@@ -489,7 +489,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    * @return  Collection
    */
   defaults(geometry, limit = 10, startWithRecents = true, loc = null) {
-    let results = new Map();   // Map (itemID -> item)  (may be a Preset or a Category)
+    let results = new Map();   // Map<itemID, item>  (may be a Preset or a Category)
 
     if (startWithRecents) {
       for (const preset of this.getRecents()) {

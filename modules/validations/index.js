@@ -18,3 +18,10 @@ export { validationPrivateData } from './private_data.js';
 export { validationYShapedConnection } from './y_shaped_connection.js';
 export { validationSuspiciousName } from './suspicious_name.js';
 export { validationUnsquareWay } from './unsquare_way.js';
+
+/**
+ *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
+ *  (services also inherit from AbstractSystem)
+ *  @typedef  {string}     validationID
+ *  @typedef  {function}   Validation
+ */

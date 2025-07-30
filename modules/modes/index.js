@@ -31,7 +31,7 @@ export {
 
 // At init time, we will instantiate any that are in the 'available' collection.
 export const modes = {
-  available: new Map()   // Map (id -> Mode constructor)
+  available: new Map()   // Map<modeID, Mode constructor>
 };
 
 modes.available.set('add-note', AddNoteMode);
@@ -46,3 +46,9 @@ modes.available.set('rotate', RotateMode);
 modes.available.set('save', SaveMode);
 modes.available.set('select', SelectMode);
 modes.available.set('select-osm', SelectOsmMode);
+
+/**
+ *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
+ *  @typedef  {string}        modeID
+ *  @typedef  {AbstractMode}  Mode
+ */

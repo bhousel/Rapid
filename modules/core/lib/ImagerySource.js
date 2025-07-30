@@ -535,7 +535,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
     this._refreshPromise = null;
     this._tiler = new Tiler();
 
-    this._waybackData = new Map();        // Map (releaseDate -> data)
+    this._waybackData = new Map();        // Map<releaseDate, data>
     this._releaseDateCache = new RBush();
     this._oldestDate = null;
     this._newestDate = null;

@@ -39,7 +39,7 @@ export {
 
 // At init time, we will instantiate any that are in the 'available' collection.
 export const services = {
-  available: new Map()  // Map (id -> Service constructor)
+  available: new Map()  // Map<serviceID, Service constructor>
 };
 
 services.available.set('esri', EsriService);
@@ -60,3 +60,10 @@ services.available.set('taginfo', TaginfoService);
 services.available.set('vectortile', VectorTileService);
 services.available.set('wikidata', WikidataService);
 services.available.set('wikipedia', WikipediaService);
+
+/**
+ *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
+ *  (services also inherit from AbstractSystem)
+ *  @typedef  {string}          serviceID
+ *  @typedef  {AbstractSystem}  Service
+ */

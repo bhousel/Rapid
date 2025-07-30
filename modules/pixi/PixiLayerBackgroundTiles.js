@@ -39,8 +39,8 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
       sharpness: 1,
     };
 
-    this._tileMaps = new Map();    // Map (sourceID -> Map(tileID -> tile))
-    this._failed = new Set();      // Set of failed tileURLs
+    this._tileMaps = new Map();    // Map<sourceID, Map<tileID, tile>>
+    this._failed = new Set();      // Set<failed tileURLs>
     this._tiler = new Tiler();
   }
 
@@ -72,7 +72,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     const groupContainer = this.scene.groups.get('background');
 
     // Collect tile sources - baselayer and overlays
-    const showSources = new Map();   // Map (sourceID -> source)
+    const showSources = new Map();   // Map<sourceID, source>
 
     const base = imagery.baseLayerSource();
     const baseID = base?.key;   // note: use `key` here - for Wayback it will include the date
@@ -97,7 +97,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
       let tileMap = this._tileMaps.get(sourceID);
       if (!tileMap) {
-        tileMap = new Map();   // Map (tileID -> Tile)
+        tileMap = new Map();   // Map<tileID, Tile>
         this._tileMaps.set(sourceID, tileMap);
       }
 
@@ -123,11 +123,11 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
   /**
    * renderSource
-   * @param timestamp        Timestamp in milliseconds
-   * @param viewport         Pixi viewport to use for rendering
-   * @param source           Imagery tile source Object
-   * @param sourceContainer  PIXI.Container to render the tiles to
-   * @param tileMap          Map(tile.id -> Tile) for this tile source
+   * @param  timestamp        Timestamp in milliseconds
+   * @param  viewport         Pixi viewport to use for rendering
+   * @param  source           Imagery tile source Object
+   * @param  sourceContainer  PIXI.Container to render the tiles to
+   * @param  tileMap          Map<tile.id, Tile> for this tile source
    */
   renderSource(timestamp, viewport, source, sourceContainer, tileMap) {
     const context = this.context;
@@ -162,7 +162,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
     // Determine tiles needed to cover the view at the zoom we want,
     // including any zoomed out tiles if this field contains any holes
-    const needTiles = new Map();                // Map(tileID -> tile)
+    const needTiles = new Map();   // Map<tileID, Tile>
 
     // Make sure the min zoom is at least 1.
     // z=0 causes a bug for Mapbox layers to disappear, these use very large tile size.

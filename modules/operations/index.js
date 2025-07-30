@@ -15,3 +15,9 @@ export { operationReverse } from './reverse.js';
 export { operationRotate } from './rotate.js';
 export { operationSplit } from './split.js';
 export { operationStraighten } from './straighten.js';
+
+/**
+ *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
+ *  @typedef  {string}    operationID
+ *  @typedef  {function}  Operation
+ */

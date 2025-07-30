@@ -24,7 +24,7 @@ export {
 
 // At init time, we will instantiate any that are in the 'available' collection.
 export const behaviors = {
-  available:  new Map()  // Map (id -> Behavior constructor)
+  available:  new Map()  // Map<behaviorID, Behavior constructor>
 };
 
 behaviors.available.set('drag', DragBehavior);
@@ -35,3 +35,9 @@ behaviors.available.set('mapInteraction', MapInteractionBehavior);
 behaviors.available.set('mapNudge', MapNudgeBehavior);
 behaviors.available.set('paste', PasteBehavior);
 behaviors.available.set('select', SelectBehavior);
+
+/**
+ *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
+ *  @typedef  {string}            behaviorID
+ *  @typedef  {AbstractBehavior}  Behavior
+ */
