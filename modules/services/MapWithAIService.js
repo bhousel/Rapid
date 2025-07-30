@@ -90,7 +90,8 @@ export class MapWithAIService extends AbstractSystem {
 
     const fbRoads = new RapidDataset(context, {
       id: 'fbRoads',
-      conflated: true,
+//      conflated: true,
+      conflated: false,
       service: 'mapwithai',
       categories: new Set(['meta', 'roads', 'featured']),
       dataUsed: ['mapwithai', 'Facebook Roads'],
@@ -102,7 +103,8 @@ export class MapWithAIService extends AbstractSystem {
 
     const msBuildings = new RapidDataset(context, {
       id: 'msBuildings',
-      conflated: true,
+//      conflated: true,
+      conflated: false,
       service: 'mapwithai',
       categories: new Set(['microsoft', 'buildings', 'featured']),
       dataUsed: ['mapwithai', 'Microsoft Buildings'],
@@ -112,38 +114,38 @@ export class MapWithAIService extends AbstractSystem {
       descriptionStringID: 'rapid_menu.msBuildings.description'
     });
 
-    const omdFootways = new RapidDataset(context, {
-      id: 'omdFootways',
-      conflated: true,
-      service: 'mapwithai',
-      categories: new Set(['meta', 'footways', 'featured']),
-      tags: new Set(['opendata']),
-      overlay: {
-        url: 'https://external.xx.fbcdn.net/maps/vtp/rapid_overlay_footways/2/{z}/{x}/{y}/',
-        minZoom: 1,
-        maxZoom: 15,
-      },
-      dataUsed: ['mapwithai', 'Open Footways'],
-      itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ',
-      licenseUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ#attribution-and-license',
-      labelStringID: 'rapid_menu.omdFootways.label',
-      descriptionStringID: 'rapid_menu.omdFootways.description'
-    });
-
-
-    const metaSyntheticFootways = new RapidDataset(context, {
-      id: 'metaSyntheticFootways',
-      conflated: true,
-      service: 'mapwithai',
-      categories: new Set(['meta', 'footways', 'featured', 'preview']),
-      tags: new Set(['opendata']),
-      dataUsed: ['mapwithai', 'Meta Synthetic Footways'],
-      itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ',
-      licenseUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ#attribution-and-license',
-      labelStringID: 'rapid_menu.metaSyntheticFootways.label',
-      descriptionStringID: 'rapid_menu.metaSyntheticFootways.description'
-    });
-
+//    const omdFootways = new RapidDataset(context, {
+//      id: 'omdFootways',
+//      conflated: true,
+//      service: 'mapwithai',
+//      categories: new Set(['meta', 'footways', 'featured']),
+//      tags: new Set(['opendata']),
+//      overlay: {
+//        url: 'https://external.xx.fbcdn.net/maps/vtp/rapid_overlay_footways/2/{z}/{x}/{y}/',
+//        minZoom: 1,
+//        maxZoom: 15,
+//      },
+//      dataUsed: ['mapwithai', 'Open Footways'],
+//      itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ',
+//      licenseUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ#attribution-and-license',
+//      labelStringID: 'rapid_menu.omdFootways.label',
+//      descriptionStringID: 'rapid_menu.omdFootways.description'
+//    });
+//
+//
+//    const metaSyntheticFootways = new RapidDataset(context, {
+//      id: 'metaSyntheticFootways',
+//      conflated: true,
+//      service: 'mapwithai',
+//      categories: new Set(['meta', 'footways', 'featured', 'preview']),
+//      tags: new Set(['opendata']),
+//      dataUsed: ['mapwithai', 'Meta Synthetic Footways'],
+//      itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ',
+//      licenseUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ#attribution-and-license',
+//      labelStringID: 'rapid_menu.metaSyntheticFootways.label',
+//      descriptionStringID: 'rapid_menu.metaSyntheticFootways.description'
+//    });
+//
     const introGraph = new RapidDataset(context, {
       id: 'rapid_intro_graph',
       hidden: true,
@@ -155,7 +157,7 @@ export class MapWithAIService extends AbstractSystem {
       label: 'Rapid Walkthrough'
     });
 
-    return [fbRoads, msBuildings, omdFootways, metaSyntheticFootways, introGraph];
+    return [fbRoads, msBuildings, /*omdFootways, metaSyntheticFootways,*/ introGraph];
   }
 
 

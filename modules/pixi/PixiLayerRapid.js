@@ -212,13 +212,11 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const service = context.services[dataset.service];  // 'mapwithai' or 'esri'
     if (!service?.started) return;
 
-    const useConflationStr = utilStringQs(window.location.hash).conflation;
-
     let useConflation = dataset.conflated;
-
-    if (useConflationStr === 'false' || useConflationStr === 'no') {
-      useConflation = false;
-    }
+//    const conflationOverride = utilStringQs(window.location.hash).conflation;
+//    if (conflationOverride === 'false' || conflationOverride === 'no') {
+//      useConflation = false;
+//    }
 
     // Adjust the dataset id for whether we want the data conflated or not
     const datasetID = dataset.id + (useConflation ? '-conflated' : '');
@@ -250,9 +248,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       // fb_ai service gives us roads and buildings together,
       // so filter further according to which dataset we're drawing
       if (dataset.id === 'fbRoads'
-          || dataset.id === 'omdFootways'
-          || dataset.id === 'metaSyntheticFootways'
-          || dataset.id === 'rapid_intro_graph') {
+        || dataset.id === 'omdFootways'
+        || dataset.id === 'metaSyntheticFootways'
+        || dataset.id === 'rapid_intro_graph'
+      ) {
         data.lines = entities.filter(d => d.geometry(dsGraph) === 'line' && !!d.tags.highway);
 
         // Gather endpoint vertices, we will render these also
