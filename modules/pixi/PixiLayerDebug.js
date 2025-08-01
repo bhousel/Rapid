@@ -1,4 +1,5 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.js';
+import { PixiFeaturePoint } from './PixiFeaturePoint.js';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.js';
 
 
@@ -42,39 +43,98 @@ export class PixiLayerDebug extends AbstractPixiLayer {
   render(frame, viewport, zoom) {
     if (!this.enabled) return;
 
+    function _isBuilding(entity) {
+      return entity.type === 'way' && (!!entity.tags.building && entity.tags.building !== 'no');
+    }
+
     const context = this.context;
     const spatial = context.systems.spatial;
 
-    const parentContainer = this.scene.groups.get('debug-under');
-    const data = [];  //spatial.getData();
-
-    const style = {
+    const DEFAULTSTYLE = {
       requireFill: true,     // disable partial filling effect
-      fill:   { width: 1, color: 0xffff00, alpha: 0.3 },
+      fill:   { width: 1, color: 0xffff00, alpha: 0.5 },
       casing: { alpha: 0 },  // disable
       stroke: { alpha: 0 }   // disable
     };
+    const POISTYLE = {
+      markerName: 'smallCircle',
+      markerTint: 0xffff00,
+    };
 
-    for (const d of data) {
-      const dataID = d.id;
-      const part = d.geoms.parts[0];
-      if (!part?.world || part?.type !== 'Polygon') continue;
 
-      const featureID = `${this.layerID}-${dataID}`;
-      let feature = this.features.get(featureID);
+    const parentContainer = this.scene.groups.get('debug-under');
+    const msData = spatial.getData('msBuildings').filter(d => _isBuilding(d.data));
+    const osmIndex = spatial.getIndex('osm');
 
-      if (!feature) {
-        feature = new PixiFeaturePolygon(this, featureID);
-        feature.allowInteraction = false;
-        feature.style = style;
-        feature.parentContainer = parentContainer;
-        feature.setCoords(part);
-        feature.setData(dataID, d);
+    for (const hit of msData) {
+      if (!osmIndex.tiles.collides(hit)) continue;  // is osm data loaded here?
+
+      const data = hit.data;
+      // if (data.type !== 'way') continue;  // consider ways only (not the nodes at the corners)
+
+      const dataID = data.id;
+      const version = data.v || 0;
+      const parts = data.geoms.parts;
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (!part.world) continue;  // invalid?
+
+        const extent = part.world.extent;
+        const poi = part.world.poi;  // Pole of Inaccessability
+        const outer = extent.polygon();
+
+        // bounding box
+        const featureID = `${this.layerID}-${dataID}-${i}`;
+        let feature = this.features.get(featureID);
+        if (!feature) {
+          feature = new PixiFeaturePolygon(this, featureID);
+          feature.allowInteraction = false;
+          feature.parentContainer = parentContainer;
+
+          feature.v = version;
+          const source = { type: 'Polygon', world: { extent: extent, coords: [ outer ] } };
+          feature.setCoords(source);
+
+          // Start with default style, and apply adjustments
+          // set style = red if collides, green if not
+          const style = Object.assign({}, DEFAULTSTYLE);
+          const box = { minX: poi[0], minY: poi[1], maxX: poi[0], maxY: poi[1] };
+          // does this test point hit an OSM building?
+          const didHitBuilding = osmIndex.data.search(box).find(result => _isBuilding(result.data));
+
+          if (didHitBuilding) {
+            // console.log(`${dataID} id hit osm building ${didHitBuilding.data.id}`);
+            style.fill.color = 0xff0000;  // red
+          } else {
+            style.fill.color = 0x00ff00;  // green
+          }
+          feature.style = style;
+        }
+
+        // this.syncFeatureClasses(feature);
+        feature.update(viewport, zoom);
+        this.retainFeature(feature, frame);
+
+        // visualize test point
+        const poifeatureID = `${this.layerID}-${dataID}-${i}-poi`;
+        let poifeature = this.features.get(poifeatureID);
+        if (!poifeature) {
+          poifeature = new PixiFeaturePoint(this, poifeatureID);
+          poifeature.allowInteraction = false;
+          poifeature.parentContainer = parentContainer;
+
+          poifeature.v = version;
+          const source = { type: 'Point', world: { coords: poi } };
+          poifeature.setCoords(source);
+          poifeature.style = POISTYLE;
+        }
+
+        // this.syncFeatureClasses(poifeature);
+        poifeature.update(viewport, zoom);
+        this.retainFeature(poifeature, frame);
       }
 
-      // this.syncFeatureClasses(feature);
-      feature.update(viewport, zoom);
-      this.retainFeature(feature, frame);
     }
   }
 

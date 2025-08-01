@@ -49,7 +49,7 @@ export class MapWithAIService extends AbstractSystem {
         // allocate a special dataset for the rapid intro graph.
         const datasetID = 'rapid_intro_graph';
         const graph = new Graph(this.context);
-        const tree = new Tree(graph);
+        const tree = new Tree(graph, datasetID);
         const cache = {
           inflight: {},
           loaded: new Set(),           // Set<tileID>
@@ -172,13 +172,13 @@ export class MapWithAIService extends AbstractSystem {
       this._deferred.delete(handle);
     }
 
-    for (const ds of Object.values(this._datasets)) {
+    for (const [datasetID, ds] of Object.entries(this._datasets)) {
       if (ds.cache.inflight) {
         Object.values(ds.cache.inflight).forEach(controller => this._abortRequest(controller));
       }
       ds.lastv = null;
       ds.graph = new Graph(this.context);
-      ds.tree = new Tree(ds.graph);
+      ds.tree = new Tree(ds.graph, datasetID);
       ds.cache = {
         inflight: {},
         loaded: new Set(),           // Set(tileID)
@@ -225,7 +225,7 @@ export class MapWithAIService extends AbstractSystem {
     } else {
       // as tile requests arrive, setup the resources needed to hold the results
       graph = new Graph(this.context);
-      tree = new Tree(graph);
+      tree = new Tree(graph, datasetID);
       cache = {
         inflight: {},
         loaded: new Set(),           // Set<tileID>

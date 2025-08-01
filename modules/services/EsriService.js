@@ -73,13 +73,13 @@ export class EsriService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
-    for (const ds of Object.values(this._datasets)) {
+    for (const [datasetID, ds] of Object.entries(this._datasets)) {
       for (const controller of ds.cache.inflight.values()) {
         controller.abort();
       }
 
       ds.graph = new Graph(this.context);
-      ds.tree = new Tree(ds.graph);
+      ds.tree = new Tree(ds.graph, datasetID);
       ds.cache = {
         inflight:  new Map(),   // Map<tileID, AbortController>
         loaded:    new Map(),   // Map<tileID, Tile>
@@ -282,7 +282,7 @@ export class EsriService extends AbstractSystem {
 
     this._datasets[ds.id] = ds;
     ds.graph = new Graph(this.context);
-    ds.tree = new Tree(ds.graph);
+    ds.tree = new Tree(ds.graph, ds.id);
     ds.cache = {
       inflight:  new Map(),   // Map<tileID, AbortController>
       loaded:    new Map(),   // Map<tileID, Tile>

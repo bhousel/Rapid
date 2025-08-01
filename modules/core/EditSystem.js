@@ -202,7 +202,7 @@ export class EditSystem extends AbstractSystem {
     const staging = new Edit({ graph: currGraph });
     this._staging = staging;
     this._hasWorkInProgress = false;
-    this._tree = new Tree(currGraph);
+    this._tree = new Tree(currGraph, 'osm');
 
     this._stableKey = baseGraph.key;
     this._stableSnapshot = baseGraph.snapshot();

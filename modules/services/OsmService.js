@@ -183,8 +183,8 @@ export class OsmService extends AbstractSystem {
       toLoad: new Set(),
       loaded: new Set(),
       inflight: {},
-      seen: new Set(),
-      rbush: new RBush()
+      seen: new Set()
+//      rbush: new RBush()
     };
 
     this._noteCache = {
@@ -934,7 +934,10 @@ export class OsmService extends AbstractSystem {
     if (cache.loaded.has(tile.id) || cache.inflight[tile.id]) return;
 
     // Exit if this tile covers a blocked region (all corners are blocked)
-    const locations = this.context.systems.locations;
+    const context = this.context;
+    const locations = context.systems.locations;
+    const spatial = context.systems.spatial;
+
     const corners = tile.wgs84Extent.polygon().slice(0, 4);
     const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
     if (tileBlocked) {
@@ -951,9 +954,10 @@ export class OsmService extends AbstractSystem {
       if (!err) {
         cache.toLoad.delete(tile.id);
         cache.loaded.add(tile.id);
-        const bbox = tile.wgs84Extent.bbox();
-        bbox.id = tile.id;
-        cache.rbush.insert(bbox);
+spatial.insertTiles('osm', [tile]);
+//        const bbox = tile.wgs84Extent.bbox();
+//        bbox.id = tile.id;
+//        cache.rbush.insert(bbox);
       }
       if (callback) {
         callback(err, Object.assign({}, results, { tile: tile }));
@@ -975,8 +979,17 @@ export class OsmService extends AbstractSystem {
 
 
   isDataLoaded(loc) {
-    const bbox = { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] };
-    return this._tileCache.rbush.collides(bbox);
+const context = this.context;
+const spatial = context.systems.spatial;
+const viewport = context.viewport;
+
+const world = viewport.wgs84ToWorld(loc);
+const box = { minX: world[0], minY: world[1], maxX: world[0], maxY: world[1] };
+const { tiles } = spatial.getIndex('osm');
+return tiles.collides(box);
+
+//    const box = { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] };
+//    return this._tileCache.rbush.collides(box);
   }
 
 
