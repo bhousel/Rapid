@@ -159,43 +159,25 @@ describe('GeoJSON', () => {
     });
   });
 
-  describe('#update', () => {
+  describe('update', () => {
     it('returns a new GeoJSON element', () => {
       const a = new Rapid.GeoJSON(context, sample.point);
       const b = a.update({});
       assert.instanceOf(b, Rapid.GeoJSON);
       assert.notStrictEqual(a, b);
     });
+  });
 
-    it('updates the specified props', () => {
-      const orig = { crs: 'epsg:3857' };
-      const result = new Rapid.GeoJSON(context, sample.point).update(orig);
-      assert.deepInclude(result.props, orig);
-    });
-
-    it('preserves existing properties', () => {
-      const orig = { crs: 'epsg:3857' };
-      const result = new Rapid.GeoJSON(context, sample.point).update(orig);
-      assert.deepInclude(result.props, orig);
-      assert.deepInclude(result.props.properties, { foo: 'bar'});  // sample point contains this property
-    });
-
-    it('doesn\'t copy prototype properties', () => {
-      const props = { crs: 'epsg:3857' };
-      const result = new Rapid.GeoJSON(context, sample.point).update(props);
-      assert.doesNotHaveAnyKeys(result.props, ['constructor', '__proto__', 'toString']);
-    });
-
-    it('updates v', () => {
+  describe('updateSelf', () => {
+    it('returns the same GeoJSON element', () => {
       const a = new Rapid.GeoJSON(context, sample.point);
-      const v1 = a.v;
-      const b = a.update({});
-      assert.isAbove(b.v, v1);
+      const b = a.updateSelf({});
+      assert.instanceOf(b, Rapid.GeoJSON);
+      assert.strictEqual(a, b);
     });
   });
 
-
-  describe('#asGeoJSON', () => {
+  describe('asGeoJSON', () => {
     it('returns the originally cloned GeoJSON data, stored in props', () => {
       const a = new Rapid.GeoJSON(context, sample.point);
       const result = a.asGeoJSON();
@@ -235,7 +217,7 @@ describe('GeoJSON', () => {
     });
   });
 
-  describe('#extent', () => {
+  describe('extent', () => {
     it('returns null for empty GeoJSON', () => {
       const data = new Rapid.GeoJSON(context, {});
       const extent = data.extent();
@@ -291,7 +273,7 @@ describe('GeoJSON', () => {
     });
   });
 
-  describe('#intersects', () => {
+  describe('intersects', () => {
     it('returns true for a Point within the given extent', () => {
       const data = new Rapid.GeoJSON(context, sample.point);
       const extent = new Rapid.sdk.Extent([-5, -5], [5, 5]);

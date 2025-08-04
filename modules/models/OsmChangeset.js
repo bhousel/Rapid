@@ -30,19 +30,6 @@ export class OsmChangeset extends OsmEntity {
   }
 
   /**
-   * update
-   * Update the data element's properties and return a new data element.
-   * data elements are intended to be immutable.  To modify a data element,
-   *  pass in the properties to change, and you'll get a new data element.
-   * The new data element will have an updated `v` internal version number.
-   * @param   {Object}        props - the updated properties
-   * @return  {OsmChangeset}  a new OsmChangeset
-   */
-  update(props) {
-    return new OsmChangeset(this, props).touch();
-  }
-
-  /**
    * asGeoJSON
    * Returns a GeoJSON representation of the OsmChangeset.
    * (This currently returns an unlocated Feature, but we could return a bounding box or something)

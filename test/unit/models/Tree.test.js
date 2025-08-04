@@ -6,7 +6,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe.skip('Tree', () => {
   const context = new Rapid.MockContext();
 
-  describe('#rebase', () => {
+  describe('rebase', () => {
     it('adds entities to the tree', () => {
       const graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);
@@ -85,7 +85,7 @@ describe.skip('Tree', () => {
   });
 
 
-  describe('#intersects', () => {
+  describe('intersects', () => {
     it('includes entities within extent, excludes those without', () => {
       let graph = new Rapid.Graph(context);
       const tree = new Rapid.Tree(graph);

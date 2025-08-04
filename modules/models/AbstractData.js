@@ -56,6 +56,7 @@ export class AbstractData {
     this.geoms.destroy();
     this.geoms = null;
     this.props = null;
+    this.context = null;
   }
 
   /**
@@ -66,10 +67,10 @@ export class AbstractData {
    * The new data element will have an updated `v` internal version number.
    * @param   {Object}        props - the updated properties
    * @return  {AbstractData}  a new data element
-   * @abstract
    */
-  update(props = {}) {
-    throw new Error(`Do not call 'update' on AbstractData`);
+  update(props) {
+    const Type = this.constructor;
+    return new Type(this, props).touch();
   }
 
   /**

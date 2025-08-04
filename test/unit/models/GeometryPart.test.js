@@ -25,11 +25,12 @@ describe('GeometryPart', () => {
       assert.isNotOk(part.type);
       assert.isNull(part.orig);
       assert.isNull(part.world);
+      assert.isNull(part.context);
     });
   });
 
   describe('reset', () => {
-    it('resets a Geometry', () => {  // reset and destroy do the same thing here
+    it('resets a Geometry', () => {  // similar to destroy, but leave context alone
       const part = new Rapid.GeometryPart(context);
       part.setData(sample.point.geometry);
       part.reset();

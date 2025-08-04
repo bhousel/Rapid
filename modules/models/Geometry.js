@@ -36,6 +36,7 @@ export class Geometry {
    */
   destroy() {
     this.reset();
+    this.context = null;
   }
 
 
@@ -100,7 +101,7 @@ export class Geometry {
    * @param  {Object}  geojson - source GeoJSON data
    */
   setData(geojson = {}) {
-    this.destroy();
+    this.reset();
 
     const geojsonParts = this._geojsonToParts(geojson);
     if (!geojsonParts.length) return; // do nothing if we found no usable parts

@@ -27,11 +27,12 @@ describe('Geometry', () => {
       assert.lengthOf(geoms.parts, 0);
       assert.isNull(geoms.orig);
       assert.isNull(geoms.world);
+      assert.isNull(geoms.context);
     });
   });
 
   describe('reset', () => {
-    it('resets a Geometry', () => {  // reset and destroy do the same thing here
+    it('resets a Geometry', () => {  // similar to destroy, but leave context alone
       const geoms = new Rapid.Geometry(context);
       geoms.setData(sample.point);
       geoms.reset();

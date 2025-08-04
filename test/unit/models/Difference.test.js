@@ -43,7 +43,7 @@ describe('Difference', () => {
     });
   });
 
-  describe('#changes', () => {
+  describe('changes', () => {
     it('includes created entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const base = new Rapid.Graph(context);
@@ -149,7 +149,7 @@ describe('Difference', () => {
   });
 
 
-  describe('#created', () => {
+  describe('created', () => {
     it('returns an array of created entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const base = new Rapid.Graph(context);
@@ -159,7 +159,7 @@ describe('Difference', () => {
     });
   });
 
-  describe('#modified', () => {
+  describe('modified', () => {
     it('returns an array of modified entities', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n' });
       const n2 = n1.move([1, 2]);
@@ -170,7 +170,7 @@ describe('Difference', () => {
     });
   });
 
-  describe('#deleted', () => {
+  describe('deleted', () => {
     it('returns an array of deleted entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const base = new Rapid.Graph(context, [node]);
@@ -180,7 +180,7 @@ describe('Difference', () => {
     });
   });
 
-  describe('#summary', () => {
+  describe('summary', () => {
     const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', tags: { crossing: 'marked' }}),
       new Rapid.OsmNode(context, { id: 'n2' }),
@@ -338,7 +338,7 @@ describe('Difference', () => {
     });
   });
 
-  describe('#complete', () => {
+  describe('complete', () => {
     it('includes created entities', () => {
       const base = new Rapid.Graph(context);
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });

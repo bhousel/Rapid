@@ -44,6 +44,7 @@ export class GeometryPart {
    */
   destroy() {
     this.reset();
+    this.context = null;
   }
 
 
@@ -106,7 +107,7 @@ export class GeometryPart {
    * @param  {Object}  geojson - GeoJSON geometry data
    */
   setData(geojson = {}) {
-    this.destroy();
+    this.reset();
 
     const type = geojson.type;
     const coords = geojson.coordinates;

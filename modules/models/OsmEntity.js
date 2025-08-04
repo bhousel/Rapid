@@ -65,19 +65,6 @@ export class OsmEntity extends AbstractData {
   }
 
   /**
-   * update
-   * Update the data element's properties and return a new data element.
-   * data elements are intended to be immutable.  To modify a data element,
-   *  pass in the properties to change, and you'll get a new data element.
-   * The new data element will have an updated `v` internal version number.
-   * @param   {Object}     props - the updated properties
-   * @return  {OsmEntity}  a new OsmEntity
-   */
-  update(props) {
-    return new OsmEntity(this, props).touch();
-  }
-
-  /**
    * updateGeometry
    * OSM geometry can be complicated.
    * Nodes are easy because they represent a single coordinate.

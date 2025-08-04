@@ -37,7 +37,7 @@ export class Graph {
 
       this.previous = other;
       this.base = other.base;     // Base data is shared among the chain of Graphs
-      this.local = {               // Local data is a clone of the predecessor data
+      this.local = {              // Local data is a clone of the predecessor data
         entities:   new Map(other.local.entities),    // shallow clone
         parentWays: new Map(other.local.parentWays),  // shallow clone
         parentRels: new Map(other.local.parentRels)   // shallow clone
@@ -76,6 +76,20 @@ export class Graph {
       this.props.id = 'g-' + this.context.next('graph');
     }
     this._id = this.props.id;  // for debugging
+  }
+
+
+  /**
+   * destroy
+   * Remove all saved state and free memory.
+   * Do not use the Graph after calling `destroy()`.
+   */
+  destroy() {
+    this.base = null;
+    this.local = null;
+    this.previous = null;
+    this.props = null;
+    this.context = null;
   }
 
 

@@ -58,15 +58,59 @@ describe('AbstractData', () => {
       a.destroy();
       assert.isNull(a.geoms);
       assert.isNull(a.props);
+      assert.isNull(a.context);
     });
   });
 
   describe('update', () => {
-    it('throws when calling AbstractData.update', () => {
+    it('returns a new AbstractData', () => {
       const a = new Rapid.AbstractData(context);
-      assert.throws(() => a.update({}), /do not call/i);
+      const b = a.update({});
+      assert.instanceOf(b, Rapid.AbstractData);
+      assert.notStrictEqual(b, a);
+    });
+
+    it('updates the specified properties', () => {
+      const a = new Rapid.AbstractData(context);
+      const update = { foo: 'bar' };
+      const b = a.update(update);
+      assert.notStrictEqual(b.props, a.props);  // new object, not ===
+      assert.notStrictEqual(b.props, update);   // cloned, not ===
+      assert.deepInclude(b.props, update);
+    });
+
+    it('defaults to empty props argument', () => {
+      const a = new Rapid.AbstractData(context);
+      const b = a.update();
+      assert.notStrictEqual(b.props, a.props);  // new object, not ===
+    });
+
+    it('preserves existing properties', () => {
+      const orig = { hello: 'world' };
+      const a = new Rapid.AbstractData(context, orig);
+      const update = { foo: 'bar' };
+      const b = a.update(update);
+      assert.notStrictEqual(b.props, a.props);   // new object, not ===
+      assert.notStrictEqual(b.props, update);    // cloned, not ===
+      assert.deepInclude(b.props, orig);
+      assert.deepInclude(b.props, update);
+    });
+
+    it('doesn\'t copy prototype properties', () => {
+      const a = new Rapid.AbstractData(context);
+      const update = { foo: 'bar' };
+      const b = a.update(update);
+      assert.doesNotHaveAnyKeys(b.props, ['constructor', '__proto__', 'toString']);
+    });
+
+    it('updates v', () => {
+      const a = new Rapid.AbstractData(context);
+      const v1 = a.v;
+      const b = a.update({});
+      assert.isAbove(b.v, v1);
     });
   });
+
 
   describe('updateSelf', () => {
     it('returns the same AbstractData', () => {

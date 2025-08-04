@@ -32,19 +32,6 @@ export class Marker extends AbstractData {
   }
 
   /**
-   * update
-   * Update the data element's properties and return a new data element.
-   * data elements are intended to be immutable.  To modify a data element,
-   *  pass in the properties to change, and you'll get a new data element.
-   * The new data element will have an updated `v` internal version number.
-   * @param   {Object}  props - the updated properties
-   * @return  {Marker}  a new Marker
-   */
-  update(props) {
-    return new Marker(this, props).touch();
-  }
-
-  /**
    * updateGeometry
    * Forces a recomputation of the internal geometry data.
    * @return  {Marker}  this same Marker

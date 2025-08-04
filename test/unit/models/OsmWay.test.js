@@ -87,50 +87,18 @@ describe('OsmWay', () => {
       const a = new Rapid.OsmWay(context);
       const b = a.update({});
       assert.instanceOf(b, Rapid.OsmWay);
-      assert.notStrictEqual(b, a);
-    });
-
-    it('updates the specified properties', () => {
-      const a = new Rapid.OsmWay(context);
-      const update = { foo: 'bar' };
-      const b = a.update(update);
-      assert.notStrictEqual(b.props, a.props);  // new object, not ===
-      assert.notStrictEqual(b.props, update);   // cloned, not ===
-      assert.deepInclude(b.props, update);
-    });
-
-    it('defaults to empty props argument', () => {
-      const a = new Rapid.OsmWay(context);
-      const b = a.update();
-      assert.notStrictEqual(b.props, a.props);  // new object, not ===
-    });
-
-    it('preserves existing properties', () => {
-      const orig = { id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'residential' } };
-      const a = new Rapid.OsmWay(context, orig);
-      const update = { foo: 'bar' };
-      const b = a.update(update);
-      assert.notStrictEqual(b.props, a.props);   // new object, not ===
-      assert.notStrictEqual(b.props, update);    // cloned, not ===
-      assert.deepInclude(b.props, orig);
-      assert.deepInclude(b.props, update);
-    });
-
-    it('doesn\'t copy prototype properties', () => {
-      const a = new Rapid.OsmWay(context);
-      const update = { tags: { amenity: 'cafe' } };
-      const b = a.update(update);
-      assert.doesNotHaveAnyKeys(b.props, ['constructor', '__proto__', 'toString']);
-    });
-
-    it('updates v', () => {
-      const a = new Rapid.OsmWay(context);
-      const v1 = a.v;
-      const b = a.update({});
-      assert.isAbove(b.v, v1);
+      assert.notStrictEqual(a, b);
     });
   });
 
+  describe('updateSelf', () => {
+    it('returns the same OsmWay', () => {
+      const a = new Rapid.OsmWay(context);
+      const b = a.updateSelf({});
+      assert.instanceOf(b, Rapid.OsmWay);
+      assert.strictEqual(a, b);
+    });
+  });
 
   describe('copy', () => {
     it('returns a new OsmWay', () => {
