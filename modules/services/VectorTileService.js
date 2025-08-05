@@ -372,7 +372,7 @@ export class VectorTileService extends AbstractSystem {
           part._layerID = layerID;
           part._origID = origID;
 
-          const feat = new GeoJSON(this.context, part);
+          const feat = new GeoJSON(this.context, { geojson: part });
           const featureID = feat.id;  // the generated ID
           // rewind?  really something that `GeometryPart` should handle now
 
@@ -572,7 +572,7 @@ export class VectorTileService extends AbstractSystem {
       part._layerID = source.props._layerID;
       part._origID = source.props._origID;
 
-      const feat = new GeoJSON(this.context, part);
+      const feat = new GeoJSON(this.context, { geojson: part });
       const featureID = feat.id;  // the generated ID
       // rewind?  really something that `GeometryPart` should handle now
 

@@ -526,7 +526,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       // We may have a Feature or a FeatureCollection, coax it to an array of Features.
       const features = geojsonFeatures(geojson);
       for (const feature of features) {
-        const d = new GeoJSON(this.context, feature);
+        const d = new GeoJSON(this.context, { geojson: feature });
         this._geoData.push(d);
         const extent = d.extent();
         if (extent) {

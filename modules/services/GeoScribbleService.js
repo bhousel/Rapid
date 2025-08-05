@@ -156,10 +156,8 @@ export class GeoScribbleService extends AbstractSystem {
       throw new Error('Invalid response');
     }
 
-    for (const props of response.features) {
-      props.serviceID = this.id;
-
-      const d = new GeoJSON(this.context, props);
+    for (const feature of response.features) {
+      const d = new GeoJSON(this.context, { serviceID: this.id, geojson: feature });
       const extent = d.extent();
       if (!extent) continue;  // invalid shape?
 

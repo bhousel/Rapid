@@ -133,8 +133,8 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     const showFlatPhotos = photos.showsPhotoType('flat');
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
-    return sequences.filter(seq => {
-      const props = seq.properties;
+    return sequences.filter(sequence => {
+      const props = sequence.props;
       if (!showFlatPhotos && !props.isPano) return false;
       if (!showPanoramicPhotos && props.isPano) return false;
 

@@ -319,7 +319,7 @@ export class KartaviewService extends AbstractSystem {
           .remove();
 
         const sequence = cache.sequences.get(image.props.sequenceID);
-        const r = sequence?.properties?.rotation ?? 0;
+        const r = sequence?.props?.rotation ?? 0;
 
         $imageWrap
           .append('img')
@@ -517,9 +517,12 @@ export class KartaviewService extends AbstractSystem {
         // Rebuild the geometry for the the seen sequences.
         // Update geometry in-place.. hope this is ok.
         for (const sequence of seenSequences) {
-          const geojson = sequence.props;
-          const images = geojson.properties.images;
-          geojson.geometry.coordinates = images.map(i => i.loc).filter(Boolean);
+          const geojson = sequence.props.geojson;
+          const imageIDs = sequence.props.imageIDs;
+          geojson.geometry.coordinates = imageIDs.map(imageID => {
+            const image = cache.images.get(imageID);
+            return image?.loc;
+          }).filter(Boolean);
           sequence.updateGeometry().touch();
         }
 
@@ -594,9 +597,12 @@ export class KartaviewService extends AbstractSystem {
 
         // Rebuild the geometry for the the seen sequence.
         // Update geometry in-place.. hope this is ok.
-        const geojson = sequence.props;
-        const images = geojson.properties.images;
-        geojson.geometry.coordinates = images.map(i => i.loc).filter(Boolean);
+        const geojson = sequence.props.geojson;
+        const imageIDs = sequence.props.imageIDs;
+        geojson.geometry.coordinates = imageIDs.map(imageID => {
+          const image = cache.images.get(imageID);
+          return image?.loc;
+        }).filter(Boolean);
         sequence.updateGeometry().touch();
 
         const gfx = context.systems.gfx;
@@ -644,12 +650,12 @@ export class KartaviewService extends AbstractSystem {
     const sequence = this._cache.sequences.get(image.props.sequenceID);
     if (!sequence) return;
 
-    let r = sequence.properties.rotation || 0;
+    let r = sequence.props?.rotation || 0;
     r += deg;
 
     if (r > 180) r -= 360;
     if (r < -180) r += 360;
-    sequence.properties.rotation = r;  // Update properties in-place.. hope this is ok.
+    sequence.props.rotation = r;  // Update properties in-place.. hope this is ok.
 
     const $wrapper = context.container().select('.photoviewer .osc-wrapper');
 
@@ -709,10 +715,10 @@ export class KartaviewService extends AbstractSystem {
     if (!sequence) return;
 
     const nextIndex = image.props.sequenceIndex + stepBy;
-    const nextImage = sequence.properties.images[nextIndex];
-    if (!nextImage) return;
+    const nextImageID = sequence.props.imageIDs[nextIndex];
+    if (!nextImageID) return;
 
-    photos.selectPhoto('kartaview', nextImage.id);
+    photos.selectPhoto('kartaview', nextImageID);
 
     this.emit('imageChanged');
   }
@@ -722,45 +728,41 @@ export class KartaviewService extends AbstractSystem {
    * _cacheImage
    * Store the given image in the caches
    * @param   {Object}  cache - the cache to use
-   * @param   {Object}  props - the image properties
+   * @param   {Object}  source - the image properties
    * @return  {Marker}  The image
    */
-  _cacheImage(cache, props) {
-    let image = cache.images.get(props.id);
+  _cacheImage(cache, source) {
+    let image = cache.images.get(source.id);
     if (!image) {
       image = new Marker(this.context, {
         type:       'photo',
         serviceID:  this.id,
-        id:         props.id,
-        loc:        props.loc
+        id:         source.id,
+        loc:        source.loc
       });
 
       cache.images.set(image.id, image);
 
-      const [x, y] = props.loc;
+      const [x, y] = source.loc;
       cache.rbush.insert({ minX: x, minY: y, maxX: x, maxY: y, data: image });
     }
 
     // Allow 0, but not things like NaN, null, Infinity
-    const caIsNumber = (!isNaN(props.ca) && isFinite(props.ca));
+    const caIsNumber = (!isNaN(source.ca) && isFinite(source.ca));
 
     // Update whatever additional props we were passed..
-    const setProps = {};
-    if (props.sequenceID)     setProps.sequenceID     = props.sequenceID;
-    if (props.sequenceIndex)  setProps.sequenceIndex  = props.sequenceIndex;
-    if (props.captured_at)    setProps.captured_at    = props.captured_at;
-    if (props.captured_by)    setProps.captured_by    = props.captured_by;
-    if (caIsNumber)           setProps.ca             = props.ca;
-    if (props.isPano)         setProps.isPano         = props.isPano;
-    if (props.imageLowUrl)    setProps.imageLowUrl    = props.imageLowUrl;   // thumbnail
-    if (props.imageMedUrl)    setProps.imageMedUrl    = props.imageMedUrl;   // large thumbnail
-    if (props.imageHighUrl)   setProps.imageHighUrl   = props.imageHighUrl;  // full resolution
+    const props = image.props;
+    if (source.sequenceID)     props.sequenceID     = source.sequenceID;
+    if (source.sequenceIndex)  props.sequenceIndex  = source.sequenceIndex;
+    if (source.captured_at)    props.captured_at    = source.captured_at;
+    if (source.captured_by)    props.captured_by    = source.captured_by;
+    if (caIsNumber)            props.ca             = source.ca;
+    if (source.isPano)         props.isPano         = source.isPano;
+    if (source.imageLowUrl)    props.imageLowUrl    = source.imageLowUrl;   // thumbnail
+    if (source.imageMedUrl)    props.imageMedUrl    = source.imageMedUrl;   // large thumbnail
+    if (source.imageHighUrl)   props.imageHighUrl   = source.imageHighUrl;  // full resolution
 
-    if (Object.keys(setProps).length) {
-      image.updateSelf(setProps);
-    }
-
-    return image;
+    return image.touch();
   }
 
 
@@ -779,45 +781,40 @@ export class KartaviewService extends AbstractSystem {
     // Create if needed
     let sequence = cache.sequences.get(sequenceID);
     if (!sequence) {
-      const geojson = {
-        type: 'Feature',
-        id: sequenceID,
+      sequence = new GeoJSON(this.context, {
+        id:         sequenceID,
+        type:       'sequence',
         serviceID:  this.id,
-        properties: {
-          type:       'sequence',
-          serviceID:  this.id,
-          id:         sequenceID,
-          rotation:   0,
-          images:     [],
-          firstIndex: Infinity,
-          firstImage: null
-        },
-        geometry: {
-          type: 'LineString',
-          coordinates: []
+        imageIDs:   [],
+        rotation:   0,
+        firstIndex: Infinity,
+        geojson: {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: []
+          }
         }
-      };
+      });
 
-      sequence = new GeoJSON(this.context, geojson);
       cache.sequences.set(sequenceID, sequence);
     }
 
-    // We will update the properties in-place.. hope this is ok.
-    const properties = sequence.properties;
+    // Update sequence properties as needed.
+    const props = sequence.props;
 
-    // Insert image into sequence - note that `images` may be a sparse array.
-    properties.images[sequenceIndex] = image;
+    // Insert image into sequence - note that `imageIDs` may be a sparse array.
+    props.imageIDs[sequenceIndex] = image.id;
 
     // Set metadata for this sequence according to the earliest image.
-    if (sequenceIndex < properties.firstIndex) {
-      properties.firstIndex  = sequenceIndex;
-      properties.firstImage  = image;
-      properties.isPano      = image.props.isPano;
-      properties.captured_at = image.props.captured_at;
-      properties.captured_by = image.props.captured_by;
+    if (sequenceIndex < props.firstIndex) {
+      props.firstIndex  = sequenceIndex;
+      props.isPano      = image.props.isPano;
+      props.captured_at = image.props.captured_at;
+      props.captured_by = image.props.captured_by;
     }
 
-    return sequence;
+    return sequence.touch();
   }
 
 }

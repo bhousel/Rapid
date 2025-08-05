@@ -204,10 +204,10 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
     return sequences.filter(sequence => {
-      const seq = sequence.props.features[0];  // Expect a FeatureCollection, use the first feature
-      if (!seq) return false;
+      const first = sequence.props.geojson.features[0];  // Expect a FeatureCollection, use the first feature
+      if (!first) return false;
 
-      const props = seq.properties;
+      const props = first.properties;
       if (!showFlatPhotos && !props.is_pano) return false;
       if (!showPanoramicPhotos && props.is_pano) return false;
 

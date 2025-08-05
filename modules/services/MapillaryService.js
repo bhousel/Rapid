@@ -826,15 +826,18 @@ export class MapillaryService extends AbstractSystem {
         const sequenceID = feature.properties.id.toString();
         let sequence = cache.data.get(sequenceID);
         if (!sequence) {
-          sequence = new GeoJSON(this.context, {
-            type:      'FeatureCollection',
-            serviceID: this.id,
-            id:        sequenceID,     // not strictly spec, but should be
-            features:  []
-          });
+          const props = {
+            id:         sequenceID,
+            serviceID:  this.id,
+            geojson: {
+              type:      'FeatureCollection',
+              features:  []
+            }
+          };
+          sequence = new GeoJSON(this.context, props);
           cache.data.set(sequenceID, sequence);
         }
-        sequence.props.features.push(feature);  // updating it in-place, hope this is ok.
+        sequence.props.geojson.features.push(feature);  // updating it in-place, hope this is ok.
         sequence.updateGeometry().touch();
       }
     }

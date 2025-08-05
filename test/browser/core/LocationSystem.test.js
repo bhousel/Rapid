@@ -110,12 +110,14 @@ describe('LocationSystem', () => {
   describe('#getFeature', () => {
     it('has the world locationSet pre-resolved', () => {
       const result = _locations.getFeature('+[Q2]');
-      expect(result).to.include({ type: 'Feature', id: '+[Q2]' });
+      expect(result instanceof Rapid.GeoJSON).to.be.ok;
+      expect(result.props.geojson).to.include({ type: 'Feature', id: '+[Q2]' });
     });
 
     it('falls back to the world locationSetID in case of errors', () => {
       const result = _locations.getFeature('fake');
-      expect(result).to.include({ type: 'Feature', id: '+[Q2]' });
+      expect(result instanceof Rapid.GeoJSON).to.be.ok;
+      expect(result.props.geojson).to.include({ type: 'Feature', id: '+[Q2]' });
     });
   });
 

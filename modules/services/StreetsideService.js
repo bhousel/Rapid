@@ -814,7 +814,7 @@ export class StreetsideService extends AbstractSystem {
         const trySequenceIDs = (nextBubble && cache.bubbleHasSequences.get(nextBubbleID)) || [];
         for (sequenceID of trySequenceIDs) {
           sequence = cache.sequences.get(sequenceID);
-          const bubbleIDs = sequence.properties.bubbleIDs;
+          const bubbleIDs = sequence.props.bubbleIDs;
           const firstID = bubbleIDs.at(0);
           const lastID = bubbleIDs.at(-1);
           if (nextBubbleID === lastID) {
@@ -835,7 +835,7 @@ export class StreetsideService extends AbstractSystem {
         const trySequenceIDs = (prevBubble && cache.bubbleHasSequences.get(prevBubbleID)) || [];
         for (sequenceID of trySequenceIDs) {
           sequence = cache.sequences.get(sequenceID);
-          const bubbleIDs = sequence.properties.bubbleIDs;
+          const bubbleIDs = sequence.props.bubbleIDs;
           const firstID = bubbleIDs.at(0);
           const lastID = bubbleIDs.at(-1);
           if (prevBubbleID === lastID) {
@@ -857,24 +857,22 @@ export class StreetsideService extends AbstractSystem {
         const sequenceID = `s${sequenceNum}`;
         const bubbleIDs = [currBubbleID];
 
-        const geojson = {
-          type: 'Feature',
-          id: sequenceID,
+        const props = {
+          id:         sequenceID,
+          type:       'sequence',
           serviceID:  this.id,
-          properties: {
-            type:       'sequence',
-            serviceID:  this.id,
-            id:         sequenceID,
-            bubbleIDs:  bubbleIDs,
-            isPano:     true
-          },
-          geometry: {
-            type: 'LineString',
-            coordinates: []
+          bubbleIDs:  bubbleIDs,
+          isPano:     true,
+          geojson: {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: []
+            }
           }
         };
 
-        const sequence = new GeoJSON(this.context, geojson);
+        const sequence = new GeoJSON(this.context, props);
         cache.sequences.set(sequenceID, sequence);
         _updateCaches(sequenceID, currBubbleID);
 
@@ -893,15 +891,15 @@ export class StreetsideService extends AbstractSystem {
     // Any sequences that we touched, bump version number and recompute the coordinate array
     for (const sequenceID of touchedSequenceIDs) {
       const sequence = cache.sequences.get(sequenceID);
-      const properties = sequence.properties;
-      const bubbles = properties.bubbleIDs.map(bubbleID => cache.bubbles.get(bubbleID));
+      const props = sequence.props;
+      const bubbles = props.bubbleIDs.map(bubbleID => cache.bubbles.get(bubbleID));
 
       // We will update the properties in-place.. hope this is ok.
-      properties.captured_at = bubbles[0].props.captured_at;
-      properties.captured_by = bubbles[0].props.captured_by;
+      props.captured_at = bubbles[0].props.captured_at;
+      props.captured_by = bubbles[0].props.captured_by;
 
       // Update geometry in-place.. hope this is ok.
-      sequence.props.geometry.coordinates = bubbles.map(bubble => bubble.loc);
+      sequence.props.geojson.geometry.coordinates = bubbles.map(bubble => bubble.loc);
       sequence.updateGeometry().touch();
     }
   }

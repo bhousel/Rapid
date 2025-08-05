@@ -152,8 +152,8 @@ export class OsmWay extends OsmEntity {
       const result = source.copy(fromGraph, memo);
       nodes.push(result.id);
     }
-
-    return copy.updateSelf({ nodes: nodes });
+    copy.props.nodes = nodes;
+    return copy;
   }
 
 

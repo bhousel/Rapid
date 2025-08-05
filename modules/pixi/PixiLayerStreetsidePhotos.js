@@ -171,8 +171,8 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     const showFlatPhotos = photos.showsPhotoType('flat');
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
-    return sequences.filter(seq => {
-      const props = seq.properties;
+    return sequences.filter(sequence => {
+      const props = sequence.props;
       if (!showFlatPhotos && !props.isPano) return false;
       if (!showPanoramicPhotos && props.isPano) return false;
 
@@ -229,7 +229,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
         feature.setData(dataID, d);
         feature.setCoords(part);
         feature.clearChildData(dataID);
-        d.properties.bubbleIDs.forEach(bubbleID => feature.addChildData(dataID, bubbleID));
+        d.props.bubbleIDs.forEach(bubbleID => feature.addChildData(dataID, bubbleID));
       }
 
       this.syncFeatureClasses(feature);

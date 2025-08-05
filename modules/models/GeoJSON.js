@@ -4,7 +4,7 @@ import { AbstractData } from './AbstractData.js';
 /**
  * GeoJSON
  * This is a wrapper for any kind of arbitrary GeoJSON data.
- * Important:  Pass the entire GeoJSON object into props, not just the GeoJSON `properties`!
+ * Important:  pass the raw GeoJSON source as a `geojson` property.
  *
  * Properties you can access:
  *   `geoms`   Geometry object (inherited from `AbstractData`)
@@ -37,18 +37,27 @@ export class GeoJSON extends AbstractData {
    * @abstract
    */
   updateGeometry() {
-    this.geoms.setData(this.props);
+    this.geoms.setData(this.asGeoJSON());
     return this;
   }
 
   /**
    * asGeoJSON
-   * For compatibility with other data elements, this just returns the original
-   *  GeoJSON data, which we have stored in `props`.
+   * We expect to find the original GeoJSON source in a `geojson` property.
    * @return  {Object}  GeoJSON representation of this data element
    */
   asGeoJSON() {
-    return this.props;
+    if (this.props.geojson) {
+      return Object.assign({}, this.props.geojson, { id: this.id });
+
+    } else {  // fallback
+      return {
+        type: 'Feature',
+        id: this.id,
+        properties: this.props,
+        geometry: null
+      };
+    }
   }
 
   /**
@@ -69,7 +78,7 @@ export class GeoJSON extends AbstractData {
    * @readonly
    */
   get properties() {
-    return this.props.properties || {};
+    return this.props.geojson?.properties || {};
   }
 
 }

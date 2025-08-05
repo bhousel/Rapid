@@ -164,8 +164,8 @@ export class OsmRelation extends OsmEntity {
       const result = source.copy(fromGraph, memo);
       members.push(Object.assign({}, member, { id: result.id }));
     }
-
-    return copy.updateSelf({ members: members });
+    copy.props.members = members;
+    return copy;
   }
 
 

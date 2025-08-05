@@ -76,8 +76,8 @@ export class LocationSystem extends AbstractSystem {
     // Pre-resolve any blocked region locationSets
     const blockedFeatures = this._blocks.map(block => {
       const data = this._resolveLocationSet(block);
-      data.updateSelf(block);  // Update the props in-place to include the block information.
-      return data.props;       // Confusingly, `props` is the where the _actual_ geojson lives.
+      Object.assign(data.props, block);   // Update props in-place to include the block information.
+      return data.asGeoJSON();
     });
 
     // Make a separate which-polygon just for these (static, very few features, very frequent lookups)
@@ -150,7 +150,8 @@ export class LocationSystem extends AbstractSystem {
         let data = this._resolved.get(locationID);
 
         if (!data) {    // first time seeing a location like this
-          data = new GeoJSON(context, loco.resolveLocation(location).feature);
+          const feature = loco.resolveLocation(location).feature;
+          data = new GeoJSON(context, { geojson: feature });
           this._resolved.set(locationID, data);
         }
         area += data.properties.area;
@@ -169,7 +170,8 @@ export class LocationSystem extends AbstractSystem {
         let data = this._resolved.get(locationID);
 
         if (!data) {    // first time seeing a location like this
-          data = new GeoJSON(context, loco.resolveLocation(location).feature);
+          const feature = loco.resolveLocation(location).feature;
+          data = new GeoJSON(context, { geojson: feature });
           this._resolved.set(locationID, data);
         }
         area -= data.properties.area;
@@ -218,11 +220,11 @@ export class LocationSystem extends AbstractSystem {
       }
 
       // Important: here we use the locationSet `id` (`+[Q30]`), not the feature `id` (`Q30`)
-      const props = JSON.parse(JSON.stringify(result.feature));   // deep clone the GeoJSON feature
-      props.id = locationSetID;
-      props.properties.id = locationSetID;
+      const feature = JSON.parse(JSON.stringify(result.feature));   // deep clone the GeoJSON feature
+      feature.id = locationSetID;
+      feature.properties.id = locationSetID;
 
-      data = new GeoJSON(this.context, props);
+      data = new GeoJSON(this.context, { geojson: feature });
       this._resolved.set(locationSetID, data);
       return data;
 
@@ -240,8 +242,7 @@ export class LocationSystem extends AbstractSystem {
    * Rebuilds the whichPolygon index with whatever features have been resolved into GeoJSON.
    */
   _rebuildIndex() {
-    // Confusingly, `props` is the where the _actual_ geojson lives.
-    const features = [...this._resolved.values()].map(d => d.props);
+    const features = [...this._resolved.values()].map(d => d.props.geojson);
     this._wp = whichPolygon({ features: features });
     this.emit('locationchange');
   }
