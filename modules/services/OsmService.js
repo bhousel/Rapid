@@ -181,7 +181,7 @@ export class OsmService extends AbstractSystem {
     this._tileCache = {
       lastv: null,
       toLoad: new Set(),
-      loaded: new Set(),
+      // loaded: new Set(),
       inflight: {},
       seen: new Set()
 //      rbush: new RBush()
@@ -190,7 +190,7 @@ export class OsmService extends AbstractSystem {
     this._noteCache = {
       lastv: null,
       toLoad: new Set(),
-      loaded: new Set(),
+      // loaded: new Set(),
       inflight: {},
       inflightPost: {},
       note: {},
@@ -204,6 +204,10 @@ export class OsmService extends AbstractSystem {
     };
 
     this._changeset = {};
+
+    const spatial = this.context.systems.spatial;
+    spatial.clearCache('osm-data');
+    spatial.clearCache('osm-notes');
 
     return Promise.resolve();
   }
@@ -930,18 +934,19 @@ export class OsmService extends AbstractSystem {
   loadTile(tile, callback) {
     if (this._paused || this.getRateLimit()) return;
 
+    const context = this.context;
     const cache = this._tileCache;
-    if (cache.loaded.has(tile.id) || cache.inflight[tile.id]) return;
+    const spatial = context.systems.spatial;
+    const locations = context.systems.locations;
+
+    if (spatial.hasTile('osm-data', tile.id)) return;
+    if (cache.inflight[tile.id]) return;
 
     // Exit if this tile covers a blocked region (all corners are blocked)
-    const context = this.context;
-    const locations = context.systems.locations;
-    const spatial = context.systems.spatial;
-
     const corners = tile.wgs84Extent.polygon().slice(0, 4);
     const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
     if (tileBlocked) {
-      cache.loaded.add(tile.id);   // don't try again
+      spatial.addTiles('osm-data', tile);   // don't try again
       return;
     }
 
@@ -953,11 +958,7 @@ export class OsmService extends AbstractSystem {
       delete cache.inflight[tile.id];
       if (!err) {
         cache.toLoad.delete(tile.id);
-        cache.loaded.add(tile.id);
-spatial.insertTiles('osm', [tile]);
-//        const bbox = tile.wgs84Extent.bbox();
-//        bbox.id = tile.id;
-//        cache.rbush.insert(bbox);
+        spatial.addTiles('osm-data', [tile]);
       }
       if (callback) {
         callback(err, Object.assign({}, results, { tile: tile }));
@@ -979,22 +980,15 @@ spatial.insertTiles('osm', [tile]);
 
 
   isDataLoaded(loc) {
-const context = this.context;
-const spatial = context.systems.spatial;
-const viewport = context.viewport;
-
-const world = viewport.wgs84ToWorld(loc);
-const box = { minX: world[0], minY: world[1], maxX: world[0], maxY: world[1] };
-const { tiles } = spatial.getIndex('osm');
-return tiles.collides(box);
-
-//    const box = { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] };
-//    return this._tileCache.rbush.collides(box);
+    const spatial = this.context.systems.spatial;
+    return spatial.hasTileAtLoc('osm-data', loc);
   }
 
 
   // Load the tile that covers the given `loc`
   loadTileAtLoc(loc, callback) {
+    const spatial = this.context.systems.spatial;
+
     if (this._paused || this.getRateLimit()) return;
     const cache = this._tileCache;
 
@@ -1014,7 +1008,8 @@ return tiles.collides(box);
     const tiles = this._tiler.zoomRange(this._tileZoom).getTiles(viewport).tiles;
 
     for (const tile of tiles) {
-      if (cache.toLoad.has(tile.id) || cache.loaded.has(tile.id) || cache.inflight[tile.id]) continue;
+      if (spatial.hasTile('osm-data', tile.id)) continue;                   // already loaded
+      if (cache.toLoad.has(tile.id) || cache.inflight[tile.id]) continue;   // queued or inflight
 
       cache.toLoad.add(tile.id);
       this.loadTile(tile, callback);
@@ -1027,9 +1022,13 @@ return tiles.collides(box);
   loadNotes(noteOptions) {
     if (this._paused || this.getRateLimit()) return;
 
+    const context = this.context;
+    const cache = this._noteCache;
+    const spatial = context.systems.spatial;
+    const locations = context.systems.locations;
+
     noteOptions = Object.assign({ limit: 10000, closed: 7 }, noteOptions);
 
-    const cache = this._noteCache;
     const that = this;
     const path = '/api/0.6/notes?limit=' + noteOptions.limit + '&closed=' + noteOptions.closed + '&bbox=';
     const deferLoadUsers = _throttle(() => {
@@ -1050,14 +1049,14 @@ return tiles.collides(box);
 
     // Issue new requests..
     for (const tile of tiles) {
-      if (cache.loaded.has(tile.id) || cache.inflight[tile.id]) continue;
+      if (spatial.hasTile('osm-notes', tile.id)) continue;
+      if (cache.inflight[tile.id]) continue;
 
       // Skip if this tile covers a blocked region (all corners are blocked)
-      const locations = this.context.systems.locations;
       const corners = tile.wgs84Extent.polygon().slice(0, 4);
       const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
       if (tileBlocked) {
-        cache.loaded.add(tile.id);   // don't try again
+        spatial.addTiles('osm-notes', tile.id);   // don't try again
         continue;
       }
 
@@ -1067,7 +1066,7 @@ return tiles.collides(box);
         function(err) {
           delete that._noteCache.inflight[tile.id];
           if (!err) {
-            that._noteCache.loaded.add(tile.id);
+            spatial.addTiles('osm-notes', tile.id);
           }
           // deferLoadUsers();
           const gfx = that.context.systems.gfx;

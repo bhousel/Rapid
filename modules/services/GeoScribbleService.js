@@ -72,12 +72,12 @@ export class GeoScribbleService extends AbstractSystem {
     }
 
     this._cache = {
-      data:      new Map(),   // Map<dataID, GeoJSON>
       inflight:  new Map(),   // Map<tileID, AbortController>
-      loaded:    new Map(),   // Map<tileID, Tile>
-      rbush:     new RBush(),
       lastv:     null         // viewport version last time we fetched data
     };
+
+    const spatial = this.context.systems.spatial;
+    spatial.clearCache(this.id);
 
     return Promise.resolve();
   }
@@ -89,8 +89,8 @@ export class GeoScribbleService extends AbstractSystem {
    * @return  {Array<GeoJSON>}  Array of data
    */
   getData() {
-    const extent = this.context.viewport.visibleExtent();
-    return this._cache.rbush.search(extent.bbox()).map(d => d.data);
+    const spatial = this.context.systems.spatial;
+    return spatial.getVisibleData(this.id).map(d => d.data);
   }
 
 
@@ -100,8 +100,10 @@ export class GeoScribbleService extends AbstractSystem {
    */
   loadTiles() {
     const cache = this._cache;
+    const context = this.context;
+    const spatial = context.systems.spatial;
+    const viewport = context.viewport;
 
-    const viewport = this.context.viewport;
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
     cache.lastv = viewport.v;
 
@@ -119,7 +121,7 @@ export class GeoScribbleService extends AbstractSystem {
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
-      if (cache.loaded.has(tileID) || cache.inflight.has(tileID)) continue;
+      if (spatial.hasTile(this.id, tileID) || cache.inflight.has(tileID)) continue;
 
       const rect = tile.wgs84Extent.rectangle().join(',');
       const url = GEOSCRIBBLE_API + '?' + utilQsString({ bbox: rect });
@@ -132,7 +134,7 @@ export class GeoScribbleService extends AbstractSystem {
         .then(response => this._gotTile(tile, response))
         .catch(err => {
           if (err.name === 'AbortError') return;  // ok
-          cache.loaded.set(tileID, tile);         // don't retry
+          spatial.addTiles(this.id, tile);   // don't retry
           if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         })
         .finally(() => {
@@ -150,23 +152,20 @@ export class GeoScribbleService extends AbstractSystem {
    */
   _gotTile(tile, response) {
     const cache = this._cache;
-    cache.loaded.set(tile.id, tile);
+    const spatial = this.context.systems.spatial;
+
+    spatial.addTiles(this.id, tile);   // mark as loaded
 
     if (!Array.isArray(response?.features)) {
       throw new Error('Invalid response');
     }
 
+    const data = [];
     for (const feature of response.features) {
       const d = new GeoJSON(this.context, { serviceID: this.id, geojson: feature });
-      const extent = d.extent();
-      if (!extent) continue;  // invalid shape?
-
-      cache.data.set(d.id, d);
-
-      const box = extent.bbox();
-      box.data = d;
-      cache.rbush.insert(box);
+      data.push(d);
     }
+    spatial.addData(this.id, data);
 
     const gfx = this.context.systems.gfx;
     gfx.deferredRedraw();

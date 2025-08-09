@@ -1,7 +1,7 @@
 import { zoom as d3_zoom, zoomIdentity as d3_zoomIdentity } from 'd3-zoom';
 import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
-import RBush from 'rbush';
+// import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker, GeoJSON } from '../models/index.js';
@@ -169,13 +169,17 @@ export class KartaviewService extends AbstractSystem {
 
     this._cache = {
       inflight:  new Map(),   // Map<k, {Promise, AbortController}>
-      loaded:    new Set(),   // Set<k>  (where k is like `${tile.id},${nextPage}`)
+//      loaded:    new Set(),   // Set<k>  (where k is like `${tile.id},${nextPage}`)
       nextPage:  new Map(),   // Map<tileID, Number>
-      images:    new Map(),   // Map<imageID, Marker>
-      sequences: new Map(),   // Map<sequenceID, GeoJSON>
-      rbush:     new RBush(),
+//      images:    new Map(),   // Map<imageID, Marker>
+//      sequences: new Map(),   // Map<sequenceID, GeoJSON>
+//      rbush:     new RBush(),
       lastv:     null
     };
+
+    const spatial = this.context.systems.spatial;
+    spatial.clearCache('kartaview-images');
+    spatial.clearCache('kartaview-sequences');
 
     return Promise.resolve();
   }
@@ -187,8 +191,10 @@ export class KartaviewService extends AbstractSystem {
    * @return  {Array<Marker>}  Array of image data
    */
   getImages() {
-    const extent = this.context.viewport.visibleExtent();
-    return this._cache.rbush.search(extent.bbox()).map(d => d.data);
+//    const extent = this.context.viewport.visibleExtent();
+//    return this._cache.rbush.search(extent.bbox()).map(d => d.data);
+    const spatial = this.context.systems.spatial;
+    return spatial.getVisibleData('kartaview-images').map(d => d.data);
   }
 
 
@@ -198,23 +204,25 @@ export class KartaviewService extends AbstractSystem {
    * @return  {Array<GeoJSON>}
    */
   getSequences() {
-    const cache = this._cache;
-    const extent = this.context.viewport.visibleExtent();
-    const results = new Map();  // Map<sequenceID, GeoJSON>
-
-    for (const box of cache.rbush.search(extent.bbox())) {
-      const sequenceID = box.data.props.sequenceID;
-      if (!sequenceID) continue;  // no sequence for this image
-
-      const sequence = cache.sequences.get(sequenceID);
-      if (!sequence) continue;  // sequence not ready
-
-      if (!results.has(sequenceID)) {
-        results.set(sequenceID, sequence);
-      }
-    }
-
-    return [...results.values()];
+    const spatial = this.context.systems.spatial;
+    return spatial.getVisibleData('kartaview-sequences').map(d => d.data);
+//    const cache = this._cache;
+//    const extent = this.context.viewport.visibleExtent();
+//    const results = new Map();  // Map<sequenceID, GeoJSON>
+//
+//    for (const box of cache.rbush.search(extent.bbox())) {
+//      const sequenceID = box.data.props.sequenceID;
+//      if (!sequenceID) continue;  // no sequence for this image
+//
+//      const sequence = cache.sequences.get(sequenceID);
+//      if (!sequence) continue;  // sequence not ready
+//
+//      if (!results.has(sequenceID)) {
+//        results.set(sequenceID, sequence);
+//      }
+//    }
+//
+//    return [...results.values()];
   }
 
 
@@ -234,7 +242,7 @@ export class KartaviewService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     for (const [k, inflight] of cache.inflight) {
-      const needed = needTiles.find(tile => k.indexOf(tile.id) === 0);
+      const needed = needTiles.some(tile => k.indexOf(tile.id) === 0);
       if (!needed) {
         inflight.controller.abort();
       }
@@ -301,6 +309,7 @@ export class KartaviewService extends AbstractSystem {
     }
 
     const context = this.context;
+    const spatial = context.systems.spatial;
     const cache = this._cache;
 
     return this.startAsync()
@@ -318,7 +327,8 @@ export class KartaviewService extends AbstractSystem {
           .selectAll('.osc-image')
           .remove();
 
-        const sequence = cache.sequences.get(image.props.sequenceID);
+//        const sequence = cache.sequences.get(image.props.sequenceID);
+        const sequence = spatial.getData('kartaview-sequences', image.props.sequenceID);
         const r = sequence?.props?.rotation ?? 0;
 
         $imageWrap
@@ -343,6 +353,7 @@ export class KartaviewService extends AbstractSystem {
     const context = this.context;
     const l10n = context.systems.l10n;
     const photos = context.systems.photos;
+    const spatial = context.systems.spatial;
     const $wrapper = context.container().select('.photoviewer .osc-wrapper');
 
     // Options Section
@@ -384,7 +395,8 @@ export class KartaviewService extends AbstractSystem {
     // Attribution Section
     const $attribution = $wrapper.selectAll('.photo-attribution').html('&nbsp;');  // clear DOM content
 
-    const image = this._cache.images.get(imageID);
+//    const image = this._cache.images.get(imageID);
+    const image = spatial.getData('kartaview-images', imageID);
     if (!image) return;
 
     if (image.props.captured_by) {
@@ -454,17 +466,26 @@ export class KartaviewService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when there is nothing more to do
    */
   _loadNextTilePageAsync(tile) {
+    // preserve the original tile.id - we will add append a page number to tile.id
+    tile.origID ??= tile.id;
+
     const context = this.context;
+    const spatial = context.systems.spatial;
+
     const cache = this._cache;
     const bbox = tile.wgs84Extent.bbox();
     const currZoom = context.viewport.transform.zoom;
     const maxPages = this._maxPageAtZoom(currZoom);
-    const nextPage = cache.nextPage.get(tile.id) ?? 1;
+    const nextPage = cache.nextPage.get(tile.origID) ?? 1;
 
     if (nextPage > maxPages) return Promise.resolve();
 
-    const k = `${tile.id},${nextPage}`;
-    if (cache.loaded.has(k) || cache.inflight.has(k)) return Promise.resolve();
+    // Modify the tile.id to include the page number.
+    // This is the tile id that the spatial system will keep track of.
+    const tileID = tile.id = `${tile.origID},${nextPage}`;
+    if (spatial.hasTile('kartaview-images', tileID) || cache.inflight.has(tileID)) {
+      return Promise.resolve();
+    }
 
     const params = utilQsString({
       ipp: MAXRESULTS,
@@ -485,7 +506,7 @@ export class KartaviewService extends AbstractSystem {
     const prom = fetch(url, options)
       .then(utilFetchResponse)
       .then(response => {
-        cache.loaded.add(k);
+        spatial.addTiles('kartaview-images', [tile]);   // mark as loaded
         const data = response?.currentPageItems || [];
         if (!data.length) return;
 
@@ -498,7 +519,7 @@ export class KartaviewService extends AbstractSystem {
 
           // Note that this API call gives us the `username`, but not the image urls.
           // It also uses 'snake_case' instead of 'camelCase'.
-          const image = this._cacheImage(cache, {
+          const image = this._cacheImage({
             id:             imageID,
             sequenceID:     sequenceID,
             loc:            [+d.lng, +d.lat],
@@ -510,7 +531,7 @@ export class KartaviewService extends AbstractSystem {
           });
 
           // Update the sequence to include this image, create if needed..
-          const sequence = this._cacheSequence(cache, image);
+          const sequence = this._cacheSequence(image);
           seenSequences.add(sequence);
         }
 
@@ -520,7 +541,8 @@ export class KartaviewService extends AbstractSystem {
           const geojson = sequence.props.geojson;
           const imageIDs = sequence.props.imageIDs;
           geojson.geometry.coordinates = imageIDs.map(imageID => {
-            const image = cache.images.get(imageID);
+            const image = spatial.getData('kartaview-images', imageID);
+            // const image = cache.images.get(imageID);
             return image?.loc;
           }).filter(Boolean);
           sequence.updateGeometry().touch();
@@ -531,10 +553,10 @@ export class KartaviewService extends AbstractSystem {
         this.emit('loadedData');
 
         if (data.length === MAXRESULTS) {
-          cache.nextPage.set(tile.id, nextPage + 1);
+          cache.nextPage.set(tile.origID, nextPage + 1);
           this._loadNextTilePageAsync(tile);
         } else {
-          cache.nextPage.set(tile.id, Infinity);   // loaded all available pages for this tile
+          cache.nextPage.set(tile.origID, Infinity);   // loaded all available pages for this tile
         }
       })
       .catch(err => {
@@ -542,10 +564,10 @@ export class KartaviewService extends AbstractSystem {
         if (err instanceof Error) console.error(err);  // eslint-disable-line no-console
       })
       .finally(() => {
-        cache.inflight.delete(k);
+        cache.inflight.delete(tileID);
       });
 
-    cache.inflight.set(k, { promise: prom, controller: controller });
+    cache.inflight.set(tileID, { promise: prom, controller: controller });
     return prom;
   }
 
@@ -561,10 +583,12 @@ export class KartaviewService extends AbstractSystem {
    */
   _loadImageAsync(imageID) {
     const context = this.context;
+    const spatial = context.systems.spatial;
     const cache = this._cache;
 
     // If the image is already cached with an imageUrl, we can just resolve.
-    const image = cache.images.get(imageID);
+    // const image = cache.images.get(imageID);
+    const image = spatial.getData('kartaview-images', imageID);
     if (image?.props?.imageLowUrl) return Promise.resolve(image);  // fetched it already
 
     const url = `${OPENSTREETCAM_API}/2.0/photo/${imageID}`;
@@ -579,7 +603,7 @@ export class KartaviewService extends AbstractSystem {
 
         // Note that this API call gives us the image urls, but not the `username`.
         // It also uses 'camelCase' instead of 'snake_case'.
-        const image = this._cacheImage(cache, {
+        const image = this._cacheImage({
           id:             imageID,
           sequenceID:     sequenceID,
           loc:            [+d.lng, +d.lat],
@@ -593,14 +617,15 @@ export class KartaviewService extends AbstractSystem {
         });
 
         // Update the sequence to include this image, create if needed..
-        const sequence = this._cacheSequence(cache, image);
+        const sequence = this._cacheSequence(image);
 
         // Rebuild the geometry for the the seen sequence.
         // Update geometry in-place.. hope this is ok.
         const geojson = sequence.props.geojson;
         const imageIDs = sequence.props.imageIDs;
         geojson.geometry.coordinates = imageIDs.map(imageID => {
-          const image = cache.images.get(imageID);
+          const image = spatial.getData('kartaview-images', imageID);
+          // const image = cache.images.get(imageID);
           return image?.loc;
         }).filter(Boolean);
         sequence.updateGeometry().touch();
@@ -643,11 +668,14 @@ export class KartaviewService extends AbstractSystem {
   _rotate(deg) {
     const context = this.context;
     const photos = context.systems.photos;
+    const spatial = context.systems.spatial;
 
-    const image = this._cache.images.get(photos.currPhotoID);
+//    const image = this._cache.images.get(photos.currPhotoID);
+    const image = spatial.getData('kartaview-images', photos.currPhotoID);
     if (!image) return;
 
-    const sequence = this._cache.sequences.get(image.props.sequenceID);
+//    const sequence = this._cache.sequences.get(image.props.sequenceID);
+    const sequence = spatial.getData('kartaview-sequences', image.props.sequenceID);
     if (!sequence) return;
 
     let r = sequence.props?.rotation || 0;
@@ -707,11 +735,14 @@ export class KartaviewService extends AbstractSystem {
   _step(stepBy) {
     const context = this.context;
     const photos = context.systems.photos;
+    const spatial = context.systems.spatial;
 
-    const image = this._cache.images.get(photos.currPhotoID);
+//    const image = this._cache.images.get(photos.currPhotoID);
+    const image = spatial.getData('kartaview-images', photos.currPhotoID);
     if (!image) return;
 
-    const sequence = this._cache.sequences.get(image.props.sequenceID);
+//    const sequence = this._cache.sequences.get(image.props.sequenceID);
+    const sequence = spatial.getData('kartaview-sequences', image.props.sequenceID);
     if (!sequence) return;
 
     const nextIndex = image.props.sequenceIndex + stepBy;
@@ -727,24 +758,28 @@ export class KartaviewService extends AbstractSystem {
   /**
    * _cacheImage
    * Store the given image in the caches
-   * @param   {Object}  cache - the cache to use
    * @param   {Object}  source - the image properties
    * @return  {Marker}  The image
    */
-  _cacheImage(cache, source) {
-    let image = cache.images.get(source.id);
+  _cacheImage(source) {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+    const imageID = source.id;
+
+    let image = spatial.getData('kartaview-images', imageID);
+//    let image = cache.images.get(source.id);
     if (!image) {
-      image = new Marker(this.context, {
+      image = new Marker(context, {
         type:       'photo',
         serviceID:  this.id,
-        id:         source.id,
+        id:         imageID,
         loc:        source.loc
       });
 
-      cache.images.set(image.id, image);
-
-      const [x, y] = source.loc;
-      cache.rbush.insert({ minX: x, minY: y, maxX: x, maxY: y, data: image });
+//      cache.images.set(image.id, image);
+//
+//      const [x, y] = source.loc;
+//      cache.rbush.insert({ minX: x, minY: y, maxX: x, maxY: y, data: image });
     }
 
     // Allow 0, but not things like NaN, null, Infinity
@@ -762,6 +797,8 @@ export class KartaviewService extends AbstractSystem {
     if (source.imageMedUrl)    props.imageMedUrl    = source.imageMedUrl;   // large thumbnail
     if (source.imageHighUrl)   props.imageHighUrl   = source.imageHighUrl;  // full resolution
 
+    spatial.replaceData('kartaview-images', image);
+
     return image.touch();
   }
 
@@ -770,18 +807,21 @@ export class KartaviewService extends AbstractSystem {
    * _cacheSequence
    * Store the given sequence in the caches.
    * Sequence data is always derived from the image data.
-   * @param   {Object}   cache - the cache to use
    * @param   {Marker}   image - the image that belongs to this sequence
    * @return  {GeoJSON}  The sequence
    */
-  _cacheSequence(cache, image) {
+  _cacheSequence(image) {
+    const context = this.context;
+    const spatial = context.systems.spatial;
     const sequenceID = image.props.sequenceID;
     const sequenceIndex = image.props.sequenceIndex;
 
     // Create if needed
-    let sequence = cache.sequences.get(sequenceID);
+//    let sequence = cache.sequences.get(sequenceID);
+    let sequence = spatial.getData('kartaview-sequences', sequenceID);
+
     if (!sequence) {
-      sequence = new GeoJSON(this.context, {
+      sequence = new GeoJSON(context, {
         id:         sequenceID,
         type:       'sequence',
         serviceID:  this.id,
@@ -797,7 +837,7 @@ export class KartaviewService extends AbstractSystem {
         }
       });
 
-      cache.sequences.set(sequenceID, sequence);
+      // cache.sequences.set(sequenceID, sequence);
     }
 
     // Update sequence properties as needed.
@@ -813,6 +853,8 @@ export class KartaviewService extends AbstractSystem {
       props.captured_at = image.props.captured_at;
       props.captured_by = image.props.captured_by;
     }
+
+    spatial.replaceData('kartaview-sequences', sequence);
 
     return sequence.touch();
   }

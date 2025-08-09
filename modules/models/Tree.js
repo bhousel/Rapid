@@ -1,4 +1,3 @@
-import { Extent } from '@rapid-sdk/math';
 //import RBush from 'rbush';
 
 import { Difference } from './Difference.js';
@@ -19,10 +18,10 @@ export class Tree {
    * @constructor
    * @param  {Graph}  graph - The "current" Graph of entities that this tree is tracking
    */
-  constructor(graph, indexID) {
+  constructor(graph, cacheID) {
     this._currentKey = graph.key;
     this._currentSnapshot = graph.snapshot();
-    this._indexID = indexID;
+    this._cacheID = cacheID;
 
 //    this._entityRBush = new RBush();
 //    this._entityBoxes = new Map();     // Map<entityID, Box Object>
@@ -43,7 +42,7 @@ export class Tree {
     const context = graph.context;
     const spatial = context.systems.spatial;
 
-    spatial.remove(this._indexID, entityID);
+    spatial.removeData(this._cacheID, entityID);
 
 //    const ebox = this._entityBoxes.get(entityID);
 //    if (ebox) {
@@ -74,7 +73,7 @@ export class Tree {
     const context = graph.context;
     const spatial = context.systems.spatial;
 
-    spatial.replace(this._indexID, [...toUpdate.values()]);
+    spatial.replaceData(this._cacheID, [...toUpdate.values()]);
 
 //    let eboxes = [];
 //    let sboxes = [];
@@ -203,7 +202,6 @@ export class Tree {
     const graph = this._currentSnapshot;
     const context = graph.context;
     const spatial = context.systems.spatial;
-    const { boxes } = spatial.getIndex(this._indexID);
 
     const local = graph.local;
     const toUpdate = new Map();
@@ -218,7 +216,7 @@ export class Tree {
       if (isDeleted) continue;
 
       // Entity is already in the tree, skip (unless force = true)
-      if (boxes.has(entityID) && !force) continue;
+      if (spatial.hasData(this._cacheID, entityID) && !force) continue;
 //      if (this._entityBoxes.has(entityID) && !force) continue;
 
       // Add or Replace the Entity
@@ -244,14 +242,7 @@ export class Tree {
 
     const context = graph.context;
     const spatial = context.systems.spatial;
-    const viewport = context.viewport;
-
-// need world coords now
-const min = viewport.wgs84ToWorld([extent.min[0], extent.max[1]]);  // top left
-const max = viewport.wgs84ToWorld([extent.max[0], extent.min[1]]);  // bottom right
-const world = new Extent(min, max);
-
-    return spatial.search(this._indexID, world.bbox()).map(box => graph.entity(box.dataID));
+    return spatial.getVisibleData(this._cacheID).map(box => graph.entity(box.dataID));
 //    return this._entityRBush.search(extent.bbox()).map(ebox => graph.entity(ebox.id));
   }
 

@@ -63,11 +63,10 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
 
     const parentContainer = this.scene.groups.get('debug-under');
-    const msData = spatial.getData('msBuildings').filter(d => _isBuilding(d.data));
-    const osmIndex = spatial.getIndex('osm');
+    const msData = spatial.getVisibleData('msBuildings').filter(d => _isBuilding(d.data));
 
     for (const hit of msData) {
-      if (!osmIndex.tiles.collides(hit)) continue;  // is osm data loaded here?
+      if (!spatial.hasTileAtBox('osm', hit)) continue;  // is osm data loaded here?
 
       const data = hit.data;
       // if (data.type !== 'way') continue;  // consider ways only (not the nodes at the corners)
@@ -101,7 +100,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
           const style = Object.assign({}, DEFAULTSTYLE);
           const box = { minX: poi[0], minY: poi[1], maxX: poi[0], maxY: poi[1] };
           // does this test point hit an OSM building?
-          const didHitBuilding = osmIndex.data.search(box).find(result => _isBuilding(result.data));
+          const didHitBuilding = spatial.getDataAtBox('osm', box).some(result => _isBuilding(result.data));
 
           if (didHitBuilding) {
             // console.log(`${dataID} id hit osm building ${didHitBuilding.data.id}`);
