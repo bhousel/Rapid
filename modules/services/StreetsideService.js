@@ -1,7 +1,11 @@
 import { select as d3_select } from 'd3-selection';
-import { Extent, Tiler, geoMetersToLat, geoMetersToLon, geomRotatePoints, geomPointInPolygon, vecLength } from '@rapid-sdk/math';
+
+import {
+  DEG2RAD, Extent, Tiler, geoMetersToLat, geoMetersToLon,
+  geomRotatePoints, geomPointInPolygon, vecLength
+} from '@rapid-sdk/math';
+
 import { utilQsString } from '@rapid-sdk/util';
-import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker, GeoJSON } from '../models/index.js';
@@ -171,17 +175,16 @@ export class StreetsideService extends AbstractSystem {
     }
 
     this._cache = {
-      rbush:     new RBush(),
-      inflight:  new Map(),   // Map<tileID, {Promise, AbortController}>
-      loaded:    new Set(),   // Set<tileID>
-      bubbles:   new Map(),   // Map<bubbleID, Marker>
-      sequences: new Map(),   // Map<sequenceID, GeoJSON>
+      inflight:            new Map(),  // Map<tileID, {Promise, AbortController}>
       unattachedBubbles:   new Set(),  // Set<bubbleID>
       bubbleHasSequences:  new Map(),  // Map<bubbleID, Array<sequenceID>>
-      metadataPromise:  null,
-      lastv:            null
+      metadataPromise:     null,
+      lastv:               null
     };
 
+    const spatial = this.context.systems.spatial;
+    spatial.clearCache('streetside-images');
+    spatial.clearCache('streetside-sequences');
 
     return Promise.resolve();
   }
@@ -190,11 +193,11 @@ export class StreetsideService extends AbstractSystem {
   /**
    * getImages
    * Get already loaded image data that appears in the current map view
-   * @return  {Array}  Array of image data
+   * @return  {Array<Marker>}  Array of image data
    */
   getImages() {
-    const extent = this.context.viewport.visibleExtent();
-    return this._cache.rbush.search(extent.bbox()).map(d => d.data);
+    const spatial = this.context.systems.spatial;
+    return spatial.getVisibleData('streetside-images').map(d => d.data);
   }
 
 
@@ -204,21 +207,8 @@ export class StreetsideService extends AbstractSystem {
    * @return  {Array<GeoJSON>}  Array of sequence data
    */
   getSequences() {
-    const cache = this._cache;
-    const extent = this.context.viewport.visibleExtent();
-    const results = new Map();  // Map<sequenceID, sequence>
-
-    // Gather sequences for the bubbles in viewport
-    for (const box of cache.rbush.search(extent.bbox())) {
-      const bubbleID = box.data.id;
-      const sequenceIDs = cache.bubbleHasSequences.get(bubbleID) ?? [];
-      for (const sequenceID of sequenceIDs) {
-        if (!results.has(sequenceID)) {
-          results.set(sequenceID, cache.sequences.get(sequenceID));
-        }
-      }
-    }
-    return [...results.values()];
+    const spatial = this.context.systems.spatial;
+    return spatial.getVisibleData('streetside-sequences').map(d => d.data);
   }
 
 
@@ -227,28 +217,31 @@ export class StreetsideService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view
    */
   loadTiles() {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+    const viewport = context.viewport;
     const cache = this._cache;
-    const viewport = this.context.viewport;
+
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
     cache.lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
     // By default: request 2 nearby tiles so we can connect sequences.
     const MARGIN = 2;
-    const tiles = this._tiler.zoomRange(TILEZOOM).margin(MARGIN).getTiles(viewport).tiles;
+    const needTiles = this._tiler.zoomRange(TILEZOOM).margin(MARGIN).getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
     for (const [tileID, inflight] of cache.inflight) {
-      const needed = tiles.find(tile => tile.id === tileID);
-      if (!needed) {
+      const isNeeded = needTiles.some(tile => tile.id === tileID);
+      if (!isNeeded) {
         inflight.controller.abort();
       }
     }
 
     // Issue new requests..
-    for (const tile of tiles) {
+    for (const tile of needTiles) {
       const tileID = tile.id;
-      if (cache.loaded.has(tileID) || cache.inflight.has(tileID)) continue;
+      if (spatial.hasTile('streetside-images', tileID) || cache.inflight.has(tileID)) continue;
 
       // Promise.all([this._fetchMetadataAsync(tile), this._loadTileAsync(tile)])
       this._loadTileAsync(tile);
@@ -309,9 +302,8 @@ export class StreetsideService extends AbstractSystem {
       return Promise.resolve();  // do nothing
     }
 
-    let bubble = this._cache.bubbles.get(bubbleID);
-
     const context = this.context;
+    const spatial = context.systems.spatial;
 
     const $wrapper = context.container().select('.photoviewer .ms-wrapper');
     $wrapper.selectAll('.pnlm-load-box')   // display "loading.."
@@ -320,10 +312,11 @@ export class StreetsideService extends AbstractSystem {
 
     // It's possible we could be trying to show a photo that hasn't been fetched yet
     // (e.g. if we are starting up with a photoID specified in the url hash)
-    if (bubbleID && !bubble) {
+    const bubble = spatial.getData('streetside-images', bubbleID);
+    if (!bubble) {
       this._waitingForPhotoID = bubbleID;
+      return Promise.resolve();
     }
-    if (!bubble) return Promise.resolve();
 
     this._sceneOptions.northOffset = bubble.props.ca;
 
@@ -392,6 +385,7 @@ export class StreetsideService extends AbstractSystem {
     const context = this.context;
     const l10n = context.systems.l10n;
     const photos = context.systems.photos;
+    const spatial = context.systems.spatial;
     const $wrapper = context.container().select('.photoviewer .ms-wrapper');
 
     // Options Section
@@ -443,7 +437,7 @@ export class StreetsideService extends AbstractSystem {
     // Attribution Section
     const $attribution = $wrapper.selectAll('.photo-attribution').html('&nbsp;');  // clear DOM content
 
-    const bubble = this._cache.bubbles.get(bubbleID);
+    const bubble = spatial.getData('streetside-images', bubbleID);
     if (!bubble) return;
 
     const props = bubble.props;
@@ -484,7 +478,7 @@ export class StreetsideService extends AbstractSystem {
       const d = new Date(s);
       if (isNaN(d.getTime())) return null;
 
-      const localeCode = context.systems.l10n.localeCode();
+      const localeCode = l10n.localeCode();
       return d.toLocaleDateString(localeCode, options);
     }
   }
@@ -611,9 +605,11 @@ export class StreetsideService extends AbstractSystem {
   _step(stepBy) {
     const context = this.context;
     const photos = context.systems.photos;
+    const spatial = context.systems.spatial;
+    const viewport = context.viewport;
 
     const currBubbleID = photos.currPhotoID;
-    const selected = this._cache.bubbles.get(currBubbleID);
+    const selected = spatial.getData('streetside-images', currBubbleID);
     if (!selected) return;
 
     let nextID = (stepBy === 1 ? selected.props.ne : selected.props.pr);
@@ -645,36 +641,36 @@ export class StreetsideService extends AbstractSystem {
     let poly = [p1, p2, p3, p4, p1];
 
     // rotate it to face forward/backward
-    const angle = (stepBy === 1 ? ca : ca + 180) * (Math.PI / 180);
+    const angle = (stepBy === 1 ? ca : ca + 180) * DEG2RAD;
     poly = geomRotatePoints(poly, -angle, origin);
 
     const extent = new Extent();
-    for (const point of poly) {
-      extent.extendSelf(point);
+    for (const loc of poly) {
+      extent.extendSelf(viewport.wgs84ToWorld(loc));
     }
 
     // find nearest other bubble in the search polygon
     let minDist = Infinity;
-    this._cache.rbush.search(extent.bbox())
-      .forEach(d => {
-        const bubble = d.data;
-        if (bubble.id === selected.id) return;
-        if (!geomPointInPolygon(bubble.loc, poly)) return;
+    const hits = spatial.getDataAtBox('streetside-images', extent.bbox());
+    for (const hit of hits) {
+      const bubble = hit.data;
+      if (bubble.id === selected.id) continue;
+      if (!geomPointInPolygon(bubble.loc, poly)) continue;
 
-        let dist = vecLength(bubble.loc, selected.loc);
-        const theta = selected.props.ca - bubble.props.ca;
-        const minTheta = Math.min(Math.abs(theta), 360 - Math.abs(theta));
-        if (minTheta > 20) {
-          dist += 5;  // penalize distance if camera angles don't match
-        }
+      let dist = vecLength(bubble.loc, selected.loc);
+      const theta = selected.props.ca - bubble.props.ca;
+      const minTheta = Math.min(Math.abs(theta), 360 - Math.abs(theta));
+      if (minTheta > 20) {
+        dist += 5;  // penalize distance if camera angles don't match
+      }
 
-        if (dist < minDist) {
-          nextID = bubble.id;
-          minDist = dist;
-        }
-      });
+      if (dist < minDist) {
+        nextID = bubble.id;
+        minDist = dist;
+      }
+    }
 
-    const nextBubble = this._cache.bubbles.get(nextID);
+    const nextBubble = spatial.getData('streetside-images', nextID);
     if (!nextBubble) return;
 
     photos.selectPhoto('streetside', nextBubble.id);
@@ -699,17 +695,20 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _loadedBubbleData
+   * _gotTile
    * Processes the results of the tile data fetch.
-   * @param  {Array}  results
+   * @param  {Array<Object>}  results
    */
-  _loadedBubbleData(results) {
-    // const metadata = results[0];
-    // this._cache.loaded.add(results[1].tile.id);
-    // const bubbles = results[1].data;
+  _gotTile(results) {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const photos = context.systems.photos;
+    const spatial = context.systems.spatial;
     const cache = this._cache;
 
-    cache.loaded.add(results.tile.id);
+    const tile = results.tile;
+    spatial.addTiles('streetside-images', [tile]);   // mark as loaded
+
     const bubbles = results.data;
     if (!bubbles) return;
     if (bubbles.error) throw new Error(bubbles.error);
@@ -718,15 +717,15 @@ export class StreetsideService extends AbstractSystem {
     bubbles.shift();
 
     let selectBubbleID = null;
-    const boxes = bubbles.map(bubble => {
-      const bubbleNum = bubble.id;
-      const bubbleID = bubbleNum.toString();
+    const toLoad = [];
+    for (const bubble of bubbles) {
+      const bubbleID = bubble.id.toString();
       if (this._waitingForPhotoID === bubbleID) {
         selectBubbleID = bubbleID;
         this._waitingForPhotoID = null;
       }
 
-      if (cache.bubbles.has(bubbleID)) return null;  // skip duplicates
+      if (spatial.hasData('streetside-images', bubbleID))  continue;  // skip duplicates
 
       const loc = [bubble.lo, bubble.la];
       const props = {
@@ -742,26 +741,18 @@ export class StreetsideService extends AbstractSystem {
         isPano:       true
       };
 
-      const d = new Marker(this.context, props);
-      cache.bubbles.set(bubbleID, d);
+      toLoad.push(new Marker(context, props));
       cache.unattachedBubbles.add(bubbleID);
+    }
 
-      return {
-        minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1], data: d
-      };
-
-    }).filter(Boolean);
-
-    this._cache.rbush.load(boxes);
+    spatial.addData('streetside-images', toLoad);
     this._connectSequences();
 
     if (selectBubbleID) {
-      const photos = this.context.systems.photos;
       photos.selectPhoto();                              // deselect
       photos.selectPhoto('streetside', selectBubbleID);  // reselect
     }
 
-    const gfx = this.context.systems.gfx;
     gfx.deferredRedraw();
     this.emit('loadedData');
   }
@@ -774,7 +765,10 @@ export class StreetsideService extends AbstractSystem {
    * The API we are using is undocumented :(
    */
   _connectSequences() {
+    const context = this.context;
+    const spatial = context.systems.spatial;
     const cache = this._cache;
+
     const touchedSequenceIDs = new Set();  // sequences that we touched will need recalculation
 
     // bubbles that haven't been added to a sequence yet.
@@ -797,14 +791,14 @@ export class StreetsideService extends AbstractSystem {
 
     for (const currBubbleID of toAttach) {
       const isUnattached = cache.unattachedBubbles.has(currBubbleID);
-      const currBubble = cache.bubbles.get(currBubbleID);
+      const currBubble = spatial.getData('streetside-images', currBubbleID);
       if (!currBubble || !isUnattached) continue;   // done already
 
       // Look at adjacent bubbles
       const nextBubbleID = currBubble.props.ne;
-      const nextBubble = nextBubbleID && cache.bubbles.get(nextBubbleID);
+      const nextBubble = nextBubbleID && spatial.getData('streetside-images', nextBubbleID);
       const prevBubbleID = currBubble.props.pr;
-      const prevBubble = prevBubbleID && cache.bubbles.get(prevBubbleID);
+      const prevBubble = prevBubbleID && spatial.getData('streetside-images', prevBubbleID);
 
       // Try to link next bubble back to current bubble.
       // Prefer a sequence where next.pr === currentBubbleID
@@ -813,7 +807,7 @@ export class StreetsideService extends AbstractSystem {
         let sequenceID, sequence;
         const trySequenceIDs = (nextBubble && cache.bubbleHasSequences.get(nextBubbleID)) || [];
         for (sequenceID of trySequenceIDs) {
-          sequence = cache.sequences.get(sequenceID);
+          sequence = spatial.getData('streetside-sequences', sequenceID);
           const bubbleIDs = sequence.props.bubbleIDs;
           const firstID = bubbleIDs.at(0);
           const lastID = bubbleIDs.at(-1);
@@ -834,7 +828,7 @@ export class StreetsideService extends AbstractSystem {
         let sequenceID, sequence;
         const trySequenceIDs = (prevBubble && cache.bubbleHasSequences.get(prevBubbleID)) || [];
         for (sequenceID of trySequenceIDs) {
-          sequence = cache.sequences.get(sequenceID);
+          sequence = spatial.getData('streetside-sequences', sequenceID);
           const bubbleIDs = sequence.props.bubbleIDs;
           const firstID = bubbleIDs.at(0);
           const lastID = bubbleIDs.at(-1);
@@ -873,7 +867,7 @@ export class StreetsideService extends AbstractSystem {
         };
 
         const sequence = new GeoJSON(this.context, props);
-        cache.sequences.set(sequenceID, sequence);
+        spatial.addData('streetside-sequences', sequence);
         _updateCaches(sequenceID, currBubbleID);
 
         // Include previous and next bubbles if we have them loaded
@@ -890,17 +884,17 @@ export class StreetsideService extends AbstractSystem {
 
     // Any sequences that we touched, bump version number and recompute the coordinate array
     for (const sequenceID of touchedSequenceIDs) {
-      const sequence = cache.sequences.get(sequenceID);
-      const props = sequence.props;
-      const bubbles = props.bubbleIDs.map(bubbleID => cache.bubbles.get(bubbleID));
+      const sequence = spatial.getData('streetside-sequences', sequenceID);
+      const bubbles = sequence.props.bubbleIDs
+        .map(bubbleID => spatial.getData('streetside-images', bubbleID));
 
       // We will update the properties in-place.. hope this is ok.
-      props.captured_at = bubbles[0].props.captured_at;
-      props.captured_by = bubbles[0].props.captured_by;
-
-      // Update geometry in-place.. hope this is ok.
+      sequence.props.captured_at = bubbles[0].props.captured_at;
+      sequence.props.captured_by = bubbles[0].props.captured_by;
       sequence.props.geojson.geometry.coordinates = bubbles.map(bubble => bubble.loc);
+
       sequence.updateGeometry().touch();
+      spatial.replaceData('streetside-sequences', sequence);
     }
   }
 
@@ -948,7 +942,7 @@ export class StreetsideService extends AbstractSystem {
     const promise = fetch(bubbleURL, { signal: controller.signal })
       .then(utilFetchResponse)
       .then(data => {
-        this._loadedBubbleData({
+        this._gotTile({
           data: JSON.parse(data),  // Content-Type is 'text/plain' for some reason
           tile: tile
         });

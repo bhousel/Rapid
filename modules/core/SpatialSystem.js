@@ -357,6 +357,33 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
+   * preventCoincidentLoc
+   * This checks if the cache already has something at that location, and if so,
+   *  moves the location down slightly to a location that doesn't conflict.
+   * Used for Markers in situations where you don't want them covering each other.
+   * @param   {string}         cacheID  - the cache to search
+   * @param   {Array<number>}  loc      - the search location (WGS84 [lon,lat])
+   * @return  {Array<number>}  Adjusted [lon,lat] coordinate
+   */
+  preventCoincidentLoc(cacheID, loc) {
+    const viewport = this.context.viewport;
+    const cache = this.getCache(cacheID);
+    let [x, y] = viewport.wgs84ToWorld(loc);
+
+    while (true) {
+      const didCollide = cache.dataRBush.collides({ minX: x, minY: y, maxX: x, maxY: y });
+      if (!didCollide) {
+        return viewport.worldToWgs84([x, y]);
+      } else {
+        // These are in "world coordinates", so we are moving `y` south in "world pixels":
+        // 6356752 (polar radius in meters) * 0.9 (because ±85°) / 256 px * this number = meters moved?
+        y += 0.00001;   // roughly 0.22 meters?
+      }
+    }
+  }
+
+
+  /**
    * getTile
    * Return the reqested tile.
    * @param   {string}   cacheID - the cache to search
@@ -413,11 +440,18 @@ export class SpatialSystem extends AbstractSystem {
  *  @typedef  {string}  cacheID
  *
  *  @typedef  {Object}  Box
- *  @property {number}  minX
- *  @property {number}  minY
- *  @property {number}  maxX
- *  @property {number}  maxY
- *  @property {string}  cacheID
- *  @property {string}  dataID
- *  @property {*}       data
+ *   @property {string}   cacheID
+ *   @property {string}   dataID
+ *   @property {*}        data
+ *   @property {number}   minX
+ *   @property {number}   minY
+ *   @property {number}   maxX
+ *   @property {number}   maxY
+ *
+ *  @typedef  {Object}   Tile
+ *   @property {string}         id          - Tile identifier string ex. '0,0,0'
+ *   @property {Array<number>}  xyz         - Tile coordinate array ex. [0,0,0]
+ *   @property {Extent}         tileExtent  - Extent in world coordinates [x,y]
+ *   @property {Extent}         wgs84Extent - Extent in WGS84 coordinates [lon,lat]
+ *   @property {boolean}        isVisible   - `true` if the tile in view, `false` if not
  */

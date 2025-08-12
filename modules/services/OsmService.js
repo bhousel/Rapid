@@ -1,8 +1,7 @@
-import { Extent, Tiler, Viewport, vecAdd } from '@rapid-sdk/math';
+import { Tiler, Viewport } from '@rapid-sdk/math';
 import { utilArrayChunk, utilArrayGroupBy, utilArrayUniq, utilObjectOmit, utilQsString } from '@rapid-sdk/util';
 import _throttle from 'lodash-es/throttle.js';
 import { osmAuth } from 'osm-auth';
-import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { JXON } from '../util/jxon.js';
@@ -130,7 +129,7 @@ export class OsmService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     return this.resetAsync();
@@ -140,7 +139,7 @@ export class OsmService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -151,7 +150,7 @@ export class OsmService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     for (const handle of this._deferred) {
@@ -181,21 +180,16 @@ export class OsmService extends AbstractSystem {
     this._tileCache = {
       lastv: null,
       toLoad: new Set(),
-      // loaded: new Set(),
       inflight: {},
       seen: new Set()
-//      rbush: new RBush()
     };
 
     this._noteCache = {
       lastv: null,
       toLoad: new Set(),
-      // loaded: new Set(),
       inflight: {},
       inflightPost: {},
-      note: {},
       closed: {},
-      rbush: new RBush()
     };
 
     this._userCache = {
@@ -1024,8 +1018,10 @@ export class OsmService extends AbstractSystem {
 
     const context = this.context;
     const cache = this._noteCache;
-    const spatial = context.systems.spatial;
+    const gfx = context.systems.gfx;
     const locations = context.systems.locations;
+    const spatial = context.systems.spatial;
+    const viewport = context.viewport;
 
     noteOptions = Object.assign({ limit: 10000, closed: 7 }, noteOptions);
 
@@ -1037,7 +1033,6 @@ export class OsmService extends AbstractSystem {
       that.loadUsers(uids, function() {});  // eagerly load user details
     }, 750);
 
-    const viewport = this.context.viewport;
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
     cache.lastv = viewport.v;
 
@@ -1049,27 +1044,27 @@ export class OsmService extends AbstractSystem {
 
     // Issue new requests..
     for (const tile of tiles) {
-      if (spatial.hasTile('osm-notes', tile.id)) continue;
-      if (cache.inflight[tile.id]) continue;
+      const tileID = tile.id;
+      if (spatial.hasTile('osm-notes', tileID)) continue;
+      if (cache.inflight[tileID]) continue;
 
       // Skip if this tile covers a blocked region (all corners are blocked)
       const corners = tile.wgs84Extent.polygon().slice(0, 4);
       const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
       if (tileBlocked) {
-        spatial.addTiles('osm-notes', tile.id);   // don't try again
+        spatial.addTiles('osm-notes', [tile]);   // don't try again
         continue;
       }
 
       const options = { skipSeen: false };
-      cache.inflight[tile.id] = this.loadFromAPI(
+      cache.inflight[tileID] = this.loadFromAPI(
         path + tile.wgs84Extent.toParam(),
         function(err) {
-          delete that._noteCache.inflight[tile.id];
+          delete that._noteCache.inflight[tileID];
           if (!err) {
-            spatial.addTiles('osm-notes', tile.id);
+            spatial.addTiles('osm-notes', [tile]);
           }
           // deferLoadUsers();
-          const gfx = that.context.systems.gfx;
           gfx.deferredRedraw();
           that.emit('loadedNotes');
         },
@@ -1236,9 +1231,7 @@ export class OsmService extends AbstractSystem {
     function cloneCache(source) {
       let target = {};
       for (const [k, v] of Object.entries(source)) {
-        if (k === 'rbush') {
-          target.rbush = new RBush().fromJSON(v.toJSON());  // clone rbush
-        } else if (k === 'note') {
+        if (k === 'note') {
           target.note = {};
           for (const id of Object.keys(v)) {
             target.note[id] = new Marker(source.note[id]);  // clone notes
@@ -1324,47 +1317,48 @@ export class OsmService extends AbstractSystem {
 
   // get all cached notes covering the viewport
   getNotes() {
-    const extent = this.context.viewport.visibleExtent();
-    return this._noteCache.rbush.search(extent.bbox()).map(d => d.data);
+    const spatial = this.context.systems.spatial;
+    return spatial.getVisibleData('osm-notes').map(d => d.data);
   }
 
 
   /**
    * getNote
    * Get a note with given id from cache
-   * @param   {string}  noteID
+   * @param   {string}  dataID
    * @return  {Marker}  the cached note
    */
-  getNote(noteID) {
-    return this._noteCache.note[noteID];
-  }
-
-
-  /**
-   * removeNote
-   * Remove a single note from the cache
-   * @param  {Marker}  note - note to remove
-   */
-  removeNote(note) {
-    if (!(note instanceof Marker) || !note.id) return;
-
-    delete this._noteCache.note[note.id];
-    this._updateRBush(this._encodeNoteRBush(note), false);  // false = remove
+  getNote(dataID) {
+    const spatial = this.context.systems.spatial;
+    return spatial.getData('osm-notes', dataID);
   }
 
 
   /**
    * replaceNote
-   * Replace a single note in the cache
-   * @param   {Marker}  note to replace
-   * @return  {Marker}  the note, or `null` if it couldn't be replaced
+   * Replace a single item in the cache
+   * @param   {Marker}  item to replace
+   * @return  {Marker}  the item, or `null` if it couldn't be replaced
    */
-  replaceNote(note) {
-    if (!(note instanceof Marker) || !note.id) return;
+  replaceNote(item) {
+    if (!(item instanceof Marker) || !item.id) return null;
 
-    this._noteCache.note[note.id] = note;
-    this._updateRBush(this._encodeNoteRBush(note), true);  // true = replace
-    return note;
+    const spatial = this.context.systems.spatial;
+    spatial.replaceData('osm-notes', item);
+    return item;
+  }
+
+
+  /**
+   * removeNote
+   * Remove a single item from the cache
+   * @param  {Marker}  item to remove
+   */
+  removeNote(item) {
+    if (!(item instanceof Marker) || !item.id) return;
+
+    const spatial = this.context.systems.spatial;
+    spatial.removeData('osm-notes', item);
   }
 
 
@@ -1404,7 +1398,7 @@ export class OsmService extends AbstractSystem {
   _abortUnwantedRequests(cache, visibleTiles) {
     for (const k of Object.keys(cache.inflight)) {
       if (cache.toLoad.has(k)) continue;
-      if (visibleTiles.find(tile => tile.id === k)) continue;
+      if (visibleTiles.some(tile => tile.id === k)) continue;
 
       this._abortRequest(cache.inflight[k]);
       delete cache.inflight[k];
@@ -1495,17 +1489,6 @@ export class OsmService extends AbstractSystem {
       }
     }
     return parsedComments;
-  }
-
-
-  _encodeNoteRBush(note) {
-    return {
-      minX: note.loc[0],
-      minY: note.loc[1],
-      maxX: note.loc[0],
-      maxY: note.loc[1],
-      data: note
-    };
   }
 
 
@@ -1774,25 +1757,19 @@ export class OsmService extends AbstractSystem {
   }
 
   _parseNoteXML(xml, uid) {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+
     const attrs = xml.attributes;
     const childNodes = xml.childNodes;
     const props = {
       id: uid,
-      loc: this._getLoc(attrs),
       serviceID: this.id,
       type: 'note'
     };
 
-    // if notes are coincident, move them apart slightly
-    let coincident = false;
-    const epsilon = 0.00001;
-    do {
-      if (coincident) {
-        props.loc = vecAdd(props.loc, [epsilon, epsilon]);
-      }
-      const bbox = new Extent(props.loc).bbox();
-      coincident = this._noteCache.rbush.search(bbox).length;
-    } while (coincident);
+    // If notes are coincident, move them apart slightly..
+    props.loc = spatial.preventCoincidentLoc('osm-notes', this._getLoc(attrs));
 
     // parse note contents
     for (const node of childNodes) {
@@ -1808,10 +1785,7 @@ export class OsmService extends AbstractSystem {
     }
 
     const note = new Marker(this.context, props);
-    const box = this._encodeNoteRBush(note);
-    this._noteCache.note[note.id] = note;
-    this._noteCache.rbush.insert(box);
-
+    spatial.addData('osm-notes', note);
     return note;
   }
 
@@ -1905,16 +1879,6 @@ export class OsmService extends AbstractSystem {
     // Return status
     const apiStatus = xml.getElementsByTagName('status');
     return apiStatus[0].getAttribute('api');   // 'online', 'readonly', or 'offline'
-  }
-
-
-  // replace or remove note from rbush
-  _updateRBush(item, replace) {
-    this._noteCache.rbush.remove(item, (a, b) => a.data.id === b.data.id);
-
-    if (replace) {
-      this._noteCache.rbush.insert(item);
-    }
   }
 
 

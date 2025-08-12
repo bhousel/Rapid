@@ -1,5 +1,4 @@
-import { Tiler, vecSubtract } from '@rapid-sdk/math';
-import RBush from 'rbush';
+import { Tiler } from '@rapid-sdk/math';
 
 import { AbstractSystem } from '../core/AbstractSystem';
 import { Marker } from '../models/Marker.js';
@@ -99,9 +98,11 @@ export class MapRouletteService extends AbstractSystem {
       tileRequest: new Map(),       // Map<tileID, { status, controller, url }>
       challengeRequest: new Map(),  // Map<challengeID, { status, controller, url }>
       inflight: new Map(),          // Map<url, controller>
-      closed: [],                   // Array<{ challengeID, taskID }>
-      rbush: new RBush()
+      closed: []                    // Array<{ challengeID, taskID }>
     };
+
+    const spatial = this.context.systems.spatial;
+    spatial.clearCache('maproulette');
 
     return Promise.resolve();
   }
@@ -140,8 +141,9 @@ export class MapRouletteService extends AbstractSystem {
    * @return  {Array<Marker>}  Array of data
    */
   getData() {
-    const extent = this.context.viewport.visibleExtent();
-    return this._cache.rbush.search(extent.bbox())
+    const spatial = this.context.systems.spatial;
+
+    return spatial.getVisibleData('maproulette')
       .map(d => d.data)
       .filter(task => {
         if (this._challengeIDs.size) {
@@ -155,11 +157,12 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * getTask
-   * @param   {string}   taskID
+   * @param   {string}   dataID
    * @return  {Marker?}  The task with that id, or `undefined` if not found
    */
-  getTask(taskID) {
-    return this._cache.tasks.get(taskID);
+  getTask(dataID) {
+    const spatial = this.context.systems.spatial;
+    return spatial.getData('maproulette', dataID);
   }
 
 
@@ -180,8 +183,11 @@ export class MapRouletteService extends AbstractSystem {
   loadTiles() {
     if (this._paused) return;
 
+    const context = this.context;
+    const spatial = context.systems.spatial;
+    const viewport = context.viewport;
     const cache = this._cache;
-    const viewport = this.context.viewport;
+
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
     cache.lastv = viewport.v;
 
@@ -200,6 +206,8 @@ export class MapRouletteService extends AbstractSystem {
 
     // Issue new requests..
     for (const tile of tiles) {
+      const tileID = tile.id;
+      if (spatial.hasTile('maproulette', tileID)) continue;
       this.loadTile(tile);
     }
   }
@@ -207,10 +215,13 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * loadTile
-   * Schedule any data requests needed to cover the current map view
+   * Load a single tile of data.
    * @param  {Tile}  tile - Tile to load
    */
   loadTile(tile) {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+
     const cache = this._cache;
     if (cache.tileRequest.has(tile.id)) return;
 
@@ -225,6 +236,7 @@ export class MapRouletteService extends AbstractSystem {
     fetch(url, { signal: controller.signal })
       .then(utilFetchResponse)
       .then(data => {
+        spatial.addTiles('maproulette', [tile]);   // mark as loaded
         cache.tileRequest.set(tile.id, { status: 'loaded' });
 
         for (const props of (data ?? [])) {
@@ -238,6 +250,7 @@ export class MapRouletteService extends AbstractSystem {
           cache.tileRequest.delete(tile.id);  // allow retry
         } else {  // real error
           console.error(err);    // eslint-disable-line no-console
+          spatial.addTiles('maproulette', [tile]);              // don't retry
           cache.tileRequest.set(tile.id, { status: 'error' });  // don't retry
         }
       })
@@ -254,6 +267,9 @@ export class MapRouletteService extends AbstractSystem {
   loadChallenges() {
     if (this._paused) return;
 
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial;
     const cache = this._cache;
 
     for (const [challengeID, val] of cache.challengeRequest) {
@@ -272,17 +288,21 @@ export class MapRouletteService extends AbstractSystem {
 
           challenge.isVisible = challenge.enabled && !challenge.deleted;
 
-          // update task statuses
-          for (const task of cache.tasks.values()) {
-            if (task.props.parentId === challengeID) {
-              task.updateSelf({ isVisible: challenge.isVisible });
+          // Update task statuses
+          const toUpdate = [];
+          const allTasks = spatial.getCache('maproulette').data;
+          for (const task of allTasks.values()) {
+            if (task.props.parentId === challengeID && task.props.isVisible !== challenge.isVisible) {
+              task.props.isVisible = challenge.isVisible;
+              task.touch();
+              toUpdate.push(task);
             }
           }
+          spatial.replaceData('maproulette', toUpdate);
 
           // save the challenge
           cache.challenges.set(challengeID, challenge);
 
-          const gfx = this.context.systems.gfx;
           gfx.deferredRedraw();
           this.emit('loadedData');
         })
@@ -445,40 +465,30 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * getError
-   * Get a Task from cache
-   * @param   {string}   taskID - the taskID to get
-   * @return  {Marker?}  The Task, or `undefined` if it wasn't found
+   * replaceItem
+   * Replace a single item in the cache
+   * @param   {Marker}  item to replace
+   * @return  {Marker}  the item, or `null` if it couldn't be replaced
    */
-  getError(taskID) {
-    return this._cache.tasks.get(taskID);
+  replaceItem(item) {
+    if (!(item instanceof Marker) || !item.id) return null;
+
+    const spatial = this.context.systems.spatial;
+    spatial.replaceData('maproulette', item);
+    return item;
   }
 
 
   /**
-   * replaceTask
-   * Replace a single Task in the cache
-   * @param   {Marker}   task - The task to replace
-   * @return  {Marker?}  The Task, or `undefined` if it couldn't be replaced
+   * removeItem
+   * Remove a single item from the cache
+   * @param  {Marker}  item to remove
    */
-  replaceTask(task) {
-    if (!(task instanceof Marker) || !task.id) return;
+  removeItem(item) {
+    if (!(item instanceof Marker) || !item.id) return;
 
-    this._cache.tasks.set(task.id, task);
-    this._updateRBush(this._encodeIssueRBush(task), true); // true = replace
-    return task;
-  }
-
-
-  /**
-   * removeTask
-   * Remove a single Task from the cache
-   * @param   {Marker}  task to remove
-   */
-  removeTask(task) {
-    if (!(task instanceof Marker) || !task.id) return;
-    this._cache.tasks.delete(task.id);
-    this._updateRBush(this._encodeIssueRBush(task), false);
+    const spatial = this.context.systems.spatial;
+    spatial.removeData('maproulette', item);
   }
 
 
@@ -597,42 +607,20 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * _encodeIssueRBush
-   * Convert a Marker to a Box Object for use with RBush.
-   * @param   {Marker}  d - the item to encode
-   * @return  {Object}  Box Object for use with RBush
-   */
-  _encodeIssueRBush(d) {
-    return { minX: d.loc[0], minY: d.loc[1], maxX: d.loc[0], maxY: d.loc[1], data: d };
-  }
-
-
-  /**
-   * _updateRBush
-   * Replace or remove data from the rbush spatial index.
-   * @param   {Marker}   item - the item to replace or remove
-   * @param   {boolean}  replace - if `true` replace the item with the given new item
-   */
-  _updateRBush(item, replace) {
-    this._cache.rbush.remove(item, (a, b) => a.data.id === b.data.id);
-    if (replace) {
-      this._cache.rbush.insert(item);
-    }
-  }
-
-
-  /**
    * _cacheTask
    * Store the given task in the cache
    * @param   {Object}  props - the task properties
    * @return  {Marker}  The task
    */
   _cacheTask(props) {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+
     const cache = this._cache;
     const taskID = props.id.toString();
     const challengeID = props.parentId.toString();
 
-    let task = cache.tasks.get(taskID);
+    let task = spatial.getData('maproulette', taskID);
     if (task) return task;  // seen it already
 
     // Have we seen this challenge before?
@@ -646,33 +634,14 @@ export class MapRouletteService extends AbstractSystem {
 
     props.id = taskID;               // force to string
     props.parentId = challengeID;    // force to string
-    props.loc = this._preventCoincident(cache.rbush, [props.point.lng, props.point.lat]);
+    props.loc = spatial.preventCoincidentLoc('maproulette', [props.point.lng, props.point.lat]);
     props.serviceID = this.id;
 
     // Create a Marker for the task
-    task = new Marker(this.context, props);
-    cache.tasks.set(taskID, task);
-    cache.rbush.insert(this._encodeIssueRBush(task));
+    task = new Marker(context, props);
+    spatial.addData('maproulette', task);
 
     return task;
-  }
-
-
-  /**
-   * _preventCoincident
-   * This checks if the cache already has something at that location, and if so, moves down slightly.
-   * @param   {RBush}          rbush - the spatial cache to check
-   * @param   {Array<number>}  loc   - original [longitude,latitude] coordinate
-   * @return  {Array<number>}  Adjusted [longitude,latitude] coordinate
-   */
-  _preventCoincident(rbush, loc) {
-    for (let dy = 0; ; dy++) {
-      loc = vecSubtract(loc, [0, dy * 0.00001]);
-      const box = { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] };
-      if (!rbush.collides(box)) {
-        return loc;
-      }
-    }
   }
 
 

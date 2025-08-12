@@ -1,8 +1,7 @@
 import * as PIXI from 'pixi.js';
-import { Tiler, vecSubtract } from '@rapid-sdk/math';
+import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 import { marked } from 'marked';
-import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker } from '../models/Marker.js';
@@ -91,12 +90,9 @@ export class OsmoseService extends AbstractSystem {
       }
     }
     this._cache = {
-      issues: new Map(),          // Map<itemID, Marker>
-      loadedTile:    new Map(),   // Map<tileID, Tile>
       inflightTile:  new Map(),   // Map<tileID, AbortController>
       inflightPost:  new Map(),   // Map<dataID, AbortController>
       closed:        {},
-      rbush:         new RBush(),
       lastv:         null         // viewport version last time we fetched data
     };
 
@@ -110,8 +106,8 @@ export class OsmoseService extends AbstractSystem {
    * @return  {Array<Marker>}  Array of data
    */
   getData() {
-    const extent = this.context.viewport.visibleExtent();
-    return this._cache.rbush.search(extent.bbox()).map(d => d.data);
+    const spatial = this.context.systems.spatial;
+    return spatial.getVisibleData('osmose').map(d => d.data);
   }
 
 
@@ -120,9 +116,11 @@ export class OsmoseService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view
    */
   loadTiles() {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+    const viewport = context.viewport;
     const cache = this._cache;
 
-    const viewport = this.context.viewport;
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
     cache.lastv = viewport.v;
 
@@ -140,39 +138,55 @@ export class OsmoseService extends AbstractSystem {
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
-      if (cache.loadedTile.has(tileID) || cache.loadedTile.has(tileID)) continue;
-
-      const [x, y, z] = tile.xyz;
-      const params = { item: this._osmoseData.types };   // Only request the types that we support
-      const url = `${OSMOSE_API}/issues/${z}/${x}/${y}.json?` + utilQsString(params);
-
-      const controller = new AbortController();
-      cache.inflightTile.set(tileID, controller);
-
-      fetch(url, { signal: controller.signal })
-        .then(utilFetchResponse)
-        .then(response => this._gotTile(tile, response))
-        .catch(err => {
-          if (err.name === 'AbortError') return;    // ok
-          cache.loadedTile.set(tileID, tile);      // don't retry
-          if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-        })
-        .finally(() => {
-          cache.inflightTile.delete(tileID);
-        });
+      if (spatial.hasTile('osmose', tileID) || cache.inflightTile.has(tileID)) continue;
+      this.loadTile(tile);
     }
+  }
+
+
+  /**
+   * loadTile
+   * Load a single tile of data.
+   * @param  {Tile}  tile - Tile data
+   */
+  loadTile(tile) {
+    const spatial = this.context.systems.spatial;
+    const cache = this._cache;
+    const tileID = tile.id;
+
+    const [x, y, z] = tile.xyz;
+    const params = { item: this._osmoseData.types };   // Only request the types that we support
+    const url = `${OSMOSE_API}/issues/${z}/${x}/${y}.json?` + utilQsString(params);
+
+    const controller = new AbortController();
+    cache.inflightTile.set(tileID, controller);
+
+    fetch(url, { signal: controller.signal })
+      .then(utilFetchResponse)
+      .then(response => this._gotTile(tile, response))
+      .catch(err => {
+        if (err.name === 'AbortError') return;          // ok
+        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
+        spatial.addTiles('osmose', [tile]);             // don't retry
+      })
+      .finally(() => {
+        cache.inflightTile.delete(tileID);
+      });
   }
 
 
   /**
    * _gotTile
    * Parse the response from the tile fetch
-   * @param  {Object}  tile - Tile data
+   * @param  {Tile}  tile - Tile data
    * @param  {Object}  response - Response data
    */
   _gotTile(tile, response) {
-    const cache = this._cache;
-    cache.loadedTile.set(tile.id, tile);
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial;
+
+    spatial.addTiles('osmose', [tile]);   // mark as loaded
 
     for (const feature of (response.features ?? [])) {
       // Osmose issues are uniquely identified by a unique
@@ -184,14 +198,15 @@ export class OsmoseService extends AbstractSystem {
       // Filter out unsupported issue types (some are too specific or advanced)
       if (!iconID) continue;
 
+      const loc = spatial.preventCoincidentLoc('osmose', feature.geometry.coordinates);
       const props = {
-        id: id,
-        class: cl,
-        item: item,
-        type: itemType,
-        iconID: iconID,
+        id:        id,
+        class:     cl,
+        item:      item,
+        type:      itemType,
+        iconID:    iconID,
         serviceID: this.id,
-        loc: this._preventCoincident(this._cache.rbush, feature.geometry.coordinates)
+        loc:       loc
       };
 
       // Assigning `elems` here prevents UI detail requests
@@ -199,12 +214,9 @@ export class OsmoseService extends AbstractSystem {
         props.elems = [];
       }
 
-      const d = new Marker(this.context, props);
-      cache.issues.set(d.id, d);
-      cache.rbush.insert(this._encodeIssueRBush(d));
+      spatial.addData('osmose', new Marker(context, props));
     }
 
-    const gfx = this.context.systems.gfx;
     gfx.deferredRedraw();
     this.emit('loadedData');
   }
@@ -325,11 +337,12 @@ export class OsmoseService extends AbstractSystem {
   /**
    * getError
    * Get item with given id from cache
-   * @param   {string}   itemID
+   * @param   {string}   dataID
    * @return  {Marker?}  the cached item, or `undefined` if not found
    */
-  getError(itemID) {
-    return this._cache.issues.get(itemID);
+  getError(dataID) {
+    const spatial = this.context.systems.spatial;
+    return spatial.getData('osmose', dataID);
   }
 
 
@@ -340,11 +353,10 @@ export class OsmoseService extends AbstractSystem {
    * @return  {Marker}  the item, or `null` if it couldn't be replaced
    */
   replaceItem(item) {
-    if (!(item instanceof Marker) || !item.id) return;
+    if (!(item instanceof Marker) || !item.id) return null;
 
-    this._cache.issues.set(item.id, item);
-    this._updateRBush(this._encodeIssueRBush(item), true); // true = replace
-    return item;
+    const spatial = this.context.systems.spatial;
+    return spatial.replaceData('osmose', item);
   }
 
 
@@ -356,9 +368,10 @@ export class OsmoseService extends AbstractSystem {
   removeItem(item) {
     if (!(item instanceof Marker) || !item.id) return;
 
-    this._cache.issues.delete(item.id);
-    this._updateRBush(this._encodeIssueRBush(item), false); // false = remove
+    const spatial = this.context.systems.spatial;
+    return spatial.removeData('osmose', item);
   }
+
 
 
   /**
@@ -379,49 +392,6 @@ export class OsmoseService extends AbstractSystem {
    */
   itemURL(item) {
     return `https://osmose.openstreetmap.fr/en/error/${item.id}`;
-  }
-
-
-  /**
-   * _encodeIssueRBush
-   * Convert a Marker to a Box Object for use with RBush.
-   * @param   {Marker}  d - the item to encode
-   * @return  {Object}  Box Object for use with RBush
-   */
-  _encodeIssueRBush(d) {
-    return { minX: d.loc[0], minY: d.loc[1], maxX: d.loc[0], maxY: d.loc[1], data: d };
-  }
-
-
-  /**
-   * _updateRBush
-   * Replace or remove data from the rbush spatial index.
-   * @param  {Marker}   item - the item to replace or remove
-   * @param  {boolean}  replace - if `true` replace the item with the given new item
-   */
-  _updateRBush(item, replace) {
-    this._cache.rbush.remove(item, (a, b) => a.data.id === b.data.id);
-    if (replace) {
-      this._cache.rbush.insert(item);
-    }
-  }
-
-
-  /**
-   * _preventCoincident
-   * This checks if the cache already has something at that location, and if so, moves down slightly.
-   * @param   {RBush}          rbush - the spatial cache to check
-   * @param   {Array<number>}  loc   - original [longitude,latitude] coordinate
-   * @return  {Array<number>}  Adjusted [longitude,latitude] coordinate
-   */
-  _preventCoincident(rbush, loc) {
-    for (let dy = 0; ; dy++) {
-      loc = vecSubtract(loc, [0, dy * 0.00001]);
-      const box = { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] };
-      if (!rbush.collides(box)) {
-        return loc;
-      }
-    }
   }
 
 

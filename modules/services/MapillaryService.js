@@ -1,8 +1,7 @@
 import { select as d3_select } from 'd3-selection';
-import { Tiler, geoSphericalDistance, vecSubtract } from '@rapid-sdk/math';
+import { Tiler, geoSphericalDistance } from '@rapid-sdk/math';
 import { VectorTile } from '@mapbox/vector-tile';
 import Protobuf from 'pbf';
-import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker, GeoJSON } from '../models/index.js';
@@ -134,14 +133,18 @@ export class MapillaryService extends AbstractSystem {
     }
 
     this._cache = {
-      images:        { lastv: null, data: new Map(), rbush: new RBush() }, // Map<imageID, Marker>
-      detections:    { lastv: null, data: new Map(), rbush: new RBush() }, // Map<detectionID, Marker>
-      signs:         { lastv: null  /* signs are now stored in `detections` cache */ },
-      sequences:     { data: new Map() },   // Map<sequenceID, GeoJSON>
+      images:        { lastv: null },
+      detections:    { lastv: null },
+      signs:         { lastv: null },
       segmentations: { data: new Map() },   // Map<segmentationID, Object>
       inflight: new Map(),  // Map<url, {tileID, promise, controller}>
       loaded:   new Set()   // Set<url>
     };
+
+    const spatial = this.context.systems.spatial;
+    spatial.clearCache('mapillary-images');
+    spatial.clearCache('mapillary-sequences');
+    spatial.clearCache('mapillary-detections');
 
     return Promise.resolve();
   }
@@ -176,7 +179,8 @@ export class MapillaryService extends AbstractSystem {
    * @return  {Marker?}  The image, or `undefined` if not found
    */
   getImage(imageID) {
-    return this._cache.images.data.get(imageID);
+    const spatial = this.context.systems.spatial;
+    return spatial.getData('mapillary-images', imageID);
   }
 
 
@@ -187,7 +191,8 @@ export class MapillaryService extends AbstractSystem {
    * @return  {GeoJSON?}  The sequence, or `undefined` if not found
    */
   getSequence(sequenceID) {
-    return this._cache.sequences.data.get(sequenceID);
+    const spatial = this.context.systems.spatial;
+    return spatial.getData('mapillary-sequences', sequenceID);
   }
 
 
@@ -198,7 +203,8 @@ export class MapillaryService extends AbstractSystem {
    * @return  {Marker?}  The detection, or `undefined` if not found
    */
   getDetection(detectionID) {
-    return this._cache.detections.data.get(detectionID);
+    const spatial = this.context.systems.spatial;
+    return spatial.getData('mapillary-detections', detectionID);
   }
 
 
@@ -211,15 +217,14 @@ export class MapillaryService extends AbstractSystem {
   getData(datasetID) {
     if (!['images', 'signs', 'detections'].includes(datasetID)) return [];
 
-    const cache = this._cache;
-    const extent = this.context.viewport.visibleExtent();
+    const spatial = this.context.systems.spatial;
+
     if (datasetID === 'images') {
-      return cache.images.rbush.search(extent.bbox())
-        .map(d => d.data);
+      return spatial.getVisibleData('mapillary-images').map(d => d.data);
 
     } else {  // both signs and detections are now stored in the `detections` cache
       const type = (datasetID === 'signs') ? 'traffic_sign' : 'point';
-      return cache.detections.rbush.search(extent.bbox())
+      return spatial.getVisibleData('mapillary-detections')
         .map(d => d.data)
         .filter(d => d.props.object_type === type);
     }
@@ -232,22 +237,8 @@ export class MapillaryService extends AbstractSystem {
    * @return  {Array<GeoJSON>}
    */
   getSequences() {
-    const cache = this._cache;
-    const extent = this.context.viewport.visibleExtent();
-    const results = new Map();  // Map<sequenceID, GeoJSON>
-
-    for (const box of cache.images.rbush.search(extent.bbox())) {
-      const sequenceID = box.data.props.sequenceID;
-      if (!sequenceID) continue;  // no sequence for this image
-      const sequence = cache.sequences.data.get(sequenceID);
-      if (!sequence) continue;  // sequence not ready
-
-      if (!results.has(sequenceID)) {
-        results.set(sequenceID, sequence);
-      }
-    }
-
-    return [...results.values()];
+    const spatial = this.context.systems.spatial;
+    return spatial.getVisibleData('mapillary-sequences').map(d => d.data);
   }
 
 
@@ -453,7 +444,9 @@ export class MapillaryService extends AbstractSystem {
     // We are already showing this image, this means we won't get events like imagechanged or moveend.
     // This means we will need to update segmentations here..
     if (this._selectedImageID === imageID) {
-      const image = this._cache.images.data.get(imageID);
+      const context = this.context;
+      const spatial = context.systems.spatial;
+      const image = spatial.getData('mapillary-images', imageID);
 
       if (this._shouldShowSegmentations()) {
         return this._loadImageSegmentationsAsync(image)
@@ -470,8 +463,7 @@ export class MapillaryService extends AbstractSystem {
         .then(() => this._viewer.moveTo(imageID))
         .then(mlyImage => {
           // see Rapid#1582 for discussion on computed vs original geometries.
-          const cache = this._cache.images;
-          const image = this._cacheImage(cache, {
+          const image = this._cacheImage({
             id:          mlyImage.id.toString(),
             loc:        [mlyImage.originalLngLat.lng, mlyImage.originalLngLat.lat],        // original
             // loc:        [mlyImage.computedLngLat.lng, mlyImage.computedLngLat.lat],     // computed
@@ -565,10 +557,11 @@ export class MapillaryService extends AbstractSystem {
    */
   _updatePhotoFooter(imageID) {
     const context = this.context;
+    const spatial = context.systems.spatial;
     const $wrapper = context.container().select('.photoviewer .mly-wrapper');
     const $attribution = $wrapper.selectAll('.photo-attribution').html('&nbsp;');  // clear DOM content
 
-    const image = this._cache.images.data.get(imageID);
+    const image = spatial.getData('mapillary-images', imageID);
     if (!image) return;
 
     if (image.props.captured_by) {
@@ -645,7 +638,7 @@ export class MapillaryService extends AbstractSystem {
    * _showSegmentations
    * Segmentations are called "tags" in the Mapillary viewer.
    * Here we are create a tag for each segmentationID found in the current image.
-   * @param  {Set<string>} segmentationIDs - the segmentation ids to show
+   * @param  {Set<string>}  segmentationIDs - the segmentation ids to show
    */
   _showSegmentations(segmentationIDs) {
     if (!this._viewer) return;  // called too early?
@@ -723,6 +716,10 @@ export class MapillaryService extends AbstractSystem {
       return Promise.resolve();  // nothing to do
     }
 
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial;
+
     let url = {
       images: imageTileUrl,
       signs: trafficSignTileUrl,
@@ -758,16 +755,17 @@ export class MapillaryService extends AbstractSystem {
           throw new Error('No Data');
         }
 
-        this._processTile(buffer, tile);
+        this._gotTile(buffer, tile);
 
-        const gfx = this.context.systems.gfx;
         gfx.deferredRedraw();
 
         if (datasetID === 'images') {
+          spatial.addTiles('mapillary-images', [tile]);
           this.emit('loadedImages');
         } else if (datasetID === 'signs') {
           this.emit('loadedSigns');
         } else if (datasetID === 'detections') {
+          // spatial.addTiles('mapillary-detections', [tile]);  /// detections and signs are currently shared, so idk.
           this.emit('loadedDetections');
         }
       })
@@ -787,24 +785,25 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _processTile
+   * _gotTile
    * Process vector tile data
    * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
    * @param  {ArrayBuffer}  buffer
    * @param  {Tile}         tile - a tile object
    */
-  _processTile(buffer, tile) {
+  _gotTile(buffer, tile) {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+
     const vectorTile = new VectorTile(new Protobuf(buffer));
 
     if (vectorTile.layers.hasOwnProperty('image')) {
-      const cache = this._cache.images;
       const layer = vectorTile.layers.image;
-
       for (let i = 0; i < layer.length; i++) {
         const feature = layer.feature(i).toGeoJSON(tile.xyz[0], tile.xyz[1], tile.xyz[2]);
         if (!feature) continue;
 
-        this._cacheImage(cache, {
+        this._cacheImage({
           id:          feature.properties.id.toString(),
           loc:         feature.geometry.coordinates,
           sequenceID:  feature.properties.sequence_id.toString(),
@@ -816,15 +815,13 @@ export class MapillaryService extends AbstractSystem {
     }
 
     if (vectorTile.layers.hasOwnProperty('sequence')) {
-      const cache = this._cache.sequences;
       const layer = vectorTile.layers.sequence;
-
       for (let i = 0; i < layer.length; i++) {
         const feature = layer.feature(i).toGeoJSON(tile.xyz[0], tile.xyz[1], tile.xyz[2]);
         if (!feature) continue;
 
         const sequenceID = feature.properties.id.toString();
-        let sequence = cache.data.get(sequenceID);
+        let sequence = spatial.getData('mapillary-sequences', sequenceID);
         if (!sequence) {
           const props = {
             id:         sequenceID,
@@ -834,11 +831,11 @@ export class MapillaryService extends AbstractSystem {
               features:  []
             }
           };
-          sequence = new GeoJSON(this.context, props);
-          cache.data.set(sequenceID, sequence);
+          sequence = new GeoJSON(context, props);
         }
         sequence.props.geojson.features.push(feature);  // updating it in-place, hope this is ok.
         sequence.updateGeometry().touch();
+        spatial.replaceData('mapillary-sequences', sequence);
       }
     }
 
@@ -847,15 +844,13 @@ export class MapillaryService extends AbstractSystem {
     for (const type of ['point', 'traffic_sign']) {
       if (!vectorTile.layers.hasOwnProperty(type)) continue;
 
-      const cache = this._cache.detections;
       const layer = vectorTile.layers[type];
-
       for (let i = 0; i < layer.length; i++) {
         const feature = layer.feature(i).toGeoJSON(tile.xyz[0], tile.xyz[1], tile.xyz[2]);
         if (!feature) continue;
 
         // Note that the tile API _does not_ give us `images` or `aligned_direction`
-        this._cacheDetection(cache, {
+        this._cacheDetection({
           id:            feature.properties.id.toString(),
           loc:           feature.geometry.coordinates,
           first_seen_at: feature.properties.first_seen_at,
@@ -878,8 +873,12 @@ export class MapillaryService extends AbstractSystem {
    * @return {Promise}  Promise settled with the detection details
    */
   _loadDetectionAsync(detectionID) {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial;
+
     // Is data is cached already and includes the `images` Array?  If so, resolve immediately.
-    const detection = this._cache.detections.data.get(detectionID);
+    const detection = spatial.getData('mapillary-detections', detectionID);
     if (Array.isArray(detection?.props?.images)) {
       return Promise.resolve(detection);
     }
@@ -897,11 +896,10 @@ export class MapillaryService extends AbstractSystem {
 
         // `response.object_type` seems to be 'mvd_fast' or 'trafficsign' ??
         const type = (response.object_type === 'trafficsign') ? 'traffic_sign' : 'point';
-        const cache = this._cache.detections;
 
         // Note that the graph API _does_ give us `images` and `aligned_direction`
         // (but sometimes not `geometry`!? see Rapid#1557)
-        const detection = this._cacheDetection(cache, {
+        const detection = this._cacheDetection({
           id:                 response.id.toString(),
           loc:                response.geometry?.coordinates,
           images:             response.images?.data,
@@ -912,7 +910,6 @@ export class MapillaryService extends AbstractSystem {
           object_type:        type
         });
 
-        const gfx = this.context.systems.gfx;
         gfx.immediateRedraw();
         return detection;
       })
@@ -949,14 +946,10 @@ export class MapillaryService extends AbstractSystem {
           throw new Error('No Data');
         }
 
-        const cache = this._cache.segmentations;
         const segmentationIDs = new Set();
-        image.updateSelf({ segmentationIDs: segmentationIDs });
-
         for (const d of response.data || []) {
           const segmentationID = d.id.toString();
-
-          const segmentation = this._cacheSegmentation(cache, {
+          const segmentation = this._cacheSegmentation({
             id:          segmentationID,
             imageID:     imageID,
             // detectionID:    can't be done!?
@@ -969,6 +962,9 @@ export class MapillaryService extends AbstractSystem {
           if (segmentation) {
             segmentationIDs.add(segmentationID);
           }
+
+          image.props.segmentationIDs = segmentationIDs;
+          image.touch();
         }
 
         return segmentationIDs;
@@ -1006,14 +1002,10 @@ export class MapillaryService extends AbstractSystem {
           throw new Error('No Data');
         }
 
-        const cache = this._cache.segmentations;
         const segmentationIDs = new Set();
-        detection.updateSelf({ segmentationIDs: segmentationIDs });
-
         for (const d of response.data || []) {
           const segmentationID = d.id.toString();
-
-          const segmentation = this._cacheSegmentation(cache, {
+          const segmentation = this._cacheSegmentation({
             id:           segmentationID,
             detectionID:  detectionID,
             imageID:      d.image.id.toString(),
@@ -1027,6 +1019,9 @@ export class MapillaryService extends AbstractSystem {
             segmentationIDs.add(segmentationID);
           }
         }
+
+        detection.props.segmentationIDs = segmentationIDs;
+        detection.touch();
 
         return segmentationIDs;
       })
@@ -1086,6 +1081,7 @@ export class MapillaryService extends AbstractSystem {
 
     const context = this.context;
     const photos = context.systems.photos;
+    const spatial = context.systems.spatial;
     const ui = context.systems.ui;
 
     const opts = {
@@ -1126,7 +1122,7 @@ export class MapillaryService extends AbstractSystem {
 
     const moveEnd = (e) => {
       const imageID = photos.currPhotoID;
-      const image = this._cache.images.data.get(imageID);
+      const image = spatial.getData('mapillary-images', imageID);
 
       // If we update the segmentations before the viewer is finished moving,
       // they end up drawn in the wrong place!
@@ -1157,24 +1153,22 @@ export class MapillaryService extends AbstractSystem {
   /**
    * _cacheImage
    * Store the given image in the caches
-   * @param  {Object}  cache - the cache to use
-   * @param  {Object}  props - the image properties
-   * @return {Marker}  The image
+   * @param   {Object}  props - the image properties
+   * @return  {Marker}  The image
    */
-  _cacheImage(cache, props) {
-    let image = cache.data.get(props.id);
+  _cacheImage(props) {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+
+    const imageID = props.id;
+    let image = spatial.getData('mapillary-images', imageID);
     if (!image) {
       image = new Marker(this.context, {
         type:      'photo',
         serviceID: this.id,
-        id:        props.id,
+        id:        imageID,
         loc:       props.loc
       });
-
-      cache.data.set(image.id, image);
-
-      const [x, y] = props.loc;
-      cache.rbush.insert({ minX: x, minY: y, maxX: x, maxY: y, data: image });
     }
 
     // Allow 0, but not things like NaN, null, Infinity
@@ -1192,6 +1186,8 @@ export class MapillaryService extends AbstractSystem {
       image.updateSelf(setProps);
     }
 
+    spatial.replaceData('mapillary-images', image);
+
     return image;
   }
 
@@ -1199,33 +1195,31 @@ export class MapillaryService extends AbstractSystem {
   /**
    * _cacheDetection
    * Store the given detection in the caches
-   * @param  {Object}  cache - the cache to use
    * @param  {Object}  props - the detection properties
    * @return {Marker}  The detection
    */
-  _cacheDetection(cache, props) {
-    let detection = cache.data.get(props.id);
+  _cacheDetection(props) {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+
+    const detectionID = props.id;
+    let detection = spatial.getData('mapillary-detections', detectionID);
     if (!detection) {
       detection = new Marker(this.context, {
         type:        'detection',
         serviceID:   this.id,
-        id:          props.id,
+        id:          detectionID,
         object_type: props.object_type   // 'point' or 'traffic_sign'
       });
-
-      cache.data.set(detection.id, detection);
     }
 
     // If we haven't locked in the location yet, try here..
     // (see Rapid#1557 - sometimes we don't have this!)
     if (!detection.loc && props.loc) {
       // Marker `loc` should really have been set at construction time, but unfortunately we need to redo it
-      const loc = this._preventCoincident(cache.rbush, props.loc);
+      const loc = spatial.preventCoincidentLoc('mapillary-detections', props.loc);
       detection.updateSelf({ loc: loc });
       detection.updateGeometry();
-
-      const [x, y] = loc;
-      cache.rbush.insert({ minX: x, minY: y, maxX: x, maxY: y, data: detection });
     }
 
     // Update whatever additional props we were passed..
@@ -1261,6 +1255,8 @@ export class MapillaryService extends AbstractSystem {
     if (Object.keys(setProps).length) {
       detection.updateSelf(setProps);
     }
+
+    spatial.replaceData('mapillary-detections', detection);
     return detection;
   }
 
@@ -1268,11 +1264,12 @@ export class MapillaryService extends AbstractSystem {
   /**
    * _cacheSegmentation
    * Store the given segmentation in the caches
-   * @param  {Object}  cache - the cache to use
    * @param  {Object}  props - the segmentation properties
    * @return {Object?} The segmentation data, or `null` if we are skipping it (see below)
    */
-  _cacheSegmentation(cache, props) {
+  _cacheSegmentation(props) {
+    const cache = this._cache.segmentations;
+
     // Note: not all segmentations are ones we can work with.
     // For now, we'll only keep the ones that correspond to the known object detections and traffic_signs.
     const isDetection = this.getDetectionPresetID(props.value);
@@ -1309,24 +1306,6 @@ export class MapillaryService extends AbstractSystem {
     if (props.detectionID)  segmentation.detectionID  = props.detectionID;
 
     return segmentation;
-  }
-
-
-  /**
-   * _preventCoincident
-   * This checks if the cache already has something at that location, and if so, moves down slightly.
-   * @param   {RBush}          rbush - the spatial cache to check
-   * @param   {Array<number>}  loc   - original [longitude,latitude] coordinate
-   * @return  {Array<number>}  Adjusted [longitude,latitude] coordinate
-   */
-  _preventCoincident(rbush, loc) {
-    for (let dy = 0; ; dy++) {
-      loc = vecSubtract(loc, [0, dy * 0.00001]);
-      const box = { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] };
-      if (!rbush.collides(box)) {
-        return loc;
-      }
-    }
   }
 
 }

@@ -1,6 +1,5 @@
 import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
-import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { GeoJSON } from '../models/GeoJSON.js';
@@ -77,7 +76,7 @@ export class GeoScribbleService extends AbstractSystem {
     };
 
     const spatial = this.context.systems.spatial;
-    spatial.clearCache(this.id);
+    spatial.clearCache('geoscribble');
 
     return Promise.resolve();
   }
@@ -90,7 +89,7 @@ export class GeoScribbleService extends AbstractSystem {
    */
   getData() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData(this.id).map(d => d.data);
+    return spatial.getVisibleData('geoscribble').map(d => d.data);
   }
 
 
@@ -121,7 +120,7 @@ export class GeoScribbleService extends AbstractSystem {
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
-      if (spatial.hasTile(this.id, tileID) || cache.inflight.has(tileID)) continue;
+      if (spatial.hasTile('geoscribble', tileID) || cache.inflight.has(tileID)) continue;
 
       const rect = tile.wgs84Extent.rectangle().join(',');
       const url = GEOSCRIBBLE_API + '?' + utilQsString({ bbox: rect });
@@ -134,7 +133,7 @@ export class GeoScribbleService extends AbstractSystem {
         .then(response => this._gotTile(tile, response))
         .catch(err => {
           if (err.name === 'AbortError') return;  // ok
-          spatial.addTiles(this.id, tile);   // don't retry
+          spatial.addTiles('geoscribble', [tile]);   // don't retry
           if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         })
         .finally(() => {
@@ -147,27 +146,27 @@ export class GeoScribbleService extends AbstractSystem {
   /**
    * _gotTile
    * Parse the response from the tile fetch
-   * @param  {Object}  tile - Tile data
+   * @param  {Tile}    tile - Tile data
    * @param  {Object}  response - Response data
    */
   _gotTile(tile, response) {
-    const cache = this._cache;
-    const spatial = this.context.systems.spatial;
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial;
 
-    spatial.addTiles(this.id, tile);   // mark as loaded
+    spatial.addTiles('geoscribble', [tile]);   // mark as loaded
 
     if (!Array.isArray(response?.features)) {
       throw new Error('Invalid response');
     }
 
-    const data = [];
+    const toLoad = [];
     for (const feature of response.features) {
-      const d = new GeoJSON(this.context, { serviceID: this.id, geojson: feature });
-      data.push(d);
+      toLoad.push(new GeoJSON(context, { serviceID: this.id, geojson: feature }));
     }
-    spatial.addData(this.id, data);
 
-    const gfx = this.context.systems.gfx;
+    spatial.addData('geoscribble', toLoad);
+
     gfx.deferredRedraw();
     this.emit('loadedData');
   }

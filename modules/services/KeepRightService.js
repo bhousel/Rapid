@@ -1,6 +1,5 @@
-import { Tiler, vecSubtract } from '@rapid-sdk/math';
+import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
-import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker } from '../models/Marker.js';
@@ -107,14 +106,14 @@ export class KeepRightService extends AbstractSystem {
     }
 
     this._cache = {
-      data:          new Map(),   // Map<dataID, Marker>
-      loadedTile:    new Map(),   // Map<tileID, Tile>
       inflightTile:  new Map(),   // Map<tileID, AbortController>
       inflightPost:  new Map(),   // Map<dataID, AbortController>
       closed:        {},
-      rbush:         new RBush(),
       lastv:         null         // viewport version last time we fetched data
     };
+
+    const spatial = this.context.systems.spatial;
+    spatial.clearCache('keepright');
 
     return Promise.resolve();
   }
@@ -126,21 +125,22 @@ export class KeepRightService extends AbstractSystem {
    * @return  {Array}  Array of data
    */
   getData() {
-    const extent = this.context.viewport.visibleExtent();
-    return this._cache.rbush.search(extent.bbox()).map(d => d.data);
+    const spatial = this.context.systems.spatial;
+    return spatial.getVisibleData('keepright').map(d => d.data);
   }
 
 
   /**
    * loadTiles
-   * Schedule any data requests needed to cover the current map view
+   * Schedule any data requests needed to cover the current map view.
    * KeepRight API:  http://osm.mueschelsoft.de/keepright/interfacing.php
    */
   loadTiles() {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+    const viewport = context.viewport;
     const cache = this._cache;
-    const options = { format: 'geojson', ch: KR_RULES };
 
-    const viewport = this.context.viewport;
     if (cache._lastv === viewport.v) return;  // exit early if the view is unchanged
     cache._lastv = viewport.v;
 
@@ -158,39 +158,56 @@ export class KeepRightService extends AbstractSystem {
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
-      if (cache.loadedTile.has(tileID) || cache.loadedTile.has(tileID)) continue;
-
-      const [ left, top, right, bottom ] = tile.wgs84Extent.rectangle();
-      const params = Object.assign({}, options, { left, bottom, right, top });
-      const url = `${KEEPRIGHT_API}/export.php?` + utilQsString(params);
-
-      const controller = new AbortController();
-      cache.inflightTile.set(tileID, controller);
-
-      fetch(url, { signal: controller.signal })
-        .then(utilFetchResponse)
-        .then(response => this._gotTile(tile, response))
-        .catch(err => {
-          if (err.name === 'AbortError') return;   // ok
-          cache.loadedTile.set(tileID, tile);      // don't retry
-          if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-        })
-        .finally(() => {
-          cache.inflightTile.delete(tileID);
-        });
+      if (spatial.hasTile('keepright', tileID) || cache.inflightTile.has(tileID)) continue;
+      this.loadTile(tile);
     }
   }
 
 
   /**
+   * loadTile
+   * Load a single tile of data.
+   * @param  {Tile}  tile - Tile data
+   */
+  loadTile(tile) {
+    const spatial = this.context.systems.spatial;
+    const cache = this._cache;
+    const tileID = tile.id;
+
+    const options = { format: 'geojson', ch: KR_RULES };
+    const [ left, top, right, bottom ] = tile.wgs84Extent.rectangle();
+    const params = Object.assign({}, options, { left, bottom, right, top });
+    const url = `${KEEPRIGHT_API}/export.php?` + utilQsString(params);
+
+    const controller = new AbortController();
+    cache.inflightTile.set(tileID, controller);
+
+    fetch(url, { signal: controller.signal })
+      .then(utilFetchResponse)
+      .then(response => this._gotTile(tile, response))
+      .catch(err => {
+        if (err.name === 'AbortError') return;          // ok
+        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
+        spatial.addTiles('keepright', [tile]);          // don't retry
+      })
+      .finally(() => {
+        cache.inflightTile.delete(tileID);
+      });
+  }
+
+
+  /**
    * _gotTile
-   * Parse the response from the tile fetch
-   * @param  {Object}  tile - Tile data
+   * Parse the response from the tile fetch.
+   * @param  {Tile}    tile - Tile data
    * @param  {Object}  response - Response data
    */
   _gotTile(tile, response) {
-    const cache = this._cache;
-    cache.loadedTile.set(tile.id, tile);
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial;
+
+    spatial.addTiles('keepright', [tile]);   // mark as loaded
 
     if (!Array.isArray(response?.features)) {
       throw new Error('Invalid response');
@@ -250,33 +267,30 @@ export class KeepRightService extends AbstractSystem {
           break;
       }
 
-      loc = this._preventCoincident(cache.rbush, loc);
+      loc = spatial.preventCoincidentLoc('keepright', loc);
 
       const props = {
-        id: id,
-        loc: loc,
-        itemType: itemType,
-        comment: comment,
-        description: description,
-        whichType: whichType,
+        id:              id,
+        loc:             loc,
+        itemType:        itemType,
+        comment:         comment,
+        description:     description,
+        whichType:       whichType,
         parentIssueType: parentIssueType,
-        severity: whichTemplate.severity || 'error',
-        objectId: objectId,
-        objectType: objectType,
-        schema: schema,
-        title: title,
-        serviceID: this.id
+        severity:        whichTemplate.severity || 'error',
+        objectId:        objectId,
+        objectType:      objectType,
+        schema:          schema,
+        title:           title,
+        serviceID:       this.id
       };
 
       props.replacements = this._tokenReplacements(props);
 
-      const d = new Marker(this.context, props);
-
-      cache.data.set(d.id, d);
-      cache.rbush.insert(this._encodeIssueRBush(d));
+      spatial.addData('keepright', new Marker(context, props));
     }
 
-    const gfx = this.context.systems.gfx;
+
     gfx.deferredRedraw();
     this.emit('loadedData');
   }
@@ -338,11 +352,12 @@ export class KeepRightService extends AbstractSystem {
   /**
    * getError
    * Get item with given id from cache
-   * @param   {string}   itemID
+   * @param   {string}   dataID
    * @return  {Marker?}  the cached item, or `undefined` if not found
    */
-  getError(itemID) {
-    return this._cache.data.get(itemID);
+  getError(dataID) {
+    const spatial = this.context.systems.spatial;
+    return spatial.getData('keepright', dataID);
   }
 
 
@@ -366,8 +381,8 @@ export class KeepRightService extends AbstractSystem {
   replaceItem(item) {
     if (!(item instanceof Marker) || !item.id) return null;
 
-    this._cache.data.set(item.id, item);
-    this._updateRBush(this._encodeIssueRBush(item), true);  // true = replace
+    const spatial = this.context.systems.spatial;
+    spatial.replaceData('keepright', item);
     return item;
   }
 
@@ -380,8 +395,8 @@ export class KeepRightService extends AbstractSystem {
   removeItem(item) {
     if (!(item instanceof Marker) || !item.id) return;
 
-    this._cache.data.delete(item.id);
-    this._updateRBush(this._encodeIssueRBush(item), false);  // false = remove
+    const spatial = this.context.systems.spatial;
+    spatial.removeData('keepright', item);
   }
 
 
@@ -399,53 +414,10 @@ export class KeepRightService extends AbstractSystem {
    * getClosedIDs
    * Get an array of issues closed during this session.
    * Used to populate `closed:keepright` changeset tag
-   * @return  Array of closed item ids
+   * @return  {Array<dataID>}  Array of closed item ids
    */
   getClosedIDs() {
     return Object.keys(this._cache.closed).sort();
-  }
-
-
-  /**
-   * _encodeIssueRBush
-   * Convert a Marker to a Box Object for use with RBush.
-   * @param   {Marker}  d - the item to encode
-   * @return  {Object}  Box Object for use with RBush
-   */
-  _encodeIssueRBush(d) {
-    return { minX: d.loc[0], minY: d.loc[1], maxX: d.loc[0], maxY: d.loc[1], data: d };
-  }
-
-
-  /**
-   * _updateRBush
-   * Replace or remove data from the rbush spatial index.
-   * @param   {Marker}   item - the item to replace or remove
-   * @param   {boolean}  replace - if `true` replace the item with the given new item
-   */
-  _updateRBush(item, replace) {
-    this._cache.rbush.remove(item, (a, b) => a.data.id === b.data.id);
-    if (replace) {
-      this._cache.rbush.insert(item);
-    }
-  }
-
-
-  /**
-   * _preventCoincident
-   * This checks if the cache already has something at that location, and if so, moves down slightly.
-   * @param   {RBush}          rbush - the spatial cache to check
-   * @param   {Array<number>}  loc   - original [longitude,latitude] coordinate
-   * @return  {Array<number>}  Adjusted [longitude,latitude] coordinate
-   */
-  _preventCoincident(rbush, loc) {
-    for (let dy = 0; ; dy++) {
-      loc = vecSubtract(loc, [0, dy * 0.00001]);
-      const box = { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] };
-      if (!rbush.collides(box)) {
-        return loc;
-      }
-    }
   }
 
 
