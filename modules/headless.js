@@ -10,11 +10,8 @@ export * from './util/index.js';
 // Reexport only what our tests use, see iD#4379
 import * as D3 from 'd3';
 export const d3 = {
-  append: D3.append,
   polygonArea: D3.polygonArea,
   polygonCentroid: D3.polygonCentroid,
-  select: D3.select,
-  selectAll: D3.selectAll,
   timerFlush: D3.timerFlush
 };
 
