@@ -71,7 +71,7 @@ function setup(dataBlob) {
   viewport = new Rapid.sdk.Viewport({ x: dataBlob.projection._x, y: dataBlob.projection._y, k: dataBlob.projection._k });
   zoom = dataBlob.zoom;
   const graph = editor.staging.graph;
-  graph.rebase(graphEntities, [graph], false);
+  graph.rebase(graphEntities);
 }
 
 // Enable the cycle event if and only if we really need to print stuff every run.

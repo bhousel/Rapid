@@ -311,8 +311,8 @@ export class MapWithAIService extends AbstractSystem {
   merge(datasetID, entities) {
     const ds = this._datasets[datasetID];
     if (!ds || !ds.tree || !ds.graph) return;
-    ds.graph.rebase(entities, [ds.graph], false);
-    ds.tree.rebase(entities, false);
+    ds.graph.rebase(entities);
+    ds.tree.rebase(entities);
   }
 
 

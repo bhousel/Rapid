@@ -34,8 +34,9 @@ export class Graph {
       const other = otherOrContext;
       this.context = other.context;
       this.props = {};
-
+      this.isBaseGraph = false;
       this.previous = other;
+
       this.base = other.base;     // Base data is shared among the chain of Graphs
       this.local = {              // Local data is a clone of the predecessor data
         entities:   new Map(other.local.entities),    // shallow clone
@@ -48,8 +49,9 @@ export class Graph {
       const context = otherOrContext;
       this.context = context;
       this.props = {};
-
+      this.isBaseGraph = true;
       this.previous = null;
+
       this.base = {
         entities:   new Map(),  // Map<entityID, Entity>
         parentWays: new Map(),  // Map<entityID, Set<entityIDs>>
@@ -65,7 +67,7 @@ export class Graph {
     // Deal with extra argument
     if (Array.isArray(propsOrEntities)) {
       const toRebase = propsOrEntities;
-      this.rebase(toRebase, [this]);   // seed with base Entities, if provided
+      this.rebase(toRebase);   // seed with base Entities, if provided
 
     } else {
       const props = propsOrEntities;
@@ -218,8 +220,13 @@ export class Graph {
    * Replace an Entity in this Graph
    * @param   {OneOrMore<Entity>}  entities - entities to replace
    * @return  {Graph}              this Graph
+   * @throws  Will throw if called on a base graph
    */
   replace(entities) {
+//    if (this.isBaseGraph) {
+//      throw new Error(`Do not call 'replace' on a base graph`);
+//    }
+
     const arr = utilIterable(entities).sort(this._nodesFirst);
     for (const entity of arr) {
       const entityID = entity.id;
@@ -238,8 +245,13 @@ export class Graph {
    * Remove an Entity from this Graph
    * @param   {OneOrMore<Entity>}  entities - entities to replace
    * @return  {Graph}              this Graph
+   * @throws  Will throw if called on a base graph
    */
   remove(entities) {
+//    if (this.isBaseGraph) {
+//      throw new Error(`Do not call 'remove' on a base graph`);
+//    }
+
     const arr = utilIterable(entities).sort(this._nodesFirst);
     for (const entity of arr) {
       const entityID = entity.id;
@@ -258,8 +270,13 @@ export class Graph {
    * Revert an Entity back to whatever state it had in the base graph
    * @param   {OneOrMore<string>}  entityIDs - the entityIDs of the Entities to revert
    * @return  {Graph}              this Graph
+   * @throws  Will throw if called on a base graph
    */
   revert(entityIDs) {
+//    if (this.isBaseGraph) {
+//      throw new Error(`Do not call 'revert' on a base graph`);
+//    }
+
     for (const entityID of utilIterable(entityIDs)) {
       const original = this.base.entities.get(entityID);
       const current = this.hasEntity(entityID);
@@ -314,8 +331,13 @@ export class Graph {
    * (The Entities passed in may be undefined, in the case of deletion)
    * @param   {Object<entityID, Entity>}  entities -  Entities to load into the Graph
    * @return  {Graph}  this Graph
+   * @throws  Will throw if called on a base graph
    */
   load(entities = {}) {
+//    if (this.isBaseGraph) {
+//      throw new Error(`Do not call 'load' on a base graph`);
+//    }
+
     const _loadOne = (entityID, entity) => {
       const current = this.hasEntity(entityID);
       const replacement = entity || undefined;
@@ -342,16 +364,21 @@ export class Graph {
   /**
    * rebase
    * Loads new Entities into the base graph.
-   * Used during to merge newly downloaded data into an existing stack of edits.
-   * To external observers, it should appear as if the Graph always contained the newly downloaded data.
+   * This is used to merge newly-downloaded data into an existing stack of edits.
+   * To external observers, it should appear as if these Graphs always contained the newly downloaded data.
    * Important: `rebase` should be called on the base graph
    * @param  {OneOrMore<Entity>}  entities - Entities to add to the base Graph
    * @param  {Array<Graph>}       stack - Stack of graphs that need updates after this rebase
    * @param  {boolean}            force - If `true`, always update, if `false` skip Entities that we've seen already
+   * @throws  Will throw if _not_ called on a base graph
    */
-  rebase(entities, stack, force) {
+  rebase(entities, stack = [], force = false) {
+//    if (!this.isBaseGraph) {
+//      throw new Error(`Must call 'rebase' on a base graph`);
+//    }
+
     const base = this.base;
-    const head = stack[stack.length - 1].local.entities;
+    const head = stack.at(-1)?.local?.entities;
     const restoreIDs = new Set();
     const newIDs = new Set();
 
@@ -364,11 +391,11 @@ export class Graph {
       this._updateCaches(undefined, entity, base);  // note 'base' here
       newIDs.add(entity.id);
 
-      // A weird thing we have to watch out for..
-      // Sometimes an edit can remove a node, then we download more information and realize
-      // that that Node belonged to a parentWay.  If we detect this condition, restore the node.
+      // A weird thing we have to watch out for.. iD#2085
+      // Sometimes an edit can remove a node, then we download more information and realize that
+      // that Node was shared with another way.  If we detect this condition, restore the node.
       // (A "delete" is stored as: setting that entity = `undefined`)
-      if (entity.type === 'way') {
+      if (head && entity.type === 'way') {
         for (const id of entity.nodes) {
           if (head.has(id) && head.get(id) === undefined) {  // was deleted
             restoreIDs.add(id);
@@ -378,19 +405,7 @@ export class Graph {
     }
 
     for (const graph of stack) {
-      const local = graph.local.entities;
-      let didChange = false;
-      // Restore deleted nodes that were discovered to belong to a parentWay.
-      for (const id of restoreIDs) {
-        if (local.has(id) && local.get(id) === undefined) {  // was deleted
-          local.delete(id);  // "delete the delete", aka restore.
-          didChange = true;
-        }
-      }
-      if (didChange) {
-        graph.touch();
-      }
-      graph._updateRebased();
+      graph._updateRebased(restoreIDs);
     }
 
     this._updateGeometries(newIDs);
@@ -460,9 +475,21 @@ export class Graph {
    * Check local `parentWays` and `parentRels` caches and make sure they are consistent
    *  with the data in the base caches.
    */
-  _updateRebased() {
+  _updateRebased(restoreIDs = []) {
     const base = this.base;
     const local = this.local;
+
+    let didChange = false;
+    // Restore deleted nodes that were discovered to belong to a parentWay.
+    for (const id of restoreIDs) {
+      if (local.entities.has(id) && local.entities.get(id) === undefined) {  // was deleted
+        local.entities.delete(id);  // "delete the delete", aka restore.
+        didChange = true;
+      }
+    }
+    if (didChange) {
+      this.touch();
+    }
 
     for (const [childID, parentWayIDs] of local.parentWays) {  // for all this.parentWays we've cached
       const baseWayIDs = base.parentWays.get(childID);         // compare to base.parentWays

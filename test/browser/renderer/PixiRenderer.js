@@ -58,7 +58,7 @@ describe('PixiRenderer', () => {
 
     const editor = context.systems.editor;
     const graph = editor.staging.graph;
-    graph.rebase(graphEntities, [graph], false);
+    graph.rebase(graphEntities);
     map = context.systems.map;
     $container.call(map);
   });

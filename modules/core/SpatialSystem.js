@@ -1,5 +1,6 @@
 import RBush from 'rbush';
 
+import { Graph } from '../models/Graph.js';
 import { AbstractSystem } from './AbstractSystem.js';
 import { utilIterable } from '../util/iterable.js';
 
@@ -83,6 +84,7 @@ export class SpatialSystem extends AbstractSystem {
     let cache = this._caches.get(cacheID);
     if (!cache) {
       cache = {
+        graph:      new Graph(this.context),
         boxes:      new Map(),    // Map<dataID|tileID, Box>
         tiles:      new Map(),    // Map<tileID, Tile>
         data:       new Map(),    // Map<dataID, AbstractData>
@@ -102,6 +104,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   clearCache(cacheID) {
     const cache = this.getCache(cacheID);
+    cache.graph = new Graph(this.context);
     cache.boxes.clear();
     cache.tiles.clear();
     cache.data.clear();

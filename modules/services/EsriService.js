@@ -413,7 +413,7 @@ export class EsriService extends AbstractSystem {
 
   /**
    * _loadTilePage
-   * Get available data for a given dataset from it's feature server
+   * Get available data for a given dataset from its feature server
    * @param   {Object}  ds - the dataset to fetch data for
    * @param   {Object}  tile - the tile to fetch the data for
    * @param   {number}  page - what page of data to fetch (zero-based)
@@ -435,8 +435,8 @@ export class EsriService extends AbstractSystem {
 
         this._parseTile(ds, tile, geojson, (err, results) => {
           if (err) throw new Error(err);
-          ds.graph.rebase(results, [ds.graph], true);
-          ds.tree.rebase(results, true);
+          ds.graph.rebase(results);
+          ds.tree.rebase(results);
         });
         return geojson.properties?.exceededTransferLimit;
       })

@@ -534,21 +534,21 @@ describe('Graph', () => {
     it('preserves existing entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const base = new Rapid.Graph(context, [node]);
-      base.rebase([], [base]);
+      base.rebase([]);
       assert.strictEqual(base.hasEntity('n'), node);
     });
 
     it('includes new entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const base = new Rapid.Graph(context);
-      base.rebase([node], [base]);
+      base.rebase([node]);
       assert.strictEqual(base.hasEntity('n'), node);
     });
 
     it('doesn\'t rebase deleted entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n', visible: false });
       const graph = new Rapid.Graph(context);
-      graph.rebase([node], [graph]);
+      graph.rebase([node]);
       assert.isUndefined(graph.hasEntity('n'));
     });
 
@@ -556,7 +556,7 @@ describe('Graph', () => {
       const a = new Rapid.OsmNode(context, { id: 'n' });
       const b = new Rapid.OsmNode(context, { id: 'n' });
       const graph = new Rapid.Graph(context, [a]);
-      graph.rebase([b], [graph]);
+      graph.rebase([b]);
       assert.strictEqual(graph.hasEntity('n'), a);
     });
 
@@ -564,13 +564,13 @@ describe('Graph', () => {
       const a = new Rapid.OsmNode(context, { id: 'n' });
       const b = new Rapid.OsmNode(context, { id: 'n' });
       const graph = new Rapid.Graph(context, [a]);
-      graph.rebase([b], [graph], true);
+      graph.rebase([b], [], true);
       assert.strictEqual(graph.hasEntity('n'), b);
     });
 
     it('inherits entities from base', () => {
       const graph = new Rapid.Graph(context);
-      graph.rebase([new Rapid.OsmNode(context, { id: 'n' })], [graph]);
+      graph.rebase([new Rapid.OsmNode(context, { id: 'n' })]);
       assert.ok(!graph.local.entities.has('n'));
       assert.ok(graph.base.entities.has('n'));
     });
@@ -580,7 +580,7 @@ describe('Graph', () => {
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n'] });
       const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n'] });
       const graph = new Rapid.Graph(context, [n, w1]);
-      graph.rebase([w2], [graph]);
+      graph.rebase([w2]);
 
       const parents = graph.parentWays(n);
       assert.instanceOf(parents, Array);
@@ -594,7 +594,7 @@ describe('Graph', () => {
       const n = new Rapid.OsmNode(context, { id: 'n' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n'] });
       const graph = new Rapid.Graph(context, [n, w1]);
-      graph.rebase([w1], [graph]);
+      graph.rebase([w1]);
       assert.deepEqual(graph.parentWays(n), [w1]);
     });
 
@@ -647,7 +647,7 @@ describe('Graph', () => {
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n'}] });
       const r2 = new Rapid.OsmRelation(context, { id: 'r2', members: [{ id: 'n'}] });
       const graph = new Rapid.Graph(context, [n, r1]);
-      graph.rebase([r2], [graph]);
+      graph.rebase([r2]);
 
       const parents = graph.parentRelations(n);
       assert.instanceOf(parents, Array);
