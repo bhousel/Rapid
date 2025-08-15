@@ -16,23 +16,24 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //    |     |
       //    a --- b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
         new Rapid.OsmNode(context, { id: 'd', loc: [0, 2] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
-      assert.deepEqual(result.entity('-').nodes.length, 5);
+      assert.lengthOf(result.entity('-').nodes, 5);
     });
 
     it('orthogonalizes a quad', () => {
       //    d --- c
       //    |     |
       //    a ---  b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -40,9 +41,10 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
-      assert.deepEqual(result.entity('-').nodes.length, 5);
+      assert.lengthOf(result.entity('-').nodes, 5);
     });
 
     it('orthogonalizes a triangle', () => {
@@ -50,23 +52,24 @@ describe('actionOrthogonalize', () => {
       //    | \
       //    |   \
       //     b - c
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'a'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
-      assert.deepEqual(result.entity('-').nodes.length, 4);
+      assert.lengthOf(result.entity('-').nodes, 4);
     });
 
     it('deletes empty redundant nodes', () => {
       //    e - d - c
       //    |       |
       //    a ----- b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -75,16 +78,17 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
-      assert.strictEqual(result.hasEntity('d'), undefined);
+      assert.isUndefined(result.hasEntity('d'));
     });
 
     it('preserves non empty redundant nodes', () => {
       //    e - d - c
       //    |       |
       //    a ----- b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -93,10 +97,11 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
-      assert.deepEqual(result.entity('-').nodes.length, 6);
-      assert.notEqual(result.hasEntity('d'), undefined);
+      assert.lengthOf(result.entity('-').nodes, 6);
+      assert.isOk(result.hasEntity('d'));
     });
 
     it('only moves nodes which are near right or near straight', () => {
@@ -105,7 +110,7 @@ describe('actionOrthogonalize', () => {
       //    |     d - c
       //    |         |
       //    a -------- b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [3.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 1] }),
@@ -115,10 +120,10 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f', 'a'] })
       ]);
 
-      const stage = new Rapid.Graph(graph);
-      const result = Rapid.actionOrthogonalize('-', viewport)(stage);
+      const graph = new Rapid.Graph(base);
+      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
-      const diff = new Rapid.Difference(graph, result);
+      const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['a', 'b', 'c', 'f']);  // not d, e
     });
 
@@ -128,7 +133,7 @@ describe('actionOrthogonalize', () => {
       //   e --- d - c
       //        |    |
       //        a -- b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, -1] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, -1] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
@@ -139,12 +144,12 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'd', 'a'] })
       ]);
 
-      const stage = new Rapid.Graph(graph);
-      const result = Rapid.actionOrthogonalize('-', viewport)(stage);
+      const graph = new Rapid.Graph(base);
+      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
-      const diff = new Rapid.Difference(graph, result);
+      const diff = new Rapid.Difference(base, result);
       assert.doesNotHaveAnyKeys(diff.changes, ['d']);  // d not changed
-      assert.ok(graph.hasEntity('d'));                 // d not removed
+      assert.isOk(graph.hasEntity('d'));               // d not removed
     });
 
     it('preserves the shape of skinny quads', () => {
@@ -165,18 +170,19 @@ describe('actionOrthogonalize', () => {
       ];
 
       for (var i = 0; i < tests.length; i++) {
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: tests[i][0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: tests[i][1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: tests[i][2] }),
           new Rapid.OsmNode(context, { id: 'd', loc: tests[i][3] }),
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
         ]);
+        const graph = new Rapid.Graph(base);
         const initialWidth = Rapid.sdk.geoSphericalDistance(graph.entity('a').loc, graph.entity('b').loc);
         const result = Rapid.actionOrthogonalize('-', viewport)(graph);
         assert.instanceOf(result, Rapid.Graph);
         const finalWidth = Rapid.sdk.geoSphericalDistance(result.entity('a').loc, result.entity('b').loc);
-        assert.ok(finalWidth / initialWidth >= 0.90 && finalWidth / initialWidth <= 1.10);
+        assert.isOk(finalWidth / initialWidth >= 0.90 && finalWidth / initialWidth <= 1.10);
       }
     });
   });
@@ -187,7 +193,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //          |
       //    a --- b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -195,6 +201,7 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes.length, 4);
@@ -204,7 +211,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //          |
       //    a ---  b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -212,6 +219,7 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes.length, 4);
@@ -222,13 +230,14 @@ describe('actionOrthogonalize', () => {
       //    |
       //    |
       //     b - c
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes.length, 3);
@@ -238,7 +247,7 @@ describe('actionOrthogonalize', () => {
       //    e - d - c
       //            |
       //    a ----- b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -247,6 +256,7 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.strictEqual(result.hasEntity('d'), undefined);
@@ -256,7 +266,7 @@ describe('actionOrthogonalize', () => {
       //    e - d - c
       //            |
       //    a ----- b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -265,10 +275,11 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes.length, 5);
-      assert.ok(result.hasEntity('d'));
+      assert.isOk(result.hasEntity('d'));
     });
 
     it('only moves non-endpoint nodes which are near right or near straight', () => {
@@ -277,7 +288,7 @@ describe('actionOrthogonalize', () => {
       //          d - c
       //              |
       //    a -------- b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [3.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 1] }),
@@ -287,10 +298,10 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f'] })
       ]);
 
-      const stage = new Rapid.Graph(graph);
-      const result = Rapid.actionOrthogonalize('-', viewport)(stage);
+      const graph = new Rapid.Graph(base);
+      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
-      const diff = new Rapid.Difference(graph, result);
+      const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b', 'c']);
     });
 
@@ -298,7 +309,7 @@ describe('actionOrthogonalize', () => {
       //   f -- g
       //   |    |
       //   e --- d - c
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
         new Rapid.OsmNode(context, { id: 'd', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'e', loc: [-1, 0] }),
@@ -307,12 +318,12 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['c', 'd', 'e', 'f', 'g', 'd'] })
       ]);
 
-      const stage = new Rapid.Graph(graph);
-      const result = Rapid.actionOrthogonalize('-', viewport)(stage);
+      const graph = new Rapid.Graph(base);
+      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
       assert.instanceOf(result, Rapid.Graph);
-      const diff = new Rapid.Difference(graph, result);
+      const diff = new Rapid.Difference(base, result);
       assert.doesNotHaveAnyKeys(diff.changes, ['d']);  // d not changed
-      assert.ok(graph.hasEntity('d'));                 // d not removed
+      assert.isOk(graph.hasEntity('d'));                 // d not removed
     });
   });
 
@@ -322,7 +333,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //    |     |
       //    a ---  b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -330,10 +341,10 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
 
-      const stage = new Rapid.Graph(graph);
-      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(stage);
+      const graph = new Rapid.Graph(base);
+      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(graph);
       assert.instanceOf(result, Rapid.Graph);
-      const diff = new Rapid.Difference(graph, result);
+      const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b']);  // only b
     });
 
@@ -342,17 +353,17 @@ describe('actionOrthogonalize', () => {
       //    | \
       //    |   \
       //     b - c
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'a'] })
       ]);
 
-      const stage = new Rapid.Graph(graph);
-      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(stage);
+      const graph = new Rapid.Graph(base);
+      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(graph);
       assert.instanceOf(result, Rapid.Graph);
-      const diff = new Rapid.Difference(graph, result);
+      const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b']);  // only b
     });
 
@@ -360,7 +371,7 @@ describe('actionOrthogonalize', () => {
       //    d --- c
       //          |
       //    a ---  b
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -368,10 +379,10 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
       ]);
 
-      const stage = new Rapid.Graph(graph);
-      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(stage);
+      const graph = new Rapid.Graph(base);
+      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(graph);
       assert.instanceOf(result, Rapid.Graph);
-      const diff = new Rapid.Difference(graph, result);
+      const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b']);  // only b
     });
 
@@ -380,17 +391,17 @@ describe('actionOrthogonalize', () => {
       //    |
       //    |
       //     b - c
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c'] })
       ]);
 
-      const stage = new Rapid.Graph(graph);
-      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(stage);
+      const graph = new Rapid.Graph(base);
+      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(graph);
       assert.instanceOf(result, Rapid.Graph);
-      const diff = new Rapid.Difference(graph, result);
+      const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b']);  // only b
     });
   });
@@ -403,7 +414,7 @@ describe('actionOrthogonalize', () => {
         //    d ---- c
         //    |      |
         //    a ---- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -411,6 +422,7 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
         assert.strictEqual(result, 'square_enough');
       });
@@ -419,7 +431,7 @@ describe('actionOrthogonalize', () => {
         //    d --- c
         //    |     |
         //    a ---- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -427,8 +439,9 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
 
       it('returns false for unsquared triangle', () => {
@@ -436,22 +449,23 @@ describe('actionOrthogonalize', () => {
         //    | \
         //    |   \
         //     b - c
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [0.1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'a'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
 
       it('returns false for perfectly square shape with redundant nodes', () => {
         //    e - d - c
         //    |       |
         //    a ----- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -460,8 +474,9 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'a'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
 
       it('returns "not_squarish" for shape that can not be squared', () => {
@@ -470,7 +485,7 @@ describe('actionOrthogonalize', () => {
         //    f        c
         //     \      /
         //      a -- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [3, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -480,6 +495,7 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f', 'a'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
         assert.strictEqual(result, 'not_squarish');
       });
@@ -490,7 +506,7 @@ describe('actionOrthogonalize', () => {
         //   e --- d - c
         //        |    |
         //        a -- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, -1] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [1, -1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
@@ -501,8 +517,9 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'd', 'a'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
     });
 
@@ -512,7 +529,7 @@ describe('actionOrthogonalize', () => {
         //    d ---- c
         //           |
         //    a ---- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -520,6 +537,7 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
         assert.strictEqual(result, 'square_enough');
       });
@@ -528,7 +546,7 @@ describe('actionOrthogonalize', () => {
         //    d --- c
         //          |
         //    a ---  b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -536,8 +554,9 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
 
       it('returns false for unsquared 3-point path', () => {
@@ -545,22 +564,23 @@ describe('actionOrthogonalize', () => {
         //    |
         //    |
         //     b - c
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [0, 0.1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
 
       it('returns false for perfectly square shape with redundant nodes', () => {
         //    e - d - c
         //            |
         //    a ----- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -569,8 +589,9 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
 
       it('returns "not_squarish" for path that can not be squared', () => {
@@ -579,7 +600,7 @@ describe('actionOrthogonalize', () => {
         //    f        c
         //            /
         //      a -- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [3, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -589,6 +610,7 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
         assert.strictEqual(result, 'not_squarish');
       });
@@ -597,7 +619,7 @@ describe('actionOrthogonalize', () => {
         //   f -- g
         //   |    |
         //   e --- d - c
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'c', loc: [0, 1] }),
           new Rapid.OsmNode(context, { id: 'd', loc: [0.1, 0] }),
           new Rapid.OsmNode(context, { id: 'e', loc: [-1, 0] }),
@@ -606,8 +628,9 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['c', 'd', 'e', 'f', 'g', 'd'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
     });
 
@@ -617,7 +640,7 @@ describe('actionOrthogonalize', () => {
         //    d ---- c
         //           |
         //    a ---- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -625,6 +648,7 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport, 'b').disabled(graph);
         assert.strictEqual(result, 'square_enough');
       });
@@ -633,7 +657,7 @@ describe('actionOrthogonalize', () => {
         //    d --- c
         //          |
         //    a ---  b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [2.1, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -641,8 +665,9 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport, 'b').disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
 
       it('returns false for a vertex in an unsquared 3-point path', () => {
@@ -650,15 +675,16 @@ describe('actionOrthogonalize', () => {
         //    |
         //    |
         //     b - c
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [0, 3] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [0, 0.1] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport, 'b').disabled(graph);
-        assert.strictEqual(result, false);
+        assert.isFalse(result);
       });
 
       it('returns "not_squarish" for vertex that can not be squared', () => {
@@ -667,7 +693,7 @@ describe('actionOrthogonalize', () => {
         //    f        c
         //            /
         //      a -- b
-        const graph = new Rapid.Graph(context, [
+        const base = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'a', loc: [1, 0] }),
           new Rapid.OsmNode(context, { id: 'b', loc: [3, 0] }),
           new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -677,6 +703,7 @@ describe('actionOrthogonalize', () => {
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f'] })
         ]);
 
+        const graph = new Rapid.Graph(base);
         const result = Rapid.actionOrthogonalize('-', viewport, 'b').disabled(graph);
         assert.strictEqual(result, 'not_squarish');
       });
@@ -686,15 +713,17 @@ describe('actionOrthogonalize', () => {
 
   describe('transitions', () => {
     it('is transitionable', () => {
-      assert.strictEqual(Rapid.actionOrthogonalize().transitionable, true);
+      assert.isTrue(Rapid.actionOrthogonalize().transitionable);
     });
+
     //  for all of these:
     //
     //     f ------------ e
     //     |              |
     //     a -- b -- c -- d
+    //
     it('orthogonalize at t = 0', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
@@ -704,17 +733,18 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f', 'a'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph, 0);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c', 'd', 'e', 'f', 'a']);
-      assert.ok(Math.abs(result.entity('b').loc[0] - 1) < 1e-6);
-      assert.ok(Math.abs(result.entity('b').loc[1] - 0.01) < 1e-6);
-      assert.ok(Math.abs(result.entity('c').loc[0] - 2) < 1e-6);
-      assert.ok(Math.abs(result.entity('c').loc[1] + 0.01) < 1e-6);
+      assert.isOk(Math.abs(result.entity('b').loc[0] - 1) < 1e-6);
+      assert.isOk(Math.abs(result.entity('b').loc[1] - 0.01) < 1e-6);
+      assert.isOk(Math.abs(result.entity('c').loc[0] - 2) < 1e-6);
+      assert.isOk(Math.abs(result.entity('c').loc[1] + 0.01) < 1e-6);
     });
 
     it('orthogonalize at t = 0.5', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
@@ -724,17 +754,18 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f', 'a'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph, 0.5);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c', 'd', 'e', 'f', 'a']);
-      assert.ok(Math.abs(result.entity('b').loc[0] - 1) < 1e-3);
-      assert.ok(Math.abs(result.entity('b').loc[1] - 0.005) < 1e-3);
-      assert.ok(Math.abs(result.entity('c').loc[0] - 2) < 1e-3);
-      assert.ok(Math.abs(result.entity('c').loc[1] + 0.005) < 1e-3);
+      assert.isOk(Math.abs(result.entity('b').loc[0] - 1) < 1e-3);
+      assert.isOk(Math.abs(result.entity('b').loc[1] - 0.005) < 1e-3);
+      assert.isOk(Math.abs(result.entity('c').loc[0] - 2) < 1e-3);
+      assert.isOk(Math.abs(result.entity('c').loc[1] + 0.005) < 1e-3);
     });
 
     it('orthogonalize at t = 1', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01], tags: { foo: 'bar' } }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, -0.01] }),
@@ -744,12 +775,13 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'e', 'f', 'a'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionOrthogonalize('-', viewport)(graph, 1);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'd', 'e', 'f', 'a']);
-      assert.ok(Math.abs(result.entity('b').loc[0] - 1) < 2e-3);
-      assert.ok(Math.abs(result.entity('b').loc[1]) < 2e-3);
-      assert.strictEqual(result.hasEntity('c'), undefined);
+      assert.isOk(Math.abs(result.entity('b').loc[0] - 1) < 2e-3);
+      assert.isOk(Math.abs(result.entity('b').loc[1]) < 2e-3);
+      assert.isUndefined(result.hasEntity('c'));
     });
   });
 });

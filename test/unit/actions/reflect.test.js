@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -16,7 +16,7 @@ describe('actionReflect', () => {
   };
 
   it('does not create or remove nodes', () => {
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -24,17 +24,17 @@ describe('actionReflect', () => {
       new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionReflect(['-'], viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.deepEqual(result.entity('-').nodes.length, 5);
+    assert.instanceOf(result, Rapid.Graph);
+    assert.lengthOf(result.entity('-').nodes, 5);
   });
-
 
   it('reflects across long axis', () => {
     //    d -- c      a ---- b
     //   /     |  ->   \     |
     //  a ---- b        d -- c
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -42,30 +42,30 @@ describe('actionReflect', () => {
       new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionReflect(['-'], viewport).useLongAxis(true)(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
 
     const a = result.entity('a').loc; // [0, 2]
     const b = result.entity('b').loc; // [4, 2]
     const c = result.entity('c').loc; // [4, 0]
     const d = result.entity('d').loc; // [1, 0]
 
-    assert.ok(closeTo(a[0], 0));
-    assert.ok(closeTo(a[1], 2));
-    assert.ok(closeTo(b[0], 4));
-    assert.ok(closeTo(b[1], 2));
-    assert.ok(closeTo(c[0], 4));
-    assert.ok(closeTo(c[1], 0));
-    assert.ok(closeTo(d[0], 1));
-    assert.ok(closeTo(d[1], 0));
+    assert.isTrue(closeTo(a[0], 0));
+    assert.isTrue(closeTo(a[1], 2));
+    assert.isTrue(closeTo(b[0], 4));
+    assert.isTrue(closeTo(b[1], 2));
+    assert.isTrue(closeTo(c[0], 4));
+    assert.isTrue(closeTo(c[1], 0));
+    assert.isTrue(closeTo(d[0], 1));
+    assert.isTrue(closeTo(d[1], 0));
   });
-
 
   it('reflects across short axis', () => {
     //    d -- c      c -- d
     //   /     |  ->  |     \
     //  a ---- b      b ---- a
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
       new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
       new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -73,33 +73,33 @@ describe('actionReflect', () => {
       new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionReflect(['-'], viewport).useLongAxis(false)(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
 
     const a = result.entity('a').loc; // [4, 0]
     const b = result.entity('b').loc; // [0, 0]
     const c = result.entity('c').loc; // [0, 2]
     const d = result.entity('d').loc; // [3, 2]
 
-    assert.ok(closeTo(a[0], 4));
-    assert.ok(closeTo(a[1], 0));
-    assert.ok(closeTo(b[0], 0));
-    assert.ok(closeTo(b[1], 0));
-    assert.ok(closeTo(c[0], 0));
-    assert.ok(closeTo(c[1], 2));
-    assert.ok(closeTo(d[0], 3));
-    assert.ok(closeTo(d[1], 2));
+    assert.isTrue(closeTo(a[0], 4));
+    assert.isTrue(closeTo(a[1], 0));
+    assert.isTrue(closeTo(b[0], 0));
+    assert.isTrue(closeTo(b[1], 0));
+    assert.isTrue(closeTo(c[0], 0));
+    assert.isTrue(closeTo(c[1], 2));
+    assert.isTrue(closeTo(d[0], 3));
+    assert.isTrue(closeTo(d[1], 2));
   });
 
 
   describe('transitions', () => {
     it('is transitionable', () => {
-      assert.equal(Rapid.actionReflect().transitionable, true);
+      assert.isTrue(Rapid.actionReflect().transitionable);
     });
 
-
     it('reflect long at t = 0', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
@@ -107,76 +107,80 @@ describe('actionReflect', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionReflect(['-'], viewport)(graph, 0);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
 
       const a = result.entity('a').loc; // [0, 0]
       const b = result.entity('b').loc; // [4, 0]
       const c = result.entity('c').loc; // [4, 2]
       const d = result.entity('d').loc; // [1, 2]
 
-      assert.ok(closeTo(a[0], 0));
-      assert.ok(closeTo(a[1], 0));
-      assert.ok(closeTo(b[0], 4));
-      assert.ok(closeTo(b[1], 0));
-      assert.ok(closeTo(c[0], 4));
-      assert.ok(closeTo(c[1], 2));
-      assert.ok(closeTo(d[0], 1));
-      assert.ok(closeTo(d[1], 2));
+      assert.isTrue(closeTo(a[0], 0));
+      assert.isTrue(closeTo(a[1], 0));
+      assert.isTrue(closeTo(b[0], 4));
+      assert.isTrue(closeTo(b[1], 0));
+      assert.isTrue(closeTo(c[0], 4));
+      assert.isTrue(closeTo(c[1], 2));
+      assert.isTrue(closeTo(d[0], 1));
+      assert.isTrue(closeTo(d[1], 2));
     });
 
-
     it('reflect long at t = 0.5', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
         new Rapid.OsmNode(context, { id: 'd', loc: [1, 2] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
+
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionReflect(['-'], viewport)(graph, 0.5);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
 
       const a = result.entity('a').loc; // [0, 1]
       const b = result.entity('b').loc; // [4, 1]
       const c = result.entity('c').loc; // [4, 1]
       const d = result.entity('d').loc; // [1, 1]
 
-      assert.ok(closeTo(a[0], 0));
-      assert.ok(closeTo(a[1], 1));
-      assert.ok(closeTo(b[0], 4));
-      assert.ok(closeTo(b[1], 1));
-      assert.ok(closeTo(c[0], 4));
-      assert.ok(closeTo(c[1], 1));
-      assert.ok(closeTo(d[0], 1));
-      assert.ok(closeTo(d[1], 1));
+      assert.isTrue(closeTo(a[0], 0));
+      assert.isTrue(closeTo(a[1], 1));
+      assert.isTrue(closeTo(b[0], 4));
+      assert.isTrue(closeTo(b[1], 1));
+      assert.isTrue(closeTo(c[0], 4));
+      assert.isTrue(closeTo(c[1], 1));
+      assert.isTrue(closeTo(d[0], 1));
+      assert.isTrue(closeTo(d[1], 1));
     });
 
 
     it('reflect long at t = 1', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [4, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [4, 2] }),
         new Rapid.OsmNode(context, { id: 'd', loc: [1, 2] }),
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
+
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionReflect(['-'], viewport)(graph, 1);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
 
       const a = result.entity('a').loc; // [0, 2]
       const b = result.entity('b').loc; // [4, 2]
       const c = result.entity('c').loc; // [4, 0]
       const d = result.entity('d').loc; // [1, 0]
 
-      assert.ok(closeTo(a[0], 0));
-      assert.ok(closeTo(a[1], 2));
-      assert.ok(closeTo(b[0], 4));
-      assert.ok(closeTo(b[1], 2));
-      assert.ok(closeTo(c[0], 4));
-      assert.ok(closeTo(c[1], 0));
-      assert.ok(closeTo(d[0], 1));
-      assert.ok(closeTo(d[1], 0));
+      assert.isTrue(closeTo(a[0], 0));
+      assert.isTrue(closeTo(a[1], 2));
+      assert.isTrue(closeTo(b[0], 4));
+      assert.isTrue(closeTo(b[1], 2));
+      assert.isTrue(closeTo(c[0], 4));
+      assert.isTrue(closeTo(c[1], 0));
+      assert.isTrue(closeTo(d[0], 1));
+      assert.isTrue(closeTo(d[1], 0));
     });
   });
 });

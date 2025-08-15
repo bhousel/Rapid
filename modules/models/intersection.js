@@ -112,7 +112,8 @@ export function osmIntersection(context, graph, startvertexID, maxDistance) {
   // STEP 2:  Build a virtual graph containing only the entities in the intersection..
   // Everything done after this step should act on the virtual graph
   // Any actions that must be performed later to the main graph go in `actions` array
-  let vgraph = new Graph(context);   // virtual graph
+  let vbase = new Graph(context);
+  let vgraph = new Graph(vbase);   // virtual graph
   for (const way of ways) {
     for (const node of graph.childNodes(way)) {
       vgraph.replace(node);

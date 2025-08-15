@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -13,16 +13,17 @@ describe('actionScale', () => {
   it('scales nodes around a pivot point', () => {
     const nodeA = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
     const nodeB = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
-    const graph = new Rapid.Graph(context, [nodeA, nodeB]);
+    const base = new Rapid.Graph(context, [nodeA, nodeB]);
+    const graph = new Rapid.Graph(base);
     const pivot = [0, 0];
     const scale = 2;
 
-    const result = Rapid.actionScale([nodeA.id, nodeB.id], pivot, scale, viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    const resultA = result.hasEntity(nodeA.id);
-    const resultB = result.hasEntity(nodeB.id);
-    assert.ok(resultA instanceof Rapid.OsmNode);
-    assert.ok(resultB instanceof Rapid.OsmNode);
+    const result = Rapid.actionScale(['a', 'b'], pivot, scale, viewport)(graph);
+    assert.instanceOf(result, Rapid.Graph);
+    const resultA = result.hasEntity('a');
+    const resultB = result.hasEntity('b');
+    assert.instanceOf(resultA, Rapid.OsmNode);
+    assert.instanceOf(resultB, Rapid.OsmNode);
     assert.deepEqual(resultA.loc, [0, 0]);
     assert.deepEqual(resultB.loc, [2, 0]);
   });

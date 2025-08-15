@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -10,23 +10,24 @@ describe('actionDeleteMultiple', () => {
     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const w1 = new Rapid.OsmWay(context, {id: 'w1'});
     const r1 = new Rapid.OsmRelation(context, {id: 'r1'});
-    const graph = new Rapid.Graph(context, [n1, w1, r1]);
+    const base = new Rapid.Graph(context, [n1, w1, r1]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionDeleteMultiple(['n1', 'w1', 'r1'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(!result.hasEntity('n1'));
-    assert.ok(!result.hasEntity('w1'));
-    assert.ok(!result.hasEntity('r1'));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isNotOk(result.hasEntity('n1'));
+    assert.isNotOk(result.hasEntity('w1'));
+    assert.isNotOk(result.hasEntity('r1'));
   });
-
 
   it('deletes a way and one of its nodes', () => {
     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
     const w1 = new Rapid.OsmWay(context, {id: 'w1', nodes: ['n1']});
-    const graph = new Rapid.Graph(context, [n1, w1]);
+    const base = new Rapid.Graph(context, [n1, w1]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionDeleteMultiple(['w1', 'n1'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(!result.hasEntity('w1'));
-    assert.ok(!result.hasEntity('n1'));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isNotOk(result.hasEntity('w1'));
+    assert.isNotOk(result.hasEntity('n1'));
   });
 
 

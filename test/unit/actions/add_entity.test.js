@@ -1,15 +1,17 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+
 
 describe('actionAddEntity', () => {
   const context = new Rapid.MockContext();
 
   it('adds an entity to the graph', t => {
-    const graph = new Rapid.Graph(context);
+    const base = new Rapid.Graph(context);
+    const graph = new Rapid.Graph(base);
     const entity = new Rapid.OsmNode(context);
     const result = Rapid.actionAddEntity(entity)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.equal(result.entity(entity.id), entity);
+    assert.instanceOf(result, Rapid.Graph);
+    assert.strictEqual(result.entity(entity.id), entity);
   });
 });

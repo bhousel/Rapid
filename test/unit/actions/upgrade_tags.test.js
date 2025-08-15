@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -10,10 +10,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { amenity: 'swimming_pool' };
     const newTags = { leisure: 'swimming_pool' };
     const entity = new Rapid.OsmNode(context, { tags: { amenity: 'swimming_pool', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { leisure: 'swimming_pool', name: 'Foo' });
   });
 
@@ -21,10 +22,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { amenity: 'vending_machine', vending: 'news_papers' };
     const newTags = { amenity: 'vending_machine', vending: 'newspapers' };
     const entity = new Rapid.OsmNode(context, { tags: { amenity: 'vending_machine', vending: 'news_papers', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { amenity: 'vending_machine', vending: 'newspapers', name: 'Foo' });
   });
 
@@ -33,10 +35,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { natural: 'marsh' };
     const newTags = { natural: 'wetland', wetland: 'marsh' };
     const entity = new Rapid.OsmNode(context, { tags: { natural: 'marsh', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { natural: 'wetland', wetland: 'marsh', name: 'Foo' });
   });
 
@@ -45,10 +48,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { landuse: 'wood' };
     const newTags = { natural: 'wood' };
     const entity = new Rapid.OsmNode(context, { tags: { landuse: 'wood', natural: 'wetland', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { natural: 'wood', name: 'Foo' });
   });
 
@@ -57,10 +61,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { highway: 'no' };
     const newTags = {};
     const entity = new Rapid.OsmNode(context, { tags: { highway: 'no', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { name: 'Foo' });
   });
 
@@ -69,10 +74,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { color: '*' };
     const newTags = { colour: '$1' };
     const entity = new Rapid.OsmNode(context, { tags: { color: 'red', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { colour: 'red', name: 'Foo' });
   });
 
@@ -81,10 +87,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { amenity: 'shop' };
     const newTags = { shop: '*' };
     const entity = new Rapid.OsmNode(context, { tags: { amenity: 'shop', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { shop: 'yes', name: 'Foo' });
   });
 
@@ -93,10 +100,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { amenity: 'shop' };
     const newTags = { shop: '*' };
     const entity = new Rapid.OsmNode(context, { tags: { amenity: 'shop', shop: 'supermarket', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { shop: 'supermarket', name: 'Foo' });
   });
 
@@ -105,10 +113,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { amenity: 'shop' };
     const newTags = { shop: '*' };
     const entity = new Rapid.OsmNode(context, { tags: { amenity: 'shop', shop: 'no', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { shop: 'yes', name: 'Foo' });
   });
 
@@ -117,10 +126,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { cuisine: 'vegan' };
     const newTags = { 'diet:vegan': 'yes' };
     const entity = new Rapid.OsmNode(context, { tags: { cuisine: 'italian;vegan', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { cuisine: 'italian', 'diet:vegan': 'yes', name: 'Foo' });
   });
 
@@ -129,10 +139,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { cuisine: 'vegan' };
     const newTags = { 'diet:vegan': 'yes' };
     const entity = new Rapid.OsmNode(context, { tags: { cuisine: 'italian;vegan;regional;american', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { cuisine: 'italian;regional;american', 'diet:vegan': 'yes', name: 'Foo' });
   });
 
@@ -141,10 +152,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { leisure: 'ice_rink', sport: 'hockey' };
     const newTags = { leisure: 'ice_rink', sport: 'ice_hockey' };
     const entity = new Rapid.OsmNode(context, { tags: { leisure: 'ice_rink', sport: 'curling;hockey;multi', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { leisure: 'ice_rink', name: 'Foo', sport: 'curling;ice_hockey;multi' });
   });
 
@@ -153,10 +165,11 @@ describe('actionUpgradeTags', () => {
     const oldTags = { vending: 'parcel_mail_in;parcel_pickup' };
     const newTags = { vending: 'parcel_pickup;parcel_mail_in' };
     const entity = new Rapid.OsmNode(context, { tags: { vending: 'parcel_mail_in;parcel_pickup', name: 'Foo' } });
-    const graph = new Rapid.Graph(context, [entity]);
+    const base = new Rapid.Graph(context, [entity]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionUpgradeTags(entity.id, oldTags, newTags)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(entity.id).tags, { vending: 'parcel_pickup;parcel_mail_in', name: 'Foo' });
   });
 });

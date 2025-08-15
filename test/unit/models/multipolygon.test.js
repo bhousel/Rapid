@@ -322,7 +322,8 @@ describe('multipolygons', () => {
       const c = new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] });
       const w1 = new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b'] });
       const w2 = new Rapid.OsmWay(context, { id: '=', nodes: ['c', 'b'], tags: { 'oneway': 'yes', 'lanes:forward': 2 } });
-      const graph = new Rapid.Graph(context, [a, b, c, w1, w2]);
+      const base = new Rapid.Graph(context, [a, b, c, w1, w2]);
+      const graph = new Rapid.Graph(base);
       const result = Rapid.osmJoinWays([w1, w2], graph);
 
       assert.ok(result instanceof Array);

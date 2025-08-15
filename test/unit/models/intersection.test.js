@@ -1246,7 +1246,7 @@ describe('osmIntersection', () => {
       //         ‖
       //  d ~~~> e ≈≈≈> f
       //
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 2] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 2] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
@@ -1263,6 +1263,7 @@ describe('osmIntersection', () => {
       ]);
 
       it('with no restrictions, allows via node and via way turns', () => {
+        const graph = new Rapid.Graph(base);
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
         assert.ok(turns instanceof Array);
         assert.equal(turns.length, 4);
@@ -1297,8 +1298,8 @@ describe('osmIntersection', () => {
             { role: 'to', id: '≈', type: 'way' }
           ]
         });
-        const graph2 = graph.replace(r1);
-        const turns = Rapid.osmIntersection(context, graph2, 'b', maxDist).turns('=', 2);
+        const graph = new Rapid.Graph(base).replace(r1);
+        const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
         assert.ok(turns instanceof Array);
         assert.equal(turns.length, 4);
 
@@ -1336,8 +1337,8 @@ describe('osmIntersection', () => {
             { role: 'to', id: '≈', type: 'way' }
           ]
         });
-        const graph2 = graph.replace(r1);
-        const turns = Rapid.osmIntersection(context, graph2, 'b', maxDist).turns('=', 2);
+        const graph = new Rapid.Graph(base).replace(r1);
+        const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
         assert.ok(turns instanceof Array);
         assert.equal(turns.length, 4);
 
@@ -1375,8 +1376,8 @@ describe('osmIntersection', () => {
             { role: 'to', id: '≈', type: 'way' }
           ]
         });
-        const graph2 = graph.replace(r1);
-        const turns = Rapid.osmIntersection(context, graph2, 'b', maxDist).turns('=', 2);
+        const graph = new Rapid.Graph(base).replace(r1);
+        const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
         assert.ok(turns instanceof Array);
         assert.equal(turns.length, 4);
 
@@ -1425,8 +1426,8 @@ describe('osmIntersection', () => {
             { role: 'to', id: '≈', type: 'way' }
           ]
         });
-        const graph2 = graph.replace(r1);
-        const turns = Rapid.osmIntersection(context, graph2, 'b', maxDist).turns('=', 2);
+        const graph = new Rapid.Graph(base).replace(r1);
+        const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
         assert.ok(turns instanceof Array);
         assert.equal(turns.length, 4);
 
@@ -1472,7 +1473,7 @@ describe('osmIntersection', () => {
       //          /   \
       //   a --- b === c ~~~ d
       //
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
         new Rapid.OsmNode(context, { id: 'c', loc: [3, 0] }),
@@ -1486,6 +1487,7 @@ describe('osmIntersection', () => {
       ]);
 
       it('with no restrictions, finds all turns', () => {
+        const graph = new Rapid.Graph(base);
         const turns = Rapid.osmIntersection(context, graph, 'c', maxDist).turns('=', 2);
         assert.ok(turns instanceof Array);
         assert.equal(turns.length, 10);
@@ -1532,8 +1534,8 @@ describe('osmIntersection', () => {
             { role: 'to', id: '~', type: 'way' }
           ]
         });
-        const graph2 = graph.replace(r1);
-        const turns = Rapid.osmIntersection(context, graph2, 'c', maxDist).turns('=', 2);
+        const graph = new Rapid.Graph(base).replace(r1);
+        const turns = Rapid.osmIntersection(context, graph, 'c', maxDist).turns('=', 2);
         assert.ok(turns instanceof Array);
         assert.equal(turns.length, 10);
 
@@ -1585,8 +1587,8 @@ describe('osmIntersection', () => {
             { role: 'to', id: '~', type: 'way' }
           ]
         });
-        const graph2 = graph.replace(r1);
-        const turns = Rapid.osmIntersection(context, graph2, 'c', maxDist).turns('=', 2);
+        const graph = new Rapid.Graph(base).replace(r1);
+        const turns = Rapid.osmIntersection(context, graph, 'c', maxDist).turns('=', 2);
         assert.ok(turns instanceof Array);
         assert.equal(turns.length, 8);
 

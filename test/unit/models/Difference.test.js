@@ -19,7 +19,8 @@ describe('Difference', () => {
 
     it('constructs a create-only Difference if no base', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
-      const head = new Rapid.Graph(context).replace(node);
+      const base = new Rapid.Graph(context);
+      const head = new Rapid.Graph(base).replace(node);
       const diff = new Rapid.Difference(null, head);
       assert.instanceOf(diff, Rapid.Difference);
       assert.instanceOf(diff.changes, Map);

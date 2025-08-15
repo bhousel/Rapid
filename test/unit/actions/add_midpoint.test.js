@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+
 
 describe('actionAddMidpoint', () => {
   const context = new Rapid.MockContext();
@@ -10,10 +11,11 @@ describe('actionAddMidpoint', () => {
     const a = new Rapid.OsmNode(context);
     const b = new Rapid.OsmNode(context);
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
-    const graph = new Rapid.Graph(context, [a, b]);
+    const base = new Rapid.Graph(context, [a, b]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionAddMidpoint(midpoint, node)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(node.id).loc, [1, 2]);
   });
 
@@ -24,10 +26,11 @@ describe('actionAddMidpoint', () => {
     const w1 = new Rapid.OsmWay(context);
     const w2 = new Rapid.OsmWay(context, {nodes: [a.id, b.id]});
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
-    const graph = new Rapid.Graph(context, [a, b, w1, w2]);
+    const base = new Rapid.Graph(context, [a, b, w1, w2]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionAddMidpoint(midpoint, node)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(w1.id).nodes, []);
     assert.deepEqual(result.entity(w2.id).nodes, [a.id, node.id, b.id]);
   });
@@ -39,10 +42,11 @@ describe('actionAddMidpoint', () => {
     const w1 = new Rapid.OsmWay(context);
     const w2 = new Rapid.OsmWay(context, {nodes: [b.id, a.id]});
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
-    const graph = new Rapid.Graph(context, [a, b, w1, w2]);
+    const base = new Rapid.Graph(context, [a, b, w1, w2]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionAddMidpoint(midpoint, node)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(w1.id).nodes, []);
     assert.deepEqual(result.entity(w2.id).nodes, [b.id, node.id, a.id]);
   });
@@ -59,10 +63,11 @@ describe('actionAddMidpoint', () => {
     const c = new Rapid.OsmNode(context);
     const w = new Rapid.OsmWay(context, {nodes: [a.id, b.id, a.id]});
     const midpoint = {loc: [1, 2], edge: [a.id, b.id]};
-    const graph = new Rapid.Graph(context, [a, b, w]);
+    const base = new Rapid.Graph(context, [a, b, w]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionAddMidpoint(midpoint, c)(graph);
 
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(w.id).nodes, [a.id, c.id, b.id, a.id]);
   });
 });

@@ -1,15 +1,17 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+
 
 describe('actionAddMember', () => {
   const context = new Rapid.MockContext();
 
   it('adds an member to a relation at the specified index', () => {
     const r = new Rapid.OsmRelation(context, {members: [{id: '1'}, {id: '3'}]});
-    const graph = new Rapid.Graph(context, [r]);
+    const base = new Rapid.Graph(context, [r]);
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionAddMember(r.id, {id: '2'}, 1)(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity(r.id).members, [{id: '1'}, {id: '2'}, {id: '3'}]);
   });
 
@@ -19,7 +21,7 @@ describe('actionAddMember', () => {
     }
 
     it('handles incomplete relations', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -32,28 +34,30 @@ describe('actionAddMember', () => {
         ]})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionAddMember('r', {id: '=', type: 'way'})(graph);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(members(result), ['~', '-', '=']);
     });
 
     it('adds the member to a relation with no members', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
         new Rapid.OsmRelation(context, {id: 'r'})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionAddMember('r', {id: '-', type: 'way'})(graph);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(members(result), ['-']);
     });
 
     it('appends the member if the ways are not connecting', () => {
       // Before:  a ---> b
       // After:   a ---> b .. c ===> d
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -65,15 +69,16 @@ describe('actionAddMember', () => {
         ]})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionAddMember('r', {id: '=', type: 'way'})(graph);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(members(result), ['-', '=']);
     });
 
     it('appends the member if the way connects at end', () => {
       // Before:   a ---> b
       // After:    a ---> b ===> c
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -84,15 +89,16 @@ describe('actionAddMember', () => {
         ]})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionAddMember('r', {id: '=', type: 'way'})(graph);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(members(result), ['-', '=']);
     });
 
     it('inserts the member if the way connects at beginning', () => {
       // Before:          b ---> c ~~~> d
       // After:    a ===> b ---> c ~~~> d
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -106,15 +112,16 @@ describe('actionAddMember', () => {
         ]})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionAddMember('r', {id: '=', type: 'way'})(graph);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(members(result), ['=', '-', '~']);
     });
 
     it('inserts the member if the way connects in middle', () => {
       // Before:  a ---> b  ..  c ~~~> d
       // After:   a ---> b ===> c ~~~> d
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -128,15 +135,16 @@ describe('actionAddMember', () => {
         ]})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionAddMember('r', {id: '=', type: 'way'})(graph);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(members(result), ['-', '=', '~']);
     });
 
     it('inserts the member multiple times if insertPair provided (middle)', () => {
       // Before:  a ---> b  ..  c ~~~> d <~~~ c  ..  b <--- a
       // After:   a ---> b ===> c ~~~> d <~~~ c <=== b <--- a
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -151,6 +159,7 @@ describe('actionAddMember', () => {
           {id: '-', type: 'way'}
         ]})
       ]);
+      const graph = new Rapid.Graph(base);
 
       const member = { id: '=', type: 'way' };
       const insertPair = {
@@ -158,15 +167,16 @@ describe('actionAddMember', () => {
         insertedID: '=',
         nodes: ['a','b','c']
       };
+
       const result = Rapid.actionAddMember('r', member, undefined, insertPair)(graph);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(members(result), ['-', '=', '~', '~', '=', '-']);
     });
 
     it('inserts the member multiple times if insertPair provided (beginning/end)', () => {
       // Before:         b <=== c ~~~> d <~~~ c ===> b
       // After:   a <--- b <=== c ~~~> d <~~~ c ===> b ---> a
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -188,13 +198,15 @@ describe('actionAddMember', () => {
         insertedID: '-',
         nodes: ['c','b','a']
       };
+
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionAddMember('r', member, undefined, insertPair)(graph);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(members(result), ['-', '=', '~', '~', '=', '-']);
     });
 
     it('keeps stops and platforms ordered before node, way, relation (for PTv2 routes)', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'b', loc: [0, 0]}),
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
@@ -215,8 +227,9 @@ describe('actionAddMember', () => {
         ]})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const result = Rapid.actionAddMember('r', { id: '=', type: 'way', role: 'forward' })(graph);
-      assert.ok(result instanceof Rapid.Graph);
+      assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(members(result), ['n1', 'w1', 'n2', 'w2', 'n3', 'w3', 'n10', 'n11', 'n12', '-', '=', 'r1']);
     });
 

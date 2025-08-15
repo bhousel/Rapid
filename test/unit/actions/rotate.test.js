@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -17,19 +17,21 @@ describe('actionRotate', () => {
   it('rotates nodes around a pivot point', () => {
     const nodeA = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
     const nodeB = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
-    const graph = new Rapid.Graph(context, [nodeA, nodeB]);
+    const base = new Rapid.Graph(context, [nodeA, nodeB]);
+    const graph = new Rapid.Graph(base);
     const pivot = [0, 0];
     const angle = Math.PI / 2;  // 90 degrees in radians
 
-    const result = Rapid.actionRotate([nodeA.id, nodeB.id], pivot, angle, viewport)(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    const resultA = result.hasEntity(nodeA.id);
-    const resultB = result.hasEntity(nodeB.id);
-    assert.ok(resultA instanceof Rapid.OsmNode);
-    assert.ok(resultB instanceof Rapid.OsmNode);
-    assert.ok(closeTo(resultA.loc[0], 0));
-    assert.ok(closeTo(resultA.loc[1], 0));
-    assert.ok(closeTo(resultB.loc[0], 0));
-    assert.ok(closeTo(resultB.loc[1], 1));
+    const result = Rapid.actionRotate(['a', 'b'], pivot, angle, viewport)(graph);
+    assert.instanceOf(result, Rapid.Graph);
+
+    const resultA = result.hasEntity('a');
+    const resultB = result.hasEntity('b');
+    assert.instanceOf(resultA, Rapid.OsmNode);
+    assert.instanceOf(resultB, Rapid.OsmNode);
+    assert.isTrue(closeTo(resultA.loc[0], 0));
+    assert.isTrue(closeTo(resultA.loc[1], 0));
+    assert.isTrue(closeTo(resultB.loc[0], 0));
+    assert.isTrue(closeTo(resultB.loc[1], 1));
   });
 });

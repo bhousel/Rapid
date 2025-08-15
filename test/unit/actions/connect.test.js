@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -7,32 +7,34 @@ describe('actionConnect', () => {
   const context = new Rapid.MockContext();
 
   it('chooses the first non-new node as the survivor', () => {
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b', version: '1'}),
       new Rapid.OsmNode(context, {id: 'c', version: '1'})
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionConnect(['a', 'b', 'c'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(!result.hasEntity('a'));
-    assert.ok(result.hasEntity('b'));
-    assert.ok(!result.hasEntity('c'));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isNotOk(result.hasEntity('a'));
+    assert.isOk(result.hasEntity('b'));
+    assert.isNotOk(result.hasEntity('c'));
   });
 
 
   it('chooses the last node as the survivor when all are new', () => {
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'})
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionConnect(['a', 'b', 'c'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(!result.hasEntity('a'));
-    assert.ok(!result.hasEntity('b'));
-    assert.ok(result.hasEntity('c'));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isNotOk(result.hasEntity('a'));
+    assert.isNotOk(result.hasEntity('b'));
+    assert.isOk(result.hasEntity('c'));
   });
 
 
@@ -51,7 +53,7 @@ describe('actionConnect', () => {
     //       |
     //       d
     //
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -61,8 +63,9 @@ describe('actionConnect', () => {
       new Rapid.OsmWay(context, {id: '|', nodes: ['d', 'e']})
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionConnect(['e', 'b'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c']);
     assert.deepEqual(result.entity('|').nodes, ['d', 'b']);
   });
@@ -77,7 +80,7 @@ describe('actionConnect', () => {
     //
     // Connect [a, d].
     //
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -87,8 +90,9 @@ describe('actionConnect', () => {
       new Rapid.OsmWay(context, {id: '=', nodes: ['d', 'e']})
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionConnect(['a', 'd'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['d', 'b', 'c', 'd']);
   });
 
@@ -102,17 +106,18 @@ describe('actionConnect', () => {
     //
     // a --- c
     //
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
       new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b', 'c']})
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionConnect(['b', 'c'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', 'c']);
-    assert.ok(!result.hasEntity('b'));
+    assert.isOk(!result.hasEntity('b'));
   });
 
 
@@ -129,7 +134,7 @@ describe('actionConnect', () => {
     //       |
     //       d
     //
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -138,11 +143,12 @@ describe('actionConnect', () => {
       new Rapid.OsmWay(context, {id: '|', nodes: ['b', 'd']})
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionConnect(['b', 'c'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('-').nodes, ['a', 'c']);
     assert.deepEqual(result.entity('|').nodes, ['c', 'd']);
-    assert.ok(!result.hasEntity('b'));
+    assert.isNotOk(result.hasEntity('b'));
   });
 
 
@@ -151,35 +157,37 @@ describe('actionConnect', () => {
     //
     // Connect [a, b]
     //
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']})
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionConnect(['a', 'b'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.ok(!result.hasEntity('-'));
-    assert.ok(!result.hasEntity('a'));
-    assert.ok(!result.hasEntity('b'));
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isNotOk(result.hasEntity('-'));
+    assert.isNotOk(result.hasEntity('a'));
+    assert.isNotOk(result.hasEntity('b'));
   });
 
 
   it('merges tags to the surviving node', () => {
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a', tags: {a: 'a'}}),
       new Rapid.OsmNode(context, {id: 'b', tags: {b: 'b'}}),
       new Rapid.OsmNode(context, {id: 'c', tags: {c: 'c'}})
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionConnect(['a', 'b', 'c'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('c').tags, { a: 'a', b: 'b', c: 'c' });
   });
 
 
   it('merges memberships to the surviving node', () => {
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, {id: 'a'}),
       new Rapid.OsmNode(context, {id: 'b'}),
       new Rapid.OsmNode(context, {id: 'c'}),
@@ -190,8 +198,9 @@ describe('actionConnect', () => {
       new Rapid.OsmRelation(context, {id: 'r2', members: [{id: 'b', role: 'r2', type: 'node'}, {id: 'c', role: 'r2', type: 'node'}]})
     ]);
 
+    const graph = new Rapid.Graph(base);
     const result = Rapid.actionConnect(['b', 'c'])(graph);
-    assert.ok(result instanceof Rapid.Graph);
+    assert.instanceOf(result, Rapid.Graph);
     assert.deepEqual(result.entity('r1').members, [{ id: 'c', role: 'r1', type: 'node' }]);
     assert.deepEqual(result.entity('r2').members, [{ id: 'c', role: 'r2', type: 'node' }]);
   });
@@ -199,7 +208,7 @@ describe('actionConnect', () => {
 
   describe('#disabled', () => {
     it('returns falsy when connecting members of the same relation and same roles', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -210,13 +219,14 @@ describe('actionConnect', () => {
         ]})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const disabled = Rapid.actionConnect(['b', 'c']).disabled(graph);
-      assert.ok(!disabled);
+      assert.isNotOk(disabled);
     });
 
 
     it('returns falsy when connecting members of different relation and different roles', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -225,13 +235,14 @@ describe('actionConnect', () => {
         new Rapid.OsmRelation(context, {id: 'r2', members: [{ id: 'c', type: 'node', role: 'bar' } ]})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const disabled = Rapid.actionConnect(['b', 'c']).disabled(graph);
-      assert.ok(!disabled);
+      assert.isNotOk(disabled);
     });
 
 
     it('returns \'relation\' when connecting members of the same relation but different roles', () => {
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -242,8 +253,9 @@ describe('actionConnect', () => {
         ]})
       ]);
 
+      const graph = new Rapid.Graph(base);
       const disabled = Rapid.actionConnect(['b', 'c']).disabled(graph);
-      assert.equal(disabled, 'relation');
+      assert.strictEqual(disabled, 'relation');
     });
 
 
@@ -254,28 +266,29 @@ describe('actionConnect', () => {
       //        |                        VIA  'b'
       //        c                        TO   '|'
       //
-      const graph = new Rapid.Graph(context, [
-          new Rapid.OsmNode(context, {id: 'a'}),
-          new Rapid.OsmNode(context, {id: 'b'}),
-          new Rapid.OsmNode(context, {id: 'c'}),
-          new Rapid.OsmNode(context, {id: 'd'}),
-          new Rapid.OsmNode(context, {id: 'e'}),
-          new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
-          new Rapid.OsmWay(context, {id: '|', nodes: ['b', 'c']}),
-          new Rapid.OsmWay(context, {id: '~', nodes: ['d', 'e']}),
-          new Rapid.OsmRelation(context, {id: 'r1', tags: { type: 'restriction', restriction: 'no_right_turn' }, members: [
-              { id: '-', type: 'way', role: 'from' },
-              { id: 'b', type: 'node', role: 'via' },
-              { id: '|', type: 'way', role: 'to' }
-          ]})
+      const base = new Rapid.Graph(context, [
+        new Rapid.OsmNode(context, {id: 'a'}),
+        new Rapid.OsmNode(context, {id: 'b'}),
+        new Rapid.OsmNode(context, {id: 'c'}),
+        new Rapid.OsmNode(context, {id: 'd'}),
+        new Rapid.OsmNode(context, {id: 'e'}),
+        new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
+        new Rapid.OsmWay(context, {id: '|', nodes: ['b', 'c']}),
+        new Rapid.OsmWay(context, {id: '~', nodes: ['d', 'e']}),
+        new Rapid.OsmRelation(context, {id: 'r1', tags: { type: 'restriction', restriction: 'no_right_turn' }, members: [
+          { id: '-', type: 'way', role: 'from' },
+          { id: 'b', type: 'node', role: 'via' },
+          { id: '|', type: 'way', role: 'to' }
+        ]})
       ]);
+      const graph = new Rapid.Graph(base);
 
       const disabledAD = Rapid.actionConnect(['a', 'd']).disabled(graph);
-      assert.ok(!disabledAD);
+      assert.isNotOk(disabledAD);
       const disabledBD = Rapid.actionConnect(['b', 'd']).disabled(graph);
-      assert.ok(!disabledBD);
+      assert.isNotOk(disabledBD);
       const disabledCD = Rapid.actionConnect(['c', 'd']).disabled(graph);
-      assert.ok(!disabledCD);
+      assert.isNotOk(disabledCD);
     });
 
     it('returns falsy when connecting nodes that would not break a via-node restriction', () => {
@@ -286,7 +299,7 @@ describe('actionConnect', () => {
       //              |            TO   '|'
       //              e
       //
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -300,16 +313,17 @@ describe('actionConnect', () => {
           { id: '|', type: 'way', role: 'to' }
         ]})
       ]);
+      const graph = new Rapid.Graph(base);
 
       // allowed: adjacent connections that don't destroy a way
       const disabledAB = Rapid.actionConnect(['a', 'b']).disabled(graph);
-      assert.ok(!disabledAB);
+      assert.isNotOk(disabledAB);
       const disabledBC = Rapid.actionConnect(['b', 'c']).disabled(graph);
-      assert.ok(!disabledBC);
+      assert.isNotOk(disabledBC);
       const disabledCD = Rapid.actionConnect(['c', 'd']).disabled(graph);
-      assert.ok(!disabledCD);
+      assert.isNotOk(disabledCD);
       const disabledDE = Rapid.actionConnect(['d', 'e']).disabled(graph);
-      assert.ok(!disabledDE);
+      assert.isNotOk(disabledDE);
     });
 
 
@@ -321,7 +335,7 @@ describe('actionConnect', () => {
       //              |            TO   '-'
       //  g === f === e
       //
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -338,20 +352,21 @@ describe('actionConnect', () => {
           { id: '-', type: 'way', role: 'to' }
         ]})
       ]);
+      const graph = new Rapid.Graph(base);
 
       // allowed: adjacent connections that don't destroy a way
       const disabledAB = Rapid.actionConnect(['a', 'b']).disabled(graph);
-      assert.ok(!disabledAB);
+      assert.isNotOk(disabledAB);
       const disabledBC = Rapid.actionConnect(['b', 'c']).disabled(graph);
-      assert.ok(!disabledBC);
+      assert.isNotOk(disabledBC);
       const disabledCD = Rapid.actionConnect(['c', 'd']).disabled(graph);
-      assert.ok(!disabledCD);
+      assert.isNotOk(disabledCD);
       const disabledDE = Rapid.actionConnect(['d', 'e']).disabled(graph);
-      assert.ok(!disabledDE);
+      assert.isNotOk(disabledDE);
       const disabledEF = Rapid.actionConnect(['e', 'f']).disabled(graph);
-      assert.ok(!disabledEF);
+      assert.isNotOk(disabledEF);
       const disabledFG = Rapid.actionConnect(['f', 'g']).disabled(graph);
-      assert.ok(!disabledFG);
+      assert.isNotOk(disabledFG);
     });
 
 
@@ -363,7 +378,7 @@ describe('actionConnect', () => {
       //              |            TO   '|'
       //              e
       //
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -377,15 +392,16 @@ describe('actionConnect', () => {
           { id: '|', type: 'way', role: 'to' }
         ]})
       ]);
+      const graph = new Rapid.Graph(base);
 
       // prevented:
       // extra connections to the VIA node, or any connections between distinct FROM and TO
       const disabledAC = Rapid.actionConnect(['a', 'c']).disabled(graph);
-      assert.equal(disabledAC, 'restriction', 'extra connection FROM-VIA');
+      assert.strictEqual(disabledAC, 'restriction', 'extra connection FROM-VIA');
       const disabledEC = Rapid.actionConnect(['e', 'c']).disabled(graph);
-      assert.equal(disabledEC, 'restriction', 'extra connection TO-VIA');
+      assert.strictEqual(disabledEC, 'restriction', 'extra connection TO-VIA');
       const disabledBD = Rapid.actionConnect(['b', 'd']).disabled(graph);
-      assert.equal(disabledBD, 'restriction', 'extra connection FROM-TO');
+      assert.strictEqual(disabledBD, 'restriction', 'extra connection FROM-TO');
     });
 
 
@@ -397,7 +413,7 @@ describe('actionConnect', () => {
       //              |            TO   '-'
       //              e
       //
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -411,12 +427,13 @@ describe('actionConnect', () => {
           { id: '-', type: 'way', role: 'to' }
         ]})
       ]);
+      const graph = new Rapid.Graph(base);
 
       // The u-turn case is one where a connection between FROM-TO should be allowed
       const disabledAB = Rapid.actionConnect(['a', 'b']).disabled(graph);
-      assert.ok(!disabledAB);
+      assert.isNotOk(disabledAB);
       const disabledBC = Rapid.actionConnect(['b', 'c']).disabled(graph);
-      assert.ok(!disabledBC);
+      assert.isNotOk(disabledBC);
     });
 
 
@@ -428,7 +445,7 @@ describe('actionConnect', () => {
       //              |            TO   '-'
       //  g === f === e
       //
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -445,25 +462,26 @@ describe('actionConnect', () => {
           { id: '-', type: 'way', role: 'to' }
         ]})
       ]);
+      const graph = new Rapid.Graph(base);
 
       // prevented:
       // extra connections to any node along VIA way
       const disabledAC = Rapid.actionConnect(['a', 'c']).disabled(graph);
-      assert.equal(disabledAC, 'restriction', 'extra connection TO-VIA c');
+      assert.strictEqual(disabledAC, 'restriction', 'extra connection TO-VIA c');
       const disabledBD = Rapid.actionConnect(['b', 'd']).disabled(graph);
-      assert.equal(disabledBD, 'restriction', 'extra connection TO-VIA d');
+      assert.strictEqual(disabledBD, 'restriction', 'extra connection TO-VIA d');
       const disabledBE = Rapid.actionConnect(['b', 'e']).disabled(graph);
-      assert.equal(disabledBE, 'restriction', 'extra connection TO-VIA e');
+      assert.strictEqual(disabledBE, 'restriction', 'extra connection TO-VIA e');
 
       const disabledCE = Rapid.actionConnect(['c', 'e']).disabled(graph);
-      assert.equal(disabledCE, 'restriction', 'extra connection VIA-VIA');
+      assert.strictEqual(disabledCE, 'restriction', 'extra connection VIA-VIA');
 
       const disabledFC = Rapid.actionConnect(['f', 'c']).disabled(graph);
-      assert.equal(disabledFC, 'restriction', 'extra connection FROM-VIA c');
+      assert.strictEqual(disabledFC, 'restriction', 'extra connection FROM-VIA c');
       const disabledFD = Rapid.actionConnect(['f', 'd']).disabled(graph);
-      assert.equal(disabledFD, 'restriction', 'extra connection FROM-VIA d');
+      assert.strictEqual(disabledFD, 'restriction', 'extra connection FROM-VIA d');
       const disabledGE = Rapid.actionConnect(['g', 'e']).disabled(graph);
-      assert.equal(disabledGE, 'restriction', 'extra connection FROM-VIA e');
+      assert.strictEqual(disabledGE, 'restriction', 'extra connection FROM-VIA e');
     });
 
 
@@ -474,7 +492,7 @@ describe('actionConnect', () => {
       //        |            VIA  'b'
       //        c            TO   '|'
       //
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -486,11 +504,12 @@ describe('actionConnect', () => {
           { id: '|', type: 'way', role: 'to' }
         ]})
       ]);
+      const graph = new Rapid.Graph(base);
 
       const disabledAB = Rapid.actionConnect(['a', 'b']).disabled(graph);
-      assert.equal(disabledAB, 'restriction', 'destroy FROM');
+      assert.strictEqual(disabledAB, 'restriction', 'destroy FROM');
       const disabledBC = Rapid.actionConnect(['b', 'c']).disabled(graph);
-      assert.equal(disabledBC, 'restriction', 'destroy TO');
+      assert.strictEqual(disabledBC, 'restriction', 'destroy TO');
     });
 
 
@@ -501,7 +520,7 @@ describe('actionConnect', () => {
       //        |            VIA  '|'
       //  d === c            TO   '-'
       //
-      const graph = new Rapid.Graph(context, [
+      const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),
         new Rapid.OsmNode(context, {id: 'b'}),
         new Rapid.OsmNode(context, {id: 'c'}),
@@ -515,13 +534,14 @@ describe('actionConnect', () => {
           { id: '-', type: 'way', role: 'to' }
         ]})
       ]);
+      const graph = new Rapid.Graph(base);
 
       const disabledAB = Rapid.actionConnect(['a', 'b']).disabled(graph);
-      assert.equal(disabledAB, 'restriction', 'destroy TO');
+      assert.strictEqual(disabledAB, 'restriction', 'destroy TO');
       const disabledBC = Rapid.actionConnect(['b', 'c']).disabled(graph);
-      assert.equal(disabledBC, 'restriction', 'destroy VIA');
+      assert.strictEqual(disabledBC, 'restriction', 'destroy VIA');
       const disabledCD = Rapid.actionConnect(['c', 'd']).disabled(graph);
-      assert.equal(disabledCD, 'restriction', 'destroy FROM');
+      assert.strictEqual(disabledCD, 'restriction', 'destroy FROM');
     });
 
   });

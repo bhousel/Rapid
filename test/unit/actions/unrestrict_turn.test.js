@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -10,7 +10,7 @@ describe('actionUnrestrictTurn', () => {
     //
     // u === * --- w
     //
-    const graph = new Rapid.Graph(context, [
+    const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'u' }),
       new Rapid.OsmNode(context, { id: '*' }),
       new Rapid.OsmNode(context, { id: 'w' }),
@@ -26,9 +26,9 @@ describe('actionUnrestrictTurn', () => {
         ]
       })
     ]);
-    const action = Rapid.actionUnrestrictTurn({ restrictionID: 'r' });
-    const result = action(graph);
-    assert.ok(result instanceof Rapid.Graph);
-    assert.equal(result.hasEntity('r'), undefined);
+    const graph = new Rapid.Graph(base);
+    const result = Rapid.actionUnrestrictTurn({ restrictionID: 'r' })(graph);
+    assert.instanceOf(result, Rapid.Graph);
+    assert.isUndefined(result.hasEntity('r'));
   });
 });

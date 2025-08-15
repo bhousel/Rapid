@@ -5,7 +5,7 @@ import { utilIterable } from '../util/iterable.js';
 /**
  * Graph
  * A `Graph` is a special collection of OSM Entities.
- * Each graph contains a base state (uneditied) and local state (edited).
+ * Each graph contains a "base" state (uneditied) and "local" state (edited).
  * The graph also contains all the caches and methods needed to manage OSM topology.
  *
  * In previous versions of the code, Graph was written in an immutable style,
@@ -37,7 +37,7 @@ export class Graph {
       this.isBaseGraph = false;
       this.previous = other;
 
-      this.base = other.base;     // Base data is shared among the chain of Graphs
+      this.base = other.base;     // Base cache is shared among the chain of Graphs
       this.local = {              // Local data is a clone of the predecessor data
         entities:   new Map(other.local.entities),    // shallow clone
         parentWays: new Map(other.local.parentWays),  // shallow clone
@@ -223,9 +223,9 @@ export class Graph {
    * @throws  Will throw if called on a base graph
    */
   replace(entities) {
-//    if (this.isBaseGraph) {
-//      throw new Error(`Do not call 'replace' on a base graph`);
-//    }
+    if (this.isBaseGraph) {
+      throw new Error(`Do not call 'replace' on a base graph`);
+    }
 
     const arr = utilIterable(entities).sort(this._nodesFirst);
     for (const entity of arr) {
@@ -248,9 +248,9 @@ export class Graph {
    * @throws  Will throw if called on a base graph
    */
   remove(entities) {
-//    if (this.isBaseGraph) {
-//      throw new Error(`Do not call 'remove' on a base graph`);
-//    }
+    if (this.isBaseGraph) {
+      throw new Error(`Do not call 'remove' on a base graph`);
+    }
 
     const arr = utilIterable(entities).sort(this._nodesFirst);
     for (const entity of arr) {
@@ -273,9 +273,9 @@ export class Graph {
    * @throws  Will throw if called on a base graph
    */
   revert(entityIDs) {
-//    if (this.isBaseGraph) {
-//      throw new Error(`Do not call 'revert' on a base graph`);
-//    }
+    if (this.isBaseGraph) {
+      throw new Error(`Do not call 'revert' on a base graph`);
+    }
 
     for (const entityID of utilIterable(entityIDs)) {
       const original = this.base.entities.get(entityID);
@@ -334,9 +334,9 @@ export class Graph {
    * @throws  Will throw if called on a base graph
    */
   load(entities = {}) {
-//    if (this.isBaseGraph) {
-//      throw new Error(`Do not call 'load' on a base graph`);
-//    }
+    if (this.isBaseGraph) {
+      throw new Error(`Do not call 'load' on a base graph`);
+    }
 
     const _loadOne = (entityID, entity) => {
       const current = this.hasEntity(entityID);
