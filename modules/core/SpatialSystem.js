@@ -342,7 +342,9 @@ export class SpatialSystem extends AbstractSystem {
   getDataAtLoc(cacheID, loc) {
     const cache = this.getCache(cacheID);
     const [x, y] = this.context.viewport.wgs84ToWorld(loc);
-    return cache.dataRBush.search({ minX: x, minY: y, maxX: x, maxY: y });
+    const epsilon = 1e-7;
+    const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
+    return cache.dataRBush.search(test);
   }
 
   /**
@@ -355,7 +357,9 @@ export class SpatialSystem extends AbstractSystem {
   hasDataAtLoc(cacheID, loc) {
     const cache = this.getCache(cacheID);
     const [x, y] = this.context.viewport.wgs84ToWorld(loc);
-    return cache.dataRBush.collides({ minX: x, minY: y, maxX: x, maxY: y });
+    const epsilon = 1e-7;
+    const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
+    return cache.dataRBush.collides(test);
   }
 
 
@@ -372,9 +376,11 @@ export class SpatialSystem extends AbstractSystem {
     const viewport = this.context.viewport;
     const cache = this.getCache(cacheID);
     let [x, y] = viewport.wgs84ToWorld(loc);
+    const epsilon = 1e-7;
 
     while (true) {
-      const didCollide = cache.dataRBush.collides({ minX: x, minY: y, maxX: x, maxY: y });
+      const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
+      const didCollide = cache.dataRBush.collides(test);
       if (!didCollide) {
         return viewport.worldToWgs84([x, y]);
       } else {
@@ -432,7 +438,9 @@ export class SpatialSystem extends AbstractSystem {
   hasTileAtLoc(cacheID, loc) {
     const cache = this.getCache(cacheID);
     const [x, y] = this.context.viewport.wgs84ToWorld(loc);
-    return cache.tileRBush.collides({ minX: x, minY: y, maxX: x, maxY: y });
+    const epsilon = 1e-7;
+    const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
+    return cache.tileRBush.collides(test);
   }
 
 }
