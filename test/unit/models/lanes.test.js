@@ -9,20 +9,20 @@ describe('lanes', () => {
   describe('default lane tags', () => {
     it('implies lane count for highway=motorway', () => {
       const w1 = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
-      assert.equal(w1.lanes().metadata.count, 2);
+      assert.strictEqual(w1.lanes().metadata.count, 2);
       const w2 = new Rapid.OsmWay(context, { tags: { highway: 'motorway', oneway: 'no' } });  // weird, but test anyway
-      assert.equal(w2.lanes().metadata.count, 4);
+      assert.strictEqual(w2.lanes().metadata.count, 4);
       const w3 = new Rapid.OsmWay(context, { tags: { highway: 'motorway', oneway: 'yes' } });
-      assert.equal(w3.lanes().metadata.count, 2);
+      assert.strictEqual(w3.lanes().metadata.count, 2);
     });
 
     it('implies lane count for highway=trunk', () => {
       const w1 = new Rapid.OsmWay(context, { tags: { highway: 'trunk' } });
-      assert.equal(w1.lanes().metadata.count, 4);
+      assert.strictEqual(w1.lanes().metadata.count, 4);
       const w2 = new Rapid.OsmWay(context, { tags: { highway: 'trunk', oneway: 'no' } });
-      assert.equal(w2.lanes().metadata.count, 4);
+      assert.strictEqual(w2.lanes().metadata.count, 4);
       const w3 = new Rapid.OsmWay(context, { tags: { highway: 'trunk', oneway: 'yes' } });
-      assert.equal(w3.lanes().metadata.count, 2);
+      assert.strictEqual(w3.lanes().metadata.count, 2);
     });
 
     // all others, assume oneway is 1 lane, bidirectional is 2 lane..
@@ -35,11 +35,11 @@ describe('lanes', () => {
     for (const tag of tags) {
       it(`implies lane count for highway=${tag}`, () => {
         const w1 = new Rapid.OsmWay(context, { tags: { highway: tag } });
-        assert.equal(w1.lanes().metadata.count, 2);
+        assert.strictEqual(w1.lanes().metadata.count, 2);
         const w2 = new Rapid.OsmWay(context, { tags: { highway: tag, oneway: 'no' } });
-        assert.equal(w2.lanes().metadata.count, 2);
+        assert.strictEqual(w2.lanes().metadata.count, 2);
         const w3 = new Rapid.OsmWay(context, { tags: { highway: tag, oneway: 'yes' } });
-        assert.equal(w3.lanes().metadata.count, 1);
+        assert.strictEqual(w3.lanes().metadata.count, 1);
       });
     }
   });
@@ -48,9 +48,9 @@ describe('lanes', () => {
   describe('oneway tags', () => {
     it('returns correctly oneway when tagged as oneway', () => {
       const w1 = new Rapid.OsmWay(context, { tags: { highway: 'residential', oneway: 'no' } });
-      assert.equal(w1.lanes().metadata.oneway, false);
+      assert.strictEqual(w1.lanes().metadata.oneway, false);
       const w2 = new Rapid.OsmWay(context, { tags: { highway: 'residential', oneway: 'yes' } });
-      assert.equal(w2.lanes().metadata.oneway, true);
+      assert.strictEqual(w2.lanes().metadata.oneway, true);
     });
   });
 
@@ -60,121 +60,121 @@ describe('lanes', () => {
     it('returns correctly the `lane:forward` and `lane:backward` counts', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'residential', lanes: 2, 'lanes:forward': 1, 'lanes:backward': 1 } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 2);
-      assert.equal(m.oneway, false);
-      assert.equal(m.forward, 1);
-      assert.equal(m.backward, 1);
-      assert.equal(m.bothways, 0);
+      assert.strictEqual(m.count, 2);
+      assert.strictEqual(m.oneway, false);
+      assert.strictEqual(m.forward, 1);
+      assert.strictEqual(m.backward, 1);
+      assert.strictEqual(m.bothways, 0);
     });
 
     it('returns correctly the count if erroneous values are supplied', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'trunk', lanes: 2, 'lanes:forward': 3 } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 2);
-      assert.equal(m.oneway, false);
-      assert.equal(m.forward, 2);
-      assert.equal(m.backward, 0);
-      assert.equal(m.bothways, 0);
+      assert.strictEqual(m.count, 2);
+      assert.strictEqual(m.oneway, false);
+      assert.strictEqual(m.forward, 2);
+      assert.strictEqual(m.backward, 0);
+      assert.strictEqual(m.bothways, 0);
     });
 
     it('includes all lanes in forward count when `oneway=yes`', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'trunk', lanes: 2, oneway: 'yes' } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 2);
-      assert.equal(m.oneway, true);
-      assert.equal(m.forward, 2);
-      assert.equal(m.backward, 0);
-      assert.equal(m.bothways, 0);
+      assert.strictEqual(m.count, 2);
+      assert.strictEqual(m.oneway, true);
+      assert.strictEqual(m.forward, 2);
+      assert.strictEqual(m.backward, 0);
+      assert.strictEqual(m.bothways, 0);
     });
 
     it('includes all lanes in backward count when `oneway=-1`', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'primary', lanes: 4, oneway: '-1' } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 4);
-      assert.equal(m.oneway, true);
-      assert.equal(m.forward, 0);
-      assert.equal(m.backward, 4);
-      assert.equal(m.bothways, 0);
+      assert.strictEqual(m.count, 4);
+      assert.strictEqual(m.oneway, true);
+      assert.strictEqual(m.forward, 0);
+      assert.strictEqual(m.backward, 4);
+      assert.strictEqual(m.bothways, 0);
     });
 
     it('disregards `lanes:forward` value when `oneway=yes`', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'trunk', lanes: 2, oneway: 'yes', 'lanes:forward': 1 } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 2);
-      assert.equal(m.oneway, true);
-      assert.equal(m.forward, 2);
-      assert.equal(m.backward, 0);
-      assert.equal(m.bothways, 0);
+      assert.strictEqual(m.count, 2);
+      assert.strictEqual(m.oneway, true);
+      assert.strictEqual(m.forward, 2);
+      assert.strictEqual(m.backward, 0);
+      assert.strictEqual(m.bothways, 0);
     });
 
     it('disregards `lanes:backward` value when `oneway=yes`', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'trunk', lanes: 2, oneway: 'yes', 'lanes:backward': 1 } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 2);
-      assert.equal(m.oneway, true);
-      assert.equal(m.forward, 2);
-      assert.equal(m.backward, 0);
-      assert.equal(m.bothways, 0);
+      assert.strictEqual(m.count, 2);
+      assert.strictEqual(m.oneway, true);
+      assert.strictEqual(m.forward, 2);
+      assert.strictEqual(m.backward, 0);
+      assert.strictEqual(m.bothways, 0);
     });
 
     it('infers forward count from `lanes` and `lanes:backward`', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'residential', lanes: 3, 'lanes:backward': 1 } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 3);
-      assert.equal(m.oneway, false);
-      assert.equal(m.forward, 2);
-      assert.equal(m.backward, 1);
-      assert.equal(m.bothways, 0);
+      assert.strictEqual(m.count, 3);
+      assert.strictEqual(m.oneway, false);
+      assert.strictEqual(m.forward, 2);
+      assert.strictEqual(m.backward, 1);
+      assert.strictEqual(m.bothways, 0);
     });
 
     it('infers backward count from `lanes` and `lanes:forward`', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'residential', lanes: 3, 'lanes:forward': 1 } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 3);
-      assert.equal(m.oneway, false);
-      assert.equal(m.forward, 1);
-      assert.equal(m.backward, 2);
-      assert.equal(m.bothways, 0);
+      assert.strictEqual(m.count, 3);
+      assert.strictEqual(m.oneway, false);
+      assert.strictEqual(m.forward, 1);
+      assert.strictEqual(m.backward, 2);
+      assert.strictEqual(m.bothways, 0);
     });
 
     it('infers forward count from `lanes`, `lanes:backward`, and `lanes:both_ways', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'residential', lanes: 3, 'lanes:backward': 1, 'lanes:both_ways': 1 } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 3);
-      assert.equal(m.oneway, false);
-      assert.equal(m.forward, 1);
-      assert.equal(m.backward, 1);
-      assert.equal(m.bothways, 1);
+      assert.strictEqual(m.count, 3);
+      assert.strictEqual(m.oneway, false);
+      assert.strictEqual(m.forward, 1);
+      assert.strictEqual(m.backward, 1);
+      assert.strictEqual(m.bothways, 1);
     });
 
     it('infers backward count from `lanes`, `lanes:forward`, and `lanes:both_ways', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'residential', lanes: 3, 'lanes:forward': 1, 'lanes:both_ways': 1 } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 3);
-      assert.equal(m.oneway, false);
-      assert.equal(m.forward, 1);
-      assert.equal(m.backward, 1);
-      assert.equal(m.bothways, 1);
+      assert.strictEqual(m.count, 3);
+      assert.strictEqual(m.oneway, false);
+      assert.strictEqual(m.forward, 1);
+      assert.strictEqual(m.backward, 1);
+      assert.strictEqual(m.bothways, 1);
     });
 
     it('infer bothways count of 1 when `lane:both_ways>1`', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'residential', lanes: 5, 'lanes:forward': 2, 'lanes:both_ways': 2, 'lanes:backward': 2 } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 5);
-      assert.equal(m.oneway, false);
-      assert.equal(m.forward, 2);
-      assert.equal(m.backward, 2);
-      assert.equal(m.bothways, 1);
+      assert.strictEqual(m.count, 5);
+      assert.strictEqual(m.oneway, false);
+      assert.strictEqual(m.forward, 2);
+      assert.strictEqual(m.backward, 2);
+      assert.strictEqual(m.bothways, 1);
     });
 
     it('infer 0 for any non-numeric number', () => {
       const w = new Rapid.OsmWay(context, { tags: { highway: 'residential', lanes: 2, 'lanes:forward': 1, 'lanes:both_ways': 'none' } });
       const m = w.lanes().metadata;
-      assert.equal(m.count, 2);
-      assert.equal(m.oneway, false);
-      assert.equal(m.forward, 1);
-      assert.equal(m.backward, 1);
-      assert.equal(m.bothways, 0);
+      assert.strictEqual(m.count, 2);
+      assert.strictEqual(m.oneway, false);
+      assert.strictEqual(m.forward, 1);
+      assert.strictEqual(m.backward, 1);
+      assert.strictEqual(m.bothways, 0);
     });
   });
 
@@ -377,9 +377,9 @@ describe('lanes', () => {
       });
 
       const m = w.lanes().metadata;
-      assert.equal(m.turnLanes.unspecified, undefined);
-      assert.equal(m.turnLanes.forward, undefined);
-      assert.equal(m.turnLanes.backward, undefined);
+      assert.strictEqual(m.turnLanes.unspecified, undefined);
+      assert.strictEqual(m.turnLanes.forward, undefined);
+      assert.strictEqual(m.turnLanes.backward, undefined);
     });
 
 
@@ -395,8 +395,8 @@ describe('lanes', () => {
 
       const m = w.lanes().metadata;
       assert.deepEqual(m.turnLanes.unspecified, [['through'], ['through', 'slight_right']]);
-      assert.equal(m.turnLanes.forward, undefined);
-      assert.equal(m.turnLanes.backward, undefined);
+      assert.strictEqual(m.turnLanes.forward, undefined);
+      assert.strictEqual(m.turnLanes.backward, undefined);
     });
 
     it('parses turnLane correctly when `lanes:both_ways=1` is present', () => {
@@ -549,55 +549,55 @@ describe('lanes', () => {
     it('should parse maxspeed without any units correctly', () => {
       const w = new Rapid.OsmWay(context, {tags: {highway: 'primary', lanes: 5, 'maxspeed': '70' }});
       const m = w.lanes().metadata;
-      assert.equal(m.maxspeed, 70);
+      assert.strictEqual(m.maxspeed, 70);
     });
 
     it('should parse maxspeed with km/h correctly', () => {
       const w = new Rapid.OsmWay(context, {tags: {highway: 'primary', lanes: 5, 'maxspeed': '70 km/h' }});
       const m = w.lanes().metadata;
-      assert.equal(m.maxspeed, 70);
+      assert.strictEqual(m.maxspeed, 70);
     });
 
     it('should parse maxspeed with kmh correctly', () => {
       const w = new Rapid.OsmWay(context, {tags: {highway: 'primary', lanes: 5, 'maxspeed': '70 kmh' }});
       const m = w.lanes().metadata;
-      assert.equal(m.maxspeed, 70);
+      assert.strictEqual(m.maxspeed, 70);
     });
 
     it('should parse maxspeed with kph correctly', () => {
       const w = new Rapid.OsmWay(context, {tags: {highway: 'primary', lanes: 5, 'maxspeed': '70 kph' }});
       const m = w.lanes().metadata;
-      assert.equal(m.maxspeed, 70);
+      assert.strictEqual(m.maxspeed, 70);
     });
 
     it('should parse maxspeed with mph correctly', () => {
       const w = new Rapid.OsmWay(context, {tags: {highway: 'primary', lanes: 5, 'maxspeed': '70mph' }});
       const m = w.lanes().metadata;
-      assert.equal(m.maxspeed, 70);
+      assert.strictEqual(m.maxspeed, 70);
     });
 
     it('should parse maxspeed with knots correctly', () => {
       const w = new Rapid.OsmWay(context, {tags: {highway: 'primary', lanes: 5, 'maxspeed': '50knots' }});
       const m = w.lanes().metadata;
-      assert.equal(m.maxspeed, 50);
+      assert.strictEqual(m.maxspeed, 50);
     });
 
     it('should return undefined when incorrect maxspeed unit provided ', () => {
       const w = new Rapid.OsmWay(context, {tags: {highway: 'primary', lanes: 5, 'maxspeed': '50 km' }});
       const m = w.lanes().metadata;
-      assert.equal(m.maxspeed, undefined);
+      assert.strictEqual(m.maxspeed, undefined);
     });
 
     it('should return undefined when incorrect maxspeed value provided ', () => {
       const w = new Rapid.OsmWay(context, {tags: {highway: 'primary', lanes: 5, 'maxspeed': 'a70kph' }});
       const m = w.lanes().metadata;
-      assert.equal(m.maxspeed, undefined);
+      assert.strictEqual(m.maxspeed, undefined);
     });
 
     it('should return undefined when maxspeed not provided ', () => {
       const w = new Rapid.OsmWay(context, {tags: {highway: 'primary', lanes: 5 }});
       const m = w.lanes().metadata;
-      assert.equal(m.maxspeed, undefined);
+      assert.strictEqual(m.maxspeed, undefined);
     });
   });
 

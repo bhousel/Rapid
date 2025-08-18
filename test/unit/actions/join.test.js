@@ -6,7 +6,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe('actionJoin', () => {
   const context = new Rapid.MockContext();
 
-  describe('#disabled', () => {
+  describe('disabled', () => {
     it('returns falsy for ways that share an end/start node', () => {
       // a --> b ==> c
       const base = new Rapid.Graph(context, [

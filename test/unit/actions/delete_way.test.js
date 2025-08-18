@@ -102,7 +102,7 @@ describe('actionDeleteWay', () => {
   });
 
 //  // This was moved to operationDelete.  We should test operations and move this test there.
-//  describe('#disabled', () => {
+//  describe('disabled', () => {
 //    it('returns \'part_of_relation\' for members of route and boundary relations', () => {
 //      const w1 = new Rapid.OsmWay(context, {id: 'w1'});
 //      const w2 = new Rapid.OsmWay(context, {id: 'w2'});

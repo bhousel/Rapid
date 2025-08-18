@@ -206,7 +206,7 @@ describe('actionConnect', () => {
   });
 
 
-  describe('#disabled', () => {
+  describe('disabled', () => {
     it('returns falsy when connecting members of the same relation and same roles', () => {
       const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a'}),

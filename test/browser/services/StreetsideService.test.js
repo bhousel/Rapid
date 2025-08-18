@@ -40,7 +40,7 @@ describe('StreetsideService', () => {
   });
 
 
-  describe('#initAsync', () => {
+  describe('initAsync', () => {
     it('initializes cache', () => {
       const cache = _streetside._cache;
       expect(cache).to.have.property('bubbles');
@@ -50,7 +50,7 @@ describe('StreetsideService', () => {
     });
   });
 
-  describe('#resetAsync', () => {
+  describe('resetAsync', () => {
     it('resets cache', () => {
       _streetside._cache.bubbles.set('foo', { id: 'foo' });
 
@@ -60,7 +60,7 @@ describe('StreetsideService', () => {
   });
 
 
-  describe('#loadTiles', () => {
+  describe('loadTiles', () => {
     it('fires loadedData when tiles are loaded', done => {
       const spy = sinon.spy();
       _streetside.on('loadedData', spy);
@@ -139,7 +139,7 @@ describe('StreetsideService', () => {
   });
 
 
-  describe('#getImages', () => {
+  describe('getImages', () => {
     it('returns images in the visible map area', () => {
       const bubbles = [
         new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10, 0], ca: 90, pr: undefined, ne: '2', isPano: true }),
@@ -164,7 +164,7 @@ describe('StreetsideService', () => {
   });
 
 
-  describe('#getSequences', () => {
+  describe('getSequences', () => {
     it('returns sequence linestrings in the visible map area', () => {
       const bubbles = [
         new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10, 0], ca: 90, pr: undefined, ne: '2', isPano: true }),

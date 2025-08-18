@@ -21,7 +21,7 @@ describe('Category', () => {
     assert.equal(category.members.array[0], residential);
   });
 
-  describe('#matchGeometry', () => {
+  describe('matchGeometry', () => {
     it('matches the type of an entity', () => {
       assert.equal(category.matchGeometry('line'), true);
       assert.equal(category.matchGeometry('point'), false);

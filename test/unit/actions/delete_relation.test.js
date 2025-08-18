@@ -124,7 +124,7 @@ describe('actionDeleteRelation', () => {
   });
 
   // This was moved to operationDelete.  We should test operations and move this test there.
-  // describe('#disabled', () => {
+  // describe('disabled', () => {
   //   it('returns \'incomplete_relation\' if the relation is incomplete', () => {
   //     const r1 = new Rapid.OsmRelation(context, {id: 'r1', members: [{ id: 'w1' }]});  // 'w1' not downloaded
   //     const base = new Rapid.Graph(context, [r1]);

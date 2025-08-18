@@ -63,7 +63,7 @@ describe('LocalizationSystem', () => {
   });
 
 
-  describe('#displayName', () => {
+  describe('displayName', () => {
     it('returns the name if tagged with a name', () => {
       const tags = { name: 'East Coast Greenway' };
       expect(_l10n.displayName(tags)).to.eql('East Coast Greenway');

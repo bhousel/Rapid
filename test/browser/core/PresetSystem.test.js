@@ -82,7 +82,7 @@ describe('PresetSystem', () => {
   });
 
 
-  describe('#match', () => {
+  describe('match', () => {
     beforeEach(() => {
       const testPresets = {
         residential: { tags: { highway: 'residential' }, geometry: ['line'] },
@@ -136,7 +136,7 @@ describe('PresetSystem', () => {
   });
 
 
-  describe('#areaKeys', () => {
+  describe('areaKeys', () => {
     beforeEach(() => {
       const testPresets = {
         'amenity/fuel/shell': { tags: { 'amenity': 'fuel' }, geometry: ['point', 'area'], suggestion: true },
@@ -202,7 +202,7 @@ describe('PresetSystem', () => {
   });
 
 
-  describe('#merge', () => {
+  describe('merge', () => {
     it('builds presets from provided', () => {
       const surfShop = new Rapid.OsmNode(context, { tags: { amenity: 'shop', 'shop:type': 'surf' } });
       const presets = new Rapid.PresetSystem(context);
@@ -228,7 +228,7 @@ describe('PresetSystem', () => {
   });
 
 
-  describe('#match', () => {
+  describe('match', () => {
 
     beforeEach(() => {
       const testPresets = {

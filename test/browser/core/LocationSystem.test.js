@@ -42,7 +42,7 @@ describe('LocationSystem', () => {
   });
 
 
-  describe('#mergeCustomGeoJSON', () => {
+  describe('mergeCustomGeoJSON', () => {
     it('merges geojson into lococation-conflation cache', () => {
       _locations.mergeCustomGeoJSON(fc);
       const loco = _locations._loco;
@@ -51,7 +51,7 @@ describe('LocationSystem', () => {
   });
 
 
-  describe('#mergeLocationSets', () => {
+  describe('mergeLocationSets', () => {
     it('returns a promise rejected if not passed an array', done => {
       const prom = _locations.mergeLocationSets({});
       expect(prom).to.be.an.instanceof(Promise);
@@ -95,7 +95,7 @@ describe('LocationSystem', () => {
   });
 
 
-  describe('#locationSetID', () => {
+  describe('locationSetID', () => {
     it('calculates a locationSetID for a locationSet', () => {
       expect(_locations.locationSetID({ include: ['usa'] })).to.eql('+[Q30]');
     });
@@ -107,7 +107,7 @@ describe('LocationSystem', () => {
   });
 
 
-  describe('#getFeature', () => {
+  describe('getFeature', () => {
     it('has the world locationSet pre-resolved', () => {
       const result = _locations.getFeature('+[Q2]');
       expect(result instanceof Rapid.GeoJSON).to.be.ok;
@@ -122,7 +122,7 @@ describe('LocationSystem', () => {
   });
 
 
-  describe('#locationSetsAt', () => {
+  describe('locationSetsAt', () => {
     it('has the world locationSet pre-resolved', () => {
       const result1 = _locations.locationSetsAt([-108.557, 39.065]);  // Grand Junction
       expect(result1).to.be.an('object').that.has.all.keys('+[Q2]');

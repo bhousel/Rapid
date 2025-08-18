@@ -7,7 +7,7 @@ describe('actionMove', () => {
   const context = new Rapid.MockContext();
 
   // This was moved to operationMove.  We should test operations and move this test there.
-  // it('#disabled', function() {
+  // it('disabled', function() {
   //   it('returns falsy by default', function() {
   //     const node  = new Rapid.OsmNode(context, {loc: [0, 0]});
   //     const action = Rapid.actionMove([node.id], [0, 0], viewport)

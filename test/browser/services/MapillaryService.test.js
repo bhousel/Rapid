@@ -44,7 +44,7 @@ describe('MapillaryService', () => {
   });
 
 
-  describe('#initAsync', () => {
+  describe('initAsync', () => {
     it('initializes cache', () => {
       const cache = _mapillary._cache;
       expect(cache).to.have.property('images');
@@ -56,7 +56,7 @@ describe('MapillaryService', () => {
   });
 
 
-  describe('#resetAsync', () => {
+  describe('resetAsync', () => {
     it('resets cache', () => {
       _mapillary._cache.images.data.set('foo', 'bar');
 
@@ -68,7 +68,7 @@ describe('MapillaryService', () => {
   });
 
 
-  describe('#getData', () => {
+  describe('getData', () => {
     it('returns images in the visible map area', () => {
       const data = [
         new Rapid.Marker(context, { type: 'photo', id: 'photo0', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' }),
@@ -140,7 +140,7 @@ describe('MapillaryService', () => {
   });
 
 
-  describe('#getSequences', () => {
+  describe('getSequences', () => {
     it('returns sequence linestrings in the visible map area', () => {
       const data = [
         new Rapid.Marker(context, { type: 'photo', id: 'photo0', loc: [10,0], ca: 90, isPano: false, sequenceID: 'seq1' }),
@@ -181,7 +181,7 @@ describe('MapillaryService', () => {
   });
 
 
-  describe('#loadTiles', () => {
+  describe('loadTiles', () => {
     it('fires loadedImages when image tiles are loaded', done => {
       fetchMock.route(/mly1(_computed)?_public/, {
         body: '{"data":[]}',

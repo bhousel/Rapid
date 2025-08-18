@@ -48,7 +48,7 @@ describe('NominatimService', () => {
   }
 
 
-  describe('#countryCode', () => {
+  describe('countryCode', () => {
     it('calls the given callback with the results of the country code query', done => {
       const callback = sinon.spy();
       nominatim.countryCode([16, 48], callback);
@@ -64,7 +64,7 @@ describe('NominatimService', () => {
   });
 
 
-  describe('#reverse', () => {
+  describe('reverse', () => {
     it('should not cache distant result', done => {
       let callback = sinon.spy();
       nominatim.reverse([16, 48], callback);
@@ -127,7 +127,7 @@ describe('NominatimService', () => {
   });
 
 
-  describe('#search', () => {
+  describe('search', () => {
     it('calls the given callback with the results of the search query', done => {
       const callback = sinon.spy();
       fetchMock.route(/search/, {

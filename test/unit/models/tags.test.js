@@ -4,18 +4,19 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('osmRemoveLifecyclePrefix', () => {
-  it('removes the lifecycle prefix from a tag key', () => {
-    let result = Rapid.osmRemoveLifecyclePrefix('was:natural');
-    assert.equal(result, 'natural');
-
-    result = Rapid.osmRemoveLifecyclePrefix('destroyed:seamark:type');
-    assert.equal(result, 'seamark:type');
+  it('removes a lifecycle prefix from a tag key', () => {
+    const result = Rapid.osmRemoveLifecyclePrefix('was:natural');
+    assert.strictEqual(result, 'natural');
   });
 
+  it('handles keys with multiple colons', () => {
+    const result = Rapid.osmRemoveLifecyclePrefix('destroyed:seamark:type');
+    assert.strictEqual(result, 'seamark:type');
+  });
 
-  it('ignores invalid lifecycle prefixes', () => {
-    let result = Rapid.osmRemoveLifecyclePrefix('ex:leisure');
-    assert.equal(result, 'ex:leisure');
+  it('ignores unrecognized lifecycle prefixes', () => {
+    const result = Rapid.osmRemoveLifecyclePrefix('ex:leisure');
+    assert.strictEqual(result, 'ex:leisure');
   });
 });
 
@@ -25,7 +26,6 @@ describe('osmTagSuggestingArea', () => {
     Rapid.osmSetAreaKeys({ leisure: {} });
   });
 
-
   it('handles features with a lifecycle prefixes', () => {
     let result = Rapid.osmTagSuggestingArea({ leisure: 'stadium' });
     assert.deepEqual(result, { leisure: 'stadium' });
@@ -34,7 +34,7 @@ describe('osmTagSuggestingArea', () => {
     assert.deepEqual(result, { 'disused:leisure': 'stadium' });
 
     result = Rapid.osmTagSuggestingArea({ 'ex:leisure': 'stadium' });
-    assert.equal(result, null);
+    assert.isNull(result);
   });
 });
 

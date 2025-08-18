@@ -6,7 +6,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe('actionSplit', () => {
   const context = new Rapid.MockContext();
 
-  describe('#disabled', () => {
+  describe('disabled', () => {
     it('returns falsy for a non-end node of a single way', () => {
       //
       //  a ---> b ---> c         split at 'b' not disabled

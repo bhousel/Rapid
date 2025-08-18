@@ -407,7 +407,7 @@ describe('actionOrthogonalize', () => {
   });
 
 
-  describe('#disabled', () => {
+  describe('disabled', () => {
 
     describe('closed paths', () => {
       it('returns "square_enough" for a perfect quad', () => {

@@ -32,7 +32,7 @@ describe('actionDeleteMultiple', () => {
 
 
   // This was moved to operationDelete.  We should test operations and move this test there.
-  // describe('#disabled', () => {
+  // describe('disabled', () => {
   //   it('returns the result of the first action that is disabled', () => {
   //     const n1 = new Rapid.OsmNode(context, {id: 'n1'});
   //     const r1 = new Rapid.OsmRelation(context, {id: 'r1', members: [{id: 'w1'}]});  // 'w1' not downloaded

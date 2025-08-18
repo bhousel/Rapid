@@ -11,55 +11,55 @@ describe('multipolygons', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
       const graph = new Rapid.Graph(context, [outer, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), relation);
+      assert.strictEqual(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), relation);
     });
 
     it('returns the parent relation of a simple multipolygon outer, assuming role outer if unspecified', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer.id }] });
       const graph = new Rapid.Graph(context, [outer, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), relation);
+      assert.strictEqual(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), relation);
     });
 
     it('returns false if entity is not a way', () => {
       const outer = new Rapid.OsmNode(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
       const graph = new Rapid.Graph(context, [outer, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(outer, graph));
     });
 
     it('returns false if entity does not have interesting tags', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'tiger:reviewed': 'no' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
       const graph = new Rapid.Graph(context, [outer, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(outer, graph));
     });
 
     it('returns false if entity does not have a parent relation', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const graph = new Rapid.Graph(context, [outer]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(outer, graph));
     });
 
     it('returns false if the parent is not a multipolygon', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'route' }, members: [{ id: outer.id, role: 'outer' }] });
       const graph = new Rapid.Graph(context, [outer, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(outer, graph));
     });
 
     it('returns false if the parent has interesting tags', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { natural: 'wood', type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
       const graph = new Rapid.Graph(context, [outer, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), false);
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(outer, graph));
     });
 
     it('returns the parent relation of a simple multipolygon outer, ignoring uninteresting parent tags', () => {
       const outer = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { 'tiger:reviewed': 'no', type: 'multipolygon' }, members: [{ id: outer.id, role: 'outer' }] });
       const graph = new Rapid.Graph(context, [outer, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), relation);
+      assert.strictEqual(Rapid.osmIsOldMultipolygonOuterMember(outer, graph), relation);
     });
 
     it('returns false if the parent has multiple outer ways', () => {
@@ -67,8 +67,8 @@ describe('multipolygons', () => {
       const outer2 = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer1.id, role: 'outer' }, { id: outer2.id, role: 'outer' }] });
       const graph = new Rapid.Graph(context, [outer1, outer2, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer1, graph), false);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer2, graph), false);
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(outer1, graph));
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(outer2, graph));
     });
 
     it('returns false if the parent has multiple outer ways, assuming role outer if unspecified', () => {
@@ -76,15 +76,15 @@ describe('multipolygons', () => {
       const outer2 = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: outer1.id }, { id: outer2.id }] });
       const graph = new Rapid.Graph(context, [outer1, outer2, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer1, graph), false);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(outer2, graph), false);
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(outer1, graph));
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(outer2, graph));
     });
 
     it('returns false if the entity is not an outer', () => {
       const inner = new Rapid.OsmWay(context, { tags: { 'natural': 'wood' } });
       const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon' }, members: [{ id: inner.id, role: 'inner' }] });
       const graph = new Rapid.Graph(context, [inner, relation]);
-      assert.equal(Rapid.osmIsOldMultipolygonOuterMember(inner, graph), false);
+      assert.isFalse(Rapid.osmIsOldMultipolygonOuterMember(inner, graph));
     });
   });
 
@@ -102,8 +102,8 @@ describe('multipolygons', () => {
       });
       const graph = new Rapid.Graph(context, [inner, outer, relation]);
 
-      assert.equal(Rapid.osmOldMultipolygonOuterMember(inner, graph), outer);
-      assert.equal(Rapid.osmOldMultipolygonOuterMember(outer, graph), outer);
+      assert.strictEqual(Rapid.osmOldMultipolygonOuterMember(inner, graph), outer);
+      assert.strictEqual(Rapid.osmOldMultipolygonOuterMember(outer, graph), outer);
     });
 
     it('returns falsy for a complex multipolygon', () => {
@@ -120,9 +120,9 @@ describe('multipolygons', () => {
       });
       const graph = new Rapid.Graph(context, [inner, outer1, outer2, relation]);
 
-      assert.ok(!Rapid.osmOldMultipolygonOuterMember(inner, graph));
-      assert.ok(!Rapid.osmOldMultipolygonOuterMember(outer1, graph));
-      assert.ok(!Rapid.osmOldMultipolygonOuterMember(outer2, graph));
+      assert.isNotOk(Rapid.osmOldMultipolygonOuterMember(inner, graph));
+      assert.isNotOk(Rapid.osmOldMultipolygonOuterMember(outer1, graph));
+      assert.isNotOk(Rapid.osmOldMultipolygonOuterMember(outer2, graph));
     });
 
     it('handles incomplete relations', () => {
@@ -136,7 +136,7 @@ describe('multipolygons', () => {
         ]
       });
       const graph = new Rapid.Graph(context, [way, relation]);
-      assert.ok(!Rapid.osmOldMultipolygonOuterMember(way, graph));
+      assert.isNotOk(Rapid.osmOldMultipolygonOuterMember(way, graph));
     });
   });
 
@@ -153,12 +153,12 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [node, way]);
       const result = Rapid.osmJoinWays([member], graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 1);
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
       assert.deepEqual(result.actions, []);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 1);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 1);
       assert.deepEqual(getIDs(result[0].nodes), ['a']);
       assert.deepEqual(result[0][0], member);
     });
@@ -175,12 +175,12 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [a, b, c, w1, w2]);
       const result = Rapid.osmJoinWays([w1, w2], graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 1);
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
       assert.deepEqual(result.actions, []);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 2);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 2);
       assert.deepEqual(getIDs(result[0].nodes), ['a', 'b', 'c']);
       assert.deepEqual(result[0][0], w1);
       assert.deepEqual(result[0][1], w2);
@@ -198,12 +198,12 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [a, b, c, w1, w2]);
       const result = Rapid.osmJoinWays([w2, w1], graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 1);
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
       assert.deepEqual(result.actions, []);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 2);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 2);
       assert.deepEqual(getIDs(result[0].nodes), ['a', 'b', 'c']);
       assert.deepEqual(result[0][0], w1);
       assert.deepEqual(result[0][1], w2);
@@ -229,12 +229,12 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [a, b, c, w1, w2, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 1);
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
       assert.deepEqual(result.actions, []);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 2);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 2);
       assert.deepEqual(getIDs(result[0].nodes), ['a', 'b', 'c']);
       assert.deepEqual(result[0][0], { id: '-', type: 'way' });
       assert.deepEqual(result[0][1], { id: '=', type: 'way' });
@@ -260,14 +260,14 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [a, b, c, w1, w2, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 1);
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
 
-      assert.ok(result.actions instanceof Array);
-      assert.equal(result.actions.length, 2);
+      assert.isArray(result.actions);
+      assert.lengthOf(result.actions, 2);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 2);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 2);
       assert.deepEqual(getIDs(result[0].nodes), ['c', 'b', 'a']);
       assert.deepEqual(result[0][0], { id: '=', type: 'way' });
       assert.deepEqual(result[0][1], { id: '-', type: 'way' });
@@ -296,14 +296,14 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [a, b, c, d, w1, w2, w3, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 1);
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
 
-      assert.ok(result.actions instanceof Array);
-      assert.equal(result.actions.length, 1);
+      assert.isArray(result.actions);
+      assert.lengthOf(result.actions, 1);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 3);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 3);
       assert.deepEqual(getIDs(result[0].nodes), ['a', 'b', 'c', 'd']);
       assert.deepEqual(result[0][0], { id: '=', type: 'way' });
       assert.deepEqual(result[0][1], { id: '-', type: 'way' });
@@ -326,20 +326,20 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(base);
       const result = Rapid.osmJoinWays([w1, w2], graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 1);
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
 
-      assert.ok(result.actions instanceof Array);
-      assert.equal(result.actions.length, 1);
+      assert.isArray(result.actions);
+      assert.lengthOf(result.actions, 1);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 2);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 2);
       assert.deepEqual(getIDs(result[0].nodes), ['a', 'b', 'c']);
 
-      assert.ok(result[0][0] instanceof Rapid.OsmWay);
+      assert.instanceOf(result[0][0], Rapid.OsmWay);
       assert.deepEqual(result[0][0].nodes, ['a', 'b']);
 
-      assert.ok(result[0][1] instanceof Rapid.OsmWay);
+      assert.instanceOf(result[0][1], Rapid.OsmWay);
       assert.deepEqual(result[0][1].nodes, ['b', 'c']);
       assert.deepEqual(result[0][1].tags, { 'oneway': '-1', 'lanes:backward': 2 });
     });
@@ -366,14 +366,14 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [a, b, c, w1, w2, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 1);
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
 
-      assert.ok(result.actions instanceof Array);
-      assert.equal(result.actions.length, 1);
+      assert.isArray(result.actions);
+      assert.lengthOf(result.actions, 1);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 2);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 2);
       assert.deepEqual(getIDs(result[0].nodes), ['a', 'b', 'c']);
       assert.deepEqual(result[0][0], { id: '-', type: 'way' });
       assert.deepEqual(result[0][1], { id: '=', type: 'way' });
@@ -384,16 +384,14 @@ describe('multipolygons', () => {
       const member = { id: 'n', type: 'node' };
       const graph = new Rapid.Graph(context, [node]);
       const result = Rapid.osmJoinWays([member], graph);
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 0);
+      assert.deepEqual(result, []);
     });
 
     it('ignores incomplete members', () => {
       const member = { id: 'w', type: 'way' };
       const graph = new Rapid.Graph(context);
       const result = Rapid.osmJoinWays([member], graph);
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 0);
+      assert.deepEqual(result, []);
     });
 
     it('returns multiple arrays for disjoint ways', () => {
@@ -415,18 +413,18 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [a, b, c, d, e, f, w1, w2, w3, w4]);
       const result = Rapid.osmJoinWays([w1, w2, w3, w4], graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 2);
+      assert.isArray(result);
+      assert.lengthOf(result, 2);
       assert.deepEqual(result.actions, []);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 2);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 2);
       assert.deepEqual(getIDs(result[0].nodes), ['a', 'b', 'c']);
       assert.deepEqual(result[0][0], w1);
       assert.deepEqual(result[0][1], w2);
 
-      assert.ok(result[1] instanceof Array);
-      assert.equal(result[1].length, 2);
+      assert.isArray(result[1]);
+      assert.lengthOf(result[1], 2);
       assert.deepEqual(getIDs(result[1].nodes), ['d', 'e', 'f']);
       assert.deepEqual(result[1][0], w3);
       assert.deepEqual(result[1][1], w4);
@@ -462,18 +460,18 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [a, b, c, d, e, f, w1, w2, w3, w4, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 2);
+      assert.isArray(result);
+      assert.lengthOf(result, 2);
       assert.deepEqual(result.actions, []);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 2);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 2);
       assert.deepEqual(getIDs(result[0].nodes), ['a', 'b', 'c']);
       assert.deepEqual(result[0][0], { id: '/', type: 'way' });
       assert.deepEqual(result[0][1], { id: '\\', type: 'way' });
 
-      assert.ok(result[1] instanceof Array);
-      assert.equal(result[1].length, 2);
+      assert.isArray(result[1]);
+      assert.lengthOf(result[1], 2);
       assert.deepEqual(getIDs(result[1].nodes), ['d', 'e', 'f']);
       assert.deepEqual(result[1][0], { id: '-', type: 'way' });
       assert.deepEqual(result[1][1], { id: '=', type: 'way' });
@@ -512,14 +510,14 @@ describe('multipolygons', () => {
       const graph = new Rapid.Graph(context, [a, b, c, d, e, w1, w2, w3, w4, w5, r]);
       const result = Rapid.osmJoinWays(r.members, graph);
 
-      assert.ok(result instanceof Array);
-      assert.equal(result.length, 1);
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
 
-      assert.ok(result.actions instanceof Array);
-      assert.equal(result.actions.length, 3);
+      assert.isArray(result.actions);
+      assert.lengthOf(result.actions, 3);
 
-      assert.ok(result[0] instanceof Array);
-      assert.equal(result[0].length, 7);
+      assert.isArray(result[0]);
+      assert.lengthOf(result[0], 7);
       assert.deepEqual(getIDs(result[0].nodes), ['a', 'b', 'c', 'd', 'e', 'c', 'b', 'a']);
       assert.deepEqual(result[0][0], { id: '=', type: 'way' });
       assert.deepEqual(result[0][1], { id: '-', type: 'way' });

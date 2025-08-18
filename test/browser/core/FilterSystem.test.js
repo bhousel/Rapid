@@ -83,7 +83,7 @@ describe('FilterSystem', () => {
     }
   });
 
-  describe('#toggle', () => {
+  describe('toggle', () => {
     it('toggles', () => {
       _filterSystem.toggle('water');
       expect(_filterSystem.isEnabled('water')).to.be.false;

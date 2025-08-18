@@ -29,8 +29,8 @@ describe('osmIntersection', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['*'], tags: { highway: 'residential' } })
       ]);
       const result = Rapid.osmIntersection(context, graph, '*', maxDist);
-      assert.equal(result.ways.length, 1);
-      assert.equal(result.ways[0].id, '=');
+      assert.lengthOf(result.ways, 1);
+      assert.strictEqual(result.ways[0].id, '=');
     });
 
     it('excludes untagged lines', () => {
@@ -42,8 +42,8 @@ describe('osmIntersection', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['*', 'w'] })
       ]);
       const result = Rapid.osmIntersection(context, graph, '*', maxDist);
-      assert.equal(result.ways.length, 1);
-      assert.equal(result.ways[0].id, '=');
+      assert.lengthOf(result.ways, 1);
+      assert.strictEqual(result.ways[0].id, '=');
     });
 
     it('excludes area highways', () => {
@@ -65,7 +65,7 @@ describe('osmIntersection', () => {
         new Rapid.OsmWay(context, { id: '=', nodes: ['u', '*', 'w'], tags: { highway: 'residential' } })
       ]);
       const result = Rapid.osmIntersection(context, graph, '*', maxDist);
-      assert.equal(result.ways.length, 2);
+      assert.lengthOf(result.ways, 2);
     });
   });
 
@@ -82,16 +82,16 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 2);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 2);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_=');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_=');
+      assert.strictEqual(turns[0].u, true);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_-');
-      assert.equal(turns[1].u, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_-');
+      assert.strictEqual(turns[1].u, false);
     });
 
 
@@ -106,16 +106,16 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 2);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 2);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_=');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_=');
+      assert.strictEqual(turns[0].u, true);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_-');
-      assert.equal(turns[1].u, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_-');
+      assert.strictEqual(turns[1].u, false);
     });
 
 
@@ -135,20 +135,20 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('-');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 3);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 3);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '-_*_=');
-      assert.equal(turns[0].u, false);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '-_*_=');
+      assert.strictEqual(turns[0].u, false);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '-_*_-');
-      assert.equal(turns[1].u, true);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '-_*_-');
+      assert.strictEqual(turns[1].u, true);
 
-      assert.ok(turns[2] instanceof Rapid.osmTurn);
+      assert.instanceOf(turns[2], Rapid.osmTurn);
       assert.match(turns[2].key, /^-\_\*\_w-\d+$/);  // a new way, e.g. '-_*_w-1'
-      assert.equal(turns[2].u, false);
+      assert.strictEqual(turns[2].u, false);
     });
 
 
@@ -168,20 +168,20 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 3);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 3);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_=');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_=');
+      assert.strictEqual(turns[0].u, true);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_-');
-      assert.equal(turns[1].u, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_-');
+      assert.strictEqual(turns[1].u, false);
 
-      assert.ok(turns[2] instanceof Rapid.osmTurn);
+      assert.instanceOf(turns[2], Rapid.osmTurn);
       assert.match(turns[2].key, /^=\_\*\_w-\d+$/);  // a new way, e.g. '=_*_w-1'
-      assert.equal(turns[2].u, false);
+      assert.strictEqual(turns[2].u, false);
     });
 
 
@@ -196,12 +196,12 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 1);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 1);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_-');
-      assert.equal(turns[0].u, false);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_-');
+      assert.strictEqual(turns[0].u, false);
     });
 
 
@@ -216,12 +216,12 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 1);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 1);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_-');
-      assert.equal(turns[0].u, false);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_-');
+      assert.strictEqual(turns[0].u, false);
     });
 
 
@@ -264,16 +264,16 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 2);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 2);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_=');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_=');
+      assert.strictEqual(turns[0].u, true);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_-');
-      assert.equal(turns[1].u, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_-');
+      assert.strictEqual(turns[1].u, false);
     });
 
 
@@ -288,16 +288,16 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 2);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 2);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_=');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_=');
+      assert.strictEqual(turns[0].u, true);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_-');
-      assert.equal(turns[1].u, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_-');
+      assert.strictEqual(turns[1].u, false);
     });
 
 
@@ -312,12 +312,12 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 1);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 1);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_=');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_=');
+      assert.strictEqual(turns[0].u, true);
     });
 
 
@@ -332,12 +332,12 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 1);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 1);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_=');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_=');
+      assert.strictEqual(turns[0].u, true);
     });
 
 
@@ -360,19 +360,19 @@ describe('osmIntersection', () => {
         })
       ]);
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 2);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 2);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_=');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_=');
+      assert.strictEqual(turns[0].u, true);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_-');
-      assert.equal(turns[1].u, false);
-      assert.equal(turns[1].restrictionID, 'r');
-      assert.equal(turns[1].direct, true);
-      assert.equal(turns[1].only, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_-');
+      assert.strictEqual(turns[1].u, false);
+      assert.strictEqual(turns[1].restrictionID, 'r');
+      assert.strictEqual(turns[1].direct, true);
+      assert.strictEqual(turns[1].only, false);
     });
 
 
@@ -400,26 +400,26 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 3);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 3);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_=');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_=');
+      assert.strictEqual(turns[0].u, true);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_~');
-      assert.equal(turns[1].u, false);
-      assert.equal(turns[1].restrictionID, 'r');
-      assert.equal(turns[1].direct, false);
-      assert.equal(turns[1].only, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_~');
+      assert.strictEqual(turns[1].u, false);
+      assert.strictEqual(turns[1].restrictionID, 'r');
+      assert.strictEqual(turns[1].direct, false);
+      assert.strictEqual(turns[1].only, false);
 
-      assert.ok(turns[2] instanceof Rapid.osmTurn);
-      assert.equal(turns[2].key, '=_*_-');
-      assert.equal(turns[2].u, false);
-      assert.equal(turns[2].restrictionID, 'r');
-      assert.equal(turns[2].direct, true);
-      assert.equal(turns[2].only, true);
+      assert.instanceOf(turns[2], Rapid.osmTurn);
+      assert.strictEqual(turns[2].key, '=_*_-');
+      assert.strictEqual(turns[2].u, false);
+      assert.strictEqual(turns[2].restrictionID, 'r');
+      assert.strictEqual(turns[2].direct, true);
+      assert.strictEqual(turns[2].only, true);
     });
 
 
@@ -440,20 +440,20 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 3);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 3);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_-');
-      assert.equal(turns[0].u, false);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_-');
+      assert.strictEqual(turns[0].u, false);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_=');
-      assert.equal(turns[1].u, true);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_=');
+      assert.strictEqual(turns[1].u, true);
 
-      assert.ok(turns[2] instanceof Rapid.osmTurn);
+      assert.instanceOf(turns[2], Rapid.osmTurn);
       assert.match(turns[2].key, /^=\_\*\_w-\d+$/);  // a new way, e.g. '=_*_w-1'
-      assert.equal(turns[2].u, false);
+      assert.strictEqual(turns[2].u, false);
     });
 
 
@@ -474,20 +474,20 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('-');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 3);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 3);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '-_*_-');
-      assert.equal(turns[0].u, true);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '-_*_-');
+      assert.strictEqual(turns[0].u, true);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '-_*_=');
-      assert.equal(turns[1].u, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '-_*_=');
+      assert.strictEqual(turns[1].u, false);
 
-      assert.ok(turns[2] instanceof Rapid.osmTurn);
+      assert.instanceOf(turns[2], Rapid.osmTurn);
       assert.match(turns[2].key, /^-\_\*\_w-\d+$/);  // a new way, e.g. '=_*_w-1'
-      assert.equal(turns[2].u, false);
+      assert.strictEqual(turns[2].u, false);
     });
 
 
@@ -508,16 +508,16 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 2);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 2);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_-');
-      assert.equal(turns[0].u, false);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_-');
+      assert.strictEqual(turns[0].u, false);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_=');
-      assert.equal(turns[1].u, true);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_=');
+      assert.strictEqual(turns[1].u, true);
     });
 
 
@@ -538,16 +538,16 @@ describe('osmIntersection', () => {
       ]);
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns('=');
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 2);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 2);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, '=_*_-');
-      assert.equal(turns[0].u, false);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, '=_*_-');
+      assert.strictEqual(turns[0].u, false);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, '=_*_=');
-      assert.equal(turns[1].u, true);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, '=_*_=');
+      assert.strictEqual(turns[1].u, true);
     });
 
 
@@ -572,16 +572,16 @@ describe('osmIntersection', () => {
       const newWay = intersection.ways.find(way => /^w-\d+$/.test(way.id));
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns(newWay.id);
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 2);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 2);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, newWay.id + '_*_-');
-      assert.equal(turns[0].u, false);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, newWay.id + '_*_-');
+      assert.strictEqual(turns[0].u, false);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, newWay.id  + '_*_=');
-      assert.equal(turns[1].u, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, newWay.id  + '_*_=');
+      assert.strictEqual(turns[1].u, false);
     });
 
 
@@ -606,16 +606,16 @@ describe('osmIntersection', () => {
       const newWay = intersection.ways.find(way => /^w-\d+$/.test(way.id));
 
       const turns = Rapid.osmIntersection(context, graph, '*', maxDist).turns(newWay.id);
-      assert.ok(turns instanceof Array);
-      assert.equal(turns.length, 2);
+      assert.isArray(turns);
+      assert.lengthOf(turns, 2);
 
-      assert.ok(turns[0] instanceof Rapid.osmTurn);
-      assert.equal(turns[0].key, newWay.id + '_*_-');
-      assert.equal(turns[0].u, false);
+      assert.instanceOf(turns[0], Rapid.osmTurn);
+      assert.strictEqual(turns[0].key, newWay.id + '_*_-');
+      assert.strictEqual(turns[0].u, false);
 
-      assert.ok(turns[1] instanceof Rapid.osmTurn);
-      assert.equal(turns[1].key, newWay.id  + '_*_=');
-      assert.equal(turns[1].u, false);
+      assert.instanceOf(turns[1], Rapid.osmTurn);
+      assert.strictEqual(turns[1].key, newWay.id  + '_*_=');
+      assert.strictEqual(turns[1].u, false);
     });
 
 
@@ -660,55 +660,55 @@ describe('osmIntersection', () => {
 
       it('allows via node and via way turns from a oneway', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 5);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 5);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '=_b_|_e_≈'); // u-turn via | to ≈
-        assert.equal(turns[2].u, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '=_b_|_e_≈'); // u-turn via | to ≈
+        assert.strictEqual(turns[2].u, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '=_b_|_e_\\'); // left via | to \
-        assert.equal(turns[3].u, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '=_b_|_e_\\'); // left via | to \
+        assert.strictEqual(turns[3].u, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '=_b_/'); // right to /
-        assert.equal(turns[4].u, false);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '=_b_/'); // right to /
+        assert.strictEqual(turns[4].u, false);
       });
 
 
       it('allows via node and via way turns from a bidirectional', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('/', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 5);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 5);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '/_b_-'); // right to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '/_b_-'); // right to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '/_b_|'); // straight to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '/_b_|'); // straight to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '/_b_|_e_≈'); // left via | to ≈
-        assert.equal(turns[2].u, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '/_b_|_e_≈'); // left via | to ≈
+        assert.strictEqual(turns[2].u, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '/_b_|_e_\\'); // straight via | to \
-        assert.equal(turns[3].u, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '/_b_|_e_\\'); // straight via | to \
+        assert.strictEqual(turns[3].u, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '/_b_/'); // u-turn
-        assert.equal(turns[4].u, true);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '/_b_/'); // u-turn
+        assert.strictEqual(turns[4].u, true);
       });
     });
 
@@ -752,63 +752,63 @@ describe('osmIntersection', () => {
 
       it('allows via node and via way turns from a oneway', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 5);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 5);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '|_e_≈'); // right turn from | to ≈
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r');
-        assert.equal(turns[2].direct, false);  // indirect
-        assert.equal(turns[2].no, true);  // restricted!
-        assert.equal(turns[2].only, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '|_e_≈'); // right turn from | to ≈
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r');
+        assert.strictEqual(turns[2].direct, false);  // indirect
+        assert.strictEqual(turns[2].no, true);  // restricted!
+        assert.strictEqual(turns[2].only, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '=_b_|_e_\\'); // left via | to \
-        assert.equal(turns[3].u, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '=_b_|_e_\\'); // left via | to \
+        assert.strictEqual(turns[3].u, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '=_b_/'); // right to /
-        assert.equal(turns[4].u, false);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '=_b_/'); // right to /
+        assert.strictEqual(turns[4].u, false);
       });
 
 
       it('allows via node and via way turns from a bidirectional', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('/', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 5);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 5);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '/_b_-'); // right to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '/_b_-'); // right to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '/_b_|'); // straight to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '/_b_|'); // straight to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '|_e_≈'); // right turn from | to ≈
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r');
-        assert.equal(turns[2].direct, false);  // indirect
-        assert.equal(turns[2].no, true);  // restricted!
-        assert.equal(turns[2].only, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '|_e_≈'); // right turn from | to ≈
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r');
+        assert.strictEqual(turns[2].direct, false);  // indirect
+        assert.strictEqual(turns[2].no, true);  // restricted!
+        assert.strictEqual(turns[2].only, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '/_b_|_e_\\'); // straight via | to \
-        assert.equal(turns[3].u, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '/_b_|_e_\\'); // straight via | to \
+        assert.strictEqual(turns[3].u, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '/_b_/'); // u-turn
-        assert.equal(turns[4].u, true);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '/_b_/'); // u-turn
+        assert.strictEqual(turns[4].u, true);
       });
     });
 
@@ -861,63 +861,63 @@ describe('osmIntersection', () => {
 
       it('allows via node and via way turns from a oneway', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 5);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 5);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '=_b_|_e_≈'); // u turn via | to ≈
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r1');
-        assert.equal(turns[2].direct, true);  // direct
-        assert.equal(turns[2].no, true);  // restricted!
-        assert.equal(turns[2].only, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '=_b_|_e_≈'); // u turn via | to ≈
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r1');
+        assert.strictEqual(turns[2].direct, true);  // direct
+        assert.strictEqual(turns[2].no, true);  // restricted!
+        assert.strictEqual(turns[2].only, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '=_b_|_e_\\'); // left via | to \
-        assert.equal(turns[3].u, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '=_b_|_e_\\'); // left via | to \
+        assert.strictEqual(turns[3].u, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '=_b_/'); // right to /
-        assert.equal(turns[4].u, false);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '=_b_/'); // right to /
+        assert.strictEqual(turns[4].u, false);
       });
 
 
       it('allows via node and via way turns from a bidirectional', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('/', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 5);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 5);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '/_b_-'); // right to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '/_b_-'); // right to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '/_b_|'); // straight to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '/_b_|'); // straight to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '/_b_|_e_≈'); // right turn from | to ≈
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r2');
-        assert.equal(turns[2].direct, true);  // direct
-        assert.equal(turns[2].no, true);  // restricted!
-        assert.equal(turns[2].only, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '/_b_|_e_≈'); // right turn from | to ≈
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r2');
+        assert.strictEqual(turns[2].direct, true);  // direct
+        assert.strictEqual(turns[2].no, true);  // restricted!
+        assert.strictEqual(turns[2].only, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '/_b_|_e_\\'); // straight via | to \
-        assert.equal(turns[3].u, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '/_b_|_e_\\'); // straight via | to \
+        assert.strictEqual(turns[3].u, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '/_b_/'); // u-turn
-        assert.equal(turns[4].u, true);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '/_b_/'); // u-turn
+        assert.strictEqual(turns[4].u, true);
       });
     });
 
@@ -961,114 +961,114 @@ describe('osmIntersection', () => {
 
       it('allows via node and via way turns from a oneway', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 5);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 5);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '|_e_≈'); // right turn from | to ≈
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r');
-        assert.equal(turns[2].direct, false);  // indirect
-        assert.equal(turns[2].no, false);
-        assert.equal(turns[2].only, true);  // only!
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '|_e_≈'); // right turn from | to ≈
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r');
+        assert.strictEqual(turns[2].direct, false);  // indirect
+        assert.strictEqual(turns[2].no, false);
+        assert.strictEqual(turns[2].only, true);  // only!
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '|_e_\\'); // straight from | to \
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, 'r');
-        assert.equal(turns[3].direct, false);  // indirect
-        assert.equal(turns[3].no, true);  // restricted!
-        assert.equal(turns[3].only, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '|_e_\\'); // straight from | to \
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, 'r');
+        assert.strictEqual(turns[3].direct, false);  // indirect
+        assert.strictEqual(turns[3].no, true);  // restricted!
+        assert.strictEqual(turns[3].only, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '=_b_/'); // right to /
-        assert.equal(turns[4].u, false);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '=_b_/'); // right to /
+        assert.strictEqual(turns[4].u, false);
       });
 
 
       it('allows via node and via way turns from a bidirectional', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('/', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 5);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 5);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '/_b_-'); // right to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '/_b_-'); // right to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '/_b_|'); // straight to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '/_b_|'); // straight to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '|_e_≈'); // right turn from | to ≈
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r');
-        assert.equal(turns[2].direct, false);  // indirect
-        assert.equal(turns[2].no, false);
-        assert.equal(turns[2].only, true);  // only!
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '|_e_≈'); // right turn from | to ≈
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r');
+        assert.strictEqual(turns[2].direct, false);  // indirect
+        assert.strictEqual(turns[2].no, false);
+        assert.strictEqual(turns[2].only, true);  // only!
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '|_e_\\'); // straight from | to \
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, 'r');
-        assert.equal(turns[3].direct, false);  // indirect
-        assert.equal(turns[3].no, true);  // restricted!
-        assert.equal(turns[3].only, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '|_e_\\'); // straight from | to \
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, 'r');
+        assert.strictEqual(turns[3].direct, false);  // indirect
+        assert.strictEqual(turns[3].no, true);  // restricted!
+        assert.strictEqual(turns[3].only, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '/_b_/'); // u-turn
-        assert.equal(turns[4].u, true);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '/_b_/'); // u-turn
+        assert.strictEqual(turns[4].u, true);
       });
 
 
       it('`only_` restriction is only effective towards the via', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('|', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 6);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 6);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '|_b_-'); // left from | to - (away from only-via)
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '|_b_-'); // left from | to - (away from only-via)
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '|_b_|'); // u-turn from | to | (away from only-via)
-        assert.equal(turns[1].u, true);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '|_b_|'); // u-turn from | to | (away from only-via)
+        assert.strictEqual(turns[1].u, true);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '|_b_/'); // straight from | to / (away from only-via)
-        assert.equal(turns[2].u, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '|_b_/'); // straight from | to / (away from only-via)
+        assert.strictEqual(turns[2].u, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '|_e_|'); // u-turn from | to | via e
-        assert.equal(turns[3].u, true);
-        assert.equal(turns[3].restrictionID, 'r');
-        assert.equal(turns[3].direct, false);  // indirect
-        assert.equal(turns[3].no, true);  // restricted!
-        assert.equal(turns[3].only, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '|_e_|'); // u-turn from | to | via e
+        assert.strictEqual(turns[3].u, true);
+        assert.strictEqual(turns[3].restrictionID, 'r');
+        assert.strictEqual(turns[3].direct, false);  // indirect
+        assert.strictEqual(turns[3].no, true);  // restricted!
+        assert.strictEqual(turns[3].only, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '|_e_≈'); // right turn from | to ≈
-        assert.equal(turns[4].u, false);
-        assert.equal(turns[4].restrictionID, 'r');
-        assert.equal(turns[4].direct, true);  // direct
-        assert.equal(turns[4].no, false);
-        assert.equal(turns[4].only, true); // only!
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '|_e_≈'); // right turn from | to ≈
+        assert.strictEqual(turns[4].u, false);
+        assert.strictEqual(turns[4].restrictionID, 'r');
+        assert.strictEqual(turns[4].direct, true);  // direct
+        assert.strictEqual(turns[4].no, false);
+        assert.strictEqual(turns[4].only, true); // only!
 
-        assert.ok(turns[5] instanceof Rapid.osmTurn);
-        assert.equal(turns[5].key, '|_e_\\'); // straight from | to \
-        assert.equal(turns[5].u, false);
-        assert.equal(turns[5].restrictionID, 'r');
-        assert.equal(turns[5].direct, false);  // indirect
-        assert.equal(turns[5].no, true);  // restricted!
-        assert.equal(turns[5].only, false);
+        assert.instanceOf(turns[5], Rapid.osmTurn);
+        assert.strictEqual(turns[5].key, '|_e_\\'); // straight from | to \
+        assert.strictEqual(turns[5].u, false);
+        assert.strictEqual(turns[5].restrictionID, 'r');
+        assert.strictEqual(turns[5].direct, false);  // indirect
+        assert.strictEqual(turns[5].no, true);  // restricted!
+        assert.strictEqual(turns[5].only, false);
       });
     });
 
@@ -1127,113 +1127,113 @@ describe('osmIntersection', () => {
 
       it('allows via node and via way turns from a oneway', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 5);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 5);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
-        assert.equal(turns[0].restrictionID, 'r1');
-        assert.equal(turns[0].direct, false);  // indirect
-        assert.equal(turns[0].no, true);  // restricted!
-        assert.equal(turns[0].only, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
+        assert.strictEqual(turns[0].restrictionID, 'r1');
+        assert.strictEqual(turns[0].direct, false);  // indirect
+        assert.strictEqual(turns[0].no, true);  // restricted!
+        assert.strictEqual(turns[0].only, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
-        assert.equal(turns[1].restrictionID, 'r1');
-        assert.equal(turns[1].direct, false);  // indirect
-        assert.equal(turns[1].no, false);
-        assert.equal(turns[1].only, true);  // only (along via way)
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
+        assert.strictEqual(turns[1].restrictionID, 'r1');
+        assert.strictEqual(turns[1].direct, false);  // indirect
+        assert.strictEqual(turns[1].no, false);
+        assert.strictEqual(turns[1].only, true);  // only (along via way)
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '=_b_|_e_≈'); // u-turn to ≈ via |
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r1');
-        assert.equal(turns[2].direct, true);  // direct
-        assert.equal(turns[2].no, false);
-        assert.equal(turns[2].only, true);  // only!
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '=_b_|_e_≈'); // u-turn to ≈ via |
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r1');
+        assert.strictEqual(turns[2].direct, true);  // direct
+        assert.strictEqual(turns[2].no, false);
+        assert.strictEqual(turns[2].only, true);  // only!
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '=_b_|_e_\\'); // left to \ via |
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, 'r1');
-        assert.equal(turns[3].direct, false);  // indirect
-        assert.equal(turns[3].no, true);  // restricted!
-        assert.equal(turns[3].only, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '=_b_|_e_\\'); // left to \ via |
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, 'r1');
+        assert.strictEqual(turns[3].direct, false);  // indirect
+        assert.strictEqual(turns[3].no, true);  // restricted!
+        assert.strictEqual(turns[3].only, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '=_b_/'); // right to /
-        assert.equal(turns[4].u, false);
-        assert.equal(turns[4].restrictionID, 'r1');
-        assert.equal(turns[4].direct, false);  // indirect
-        assert.equal(turns[4].no, true);  // restricted!
-        assert.equal(turns[4].only, false);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '=_b_/'); // right to /
+        assert.strictEqual(turns[4].u, false);
+        assert.strictEqual(turns[4].restrictionID, 'r1');
+        assert.strictEqual(turns[4].direct, false);  // indirect
+        assert.strictEqual(turns[4].no, true);  // restricted!
+        assert.strictEqual(turns[4].only, false);
       });
 
 
       it('allows via node and via way turns from a bidirectional', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('/', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 8);
+        assert.isArray(turns);
+        assert.strictEqual(turns.length, 8);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '/_b_-'); // right to -
-        assert.equal(turns[0].u, false);
-        assert.equal(turns[0].restrictionID, 'r2');
-        assert.equal(turns[0].direct, false);  // indirect
-        assert.equal(turns[0].no, true);  // restricted!
-        assert.equal(turns[0].only, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '/_b_-'); // right to -
+        assert.strictEqual(turns[0].u, false);
+        assert.strictEqual(turns[0].restrictionID, 'r2');
+        assert.strictEqual(turns[0].direct, false);  // indirect
+        assert.strictEqual(turns[0].no, true);  // restricted!
+        assert.strictEqual(turns[0].only, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '/_b_|'); // straight to |
-        assert.equal(turns[1].u, false);
-        assert.equal(turns[1].restrictionID, 'r2');
-        assert.equal(turns[1].direct, false);  // indirect
-        assert.equal(turns[1].no, false);
-        assert.equal(turns[1].only, true); // only (along via way)
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '/_b_|'); // straight to |
+        assert.strictEqual(turns[1].u, false);
+        assert.strictEqual(turns[1].restrictionID, 'r2');
+        assert.strictEqual(turns[1].direct, false);  // indirect
+        assert.strictEqual(turns[1].no, false);
+        assert.strictEqual(turns[1].only, true); // only (along via way)
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '/_b_|_e_≈'); // right turn from | to ≈
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r2');
-        assert.equal(turns[2].direct, true);  // direct
-        assert.equal(turns[2].no, false);
-        assert.equal(turns[2].only, true); // only!
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '/_b_|_e_≈'); // right turn from | to ≈
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r2');
+        assert.strictEqual(turns[2].direct, true);  // direct
+        assert.strictEqual(turns[2].no, false);
+        assert.strictEqual(turns[2].only, true); // only!
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '/_b_|_e_\\'); // straight from | to \
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, 'r2');
-        assert.equal(turns[3].direct, false);  // indirect
-        assert.equal(turns[3].no, true);  // restricted!
-        assert.equal(turns[3].only, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '/_b_|_e_\\'); // straight from | to \
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, 'r2');
+        assert.strictEqual(turns[3].direct, false);  // indirect
+        assert.strictEqual(turns[3].no, true);  // restricted!
+        assert.strictEqual(turns[3].only, false);
 
-        assert.ok(turns[4] instanceof Rapid.osmTurn);
-        assert.equal(turns[4].key, '/_b_/'); // u-turn
-        assert.equal(turns[4].u, true);
-        assert.equal(turns[4].restrictionID, 'r2');
-        assert.equal(turns[4].direct, false);  // indirect
-        assert.equal(turns[4].no, true);  // restricted!
-        assert.equal(turns[4].only, false);
+        assert.instanceOf(turns[4], Rapid.osmTurn);
+        assert.strictEqual(turns[4].key, '/_b_/'); // u-turn
+        assert.strictEqual(turns[4].u, true);
+        assert.strictEqual(turns[4].restrictionID, 'r2');
+        assert.strictEqual(turns[4].direct, false);  // indirect
+        assert.strictEqual(turns[4].no, true);  // restricted!
+        assert.strictEqual(turns[4].only, false);
       });
 
       it('`only_` restriction is only effective towards the via', () => {
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('/', 1);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 8);
+        assert.isArray(turns);
+        assert.strictEqual(turns.length, 8);
 
-        assert.ok(turns[5] instanceof Rapid.osmTurn);
-        assert.equal(turns[5].key, '/_g_/'); // u-turn from / to / (away from only-via)
-        assert.equal(turns[5].u, true);
+        assert.instanceOf(turns[5], Rapid.osmTurn);
+        assert.strictEqual(turns[5].key, '/_g_/'); // u-turn from / to / (away from only-via)
+        assert.strictEqual(turns[5].u, true);
 
-        assert.ok(turns[6] instanceof Rapid.osmTurn);
-        assert.equal(turns[6].key, '/_g_≃'); // left turn from / to ≃ (away from only-via)
-        assert.equal(turns[6].u, false);
+        assert.instanceOf(turns[6], Rapid.osmTurn);
+        assert.strictEqual(turns[6].key, '/_g_≃'); // left turn from / to ≃ (away from only-via)
+        assert.strictEqual(turns[6].u, false);
 
-        assert.ok(turns[7] instanceof Rapid.osmTurn);
-        assert.equal(turns[7].key, '/_g_‖'); // straight from / to ‖ (away from only-via)
-        assert.equal(turns[7].u, false);
+        assert.instanceOf(turns[7], Rapid.osmTurn);
+        assert.strictEqual(turns[7].key, '/_g_‖'); // straight from / to ‖ (away from only-via)
+        assert.strictEqual(turns[7].u, false);
       });
     });
 
@@ -1265,24 +1265,24 @@ describe('osmIntersection', () => {
       it('with no restrictions, allows via node and via way turns', () => {
         const graph = new Rapid.Graph(base);
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 4);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 4);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
-        assert.equal(turns[2].u, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
+        assert.strictEqual(turns[2].u, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
-        assert.equal(turns[3].u, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
+        assert.strictEqual(turns[3].u, false);
       });
 
 
@@ -1300,28 +1300,28 @@ describe('osmIntersection', () => {
         });
         const graph = new Rapid.Graph(base).replace(r1);
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 4);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 4);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
-        assert.equal(turns[2].u, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
+        assert.strictEqual(turns[2].u, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, 'r1');
-        assert.equal(turns[3].direct, true); // direct
-        assert.equal(turns[3].no, true); // restricted!
-        assert.equal(turns[3].only, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, 'r1');
+        assert.strictEqual(turns[3].direct, true); // direct
+        assert.strictEqual(turns[3].no, true); // restricted!
+        assert.strictEqual(turns[3].only, false);
       });
 
 
@@ -1339,28 +1339,28 @@ describe('osmIntersection', () => {
         });
         const graph = new Rapid.Graph(base).replace(r1);
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 4);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 4);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
-        assert.equal(turns[2].u, false);
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
+        assert.strictEqual(turns[2].u, false);
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, 'r1');
-        assert.equal(turns[3].direct, true); // direct
-        assert.equal(turns[3].no, true); // restricted!
-        assert.equal(turns[3].only, false);
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, 'r1');
+        assert.strictEqual(turns[3].direct, true); // direct
+        assert.strictEqual(turns[3].no, true); // restricted!
+        assert.strictEqual(turns[3].only, false);
       });
 
 
@@ -1378,40 +1378,40 @@ describe('osmIntersection', () => {
         });
         const graph = new Rapid.Graph(base).replace(r1);
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 4);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 4);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
-        assert.equal(turns[0].restrictionID, 'r1');
-        assert.equal(turns[0].direct, false); // indirect
-        assert.equal(turns[0].no, true); // restricted!
-        assert.equal(turns[0].only, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
+        assert.strictEqual(turns[0].restrictionID, 'r1');
+        assert.strictEqual(turns[0].direct, false); // indirect
+        assert.strictEqual(turns[0].no, true); // restricted!
+        assert.strictEqual(turns[0].only, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
-        assert.equal(turns[1].restrictionID, 'r1');
-        assert.equal(turns[1].direct, false); // indirect
-        assert.equal(turns[1].no, false);
-        assert.equal(turns[1].only, true);  // only (along via way)
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
+        assert.strictEqual(turns[1].restrictionID, 'r1');
+        assert.strictEqual(turns[1].direct, false); // indirect
+        assert.strictEqual(turns[1].no, false);
+        assert.strictEqual(turns[1].only, true);  // only (along via way)
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r1');
-        assert.equal(turns[2].direct, false); // indirect
-        assert.equal(turns[2].no, false);
-        assert.equal(turns[2].only, true);  // only (along via way)
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r1');
+        assert.strictEqual(turns[2].direct, false); // indirect
+        assert.strictEqual(turns[2].no, false);
+        assert.strictEqual(turns[2].only, true);  // only (along via way)
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, 'r1');
-        assert.equal(turns[3].direct, true); // direct
-        assert.equal(turns[3].no, false);
-        assert.equal(turns[3].only, true); // only!
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, 'r1');
+        assert.strictEqual(turns[3].direct, true); // direct
+        assert.strictEqual(turns[3].no, false);
+        assert.strictEqual(turns[3].only, true); // only!
       });
 
       it('supports `only_` via 2 way restriction (unordered)', () => {
@@ -1428,40 +1428,40 @@ describe('osmIntersection', () => {
         });
         const graph = new Rapid.Graph(base).replace(r1);
         const turns = Rapid.osmIntersection(context, graph, 'b', maxDist).turns('=', 2);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 4);
+        assert.isArray(turns);
+        assert.lengthOf(turns, 4);
 
-        assert.ok(turns[0] instanceof Rapid.osmTurn);
-        assert.equal(turns[0].key, '=_b_-'); // straight to -
-        assert.equal(turns[0].u, false);
-        assert.equal(turns[0].restrictionID, 'r1');
-        assert.equal(turns[0].direct, false); // indirect
-        assert.equal(turns[0].no, true); // restricted!
-        assert.equal(turns[0].only, false);
+        assert.instanceOf(turns[0], Rapid.osmTurn);
+        assert.strictEqual(turns[0].key, '=_b_-'); // straight to -
+        assert.strictEqual(turns[0].u, false);
+        assert.strictEqual(turns[0].restrictionID, 'r1');
+        assert.strictEqual(turns[0].direct, false); // indirect
+        assert.strictEqual(turns[0].no, true); // restricted!
+        assert.strictEqual(turns[0].only, false);
 
-        assert.ok(turns[1] instanceof Rapid.osmTurn);
-        assert.equal(turns[1].key, '=_b_|'); // left to |
-        assert.equal(turns[1].u, false);
-        assert.equal(turns[1].restrictionID, 'r1');
-        assert.equal(turns[1].direct, false); // indirect
-        assert.equal(turns[1].no, false);
-        assert.equal(turns[1].only, true);  // only (along via way)
+        assert.instanceOf(turns[1], Rapid.osmTurn);
+        assert.strictEqual(turns[1].key, '=_b_|'); // left to |
+        assert.strictEqual(turns[1].u, false);
+        assert.strictEqual(turns[1].restrictionID, 'r1');
+        assert.strictEqual(turns[1].direct, false); // indirect
+        assert.strictEqual(turns[1].no, false);
+        assert.strictEqual(turns[1].only, true);  // only (along via way)
 
-        assert.ok(turns[2] instanceof Rapid.osmTurn);
-        assert.equal(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
-        assert.equal(turns[2].u, false);
-        assert.equal(turns[2].restrictionID, 'r1');
-        assert.equal(turns[2].direct, false); // indirect
-        assert.equal(turns[2].no, false);
-        assert.equal(turns[2].only, true);  // only (along via way)
+        assert.instanceOf(turns[2], Rapid.osmTurn);
+        assert.strictEqual(turns[2].key, '=_b_|_*_‖'); // left to ‖ via |
+        assert.strictEqual(turns[2].u, false);
+        assert.strictEqual(turns[2].restrictionID, 'r1');
+        assert.strictEqual(turns[2].direct, false); // indirect
+        assert.strictEqual(turns[2].no, false);
+        assert.strictEqual(turns[2].only, true);  // only (along via way)
 
-        assert.ok(turns[3] instanceof Rapid.osmTurn);
-        assert.equal(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, 'r1');
-        assert.equal(turns[3].direct, true); // direct
-        assert.equal(turns[3].no, false);
-        assert.equal(turns[3].only, true); // only!
+        assert.instanceOf(turns[3], Rapid.osmTurn);
+        assert.strictEqual(turns[3].key, '=_b_|_*_‖_e_≈'); // u-turn via |,‖ to ≈
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, 'r1');
+        assert.strictEqual(turns[3].direct, true); // direct
+        assert.strictEqual(turns[3].no, false);
+        assert.strictEqual(turns[3].only, true); // only!
       });
     });
 
@@ -1489,38 +1489,38 @@ describe('osmIntersection', () => {
       it('with no restrictions, finds all turns', () => {
         const graph = new Rapid.Graph(base);
         const turns = Rapid.osmIntersection(context, graph, 'c', maxDist).turns('=', 2);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 10);
+        assert.isArray(turns);
+        assert.strictEqual(turns.length, 10);
 
-        assert.equal(turns[0].key, '=_b_=');
-        assert.equal(turns[0].u, true);
+        assert.strictEqual(turns[0].key, '=_b_=');
+        assert.strictEqual(turns[0].u, true);
 
-        assert.equal(turns[1].key, '=_b_/');
-        assert.equal(turns[1].u, false);
+        assert.strictEqual(turns[1].key, '=_b_/');
+        assert.strictEqual(turns[1].u, false);
 
-        assert.equal(turns[2].key, '=_b_/_e_\\');
-        assert.equal(turns[2].u, false);
+        assert.strictEqual(turns[2].key, '=_b_/_e_\\');
+        assert.strictEqual(turns[2].u, false);
 
-        assert.equal(turns[3].key, '=_b_/_e_\\_c_~');
-        assert.equal(turns[3].u, false);
+        assert.strictEqual(turns[3].key, '=_b_/_e_\\_c_~');
+        assert.strictEqual(turns[3].u, false);
 
-        assert.equal(turns[4].key, '=_b_-');
-        assert.equal(turns[4].u, false);
+        assert.strictEqual(turns[4].key, '=_b_-');
+        assert.strictEqual(turns[4].u, false);
 
-        assert.equal(turns[5].key, '=_c_=');
-        assert.equal(turns[5].u, true);
+        assert.strictEqual(turns[5].key, '=_c_=');
+        assert.strictEqual(turns[5].u, true);
 
-        assert.equal(turns[6].key, '=_c_~');
-        assert.equal(turns[6].u, false);
+        assert.strictEqual(turns[6].key, '=_c_~');
+        assert.strictEqual(turns[6].u, false);
 
-        assert.equal(turns[7].key, '=_c_\\');
-        assert.equal(turns[7].u, false);
+        assert.strictEqual(turns[7].key, '=_c_\\');
+        assert.strictEqual(turns[7].u, false);
 
-        assert.equal(turns[8].key, '=_c_\\_e_/');
-        assert.equal(turns[8].u, false);
+        assert.strictEqual(turns[8].key, '=_c_\\_e_/');
+        assert.strictEqual(turns[8].u, false);
 
-        assert.equal(turns[9].key, '=_c_\\_e_/_b_-');
-        assert.equal(turns[9].u, false);
+        assert.strictEqual(turns[9].key, '=_c_\\_e_/_b_-');
+        assert.strictEqual(turns[9].u, false);
       });
 
 
@@ -1536,44 +1536,44 @@ describe('osmIntersection', () => {
         });
         const graph = new Rapid.Graph(base).replace(r1);
         const turns = Rapid.osmIntersection(context, graph, 'c', maxDist).turns('=', 2);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 10);
+        assert.isArray(turns);
+        assert.strictEqual(turns.length, 10);
 
-        assert.equal(turns[0].key, '=_b_=');
-        assert.equal(turns[0].u, true);
+        assert.strictEqual(turns[0].key, '=_b_=');
+        assert.strictEqual(turns[0].u, true);
 
-        assert.equal(turns[1].key, '=_b_/');
-        assert.equal(turns[1].u, false);
+        assert.strictEqual(turns[1].key, '=_b_/');
+        assert.strictEqual(turns[1].u, false);
 
-        assert.equal(turns[2].key, '=_b_/_e_\\');
-        assert.equal(turns[2].u, false);
+        assert.strictEqual(turns[2].key, '=_b_/_e_\\');
+        assert.strictEqual(turns[2].u, false);
 
-        assert.equal(turns[3].key, '=_b_/_e_\\_c_~');
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, undefined); // the alternate path should not match
-        assert.equal(turns[3].direct, undefined);
+        assert.strictEqual(turns[3].key, '=_b_/_e_\\_c_~');
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, undefined); // the alternate path should not match
+        assert.strictEqual(turns[3].direct, undefined);
 
-        assert.equal(turns[4].key, '=_b_-');
-        assert.equal(turns[4].u, false);
+        assert.strictEqual(turns[4].key, '=_b_-');
+        assert.strictEqual(turns[4].u, false);
 
-        assert.equal(turns[5].key, '=_c_=');
-        assert.equal(turns[5].u, true);
+        assert.strictEqual(turns[5].key, '=_c_=');
+        assert.strictEqual(turns[5].u, true);
 
-        assert.equal(turns[6].key, '=_c_~');
-        assert.equal(turns[6].u, false);
-        assert.equal(turns[6].restrictionID, 'r1');
-        assert.equal(turns[6].direct, true); // direct
-        assert.equal(turns[6].no, true); // restricted!
-        assert.equal(turns[6].only, false);
+        assert.strictEqual(turns[6].key, '=_c_~');
+        assert.strictEqual(turns[6].u, false);
+        assert.strictEqual(turns[6].restrictionID, 'r1');
+        assert.strictEqual(turns[6].direct, true); // direct
+        assert.strictEqual(turns[6].no, true); // restricted!
+        assert.strictEqual(turns[6].only, false);
 
-        assert.equal(turns[7].key, '=_c_\\');
-        assert.equal(turns[7].u, false);
+        assert.strictEqual(turns[7].key, '=_c_\\');
+        assert.strictEqual(turns[7].u, false);
 
-        assert.equal(turns[8].key, '=_c_\\_e_/');
-        assert.equal(turns[8].u, false);
+        assert.strictEqual(turns[8].key, '=_c_\\_e_/');
+        assert.strictEqual(turns[8].u, false);
 
-        assert.equal(turns[9].key, '=_c_\\_e_/_b_-');
-        assert.equal(turns[9].u, false);
+        assert.strictEqual(turns[9].key, '=_c_\\_e_/_b_-');
+        assert.strictEqual(turns[9].u, false);
       });
 
 
@@ -1589,46 +1589,46 @@ describe('osmIntersection', () => {
         });
         const graph = new Rapid.Graph(base).replace(r1);
         const turns = Rapid.osmIntersection(context, graph, 'c', maxDist).turns('=', 2);
-        assert.ok(turns instanceof Array);
-        assert.equal(turns.length, 8);
+        assert.isArray(turns);
+        assert.strictEqual(turns.length, 8);
 
-        assert.equal(turns[0].key, '=_b_=');  // not towards via
-        assert.equal(turns[0].u, true);
+        assert.strictEqual(turns[0].key, '=_b_=');  // not towards via
+        assert.strictEqual(turns[0].u, true);
 
-        assert.equal(turns[1].key, '=_b_/');  // not towards via
-        assert.equal(turns[1].u, false);
+        assert.strictEqual(turns[1].key, '=_b_/');  // not towards via
+        assert.strictEqual(turns[1].u, false);
 
-        assert.equal(turns[2].key, '=_b_/_e_\\');  // not towards via
-        assert.equal(turns[2].u, false);
+        assert.strictEqual(turns[2].key, '=_b_/_e_\\');  // not towards via
+        assert.strictEqual(turns[2].u, false);
 
-        assert.equal(turns[3].key, '=_b_/_e_\\_c_~');  // not towards via
-        assert.equal(turns[3].u, false);
-        assert.equal(turns[3].restrictionID, undefined); // the alternate path should not match
-        assert.equal(turns[3].direct, undefined);
+        assert.strictEqual(turns[3].key, '=_b_/_e_\\_c_~');  // not towards via
+        assert.strictEqual(turns[3].u, false);
+        assert.strictEqual(turns[3].restrictionID, undefined); // the alternate path should not match
+        assert.strictEqual(turns[3].direct, undefined);
 
-        assert.equal(turns[4].key, '=_b_-'); // not towards via
-        assert.equal(turns[4].u, false);
+        assert.strictEqual(turns[4].key, '=_b_-'); // not towards via
+        assert.strictEqual(turns[4].u, false);
 
-        assert.equal(turns[5].key, '=_c_=');
-        assert.equal(turns[5].u, true);
-        assert.equal(turns[5].restrictionID, 'r1');
-        assert.equal(turns[5].direct, false); // indirect
-        assert.equal(turns[5].no, true); // restricted!
-        assert.equal(turns[5].only, false);
+        assert.strictEqual(turns[5].key, '=_c_=');
+        assert.strictEqual(turns[5].u, true);
+        assert.strictEqual(turns[5].restrictionID, 'r1');
+        assert.strictEqual(turns[5].direct, false); // indirect
+        assert.strictEqual(turns[5].no, true); // restricted!
+        assert.strictEqual(turns[5].only, false);
 
-        assert.equal(turns[6].key, '=_c_~');
-        assert.equal(turns[6].u, false);
-        assert.equal(turns[6].restrictionID, 'r1');
-        assert.equal(turns[6].direct, true); // direct
-        assert.equal(turns[6].no, false);
-        assert.equal(turns[6].only, true); // only!
+        assert.strictEqual(turns[6].key, '=_c_~');
+        assert.strictEqual(turns[6].u, false);
+        assert.strictEqual(turns[6].restrictionID, 'r1');
+        assert.strictEqual(turns[6].direct, true); // direct
+        assert.strictEqual(turns[6].no, false);
+        assert.strictEqual(turns[6].only, true); // only!
 
-        assert.equal(turns[7].key, '=_c_\\');
-        assert.equal(turns[7].u, false);
-        assert.equal(turns[7].restrictionID, 'r1');
-        assert.equal(turns[7].direct, false); // indirect
-        assert.equal(turns[7].no, true); // restricted!
-        assert.equal(turns[7].only, false);
+        assert.strictEqual(turns[7].key, '=_c_\\');
+        assert.strictEqual(turns[7].u, false);
+        assert.strictEqual(turns[7].restrictionID, 'r1');
+        assert.strictEqual(turns[7].direct, false); // indirect
+        assert.strictEqual(turns[7].no, true); // restricted!
+        assert.strictEqual(turns[7].only, false);
       });
     });
 
@@ -1659,37 +1659,37 @@ describe('osmInferRestriction', () => {
       from: { node: 'u', way: '=', vertex: '*' },
       to: { node: 'x', way: '-', vertex: '*' }
     });
-    assert.equal(r1, 'no_right_turn');
+    assert.strictEqual(r1, 'no_right_turn');
 
     const r2 = Rapid.osmInferRestriction(graph, {
       from: { node: 'x', way: '-', vertex: '*' },
       to: { node: 'w', way: '~', vertex: '*' }
     });
-    assert.equal(r2, 'no_right_turn');
+    assert.strictEqual(r2, 'no_right_turn');
 
     const l1 = Rapid.osmInferRestriction(graph, {
       from: { node: 'x', way: '-', vertex: '*' },
       to: { node: 'u', way: '=', vertex: '*' }
     });
-    assert.equal(l1, 'no_left_turn');
+    assert.strictEqual(l1, 'no_left_turn');
 
     const l2 = Rapid.osmInferRestriction(graph, {
       from: { node: 'w', way: '~', vertex: '*' },
       to: { node: 'x', way: '-', vertex: '*' }
     });
-    assert.equal(l2, 'no_left_turn');
+    assert.strictEqual(l2, 'no_left_turn');
 
     const s = Rapid.osmInferRestriction(graph, {
       from: { node: 'u', way: '=', vertex: '*' },
       to: { node: 'w', way: '~', vertex: '*' }
     });
-    assert.equal(s, 'no_straight_on');
+    assert.strictEqual(s, 'no_straight_on');
 
     const u = Rapid.osmInferRestriction(graph, {
       from: { node: 'u', way: '=', vertex: '*' },
       to: { node: 'u', way: '=', vertex: '*' }
     });
-    assert.equal(u, 'no_u_turn');
+    assert.strictEqual(u, 'no_u_turn');
   });
 
 
@@ -1711,7 +1711,7 @@ describe('osmInferRestriction', () => {
       from: { node: 'x', way: 'w1', vertex: '*' },
       to: { node: 'u', way: 'w2', vertex: '*' }
     });
-    assert.equal(r, 'no_u_turn');
+    assert.strictEqual(r, 'no_u_turn');
   });
 
 
@@ -1733,7 +1733,7 @@ describe('osmInferRestriction', () => {
       from: { node: 'x', way: 'w1', vertex: '*' },
       to: { node: 'u', way: 'w2', vertex: '*' }
     });
-    assert.equal(r, 'no_left_turn');
+    assert.strictEqual(r, 'no_left_turn');
   });
 
 
@@ -1757,7 +1757,7 @@ describe('osmInferRestriction', () => {
       from: { node: 'x', way: 'w1', vertex: '+' },
       to: { node: 'u', way: 'w2', vertex: '*' }
     });
-    assert.equal(r, 'no_u_turn');
+    assert.strictEqual(r, 'no_u_turn');
   });
 
 
@@ -1781,6 +1781,6 @@ describe('osmInferRestriction', () => {
       from: { node: 'x', way: 'w1', vertex: '+' },
       to: { node: 'u', way: 'w2', vertex: '*' }
     });
-    assert.equal(r, 'no_u_turn');
+    assert.strictEqual(r, 'no_u_turn');
   });
 });

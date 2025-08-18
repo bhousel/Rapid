@@ -15,7 +15,7 @@ describe('AssetSystem', () => {
   });
 
 
-  describe('#origin', () => {
+  describe('origin', () => {
     it('sets and gets origin', () => {
       expect(_assets.origin).to.eql('latest');
 
@@ -25,7 +25,7 @@ describe('AssetSystem', () => {
   });
 
 
-  describe('#filePath', () => {
+  describe('filePath', () => {
     it('sets and gets filePath', () => {
       expect(_assets.filePath).to.eql('');
 
@@ -35,7 +35,7 @@ describe('AssetSystem', () => {
   });
 
 
-  describe('#fileReplacements', () => {
+  describe('fileReplacements', () => {
     const TESTMAP = { 'test/img/loader.gif': '/assets/test/img/loader-b66184b5c4afbccc25f.gif' };
 
     it('sets and gets fileReplacements', () => {
@@ -47,7 +47,7 @@ describe('AssetSystem', () => {
   });
 
 
-  describe('#sources', () => {
+  describe('sources', () => {
     it('gets the sources', () => {
       const sources = _assets.sources;
       expect(sources).to.be.an('object').that.has.all.keys(['latest', 'local']);
@@ -55,7 +55,7 @@ describe('AssetSystem', () => {
   });
 
 
-  describe('#getFileURL', () => {
+  describe('getFileURL', () => {
     const TESTMAP = { 'test/img/loader.gif': '/assets/test/img/loader-b66184b5c4afbccc25f.gif' };
 
     beforeEach(() => {
@@ -78,7 +78,7 @@ describe('AssetSystem', () => {
   });
 
 
-  describe('#getAssetURL', () => {
+  describe('getAssetURL', () => {
     it('ignores urls', () => {
       expect(_assets.getAssetURL('HTTP://hello')).to.eql('HTTP://hello');
       expect(_assets.getAssetURL('https://world')).to.eql('https://world');
@@ -101,7 +101,7 @@ describe('AssetSystem', () => {
   });
 
 
-  describe('#loadAssetAsync', () => {
+  describe('loadAssetAsync', () => {
     it('returns a promise resolved if we already have the data', () => {
       _assets._cache.test = { hello: 'world' };
 

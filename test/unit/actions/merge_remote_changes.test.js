@@ -438,7 +438,7 @@ describe('actionMergeRemoteChanges', () => {
       });
     });
 
-    describe('#conflicts', () => {
+    describe('conflicts', () => {
       it('returns conflict details', () => {
         const localTags = { foo: 'foo_local' };                 // changed foo
         const remoteTags = { foo: 'foo', bar: 'bar_remote' };   // same foo, added bar

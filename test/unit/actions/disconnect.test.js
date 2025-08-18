@@ -255,7 +255,7 @@ describe('actionDisconnect', () => {
   });
 
 
-  describe('#disabled', () => {
+  describe('disabled', () => {
     it('returns \'not_connected\' for a node shared by less than two ways', () => {
       const base = new Rapid.Graph(context, [new Rapid.OsmNode(context, {id: 'a'})]);
       const graph = new Rapid.Graph(base);

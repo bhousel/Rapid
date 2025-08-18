@@ -40,7 +40,7 @@ describe('KartaviewService', () => {
   });
 
 
-  describe('#initAsync', () => {
+  describe('initAsync', () => {
     it('initializes cache', () => {
       const cache = _kartaview._cache;
       expect(cache).to.have.property('images');
@@ -50,7 +50,7 @@ describe('KartaviewService', () => {
     });
   });
 
-  describe('#resetAsync', () => {
+  describe('resetAsync', () => {
     it('resets cache and selected image', () => {
       _kartaview._cache.images.set('foo', { id: 'foo' });
 
@@ -61,7 +61,7 @@ describe('KartaviewService', () => {
     });
   });
 
-  describe('#loadTiles', () => {
+  describe('loadTiles', () => {
     it('fires loadedData when tiles are loaded', done => {
       const nearbyResponse = {
         status: { apiCode: '600', httpCode: 200, httpMessage: 'Success' },
@@ -166,7 +166,7 @@ describe('KartaviewService', () => {
   });
 
 
-  describe('#getImages', () => {
+  describe('getImages', () => {
     it('returns images in the visible map area', () => {
       const photos = [
         new Rapid.Marker(context, { type: 'photo', id: '0', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 0 }),
@@ -191,7 +191,7 @@ describe('KartaviewService', () => {
   });
 
 
-  describe('#getSequences', () => {
+  describe('getSequences', () => {
     it('returns sequence linestrings in the visible map area', () => {
       const photos = [
         new Rapid.Marker(context, { type: 'photo', id: '0', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 0 }),

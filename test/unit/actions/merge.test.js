@@ -127,7 +127,7 @@ describe('actionMerge', () => {
   });
 
 
-  describe('#disabled', () => {
+  describe('disabled', () => {
     it('disables action when there are no points', () => {
       const base = new Rapid.Graph(context, [
         new Rapid.OsmWay(context, { id: 'w1' }),

@@ -6,7 +6,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe('Preset', () => {
   const context = new Rapid.MockContext();
 
-  describe('#fields', () => {
+  describe('fields', () => {
     it('has no fields by default', () => {
       const preset = new Rapid.Preset(context, 'test', {});
       assert.deepEqual(preset.fields(), []);
@@ -14,7 +14,7 @@ describe('Preset', () => {
   });
 
 
-  describe('#moreFields', () => {
+  describe('moreFields', () => {
     it('has no moreFields by default', () => {
       const preset = new Rapid.Preset(context, 'test', {});
       assert.deepEqual(preset.moreFields(), []);
@@ -22,7 +22,7 @@ describe('Preset', () => {
   });
 
 
-  describe('#matchGeometry', () => {
+  describe('matchGeometry', () => {
     it('returns false if it doesn\'t match', () => {
       const preset = new Rapid.Preset(context, 'test', { geometry: ['line'] });
       assert.equal(preset.matchGeometry('point'), false);
@@ -35,7 +35,7 @@ describe('Preset', () => {
   });
 
 
-  describe('#matchAllGeometry', () => {
+  describe('matchAllGeometry', () => {
     it('returns false if they don\'t all match', () => {
       const preset = new Rapid.Preset(context, 'test', { geometry: ['line'] });
       assert.equal(preset.matchAllGeometry(['point', 'line']), false);
@@ -48,7 +48,7 @@ describe('Preset', () => {
   });
 
 
-  describe('#matchScore', () => {
+  describe('matchScore', () => {
     it('returns -1 if preset does not match tags', () => {
       const preset = new Rapid.Preset(context, 'test', { tags: { foo: 'bar' } });
       const entity = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
@@ -132,7 +132,7 @@ describe('Preset', () => {
   });
 
 
-  describe('#setTags', () => {
+  describe('setTags', () => {
     let _savedAreaKeys;
 
     before(() => {
@@ -199,7 +199,7 @@ describe('Preset', () => {
   });
 
 
-  describe('#unsetTags', () => {
+  describe('unsetTags', () => {
     it('removes tags that match preset tags', () => {
       const preset = new Rapid.Preset(context, 'test', { tags: { highway: 'residential' } });
       assert.deepEqual(preset.unsetTags({ highway: 'residential' }, 'area'), {});

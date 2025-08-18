@@ -296,7 +296,7 @@ describe('actionCircularize', () => {
   });
 
 
-  describe('#disabled', () => {
+  describe('disabled', () => {
     it('not disable circularize when its not circular', () => {
       const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, {id: 'a', loc: [0, 0]}),

@@ -254,7 +254,7 @@ describe('OsmWikibaseService', () => {
     sitelinks: { wiki: { site: 'wiki', title: 'Locale:fr' } }
   };
 
-  describe('#getEntity', () => {
+  describe('getEntity', () => {
     it('calls the given callback with the results of the getEntity data item query', done => {
       const callback = sinon.spy();
       fetchMock.route(/action=wbgetentities/, {

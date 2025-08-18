@@ -31,7 +31,7 @@ describe('operationStraighten', () => {
   const context = new MockContext();
   let _graph;
 
-  describe('#available', () => {
+  describe('available', () => {
     beforeEach(() => {
       // w1 - way with 2 nodes
       // w1-2 - way with 2 nodes connected to w1

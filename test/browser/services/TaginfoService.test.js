@@ -38,7 +38,7 @@ describe('TaginfoService', () => {
   }
 
 
-  describe('#keys', () => {
+  describe('keys', () => {
     it('calls the given callback with the results of the keys query', done => {
       fetchMock.route(/\/keys\/all/, {
         body: '{"data":[{"count_all":5190337,"key":"amenity","count_all_fraction":1.0}]}',
@@ -132,7 +132,7 @@ describe('TaginfoService', () => {
     });
   });
 
-  describe('#multikeys', () => {
+  describe('multikeys', () => {
     it('calls the given callback with the results of the multikeys query', done => {
       fetchMock.route(/\/keys\/all/, {
         body: '{"data":[{"count_all":69593,"key":"recycling:glass","count_all_fraction":0.0}]}',
@@ -193,7 +193,7 @@ describe('TaginfoService', () => {
     });
   });
 
-  describe('#values', () => {
+  describe('values', () => {
     it('calls the given callback with the results of the values query', done => {
       fetchMock.route(/\/key\/values/, {
         body: '{"data":[{"value":"parking","description":"A place for parking cars", "fraction":0.1}]}',
@@ -348,7 +348,7 @@ describe('TaginfoService', () => {
     });
   });
 
-  describe('#roles', () => {
+  describe('roles', () => {
     it('calls the given callback with the results of the roles query', done => {
       fetchMock.route(/\/relation\/roles/, {
         body: '{"data":[{"role":"stop","count_relation_members_fraction":0.1757},' +
@@ -373,7 +373,7 @@ describe('TaginfoService', () => {
     });
   });
 
-  describe('#docs', () => {
+  describe('docs', () => {
     it('calls the given callback with the results of the docs query', done => {
       fetchMock.route(/\/tag\/wiki_page/, {
         body: '{"data":[{"on_way":false,"lang":"en","on_area":true,"image":"File:Car park2.jpg"}]}',

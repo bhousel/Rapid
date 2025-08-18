@@ -67,7 +67,7 @@ describe('PixiRenderer', () => {
   afterEach(() => $container.remove());
 
 
-  describe('#osmRenderer', () => {
+  describe('osmRenderer', () => {
     it('renders the canned data scene', () => {
       const layers = context.systems.gfx.scene.layers;
       const osmLayer = layers.get('osm');

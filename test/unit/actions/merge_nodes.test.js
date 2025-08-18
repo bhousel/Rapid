@@ -6,7 +6,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe('actionMergeNodes', () => {
   const context = new Rapid.MockContext();
 
-  describe('#disabled', () => {
+  describe('disabled', () => {
     it('enabled for both internal and endpoint nodes', () => {
       //
       // a --- b --- c

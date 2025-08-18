@@ -75,7 +75,7 @@ describe('MapSystem', () => {
   });
 
 
-  describe('#zoom', () => {
+  describe('zoom', () => {
     it('gets and sets zoom level', () => {
       expect(_mapSystem.zoom(4)).to.equal(_mapSystem);
       expect(_mapSystem.zoom()).to.equal(4);
@@ -88,7 +88,7 @@ describe('MapSystem', () => {
   });
 
 
-  describe('#zoomIn', () => {
+  describe('zoomIn', () => {
     it('increments zoom', done => {
       expect(_mapSystem.zoom(4)).to.equal(_mapSystem);
       _mapSystem.zoomIn();
@@ -99,7 +99,7 @@ describe('MapSystem', () => {
     });
   });
 
-  describe('#zoomOut', () => {
+  describe('zoomOut', () => {
     it('decrements zoom', done => {
       expect(_mapSystem.zoom(4)).to.equal(_mapSystem);
       _mapSystem.zoomOut();
@@ -110,7 +110,7 @@ describe('MapSystem', () => {
     });
   });
 
-  describe('#center', () => {
+  describe('center', () => {
     it('gets and sets center', () => {
       expect(_mapSystem.center([0, 0])).to.equal(_mapSystem);
       expect(_mapSystem.center()[0]).to.be.closeTo(0, 1e-6);
@@ -121,7 +121,7 @@ describe('MapSystem', () => {
     });
   });
 
-  describe('#centerEase', () => {
+  describe('centerEase', () => {
     it('sets center', done => {
       expect(_mapSystem.center([10, 10])).to.equal(_mapSystem);
       expect(_mapSystem.centerEase([20, 20], 1)).to.equal(_mapSystem);
@@ -133,7 +133,7 @@ describe('MapSystem', () => {
     });
   });
 
-  describe('#centerZoom', () => {
+  describe('centerZoom', () => {
     it('gets and sets center and zoom', () => {
       expect(_mapSystem.centerZoom([20, 25], 4)).to.equal(_mapSystem);
       expect(_mapSystem.center()[0]).to.be.closeTo(20, 1e-6);
@@ -142,7 +142,7 @@ describe('MapSystem', () => {
     });
   });
 
-  describe('#extent', () => {
+  describe('extent', () => {
     it('gets and sets extent', () => {
       _mapSystem.center([0, 0]);
       let extent;

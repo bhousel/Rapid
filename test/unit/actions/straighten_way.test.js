@@ -14,7 +14,7 @@ describe('actionStraightenWay', () => {
     unproject: val => val
   };
 
-  describe('#disabled', () => {
+  describe('disabled', () => {
     it('returns falsy for ways with internal nodes near centerline', () => {
       const base = new Rapid.Graph(context, [
         new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),

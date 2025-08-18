@@ -107,7 +107,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#resetAsync', () => {
+  describe('resetAsync', () => {
     it('clears the history stack', () => {
       _editor.commit({ annotation: 'one' });
       _editor.commit({ annotation: 'two' });
@@ -141,14 +141,14 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#base', () => {
+  describe('base', () => {
     it('returns the base edit', () => {
       expect(_editor.base).to.be.an.instanceOf(Rapid.Edit);
       expect(_editor.base).to.equal(_editor._history[0]);
     });
   });
 
-  describe('#stable', () => {
+  describe('stable', () => {
     it('returns the stable edit', () => {
       _editor.commit({ annotation: 'one' });
       expect(_editor.stable).to.be.an.instanceOf(Rapid.Edit);
@@ -156,7 +156,7 @@ describe('EditSystem', () => {
     });
   });
 
-  describe('#staging', () => {
+  describe('staging', () => {
     it('returns the staging edit', () => {
       _editor.commit({ annotation: 'one' });
       expect(_editor.staging).to.be.an.instanceOf(Rapid.Edit);
@@ -165,19 +165,19 @@ describe('EditSystem', () => {
     });
   });
 
-  describe('#history', () => {
+  describe('history', () => {
     it('returns the history', () => {
       expect(_editor.history).to.be.an.instanceOf(Array).with.lengthOf(1);
     });
   });
 
-  describe('#index', () => {
+  describe('index', () => {
     it('returns the index', () => {
       expect(_editor.index).to.eql(0);
     });
   });
 
-  describe('#hasWorkInProgress', () => {
+  describe('hasWorkInProgress', () => {
     it('returns true when work has been performed on the staging edit', () => {
       expect(_editor.hasWorkInProgress).to.be.false;
       _editor.perform(actionNoop());
@@ -186,7 +186,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#merge', () => {
+  describe('merge', () => {
     it('merges the entities into all graph versions', () => {
       const n = new Rapid.OsmNode(context, { id: 'n1' });
       _editor.merge([n]);
@@ -205,7 +205,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#perform', () => {
+  describe('perform', () => {
     it('returns a Difference', () => {
       const diff = _editor.perform(actionNoop());
       expect(diff).to.be.an.instanceOf(Rapid.Difference);
@@ -259,7 +259,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#performAsync', () => {
+  describe('performAsync', () => {
     it('returns a rejected Promise when passed no args', () => {
       const prom = _editor.performAsync();
       expect(prom).to.be.an.instanceOf(Promise);
@@ -309,7 +309,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#revert', () => {
+  describe('revert', () => {
     it('replaces staging with a fresh copy of stable', () => {
       _editor.perform(actionAddNode('n-1'));
       expect(_editor.staging.graph.hasEntity('n-1')).to.be.ok;
@@ -356,7 +356,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#commit', () => {
+  describe('commit', () => {
     it('commit work in progress to history', () => {
       expect(_editor.history).to.be.an.instanceOf(Array).with.lengthOf(1);
       expect(_editor.index).to.eql(0);
@@ -405,7 +405,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#commitAppend', () => {
+  describe('commitAppend', () => {
     it('throws if you try to commitAppend to the base edit', () => {
       _editor.perform(actionAddNode('n-1'));
       const fn = () => _editor.commitAppend('added a node');
@@ -460,7 +460,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#undo / #redo', () => {
+  describe('undo / #redo', () => {
     it('can undo and redo edits', () => {
       _editor.perform(actionAddNode('n-1'));
       _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
@@ -565,7 +565,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#setCheckpoint / #restoreCheckpoint', () => {
+  describe('setCheckpoint / #restoreCheckpoint', () => {
     it('can set and restore checkpoints', () => {
       _editor.perform(actionAddNode('n-1'));
       _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
@@ -648,7 +648,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#beginTransaction / #endTransaction', () => {
+  describe('beginTransaction / #endTransaction', () => {
     it('prevents change events from getting dispatched in a transaction', () => {
       const onStagingChange = sinon.spy();
       const onStableChange = sinon.spy();
@@ -739,7 +739,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#difference / #hasChanges / #changes', () => {
+  describe('difference / #hasChanges / #changes', () => {
     it('returns the difference between base -> stable', () => {
       prepareTestHistory();
 
@@ -761,7 +761,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#toJSON', () => {
+  describe('toJSON', () => {
     it('doesn\'t generate unsaveable changes', () => {
       _editor.perform(actionAddNode('n-1'));
       _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
@@ -801,7 +801,7 @@ describe('EditSystem', () => {
   });
 
 
-  describe('#fromJSONAsync', () => {
+  describe('fromJSONAsync', () => {
     it('restores from v3 JSON (creation)', () => {
       const json = {
         version: 3,

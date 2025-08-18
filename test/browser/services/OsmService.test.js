@@ -217,7 +217,7 @@ describe('OsmService', () => {
   }
 
 
-  describe('#connectionID', () => {
+  describe('connectionID', () => {
     it('changes the connectionID every time service is reset', () => {
       const originalID = _osm.connectionID;
       return _osm.resetAsync()
@@ -235,13 +235,13 @@ describe('OsmService', () => {
     });
   });
 
-  describe('#changesetURL', () => {
+  describe('changesetURL', () => {
     it('provides a changeset url based on wwwroot', () => {
       expect(_osm.changesetURL(2)).to.eql('https://www.openstreetmap.org/changeset/2');
     });
   });
 
-  describe('#changesetsURL', () => {
+  describe('changesetsURL', () => {
     it('provides a local changesets url based on wwwroot', () => {
       const center = [-74.65, 40.65];
       const zoom = 17;
@@ -249,7 +249,7 @@ describe('OsmService', () => {
     });
   });
 
-  describe('#entityURL', () => {
+  describe('entityURL', () => {
     it('provides an entity url for a node based on wwwroot', () => {
       const e = new Rapid.OsmNode(context, { id: 'n1' });
       expect(_osm.entityURL(e)).to.eql('https://www.openstreetmap.org/node/1');
@@ -266,7 +266,7 @@ describe('OsmService', () => {
     });
   });
 
-  describe('#historyURL', () => {
+  describe('historyURL', () => {
     it('provides a history url for a node based on wwwroot', () => {
       const e = new Rapid.OsmNode(context, { id: 'n1' });
       expect(_osm.historyURL(e)).to.eql('https://www.openstreetmap.org/node/1/history');
@@ -283,14 +283,14 @@ describe('OsmService', () => {
     });
   });
 
-  describe('#userURL', () => {
+  describe('userURL', () => {
     it('provides a user url based on wwwroot', () => {
       expect(_osm.userURL('bob')).to.eql('https://www.openstreetmap.org/user/bob');
     });
   });
 
 
-  describe('#resetAsync', () => {
+  describe('resetAsync', () => {
     it('resets cache', () => {
       _osm._tileCache.lastv = 1;
       return _osm.resetAsync()
@@ -299,7 +299,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#switchAsync', () => {
+  describe('switchAsync', () => {
     it('changes the wwwroot', () => {
       const newOpts = {
         url: 'https://www.example.com',
@@ -320,7 +320,7 @@ describe('OsmService', () => {
     });
   });
 
-  describe('#loadFromAPI', () => {
+  describe('loadFromAPI', () => {
     const path = '/api/0.6/map.json?bbox=-74.542,40.655,-74.541,40.656';
     const body =
 `{
@@ -420,7 +420,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#loadFromAPIWithErrors', () => {
+  describe('loadFromAPIWithErrors', () => {
     const path = '/api/0.6/map.json?bbox=-74.542,40.655,-74.541,40.656';
     const partialBody =
 `{
@@ -446,7 +446,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#loadTiles', () => {
+  describe('loadTiles', () => {
     const tileBody =
 `{
   "version":"0.6",
@@ -480,7 +480,7 @@ describe('OsmService', () => {
     });
 
 
-//    it('#isDataLoaded', () => {
+//    it('isDataLoaded', () => {
 //      expect(_osm.isDataLoaded([-74.0444216, 40.6694299])).to.be.false;
 //
 //      const bbox = { minX: -75, minY: 40, maxX: -74, maxY: 41, id: 'fake' };
@@ -491,7 +491,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#loadEntity', () => {
+  describe('loadEntity', () => {
     const nodeBody =
 `{
   "version":"0.6",
@@ -563,7 +563,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#loadEntityVersion', () => {
+  describe('loadEntityVersion', () => {
     const nodeBody =
 `{
   "version":"0.6",
@@ -635,7 +635,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#userDetails', () => {
+  describe('userDetails', () => {
     it('retrieves user details', done => {
       loginAsync()
         .then(() => {
@@ -648,7 +648,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#userChangesets', () => {
+  describe('userChangesets', () => {
     it('retrieves user changesets', done => {
       loginAsync()
         .then(() => {
@@ -666,7 +666,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#caches', () => {
+  describe('caches', () => {
     it('loads reset caches', () => {
       const caches = _osm.caches();
       expect(caches.tile).to.have.all.keys(['lastv','toLoad','inflight','seen']);
@@ -712,7 +712,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#loadNotes', () => {
+  describe('loadNotes', () => {
     const notesBody =
 `<?xml version="1.0" encoding="UTF-8"?>
 <osm>
@@ -754,7 +754,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#notes', () => {
+  describe('notes', () => {
     beforeEach(() => {
       const v = context.viewport;
       v.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
@@ -778,7 +778,7 @@ describe('OsmService', () => {
   });
 
 
-  describe('#replaceNote', () => {
+  describe('replaceNote', () => {
     it('adds a note', () => {
       const noteID = '-1';
       const note = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm', isNew: true });
@@ -811,7 +811,7 @@ describe('OsmService', () => {
     });
   });
 
-  describe('#getNote', () => {
+  describe('getNote', () => {
     it('returns a note from the cache', () => {
       const noteID = '3';
       const note = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm' });
@@ -821,7 +821,7 @@ describe('OsmService', () => {
     });
   });
 
-  describe('#removeNote', () => {
+  describe('removeNote', () => {
     it('removes a note', () => {
       const noteID = '4';
       const note = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm', isNew: true });
@@ -839,7 +839,7 @@ describe('OsmService', () => {
 
 
   describe('API capabilities', () => {
-    describe('#status', () => {
+    describe('status', () => {
       it('gets API status', done => {
         _osm.status((err, result) => {
           expect(result).to.eql('online');
@@ -848,7 +848,7 @@ describe('OsmService', () => {
       });
     });
 
-    describe('#imageryBlocklists', () => {
+    describe('imageryBlocklists', () => {
       it('updates imagery blocklists', done => {
         _osm.status(() => {
           const blocklists = _osm.imageryBlocklists;

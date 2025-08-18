@@ -47,6 +47,17 @@ describe('Graph', () => {
     });
   });
 
+  describe('destroy', () => {
+    it('destroys and frees the data', () => {
+      const g = new Rapid.Graph(context);
+      g.destroy();
+      assert.isNull(g.base);
+      assert.isNull(g.local);
+      assert.isNull(g.previous);
+      assert.isNull(g.props);
+      assert.isNull(g.context);
+    });
+  });
 
   describe('id', () => {
     it('gets id', () => {

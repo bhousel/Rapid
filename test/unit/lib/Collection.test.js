@@ -60,19 +60,19 @@ describe('Collection', () => {
     p.park, p.parking, p.soccer, p.football, p.excluded
   ]);
 
-  describe('#item', () => {
+  describe('item', () => {
     it('fetches a preset by id', () => {
       assert.equal(collection.item('highway/residential'), p.residential);
     });
   });
 
-  describe('#index', () => {
+  describe('index', () => {
     it('return -1 when given id for preset not in the collection', () => {
       assert.equal(collection.index('foobar'), -1);
     });
   });
 
-  describe('#matchGeometry', () => {
+  describe('matchGeometry', () => {
     it('returns a new collection only containing presets matching a geometry', () => {
       const arr = collection.matchGeometry('area').array;
       assert.ok(arr.includes(p.residential));
