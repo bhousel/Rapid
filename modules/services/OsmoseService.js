@@ -244,7 +244,9 @@ export class OsmoseService extends AbstractSystem {
         // Some issues have instance specific detail in a subtitle
         const detail = data.subtitle ? marked.parse(data.subtitle.auto) : '';
 
-        issue = issue.updateSelf({ elems: elems, detail: detail });
+        issue.props.elems = elems;
+        issue.props.detail = detail;
+        issue.touch();
         this.replaceItem(issue);
         return issue;
       });

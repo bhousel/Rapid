@@ -82,15 +82,6 @@ describe('OsmRelation', () => {
     });
   });
 
-  describe('updateSelf', () => {
-    it('returns the same OsmRelation', () => {
-      const a = new Rapid.OsmRelation(context);
-      const b = a.updateSelf({});
-      assert.instanceOf(b, Rapid.OsmRelation);
-      assert.strictEqual(a, b);
-    });
-  });
-
   describe('copy', () => {
     it('returns a new Relation', () => {
       const r = new Rapid.OsmRelation(context, { id: 'r' });

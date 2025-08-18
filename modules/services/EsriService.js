@@ -545,8 +545,9 @@ export class EsriService extends AbstractSystem {
       }
 
       if (ways.length === 1) {  // single ring, assign tags and return
-        const props = Object.assign({ tags: parseTags(properties) }, metadata);
-        entities.push(ways[0].updateSelf(props));
+        const w = ways[0];
+        Object.assign(w.props, { tags: parseTags(properties) }, metadata);
+        entities.push(w);
       } else {  // multiple rings, make a multipolygon relation with inner/outer members
         const members = ways.map((w, i) => {
           entities.push(w);

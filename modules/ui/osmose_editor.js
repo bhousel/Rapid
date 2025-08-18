@@ -123,7 +123,8 @@ export function uiOsmoseEditor(context) {
       .on('click.close', function(d3_event, d) {
         this.blur();    // avoid keeping focus on the button - iD#4641
         if (osmose) {
-          d.updateSelf({ newStatus: 'done' });
+          d.props.newStatus = 'done';
+          d.touch();
           osmose.postUpdate(d, (err, item) => dispatch.call('change', item));
         }
       });
@@ -133,7 +134,8 @@ export function uiOsmoseEditor(context) {
       .on('click.ignore', function(d3_event, d) {
         this.blur();    // avoid keeping focus on the button - iD#4641
         if (osmose) {
-          d.updateSelf({ newStatus: 'false' });
+          d.props.newStatus = 'false';
+          d.touch();
           osmose.postUpdate(d, (err, item) => dispatch.call('change', item));
         }
       });

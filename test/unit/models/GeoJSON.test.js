@@ -171,15 +171,6 @@ describe('GeoJSON', () => {
     });
   });
 
-  describe('updateSelf', () => {
-    it('returns the same GeoJSON element', () => {
-      const a = new Rapid.GeoJSON(context, { geojson: sample.point });
-      const b = a.updateSelf({});
-      assert.instanceOf(b, Rapid.GeoJSON);
-      assert.strictEqual(a, b);
-    });
-  });
-
   describe('asGeoJSON', () => {
     it('returns the originally cloned GeoJSON data, stored in props', () => {
       const orig = { geojson: sample.point };

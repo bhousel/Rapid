@@ -5,7 +5,7 @@ import { Geometry } from './Geometry.js';
  * AbstractData is the base class from which all managed data elements inherit.
  * A data element is the internal representation of a piece of map data.
  * It can refer to an OSM Entity or a GeoJSON object.
- * It has a type, geometry, and properties (in OSM, these are the tags).
+ * It has a type, geometry, and properties.
  *
  * Data elements are intended to be immutable - the `update()` method will return a new data element.
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
@@ -71,26 +71,6 @@ export class AbstractData {
   update(props) {
     const Type = this.constructor;
     return new Type(this, props).touch();
-  }
-
-  /**
-   * updateSelf
-   * Like `update` but it modifies the current data element's properties in-place.
-   * This will also update the data element's `v` internal version number.
-   * `updateSelf` is slightly more performant for situations where you don't need
-   * immutability and don't mind mutating the data element.
-   *
-   * A warning for OSM Entities - this can circumvent `updateGeometry`.
-   * So you shouldn't `updateSelf` for OsmNodes where to try to change it's `loc`.
-   * And you shouldn't `updateSelf` for any entity after it has been added to a Graph.
-   *
-   * @param   {Object}        props - the updated properties
-   * @return  {AbstractData}  this same data element
-   */
-  updateSelf(props = {}) {
-    Object.assign(this.props, globalThis.structuredClone(props));  // override with passed in props
-    this.touch();
-    return this;
   }
 
   /**

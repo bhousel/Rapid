@@ -70,15 +70,6 @@ describe('OsmChangeset', () => {
     });
   });
 
-  describe('updateSelf', () => {
-    it('returns the same OsmChangeset', () => {
-      const a = new Rapid.OsmChangeset(context);
-      const b = a.updateSelf({});
-      assert.instanceOf(b, Rapid.OsmChangeset);
-      assert.strictEqual(a, b);
-    });
-  });
-
   describe('asGeoJSON', () => {
     it('returns an unlocated GeoJSON Feature', () => {
       const c1 = new Rapid.OsmChangeset(context, { id: 'c1', tags: { comment: 'hello' }});

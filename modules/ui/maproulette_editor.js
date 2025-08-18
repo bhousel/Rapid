@@ -182,7 +182,8 @@ export function uiMapRouletteEditor(context) {
       const $input = d3_select(this);
       const val = $input.property('value').trim() || undefined;
 
-      _marker.updateSelf({ newComment: val });
+      _marker.props.newComment = val;
+      _marker.touch();
       if (maproulette) {
         maproulette.replaceTask(_marker);  // update note cache
       }

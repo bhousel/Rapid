@@ -1153,90 +1153,86 @@ export class MapillaryService extends AbstractSystem {
   /**
    * _cacheImage
    * Store the given image in the caches
-   * @param   {Object}  props - the image properties
+   * @param   {Object}  source - the image properties
    * @return  {Marker}  The image
    */
-  _cacheImage(props) {
+  _cacheImage(source) {
     const context = this.context;
     const spatial = context.systems.spatial;
+    const imageID = source.id;
 
-    const imageID = props.id;
     let image = spatial.getData('mapillary-images', imageID);
     if (!image) {
+      const loc = spatial.preventCoincidentLoc('mapillary-images', source.loc);
       image = new Marker(this.context, {
-        type:      'photo',
-        serviceID: this.id,
-        id:        imageID,
-        loc:       props.loc
+        type:       'photo',
+        serviceID:  this.id,
+        id:         imageID,
+        loc:        loc
       });
     }
 
     // Allow 0, but not things like NaN, null, Infinity
-    const caIsNumber = (!isNaN(props.ca) && isFinite(props.ca));
+    const caIsNumber = (!isNaN(source.ca) && isFinite(source.ca));
 
     // Update whatever additional props we were passed..
-    const setProps = {};
-    if (props.sequenceID)   setProps.sequenceID  = props.sequenceID;
-    if (props.captured_at)  setProps.captured_at = props.captured_at;
-    if (props.captured_by)  setProps.captured_by = props.captured_by;
-    if (caIsNumber)         setProps.ca          = props.ca;
-    if (props.isPano)       setProps.isPano      = props.isPano;
-
-    if (Object.keys(setProps).length) {
-      image.updateSelf(setProps);
-    }
+    const props = image.props;
+    if (source.sequenceID)   props.sequenceID  = source.sequenceID;
+    if (source.captured_at)  props.captured_at = source.captured_at;
+    if (source.captured_by)  props.captured_by = source.captured_by;
+    if (caIsNumber)          props.ca          = source.ca;
+    if (source.isPano)       props.isPano      = source.isPano;
 
     spatial.replaceData('mapillary-images', image);
-
-    return image;
+    return image.touch();
   }
 
 
   /**
    * _cacheDetection
    * Store the given detection in the caches
-   * @param  {Object}  props - the detection properties
+   * @param  {Object}  source - the detection properties
    * @return {Marker}  The detection
    */
-  _cacheDetection(props) {
+  _cacheDetection(source) {
     const context = this.context;
     const spatial = context.systems.spatial;
+    const detectionID = source.id;
 
-    const detectionID = props.id;
     let detection = spatial.getData('mapillary-detections', detectionID);
     if (!detection) {
       detection = new Marker(this.context, {
-        type:        'detection',
-        serviceID:   this.id,
-        id:          detectionID,
-        object_type: props.object_type   // 'point' or 'traffic_sign'
+        type:         'detection',
+        serviceID:    this.id,
+        id:           detectionID,
+        object_type:  source.object_type   // 'point' or 'traffic_sign'
       });
     }
 
     // If we haven't locked in the location yet, try here..
     // (see Rapid#1557 - sometimes we don't have this!)
-    if (!detection.loc && props.loc) {
+    if (!detection.loc && source.loc) {
       // Marker `loc` should really have been set at construction time, but unfortunately we need to redo it
-      const loc = spatial.preventCoincidentLoc('mapillary-detections', props.loc);
-      detection.updateSelf({ loc: loc });
+      const loc = spatial.preventCoincidentLoc('mapillary-detections', source.loc);
+      detection.props.loc = loc;
       detection.updateGeometry();
     }
 
     // Update whatever additional props we were passed..
     // Allow 0, but not things like NaN, null, Infinity
-    const dirIsNumber = (!isNaN(props.aligned_direction) && isFinite(props.aligned_direction));
+    const dirIsNumber = (!isNaN(source.aligned_direction) && isFinite(source.aligned_direction));
 
-    const setProps = {};
-    if (props.images)         setProps.images             = props.images;
-    if (props.first_seen_at)  setProps.first_seen_at      = props.first_seen_at;
-    if (props.last_seen_at)   setProps.last_seen_at       = props.last_seen_at;
-    if (props.value)          setProps.value              = props.value;
-    if (dirIsNumber)          setProps.aligned_direction  = props.aligned_direction;
+    const props = detection.props;
+    if (source.images)         props.images             = source.images;
+    if (source.first_seen_at)  props.first_seen_at      = source.first_seen_at;
+    if (source.last_seen_at)   props.last_seen_at       = source.last_seen_at;
+    if (source.value)          props.value              = source.value;
+    if (dirIsNumber)           props.aligned_direction  = source.aligned_direction;
 
     // If we haven't locked in the bestImageID yet, try here..
     // This requires a location and an Array of images..
-    const nearImages = detection.props.images || props.images;
-    if (!detection.props.bestImageID && detection.loc && nearImages) {
+    const nearImages = props.images || source.images;
+    if (!props.bestImageID && detection.loc && Array.isArray(nearImages)) {
       let minDist = Infinity;
       let bestImageID = null;
 
@@ -1248,38 +1244,34 @@ export class MapillaryService extends AbstractSystem {
         }
       }
       if (bestImageID) {
-        setProps.bestImageID = bestImageID;
+        props.bestImageID = bestImageID;
       }
     }
 
-    if (Object.keys(setProps).length) {
-      detection.updateSelf(setProps);
-    }
-
     spatial.replaceData('mapillary-detections', detection);
-    return detection;
+    return detection.touch();
   }
 
 
   /**
    * _cacheSegmentation
    * Store the given segmentation in the caches
-   * @param  {Object}  props - the segmentation properties
+   * @param  {Object}  source - the segmentation properties
    * @return {Object?} The segmentation data, or `null` if we are skipping it (see below)
    */
-  _cacheSegmentation(props) {
+  _cacheSegmentation(source) {
     const cache = this._cache.segmentations;
 
     // Note: not all segmentations are ones we can work with.
     // For now, we'll only keep the ones that correspond to the known object detections and traffic_signs.
-    const isDetection = this.getDetectionPresetID(props.value);
-    const isTrafficSign = /^(regulatory|information|warning|complementary)/.test(props.value);
+    const isDetection = this.getDetectionPresetID(source.value);
+    const isTrafficSign = /^(regulatory|information|warning|complementary)/.test(source.value);
     if (!isDetection && !isTrafficSign) return null;
 
-    let segmentation = cache.data.get(props.id);
+    let segmentation = cache.data.get(source.id);
     if (!segmentation) {
       // Convert encoded geometry into a polygon..
-      const decodedGeometry = window.atob(props.geometry);
+      const decodedGeometry = window.atob(source.geometry);
       let arr = new Uint8Array(decodedGeometry.length);
       for (let i = 0; i < decodedGeometry.length; i++) {
         arr[i] = decodedGeometry.charCodeAt(i);
@@ -1292,18 +1284,18 @@ export class MapillaryService extends AbstractSystem {
       const geometry = new window.mapillary.PolygonGeometry(polygon[0]);
 
       segmentation = {
-        id:        props.id,
-        imageID:   props.imageID,
+        id:        source.id,
+        imageID:   source.imageID,
         geometry:  geometry,
-        value:     props.value
+        value:     source.value
       };
 
       cache.data.set(segmentation.id, segmentation);
     }
 
     // Update whatever additional props we were passed..
-    if (props.created_at)   segmentation.created_at   = props.created_at;
-    if (props.detectionID)  segmentation.detectionID  = props.detectionID;
+    if (source.created_at)   segmentation.created_at   = source.created_at;
+    if (source.detectionID)  segmentation.detectionID  = source.detectionID;
 
     return segmentation;
   }

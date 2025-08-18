@@ -526,8 +526,9 @@ export class MapWithAIService extends AbstractSystem {
       __datasetid__: dataset.id
     };
 
-    // Adds metadata directly, this is kind of hacky
-    return entity.updateSelf(metadata);
+    // Adds metadata props directly
+    Object.assign(entity.props, metadata);
+    return entity;
   }
 
 
@@ -643,13 +644,13 @@ export class MapWithAIService extends AbstractSystem {
           __service__: 'mapwithai',
           __datasetid__: dataset.id
         };
-        results.push(survivor.updateSelf(metadata));
+        Object.assign(survivor.props, metadata);
+        results.push(survivor);
       }
 
     }
 
     return results;
   }
-
 
 }

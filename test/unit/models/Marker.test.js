@@ -64,15 +64,6 @@ describe('Marker', () => {
     });
   });
 
-  describe('updateSelf', () => {
-    it('returns the same Marker', () => {
-      const a = new Rapid.Marker(context);
-      const b = a.updateSelf({});
-      assert.instanceOf(b, Rapid.Marker);
-      assert.strictEqual(a, b);
-    });
-  });
-
   describe('updateGeometry', () => {
     it('updates the geometry', () => {
       const a = new Rapid.Marker(context);  // no loc
@@ -81,7 +72,8 @@ describe('Marker', () => {
       assert.isNull(geoms.orig);
       assert.isNull(geoms.world);
 
-      a.updateSelf({ loc: [0, 0] });
+      a.props.loc = [0, 0];
+      a.touch();
       a.updateGeometry();
 
       geoms = a.geoms;

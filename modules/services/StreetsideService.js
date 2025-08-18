@@ -727,7 +727,7 @@ export class StreetsideService extends AbstractSystem {
 
       if (spatial.hasData('streetside-images', bubbleID))  continue;  // skip duplicates
 
-      const loc = [bubble.lo, bubble.la];
+      const loc = spatial.preventCoincidentLoc('streetside-images', [bubble.lo, bubble.la]);
       const props = {
         type:         'photo',
         serviceID:    this.id,

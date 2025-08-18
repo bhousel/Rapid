@@ -337,10 +337,9 @@ export class MapRouletteService extends AbstractSystem {
     return fetch(url)
       .then(utilFetchResponse)
       .then(data => {
-        return task.updateSelf({
-          instruction: data.instruction || '',
-          description: data.description || ''
-        });
+        task.props.instruction = data.instruction || '';
+        task.props.description = data.description || '';
+        return task.touch();
       })
       .then(task => this.loadTaskFeaturesAsync(task));
   }
@@ -362,9 +361,8 @@ export class MapRouletteService extends AbstractSystem {
     return fetch(url)
       .then(utilFetchResponse)
       .then(data => {
-        return task.updateSelf({
-          taskFeatures: data?.geometries?.features || []
-        });
+        task.props.taskFeature = data?.geometries?.features || [];
+        return task.touch();
       });
   }
 
@@ -562,11 +560,9 @@ export class MapRouletteService extends AbstractSystem {
 // Why is this different from what `loadChallenges()` does???
         return this.getChallengeDetails(challengeID)
           .then(challengeData => {
-            // Set the title and parentName using the challenge name
-            task.updateSelf({
-              title: challengeData.name,
-              parentName: challengeData.name
-            });
+            task.props.title = challengeData.name;
+            task.props.parentName = challengeData.name;
+            task.touch();
 
             const map = this.context.systems.map;
             if (map) {

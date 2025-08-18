@@ -82,15 +82,6 @@ describe('OsmNode', () => {
     });
   });
 
-  describe('updateSelf', () => {
-    it('returns the same OsmNode', () => {
-      const a = new Rapid.OsmNode(context);
-      const b = a.updateSelf({});
-      assert.instanceOf(b, Rapid.OsmNode);
-      assert.strictEqual(a, b);
-    });
-  });
-
   describe('asGeoJSON', () => {
     it('converts to a GeoJSON Point Feature', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { amenity: 'cafe' }, loc: [1, 2] });

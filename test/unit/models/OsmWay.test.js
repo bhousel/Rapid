@@ -91,15 +91,6 @@ describe('OsmWay', () => {
     });
   });
 
-  describe('updateSelf', () => {
-    it('returns the same OsmWay', () => {
-      const a = new Rapid.OsmWay(context);
-      const b = a.updateSelf({});
-      assert.instanceOf(b, Rapid.OsmWay);
-      assert.strictEqual(a, b);
-    });
-  });
-
   describe('copy', () => {
     it('returns a new OsmWay', () => {
       const w = new Rapid.OsmWay(context, { id: 'w' });

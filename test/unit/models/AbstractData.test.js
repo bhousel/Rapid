@@ -111,55 +111,6 @@ describe('AbstractData', () => {
     });
   });
 
-
-  describe('updateSelf', () => {
-    it('returns the same AbstractData', () => {
-      const a = new Rapid.AbstractData(context);
-      const b = a.updateSelf({});
-      assert.strictEqual(b, a);
-    });
-
-    it('updates the specified properties', () => {
-      const a = new Rapid.AbstractData(context);
-      const update = { foo: 'bar' };
-      const b = a.updateSelf(update);
-      assert.strictEqual(b.props, a.props);     // same object, ===
-      assert.notStrictEqual(b.props, update);   // cloned, not ===
-      assert.deepInclude(b.props, update);
-    });
-
-    it('defaults to empty props argument', () => {
-      const a = new Rapid.AbstractData(context);
-      const b = a.updateSelf();
-      assert.strictEqual(b.props, a.props);   // same object, ===
-    });
-
-    it('preserves existing properties', () => {
-      const orig = { hello: 'world' };
-      const a = new Rapid.AbstractData(context, orig);
-      const update = { foo: 'bar' };
-      const b = a.updateSelf(update);
-      assert.strictEqual(b.props, a.props);    // same object, ===
-      assert.notStrictEqual(b.props, update);  // cloned, not ===
-      assert.deepInclude(b.props, orig);
-      assert.deepInclude(b.props, update);
-    });
-
-    it('doesn\'t copy prototype properties', () => {
-      const a = new Rapid.AbstractData(context);
-      const update = { foo: 'bar' };
-      const b = a.updateSelf(update);
-      assert.doesNotHaveAnyKeys(b.props, ['constructor', '__proto__', 'toString']);
-    });
-
-    it('updates v', () => {
-      const a = new Rapid.AbstractData(context);
-      const v1 = a.v;
-      a.updateSelf({});
-      assert.isAbove(a.v, v1);
-    });
-  });
-
   describe('updateGeometry', () => {
     it('throws when calling AbstractData.updateGeometry', () => {
       const a = new Rapid.AbstractData(context);

@@ -737,11 +737,12 @@ export class KartaviewService extends AbstractSystem {
 
     let image = spatial.getData('kartaview-images', imageID);
     if (!image) {
+      const loc = spatial.preventCoincidentLoc('kartaview-images', source.loc);
       image = new Marker(context, {
         type:       'photo',
         serviceID:  this.id,
         id:         imageID,
-        loc:        source.loc
+        loc:        loc
       });
     }
 

@@ -93,15 +93,6 @@ describe('OsmEntity', () => {
     });
   });
 
-  describe('updateSelf', () => {
-    it('returns the same OsmEntity', () => {
-      const a = new Rapid.OsmEntity(context);
-      const b = a.updateSelf({});
-      assert.instanceOf(b, Rapid.OsmEntity);
-      assert.strictEqual(a, b);
-    });
-  });
-
   describe('asGeoJSON', () => {
     it('returns a GeoJSON Feature with null geometry', () => {
       const a = new Rapid.OsmEntity(context, { id: 'a', tags: { amenity: 'cafe' }});
