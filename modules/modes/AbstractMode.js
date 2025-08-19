@@ -9,10 +9,10 @@ import { EventEmitter } from 'pixi.js';
  * All modes are event emitters.
  *
  * Properties you can access:
- *   `id`           `String` identifier for the mode (e.g. 'browse')
- *   `active`       `true` if the mode is active, `false` if not.
- *   `operations`   `Array` of operations allowed on the right-click edit menu
- *   `selectedData` `Map<dataID, data>` containing selected data
+ *   `id` (or `modeID`)   `String` identifier for the mode (e.g. 'browse')
+ *   `active`             `true` if the mode is active, `false` if not.
+ *   `operations`         `Array` of operations allowed on the right-click edit menu
+ *   `selectedData`       `Map<dataID, data>` containing selected data
  */
 export class AbstractMode extends EventEmitter {
 
@@ -22,8 +22,8 @@ export class AbstractMode extends EventEmitter {
    */
   constructor(context) {
     super();
-    this.context = context;
     this.id = '';
+    this.context = context;
 
     this._active = false;
     this._selectedData = new Map();
@@ -34,8 +34,8 @@ export class AbstractMode extends EventEmitter {
   /**
    * enter
    * Every mode should have an `enter` function to peform any necessary setup tasks
-   * @param   `options`  Optional `Object` of options passed to the mode
-   * @return  `true` if mode could be entered, `false` it not
+   * @param   {Object}   options -  Optional `Object` of options passed to the mode
+   * @return  {boolean}  `true` if mode could be entered, `false` it not
    */
   enter() {
     this._active = true;
@@ -53,9 +53,20 @@ export class AbstractMode extends EventEmitter {
 
 
   /**
+   * modeID
+   * Unique string to identify this Mode.
+   * @return  {string}
+   * @readonly
+   */
+  get modeID() {
+    return this.id;
+  }
+
+
+  /**
    * active
    * Whether the mode is active
-   * @return `true` if active, `false` if not.
+   * @return {boolean}  `true` if active, `false` if not.
    * @readonly
    */
   get active() {
@@ -65,6 +76,7 @@ export class AbstractMode extends EventEmitter {
 
   /**
    * selectedData
+   * @return  {Map<string,AbstractData>}  selected data
    * @readonly
    */
   get selectedData() {
@@ -74,6 +86,7 @@ export class AbstractMode extends EventEmitter {
 
   /**
    * selectedIDs
+   * @return  {Array<string>}  selected IDs
    * @readonly
    */
   get selectedIDs() {

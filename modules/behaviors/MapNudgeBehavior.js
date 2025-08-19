@@ -85,7 +85,7 @@ export class MapNudgeBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointermove(e) {
     if (!this._enabled) return;

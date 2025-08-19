@@ -130,7 +130,7 @@ export class GraphicsSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -160,7 +160,7 @@ export class GraphicsSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     if (this._startPromise) return this._startPromise;
@@ -184,7 +184,7 @@ export class GraphicsSystem extends AbstractSystem {
    * resetAsync
    * Called after completing an edit session to reset any internal state
    * Note that calling `resetAsync` schedules an "immediate" redraw (on the next available tick).
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     this.immediateRedraw();

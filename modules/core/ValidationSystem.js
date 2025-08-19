@@ -126,7 +126,7 @@ export class ValidationSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -137,7 +137,7 @@ export class ValidationSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     // empty queues
@@ -169,8 +169,8 @@ export class ValidationSystem extends AbstractSystem {
   /**
    * _parseHashParam
    * Converts hash parameters for severity overrides to regex matchers
-   * @param   {String}  val  - The value retrieved, e.g. `crossing_ways/bridge*,crossing_ways/tunnel*`
-   * @return  {Array}   Array of Objects like { type: RegExp, subtype: RegExp }
+   * @param   {String}    val  - The value retrieved, e.g. `crossing_ways/bridge*,crossing_ways/tunnel*`
+   * @return  {Array<*>}  Array of Objects like { type: RegExp, subtype: RegExp }
    */
   _parseHashParam(val = '') {
     let result = [];
@@ -247,8 +247,7 @@ export class ValidationSystem extends AbstractSystem {
    *     includeIgnored: false,        // true, false, or 'only'
    *     includeDisabledRules: false   // true, false, or 'only'
    *   }
-   *
-   * @return  {Array}  An Array containing the issues
+   * @return  {Array<VaidationIssue>}  An Array containing the issues
    */
   getIssues(options) {
     // Note that we use `staging.graph` here, not `cache.graph` or `stable.graph`,
@@ -316,8 +315,8 @@ export class ValidationSystem extends AbstractSystem {
    * getResolvedIssues
    * Gets the issues that have been fixed by the user.
    * Resolved issues are tracked in the `_resolvedIssueIDs` Set,
-   * and they should all be issues that exist in the base cache.
-   * @return  {Array}  An Array containing the issues
+   *  and they should all be issues that exist in the base cache.
+   * @return  {Array<VaidationIssue>}  An Array containing the issues
    */
   getResolvedIssues() {
     return Array.from(this._resolvedIssueIDs)
@@ -402,7 +401,7 @@ export class ValidationSystem extends AbstractSystem {
    *
    * @param   {Array|Set}  entityIDs - Array or Set of entityIDs to get issues for
    * @param   {Object}     options   - See `getIssues`
-   * @return  {Array}   An Array containing the issues
+   * @return  {Array<VaidationIssue>}  An Array containing the issues
    */
   getSharedEntityIssues(entityIDs, options) {
     const orderedIssueTypes = [                 // Show some issue types in a particular order:
@@ -440,7 +439,7 @@ export class ValidationSystem extends AbstractSystem {
    *
    * @param   {string}  entityID - The entityID to get issues for
    * @param   {Object}  options  - See `getIssues`
-   * @return  {Array}   An Array containing the issues
+   * @return  {Array<VaidationIssue>}  An Array containing the issues
    */
   getEntityIssues(entityID, options) {
     return this.getSharedEntityIssues([entityID], options);
@@ -449,7 +448,7 @@ export class ValidationSystem extends AbstractSystem {
 
   /**
    * getRuleKeys
-   * @return  {Array}  An Array containing the rule keys
+   * @return  {Array<string>}  An Array containing the rule keys
    */
   getRuleKeys() {
     return [...this._rules.keys()];
@@ -821,7 +820,7 @@ class ValidationCache {
 
   /**
    * @constructor
-   * @param  which String 'base' or 'head' to keep track of it
+   * @param  {string}  which - 'base' or 'head' (to identify it)
    */
   constructor(which) {
     this.which = which;   // 'base' or 'head'

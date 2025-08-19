@@ -13,11 +13,11 @@ export class PixiLayerRapidOverlay extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  scene    The Scene that owns this Layer
-   * @param  layerID  Unique string to use for the name of this Layer
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'rapidoverlay';
 
     this._enabled = true;
     this._overlaysDefined = null;
@@ -57,9 +57,9 @@ export class PixiLayerRapidOverlay extends AbstractPixiLayer {
   /**
    * render
    * Render the GeoJSON custom data
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
   render(frame, viewport, zoom) {
 return; // not yet
@@ -91,11 +91,11 @@ return; // not yet
 
   /**
    * renderPoints
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  lines      Array of point data
-   * @param  color      The color to use
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  {*}         lines    -  Array of point data
+   * @param  {*}         color    -  The color to use
    */
   renderPoints(frame, viewport, zoom, points, color) {
     const parentContainer = this.overlaysContainer;
@@ -122,7 +122,7 @@ return; // not yet
   /**
    * hasData
    * Return true if there is any overlay endpoint URLs defined in the rapid datasets.
-   * @return {boolean}  `true` if there is a vector tile template or geojson to display
+   * @return  {boolean} `true` if there is a vector tile template or geojson to display
    */
   hasData() {
     if (this._overlaysDefined === null) {

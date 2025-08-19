@@ -104,7 +104,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  {Event}  e - A DOM KeyboardEvent
    */
   _keydown(e) {
     // Only allow key navigation if the user doesn't have something
@@ -172,7 +172,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _click
    * Handler for click events, used to support double-click to zoom/unzoom.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _click(e) {
     if (!this.doubleClickEnabled) return;
@@ -219,7 +219,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerdown(e) {
     if (this._isPaneOpen()) {
@@ -271,7 +271,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointermove(e) {
     if (this._isPaneOpen()) {
@@ -358,7 +358,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _pointerup
    * Handler for pointerup events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerup(e) {
     delete this.activeTouches[e.pointerId];
@@ -386,7 +386,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _pointercancel
    * Handler for pointercancel events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointercancel(e) {
     delete this.activeTouches[e.pointerId];
@@ -450,8 +450,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _getDistanceBetweenTouches
    * Calculates the distance between two touch points.
-   * @param {Event} e - The event object containing touch points.
-   * @return {number} The distance between the two touch points.
+   * @param   {Event}   e - The event object containing touch points.
+   * @return  {number}  The distance between the two touch points.
    */
   _getDistanceBetweenTouches() {
     const touchPoints = Object.values(this.activeTouches);
@@ -551,7 +551,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _isPaneOpen
    * Checks if any of the specified panes within the '.map-panes' container are open.
-   * @returns {boolean} True if any of the specified panes are open, otherwise false.
+   * @returns {boolean}  True if any of the specified panes are open, otherwise false.
    */
   _isPaneOpen() {
     // Check if the user is on a mobile device

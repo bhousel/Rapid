@@ -524,7 +524,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
   /**
    * style
-   * @param {Object} obj - Style `Object` (contents depends on the Feature type)
+   * @param  {Object}  obj - Style `Object` (contents depends on the Feature type)
    *
    * 'point' - @see `PixiFeaturePoint.js`
    * 'line'/'polygon' - @see `StyleSystem.js`

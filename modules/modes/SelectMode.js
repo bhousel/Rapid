@@ -36,7 +36,8 @@ export class SelectMode extends AbstractMode {
   /**
    * enter
    * Expects a `selection` property in the options argument as a `Map<datumID, datum>`
-   * @param  `options`  Optional `Object` of options passed to the new mode
+   * @param   {Object}   options -  Optional `Object` of options passed to the mode
+   * @return  {boolean}  `true` if mode could be entered, `false` it not
    */
   enter(options = {}) {
     const selection = options.selection;

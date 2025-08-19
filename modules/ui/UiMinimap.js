@@ -491,7 +491,8 @@ renderer.view.canvas = mainCanvas;  // restore main canvas
     miniScene.groups.set('background', groupContainer);
 
     // Layer
-    this.layer = new PixiLayerBackgroundTiles(miniScene, 'minimap-background', true);  // isMinimap = true
+    this.layer = new PixiLayerBackgroundTiles(miniScene, 'minimap-background');
+    this.layer.isMinimap = true;
     miniScene.layers.set(this.layer.id, this.layer);
 
     return this._initPromise = Promise.resolve();

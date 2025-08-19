@@ -22,11 +22,11 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  scene    The Scene that owns this Layer
-   * @param  layerID  Unique string to use for the name of this Layer
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'map-ui';
     this.enabled = true;   // this layer should always be enabled
 
     this._oldz = 0;
@@ -155,11 +155,12 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * render
    * Render any of the child containers for UI that should float over the map.
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
   render(frame, viewport) {
-    // redraw if zoom changes
+    // redraw if zoom changes - note: use true zoom here, not "effective" zoom.
     const z = viewport.transform.zoom;
     if (z !== this._oldz) {
       this._geolocationDirty = true;
@@ -180,8 +181,8 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * renderLasso
    * Render the lasso polygon
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
    */
   renderLasso(frame, viewport) {
     if (!this._lassoDirty) return;
@@ -230,8 +231,8 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * renderGeolocation
    * Render the geoloation data
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
    */
   renderGeolocation(frame, viewport) {
     if (!this._geolocationDirty) return;

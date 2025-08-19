@@ -59,16 +59,11 @@ describe('Graph', () => {
     });
   });
 
-  describe('id', () => {
-    it('gets id', () => {
+  describe('graphID', () => {
+    it('gets graphID', () => {
       const g = new Rapid.Graph(context, { id: 'g-10' });
+      assert.strictEqual(g.graphID, 'g-10');
       assert.strictEqual(g.id, 'g-10');
-    });
-
-    it('gets empty string if no id', () => {
-      const g = new Rapid.Graph(context);
-      g.props.id = null;
-      assert.strictEqual(g.id, '');
     });
   });
 

@@ -18,11 +18,11 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  scene    The Scene that owns this Layer
-   * @param  layerID  Unique string to use for the name of this Layer
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'geoscribble';
 
     this.scribblesContainer = null;
   }
@@ -93,9 +93,9 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   /**
    * render
    * Render the geojson custom data
-   * @param  frame     Integer frame being rendered
-   * @param  viewport  Pixi viewport to use for rendering
-   * @param  zoom      Effective zoom to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
   render(frame, viewport, zoom) {
     if (!this.enabled) return;

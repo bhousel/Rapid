@@ -17,11 +17,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  scene    The Scene that owns this Layer
-   * @param  layerID  Unique string to use for the name of this Layer
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'osm';
     this.enabled = true;   // OSM layers should be enabled by default
 
     this.areaContainer = null;
@@ -99,9 +99,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
   render(frame, viewport, zoom) {
     const context = this.context;
@@ -201,10 +201,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * renderPolygons
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  data       Visible OSM data to render, sorted by type
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  {*}         data     -  Visible OSM data to render, sorted by type
    */
   renderPolygons(frame, viewport, zoom, data) {
     const context = this.context;
@@ -349,10 +349,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * renderLines
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  data       Visible OSM data to render, sorted by type
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  {*}         data     -  Visible OSM data to render, sorted by type
    */
   renderLines(frame, viewport, zoom, data) {
     const context = this.context;
@@ -465,11 +465,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * renderVertices
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  data       Visible OSM data to render, sorted by type
-   * @param  realated   Collections of related OSM IDs
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  {*}         data     -  Visible OSM data to render, sorted by type
+   * @param  {*}         realated -  Collections of related OSM IDs
    */
   renderVertices(frame, viewport, zoom, data, related) {
     const context = this.context;
@@ -575,10 +575,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * renderPoints
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  data       Visible OSM data to render, sorted by type
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  {*}         data     -  Visible OSM data to render, sorted by type
    */
   renderPoints(frame, viewport, zoom, data) {
     const context = this.context;
@@ -661,11 +661,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * renderMidpoints
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  data       Visible OSM data to render, sorted by type
-   * @param  related    Collections of related OSM IDs
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  {*}         data     -  Visible OSM data to render, sorted by type
+   * @param  {*}         related  -  Collections of related OSM IDs
    */
   renderMidpoints(frame, viewport, zoom, data, related) {
     const MIN_MIDPOINT_DIST = 40;   // distance in pixels
@@ -766,7 +766,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     function _midpointVersion(d) {
       return d.loc[0] + d.loc[1] + d.rot;
     }
-
   }
 
 }

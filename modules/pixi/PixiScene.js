@@ -50,7 +50,7 @@ export class PixiScene extends EventEmitter {
 
   /**
    * @constructor
-   * @param  gfx   The GraphicsSystem that owns this Scene
+   * @param  {GraphicsSystem}  gfx -  The GraphicsSystem that owns this Scene
    */
   constructor(gfx) {
     super();
@@ -63,30 +63,30 @@ export class PixiScene extends EventEmitter {
 
     // Create Layers
     [
-      new PixiLayerBackgroundTiles(this, 'background'),
-      new PixiLayerDebug(this, 'debug'),
-      new PixiLayerGeoScribble(this, 'geoscribble'),
+      new PixiLayerBackgroundTiles(this),
+      new PixiLayerDebug(this),
+      new PixiLayerGeoScribble(this),
 
-      new PixiLayerOsm(this, 'osm'),
-      new PixiLayerRapid(this, 'rapid'),
-      new PixiLayerRapidOverlay(this, 'rapidoverlay'),
+      new PixiLayerOsm(this),
+      new PixiLayerRapid(this),
+      new PixiLayerRapidOverlay(this),
 
-      new PixiLayerMapillaryDetections(this, 'mapillary-detections'),
-      new PixiLayerMapillarySigns(this, 'mapillary-signs'),
+      new PixiLayerMapillaryDetections(this),
+      new PixiLayerMapillarySigns(this),
 
-      new PixiLayerCustomData(this, 'custom-data'),
-      new PixiLayerMapRoulette(this, 'maproulette'),
-      new PixiLayerOsmNotes(this, 'notes'),
-      new PixiLayerKeepRight(this, 'keepright'),
-      new PixiLayerOsmose(this, 'osmose'),
+      new PixiLayerCustomData(this),
+      new PixiLayerMapRoulette(this),
+      new PixiLayerOsmNotes(this),
+      new PixiLayerKeepRight(this),
+      new PixiLayerOsmose(this),
 
-      new PixiLayerMapillaryPhotos(this, 'mapillary'),
-      new PixiLayerKartaPhotos(this, 'kartaview'),
-      new PixiLayerStreetsidePhotos(this, 'streetside'),
+      new PixiLayerMapillaryPhotos(this),
+      new PixiLayerKartaPhotos(this),
+      new PixiLayerStreetsidePhotos(this),
 
-      new PixiLayerLabels(this, 'labels'),
-      new PixiLayerEditBlocks(this, 'edit-blocks'),
-      new PixiLayerMapUI(this, 'map-ui')
+      new PixiLayerLabels(this),
+      new PixiLayerEditBlocks(this),
+      new PixiLayerMapUI(this)
     ].forEach(layer => this.layers.set(layer.id, layer));
 
     this.reset();
@@ -153,9 +153,9 @@ export class PixiScene extends EventEmitter {
    * - For proper label placement, we really need to cull the feature layers
    *   before we render the label layer, so we do these calls in layer order.
    *
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
   render(frame, viewport, zoom) {
     for (const layer of this.layers.values()) {
@@ -230,7 +230,7 @@ export class PixiScene extends EventEmitter {
   /**
    * addFeature
    * Add a feature to the scene feature cache.
-   * @param  feature  A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
+   * @param  {Feature}  feature - A render feature (point, line, multipolygon)
    */
   addFeature(feature) {
     this.features.set(feature.id, feature);
@@ -240,7 +240,7 @@ export class PixiScene extends EventEmitter {
   /**
    * removeFeature
    * Remove a Feature from the scene feature cache.
-   * @param  feature  A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
+   * @param  {Feature}  feature - A render feature (point, line, multipolygon)
    */
   removeFeature(feature) {
     this.features.delete(feature.id);
@@ -250,9 +250,9 @@ export class PixiScene extends EventEmitter {
   /**
    * setClass
    * Sets a dataID as being classed a certain way (e.g. 'hover')
-   * @param  classID  `String` classID (e.g. 'hover')
-   * @param  layerID  `String` layerID (e.g. 'osm')
-   * @param  dataID   `String` dataID (e.g. 'r123')
+   * @param  {string}  classID - classID (e.g. 'hover')
+   * @param  {string}  layerID - layerID (e.g. 'osm')
+   * @param  {string}  dataID  - dataID (e.g. 'r123')
    */
   setClass(classID, layerID, dataID) {
     this.layers.get(layerID)?.setClass(classID, dataID);
@@ -262,9 +262,9 @@ export class PixiScene extends EventEmitter {
   /**
    * unsetClass
    * Unsets a dataID from being classed a certain way (e.g. 'hover')
-   * @param  classID  `String` classID (e.g. 'hover')
-   * @param  layerID  `String` layerID (e.g. 'osm')
-   * @param  dataID   `String` dataID (e.g. 'r123')
+   * @param  {string}  classID - classID (e.g. 'hover')
+   * @param  {string}  layerID - layerID (e.g. 'osm')
+   * @param  {string}  dataID  - dataID (e.g. 'r123')
    */
   unsetClass(classID, layerID, dataID) {
     this.layers.get(layerID)?.unsetClass(classID, dataID);
@@ -274,7 +274,7 @@ export class PixiScene extends EventEmitter {
   /**
    * clearClass
    * Clear out all uses of the given classID across all layers.
-   * @param  classID   `String` classID (e.g. 'hover')
+   * @param  {string}  classID - classID (e.g. 'hover')
    */
   clearClass(classID) {
     for (const layer of this.layers.values()) {
@@ -286,7 +286,7 @@ export class PixiScene extends EventEmitter {
   /**
    * dirtyScene
    * Mark the whole scene as `dirty`, for example when changing zooms.
-   * During the next "app" pass, dirty features will be rebuilt.
+   * During the next "APP" pass, dirty features will be rebuilt.
    */
   dirtyScene() {
     for (const feature of this.features.values()) {
@@ -298,7 +298,7 @@ export class PixiScene extends EventEmitter {
   /**
    * dirtyLayers
    * Mark all features on a given layer as `dirty`
-   * @param  layerIDs  A `Set` or `Array` of layerIDs, or single `String` layerID
+   * @param  {OneOrMore<string>}  layerIDs - layerIDs to flag as 'dirty'
    */
   dirtyLayers(layerIDs) {
     for (const layerID of utilIterable(layerIDs)) {
@@ -310,8 +310,8 @@ export class PixiScene extends EventEmitter {
   /**
    * dirtyFeatures
    * Mark specific features features as `dirty`
-   * During the next "app" pass, dirty features will be rebuilt.
-   * @param  featureIDs  A `Set` or `Array` of featureIDs, or single `String` featureID
+   * During the next "APP" pass, dirty features will be rebuilt.
+   * @param  {OneOrMore<string>}  featureIDs - featureIDs to flag as 'dirty'
    */
   dirtyFeatures(featureIDs) {
     for (const featureID of utilIterable(featureIDs)) {
@@ -327,8 +327,8 @@ export class PixiScene extends EventEmitter {
    * dirtyData
    * Mark any features bound to a given dataID as `dirty`
    * DataIDs are only consistent within a Layer, therefore the layerID is required here.
-   * @param  layerID  `String` id of a Layer
-   * @param  dataIDs  A `Set` or `Array` of dataIDs, or single `String` dataID
+   * @param  {string}             layerID - layerID that is rendering the data
+   * @param  {OneOrMore<string>}  dataIDs - dataIDs to flag as 'dirty'
    */
   dirtyData(layerID, dataIDs) {
     this.layers.get(layerID)?.dirtyData(dataIDs);

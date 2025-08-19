@@ -3,39 +3,40 @@ import { PixiGeometryPart } from './PixiGeometryPart.js';
 
 
 /**
- * AbstractPixiFeature is the base class from which all rendered Pixi Features inherit.
- * It contains properties that used to manage the Feature in the scene graph
+ * AbstractPixiFeature is the base class from which all rendered Features inherit.
+ * It contains properties that used to manage the Feature in the scene graph.
  *
  * Properties you can access:
- *   `id`                Unique string to use for the name of this Feature
- *   `type`              String describing what kind of Feature this is ('Point', 'LineString', 'Polygon')
- *   `container`         PIXI.Container() that contains all the graphics needed to draw the Feature
- *   `parentContainer`   PIXI.Container() for the parent - this Feature's container will be added to it.
- *   `geom`              PixiGeometryPart() class containing all the information about the geometry
- *   `style`             Object containing style info
- *   `label`             String containing the Feature's label (if any)
- *   `data`              Data bound to this Feature (like `__data__` from the D3.js days)
- *   `dataID`            Data bound to this Feature (like `__data__` from the D3.js days)
- *   `visible`           `true` if the Feature is visible (`false` if it is culled)
- *   `allowInteraction`  `true` if the Feature is allowed to be interactive (emits Pixi events)
- *   `dirty`             `true` if the Feature needs to be rebuilt
- *   `v`                 Version of the Feature, can be used to detect changes
- *   `lod`               Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full)
- *   `halo`              A PIXI.DisplayObject() that contains the graphics for the Feature's halo (if it has one)
+ *   `id` (or `featureID`)  Unique string to use for the name of this Feature
+ *   `type`                 String describing what kind of Feature this is ('Point', 'LineString', 'Polygon')
+ *   `container`            PIXI.Container() that contains all the graphics needed to draw the Feature
+ *   `parentContainer`      PIXI.Container() for the parent - this Feature's container will be added to it.
+ *   `geom`                 PixiGeometryPart() class containing all the information about the geometry
+ *   `style`                Object containing style info
+ *   `label`                String containing the Feature's label (if any)
+ *   `data`                 Data bound to this Feature (like `__data__` from the D3.js days)
+ *   `dataID`               Data bound to this Feature (like `__data__` from the D3.js days)
+ *   `visible`              `true` if the Feature is visible (`false` if it is culled)
+ *   `allowInteraction`     `true` if the Feature is allowed to be interactive (emits Pixi events)
+ *   `dirty`                `true` if the Feature needs to be rebuilt
+ *   `v`                    Version of the Feature, can be used to detect changes
+ *   `lod`                  Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full)
+ *   `halo`                 A PIXI.DisplayObject() that contains the graphics for the Feature's halo (if it has one)
  */
 export class AbstractPixiFeature {
 
   /**
    * @constructor
    * @param  {Layer}   layer     - The Layer that owns this Feature
-   * @param  {string}  featureID - Unique string to use for the name of this Feature
+   * @param  {string}  featureID - Unique string to use for the identifier of this Feature
    */
   constructor(layer, featureID) {
+    this.id = featureID;  // put this first so debug inspect shows it first
+
     this.layer = layer;
     this.scene = layer.scene;
     this.gfx = layer.gfx;
     this.context = layer.context;
-    this.featureID = featureID;
 
     const container = new PIXI.Container();
     this.container = container;
@@ -135,16 +136,19 @@ export class AbstractPixiFeature {
 
 
   /**
-   * Feature id
+   * featureID
+   * Unique string to identify this render Feature.
+   * @return  {string}  This feature's unique id
    * @readonly
    */
-  get id() {
-    return this.featureID;
+  get featureID() {
+    return this.id;
   }
 
   /**
    * Feature type
-   * Pull from the GeometryPart - should be one of 'Point', 'LineString', or 'Polygon'
+   * The type of feature, this is taken from the GeometryPart.
+   * @return  {string}  This feature's type, one of 'Point', 'LineString', or 'Polygon'
    * @readonly
    */
   get type() {
@@ -153,7 +157,7 @@ export class AbstractPixiFeature {
 
   /**
    * parentContainer
-   * @param  val  PIXI.Container() for the parent - this Feature's container will be added to it.
+   * @param  {PIXI.Container}  val - container for the parent, this Feature's container will be added to it.
    */
   get parentContainer() {
     return this.container.parent;
@@ -171,6 +175,7 @@ export class AbstractPixiFeature {
   /**
    * visible
    * Whether the Feature is currently visible
+   * @return  {boolean}  `true` if the feature is currently visible
    */
   get visible() {
     return this.container.visible;
@@ -186,6 +191,7 @@ export class AbstractPixiFeature {
   /**
    * dirty
    * Whether the Feature needs to be rebuilt
+   * @return  {boolean}  `true` if the feature needs to be rebuilt
    */
   get dirty() {
     // The labeling code will decide what to do with the `_labelDirty` flag
@@ -201,6 +207,7 @@ export class AbstractPixiFeature {
   /**
    * allowInteraction
    * Whether the Feature is allowed to be interactive
+   * @return  {boolean}  `true` if the feature is currently interactive, `false` if not
    */
   get allowInteraction() {
     return this._allowInteraction;

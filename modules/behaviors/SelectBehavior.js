@@ -120,7 +120,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  {Event}  e - A DOM KeyboardEvent
    */
   _keydown(e) {
     // if any key is pressed the user is probably doing something other than long-pressing
@@ -155,7 +155,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _keyup
    * Handler for keyup events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  {Event}  e - A DOM KeyboardEvent
    */
   _keyup(e) {
     // After spacebar click, user must move pointer or lift spacebar to allow another spacebar click
@@ -171,7 +171,7 @@ export class SelectBehavior extends AbstractBehavior {
    * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerdown(e) {
     if (this.lastDown) return;  // a pointer is already down
@@ -201,7 +201,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointermove(e) {
     const move = this._getEventData(e);
@@ -229,7 +229,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _pointerup
    * Handler for pointerup events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerup(e) {
     const down = this.lastDown;
@@ -276,7 +276,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _pointercancel
    * Handler for pointercancel events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointercancel() {
     // Here we can throw away the down data to prepare for another `pointerdown`.
@@ -418,7 +418,7 @@ export class SelectBehavior extends AbstractBehavior {
    * _doLongPress
    * Called a short time after pointerdown.
    * If we're still down, treat it as a click + contextmenu.
-   * @param  `down`  EventData Object for the original down event
+   * @param  {Object}  down - EventData Object for the original down event
    */
   _doLongPress(down) {
     this._longPressTimeout = null;

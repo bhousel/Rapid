@@ -59,7 +59,7 @@ export class KeyOperationBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handles the keydown event
-   * @param  `e`  A d3 keydown event
+   * @param  {Event}  e - A d3 keydown event
    */
   _keydown(e) {
     const context = this.context;

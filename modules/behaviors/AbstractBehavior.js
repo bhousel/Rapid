@@ -11,8 +11,8 @@ import { vecRotate } from '@rapid-sdk/math';
  * All behaviors are event emitters.
  *
  * Properties you can access:
- *   `id`        `String` identifier for the behavior (e.g. 'draw')
- *   `enabled`   `true` if the event handlers are enabled, `false` if not.
+ *   `id` (or `behaviorID`)  `String` identifier for the behavior (e.g. 'draw')
+ *   `enabled`               `true` if the event handlers are enabled, `false` if not.
  */
 export class AbstractBehavior extends EventEmitter {
 
@@ -22,8 +22,8 @@ export class AbstractBehavior extends EventEmitter {
    */
   constructor(context) {
     super();
-    this.context = context;
     this.id = '';
+    this.context = context;
 
     this._enabled = false;
   }
@@ -52,8 +52,20 @@ export class AbstractBehavior extends EventEmitter {
 
 
   /**
+   * behaviorID
+   * Unique string to identify this Behavior.
+   * @return  {string}
+   * @readonly
+   */
+  get behaviorID() {
+    return this.id;
+  }
+
+
+  /**
    * enabled
-   * Whether the behavior is enabled
+   * Whether the behavior is enabled.
+   * @return  {boolean}  `true` if enabled, `false` if not enabled
    * @readonly
    */
   get enabled() {
@@ -85,7 +97,7 @@ export class AbstractBehavior extends EventEmitter {
   /**
    * _getEventData
    * Returns an object containing the important details about this Pixi event.
-   * @param  {Object}  e - A Pixi FederatedEvent (or something that looks like one)
+   * @param  {Event}   e - A Pixi FederatedEvent (or something that looks like one)
    * @return {Object}  Object containing data about the event and what was targeted
    */
   _getEventData(e) {

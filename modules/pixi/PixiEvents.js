@@ -31,7 +31,7 @@ export class PixiEvents extends EventEmitter {
 
   /**
    * @constructor
-   * @param  gfx   The GraphicsSystem that owns this EventManager
+   * @param  {GraphicsSystem}  gfx -  The GraphicsSystem that owns this event manager
    */
   constructor(gfx) {
     super();
@@ -205,7 +205,7 @@ export class PixiEvents extends EventEmitter {
    * It's possible to miss a modifier key if it changed when the window was out of focus
    *   but we will know its state once the pointer events occur on the canvas again.
    *
-   * @param  `e`  A Pixi FederatedPointerEvent or DOM KeyboardEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent or DOM KeyboardEvent
    */
   _observeModifierKeys(e) {
     const modifiers = this.modifierKeys;
@@ -238,8 +238,9 @@ export class PixiEvents extends EventEmitter {
 
   /**
    * _observeCoordinate
-   * Gather the coordinate data
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * Gather the coordinate data from the event.
+   * @param {number}  x - The x coordinate
+   * @param {number}  y - The y coordinate
    */
   _observeCoordinate(x, y) {
     this.coord = {
@@ -260,7 +261,7 @@ export class PixiEvents extends EventEmitter {
    * On Mac, consider a control-left-click as a right-click - Rapid#920
    * https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
    * https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _checkButtons(e) {
     if (e.ctrlKey && utilDetect().os === 'mac') {
@@ -277,7 +278,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  {Event}  e - A DOM KeyboardEvent
    */
   _keydown(e) {
     this._observeModifierKeys(e);
@@ -287,7 +288,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _keyup
    * Handler for keyup events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  {Event}  e - A DOM KeyboardEvent
    */
   _keyup(e) {
     this._observeModifierKeys(e);
@@ -297,7 +298,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointerover
    * Handler for pointerover events on the canvas.
-   * @param  `e`  A DOM PointerEvent
+   * @param  {Event}  e - A DOM PointerEvent
    */
   _pointerover(e) {
     this._observeModifierKeys(e);
@@ -311,7 +312,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointerout
    * Handler for pointerout events on the canvas.
-   * @param  `e`  A DOM PointerEvent
+   * @param  {Event}  e - A DOM PointerEvent
    */
   _pointerout(e) {
     this._observeModifierKeys(e);
@@ -325,7 +326,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointerdown
    * Handler for pointerdown events on the stage.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerdown(e) {
     this._observeModifierKeys(e);
@@ -337,7 +338,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointermove
    * Handler for pointermove events on the stage.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointermove(e) {
     this._observeModifierKeys(e);
@@ -349,7 +350,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointerup
    * Handler for pointerup events on the stage.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerup(e) {
     this._observeModifierKeys(e);
@@ -361,7 +362,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointercancel
    * Handler for pointercancel events on the stage.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointercancel(e) {
     this.emit('pointercancel', e);
@@ -370,7 +371,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _click
    * Handler for click events on the stage.
-   * @param  `e`  A DOM PointerEvent
+   * @param  {Event}  e - A DOM PointerEvent
    */
   _click(e) {
     // no need to _observeModifierKeys here, 'click' fires immediately after 'pointerup'
@@ -382,7 +383,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * _wheel
    * Handler for wheel events on the supersurface.
-   * @param  `e`  A DOM WheelEvent
+   * @param  {Event}  e - A DOM WheelEvent
    */
   _wheel(e) {
     e.preventDefault();             // don't scroll supersurface contents
@@ -472,8 +473,8 @@ export class PixiEvents extends EventEmitter {
    * And this great page for testing what events your browser generates:
    *   https://domeventviewer.com/
    *
-   * @param   `e`  A native DOM WheelEvent
-   * @returns `Array` of normalized `[deltaX, deltaY]` in pixels
+   * @param   {Event}          e - A native DOM WheelEvent
+   * @returns {Array<number>}  Normalized `[deltaX, deltaY]` in pixels
    */
   _normalizeWheelDelta(e) {
     let [dX, dY] = [e.deltaX, e.deltaY];  // raw delta values

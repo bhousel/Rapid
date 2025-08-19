@@ -28,6 +28,7 @@ export class BrowseMode extends AbstractMode {
   /**
    * enter
    * Enters the mode.
+   * @return  {boolean}  `true` if mode could be entered, `false` it not
    */
   enter() {
     if (DEBUG) {

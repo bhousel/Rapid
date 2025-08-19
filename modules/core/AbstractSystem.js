@@ -44,8 +44,8 @@ import { EventEmitter } from 'pixi.js';
  *   (Note: they are currently sync - may need to be made async in the future?)
  *
  * Properties you can access:
- *   `id`        `String`   Identifier for the system (e.g. 'l10n')
- *   `autoStart` `Boolean`  True to start automatically when initializing the Context
+ *   `id`         `String`   Identifier for the system (e.g. 'l10n')
+ *   `autoStart`  `Boolean`  True to start automatically when initializing the Context
  */
 export class AbstractSystem extends EventEmitter {
 
@@ -55,13 +55,37 @@ export class AbstractSystem extends EventEmitter {
    */
   constructor(context) {
     super();
-    this.context = context;
     this.id = '';
+    this.context = context;
     this.dependencies = new Set();
     this.autoStart = true;
 
     this._started = false;
     this._paused = false;
+  }
+
+
+  /**
+   * systemID
+   * Unique string to identify this System.
+   * @return  {string}  This system's unique id
+   * @readonly
+   */
+  get systemID() {
+    return this.id;
+  }
+
+
+  /**
+   * serviceID
+   * Because services also inherit from 'AbstractSystem',
+   *  we will offer a convenience getter named `serviceID` too.
+   * They all just return `id` anyway.
+   * @return  {string}   This service's unique id
+   * @readonly
+   */
+  get serviceID() {
+    return this.id;
   }
 
 

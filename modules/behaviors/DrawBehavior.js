@@ -113,7 +113,7 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  {Event}  e - A DOM KeyboardEvent
    */
   _keydown(e) {
     if (['Enter', 'Escape', 'Esc'].includes(e.key)) {
@@ -136,7 +136,7 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _keyup
    * Handler for keyup events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  {Event}  e - A DOM KeyboardEvent
    */
   _keyup(e) {
     // After spacebar click, user must move pointer or lift spacebar to allow another spacebar click
@@ -152,7 +152,7 @@ export class DrawBehavior extends AbstractBehavior {
    * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
-   * @param  `e`  A Pixi InteractionEvent
+   * @param  {Event}  e - A Pixi InteractionEvent
    */
   _pointerdown(e) {
     if (this.lastDown) return;  // a pointer is already down
@@ -167,7 +167,7 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  `e`  A Pixi InteractionEvent
+   * @param  {Event}  e - A Pixi InteractionEvent
    */
   _pointermove(e) {
     const move = this._getEventData(e);
@@ -197,7 +197,7 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _pointerup
    * Handler for pointerup events.
-   * @param  `e`  A Pixi InteractionEvent
+   * @param  {Event}  e - A Pixi InteractionEvent
    */
   _pointerup(e) {
     const down = this.lastDown;
@@ -219,7 +219,7 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _pointercancel
    * Handler for pointercancel events.
-   * @param  `e`  A Pixi InteractionEvent
+   * @param  {Event}  e - A Pixi InteractionEvent
    */
   _pointercancel() {
     this.lastDown = null;  // prepare for the next `pointerdown`

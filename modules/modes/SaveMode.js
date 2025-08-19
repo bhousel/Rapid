@@ -53,6 +53,7 @@ export class SaveMode extends AbstractMode {
   /**
    * enter
    * Enters the mode.
+   * @return  {boolean}  `true` if mode could be entered, `false` it not
    */
   enter() {
     const context = this.context;

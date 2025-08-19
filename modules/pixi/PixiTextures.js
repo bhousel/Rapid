@@ -16,7 +16,7 @@ export class PixiTextures {
 
   /**
    * @constructor
-   * @param  gfx   The GraphicsSystem that owns this TextureManager
+   * @param  {GraphicsSystem}  gfx -  The GraphicsSystem that owns the texture manager
    */
   constructor(gfx) {
     this.gfx = gfx;

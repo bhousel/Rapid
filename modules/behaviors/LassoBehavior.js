@@ -70,7 +70,7 @@ export class LassoBehavior extends AbstractBehavior {
   /**
    * _pointerdown
    * Handler for pointerdown events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerdown() {
     // Ignore it if we are not over the canvas
@@ -96,7 +96,7 @@ export class LassoBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointermove() {
     if (!this._lassoing) return;
@@ -123,7 +123,7 @@ export class LassoBehavior extends AbstractBehavior {
   /**
    * _pointerup
    * Handler for pointerup events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerup() {
     if (!this._lassoing) return;

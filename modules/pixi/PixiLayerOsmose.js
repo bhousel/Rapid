@@ -12,11 +12,11 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  scene    The Scene that owns this Layer
-   * @param  layerID  Unique string to use for the name of this Layer
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'osmose';
   }
 
 
@@ -65,15 +65,20 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
 
   /**
-   * renderMarkers
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * render
+   * Render any data we have, and schedule fetching more of it to cover the view
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
-  renderMarkers(frame, viewport, zoom) {
+  render(frame, viewport, zoom) {
     const osmose = this.context.services.osmose;
-    if (!osmose?.started) return;
+    if (!this.enabled || !osmose?.started || zoom < MINZOOM) return;
 
+    // Fetch new data, if needed..
+    osmose.loadTiles();
+
+    // Render the data that we have..
     const parentContainer = this.scene.groups.get('qa');
     const items = osmose.getData();
 
@@ -106,21 +111,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
       this.retainFeature(feature, frame);
     }
-  }
 
-
-  /**
-   * render
-   * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   */
-  render(frame, viewport, zoom) {
-    const osmose = this.context.services.osmose;
-    if (!this.enabled || !osmose?.started || zoom < MINZOOM) return;
-
-    osmose.loadTiles();
     this.renderMarkers(frame, viewport, zoom);
   }
 

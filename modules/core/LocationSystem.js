@@ -92,7 +92,7 @@ export class LocationSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -120,7 +120,7 @@ export class LocationSystem extends AbstractSystem {
    * Use `_resolveLocationSet()` instead if you need to resolve geojson of locationSet, for example to render it.
    * Note: You need to call `_rebuildIndex()` after you're all finished validating the locationSets.
    *
-   * @param  {Object}   obj - Object to check, it should have `locationSet` property
+   * @param  {Object}  obj - Object to check, it should have `locationSet` property
    */
   _validateLocationSet(obj) {
     if (obj.locationSetID) return;  // work was done already

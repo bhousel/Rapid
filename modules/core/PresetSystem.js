@@ -62,7 +62,7 @@ export class PresetSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -117,7 +117,7 @@ export class PresetSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -128,7 +128,7 @@ export class PresetSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();
@@ -145,6 +145,7 @@ export class PresetSystem extends AbstractSystem {
    *   defaults: {},             // geometry -> Array(presetIDs)
    *   featureCollection: {}     // GeoJSON
    * }
+   * @param  {Object}  src - preset data to merge into the caches
    */
   merge(src) {
     let newLocationSets = [];
@@ -274,9 +275,9 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
 
   /**
    * match
-   * @param   entity
-   * @param   graph
-   * @return  Preset that best matches
+   * @param   {Entity}  entity  - the Entity to test
+   * @param   {Graph}   graph   - the Graph containing this Entity
+   * @return  {Preset}  Preset that best matches
    */
   match(entity, graph) {
     return entity.transient('presetMatch', () => {
@@ -293,10 +294,10 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
 
   /**
    * matchTags
-   * @param   tags
-   * @param   geometry
-   * @param   loc
-   * @return  Preset that best matches
+   * @param   {Object}         tags
+   * @param   {string}         geometry
+   * @param   {Array<number>}  loc
+   * @return  {Preset}         Preset that best matches
    */
   matchTags(tags, geometry, loc) {
     const keyIndex = this._geometryIndex[geometry];
@@ -354,9 +355,9 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
 
   /**
    * allowsVertex
-   * @param   entity
-   * @param   graph
-   * @return  `true` if this entity can be a vertex, `false` if not
+   * @param   {Entity}  entity  - the Entity to test
+   * @param   {Graph}   graph   - the Graph containing this Entity
+   * @return  {boolean} `true` if this entity can be a vertex, `false` if not
    */
   allowsVertex(entity, graph) {
     if (entity.type !== 'node') return false;
@@ -389,7 +390,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    * (see `Way#isArea()`). In other words, the keys of L form the keeplist,
    * and the subkeys form the discardlist.
    *
-   * @returns  areaKeys Object
+   * @returns {Object}  areaKeys Object
    */
   areaKeys() {
     // The ignore list is for keys that imply lines. (We always add `area=yes` for exceptions)
@@ -482,11 +483,11 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    * Defaults are the Presets and Categories offered to the user when adding a new feature.
    * Each geometry type has its own set of defaults.
    * The fallback preset for the given geometry is appended to the list automatically.
-   * @param   geometry
-   * @param   limit               Integer max number of results to return
-   * @param   startWithRecents    Boolean
-   * @param   loc
-   * @return  Collection
+   * @param   {string}          geometry
+   * @param   {number}          limit - max number of results to return
+   * @param   {boolean}         startWithRecents - `true` to start with recently used presets
+   * @param   {Array<number>}   loc - WGS84 [lon,lat] where we are editing
+   * @return  {Collection}      Collection
    */
   defaults(geometry, limit = 10, startWithRecents = true, loc = null) {
     let results = new Map();   // Map<itemID, item>  (may be a Preset or a Category)
@@ -536,7 +537,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    * getRecents
    * Returns the recently used presets
    * If this._recentIDs is unset, try to load them from localStorage
-   * @return   An Array of recent presets
+   * @return  {Array<Preset>}  An Array of recent presets
    */
   getRecents() {
     let presetIDs = this._recentIDs;
@@ -563,7 +564,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
   /**
    * setMostRecent
    * Prepends a preset to the recently used presets array
-   * @param   A preset to add
+   * @param  {Preset}  A preset to add
    */
   setMostRecent(preset) {
     if (preset.searchable === false) return;

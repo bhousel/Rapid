@@ -162,16 +162,17 @@ describe('AbstractData', () => {
     });
   });
 
-  describe('id', () => {
-    it('gets id', () => {
+  describe('dataID', () => {
+    it('gets dataID', () => {
       const a = new Rapid.AbstractData(context, { id: '10' });
       assert.strictEqual(a.props.id, '10');
+      assert.strictEqual(a.dataID, '10');
       assert.strictEqual(a.id, '10');
     });
 
-    it('gets empty string if no id', () => {
+    it('gets empty string if no dataID', () => {
       const a = new Rapid.AbstractData(context);
-      assert.strictEqual(a.id, '');
+      assert.strictEqual(a.dataID, '');
     });
   });
 

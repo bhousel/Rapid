@@ -12,11 +12,11 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  scene    The Scene that owns this Layer
-   * @param  layerID  Unique string to use for the name of this Layer
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'maproulette';
   }
 
 
@@ -65,15 +65,20 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
 
 
   /**
-   * renderMarkers
-   * @param  frame        Integer frame being rendered
-   * @param  projection   Pixi projection to use for rendering
-   * @param  zoom         Effective zoom to use for rendering
+   * render
+   * Render any data we have, and schedule fetching more of it to cover the view
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
-  renderMarkers(frame, projection, zoom) {
+  render(frame, projection, zoom) {
     const maproulette = this.context.services.maproulette;
-    if (!maproulette?.started) return;
+    if (!this.enabled || !maproulette?.started || zoom < MINZOOM) return;
 
+    // Fetch new data, if needed..
+    maproulette.loadTiles();
+
+    // Render the data that we have..
     const parentContainer = this.scene.groups.get('qa');
     const data = maproulette.getData();
 
@@ -106,22 +111,7 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
 
       this.retainFeature(feature, frame);
     }
-  }
 
-
-  /**
-   * render
-   * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame        Integer frame being rendered
-   * @param  projection   Pixi projection to use for rendering
-   * @param  zoom         Effective zoom to use for rendering
-   */
-  render(frame, projection, zoom) {
-    const maproulette = this.context.services.maproulette;
-    if (!this.enabled || !maproulette?.started || zoom < MINZOOM) return;
-
-    maproulette.loadTiles();
-    this.renderMarkers(frame, projection, zoom);
   }
 
 }

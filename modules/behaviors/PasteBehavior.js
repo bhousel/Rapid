@@ -56,7 +56,7 @@ export class PasteBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  {Event}  e - A DOM KeyboardEvent
    */
   _keydown(e) {
     const isMacOS = this._isMacOS;
@@ -70,7 +70,7 @@ export class PasteBehavior extends AbstractBehavior {
   /**
    * _doPaste
    * Pastes copied features onto the map, if possible
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  {Event}  e - A DOM KeyboardEvent
    */
   _doPaste(e) {
     const context = this.context;

@@ -88,7 +88,7 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     for (const id of this.dependencies) {
@@ -103,7 +103,7 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     if (this._startPromise) return this._startPromise;
@@ -143,7 +143,7 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();
@@ -181,7 +181,8 @@ export class UrlHashSystem extends AbstractSystem {
 
   /**
    * initialHashParams
-   * Get the initial hash parameters  (was: `context.initialHashParams`)
+   * Get the initial urlhash parameters  (was: `context.initialHashParams`)
+   * This were the values that were present when Rapid initally started up.
    * @readonly
    */
   get initialHashParams() {
@@ -191,8 +192,9 @@ export class UrlHashSystem extends AbstractSystem {
 
   /**
    * getParam
-   * @param  k  {String} The key to get
-   * @return {String} The value to return, or `undefined`
+   * Gets the current parameter value for a given key.
+   * @param  {string}  k - The parameter key to get
+   * @return {string}  The parameter's current value, or `undefined`
    */
   getParam(k) {
     return this._currParams.get(k);
@@ -201,11 +203,11 @@ export class UrlHashSystem extends AbstractSystem {
 
   /**
    * setParam
-   * Sets a `key=value` pair that will be added to the hash params.
+   * Sets a `key=value` pair that will be added to the urlhash params.
    * Values passed as `undefined` or `null` will be deleted from the query params
    * Values passed as empty string '' will remain in the query params
-   * @param  k  {String} The key to set
-   * @param  v  {String} The value to set, pass `undefined` to delete the value
+   * @param  {string}  k - The parameter key to set
+   * @param  {string}  v - The parameter value to set, pass `undefined` to delete the value
    */
   setParam(k, v) {
     if (typeof k !== 'string') return;

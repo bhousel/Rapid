@@ -12,11 +12,11 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  scene    The Scene that owns this Layer
-   * @param  layerID  Unique string to use for the name of this Layer
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'keepright';
   }
 
 
@@ -65,14 +65,17 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
 
   /**
-   * renderMarkers
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
+   * render
+   * Render any data we have, and schedule fetching more of it to cover the view
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
-  renderMarkers(frame, viewport, zoom) {
+  render(frame, viewport, zoom) {
     const keepRight = this.context.services.keepright;
-    if (!keepRight?.started) return;
+    if (!this.enabled || !keepRight?.started || zoom < MINZOOM) return;
+
+    keepRight.loadTiles();
 
     const parentContainer = this.scene.groups.get('qa');
     const data = keepRight.getData();
@@ -104,22 +107,6 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
       feature.update(viewport, zoom);
       this.retainFeature(feature, frame);
     }
-  }
-
-
-  /**
-   * render
-   * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   */
-  render(frame, viewport, zoom) {
-    const keepRight = this.context.services.keepright;
-    if (!this.enabled || !keepRight?.started || zoom < MINZOOM) return;
-
-    keepRight.loadTiles();
-    this.renderMarkers(frame, viewport, zoom);
   }
 
 }

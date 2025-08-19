@@ -50,11 +50,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene   - The Scene that owns this Layer
-   * @param  {string}     layerID - Unique string to use for the name of this Layer
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'labels';
     this.enabled = true;   // labels should be enabled by default
 
     this.labelOriginContainer = null;
@@ -227,9 +227,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * - label placement - do the math of figuring out where labels should be
    * - label rendering - show or hide labels based on their visibility
    *
-   * @param  {number}    frame    - Integer frame being rendered
-   * @param  {Viewport}  viewport - Pixi viewport to use for rendering
-   * @param  {number}    zoom     - Effective zoom to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
   render(frame, viewport, zoom) {
     if (!this.enabled || zoom < MINZOOM) {

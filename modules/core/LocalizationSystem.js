@@ -129,7 +129,7 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved after the files have been loaded
+   * @return  {Promise}  Promise resolved after the files have been loaded
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -170,7 +170,7 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise}  Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -181,7 +181,7 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();
@@ -191,7 +191,7 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * _selectLocale
    * Returns a Promise to select the locale.
-   * @return {Promise}  Promise resolved when the locale has been selected and strings loaded
+   * @return  {Promise}  Promise resolved when the locale has been selected and strings loaded
    */
   selectLocaleAsync() {
     const urlhash = this.context.systems.urlhash;

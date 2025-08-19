@@ -11,11 +11,11 @@ import { Geometry } from './Geometry.js';
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
  * Properties you can access:
- *   `id`      Unique string to identify this data element (elsewhere, referred to as the `dataID`)
- *   `type`    String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
- *   `v`       Internal version of the data element, can be used to detect changes
- *   `geoms`   Geometry object
- *   `props`   Properties object
+ *   `id` (or `dataID`)  Unique string to identify this data element.
+ *   `type`              String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
+ *   `v`                 Internal version of the data element, can be used to detect changes
+ *   `geoms`             Geometry object
+ *   `props`             Properties object
  */
 export class AbstractData {
 
@@ -27,7 +27,7 @@ export class AbstractData {
    * @param  {Object}                props  - Properties to assign to the data element
    */
   constructor(otherOrContext, props = {}) {
-    this._id = '';  // put this first so debug inspect shows it first
+    this.id = '';  // put this first so debug inspect shows it first
 
     if (otherOrContext instanceof AbstractData) {  // copy other
       const other = otherOrContext;
@@ -43,6 +43,9 @@ export class AbstractData {
     }
 
     Object.assign(this.props, globalThis.structuredClone(props));  // override with passed in props
+
+    // For consistency, offer a `this.id` property.
+    this.id = this.props.id || '';
   }
 
 
@@ -147,13 +150,13 @@ export class AbstractData {
   }
 
   /**
-   * id
-   * Unique string to identify this data element (elsewhere, referred to as the `dataID`)
+   * dataID
+   * Unique string to identify this data element
    * @return  {string}
    * @readonly
    */
-  get id() {
-    return this.props.id ?? '';
+  get dataID() {
+    return this.id;
   }
 
   /**

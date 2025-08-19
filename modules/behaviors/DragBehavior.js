@@ -107,7 +107,7 @@ export class DragBehavior extends AbstractBehavior {
    * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerdown(e) {
     if (this.lastDown) return;   // a pointer is already down
@@ -133,7 +133,7 @@ export class DragBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointermove(e) {
     const context = this.context;
@@ -224,7 +224,7 @@ export class DragBehavior extends AbstractBehavior {
   /**
    * _pointerup
    * Handler for pointerup events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointerup(e) {
     const down = this.lastDown;
@@ -258,7 +258,7 @@ export class DragBehavior extends AbstractBehavior {
   /**
    * _pointercancel
    * Handler for pointercancel events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
   _pointercancel(e) {
     const cancel = this._getEventData(e);
@@ -279,6 +279,7 @@ export class DragBehavior extends AbstractBehavior {
 
   /**
    * _snappingDisabled
+   * @return {boolean}  `true` if line snapping is disabled, `false` if line snapping is enabled.
    */
   _snappingDisabled() {
     // Ignore it if we are not over the canvas

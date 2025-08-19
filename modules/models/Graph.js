@@ -27,7 +27,7 @@ export class Graph {
    * @param  {Array<Entity>|Object?}  propsOrEntities - optional properties or base Entities to include in the graph.
    */
   constructor(otherOrContext, propsOrEntities = {}) {
-    this._id = '';  // put this first so debug inspect shows it first
+    this.id = '';  // put this first so debug inspect shows it first
 
     // A Graph derived from a predecessor Graph
     if (otherOrContext instanceof Graph) {  // copy other
@@ -77,7 +77,9 @@ export class Graph {
     if (!this.props.id) {  // no ID provided - generate one
       this.props.id = 'g-' + this.context.next('graph');
     }
-    this._id = this.props.id;  // for debugging
+
+    // For consistency, offer a `this.id` property.
+    this.id = this.props.id;
   }
 
 
@@ -101,8 +103,8 @@ export class Graph {
    * @return  {string}
    * @readonly
    */
-  get id() {
-    return this.props.id ?? '';
+  get graphID() {
+    return this.id;
   }
 
   /**

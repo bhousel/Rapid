@@ -65,7 +65,7 @@ export class UiSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -168,7 +168,7 @@ export class UiSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     if (this._startPromise) return this._startPromise;
@@ -221,7 +221,7 @@ export class UiSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     // don't leave stale state in the inspector
@@ -279,7 +279,7 @@ export class UiSystem extends AbstractSystem {
    * resize
    * Handler for resize events on the window.
    * Note that this can just be called with no event to recheck the dimensions.
-   * @param {Event}  e? - the resize event (if any)
+   * @param  {Event} e - the resize event (if any)
    */
   resize(e) {
     const context = this.context;
@@ -377,7 +377,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
   /**
    * togglePanes
    * If no `$showpane` is passed, all panes are hidden.
-   * @param {d3-selection} $showpane? - A d3-selection to the pane to show
+   * @param  {d3-selection}  $showpane? - A d3-selection to the pane to show
    */
   togglePanes($showpane) {
     const context = this.context;
@@ -439,8 +439,8 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * showEditMenu
    * This shows the contextual edit menu, called by the select behavior when the
    *  user right clicks, or long presses, or presses the menu key.
-   * @param  {Array}   anchorPoint  - `[x,y]` screen coordinate where the menu should be anchored
-   * @param  {string}  triggerType  - (not used?)  'touch', 'pen', or 'rightclick' that triggered the menu
+   * @param  {Array<number>}  anchorPoint - `[x,y]` screen coordinate where the menu should be anchored
+   * @param  {string}         triggerType - (not used?)  'touch', 'pen', or 'rightclick' that triggered the menu
    */
   showEditMenu(anchorPoint, triggerType) {
     this.EditMenu.close();   // remove any displayed menu

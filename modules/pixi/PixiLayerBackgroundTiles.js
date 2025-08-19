@@ -7,7 +7,7 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 
 const DEBUGCOLOR = 0xffff00;
 
-// scalars for use by the convolution filter to sharpen the imagery
+// Parameters for use by the convolution filter to sharpen the imagery
 const sharpenMatrix = [
      0,      -0.0125,      0,
   -0.0125,    0.5,      -0.0125,
@@ -17,20 +17,22 @@ const sharpenMatrix = [
 
 /**
  * PixiLayerBackgroundTiles
+ *
+ * Properties you can access:
+ *   `isMinimap` - set this to `true` if this is a minimap background layer.
+ *
  * @class
  */
 export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  scene      The Scene that owns this Layer
-   * @param  layerID    Unique string to use for the name of this Layer
-   * @param  isMinimap  Pass `true` if this layer should be attached to the minimap
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID, isMinimap) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'background';
     this.enabled = true;   // background imagery should be enabled by default
-    this.isMinimap = isMinimap;
 
     this.filters = {
       brightness: 1,
@@ -64,8 +66,9 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
   /**
    * render
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
   render(frame, viewport) {
     const imagery = this.context.systems.imagery;
@@ -123,11 +126,11 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
   /**
    * renderSource
-   * @param  timestamp        Timestamp in milliseconds
-   * @param  viewport         Pixi viewport to use for rendering
-   * @param  source           Imagery tile source Object
-   * @param  sourceContainer  PIXI.Container to render the tiles to
-   * @param  tileMap          Map<tile.id, Tile> for this tile source
+   * @param  {number}            timestamp       - Timestamp in milliseconds
+   * @param  {Viewport}          viewport        - Pixi viewport to use for rendering
+   * @param  {ImagerySource}     source          - Imagery source Object
+   * @param  {PIXI.Container}    sourceContainer - PIXI.Container to render the tiles to
+   * @param  {Map<tileID,Tile>}  tileMap         - Tiles needed for this tile source
    */
   renderSource(timestamp, viewport, source, sourceContainer, tileMap) {
     const context = this.context;
@@ -335,7 +338,7 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
   /**
    * destroySource
    * Frees all the resources used by a source
-   * @param  sourceID
+   * @param  {string}  sourceID - the sourceID to free
    */
   destroySource(sourceID) {
     const tileMap = this._tileMaps.get(sourceID);
@@ -356,7 +359,7 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
   /**
    * destroyTile
    * Frees all the resources used by a tile
-   * @param  tile  Tile object
+   * @param  {Tile}  tile - Tile object
    */
   destroyTile(tile) {
     const textureManager = this.gfx.textures;
@@ -385,8 +388,8 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
   /**
    * getSourceContainer
    * Gets a PIXI.Container to hold the tiles for the given sourceID, creating one if needed
-   * @param   sourceID
-   * @return  a PIXI.Container
+   * @param   {string}           sourceID - the sourceID get a container for
+   * @return  {PIXI.Container}   A PIXI.Container to render tiles into
    */
   getSourceContainer(sourceID) {
     const groupContainer = this.scene.groups.get('background');
@@ -406,7 +409,7 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
    * applyFilters
    * Adds an adjustment filter for brightness/contrast/saturation and
    * a sharpen/blur filter, depending on the UI slider settings.
-   * @param  sourceContainer   PIXI.Container that contains the tiles
+   * @param  {PIXI.Container}  sourceContainer - The PIXI.Container that contains the tiles
    */
   applyFilters(sourceContainer) {
     const adjustmentFilter = new AdjustmentFilter({
@@ -444,18 +447,34 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
   }
 
 
+  /**
+   * setBrightness
+   * @param  {number}  val - the brightness value
+   */
   setBrightness(val) {
     this.filters.brightness = val;
   }
 
+  /**
+   * setContrast
+   * @param  {number}  val - the contrast value
+   */
   setContrast(val) {
     this.filters.contrast = val;
   }
 
+  /**
+   * setSaturation
+   * @param  {number}  val - the saturation value
+   */
   setSaturation(val) {
     this.filters.saturation = val;
   }
 
+  /**
+   * setSharpness
+   * @param  {number}  val - the sharpness value
+   */
   setSharpness(val) {
     this.filters.sharpness = val;
   }

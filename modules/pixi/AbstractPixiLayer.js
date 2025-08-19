@@ -7,31 +7,31 @@ import { utilIterable } from '../util/iterable.js';
  *
  * Notes on identifiers:
  * All identifiers should be strings, to avoid JavaScript comparison surprises (e.g. `'0' !== 0`)
- *   `layerID`     A unique identifier for the layer, for example 'osm'
- *   `featureID`   A unique identifier for the feature, for example 'osm-w-123-fill'
- *   `dataID`      A feature may have data bound to it, for example OSM identifier like 'w-123'
- *   `classID`     A pseudoclass identifier like 'hover' or 'select'
+ *   `layerID`    A unique identifier for the layer, for example 'osm'
+ *   `featureID`  A unique identifier for the feature, for example 'osm-w-123-fill'
+ *   `dataID`     A feature may have data bound to it, for example OSM identifier like 'w-123'
+ *   `classID`    A pseudoclass identifier like 'hover' or 'select'
  *
  * Properties you can access:
- *   `id`          Unique string to use for the name of this Layer
- *   `supported`   Is this Layer supported? (i.e. do we even show it in lists?)
- *   `zIndex`      Where this Layer sits compared to other Layers
- *   `enabled`     Whether the the user has chosen to see the Layer
- *   `features`    `Map<featureID, Feature>` of all features on this Layer
- *   `retained`    `Map<featureID, Integer frame>` last seen
+ *   `id` (or `layerID`)  A unique identifier for the layer, for example 'osm'
+ *   `supported`          Is this Layer supported? (i.e. do we even show it in lists?)
+ *   `zIndex`             Where this Layer sits compared to other Layers
+ *   `enabled`            Whether the the user has chosen to see the Layer
+ *   `features`           `Map<featureID, Feature>` of all features on this Layer
+ *   `retained`           `Map<featureID, Integer frame>` last seen
  */
 export class AbstractPixiLayer {
 
   /**
    * @constructor
    * @param  {PixiScene}  scene   - The Scene that owns this Layer
-   * @param  {string}     layerID - Unique string to use for the name of this Layer
    */
-  constructor(scene, layerID) {
+  constructor(scene) {
+    this.id = '';  // put this first so debug inspect shows it first
+
     this.scene = scene;
     this.gfx = scene.gfx;
     this.context = scene.context;
-    this.layerID = layerID;
 
     this._enabled = false;  // Whether the user has chosen to see the layer
 
@@ -56,6 +56,44 @@ export class AbstractPixiLayer {
     // because a Feature can be 'selected' or 'drawing' even before it has been created, or after destroyed
     this._dataHasClass = new Map();     // Map<dataID, Set<classID>>
     this._classHasData = new Map();     // Map<classID, Set<dataID>>
+  }
+
+
+  /**
+   * layerID
+   * Unique string to identify this render Layer.
+   * @return   {string}  This layer's unique id
+   * @readonly
+   */
+  get layerID() {
+    return this.id;
+  }
+
+  /**
+   * supported
+   * Is this Layer supported? (i.e. do we even show it in lists?)
+   * Can be overridden in a subclass with additional logic.
+   * @return  {boolean}  `true` if the layer is supported
+   * @abstract
+   */
+  get supported() {
+    return true;
+  }
+
+  /**
+   * enabled
+   * Whether the user has chosen to see the Layer.
+   * Can be overridden in a subclass with additional logic.
+   * @return  {boolean}  `true` if the user has chosen to see the layer
+   * @abstract
+   */
+  get enabled() {
+    return this._enabled;
+  }
+  set enabled(val) {
+    if (val === this._enabled) return;  // no change
+    this._enabled = val;
+    this.dirtyLayer();
   }
 
 
@@ -498,40 +536,6 @@ export class AbstractPixiLayer {
         this.dirtyFeatures(featureIDs);
       }
     }
-  }
-
-
-  /**
-   * Layer id
-   * @readonly
-   */
-  get id() {
-    return this.layerID;
-  }
-
-
-  /**
-   * supported
-   * Is this Layer supported? (i.e. do we even show it in lists?)
-   * Can be overridden in a subclass with additional logic
-   * @abstract
-   */
-  get supported() {
-    return true;
-  }
-
-
-  /**
-   * enabled
-   * Whether the user has chosen to see the Layer
-   */
-  get enabled() {
-    return this._enabled;
-  }
-  set enabled(val) {
-    if (val === this._enabled) return;  // no change
-    this._enabled = val;
-    this.dirtyLayer();
   }
 
 }

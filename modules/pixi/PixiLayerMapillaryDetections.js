@@ -14,11 +14,11 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  scene    The Scene that owns this Layer
-   * @param  layerID  Unique string to use for the name of this Layer
+   * @param  {PixiScene}  scene - The Scene that owns this Layer
    */
-  constructor(scene, layerID) {
-    super(scene, layerID);
+  constructor(scene) {
+    super(scene);
+    this.id = 'mapillary-detections';
   }
 
 
@@ -91,9 +91,9 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
   /**
    * renderMarkers
-   * @param  frame     Integer frame being rendered
-   * @param  viewport  Pixi viewport to use for rendering
-   * @param  zoom      Effective zoom to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
   renderMarkers(frame, viewport, zoom) {
     const context = this.context;
@@ -151,9 +151,9 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame     Integer frame being rendered
-   * @param  viewport  Pixi viewport to use for rendering
-   * @param  zoom      Effective zoom to use for rendering
+   * @param  {number}    frame    -  Integer frame being rendered
+   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param  {number}    zoom     -  Effective zoom level to use for rendering
    */
   render(frame, viewport, zoom) {
     const mapillary = this.context.services.mapillary;

@@ -55,7 +55,7 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
@@ -101,8 +101,8 @@ export class ImagerySystem extends AbstractSystem {
    * Set up the imagery index after it has been downloaded
    * It contains these properties:
    *   {
-   *     features:  Map(id -> GeoJSON feature)
-   *     sources:   Map(id -> ImagerySource)
+   *     features:  Map<id, GeoJSON feature>
+   *     sources:   Map<id, ImagerySource>
    *     query:     A which-polygon index to perform spatial queries against
    *   }
    *  @param  data  {Object}  imagery index data
@@ -112,8 +112,8 @@ export class ImagerySystem extends AbstractSystem {
     const arr = data.imagery || [];
 
     this._imageryIndex = {
-      features: new Map(),   // Map(id -> GeoJSON feature)
-      sources: new Map(),    // Map(id -> ImagerySource)
+      features: new Map(),   // Map<id, GeoJSON feature>
+      sources: new Map(),    // Map<id, ImagerySource>
       query: null            // which-polygon index
     };
 
@@ -188,7 +188,7 @@ export class ImagerySystem extends AbstractSystem {
    * _initWaybackAsync
    * Fetch all available Wayback imagery sources and load them into the special Wayback source.
    * If there is no wayback imagery source, or the wayback data is not available, just resolve anyway.
-   * @return {Promise} Promise resolved when this data has been loaded
+   * @return  {Promise}  Promise resolved when this data has been loaded
    */
   _initWaybackAsync() {
     const wayback = this.getSourceByID('EsriWayback');
@@ -199,7 +199,7 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -210,7 +210,7 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();
@@ -267,9 +267,9 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   *  _imageryChanged
-   *  Called whenever the imagery changes
-   *  Also used to push changes in imagery state to the urlhash
+   * _imageryChanged
+   * Called whenever the imagery changes
+   * Also used to push changes in imagery state to the urlhash
    */
   _imageryChanged() {
     const baseLayer = this._baseLayer;
@@ -331,7 +331,7 @@ export class ImagerySystem extends AbstractSystem {
   /**
    *  visibleSources
    *  Returns array of known imagery sources that are valid at the given extent and zoom
-   *  @return  Array
+   *  @return {Array<ImagerySource>}  Visible imagery sources
    */
   visibleSources() {
     if (!this._imageryIndex) return [];   // called before init()?

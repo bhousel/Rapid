@@ -56,7 +56,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     for (const id of this.dependencies) {
@@ -87,7 +87,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     if (this._startPromise) return this._startPromise;
@@ -171,7 +171,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     this.deferredRedraw.cancel();
@@ -224,7 +224,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * toggle
    * If visible, make invisible.  If invisible, make visible.
-   * @param  {Event} e? - triggering event (if any)
+   * @param  {Event}  e - triggering event (if any)
    */
   toggle(e) {
     if (e) e.preventDefault();
@@ -253,7 +253,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _loadMapLibreAsync
    * Load the MapLibre JS and CSS files into the document head
-   * @return {Promise} Promise resolved when both files have been loaded
+   * @return  {Promise}  Promise resolved when both files have been loaded
    */
   _loadMapLibreAsync() {
     if (this._loadPromise) return this._loadPromise;

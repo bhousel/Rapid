@@ -44,7 +44,7 @@ export class StorageSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return {Promise} Promise resolved when this component has completed initialization
+   * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
     for (const id of this.dependencies) {
@@ -59,7 +59,7 @@ export class StorageSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
     this._started = true;
@@ -70,7 +70,7 @@ export class StorageSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     return Promise.resolve();
@@ -79,8 +79,8 @@ export class StorageSystem extends AbstractSystem {
 
   /**
    * hasItem
-   * @param   k  String key to check for existance
-   * @return  `true` if the key is set, `false` if not
+   * @param   {string}   k - String key to check for existance
+   * @return  {boolean}  `true` if the key is set, `false` if not
    */
   hasItem(k) {
     return !!this._storage.getItem(k);
@@ -89,8 +89,8 @@ export class StorageSystem extends AbstractSystem {
 
   /**
    * getItem
-   * @param   k  String key to get the value for
-   * @return  The stored value, or `null` if not found
+   * @param   {string}  k - String key to get the value for
+   * @return  {string}  The stored value, or `null` if not found
    */
   getItem(k) {
     return this._storage.getItem(k);
@@ -99,9 +99,9 @@ export class StorageSystem extends AbstractSystem {
 
   /**
    * setItem
-   * @param   k  String key to set the value for
-   * @param   v  String value to set
-   * @return  `true` if the write to `localStorage` succeeded, `false` if it failed
+   * @param   {string}  k - String key to set the value for
+   * @param   {string}  v - String value to set
+   * @return  {boolean} `true` if the write to `localStorage` succeeded, `false` if it failed
    */
   setItem(k, v) {
     try {
@@ -116,7 +116,7 @@ export class StorageSystem extends AbstractSystem {
 
   /**
    * removeItem
-   * @param   k  String key to remove from storage
+   * @param  {string}  k - String key to remove from storage
    */
   removeItem(k) {
     this._storage.removeItem(k);

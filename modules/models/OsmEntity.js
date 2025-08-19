@@ -51,6 +51,9 @@ export class OsmEntity extends AbstractData {
       // this.props.tags = Object.create(null);
       this.props.tags = {};
     }
+
+    // For consistency, offer a `this.id` property.
+    this.id = this.props.id || '';
   }
 
   /**
