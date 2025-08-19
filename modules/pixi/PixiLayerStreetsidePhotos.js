@@ -229,7 +229,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
         feature.setData(dataID, d);
         feature.setCoords(part);
         feature.clearChildData(dataID);
-        d.props.bubbleIDs.forEach(bubbleID => feature.addChildData(dataID, bubbleID));
+        feature.addChildData(dataID, d.props.bubbleIDs);
       }
 
       this.syncFeatureClasses(feature);

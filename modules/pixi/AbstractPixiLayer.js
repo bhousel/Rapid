@@ -165,12 +165,12 @@ export class AbstractPixiLayer {
   bindData(featureID, dataID) {
     this.unbindData(featureID);
 
-    let featureIDs = this._dataHasFeature.get(dataID);
-    if (!featureIDs) {
-      featureIDs = new Set();
-      this._dataHasFeature.set(dataID, featureIDs);
+    let featureSet = this._dataHasFeature.get(dataID);
+    if (!featureSet) {
+      featureSet = new Set();
+      this._dataHasFeature.set(dataID, featureSet);
     }
-    featureIDs.add(featureID);
+    featureSet.add(featureID);
 
     this._featureHasData.set(featureID, dataID);
   }
@@ -179,18 +179,18 @@ export class AbstractPixiLayer {
   /**
    * unbindData
    * Removes the data binding for a given featureID
-   * @param  {string} featureID - featureID  (e.g. 'osm-w-123-fill')
+   * @param  {string}  featureID - featureID  (e.g. 'osm-w-123-fill')
    */
   unbindData(featureID) {
     const dataID = this._featureHasData.get(featureID);
     if (!dataID) return;
 
-    const featureIDs = this._dataHasFeature.get(dataID);
-    if (featureIDs) {
-      featureIDs.delete(featureID);
+    const featureSet = this._dataHasFeature.get(dataID);
+    if (featureSet) {
+      featureSet.delete(featureID);
 
       // If no features are bound to this data anymore, remove all references to it.
-      if (!featureIDs.size) {
+      if (!featureSet.size) {
         this._dataHasFeature.delete(dataID);
         this._parentHasChildren.delete(dataID);
         this._childHasParents.delete(dataID);
@@ -206,49 +206,53 @@ export class AbstractPixiLayer {
   /**
    * addChildData
    * Adds a mapping from parent data to child data.
-   * @param  {string}  parentID - dataID of the parent (e.g. 'r123')
-   * @param  {string}  childID  - dataID of the child (e.g. 'w123')
+   * @param  {string}             parentID - dataID of the parent (e.g. 'r123')
+   * @param  {OneOrMore<string>}  childIDs - dataIDs of the children to add (e.g. 'w123')
    */
-  addChildData(parentID, childID) {
-    let childIDs = this._parentHasChildren.get(parentID);
-    if (!childIDs) {
-      childIDs = new Set();
-      this._parentHasChildren.set(parentID, childIDs);
+  addChildData(parentID, childIDs) {
+    let childSet = this._parentHasChildren.get(parentID);
+    if (!childSet) {
+      childSet = new Set();
+      this._parentHasChildren.set(parentID, childSet);
     }
-    childIDs.add(childID);
 
-    let parentIDs = this._childHasParents.get(childID);
-    if (!parentIDs) {
-      parentIDs = new Set();
-      this._childHasParents.set(childID, parentIDs);
+    for (const childID of utilIterable(childIDs)) {
+      childSet.add(childID);
+
+      let parentSet = this._childHasParents.get(childID);
+      if (!parentSet) {
+        parentSet = new Set();
+        this._childHasParents.set(childID, parentSet);
+      }
+      parentSet.add(parentID);
     }
-    parentIDs.add(parentID);
   }
 
 
   /**
    * removeChildData
    * Removes mapping from parent data to child data.
-   * @param  {string} parentID - dataID (e.g. 'r123')
-   * @param  {string} childID  - dataID to remove as a child (e.g. 'w1')
+   * @param  {string}             parentID - dataID of the parent (e.g. 'r123')
+   * @param  {OneOrMore<string>}  childIDs - dataIDs of the children to remove (e.g. 'w123')
    */
-  removeChildData(parentID, childID) {
-    let childIDs = this._parentHasChildren.get(parentID);
-    if (childIDs) {
-      childIDs.delete(childID);
-      if (!childIDs.size) {
-        let child = this._parentHasChildren.get(childID);
-        if (!child) {
-          this._parentHasChildren.delete(childID);
-        }
+  removeChildData(parentID, childIDs) {
+    const childSet = this._parentHasChildren.get(parentID);
+    if (childSet) {
+      for (const childID of utilIterable(childIDs)) {
+        childSet.delete(childID);
+      }
+      if (!childSet.size) {
+        this._parentHasChildren.delete(parentID);
       }
     }
 
-    let parentIDs = this._childHasParents.get(childID);
-    if (parentIDs) {
-      parentIDs.delete(childID);
-      if (!parentIDs.size) {
-        this._childHasParents.delete(childID);
+    for (const childID of utilIterable(childIDs)) {
+      const parentSet = this._childHasParents.get(childID);
+      if (parentSet) {
+        parentSet.delete(childID);
+        if (!parentSet.size) {
+          this._childHasParents.delete(childID);
+        }
       }
     }
   }
@@ -260,9 +264,9 @@ export class AbstractPixiLayer {
    * @param  {string}  parentID - dataID (e.g. 'r123')
    */
   clearChildData(parentID) {
-    const childIDs = this._parentHasChildren.get(parentID) ?? new Set();
-    for (const childID of childIDs) {
-      this.removeChildData(parentID, childID);
+    const childSet = this._parentHasChildren.get(parentID);
+    if (childSet) {
+      this.removeChildData(parentID, childSet);
     }
   }
 
@@ -281,8 +285,8 @@ export class AbstractPixiLayer {
       result = new Set([dataID]);
     }
 
-    const childIDs = this._parentHasChildren.get(dataID) ?? new Set();
-    for (const childID of childIDs) {
+    const childSet = this._parentHasChildren.get(dataID) ?? new Set();
+    for (const childID of childSet) {
       if (!result.has(childID)) {
         this.getSelfAndDescendants(childID, result);
       }
@@ -306,8 +310,8 @@ export class AbstractPixiLayer {
       result = new Set([dataID]);
     }
 
-    const parentIDs = this._childHasParents.get(dataID) ?? new Set();
-    for (const parentID of parentIDs) {
+    const parentSet = this._childHasParents.get(dataID) ?? new Set();
+    for (const parentID of parentSet) {
       if (!result.has(parentID)) {
         this.getSelfAndAncestors(parentID, result);
       }
@@ -331,8 +335,8 @@ export class AbstractPixiLayer {
       result = new Set([dataID]);
     }
 
-    const parentIDs = this._childHasParents.get(dataID) ?? new Set();
-    for (const parentID of parentIDs) {
+    const parentSet = this._childHasParents.get(dataID) ?? new Set();
+    for (const parentID of parentSet) {
       const siblingIDs = this._parentHasChildren.get(parentID) ?? new Set();
       for (const siblingID of siblingIDs) {
         result.add(siblingID);

@@ -26,10 +26,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     this.areaContainer = null;
     this.lineContainer = null;
-
-// experiment for benchmarking
-//    this._alreadyDownloaded = false;
-//    this._saveCannedData = false;
   }
 
 
@@ -66,33 +62,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         .then(() => gfx.immediateRedraw());
     }
   }
-
-
-// experiment for benchmarking
-//  /**
-//   * downloadFile
-//   * experiment for benchmarking
-//   * @param  data
-//   * @param  fileName
-//   */
-//  _downloadFile(data, fileName) {
-//    let a = document.createElement('a');   // Create an invisible A element
-//    a.style.display = 'none';
-//    document.body.appendChild(a);
-//
-//    // Set the HREF to a Blob representation of the data to be downloaded
-//    a.href = window.URL.createObjectURL(new Blob([data]));
-//
-//    // Use download attribute to set set desired file name
-//    a.setAttribute('download', fileName);
-//
-//    // Trigger the download by simulating click
-//    a.click();
-//
-//    // Cleanup
-//    window.URL.revokeObjectURL(a.href);
-//    document.body.removeChild(a);
-//  }
 
 
   /**
@@ -168,30 +137,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
     }
 
-// experiment for benchmarking
-//    // Instructions to save 'canned' entity data for use in the renderer test suite:
-//    // Set a breakpoint at the next line, then modify `this._saveCannedData` to be 'true'
-//    // continuing will fire off the download of the data into a file called 'canned_data.json'.
-//    // move the data into the test/spec/renderer directory.
-//    if (this._saveCannedData && !this._alreadyDownloaded) {
-//      const [lng, lat] = map.center();
-//
-//      let viewData = {
-//        'lng': lng,
-//        'lat': lat,
-//        'zoom': zoom,
-//        'width': window.innerWidth,
-//        'height': window.innerHeight,
-//        'viewport': viewport,
-//        'data': data,
-//        'entities': graph.base.entities   // TODO convert from Map to Object if we are keeping this)
-//      };
-//
-//      let cannedData = JSON.stringify(viewData);
-//      this._downloadFile(cannedData,`${zoom}_${lat}_${lng}_canned_osm_data.json`);
-//      this._alreadyDownloaded = true;
-//    }
-
     this.renderPolygons(frame, viewport, zoom, data);
     this.renderLines(frame, viewport, zoom, data);
     this.renderPoints(frame, viewport, zoom, data);
@@ -262,7 +207,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param  data       Visible OSM data to render, sorted by type
    */
   renderPolygons(frame, viewport, zoom, data) {
-    const entities = data.polygons;
     const context = this.context;
     const graph = context.systems.editor.staging.graph;
     const filters = context.systems.filters;
@@ -290,7 +234,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       return false;   // not sure, just ignore it
     }
 
-
+    const entities = data.polygons;
     for (const [entityID, entity] of entities) {
       const version = entity.v || 0;
       const parts = entity.geoms.parts;
@@ -323,10 +267,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           feature.setData(entityID, entity);
           feature.clearChildData(entityID);
           if (entity.type === 'relation') {
-            entity.members.forEach(member => feature.addChildData(entityID, member.id));
+            feature.addChildData(entityID, entity.members.map(member => member.id));
           }
           if (entity.type === 'way') {
-            entity.nodes.forEach(nodeID => feature.addChildData(entityID, nodeID));
+            feature.addChildData(entityID, entity.nodes);
           }
         }
 
@@ -411,13 +355,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param  data       Visible OSM data to render, sorted by type
    */
   renderLines(frame, viewport, zoom, data) {
-    const entities = data.lines;
     const context = this.context;
     const graph = context.systems.editor.staging.graph;
     const l10n = context.systems.l10n;
     const styles = context.systems.styles;
     const lineContainer = this.lineContainer;
 
+    const entities = data.lines;
     for (const [entityID, entity] of entities) {
       const layer = (typeof entity.layer === 'function') ? entity.layer() : 0;
       const levelContainer = _getLevelContainer(layer.toString());
@@ -457,11 +401,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
             feature.setData(entityID, entity);
             feature.clearChildData(entityID);
+
             if (entity.type === 'relation') {
-              entity.members.forEach(member => feature.addChildData(entityID, member.id));
+              feature.addChildData(entityID, entity.members.map(member => member.id));
             }
             if (entity.type === 'way') {
-              entity.nodes.forEach(nodeID => feature.addChildData(entityID, nodeID));
+              feature.addChildData(entityID, entity.nodes);
             }
           }
 
@@ -527,7 +472,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param  realated   Collections of related OSM IDs
    */
   renderVertices(frame, viewport, zoom, data, related) {
-    const entities = data.vertices;
     const context = this.context;
     const graph = context.systems.editor.staging.graph;
     const l10n = context.systems.l10n;
@@ -546,6 +490,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     }
 
 
+    const entities = data.vertices;
     for (const [nodeID, node] of entities) {
       let parentContainer = null;
 
@@ -636,13 +581,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param  data       Visible OSM data to render, sorted by type
    */
   renderPoints(frame, viewport, zoom, data) {
-    const entities = data.points;
     const context = this.context;
     const graph = context.systems.editor.staging.graph;
     const l10n = context.systems.l10n;
     const presets = context.systems.presets;
     const pointsContainer = this.scene.groups.get('points');
 
+    const entities = data.points;
     for (const [nodeID, node] of entities) {
       const featureID = `${this.layerID}-${nodeID}`;
       const version = node.v || 0;
