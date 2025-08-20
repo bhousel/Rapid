@@ -11,7 +11,7 @@ export class AbstractUiCard {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     this.context = context;

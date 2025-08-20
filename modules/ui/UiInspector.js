@@ -31,7 +31,7 @@ import { UiViewOn } from './UiViewOn.js';
 export class UiInspector {
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     this.context = context;

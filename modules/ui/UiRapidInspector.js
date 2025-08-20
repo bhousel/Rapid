@@ -28,7 +28,7 @@ const ACCEPT_FEATURES_LIMIT = 50;
 export class UiRapidInspector {
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     this.context = context;

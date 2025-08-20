@@ -14,7 +14,7 @@ export class ImagerySource {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    * @param  `src`      source Object describing the imagery source
    */
   constructor(context, src) {

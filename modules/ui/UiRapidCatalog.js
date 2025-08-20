@@ -20,7 +20,7 @@ export class UiRapidCatalog extends EventEmitter {
 
   /**
    * @constructor
-   * @param  `context`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context, $parentModal) {
     super();
