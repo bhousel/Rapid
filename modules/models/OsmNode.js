@@ -37,6 +37,7 @@ export class OsmNode extends OsmEntity {
     this.updateGeometry();
   }
 
+
   /**
    * loc
    * @readonly
@@ -96,7 +97,12 @@ export class OsmNode extends OsmEntity {
     return result;
   }
 
-
+  /**
+   * geometry
+   * Returns 'point' if this Node is standalone, or 'vertex' if is along a parent Way.
+   * @param   {Graph}   graph - the Graph that holds the topology needed
+   * @return  {string}  'point' or 'vertex'
+   */
   geometry(graph) {
     return this.transient('geometry', () => {
       const parents = graph.parentWays(this);
@@ -104,12 +110,21 @@ export class OsmNode extends OsmEntity {
     });
   }
 
-
+  /**
+   * move
+   * Moves this node to a new location.
+   * @param   {Array<number>}  loc - the new location, in WGS84 coordinate [longitude, latitude]
+   * @return  {OsmNode}  A new Node copied from this Node, but with the updated location
+   */
   move(loc) {
     return this.update({ loc: loc });
   }
 
-
+  /**
+   * isDegenerate
+   * A node is "degenerate" if its location is not a proper WGS84 [longitude,latitude] coordinate.
+   * @return  {boolean}  `true` if the node is degenerate, `false` if not.
+   */
   isDegenerate() {
     const loc = this.loc;
     return !(
@@ -119,8 +134,12 @@ export class OsmNode extends OsmEntity {
     );
   }
 
-
-  // Inspect tags and geometry to determine which direction(s) this node/vertex points
+  /**
+   * directions
+   * Returns the directions, in degrees, that this node points, given the tags present.
+   * @param   {Graph}          graph - the Graph that holds the topology needed
+   * @return  {Array<number>}  Array of azimuth angles in degrees
+   */
   directions(graph) {
     let val;
 
@@ -221,7 +240,12 @@ export class OsmNode extends OsmEntity {
     return utilArrayUniq(results).sort((a, b) => a - b);
   }
 
-
+  /**
+   * isEndpoint
+   * Returns `true` if this node is an endpoint of a parent way.
+   * @param   {Graph}    graph - the Graph that holds the topology needed
+   * @return  {boolean}  `true` if this node is an endpoint on a parent way, `false` if not
+   */
   isEndpoint(graph) {
     return this.transient('isEndpoint', () => {
       const id = this.id;
@@ -231,6 +255,12 @@ export class OsmNode extends OsmEntity {
     });
   }
 
+  /**
+   * isConnected
+   * Returns `true` if this node is connected to multiple parent ways
+   * @param   {Graph}    graph - the Graph that holds the topology needed
+   * @return  {boolean}  `true` if this node is connected to multiple parent ways, `false` if not
+   */
   isConnected(graph) {
     return this.transient('isConnected', () => {
       const parents = graph.parentWays(this);
@@ -257,7 +287,7 @@ export class OsmNode extends OsmEntity {
    * Returns `true` if this node has multiple connections:
    *  - a Node with multiple parents, OR
    *  - a Node connected to a single parent in multiple places.
-   * @param   {Graph}    graph - The graph for this node
+   * @param   {Graph}    graph - the Graph that holds the topology needed
    * @return  {boolean}  `true` if this node has multiple connections
    */
   isShared(graph) {
@@ -280,7 +310,13 @@ export class OsmNode extends OsmEntity {
     });
   }
 
-
+  /**
+   * parentIntersectionWays
+   * Returns an array of parent ways that intersect at this node.
+   * Only linear parent ways with taggins for 'highway', 'railway', 'aeroway', 'waterway' are considered.
+   * @param   {Graph}          graph - the Graph that holds the topology needed
+   * @return  {Array<OsmWay>}  parent ways that intersect at this node.
+   */
   parentIntersectionWays(graph) {
     return this.transient('parentIntersectionWays', () => {
       return graph.parentWays(this).filter(parent => {
@@ -293,12 +329,22 @@ export class OsmNode extends OsmEntity {
     });
   }
 
-
+  /**
+   * isIntersection
+   * Returns `true` if this node is an intersection, see `parentIntersectionWays`.
+   * @param   {Graph}    graph - the Graph that holds the topology needed
+   * @return  {boolean}  `true` if this node is an intersection of parent ways, `false` if not
+   */
   isIntersection(graph) {
     return this.parentIntersectionWays(graph).length > 1;
   }
 
-
+  /**
+   * isHighwayIntersection
+   * Like `isIntersection`, but just for highways.
+   * @param   {Graph}    graph - the Graph that holds the topology needed
+   * @return  {boolean}  `true` if this node is an intersection of parent highways, `false` if not
+   */
   isHighwayIntersection(graph) {
     return this.transient('isHighwayIntersection', () => {
       return graph.parentWays(this).filter(parent => {
@@ -307,7 +353,12 @@ export class OsmNode extends OsmEntity {
     });
   }
 
-
+  /**
+   * isOnAddressLine
+   * Returns `true` if this node is along an address interpolation line.
+   * @param   {Graph}    graph - the Graph that holds the topology needed
+   * @return  {boolean}  `true` if this node is along an address interpolation line, `false` if not
+   */
   isOnAddressLine(graph) {
     return this.transient('isOnAddressLine', () => {
       return graph.parentWays(this).filter(parent => {
@@ -315,6 +366,5 @@ export class OsmNode extends OsmEntity {
       }).length > 0;
     });
   }
-
 
 }

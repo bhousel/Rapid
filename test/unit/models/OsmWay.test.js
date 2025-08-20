@@ -748,29 +748,29 @@ describe('OsmWay', () => {
   });
 
 
-  describe('areAdjacent', () => {
+  describe('isAdjacent', () => {
     it('returns false for nodes not in the way', () => {
       const way = new Rapid.OsmWay(context);
-      assert.isFalse(way.areAdjacent('a', 'b'));
+      assert.isFalse(way.isAdjacent('a', 'b'));
     });
 
     it('returns false for non-adjacent nodes in the way', () => {
       const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c'] });
-      assert.isFalse(way.areAdjacent('a', 'c'));
+      assert.isFalse(way.isAdjacent('a', 'c'));
     });
 
     it('returns true for adjacent nodes in the way (forward)', () => {
       let way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'd'] });
-      assert.isTrue(way.areAdjacent('a', 'b'));
-      assert.isTrue(way.areAdjacent('b', 'c'));
-      assert.isTrue(way.areAdjacent('c', 'd'));
+      assert.isTrue(way.isAdjacent('a', 'b'));
+      assert.isTrue(way.isAdjacent('b', 'c'));
+      assert.isTrue(way.isAdjacent('c', 'd'));
     });
 
     it('returns true for adjacent nodes in the way (reverse)', () => {
       let way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'd'] });
-      assert.isTrue(way.areAdjacent('b', 'a'));
-      assert.isTrue(way.areAdjacent('c', 'b'));
-      assert.isTrue(way.areAdjacent('d', 'c'));
+      assert.isTrue(way.isAdjacent('b', 'a'));
+      assert.isTrue(way.isAdjacent('c', 'b'));
+      assert.isTrue(way.isAdjacent('d', 'c'));
     });
   });
 

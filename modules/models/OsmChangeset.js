@@ -66,13 +66,21 @@ export class OsmChangeset extends OsmEntity {
     };
   }
 
-  //
+  /**
+   * geometry
+   * Returns 'changeset'
+   * @return  {string}  'changeset'
+   */
   geometry() {
     return 'changeset';
   }
 
-  // Generate [osmChange](http://wiki.openstreetmap.org/wiki/OsmChange) XML.
-  // Returns a string.
+
+  /**
+   * osmChangeJXON
+   * @see http://wiki.openstreetmap.org/wiki/OsmChange
+   * @return  {string}
+   */
   osmChangeJXON(changes) {
     const changesetID = this.props.id;
 

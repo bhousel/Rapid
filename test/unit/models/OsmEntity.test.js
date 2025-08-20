@@ -7,18 +7,18 @@ const context = new Rapid.MockContext();
 
 describe('createOsmFeature', () => {
   it('returns a subclass of the appropriate type', () => {
-    assert.ok(Rapid.createOsmFeature(context, {type: 'node'}) instanceof Rapid.OsmNode);
-    assert.ok(Rapid.createOsmFeature(context, {type: 'way'}) instanceof Rapid.OsmWay);
-    assert.ok(Rapid.createOsmFeature(context, {type: 'relation'}) instanceof Rapid.OsmRelation);
-    assert.ok(Rapid.createOsmFeature(context, {type: 'changeset'}) instanceof Rapid.OsmChangeset);
-    assert.ok(Rapid.createOsmFeature(context, {id: 'n1'}) instanceof Rapid.OsmNode);
-    assert.ok(Rapid.createOsmFeature(context, {id: 'w1'}) instanceof Rapid.OsmWay);
-    assert.ok(Rapid.createOsmFeature(context, {id: 'r1'}) instanceof Rapid.OsmRelation);
-    assert.ok(Rapid.createOsmFeature(context, {id: 'c1'}) instanceof Rapid.OsmChangeset);
+    assert.isOk(Rapid.createOsmFeature(context, {type: 'node'}) instanceof Rapid.OsmNode);
+    assert.isOk(Rapid.createOsmFeature(context, {type: 'way'}) instanceof Rapid.OsmWay);
+    assert.isOk(Rapid.createOsmFeature(context, {type: 'relation'}) instanceof Rapid.OsmRelation);
+    assert.isOk(Rapid.createOsmFeature(context, {type: 'changeset'}) instanceof Rapid.OsmChangeset);
+    assert.isOk(Rapid.createOsmFeature(context, {id: 'n1'}) instanceof Rapid.OsmNode);
+    assert.isOk(Rapid.createOsmFeature(context, {id: 'w1'}) instanceof Rapid.OsmWay);
+    assert.isOk(Rapid.createOsmFeature(context, {id: 'r1'}) instanceof Rapid.OsmRelation);
+    assert.isOk(Rapid.createOsmFeature(context, {id: 'c1'}) instanceof Rapid.OsmChangeset);
   });
 
   it('returns a generic OsmEntity as a fallback', () => {
-    assert.ok(Rapid.createOsmFeature(context) instanceof Rapid.OsmEntity);
+    assert.isOk(Rapid.createOsmFeature(context) instanceof Rapid.OsmEntity);
   });
 });
 
@@ -242,6 +242,22 @@ describe('OsmEntity', () => {
     });
   });
 
+  describe('.creationOrder', () => {
+    it('orders existing relations newest-first', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'r1' });
+      const b = new Rapid.OsmEntity(context, { id: 'r2' });
+      assert.isOk(Rapid.OsmEntity.creationOrder(a, b) > 0);
+      assert.isOk(Rapid.OsmEntity.creationOrder(b, a) < 0);
+    });
+
+    it('orders new relations newest-first', () => {
+      const a = new Rapid.OsmEntity(context, { id: 'r-1' });
+      const b = new Rapid.OsmEntity(context, { id: 'r-2' });
+      assert.isOk(Rapid.OsmEntity.creationOrder(a, b) > 0);
+      assert.isOk(Rapid.OsmEntity.creationOrder(b, a) < 0);
+    });
+  });
+
   describe('copy', () => {
     it('returns a new OsmEntity', () => {
       const source = new Rapid.OsmEntity(context, { id: 'a' });
@@ -297,7 +313,7 @@ describe('OsmEntity', () => {
     it('returns a new OsmEntity if changed', () => {
       const a = new Rapid.OsmWay(context, { tags: { a: 'a' }});
       const b = a.mergeTags({ a: 'b' });
-      assert.ok(b instanceof Rapid.OsmWay);
+      assert.isOk(b instanceof Rapid.OsmWay);
       assert.notEqual(a, b);
     });
 

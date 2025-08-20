@@ -212,7 +212,7 @@ describe('actionAddMember', () => {
         new Rapid.OsmNode(context, {id: 'c', loc: [0, 0]}),
         new Rapid.OsmWay(context, {id: '-', nodes: ['a', 'b']}),
         new Rapid.OsmWay(context, {id: '=', nodes: ['b', 'c']}),
-        new Rapid.OsmRelation(context, {id: 'r', members: [
+        new Rapid.OsmRelation(context, {id: 'r', tags: { type: 'route' }, members: [
           { id: 'n1', type: 'node', role: 'stop' },
           { id: 'w1', type: 'way', role: 'platform' },
           { id: 'n2', type: 'node', role: 'stop_entry_only' },
@@ -233,5 +233,36 @@ describe('actionAddMember', () => {
       assert.deepEqual(members(result), ['n1', 'w1', 'n2', 'w2', 'n3', 'w3', 'n10', 'n11', 'n12', '-', '=', 'r1']);
     });
 
+    it('inserts new stops at the beginning (for PTv2)', () => {
+      const base = new Rapid.Graph(context, [
+        new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0]}),
+        new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0]}),
+        new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2']}),
+        new Rapid.OsmRelation(context, { id: 'r', tags: { type: 'route' }, members: [
+          { id: 'w1', type: 'way', role: 'forward' }
+        ]})
+      ]);
+      const graph = new Rapid.Graph(base);
+      const member = { id: 'n3', type: 'node', role: 'stop' };
+      const result = Rapid.actionAddMember('r', member)(graph);
+      assert.instanceOf(result, Rapid.Graph);
+      assert.deepEqual(members(result), ['n3', 'w1']);
+    });
+
+    it('inserts new platforms at the beginning (for PTv2)', () => {
+      const base = new Rapid.Graph(context, [
+        new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0]}),
+        new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0]}),
+        new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2']}),
+        new Rapid.OsmRelation(context, { id: 'r', tags: { type: 'route' }, members: [
+          { id: 'w1', type: 'way', role: 'forward' }
+        ]})
+      ]);
+      const graph = new Rapid.Graph(base);
+      const member = { id: 'n3', type: 'node', role: 'platform' };
+      const result = Rapid.actionAddMember('r', member)(graph);
+      assert.instanceOf(result, Rapid.Graph);
+      assert.deepEqual(members(result), ['n3', 'w1']);
+    });
   });
 });

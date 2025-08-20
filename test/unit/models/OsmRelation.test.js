@@ -1184,21 +1184,4 @@ describe('OsmRelation', () => {
       ]);
     });
   });
-
-
-  describe('.creationOrder comparator', () => {
-    it('orders existing relations newest-first', () => {
-      const a = new Rapid.OsmRelation(context, { id: 'r1' });
-      const b = new Rapid.OsmRelation(context, { id: 'r2' });
-      assert.ok(Rapid.OsmRelation.creationOrder(a, b) > 0);
-      assert.ok(Rapid.OsmRelation.creationOrder(b, a) < 0);
-    });
-
-    it('orders new relations newest-first', () => {
-      const a = new Rapid.OsmRelation(context, { id: 'r-1' });
-      const b = new Rapid.OsmRelation(context, { id: 'r-2' });
-      assert.ok(Rapid.OsmRelation.creationOrder(a, b) > 0);
-      assert.ok(Rapid.OsmRelation.creationOrder(b, a) < 0);
-    });
-  });
 });

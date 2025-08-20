@@ -80,7 +80,7 @@ export class AbstractData {
    * updateGeometry
    * Forces a recomputation of the internal geometry data.
    * The Graph param is only needed for OSM data types that require a Graph to know their topology.
-   * @param   {Graph}         graph - the Graph that holds the information needed
+   * @param   {Graph?}        graph - optional param, used only for some OSM Entities
    * @return  {AbstractData}  this same data element
    * @abstract
    */

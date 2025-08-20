@@ -176,7 +176,7 @@ export function actionConnect(nodeIDs) {
           let ok = false;
           for (let j = 0; j < memberWays.length; j++) {
             way = memberWays[j];
-            if (way.areAdjacent(n0, n1)) {
+            if (way.isAdjacent(n0, n1)) {
               ok = true;
               break;
             }
@@ -194,7 +194,7 @@ export function actionConnect(nodeIDs) {
         for (let k = 0; k < nodeIDs.length; k++) {
           if (nodeIDs[k] === survivor.id) continue;
 
-          if (way.areAdjacent(nodeIDs[k], survivor.id)) {
+          if (way.isAdjacent(nodeIDs[k], survivor.id)) {
             way = way.removeNode(nodeIDs[k]);
           } else {
             way = way.replaceNode(nodeIDs[k], survivor.id);

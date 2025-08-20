@@ -72,8 +72,8 @@ export class OsmEntity extends AbstractData {
    * OSM geometry can be complicated.
    * Nodes are easy because they represent a single coordinate.
    * But the other data types require topology information from a Graph.
-   * This function allows the calling code to setup the geometry once the Graph is ready.
-   * @param   {Graph}      graph - the Graph that holds the information needed
+   * This function allows the calling code to recompute the geometry after the Graph has been updated.
+   * @param   {Graph}      graph - the Graph that holds the topology needed
    * @return  {OsmEntity}  this same OsmEntity
    * @abstract
    */
@@ -172,7 +172,7 @@ export class OsmEntity extends AbstractData {
    * tags
    * Tags are the `key=value` pairs of strings that assign meaning to an OSM element.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Tag
-   * @return {Object}
+   * @return  {Object}
    * @readonly
    */
   get tags() {
@@ -184,7 +184,7 @@ export class OsmEntity extends AbstractData {
    * This is the OSM `visibility` attribute.
    * Objects with `visibility=false` are considered deleted.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Common_attributes
-   * @return {boolean}
+   * @return  {boolean}
    */
   get visible() {
     return this.props.visible ?? true;
@@ -199,7 +199,7 @@ export class OsmEntity extends AbstractData {
    * When updating an OSM object, its version must match the value on the server,
    *  otherwise the editing API will raise a conflict.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Common_attributes
-   * @return {string}
+   * @return  {string}
    */
   get version() {
     return this.props.version;
@@ -225,14 +225,41 @@ export class OsmEntity extends AbstractData {
     return id.slice(1);
   }
 
+  // compare entities by their osm id
+  static creationOrder(a, b) {
+    const aId = parseInt(OsmEntity.toOSM(a.id), 10);
+    const bId = parseInt(OsmEntity.toOSM(b.id), 10);
+
+    if (aId < 0 || bId < 0) return aId - bId;
+    return bId - aId;
+  };
+
+
+  /**
+   * osmId
+   * This returns just the numerc part of the entityID.
+   * @return  {string}
+   */
   osmId() {
     return OsmEntity.toOSM(this.props.id);
   }
 
+  /**
+   * isNew
+   * By convention, negative numbers are used for new Entities, and positive numbers are used for existing entities.
+   * @return  {boolean}  `true` if the Entity is new, `false` if the entity was downloaded from OSM.
+   */
   isNew() {
     return this.osmId() < 0;
   }
 
+  /**
+   * mergeTags
+   * This merges the given tags into this Entity's existing tags.
+   * When tags have different values, it attempts to convert them into a multi valued tag
+   *   such as `key=val1;val2`, without overflowing the tag character limit.
+   * @return  {OsmEntity}  A new Entity copied from this Entity, but with the updated tags
+   */
   mergeTags(tags) {
     const merged = Object.assign({}, this.props.tags);  // copy
     let changed = false;
@@ -260,10 +287,21 @@ export class OsmEntity extends AbstractData {
     return changed ? this.update({ tags: merged }) : this;
   }
 
+  /**
+   * hasParentRelations
+   * Returns `true` if this Entity is a member of any parent Relations.
+   * @param   {Graph}    graph - the Graph that holds the topology needed
+   * @return  {boolean}  `true` if this Entity has parent Relations, `false` if not
+   */
   hasParentRelations(graph) {
     return graph.parentRelations(this).length > 0;
   }
 
+  /**
+   * hasNonGeometryTags
+   * Returns `true` if this Entity has tags other than `area=yes/no`.
+   * @return  {boolean}  `true` if this Entity has non-geometry tags, `false` if not
+   */
   hasNonGeometryTags() {
     for (const k of Object.keys(this.props.tags)) {
       if (k !== 'area') return true;
@@ -271,6 +309,13 @@ export class OsmEntity extends AbstractData {
     return false;
   }
 
+  /**
+   * hasInterestingTags
+   * By convention, some tags are more for storing metadata and can be safely ignored.
+   * (For example, `source`, `created_by`, etc).
+   * The list of these tags can be found in `osmIsInterestingTag`.
+   * @return  {boolean}  `true` if this Entity has "interesting" tags, `false` if not
+   */
   hasInterestingTags() {
     for (const k of Object.keys(this.props.tags)) {
       if (osmIsInterestingTag(k)) return true;
@@ -278,10 +323,26 @@ export class OsmEntity extends AbstractData {
     return false;
   }
 
+  /**
+   * isHighwayIntersection
+   * Is this Entity a highway intersection?
+   * For most Entities this returns `false`, but is overridden in `OsmNode`.
+   * @param   {Graph}    graph - the Graph that holds the topology needed
+   * @return  {boolean}  `true` if this Entity is an intersection of parent highways, `false` if not
+   * @abstract
+   */
   isHighwayIntersection() {
     return false;
   }
 
+  /**
+   * isDegenerate
+   * Each Entity has a way of checking whether it is degenerate (aka invalid) or not.
+   * For generic Entities, this returns `true`, but should be overridden with proper logic in the derived classes.
+   * @param   {Graph}    graph - the Graph that holds the topology needed
+   * @return  {boolean}  `true` if this Entity is degenerate, `false` if not
+   * @abstract
+   */
   isDegenerate() {
     return true;
   }

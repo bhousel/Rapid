@@ -373,7 +373,7 @@ export class DragNodeMode extends AbstractMode {
       // if both vertices are part of the same way
       if (sharedParentWays.length !== 0) {
         // if the nodes are next to each other, they are merged
-        if (sharedParentWays[0].areAdjacent(this.dragNode.id, target.id)) {
+        if (sharedParentWays[0].isAdjacent(this.dragNode.id, target.id)) {
           return l10n.t('operations.connect.annotation.from_vertex.to_adjacent_vertex');
         }
         return l10n.t('operations.connect.annotation.from_vertex.to_sibling_vertex');

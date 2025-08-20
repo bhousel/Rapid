@@ -162,7 +162,7 @@ export function actionCircularize(wayID, viewport, maxDegrees = 20) {
           let sharedWay = parentWays[j];
           if (sharedWay === way) continue;
 
-          if (sharedWay.areAdjacent(startNode.id, endNode.id)) {
+          if (sharedWay.isAdjacent(startNode.id, endNode.id)) {
             const startIndex2 = sharedWay.nodes.lastIndexOf(startNode.id);
             const endIndex2 = sharedWay.nodes.lastIndexOf(endNode.id);
             let wayDirection2 = (endIndex2 - startIndex2);
