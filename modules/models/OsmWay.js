@@ -1,4 +1,3 @@
-import { geoArea as d3_geoArea } from 'd3-geo';
 import { Extent, vecCross } from '@rapid-sdk/math';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
@@ -678,39 +677,4 @@ export class OsmWay extends OsmEntity {
 
     return this.update({ nodes: nodes });
   }
-
-
-  /**
-   * area
-   * This calculates an area for the given way using d3_geoArea.
-   * The result is in "steradians" (square radians).
-   * (This should instead live in the Geometry/GeometryPart classes)
-   * @see https://d3js.org/d3-geo/math#geoArea
-   * @param   {Graph}   graph - the Graph that holds the topology needed
-   * @return  {number}  The area in square radians
-   */
-  area(graph) {
-    return this.transient('area', () => {
-      const nodes = graph.childNodes(this);
-      const json = {
-        type: 'Polygon',
-        coordinates: [ nodes.map(n => n.loc) ]
-      };
-
-      if (!this.isClosed() && nodes.length) {
-        json.coordinates[0].push(nodes[0].loc);
-      }
-
-      let area = d3_geoArea(json);
-      // Heuristic for detecting counterclockwise winding order. Assumes
-      // that OpenStreetMap polygons are not hemisphere-spanning.
-      if (area > 2 * Math.PI) {
-        json.coordinates[0] = json.coordinates[0].reverse();
-        area = d3_geoArea(json);
-      }
-
-      return isNaN(area) ? 0 : area;
-    });
-  }
-
 }

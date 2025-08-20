@@ -856,19 +856,6 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('area', () => {
-    it('returns an area', () => {
-      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
-      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0, 1] });
-      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [1, 0] });
-      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1'] });
-      const r1 = new Rapid.OsmRelation(context, { members: [{ id: 'w1', type: 'way' }] });
-      const g = new Rapid.Graph(context, [n1, n2, n3, w1, r1]);
-      assert.isFinite(r1.area(g));
-    });
-  });
-
-
   describe('isComplete', () => {
     it('returns true if all members are in the graph', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });

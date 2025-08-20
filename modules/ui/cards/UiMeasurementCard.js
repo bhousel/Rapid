@@ -1,5 +1,6 @@
 import { selection } from 'd3-selection';
-import { geoLength, geoCentroid } from 'd3-geo';
+import { geoArea, geoLength, geoCentroid } from 'd3-geo';
+import geojsonRewind from '@mapbox/geojson-rewind';
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilGetAllNodes } from '@rapid-sdk/util';
 
@@ -21,13 +22,15 @@ function steradiansToSqmeters(r) {
 
 
 function asLineString(feature) {
-  if (feature.type === 'LineString') return feature;
+  const geom = feature.geometry;
+  if (geom.type === 'LineString') return geom;
 
+  // get an outer ring
   const result = { type: 'LineString', coordinates: [] };
-  if (feature.type === 'Polygon') {
-    result.coordinates = feature.coordinates[0];
-  } else if (feature.type === 'MultiPolygon') {
-    result.coordinates = feature.coordinates[0][0];
+  if (geom.type === 'Polygon') {
+    result.coordinates = geom.coordinates[0];
+  } else if (geom.type === 'MultiPolygon') {
+    result.coordinates = geom.coordinates[0][0];
   }
 
   return result;
@@ -131,7 +134,7 @@ export class UiMeasurementCard extends AbstractUiCard {
 
     let heading;
     let center, location, centroid;
-    let closed, geometry;
+    let isClosed, geometry;
     let totalNodeCount;
     let length = 0;
     let area = 0;
@@ -158,16 +161,17 @@ export class UiMeasurementCard extends AbstractUiCard {
       }
 
       if (selected.length > 0) {    // 1…n
-        let allExtent = new Extent();
+        const allExtent = new Extent();
 
-        selected.forEach(entity => {
+        for (const entity of selected) {
           let extent = entity.extent(graph);
-          let geojson = entity.asGeoJSON(graph);
-          allExtent = allExtent.extend(extent);
+          let geojson = geojsonRewind(entity.asGeoJSON(graph), true);  // true = outer ring clockwise (how D3 wants it)
 
+          allExtent.extendSelf(extent);
           geometry = entity.geometry(graph);
+
           if (geometry === 'line' || geometry === 'area') {
-            closed = (entity.type === 'relation') || (entity.isClosed() && !entity.isDegenerate());
+            isClosed = (entity.type === 'relation') || (entity.isClosed() && !entity.isDegenerate());
 
             length += radiansToMeters(geoLength(asLineString(geojson)));
 
@@ -176,15 +180,15 @@ export class UiMeasurementCard extends AbstractUiCard {
               centroid = extent.center();
             }
 
-            if (closed) {
-              area += steradiansToSqmeters(entity.area(graph));
+            if (isClosed) {
+              area += steradiansToSqmeters(geoArea(geojson));
             }
           }
-        });
+        }
 
         if (selected.length > 1) {  // 2…n
           geometry = null;
-          closed = null;
+          isClosed = null;
           centroid = null;
         }
 
@@ -220,7 +224,7 @@ export class UiMeasurementCard extends AbstractUiCard {
         .append('li')
         .text(l10n.t('info_panels.measurement.geometry') + ':')
         .append('span')
-        .text(closed ? l10n.t('info_panels.measurement.closed_' + geometry) : l10n.t('geometry.' + geometry));
+        .text(isClosed ? l10n.t('info_panels.measurement.closed_' + geometry) : l10n.t('geometry.' + geometry));
     }
 
     if (totalNodeCount) {
@@ -242,7 +246,7 @@ export class UiMeasurementCard extends AbstractUiCard {
     if (length) {
       $list
         .append('li')
-        .text(l10n.t('info_panels.measurement.' + (closed ? 'perimeter' : 'length')) + ':')
+        .text(l10n.t('info_panels.measurement.' + (isClosed ? 'perimeter' : 'length')) + ':')
         .append('span')
         .text(l10n.displayLength(length, this._isImperial));
     }

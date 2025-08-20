@@ -358,21 +358,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * area
-   * This calculates an area for the given relation using d3_geoArea.
-   * The result is in "steradians" (square radians).
-   * (This should instead live in the Geometry/GeometryPart classes)
-   * @see https://d3js.org/d3-geo/math#geoArea
-   * @param   {Graph}   graph - the Graph that holds the topology needed
-   * @return  {number}  The area in square radians
-   */
-  area(graph) {
-    return this.transient('area', () => {
-      return d3_geoArea(this.asGeoJSON(graph));
-    });
-  }
-
-  /**
    * isMultipolygon
    * Returns whether this relation is an OSM multipolygon, given the tags present.
    * @return  {boolean}  `true` if the relation is a multipolygon, `false` if not.
@@ -518,11 +503,11 @@ export class OsmRelation extends OsmEntity {
         inner = inner.reverse();
       }
 
-      const o = findOuter(inners[i]);
+      const o = findOuter(inner);
       if (o !== undefined) {
-        result[o].push(inners[i]);
+        result[o].push(inner);
       } else {
-        result.push([inners[i]]); // Invalid geometry
+        result.push([inner]); // Invalid geometry
       }
     }
 
