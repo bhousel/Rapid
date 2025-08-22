@@ -1,3 +1,8 @@
+import { before, describe, it } from 'node:test';
+import { assert } from 'chai';
+import * as Rapid from '../../../modules/headless.js';
+
+
 describe('ValidationSystem', () => {
 
   class MockSystem {
@@ -101,7 +106,7 @@ describe('ValidationSystem', () => {
 
   it('has no issues on init', () => {
     const issues = _validator.getIssues({ what: 'all', where: 'all' });
-    expect(issues).to.be.an.instanceOf(Array).with.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
 
@@ -113,16 +118,16 @@ describe('ValidationSystem', () => {
     editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
 
     const prom = _validator.validateAsync();
-    expect(prom).to.be.an.instanceOf(Promise);
+    assert.instanceOf(prom, Promise);
 
     return prom
       .then(() => {
         const issues = _validator.getIssues({ what: 'all', where: 'all' });
-        expect(issues).to.have.lengthOf(1);
+        assert.lengthOf(issues, 1);
+
         const issue = issues[0];
-        expect(issue.type).to.eql('private_data');
-        expect(issue.entityIds).to.have.lengthOf(1);
-        expect(issue.entityIds[0]).to.eql('n-1');
+        assert.strictEqual(issue.type, 'private_data');
+        assert.deepEqual(issue.entityIds, ['n-1']);
       });
   });
 

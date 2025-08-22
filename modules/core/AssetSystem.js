@@ -148,7 +148,8 @@ export class AssetSystem extends AbstractSystem {
 
     // Mock data for testing, prevents the data from being fetched.
     // Not sure how I feel about this :-/
-    if (window.mocha) {
+    const isTestEnvironment = (typeof window === 'undefined' || globalThis.mocha);
+    if (isTestEnvironment) {
       const c = this._cache;
       c.address_formats = { addressFormats: [{ format: [['housenumber', 'street'], ['city', 'postcode'] ] }] };
       c.imagery = { imagery: [] };

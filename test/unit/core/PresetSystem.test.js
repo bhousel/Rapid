@@ -1,3 +1,8 @@
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { assert } from 'chai';
+import * as Rapid from '../../../modules/headless.js';
+
+
 describe('PresetSystem', () => {
   class MockStorageSystem {
     constructor() { }
@@ -54,7 +59,7 @@ describe('PresetSystem', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const graph = new Rapid.Graph(context, [node]);
       const presets = new Rapid.PresetSystem(context);
-      expect(presets.match(node, graph).id).to.eql('point');
+      assert.strictEqual(presets.match(node, graph).id, 'point');
     });
 
     it('has a fallback line preset', () => {
@@ -62,7 +67,7 @@ describe('PresetSystem', () => {
       const way = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'] });
       const graph = new Rapid.Graph(context, [node, way]);
       const presets = new Rapid.PresetSystem(context);
-      expect(presets.match(way, graph).id).to.eql('line');
+      assert.strictEqual(presets.match(way, graph).id, 'line');
     });
 
     it('has a fallback area preset', () => {
@@ -70,14 +75,14 @@ describe('PresetSystem', () => {
       const way = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'], tags: { area: 'yes' }});
       const graph = new Rapid.Graph(context, [node, way]);
       const presets = new Rapid.PresetSystem(context);
-      expect(presets.match(way, graph).id).to.eql('area');
+      assert.strictEqual(presets.match(way, graph).id, 'area');
     });
 
     it('has a fallback relation preset', () => {
       const relation = new Rapid.OsmRelation(context, { id: 'r' });
       const graph = new Rapid.Graph(context, [relation]);
       const presets = new Rapid.PresetSystem(context);
-      expect(presets.match(relation, graph).id).to.eql('relation');
+      assert.strictEqual(presets.match(relation, graph).id, 'relation');
     });
   });
 
@@ -96,7 +101,7 @@ describe('PresetSystem', () => {
       return presets.initAsync().then(() => {
         const way = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
         const graph = new Rapid.Graph(context, [way]);
-        expect(presets.match(way, graph).id).to.eql('residential');
+        assert.strictEqual(presets.match(way, graph).id, 'residential');
       });
     });
 
@@ -107,8 +112,8 @@ describe('PresetSystem', () => {
       const graph = new Rapid.Graph(context, [point, line]);
 
       return presets.initAsync().then(() => {
-        expect(presets.match(point, graph).id).to.eql('point');
-        expect(presets.match(line, graph).id).to.eql('line');
+        assert.strictEqual(presets.match(point, graph).id, 'point');
+        assert.strictEqual(presets.match(line, graph).id, 'line');
       });
     });
 
@@ -119,7 +124,7 @@ describe('PresetSystem', () => {
       const graph = new Rapid.Graph(context, [point, line]);
 
       return presets.initAsync().then(() => {
-        expect(presets.match(point, graph).id).to.eql('point');
+        assert.strictEqual(presets.match(point, graph).id, 'point');
       });
     });
 
@@ -130,7 +135,7 @@ describe('PresetSystem', () => {
       const graph = new Rapid.Graph(context, [point, line]);
 
       return presets.initAsync().then(() => {
-        expect(presets.match(point, graph).id).to.eql('park');
+        assert.strictEqual(presets.match(point, graph).id, 'park');
       });
     });
   });
@@ -153,50 +158,50 @@ describe('PresetSystem', () => {
     it('includes keys for presets with area geometry', () => {
       const presets = new Rapid.PresetSystem(context);
       return presets.initAsync().then(() => {
-        expect(presets.areaKeys()).to.include.keys('natural');
+        assert.containsAllKeys(presets.areaKeys(), ['natural']);
       });
     });
 
     it('discards key-values for presets with a line geometry', () => {
       const presets = new Rapid.PresetSystem(context);
       return presets.initAsync().then(() => {
-        expect(presets.areaKeys().natural).to.include.keys('tree_row');
-        expect(presets.areaKeys().natural.tree_row).to.be.true;
+        assert.containsAllKeys(presets.areaKeys().natural, ['tree_row']);
+        assert.isTrue(presets.areaKeys().natural.tree_row);
       });
     });
 
     it('discards key-values for presets with both area and line geometry', () => {
       const presets = new Rapid.PresetSystem(context);
       return presets.initAsync().then(() => {
-        expect(presets.areaKeys().leisure).to.include.keys('track');
+        assert.containsAllKeys(presets.areaKeys().leisure, ['track']);
       });
     });
 
     it('does not discard key-values for presets with neither area nor line geometry', () => {
       const presets = new Rapid.PresetSystem(context);
       return presets.initAsync().then(() => {
-        expect(presets.areaKeys().natural).not.to.include.keys('peak');
+        assert.doesNotHaveAllKeys(presets.areaKeys().natural, ['peak']);
       });
     });
 
     it('does not discard generic \'*\' key-values', () => {
       const presets = new Rapid.PresetSystem(context);
       return presets.initAsync().then(() => {
-        expect(presets.areaKeys().natural).not.to.include.keys('natural');
+        assert.doesNotHaveAllKeys(presets.areaKeys().natural, ['natural']);
       });
     });
 
     it('ignores keys like \'highway\' that are assumed to be lines', () => {
       const presets = new Rapid.PresetSystem(context);
       return presets.initAsync().then(() => {
-        expect(presets.areaKeys()).not.to.include.keys('highway');
+        assert.doesNotHaveAllKeys(presets.areaKeys(), ['highway']);
       });
     });
 
     it('ignores suggestion presets', () => {
       const presets = new Rapid.PresetSystem(context);
       return presets.initAsync().then(() => {
-        expect(presets.areaKeys()).not.to.include.keys('amenity');
+        assert.doesNotHaveAllKeys(presets.areaKeys(), ['amenity']);
       });
     });
   });
@@ -216,14 +221,14 @@ describe('PresetSystem', () => {
       };
 
       let matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
-      expect(matched.id).to.eql('point');   // no surfshop preset yet, matches fallback point
+      assert.strictEqual(matched.id, 'point');   // no surfshop preset yet, matches fallback point
       presets.merge(presetData);
 
       // todo: need to touch the entity now, due to change in how transients work.
       // may need to rethink how this works.
       surfShop.touch();
       matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
-      expect(matched.id).to.eql('amenity/shop/surf');
+      assert.strictEqual(matched.id, 'amenity/shop/surf');
     });
   });
 
@@ -266,7 +271,7 @@ describe('PresetSystem', () => {
       const graph = new Rapid.Graph(context, [relation]);
       return presets.initAsync().then(() => {
         const match = presets.match(relation, graph);
-        expect(match.id).to.eql('building');
+        assert.strictEqual(match.id, 'building');
       });
     });
 
@@ -276,7 +281,7 @@ describe('PresetSystem', () => {
       const graph = new Rapid.Graph(context, [way]);
       return presets.initAsync().then(() => {
         const match = presets.match(way, graph);
-        expect(match.id).to.eql('building');
+        assert.strictEqual(match.id, 'building');
       });
     });
 
@@ -286,7 +291,7 @@ describe('PresetSystem', () => {
       const graph = new Rapid.Graph(context, [way]);
       return presets.initAsync().then(() => {
         const match = presets.match(way, graph);
-        expect(match.id).to.eql('highway/pedestrian_area');
+        assert.strictEqual(match.id, 'highway/pedestrian_area');
       });
     });
   });

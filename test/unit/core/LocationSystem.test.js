@@ -1,3 +1,8 @@
+import { beforeEach, describe, it } from 'node:test';
+import { assert } from 'chai';
+import * as Rapid from '../../../modules/headless.js';
+
+
 describe('LocationSystem', () => {
   const colorado = {
     type: 'Feature',
@@ -46,22 +51,21 @@ describe('LocationSystem', () => {
     it('merges geojson into lococation-conflation cache', () => {
       _locations.mergeCustomGeoJSON(fc);
       const loco = _locations._loco;
-      expect(loco._cache['colorado.geojson']).to.eql(colorado);
+      assert.deepEqual(loco._cache['colorado.geojson'], colorado);
     });
   });
 
 
   describe('mergeLocationSets', () => {
-    it('returns a promise rejected if not passed an array', done => {
+    it('returns a promise rejected if not passed an array', () => {
       const prom = _locations.mergeLocationSets({});
-      expect(prom).to.be.an.instanceof(Promise);
-      prom
-        .then(() => {
-          done(new Error('This was supposed to fail, but somehow succeeded.'));
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(data => {
+          assert.fail(`This was supposed to fail, but somehow succeeded`);
         })
         .catch(err => {
-          expect(/^nothing to do/.test(err)).to.be.true;
-          done();
+          assert.match(err, /^nothing to do/);
         });
     });
 
@@ -73,9 +77,9 @@ describe('LocationSystem', () => {
 
       return _locations.mergeLocationSets(data)
         .then(result => {
-          expect(result).to.equal(data);
-          expect(result[0].locationSetID).to.eql('+[Q2]');
-          expect(result[1].locationSetID).to.eql('+[Q30]');
+          assert.strictEqual(result, data);
+          assert.strictEqual(result[0].locationSetID, '+[Q2]');
+          assert.strictEqual(result[1].locationSetID, '+[Q30]');
         });
     });
 
@@ -87,9 +91,9 @@ describe('LocationSystem', () => {
 
       return _locations.mergeLocationSets(data)
         .then(result => {
-          expect(result).to.equal(data);
-          expect(result[0].locationSetID).to.eql('+[Q2]');
-          expect(result[1].locationSetID).to.eql('+[Q2]');
+          assert.strictEqual(result, data);
+          assert.strictEqual(result[0].locationSetID, '+[Q2]');
+          assert.strictEqual(result[1].locationSetID, '+[Q2]');
         });
     });
   });
@@ -97,12 +101,12 @@ describe('LocationSystem', () => {
 
   describe('locationSetID', () => {
     it('calculates a locationSetID for a locationSet', () => {
-      expect(_locations.locationSetID({ include: ['usa'] })).to.eql('+[Q30]');
+      assert.strictEqual(_locations.locationSetID({ include: ['usa'] }), '+[Q30]');
     });
 
     it('falls back to the world locationSetID in case of errors', () => {
-      expect(_locations.locationSetID({ foo: 'bar' })).to.eql('+[Q2]');
-      expect(_locations.locationSetID({ include: ['fake.geojson'] })).to.eql('+[Q2]');
+      assert.strictEqual(_locations.locationSetID({ foo: 'bar' }), '+[Q2]');
+      assert.strictEqual(_locations.locationSetID({ include: ['fake.geojson'] }), '+[Q2]');
     });
   });
 
@@ -110,14 +114,14 @@ describe('LocationSystem', () => {
   describe('getFeature', () => {
     it('has the world locationSet pre-resolved', () => {
       const result = _locations.getFeature('+[Q2]');
-      expect(result instanceof Rapid.GeoJSON).to.be.ok;
-      expect(result.props.geojson).to.include({ type: 'Feature', id: '+[Q2]' });
+      assert.instanceOf(result, Rapid.GeoJSON);
+      assert.deepInclude(result.props.geojson, { type: 'Feature', id: '+[Q2]' });
     });
 
     it('falls back to the world locationSetID in case of errors', () => {
       const result = _locations.getFeature('fake');
-      expect(result instanceof Rapid.GeoJSON).to.be.ok;
-      expect(result.props.geojson).to.include({ type: 'Feature', id: '+[Q2]' });
+      assert.instanceOf(result, Rapid.GeoJSON);
+      assert.deepInclude(result.props.geojson, { type: 'Feature', id: '+[Q2]' });
     });
   });
 
@@ -125,11 +129,11 @@ describe('LocationSystem', () => {
   describe('locationSetsAt', () => {
     it('has the world locationSet pre-resolved', () => {
       const result1 = _locations.locationSetsAt([-108.557, 39.065]);  // Grand Junction
-      expect(result1).to.be.an('object').that.has.all.keys('+[Q2]');
+      assert.hasAllKeys(result1, ['+[Q2]']);
       const result2 = _locations.locationSetsAt([-74.481, 40.797]);   // Morristown
-      expect(result2).to.be.an('object').that.has.all.keys('+[Q2]');
+      assert.hasAllKeys(result2, ['+[Q2]']);
       const result3 = _locations.locationSetsAt([13.575, 41.207]);    // Gaeta
-      expect(result3).to.be.an('object').that.has.all.keys('+[Q2]');
+      assert.hasAllKeys(result3, ['+[Q2]']);
     });
 
     it('returns valid locationSets at a given lon,lat', () => {
@@ -143,11 +147,11 @@ describe('LocationSystem', () => {
       return _locations.mergeLocationSets(data)
         .then(() => {
           const result1 = _locations.locationSetsAt([-108.557, 39.065]);  // Grand Junction
-          expect(result1).to.be.an('object').that.has.all.keys('+[Q2]', '+[Q30]', '+[colorado.geojson]');
+          assert.hasAllKeys(result1, ['+[Q2]', '+[Q30]', '+[colorado.geojson]']);
           const result2 = _locations.locationSetsAt([-74.481, 40.797]);   // Morristown
-          expect(result2).to.be.an('object').that.has.all.keys('+[Q2]', '+[Q30]');
+          assert.hasAllKeys(result2, ['+[Q2]', '+[Q30]']);
           const result3 = _locations.locationSetsAt([13.575, 41.207]);    // Gaeta
-          expect(result3).to.be.an('object').that.has.all.keys('+[Q2]');
+          assert.hasAllKeys(result3, ['+[Q2]']);
         });
     });
   });

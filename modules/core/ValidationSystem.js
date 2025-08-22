@@ -146,13 +146,13 @@ export class ValidationSystem extends AbstractSystem {
 
     // cancel deferred work and reject any pending promise
     for (const [handle, reject] of this._deferredRIC) {
-      window.cancelIdleCallback(handle);
+      globalThis.cancelIdleCallback(handle);
       reject();
     }
     this._deferredRIC.clear();
 
     for (const handle of this._deferredST) {
-      window.clearTimeout(handle);
+      globalThis.clearTimeout(handle);
     }
     this._deferredST.clear();
 
@@ -347,7 +347,7 @@ export class ValidationSystem extends AbstractSystem {
     }
 
     // Select the first entity in the issue.
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       context.enter('select-osm', { selection: { osm: [selectID] }} );
       this.emit('focusedIssue', issue);
     }, 250);  // after ease
@@ -764,7 +764,7 @@ export class ValidationSystem extends AbstractSystem {
   _revalidateProvisionalEntities(cache) {
     if (!cache.provisionalEntityIDs.size) return;  // nothing to do
 
-    const handle = window.setTimeout(() => {
+    const handle = globalThis.setTimeout(() => {
       this._deferredST.delete(handle);
       if (!cache.provisionalEntityIDs.size) return;  // nothing to do
       this._validateEntitiesAsync(cache, cache.provisionalEntityIDs);
@@ -788,7 +788,7 @@ export class ValidationSystem extends AbstractSystem {
     const chunk = cache.queue.pop();
 
     return new Promise((resolve, reject) => {
-        const handle = window.requestIdleCallback(() => {
+        const handle = globalThis.requestIdleCallback(() => {
           this._deferredRIC.delete(handle);
           // const t0 = performance.now();
           chunk.forEach(job => job());

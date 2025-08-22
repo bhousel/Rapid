@@ -134,7 +134,8 @@ export class EditSystem extends AbstractSystem {
 
     return this._initPromise = prerequisites
       .then(() => {
-        if (window.mocha) return;
+        const isTestEnvironment = (typeof window === 'undefined' || globalThis.mocha);
+        if (isTestEnvironment) return;
 
         // Setup event handlers..
         window.addEventListener('beforeunload', e => {
@@ -1029,7 +1030,8 @@ export class EditSystem extends AbstractSystem {
     gfx.pause();  // block rendering
 
     let loading;
-    if (!window.mocha) {
+    const isTestEnvironment = (typeof window === 'undefined' || globalThis.mocha);
+    if (!isTestEnvironment) {
       loading = uiLoading(context).blocking(true);
       context.container().call(loading);   // block ui
     }
@@ -1277,7 +1279,8 @@ export class EditSystem extends AbstractSystem {
    * @return  {string}  The key used to store/retrieve backup edits in localStorage
    */
   _backupKey() {
-    return 'Rapid_' + window.location.origin + '_saved_history';
+    const key = globalThis?.location?.origin || 'headless';
+    return `Rapid_${key}_saved_history`;
   }
 
 

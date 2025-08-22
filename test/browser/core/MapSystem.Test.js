@@ -1,3 +1,8 @@
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { assert } from 'chai';
+import * as Rapid from '../../../modules/headless.js';
+
+
 describe('MapSystem', () => {
   let _container, _mapSystem;
 
