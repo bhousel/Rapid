@@ -5,14 +5,6 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('ValidationSystem', () => {
 
-  class MockSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    on()          { return this; }
-    pause()       { }
-    resume()      { }
-  }
-
   class MockGfxSystem {
     constructor() {
       this.scene = { layers: new Map() };
@@ -22,31 +14,12 @@ describe('ValidationSystem', () => {
     resume()      { }
   }
 
-  class MockImagerySystem {
+  class MockMapSystem {
     constructor() { }
     initAsync()   { return Promise.resolve(); }
-    imageryUsed() { return ''; }
-  }
-
-  class MockLocalizationSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    t(id)         { return id; }
-    tHtml(id)     { return id; }
-  }
-
-  class MockPhotoSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    photosUsed()  { return ''; }
-  }
-
-  class MockStorageSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    getItem()     { return ''; }
-    hasItem()     { return false; }
-    setItem()     { }
+    on()          { return this; }
+    pause()       { }
+    resume()      { }
   }
 
   class MockUrlSystem {
@@ -64,15 +37,16 @@ describe('ValidationSystem', () => {
       this.systems = {
         assets:   new Rapid.AssetSystem(this),
         editor:   new Rapid.EditSystem(this),
-        gfx:      new MockGfxSystem(),
-        imagery:  new MockImagerySystem(),
-        l10n:     new MockLocalizationSystem(),
-        map:      new MockSystem(),
-        photos:   new MockPhotoSystem(),
-        presets:  new MockSystem(),
-        rapid:    new MockSystem(),
-        storage:  new MockStorageSystem(),
-        urlhash:  new MockUrlSystem()
+        gfx:      new MockGfxSystem(this),
+        imagery:  new Rapid.ImagerySystem(this),
+        l10n:     new Rapid.LocalizationSystem(this),
+        map:      new MockMapSystem(this),
+        photos:   new Rapid.PhotoSystem(this),
+        presets:  new Rapid.PresetSystem(this),
+        rapid:    new Rapid.RapidSystem(this),
+        spatial:  new Rapid.SpatialSystem(this),
+        storage:  new Rapid.StorageSystem(this),
+        urlhash:  new MockUrlSystem(this)
       };
     }
     selectedIDs() { return []; }

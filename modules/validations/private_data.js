@@ -1,7 +1,8 @@
 import { utilTagDiff } from '@rapid-sdk/util';
 
 import { actionChangeTags } from '../actions/change_tags.js';
-import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
+import { ValidationIssue } from '../core/lib/ValidationIssue.js';
+import { ValidationFix } from '../core/lib/ValidationFix.js';
 
 
 export function validationPrivateData(context) {

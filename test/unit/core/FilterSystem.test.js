@@ -5,11 +5,13 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('FilterSystem', () => {
 
-  class MockStorageSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    getItem()     { return ''; }
-    setItem()     { }
+  class MockEditSystem {
+    constructor(context) {
+      this.context = context;
+    }
+    get staging() {
+      return { graph: new Rapid.Graph(this.context) };
+    }
   }
 
   class MockUrlHashSystem {
@@ -20,22 +22,13 @@ describe('FilterSystem', () => {
     on()          { return this; }
   }
 
-  class MockEditSystem {
-    constructor(context) {
-      this.context = context;
-    }
-    get staging() {
-      return { graph: new Rapid.Graph(this.context) };
-    }
-  }
-
   class MockContext {
     constructor()   {
       this.viewport = new Rapid.sdk.Viewport();
       this.sequences = {};
       this.systems = {
         editor:  new MockEditSystem(this),
-        storage: new MockStorageSystem(this),
+        storage: new Rapid.StorageSystem(this),
         urlhash: new MockUrlHashSystem(this)
       };
     }

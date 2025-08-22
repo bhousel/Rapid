@@ -4,10 +4,6 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('PresetSystem', () => {
-  class MockStorageSystem {
-    constructor() { }
-    getItem() { return ''; }
-  }
 
   class MockUrlSystem {
     constructor() {
@@ -17,22 +13,15 @@ describe('PresetSystem', () => {
     on()          { return this; }
   }
 
-  class MockLocalizationSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    t(id)         { return id; }
-    tHtml(id)     { return id; }
-  }
-
   class MockContext {
     constructor()   {
       this.sequences = {};
       this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
         assets:     new Rapid.AssetSystem(this),
-        l10n:       new MockLocalizationSystem(),
+        l10n:       new Rapid.LocalizationSystem(this),
         locations:  new Rapid.LocationSystem(this),
-        storage:    new MockStorageSystem(),
+        storage:    new Rapid.StorageSystem(this),
         urlhash:    new MockUrlSystem()
       };
     }

@@ -8,7 +8,8 @@ import { actionChangeTags } from '../actions/change_tags.js';
 import { actionMergeNodes } from '../actions/merge_nodes.js';
 import { geoHasSelfIntersections } from '../geo/index.js';
 import { osmRoutableHighwayTagValues } from '../models/tags.js';
-import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
+import { ValidationIssue } from '../core/lib/ValidationIssue.js';
+import { ValidationFix } from '../core/lib/ValidationFix.js';
 
 
 /**

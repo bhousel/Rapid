@@ -25,19 +25,7 @@ describe('LocationSystem', () => {
 
   const fc = { type: 'FeatureCollection', features: [colorado] };
 
-  class MockContext {
-    constructor()   {
-      this.viewport = new Rapid.sdk.Viewport();
-      this.sequences = {};
-      this.systems = {};
-    }
-    next(which) {
-      let num = this.sequences[which] || 0;
-      return this.sequences[which] = ++num;
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
   let _locations;
 
 

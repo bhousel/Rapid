@@ -9,7 +9,8 @@ import { actionExtract } from '../actions/extract.js';
 import { osmJoinWays } from '../models/multipolygon.js';
 import { osmNodeGeometriesForTags, osmTagSuggestingArea } from '../models/tags.js';
 import { geoHasSelfIntersections } from '../geo/index.js';
-import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
+import { ValidationIssue } from '../core/lib/ValidationIssue.js';
+import { ValidationFix } from '../core/lib/ValidationFix.js';
 
 
 export function validationMismatchedGeometry(context) {

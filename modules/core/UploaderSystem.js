@@ -34,7 +34,7 @@ export class UploaderSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'uploader';
-    this.dependencies = new Set(['assets', 'editor', 'l10n']);
+    this.dependencies = new Set(['assets', 'editor', 'spatial', 'l10n']);
 
     this.changeset = null;    // uiCommit will create it
 

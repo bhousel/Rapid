@@ -4,7 +4,8 @@ import { actionChangePreset } from '../actions/change_preset.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionUpgradeTags } from '../actions/upgrade_tags.js';
 import { getDeprecatedTags, osmIsOldMultipolygonOuterMember, osmOldMultipolygonOuterMemberOfRelation } from '../models/index.js';
-import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
+import { ValidationIssue } from '../core/lib/ValidationIssue.js';
+import { ValidationFix } from '../core/lib/ValidationFix.js';
 
 
 const pathVals = new Set([

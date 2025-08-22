@@ -83,7 +83,7 @@ export class EditSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'editor';   // was: 'history'
-    this.dependencies = new Set(['gfx', 'imagery', 'map', 'photos', 'storage']);
+    this.dependencies = new Set(['gfx', 'imagery', 'map', 'photos', 'spatial', 'storage']);
 
     this._mutex = utilSessionMutex('lock');
     this._canRestoreBackup = false;

@@ -35,7 +35,9 @@ export class MapSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'map';
-    this.dependencies = new Set(['editor', 'filters', 'gfx', 'imagery', 'l10n', 'photos', 'rapid', 'storage', 'styles', 'urlhash']);
+    this.dependencies = new Set([
+      'editor', 'filters', 'gfx', 'imagery', 'l10n', 'photos', 'rapid', 'spatial', 'storage', 'styles', 'urlhash'
+    ]);
 
     // display options
     this.areaFillOptions = ['wireframe', 'partial', 'full'];

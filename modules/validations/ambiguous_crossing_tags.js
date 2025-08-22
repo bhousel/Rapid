@@ -3,7 +3,8 @@ import { utilTagDiff } from '@rapid-sdk/util';
 
 import { actionChangePreset, actionChangeTags, actionSyncCrossingTags } from '../actions/index.js';
 import { Difference } from '../models/Difference.js';
-import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
+import { ValidationIssue } from '../core/lib/ValidationIssue.js';
+import { ValidationFix } from '../core/lib/ValidationFix.js';
 
 
 /**

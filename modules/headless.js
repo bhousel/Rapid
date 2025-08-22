@@ -4,6 +4,7 @@ export * from './core/lib/index.js';
 export * from './geo/index.js';
 export * from './models/index.js';
 export * from './util/index.js';
+export * from './validations/index.js';
 
 // These systems can work without browser and UI.
 export { AbstractSystem } from './core/AbstractSystem.js';
@@ -14,6 +15,7 @@ export { ImagerySystem } from './core/ImagerySystem.js';
 export { LocalizationSystem } from './core/LocalizationSystem.js';
 export { LocationSystem } from './core/LocationSystem.js';
 export { MapSystem } from './core/MapSystem.js';
+export { PhotoSystem } from './core/PhotoSystem.js';
 export { PresetSystem } from './core/PresetSystem.js';
 export { RapidSystem } from './core/RapidSystem.js';
 export { SpatialSystem } from './core/SpatialSystem.js';

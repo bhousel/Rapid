@@ -1,10 +1,10 @@
-describe('EditSystem', () => {
+import { beforeEach, describe, it } from 'node:test';
+import { assert } from 'chai';
+import sinon from 'sinon';
+import * as Rapid from '../../../modules/headless.js';
 
-  class MockSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    on()          { return this; }
-  }
+
+describe('EditSystem', () => {
 
   class MockGfxSystem {
     constructor() {
@@ -15,24 +15,10 @@ describe('EditSystem', () => {
     resume()      { }
   }
 
-  class MockImagerySystem {
+  class MockMapSystem {
     constructor() { }
     initAsync()   { return Promise.resolve(); }
-    imageryUsed() { return ''; }
-  }
-
-  class MockPhotoSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    photosUsed()  { return ''; }
-  }
-
-  class MockStorageSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    getItem()     { return ''; }
-    hasItem()     { return false; }
-    setItem()     { }
+    on()          { return this; }
   }
 
   class MockContext {
@@ -40,12 +26,13 @@ describe('EditSystem', () => {
       this.sequences = {};
       this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
-        imagery:  new MockImagerySystem(),
-        gfx:      new MockGfxSystem(),
-        map:      new MockSystem(),
-        photos:   new MockPhotoSystem(),
-        rapid:    new MockSystem(),
-        storage:  new MockStorageSystem()
+        imagery:  new Rapid.ImagerySystem(this),
+        gfx:      new MockGfxSystem(this),
+        map:      new MockMapSystem(this),
+        photos:   new Rapid.PhotoSystem(this),
+        rapid:    new Rapid.RapidSystem(this),
+        spatial:  new Rapid.SpatialSystem(this),
+        storage:  new Rapid.StorageSystem(this)
       };
       this.services = {};
     }
@@ -61,10 +48,6 @@ describe('EditSystem', () => {
 
   const context = new MockContext();
   let _editor;
-
-  function actionNoop() {
-    return (graph) => graph;
-  }
 
   function actionAddNode(nodeID) {
     return (graph) => graph.replace(new Rapid.OsmNode(context, { id: nodeID })).commit();
@@ -113,10 +96,13 @@ describe('EditSystem', () => {
       _editor.commit({ annotation: 'two' });
       _editor.undo();
 
-      return _editor.resetAsync()
+      const prom = _editor.resetAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
         .then(() => {
-          expect(_editor._history).to.be.an.instanceOf(Array).with.lengthOf(1);
-          expect(_editor._index).to.eql(0);
+          assert.isArray(_editor._history, Array);
+          assert.lengthOf(_editor._history, 1);
+          assert.strictEqual(_editor._index, 0);
         });
     });
 
@@ -130,12 +116,14 @@ describe('EditSystem', () => {
       _editor.on('historyjump', onHistoryJump);
       _editor.on('backupstatuschange', onBackupStatusChange);
 
-      return _editor.resetAsync()
+      const prom = _editor.resetAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
         .then(() => {
-          expect(onStagingChange.calledOnceWithExactly(_editor._fullDifference)).to.be.ok;
-          expect(onStableChange.calledOnceWithExactly(_editor._fullDifference)).to.be.ok;
-          expect(onHistoryJump.calledOnceWithExactly(0, 0)).to.be.ok;
-          expect(onBackupStatusChange.calledOnceWithExactly(true)).to.be.ok;
+          assert.isOk(onStagingChange.calledOnceWithExactly(_editor._fullDifference));
+          assert.isOk(onStableChange.calledOnceWithExactly(_editor._fullDifference));
+          assert.isOk(onHistoryJump.calledOnceWithExactly(0, 0));
+          assert.isOk(onBackupStatusChange.calledOnceWithExactly(true));
         });
     });
   });
@@ -143,45 +131,46 @@ describe('EditSystem', () => {
 
   describe('base', () => {
     it('returns the base edit', () => {
-      expect(_editor.base).to.be.an.instanceOf(Rapid.Edit);
-      expect(_editor.base).to.equal(_editor._history[0]);
+      assert.instanceOf(_editor.base, Rapid.Edit);
+      assert.strictEqual(_editor.base, _editor._history[0]);
     });
   });
 
   describe('stable', () => {
     it('returns the stable edit', () => {
       _editor.commit({ annotation: 'one' });
-      expect(_editor.stable).to.be.an.instanceOf(Rapid.Edit);
-      expect(_editor.stable).to.equal(_editor._history[1]);
+      assert.instanceOf(_editor.stable, Rapid.Edit);
+      assert.strictEqual(_editor.stable, _editor._history[1]);
     });
   });
 
   describe('staging', () => {
     it('returns the staging edit', () => {
       _editor.commit({ annotation: 'one' });
-      expect(_editor.staging).to.be.an.instanceOf(Rapid.Edit);
-      expect(_editor.staging).to.not.equal(_editor.stable);
-      expect(_editor.staging).to.not.equal(_editor.base);
+      assert.instanceOf(_editor.staging, Rapid.Edit);
+      assert.notStrictEqual(_editor.staging, _editor.stable);
+      assert.notStrictEqual(_editor.staging, _editor.base);
     });
   });
 
   describe('history', () => {
     it('returns the history', () => {
-      expect(_editor.history).to.be.an.instanceOf(Array).with.lengthOf(1);
+      assert.isArray(_editor.history, Array);
+      assert.lengthOf(_editor.history, 1);
     });
   });
 
   describe('index', () => {
     it('returns the index', () => {
-      expect(_editor.index).to.eql(0);
+      assert.strictEqual(_editor.index, 0);
     });
   });
 
   describe('hasWorkInProgress', () => {
     it('returns true when work has been performed on the staging edit', () => {
-      expect(_editor.hasWorkInProgress).to.be.false;
-      _editor.perform(actionNoop());
-      expect(_editor.hasWorkInProgress).to.be.true;
+      assert.isFalse(_editor.hasWorkInProgress);
+      _editor.perform(Rapid.actionNoop());
+      assert.isTrue(_editor.hasWorkInProgress);
     });
   });
 
@@ -190,9 +179,9 @@ describe('EditSystem', () => {
     it('merges the entities into all graph versions', () => {
       const n = new Rapid.OsmNode(context, { id: 'n1' });
       _editor.merge([n]);
-      expect(_editor.base.graph.entity('n1')).to.equal(n);
-      expect(_editor.stable.graph.entity('n1')).to.equal(n);
-      expect(_editor.staging.graph.entity('n1')).to.equal(n);
+      assert.strictEqual(_editor.base.graph.entity('n1'), n);
+      assert.strictEqual(_editor.stable.graph.entity('n1'), n);
+      assert.strictEqual(_editor.staging.graph.entity('n1'), n);
     });
 
     it('emits a merge event with the new entities', () => {
@@ -200,22 +189,24 @@ describe('EditSystem', () => {
       const onMerge = sinon.spy();
       _editor.on('merge', onMerge);
       _editor.merge([n]);
-      expect(onMerge.calledOnceWith(new Set([n.id]))).to.be.ok;
+      assert.isTrue(onMerge.calledOnceWith(new Set([n.id])));
     });
   });
 
 
   describe('perform', () => {
     it('returns a Difference', () => {
-      const diff = _editor.perform(actionNoop());
-      expect(diff).to.be.an.instanceOf(Rapid.Difference);
-      expect(diff.changes).to.be.an.instanceOf(Map).that.is.empty;
+      const diff = _editor.perform(Rapid.actionNoop());
+      assert.instanceOf(diff, Rapid.Difference);
+      assert.instanceOf(diff.changes, Map);
+      assert.isEmpty(diff.changes);
     });
 
     it('returns an empty Difference when passed no args', () => {
       const diff = _editor.perform();
-      expect(diff).to.be.an.instanceOf(Rapid.Difference);
-      expect(diff.changes).to.be.an.instanceOf(Map).that.is.empty;
+      assert.instanceOf(diff, Rapid.Difference);
+      assert.instanceOf(diff.changes, Map);
+      assert.isEmpty(diff.changes);
     });
 
     it('updates the staging graph only', () => {
@@ -225,11 +216,11 @@ describe('EditSystem', () => {
       const stableKey = stable.key;
 
       _editor.perform(actionAddNode('n-1'));
-      expect(_editor.base.graph.hasEntity('n-1')).to.be.not.ok;
-      expect(_editor.stable.graph.hasEntity('n-1')).to.be.not.ok;
-      expect(_editor.staging.graph.hasEntity('n-1')).to.be.ok;
-      expect(_editor.staging.graph.key).to.not.equal(stagingKey);  // staging changed
-      expect(_editor.stable.graph.key).to.equal(stableKey);        // same stable
+      assert.isUndefined(_editor.base.graph.hasEntity('n-1'));
+      assert.isUndefined(_editor.stable.graph.hasEntity('n-1'));
+      assert.isOk(_editor.staging.graph.hasEntity('n-1'));
+      assert.notStrictEqual(_editor.staging.graph.key, stagingKey);  // staging changed
+      assert.strictEqual(_editor.stable.graph.key, stableKey);       // same stable
     });
 
     it('emits an stagingchange event only', () => {
@@ -238,10 +229,10 @@ describe('EditSystem', () => {
       _editor.on('stagingchange', onStagingChange);
       _editor.on('stablechange', onStableChange);
 
-      const action = actionNoop();
+      const action = Rapid.actionNoop();
       const difference = _editor.perform(action);
-      expect(onStagingChange.calledOnceWithExactly(difference)).to.be.ok;
-      expect(onStableChange.notCalled).to.be.ok;
+      assert.isTrue(onStagingChange.calledOnceWithExactly(difference));
+      assert.isTrue(onStableChange.notCalled);
     });
 
     it('performs multiple actions, emits a single stagingchange event', () => {
@@ -253,8 +244,8 @@ describe('EditSystem', () => {
       const action1 = actionAddNode('n-1');
       const action2 = actionAddNode('n-2');
       const difference = _editor.perform(action1, action2);
-      expect(onStagingChange.calledOnceWithExactly(difference)).to.be.ok;
-      expect(onStableChange.notCalled).to.be.ok;
+      assert.isTrue(onStagingChange.calledOnceWithExactly(difference));
+      assert.isTrue(onStableChange.notCalled);
     });
   });
 
@@ -262,13 +253,13 @@ describe('EditSystem', () => {
   describe('performAsync', () => {
     it('returns a rejected Promise when passed no args', () => {
       const prom = _editor.performAsync();
-      expect(prom).to.be.an.instanceOf(Promise);
+      assert.instanceOf(prom, Promise);
       return prom.then(
         () => {
-          expect.fail('Promise was fulfilled but should have been rejected');
+          assert.fail('Promise was fulfilled but should have been rejected');
         },
         () => {
-          expect(true).to.be.true;
+          assert.isTrue(true);
         }
       );
     });
@@ -276,13 +267,13 @@ describe('EditSystem', () => {
     it('returns a resolved Promise when passed a non-transitionable action', () => {
       const action = actionAddNode('n-1');
       const prom = _editor.performAsync(action);
-      expect(prom).to.be.an.instanceOf(Promise);
+      assert.instanceOf(prom, Promise);
       return prom.then(
         () => {
-          expect(_editor.staging.graph.hasEntity('n-1')).to.be.ok;
+          assert.isOk(_editor.staging.graph.hasEntity('n-1'));
         },
         () => {
-          expect.fail('Promise was rejected but should have been fulfilled');
+          assert.fail('Promise was rejected but should have been fulfilled');
         }
       );
     });
@@ -295,14 +286,14 @@ describe('EditSystem', () => {
 
       const action = actionTransitionNoop();
       const prom = _editor.performAsync(action);
-      expect(prom).to.be.an.instanceOf(Promise);
+      assert.instanceOf(prom, Promise);
       return prom.then(
         () => {
-          expect(onStagingChange.callCount).to.be.above(2);
-          expect(onStableChange.notCalled).to.be.ok;
+          assert.isAbove(onStagingChange.callCount, 2);
+          assert.isTrue(onStableChange.notCalled);
         },
         () => {
-          expect.fail('Promise was rejected but should have been fulfilled');
+          assert.fail('Promise was rejected but should have been fulfilled');
         }
       );
     });
@@ -312,17 +303,17 @@ describe('EditSystem', () => {
   describe('revert', () => {
     it('replaces staging with a fresh copy of stable', () => {
       _editor.perform(actionAddNode('n-1'));
-      expect(_editor.staging.graph.hasEntity('n-1')).to.be.ok;
-      expect(_editor.hasWorkInProgress).to.be.true;
+      assert.isOk(_editor.staging.graph.hasEntity('n-1'));
+      assert.isTrue(_editor.hasWorkInProgress);
 
       const staging = _editor.staging;
       const stable = _editor.stable;
 
       _editor.revert();
-      expect(_editor.staging.graph.hasEntity('n-1')).to.be.not.ok;
-      expect(_editor.hasWorkInProgress).to.be.false;
-      expect(_editor.staging).to.not.equal(staging);  // new staging
-      expect(_editor.stable).to.equal(stable);        // same stable
+      assert.isUndefined(_editor.staging.graph.hasEntity('n-1'));
+      assert.isFalse(_editor.hasWorkInProgress);
+      assert.notStrictEqual(_editor.staging, staging);  // new staging
+      assert.strictEqual(_editor.stable, stable);       // same stable
     });
 
     it('emits stagingchange and stablechange events', () => {
@@ -334,8 +325,8 @@ describe('EditSystem', () => {
       _editor.on('stablechange', onStableChange);
 
       _editor.revert();
-      expect(onStagingChange.callCount).to.eql(1);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 1);
+      assert.strictEqual(onStableChange.callCount, 0);
     });
 
     it('does nothing if no work in progress', () => {
@@ -348,36 +339,37 @@ describe('EditSystem', () => {
       const stable = _editor.stable;
 
       _editor.revert();
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
-      expect(_editor.staging).to.equal(staging);   // same staging
-      expect(_editor.stable).to.equal(stable);     // same stable
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
+      assert.strictEqual(_editor.staging, staging);   // same staging
+      assert.strictEqual(_editor.stable, stable);     // same stable
     });
   });
 
 
   describe('commit', () => {
     it('commit work in progress to history', () => {
-      expect(_editor.history).to.be.an.instanceOf(Array).with.lengthOf(1);
-      expect(_editor.index).to.eql(0);
-      expect(_editor.staging.graph.hasEntity('n-1')).to.be.not.ok;
-      expect(_editor.staging.graph.hasEntity('n-2')).to.be.not.ok;
+      assert.isArray(_editor.history, Array);
+      assert.lengthOf(_editor.history, 1);
+      assert.strictEqual(_editor.index, 0);
+      assert.isUndefined(_editor.staging.graph.hasEntity('n-1'));
+      assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
       _editor.perform(actionAddNode('n-1'));
       _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
 
-      expect(_editor.history).to.be.an.instanceOf(Array).with.lengthOf(2);
-      expect(_editor.index).to.eql(1);
-      expect(_editor.staging.graph.hasEntity('n-1')).to.be.ok;
-      expect(_editor.staging.graph.hasEntity('n-2')).to.be.not.ok;
+      assert.lengthOf(_editor.history, 2);
+      assert.strictEqual(_editor.index, 1);
+      assert.isOk(_editor.staging.graph.hasEntity('n-1'));
+      assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
       _editor.perform(actionAddNode('n-2'));
       _editor.commit({ annotation: 'added a node', selectedIDs: ['n-2'] });
 
-      expect(_editor.history).to.be.an.instanceOf(Array).with.lengthOf(3);
-      expect(_editor.index).to.eql(2);
-      expect(_editor.staging.graph.hasEntity('n-1')).to.be.ok;
-      expect(_editor.staging.graph.hasEntity('n-2')).to.be.ok;
+      assert.lengthOf(_editor.history, 3);
+      assert.strictEqual(_editor.index, 2);
+      assert.isOk(_editor.staging.graph.hasEntity('n-1'));
+      assert.isOk(_editor.staging.graph.hasEntity('n-2'));
     });
 
     it('emits stagingchange and stablechange events', () => {
@@ -387,20 +379,20 @@ describe('EditSystem', () => {
       _editor.on('stablechange', onStableChange);
 
       _editor.perform(actionAddNode('n-1'));
-      expect(onStagingChange.callCount).to.eql(1);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 1);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
-      expect(onStagingChange.callCount).to.eql(2);
-      expect(onStableChange.callCount).to.eql(1);
+      assert.strictEqual(onStagingChange.callCount, 2);
+      assert.strictEqual(onStableChange.callCount, 1);
 
       _editor.perform(actionAddNode('n-2'));
-      expect(onStagingChange.callCount).to.eql(3);
-      expect(onStableChange.callCount).to.eql(1);
+      assert.strictEqual(onStagingChange.callCount, 3);
+      assert.strictEqual(onStableChange.callCount, 1);
 
       _editor.commit({ annotation: 'added a node', selectedIDs: ['n-2'] });
-      expect(onStagingChange.callCount).to.eql(4);
-      expect(onStableChange.callCount).to.eql(2);
+      assert.strictEqual(onStagingChange.callCount, 4);
+      assert.strictEqual(onStableChange.callCount, 2);
     });
   });
 
@@ -409,30 +401,31 @@ describe('EditSystem', () => {
     it('throws if you try to commitAppend to the base edit', () => {
       _editor.perform(actionAddNode('n-1'));
       const fn = () => _editor.commitAppend('added a node');
-      expect(fn).to.throw();
+      assert.throws(fn, /can not commitAppend to the base edit/i);
     });
 
     it('commitAppend work in progress to history', () => {
-      expect(_editor.history).to.be.an.instanceOf(Array).with.lengthOf(1);
-      expect(_editor.index).to.eql(0);
-      expect(_editor.staging.graph.hasEntity('n-1')).to.be.not.ok;
-      expect(_editor.staging.graph.hasEntity('n-2')).to.be.not.ok;
+      assert.isArray(_editor.history, Array);
+      assert.lengthOf(_editor.history, 1);
+      assert.strictEqual(_editor.index, 0);
+      assert.isUndefined(_editor.staging.graph.hasEntity('n-1'));
+      assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
       _editor.perform(actionAddNode('n-1'));
       _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
 
-      expect(_editor.history).to.be.an.instanceOf(Array).with.lengthOf(2);
-      expect(_editor.index).to.eql(1);
-      expect(_editor.staging.graph.hasEntity('n-1')).to.be.ok;
-      expect(_editor.staging.graph.hasEntity('n-2')).to.be.not.ok;
+      assert.lengthOf(_editor.history, 2);
+      assert.strictEqual(_editor.index, 1);
+      assert.isOk(_editor.staging.graph.hasEntity('n-1'));
+      assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
       _editor.perform(actionAddNode('n-2'));
       _editor.commitAppend({ annotation: 'added a node', selectedIDs: ['n-2'] });  // commitAppend
 
-      expect(_editor.history).to.be.an.instanceOf(Array).with.lengthOf(2);         // still 2
-      expect(_editor.index).to.eql(1);                                             // still 1
-      expect(_editor.staging.graph.hasEntity('n-1')).to.be.ok;
-      expect(_editor.staging.graph.hasEntity('n-2')).to.be.ok;
+      assert.lengthOf(_editor.history, 2);   // still 2
+      assert.strictEqual(_editor.index, 1);  // still 1
+      assert.isOk(_editor.staging.graph.hasEntity('n-1'));
+      assert.isOk(_editor.staging.graph.hasEntity('n-2'));
     });
 
     it('emits stagingchange and stablechange events', () => {
@@ -442,20 +435,20 @@ describe('EditSystem', () => {
       _editor.on('stablechange', onStableChange);
 
       _editor.perform(actionAddNode('n-1'));
-      expect(onStagingChange.callCount).to.eql(1);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 1);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
-      expect(onStagingChange.callCount).to.eql(2);
-      expect(onStableChange.callCount).to.eql(1);
+      assert.strictEqual(onStagingChange.callCount, 2);
+      assert.strictEqual(onStableChange.callCount, 1);
 
       _editor.perform(actionAddNode('n-2'));
-      expect(onStagingChange.callCount).to.eql(3);
-      expect(onStableChange.callCount).to.eql(1);
+      assert.strictEqual(onStagingChange.callCount, 3);
+      assert.strictEqual(onStableChange.callCount, 1);
 
       _editor.commitAppend({ annotation: 'added a node', selectedIDs: ['n-2'] });  // commitAppend
-      expect(onStagingChange.callCount).to.eql(4);
-      expect(onStableChange.callCount).to.eql(2);
+      assert.strictEqual(onStagingChange.callCount, 4);
+      assert.strictEqual(onStableChange.callCount, 2);
     });
   });
 
@@ -469,21 +462,21 @@ describe('EditSystem', () => {
       _editor.perform(actionAddNode('n-3'));
       _editor.commit({ annotation: 'added n-3', selectedIDs: ['n-3'] });
 
-      expect(_editor.getUndoAnnotation()).to.eql('added n-3');
-      expect(_editor.getRedoAnnotation()).to.be.undefined;
-      expect(_editor.stable.graph.hasEntity('n-3')).to.be.ok;
+      assert.strictEqual(_editor.getUndoAnnotation(), 'added n-3');
+      assert.isUndefined(_editor.getRedoAnnotation());
+      assert.isOk(_editor.stable.graph.hasEntity('n-3'));
 
       _editor.undo();
 
-      expect(_editor.getUndoAnnotation()).to.eql('added n-2');
-      expect(_editor.getRedoAnnotation()).to.eql('added n-3');
-      expect(_editor.stable.graph.hasEntity('n-3')).to.be.not.ok;
+      assert.strictEqual(_editor.getUndoAnnotation(), 'added n-2');
+      assert.strictEqual(_editor.getRedoAnnotation(), 'added n-3');
+      assert.isUndefined(_editor.stable.graph.hasEntity('n-3'));
 
       _editor.redo();
 
-      expect(_editor.getUndoAnnotation()).to.eql('added n-3');
-      expect(_editor.getRedoAnnotation()).to.be.undefined;
-      expect(_editor.stable.graph.hasEntity('n-3')).to.be.ok;
+      assert.strictEqual(_editor.getUndoAnnotation(), 'added n-3');
+      assert.isUndefined(_editor.getRedoAnnotation());
+      assert.isOk(_editor.stable.graph.hasEntity('n-3'));
     });
 
     it('emits stagingchange, stablechange, and historyjump events', () => {
@@ -495,44 +488,44 @@ describe('EditSystem', () => {
       _editor.on('historyjump', onHistoryJump);
 
       _editor.perform(actionAddNode('n-1'));
-      expect(onStagingChange.callCount).to.eql(1);
-      expect(onStableChange.callCount).to.eql(0);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 1);
+      assert.strictEqual(onStableChange.callCount, 0);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
-      expect(onStagingChange.callCount).to.eql(2);
-      expect(onStableChange.callCount).to.eql(1);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 2);
+      assert.strictEqual(onStableChange.callCount, 1);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.perform(actionAddNode('n-2'));
-      expect(onStagingChange.callCount).to.eql(3);
-      expect(onStableChange.callCount).to.eql(1);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 3);
+      assert.strictEqual(onStableChange.callCount, 1);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
-      expect(onStagingChange.callCount).to.eql(4);
-      expect(onStableChange.callCount).to.eql(2);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 4);
+      assert.strictEqual(onStableChange.callCount, 2);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.perform(actionAddNode('n-3'));
-      expect(onStagingChange.callCount).to.eql(5);
-      expect(onStableChange.callCount).to.eql(2);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 5);
+      assert.strictEqual(onStableChange.callCount, 2);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.commit({ annotation: 'added n-3', selectedIDs: ['n-3'] });
-      expect(onStagingChange.callCount).to.eql(6);
-      expect(onStableChange.callCount).to.eql(3);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 6);
+      assert.strictEqual(onStableChange.callCount, 3);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.undo();
-      expect(onStagingChange.callCount).to.eql(7);
-      expect(onStableChange.callCount).to.eql(4);
-      expect(onHistoryJump.callCount).to.eql(1);
+      assert.strictEqual(onStagingChange.callCount, 7);
+      assert.strictEqual(onStableChange.callCount, 4);
+      assert.strictEqual(onHistoryJump.callCount, 1);
 
       _editor.redo();
-      expect(onStagingChange.callCount).to.eql(8);
-      expect(onStableChange.callCount).to.eql(5);
-      expect(onHistoryJump.callCount).to.eql(2);
+      assert.strictEqual(onStagingChange.callCount, 8);
+      assert.strictEqual(onStableChange.callCount, 5);
+      assert.strictEqual(onHistoryJump.callCount, 2);
     });
 
     it('does nothing if nothing to undo', () => {
@@ -544,9 +537,9 @@ describe('EditSystem', () => {
       _editor.on('historyjump', onHistoryJump);
 
       _editor.undo();
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
+      assert.strictEqual(onHistoryJump.callCount, 0);
     });
 
     it('does nothing if nothing to redo', () => {
@@ -558,9 +551,9 @@ describe('EditSystem', () => {
       _editor.on('historyjump', onHistoryJump);
 
       _editor.redo();
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
+      assert.strictEqual(onHistoryJump.callCount, 0);
     });
   });
 
@@ -579,11 +572,11 @@ describe('EditSystem', () => {
 
       _editor.restoreCheckpoint('checkpoint');
 
-      expect(_editor.getUndoAnnotation()).to.eql('added n-1');
-      expect(_editor.getRedoAnnotation()).to.be.undefined;
-      expect(_editor.stable.graph.hasEntity('n-1')).to.be.ok;
-      expect(_editor.stable.graph.hasEntity('n-2')).to.be.not.ok;
-      expect(_editor.stable.graph.hasEntity('n-3')).to.be.not.ok;
+      assert.strictEqual(_editor.getUndoAnnotation(), 'added n-1');
+      assert.isUndefined(_editor.getRedoAnnotation());
+      assert.isOk(_editor.stable.graph.hasEntity('n-1'));
+      assert.isUndefined(_editor.stable.graph.hasEntity('n-2'));
+      assert.isUndefined(_editor.stable.graph.hasEntity('n-3'));
     });
 
     it('emits stagingchange, stablechange, and historyjump events', () => {
@@ -595,40 +588,40 @@ describe('EditSystem', () => {
       _editor.on('historyjump', onHistoryJump);
 
       _editor.perform(actionAddNode('n-1'));
-      expect(onStagingChange.callCount).to.eql(1);
-      expect(onStableChange.callCount).to.eql(0);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 1);
+      assert.strictEqual(onStableChange.callCount, 0);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
       _editor.setCheckpoint('checkpoint');
-      expect(onStagingChange.callCount).to.eql(2);
-      expect(onStableChange.callCount).to.eql(1);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 2);
+      assert.strictEqual(onStableChange.callCount, 1);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.perform(actionAddNode('n-2'));
-      expect(onStagingChange.callCount).to.eql(3);
-      expect(onStableChange.callCount).to.eql(1);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 3);
+      assert.strictEqual(onStableChange.callCount, 1);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
-      expect(onStagingChange.callCount).to.eql(4);
-      expect(onStableChange.callCount).to.eql(2);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 4);
+      assert.strictEqual(onStableChange.callCount, 2);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.perform(actionAddNode('n-3'));
-      expect(onStagingChange.callCount).to.eql(5);
-      expect(onStableChange.callCount).to.eql(2);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 5);
+      assert.strictEqual(onStableChange.callCount, 2);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.commit({ annotation: 'added n-3', selectedIDs: ['n-3'] });
-      expect(onStagingChange.callCount).to.eql(6);
-      expect(onStableChange.callCount).to.eql(3);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 6);
+      assert.strictEqual(onStableChange.callCount, 3);
+      assert.strictEqual(onHistoryJump.callCount, 0);
 
       _editor.restoreCheckpoint('checkpoint');
-      expect(onStagingChange.callCount).to.eql(7);
-      expect(onStableChange.callCount).to.eql(4);
-      expect(onHistoryJump.callCount).to.eql(1);
+      assert.strictEqual(onStagingChange.callCount, 7);
+      assert.strictEqual(onStableChange.callCount, 4);
+      assert.strictEqual(onHistoryJump.callCount, 1);
     });
 
     it('does nothing if checkpointID is missing or invalid', () => {
@@ -641,9 +634,9 @@ describe('EditSystem', () => {
 
       _editor.restoreCheckpoint();
       _editor.restoreCheckpoint('fake');
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
-      expect(onHistoryJump.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
+      assert.strictEqual(onHistoryJump.callCount, 0);
     });
   });
 
@@ -658,29 +651,30 @@ describe('EditSystem', () => {
       _editor.beginTransaction();
 
       _editor.perform(actionAddNode('n-1'));
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.perform(actionAddNode('n-2'));
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.endTransaction();   // events emit here
-      expect(onStagingChange.callCount).to.eql(1);
-      expect(onStableChange.callCount).to.eql(1);
+      assert.strictEqual(onStagingChange.callCount, 1);
+      assert.strictEqual(onStableChange.callCount, 1);
 
       // diff should contain all things changed during the transaction
       const diff = onStagingChange.lastCall.firstArg;
-      expect(diff).to.be.an.instanceOf(Rapid.Difference);
-      expect(diff.changes).to.be.an.instanceOf(Map).that.has.all.keys(['n-1', 'n-2']);
+      assert.instanceOf(diff, Rapid.Difference);
+      assert.instanceOf(diff.changes, Map);
+      assert.hasAllKeys(diff.changes, ['n-1', 'n-2']);
     });
 
     it('does nothing if endTransaction called without beginTransaction', () => {
@@ -692,12 +686,12 @@ describe('EditSystem', () => {
       _editor.endTransaction();
 
       _editor.perform(actionAddNode('n-1'));
-      expect(onStagingChange.callCount).to.eql(1);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 1);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
-      expect(onStagingChange.callCount).to.eql(2);
-      expect(onStableChange.callCount).to.eql(1);
+      assert.strictEqual(onStagingChange.callCount, 2);
+      assert.strictEqual(onStableChange.callCount, 1);
     });
 
     it('uses earliest difference if beginTransaction called multiple times', () => {
@@ -709,32 +703,33 @@ describe('EditSystem', () => {
       _editor.beginTransaction();
 
       _editor.perform(actionAddNode('n-1'));
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       // This beginTransaction has no effect - we are already in a transaction
       _editor.beginTransaction();
 
       _editor.perform(actionAddNode('n-2'));
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
-      expect(onStagingChange.callCount).to.eql(0);
-      expect(onStableChange.callCount).to.eql(0);
+      assert.strictEqual(onStagingChange.callCount, 0);
+      assert.strictEqual(onStableChange.callCount, 0);
 
       _editor.endTransaction();   // events emit here
-      expect(onStagingChange.callCount).to.eql(1);
-      expect(onStableChange.callCount).to.eql(1);
+      assert.strictEqual(onStagingChange.callCount, 1);
+      assert.strictEqual(onStableChange.callCount, 1);
 
       // diff should contain all things changed during the transaction
       const diff = onStagingChange.lastCall.firstArg;
-      expect(diff).to.be.an.instanceOf(Rapid.Difference);
-      expect(diff.changes).to.be.an.instanceOf(Map).that.has.all.keys(['n-1', 'n-2']);
+      assert.instanceOf(diff, Rapid.Difference);
+      assert.instanceOf(diff.changes, Map);
+      assert.hasAllKeys(diff.changes, ['n-1', 'n-2']);
     });
   });
 
@@ -743,20 +738,22 @@ describe('EditSystem', () => {
     it('returns the difference between base -> stable', () => {
       prepareTestHistory();
 
-      expect(_editor.hasChanges()).to.be.true;
+      assert.isTrue(_editor.hasChanges());
 
       const diff = _editor.difference();
-      expect(diff).to.be.an.instanceOf(Rapid.Difference);
-      expect(diff.changes).to.be.an.instanceOf(Map).that.has.all.keys(['n-1', 'n2', 'n3']);
+      assert.instanceOf(diff, Rapid.Difference);
+      assert.instanceOf(diff.changes, Map);
+      assert.hasAllKeys(diff.changes, ['n-1', 'n2', 'n3']);
 
       const detail = _editor.changes();
-      expect(detail).to.be.an.instanceOf(Object).that.has.all.keys(['created', 'modified', 'deleted']);
+      assert.isObject(detail);
+      assert.hasAllKeys(detail, ['created', 'modified', 'deleted']);
 
       const stable = _editor.stable.graph;
       const base = _editor.base.graph;
-      expect(detail.created).to.eql([ stable.entity('n-1') ]);
-      expect(detail.modified).to.eql([ stable.entity('n2') ]);
-      expect(detail.deleted).to.eql([ base.entity('n3') ]);
+      assert.strictEqual(detail.created[0], stable.entity('n-1'));
+      assert.strictEqual(detail.modified[0], stable.entity('n2'));
+      assert.strictEqual(detail.deleted[0], base.entity('n3'));
     });
   });
 
@@ -768,7 +765,7 @@ describe('EditSystem', () => {
       _editor.perform(Rapid.actionDeleteNode('n-1'));
       _editor.commit({ annotation: 'deleted n-1', selectedIDs: [] });
 
-      expect(_editor.toJSON()).to.be.undefined;
+      assert.isUndefined(_editor.toJSON());
     });
 
     it('generates v3 JSON', () => {
@@ -782,21 +779,21 @@ describe('EditSystem', () => {
       const node2upd_json = { id: 'n2', tags: { natural: 'tree' }, v: node2upd.v };
 
       const json = JSON.parse(_editor.toJSON());
-      expect(json.version).to.eql(3);
+      assert.strictEqual(json.version, 3);
 
       // base entities - before all edits
-      expect(json.baseEntities).to.not.include(node_1_json);    // n-1 was not in the base
-      expect(json.baseEntities).to.not.include(node1_json);     // n1 was never edited
-      expect(json.baseEntities).to.deep.include(node2_json);    // n2 is in base and was edited
-      expect(json.baseEntities).to.deep.include(node3_json);    // n3 is in base and was edited
-      expect(json.baseEntities).to.not.include(node2upd_json);
+      assert.notDeepInclude(json.baseEntities, node_1_json);    // n-1 was not in the base
+      assert.notDeepInclude(json.baseEntities, node1_json);     // n1 was never edited
+      assert.deepInclude(json.baseEntities, node2_json);        // n2 is in base and was edited
+      assert.deepInclude(json.baseEntities, node3_json);        // n3 is in base and was edited
+      assert.notDeepInclude(json.baseEntities, node2upd_json);
 
       // edited entities
-      expect(json.entities).to.deep.include(node_1_json);     // n-1 was added
-      expect(json.entities).to.deep.include(node2upd_json);   // n2 was updated
-      expect(json.entities).to.not.include(node1_json);       // n1 was never updated
-      expect(json.entities).to.not.include(node2_json);       // n2 is in the base, not here
-      expect(json.entities).to.not.include(node3_json);       // n3 is now deleted
+      assert.deepInclude(json.entities, node_1_json);     // n-1 was added
+      assert.deepInclude(json.entities, node2upd_json);   // n2 was updated
+      assert.notDeepInclude(json.entities, node1_json);   // n1 was never updated
+      assert.notDeepInclude(json.entities, node2_json);   // n2 is in the base, not here
+      assert.notDeepInclude(json.entities, node3_json);   // n3 is now deleted
     });
   });
 
@@ -817,14 +814,14 @@ describe('EditSystem', () => {
       return _editor.fromJSONAsync(JSON.stringify(json))
         .then(() => {
           const restored = _editor.staging.graph.entity('n-1');
-          expect(restored).to.be.an.instanceOf(Rapid.OsmNode);
-          expect(restored.id).to.equal('n-1');
-          expect(restored.loc).to.eql([1, 2]);
-          expect(restored.v).to.equal(0);
-          expect(_editor.getUndoAnnotation()).to.eql('Added a point.');
-          expect(_editor.sourcesUsed().imagery).to.include('Bing');
-          expect(_editor.difference().created().length).to.eql(1);
-          expect(context.sequences).to.include({ node: 2, way: 1, relation: 1 });
+          assert.instanceOf(restored, Rapid.OsmNode);
+          assert.strictEqual(restored.id, 'n-1');
+          assert.deepEqual(restored.loc, [1, 2]);
+          assert.strictEqual(restored.v, 0);
+          assert.strictEqual(_editor.getUndoAnnotation(), 'Added a point.');
+          assert.include(_editor.sourcesUsed().imagery, 'Bing');
+          assert.lengthOf(_editor.difference().created(), 1);
+          assert.deepInclude(context.sequences, { node: 2, way: 1, relation: 1 });
         });
     });
 
@@ -842,11 +839,15 @@ describe('EditSystem', () => {
       };
       return _editor.fromJSONAsync(JSON.stringify(json))
         .then(() => {
-          expect(_editor.staging.graph.entity('n1')).to.eql(new Rapid.OsmNode(context, { id: 'n1', loc: [2, 3], v: 1 }));
-          expect(_editor.getUndoAnnotation()).to.eql('Moved a point.');
-          expect(_editor.sourcesUsed().imagery).to.include('Bing');
-          expect(_editor.difference().modified().length).to.eql(1);
-          expect(context.sequences).to.include({ node: 2, way: 1, relation: 1 });
+          const restored = _editor.staging.graph.entity('n1');
+          assert.instanceOf(restored, Rapid.OsmNode);
+          assert.strictEqual(restored.id, 'n1');
+          assert.deepEqual(restored.loc, [2, 3]);
+          assert.strictEqual(restored.v, 1);
+          assert.strictEqual(_editor.getUndoAnnotation(), 'Moved a point.');
+          assert.include(_editor.sourcesUsed().imagery, 'Bing');
+          assert.lengthOf(_editor.difference().modified(), 1);
+          assert.deepInclude(context.sequences, { node: 2, way: 1, relation: 1 });
         });
     });
 
@@ -864,11 +865,11 @@ describe('EditSystem', () => {
       };
       return _editor.fromJSONAsync(JSON.stringify(json))
         .then(() => {
-          expect(_editor.staging.graph.hasEntity('n1')).to.be.undefined;
-          expect(_editor.getUndoAnnotation()).to.eql('Deleted a point.');
-          expect(_editor.sourcesUsed().imagery).to.include('Bing');
-          expect(_editor.difference().deleted().length).to.eql(1);
-          expect(context.sequences).to.include({ node: 1, way: 2, relation: 3 });
+          assert.isUndefined(_editor.staging.graph.hasEntity('n1'));
+          assert.strictEqual(_editor.getUndoAnnotation(), 'Deleted a point.');
+          assert.include(_editor.sourcesUsed().imagery, 'Bing');
+          assert.lengthOf(_editor.difference().deleted(), 1);
+          assert.deepInclude(context.sequences, { node: 1, way: 2, relation: 3 });
         });
     });
 
@@ -886,7 +887,7 @@ describe('EditSystem', () => {
       };
       return _editor.fromJSONAsync(JSON.stringify(json))
         .then(() => {
-          expect(context.sequences).to.include({ node: 2, way: 1, relation: 1 });
+          assert.deepInclude(context.sequences, { node: 2, way: 1, relation: 1 });
         });
     });
 

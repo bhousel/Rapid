@@ -36,7 +36,7 @@ export class ValidationSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'validator';
-    this.dependencies = new Set(['editor', 'storage', 'map', 'urlhash']);
+    this.dependencies = new Set(['editor', 'storage', 'map', 'spatial', 'urlhash']);
 
     this._rules = new Map();    // Map(ruleID -> validator)
     this._base = new ValidationCache('base');   // issues before any user edits

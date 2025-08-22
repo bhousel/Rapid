@@ -1,7 +1,8 @@
 import { operationDelete } from '../operations/delete.js';
 import { osmIsInterestingTag } from '../models/tags.js';
 import { osmOldMultipolygonOuterMemberOfRelation } from '../models/multipolygon.js';
-import { ValidationIssue, ValidationFix } from '../core/lib/index.js';
+import { ValidationIssue } from '../core/lib/ValidationIssue.js';
+import { ValidationFix } from '../core/lib/ValidationFix.js';
 
 
 export function validationMissingTag(context) {
