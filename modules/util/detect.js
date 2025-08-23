@@ -46,7 +46,7 @@ export function utilDetect(refresh) {
     }
   }
   if (!_cached.browser) {
-    m = ua.match(/(opera|chrome|safari|firefox|msie)\/?\s*(\.?\d+(\.\d+)*)/i);
+    m = ua.match(/(opera|chrome|safari|firefox|msie|node\.js|deno)\/?\s*(\.?\d+(\.\d+)*)/i);
     if (m !== null) {
       _cached.browser = m[1];
       _cached.version = m[2];
@@ -86,20 +86,25 @@ export function utilDetect(refresh) {
   /* Locale */
   _cached.locales = navigator.languages.slice();  // shallow copy
 
-  /* Host */
-  const loc = window.top.location;
-  let origin = loc.origin;
-  if (!origin) {  // for unpatched IE11
-    origin = loc.protocol + '//' + loc.hostname + (loc.port ? ':' + loc.port: '');
+  _cached.isTestEnvironment = (typeof window === 'undefined' || globalThis.mocha);
+
+  // test environment will not have `window`
+  if (!_cached.isTestEnvironment) {
+    /* Host */
+    const loc = window.top.location;
+    let origin = loc.origin;
+    if (!origin) {  // for unpatched IE11
+      origin = loc.protocol + '//' + loc.hostname + (loc.port ? ':' + loc.port: '');
+    }
+
+    _cached.host = origin + loc.pathname;
+
+    _cached.prefersColorScheme = window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    _cached.prefersContrast = window.matchMedia?.('(prefers-contrast: more)').matches ? 'more'
+      : window.matchMedia?.('(prefers-contrast: less)').matches ? 'less' : null;
+    _cached.prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    _cached.prefersReducedTransparency = window.matchMedia?.('(prefers-reduced-transparency: reduce)').matches;
   }
-
-  _cached.host = origin + loc.pathname;
-
-  _cached.prefersColorScheme = window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  _cached.prefersContrast = window.matchMedia?.('(prefers-contrast: more)').matches ? 'more'
-    : window.matchMedia?.('(prefers-contrast: less)').matches ? 'less' : null;
-  _cached.prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  _cached.prefersReducedTransparency = window.matchMedia?.('(prefers-reduced-transparency: reduce)').matches;
 
   return _cached;
 }

@@ -5,12 +5,22 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('PresetSystem', () => {
 
-  class MockUrlSystem {
+  class MockUrlHashSystem {
     constructor() {
       this.initialHashParams = new Map();
+      this._currParams = new Map();
     }
     initAsync()   { return Promise.resolve(); }
     on()          { return this; }
+    getParam(k)   { return this._currParams.get(k); }
+    setParam(k, v) {
+      if (typeof k !== 'string') return;
+      if (v === undefined || v === null || v === 'undefined' || v === 'null') {
+        this._currParams.delete(k);
+      } else {
+        this._currParams.set(k, v);
+      }
+    }
   }
 
   class MockContext {
@@ -22,7 +32,7 @@ describe('PresetSystem', () => {
         l10n:       new Rapid.LocalizationSystem(this),
         locations:  new Rapid.LocationSystem(this),
         storage:    new Rapid.StorageSystem(this),
-        urlhash:    new MockUrlSystem()
+        urlhash:    new MockUrlHashSystem(this)
       };
     }
     next(which) {
