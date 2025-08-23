@@ -22,6 +22,7 @@ export { SpatialSystem } from './core/SpatialSystem.js';
 export { StorageSystem } from './core/StorageSystem.js';
 export { StyleSystem } from './core/StyleSystem.js';
 export { UploaderSystem } from './core/UploaderSystem.js';
+export { UrlHashSystem } from './core/UrlHashSystem.js';
 export { ValidationSystem } from './core/ValidationSystem.js';
 
 // Reexport only what our tests use, see iD#4379

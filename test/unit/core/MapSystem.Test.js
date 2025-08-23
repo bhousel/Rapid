@@ -13,24 +13,6 @@ describe('MapSystem', () => {
     off()                { return this; }
   }
 
-  class MockUrlHashSystem {
-    constructor() {
-      this.initialHashParams = new Map();
-      this._currParams = new Map();
-    }
-    initAsync()   { return Promise.resolve(); }
-    on()          { return this; }
-    getParam(k)   { return this._currParams.get(k); }
-    setParam(k, v) {
-      if (typeof k !== 'string') return;
-      if (v === undefined || v === null || v === 'undefined' || v === 'null') {
-        this._currParams.delete(k);
-      } else {
-        this._currParams.set(k, v);
-      }
-    }
-  }
-
   class MockGfxSystem extends MockSystem {
     constructor(context) {
       super(context);
@@ -53,14 +35,15 @@ describe('MapSystem', () => {
         filters:  new MockSystem(this),
         gfx:      new MockGfxSystem(this),
         imagery:  new Rapid.ImagerySystem(this),
+        map:      new Rapid.MapSystem(this),
         photos:   new Rapid.PhotoSystem(this),
         presets:  new Rapid.PresetSystem(this),
-        rapid:    new MockSystem(this),
+        rapid:    new Rapid.RapidSystem(this),
         l10n:     new Rapid.LocalizationSystem(this),
         spatial:  new Rapid.SpatialSystem(this),
         storage:  new Rapid.StorageSystem(this),
         styles:   new Rapid.StyleSystem(this),
-        urlhash:  new MockUrlHashSystem(this)
+        urlhash:  new Rapid.UrlHashSystem(this)
       };
       this.viewport = new Rapid.sdk.Viewport(undefined, [100, 100]);
       this._keybinding = new MockSystem(this);
@@ -89,7 +72,7 @@ describe('MapSystem', () => {
       }
     };
 
-    _map = new Rapid.MapSystem(context);
+    _map = context.systems.map;
     return _map.initAsync();
   });
 

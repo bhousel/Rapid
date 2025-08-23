@@ -24,7 +24,8 @@ export class StorageSystem extends AbstractSystem {
 
     this._storage = null;
 
-    // Note that accessing localStorage may throw a `SecurityError`, so wrap in a try/catch.
+    // Note that accessing localStorage may throw a `SecurityError`,
+    // or just not exist in a non-browser environment, so fallback to a mock.
     try {
       this._storage = window.localStorage;
     } catch (e) {

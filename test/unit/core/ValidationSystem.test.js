@@ -14,22 +14,6 @@ describe('ValidationSystem', () => {
     resume()      { }
   }
 
-  class MockMapSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    on()          { return this; }
-    pause()       { }
-    resume()      { }
-  }
-
-  class MockUrlSystem {
-    constructor() {
-      this.initialHashParams = new Map();
-    }
-    initAsync()   { return Promise.resolve(); }
-    on()          { return this; }
-  }
-
   class MockContext {
     constructor()   {
       this.viewport = new Rapid.sdk.Viewport();
@@ -40,13 +24,13 @@ describe('ValidationSystem', () => {
         gfx:      new MockGfxSystem(this),
         imagery:  new Rapid.ImagerySystem(this),
         l10n:     new Rapid.LocalizationSystem(this),
-        map:      new MockMapSystem(this),
+        map:      new Rapid.MapSystem(this),
         photos:   new Rapid.PhotoSystem(this),
         presets:  new Rapid.PresetSystem(this),
         rapid:    new Rapid.RapidSystem(this),
         spatial:  new Rapid.SpatialSystem(this),
         storage:  new Rapid.StorageSystem(this),
-        urlhash:  new MockUrlSystem(this)
+        urlhash:  new Rapid.UrlHashSystem(this)
       };
     }
     selectedIDs() { return []; }

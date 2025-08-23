@@ -3,6 +3,8 @@ import throttle from 'lodash-es/throttle.js';
 
 import { AbstractSystem } from './AbstractSystem.js';
 
+let _window;
+let _document;
 
 /**
  * `UrlHashSystem` is responsible for managing the url hash and query parameters.
@@ -20,18 +22,6 @@ import { AbstractSystem } from './AbstractSystem.js';
  *   `hashchange`   Fires on hashchange and when enable is called, receives Map(currParams), Map(prevParams)
  */
 export class UrlHashSystem extends AbstractSystem {
-
-  /**
-   * @constructor
-   * @param  {Context}  context - Global shared application context
-   */
-  constructor(context) {
-    super(context);
-    this.id = 'urlhash';
-    this.dependencies = new Set(['editor', 'l10n', 'map']);
-
-    this.doUpdateTitle = true;
-    this.titleBase = 'Rapid';
 
 /**
 * Initial only
@@ -66,7 +56,39 @@ export class UrlHashSystem extends AbstractSystem {
 * __`offset`__ - Background imagery alignment offset in meters, formatted as `east,north`.
 **/
 
-    const q = utilStringQs(window.location.hash);
+  /**
+   * @constructor
+   * @param  {Context}  context - Global shared application context
+   */
+  constructor(context) {
+    super(context);
+    this.id = 'urlhash';
+    this.dependencies = new Set(['editor', 'l10n', 'map']);
+
+    this.doUpdateTitle = true;
+    this.titleBase = 'Rapid';
+
+    // Note that `window` or `document` may not exist in a
+    // non-browser environment so fallback to a mock.
+    try {
+      _window = window;
+      _document = window.document;
+    } catch (e) {
+      _document = {
+        isMocked: true,
+        title: ''
+      };
+      _window = {
+        isMocked: true,
+        location: { hash: '' },
+        history:  { replaceState: () => true },
+        document: _document,
+        addEventListener:    () => true,
+        removeEventListener: () => true,
+      };
+    }
+
+    const q = utilStringQs(_window.location.hash);
     this._initParams = new Map(Object.entries(q));
 
     this._currParams = new Map(this._initParams);  // make copy
@@ -132,7 +154,7 @@ export class UrlHashSystem extends AbstractSystem {
         // Register event handlers here
         editor.on('stablechange', this.deferredUpdateTitle);
         context.on('modechange', this.deferredUpdateTitle);
-        window.addEventListener('hashchange', this._hashchange);
+        _window.addEventListener('hashchange', this._hashchange);
 
         this._started = true;
         this.resume();  // Emits 'hashchange'
@@ -238,7 +260,7 @@ export class UrlHashSystem extends AbstractSystem {
 
     const newHash = '#' + utilQsString(params, true);
     if (newHash !== this._currHash) {
-      window.history.replaceState(null, this.titleBase, newHash);
+      _window.history.replaceState(null, this.titleBase, newHash);
       this._currHash = newHash;
     }
   }
@@ -286,8 +308,8 @@ export class UrlHashSystem extends AbstractSystem {
       title = this.titleBase;
     }
 
-    if (document.title !== title) {
-      document.title = title;
+    if (_document.title !== title) {
+      _document.title = title;
     }
   }
 
@@ -300,7 +322,7 @@ export class UrlHashSystem extends AbstractSystem {
   _hashchange() {
     if (!this._started || this._paused) return;
 
-    this._currHash = window.location.hash;
+    this._currHash = _window.location.hash;
     const q = utilStringQs(this._currHash);
 
     if (!this._prevParams) {         // We haven't emitted `hashchange` yet

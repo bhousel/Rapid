@@ -5,34 +5,18 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('PresetSystem', () => {
 
-  class MockUrlHashSystem {
-    constructor() {
-      this.initialHashParams = new Map();
-      this._currParams = new Map();
-    }
-    initAsync()   { return Promise.resolve(); }
-    on()          { return this; }
-    getParam(k)   { return this._currParams.get(k); }
-    setParam(k, v) {
-      if (typeof k !== 'string') return;
-      if (v === undefined || v === null || v === 'undefined' || v === 'null') {
-        this._currParams.delete(k);
-      } else {
-        this._currParams.set(k, v);
-      }
-    }
-  }
-
   class MockContext {
     constructor()   {
       this.sequences = {};
       this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
         assets:     new Rapid.AssetSystem(this),
+        editor:     new Rapid.EditSystem(this),
         l10n:       new Rapid.LocalizationSystem(this),
+        map:        new Rapid.MapSystem(this),
         locations:  new Rapid.LocationSystem(this),
         storage:    new Rapid.StorageSystem(this),
-        urlhash:    new MockUrlHashSystem(this)
+        urlhash:    new Rapid.UrlHashSystem(this)
       };
     }
     next(which) {
