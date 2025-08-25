@@ -76,10 +76,10 @@ export class Geometry {
       for (const [k, v] of Object.entries(src)) {
         if (v instanceof Extent) {
           dst[k] = new Extent(v);
-/* c8 ignore start */
+        /* c8 ignore start */
         } else {
           dst[k] = globalThis.structuredClone(v);
-/* c8 ignore end */
+        /* c8 ignore end */
         }
       }
     }

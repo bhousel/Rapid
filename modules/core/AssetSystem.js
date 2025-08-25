@@ -148,6 +148,7 @@ export class AssetSystem extends AbstractSystem {
 
     // Mock data for testing, prevents the data from being fetched.
     // Not sure how I feel about this :-/
+    /* c8 ignore start */
     const isTestEnvironment = (typeof window === 'undefined' || globalThis.mocha);
     if (isTestEnvironment) {
       const c = this._cache;
@@ -168,6 +169,7 @@ export class AssetSystem extends AbstractSystem {
       c.tagging_preset_overrides = {};
       c.wmf_sitematrix = [ ['English', 'English', 'en'], ['German', 'Deutsch', 'de'] ];
     }
+    /* c8 ignore end */
   }
 
 
@@ -249,8 +251,8 @@ export class AssetSystem extends AbstractSystem {
   /**
    * loadAssetAsync
    * Returns a Promise to fetch the data identified by the key.
-   * @param  {string}  key - identifier for the data, should be found in the asset map.
-   * @return {Promise} Promise resolved with the data
+   * @param   {string}   key - identifier for the data, should be found in the asset map.
+   * @return  {Promise}  Promise resolved with the data
    */
   loadAssetAsync(key) {
     if (this._cache[key]) {
@@ -269,16 +271,14 @@ export class AssetSystem extends AbstractSystem {
       this._inflight[url] = loadPromise = fetch(url)
         .then(utilFetchResponse)
         .then(result => {
-          delete this._inflight[url];
           if (!result) {
             throw new Error(`No data loaded for "${key}"`);
           }
           this._cache[key] = result;
           return result;
         })
-        .catch(err => {
+        .finally(() => {
           delete this._inflight[url];
-          throw err;
         });
     }
 
