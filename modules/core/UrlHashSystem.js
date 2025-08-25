@@ -113,12 +113,20 @@ export class UrlHashSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
+    const context = this.context;
+
     for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
+      if (!context.systems[id]) {
         return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
       }
     }
-    return Promise.resolve();
+
+    const editor = context.systems.editor;
+    const prerequisites = Promise.all([
+      editor.initAsync()
+    ]);
+
+    return prerequisites;
   }
 
 

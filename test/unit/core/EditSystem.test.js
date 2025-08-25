@@ -5,48 +5,17 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('EditSystem', () => {
+  const context = new Rapid.MockContext();
+  context.systems = {
+    imagery:  new Rapid.ImagerySystem(context),
+    gfx:      new Rapid.MockGfxSystem(context),
+    map:      new Rapid.MockSystem(context),
+    photos:   new Rapid.PhotoSystem(context),
+    rapid:    new Rapid.RapidSystem(context),
+    spatial:  new Rapid.SpatialSystem(context),
+    storage:  new Rapid.MockSystem(context)
+  };
 
-  class MockGfxSystem {
-    constructor() {
-      this.scene = { layers: new Map() };
-    }
-    initAsync()   { return Promise.resolve(); }
-    pause()       { }
-    resume()      { }
-  }
-
-  class MockMapSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    on()          { return this; }
-  }
-
-  class MockContext {
-    constructor()   {
-      this.sequences = {};
-      this.viewport = new Rapid.sdk.Viewport();
-      this.systems = {
-        imagery:  new Rapid.ImagerySystem(this),
-        gfx:      new MockGfxSystem(this),
-        map:      new MockMapSystem(this),
-        photos:   new Rapid.PhotoSystem(this),
-        rapid:    new Rapid.RapidSystem(this),
-        spatial:  new Rapid.SpatialSystem(this),
-        storage:  new Rapid.StorageSystem(this)
-      };
-      this.services = {};
-    }
-    selectedIDs() {
-      return [];
-    }
-    next(which) {
-      let num = this.sequences[which] || 0;
-      return this.sequences[which] = ++num;
-    }
-  }
-
-
-  const context = new MockContext();
   let _editor;
 
   function actionAddNode(nodeID) {
@@ -90,7 +59,60 @@ describe('EditSystem', () => {
   });
 
 
+  describe('constructor', () => {
+    it('constructs an EditSystem from a context', () => {
+      const editor = new Rapid.EditSystem(context);
+      assert.instanceOf(editor, Rapid.EditSystem);
+      assert.strictEqual(editor.id, 'editor');
+      assert.strictEqual(editor.context, context);
+      assert.instanceOf(editor.dependencies, Set);
+      assert.isTrue(editor.autoStart);
+    });
+  });
+
+  describe('initAsync', () => {
+    it('returns an promise to init', () => {
+      const editor = new Rapid.EditSystem(context);
+      const prom = editor.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+
+    it('rejects if a dependency is missing', () => {
+      const editor = new Rapid.EditSystem(context);
+      editor.dependencies.add('missing');
+      const prom = editor.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+        .catch(err => assert.match(err, /cannot init/i));
+    });
+  });
+
+  describe('startAsync', () => {
+    it('returns a promise to start', () => {
+      const editor = new Rapid.EditSystem(context);
+      const prom = editor.initAsync().then(() => editor.startAsync());
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(editor.started))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+  });
+
+
   describe('resetAsync', () => {
+    it('returns a promise to reset', () => {
+      const editor = new Rapid.EditSystem(context);
+      const prom = editor.resetAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+
     it('clears the history stack', () => {
       _editor.commit({ annotation: 'one' });
       _editor.commit({ annotation: 'two' });

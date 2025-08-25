@@ -4,6 +4,8 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('LocationSystem', () => {
+  const context = new Rapid.MockContext();
+
   const colorado = {
     type: 'Feature',
     id: 'colorado.geojson',
@@ -24,8 +26,6 @@ describe('LocationSystem', () => {
   };
 
   const fc = { type: 'FeatureCollection', features: [colorado] };
-
-  const context = new Rapid.MockContext();
   let _locations;
 
 
@@ -34,6 +34,59 @@ describe('LocationSystem', () => {
     return _locations.initAsync();
   });
 
+  describe('constructor', () => {
+    it('constructs an LocationSystem from a context', () => {
+      const locations = new Rapid.LocationSystem(context);
+      assert.instanceOf(locations, Rapid.LocationSystem);
+      assert.strictEqual(locations.id, 'locations');
+      assert.strictEqual(locations.context, context);
+      assert.instanceOf(locations.dependencies, Set);
+      assert.isTrue(locations.autoStart);
+    });
+  });
+
+  describe('initAsync', () => {
+    it('returns an promise to init', () => {
+      const locations = new Rapid.LocationSystem(context);
+      const prom = locations.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+
+    it('rejects if a dependency is missing', () => {
+      const locations = new Rapid.LocationSystem(context);
+      locations.dependencies.add('missing');
+      const prom = locations.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+        .catch(err => assert.match(err, /cannot init/i));
+    });
+  });
+
+  describe('startAsync', () => {
+    it('returns a promise to start', () => {
+      const locations = new Rapid.LocationSystem(context);
+      const prom = locations.initAsync().then(() => locations.startAsync());
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(locations.started))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+  });
+
+  describe('resetAsync', () => {
+    it('returns a promise to reset', () => {
+      const locations = new Rapid.LocationSystem(context);
+      const prom = locations.resetAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+  });
 
   describe('mergeCustomGeoJSON', () => {
     it('merges geojson into lococation-conflation cache', () => {

@@ -4,58 +4,29 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('MapSystem', () => {
+  const context = new Rapid.MockContext();
+  context.systems = {
+    assets:   new Rapid.MockSystem(context),
+    editor:   new Rapid.MockSystem(context),
+    filters:  new Rapid.MockSystem(context),
+    gfx:      new Rapid.MockGfxSystem(context),
+    imagery:  new Rapid.MockSystem(context),
+    map:      new Rapid.MapSystem(context),
+    photos:   new Rapid.MockSystem(context),
+    presets:  new Rapid.MockSystem(context),
+    rapid:    new Rapid.MockSystem(context),
+    l10n:     new Rapid.LocalizationSystem(context),
+    spatial:  new Rapid.MockSystem(context),
+    storage:  new Rapid.StorageSystem(context),
+    styles:   new Rapid.MockSystem(context),
+    urlhash:  new Rapid.UrlHashSystem(context)
+  };
+
+
   let _map;
 
-  class MockSystem {
-    constructor(context) { this.context = context; }
-    initAsync()          { return Promise.resolve(); }
-    on()                 { return this; }
-    off()                { return this; }
-  }
-
-  class MockGfxSystem extends MockSystem {
-    constructor(context) {
-      super(context);
-      this.scene = new MockSystem();
-    }
-    deferredRedraw() {}
-    immediateRedraw() {}
-    setTransformAsync(t) {
-      this.context.viewport.transform = t;
-      return Promise.resolve(t);
-    }
-  }
-
-  class MockContext {
-    constructor()   {
-      this.services = {};
-      this.systems = {
-        assets:   new Rapid.AssetSystem(this),
-        editor:   new MockSystem(this),
-        filters:  new MockSystem(this),
-        gfx:      new MockGfxSystem(this),
-        imagery:  new Rapid.ImagerySystem(this),
-        map:      new Rapid.MapSystem(this),
-        photos:   new Rapid.PhotoSystem(this),
-        presets:  new Rapid.PresetSystem(this),
-        rapid:    new Rapid.RapidSystem(this),
-        l10n:     new Rapid.LocalizationSystem(this),
-        spatial:  new Rapid.SpatialSystem(this),
-        storage:  new Rapid.StorageSystem(this),
-        styles:   new Rapid.StyleSystem(this),
-        urlhash:  new Rapid.UrlHashSystem(this)
-      };
-      this.viewport = new Rapid.sdk.Viewport(undefined, [100, 100]);
-      this._keybinding = new MockSystem(this);
-    }
-    container()   { return _container; }
-    keybinding()  { return this._keybinding; }
-    on()          { return this; }
-  }
-
-
   beforeEach(() => {
-    const context = new MockContext();  // get a fresh viewport each time
+    context.viewport = new Rapid.sdk.Viewport(undefined, [100, 100]);
 
     const l10n = context.systems.l10n;
     l10n.preferredLocaleCodes = 'en';
@@ -76,6 +47,60 @@ describe('MapSystem', () => {
     return _map.initAsync();
   });
 
+
+  describe('constructor', () => {
+    it('constructs an MapSystem from a context', () => {
+      const map = new Rapid.MapSystem(context);
+      assert.instanceOf(map, Rapid.MapSystem);
+      assert.strictEqual(map.id, 'map');
+      assert.strictEqual(map.context, context);
+      assert.instanceOf(map.dependencies, Set);
+      assert.isTrue(map.autoStart);
+    });
+  });
+
+  describe('initAsync', () => {
+    it('returns an promise to init', () => {
+      const map = new Rapid.MapSystem(context);
+      const prom = map.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+
+    it('rejects if a dependency is missing', () => {
+      const map = new Rapid.MapSystem(context);
+      map.dependencies.add('missing');
+      const prom = map.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+        .catch(err => assert.match(err, /cannot init/i));
+    });
+  });
+
+  describe('startAsync', () => {
+    it('returns a promise to start', () => {
+      const map = new Rapid.MapSystem(context);
+      const prom = map.initAsync().then(() => map.startAsync());
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(map.started))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+  });
+
+  describe('resetAsync', () => {
+    it('returns a promise to reset', () => {
+      const map = new Rapid.MapSystem(context);
+      const prom = map.resetAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+  });
 
   describe('zoom', () => {
     it('gets and sets zoom level', () => {

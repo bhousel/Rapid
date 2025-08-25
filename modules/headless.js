@@ -25,6 +25,69 @@ export { UploaderSystem } from './core/UploaderSystem.js';
 export { UrlHashSystem } from './core/UrlHashSystem.js';
 export { ValidationSystem } from './core/ValidationSystem.js';
 
+// Mocks for testing
+// Headless will not have access to the GraphicsSystem or UiSystem.
+
+/**
+ * MockSystem
+ * @class
+ */
+export class MockSystem {
+  constructor(context) { this.context = context; }
+  initAsync()   { return Promise.resolve(); }
+  startAsync()  { return Promise.resolve(); }
+  resetAsync()  { return Promise.resolve(); }
+  on()          { return this; }
+  off()         { return this; }
+  pause()       { }
+  resume()      { }
+}
+
+/**
+ * MockContext
+ * @class
+ */
+export class MockContext {
+  constructor() {
+    this.sequences = {};
+    this.services = {};
+    this.systems = {};
+    this.viewport = new sdk.Viewport();
+    this._keybinding = new MockSystem(this);
+  }
+  initAsync()   { return Promise.resolve(); }
+  startAsync()  { return Promise.resolve(); }
+  resetAsync()  { return Promise.resolve(); }
+  on()          { return this; }
+  off()         { return this; }
+  keybinding()  { return this._keybinding; }
+  next(which) {
+    let num = this.sequences[which] || 0;
+    return this.sequences[which] = ++num;
+  }
+}
+
+
+/**
+ * MockGfxSystem
+ * @class
+ */
+export class MockGfxSystem extends MockSystem {
+  constructor(context) {
+    super(context);
+    this.id = 'gfx';
+    this.scene = new MockSystem();
+    this.scene.layers = new Map();
+  }
+  deferredRedraw() {}
+  immediateRedraw() {}
+  setTransformAsync(t) {
+    this.context.viewport.transform = t;
+    return Promise.resolve(t);
+  }
+}
+
+
 // Reexport only what our tests use, see iD#4379
 import * as D3 from 'd3';
 export const d3 = {
@@ -38,20 +101,6 @@ export const d3 = {
 import * as SDKMATH from '@rapid-sdk/math';
 import * as SDKUTIL from '@rapid-sdk/util';
 export const sdk = { ...SDKMATH, ...SDKUTIL };
-
-// Used for testing
-export class MockContext {
-  constructor() {
-    this.sequences = {};
-    this.services = {};
-    this.systems = {};
-    this.viewport = new sdk.Viewport();
-  }
-  next(which) {
-    let num = this.sequences[which] || 0;
-    return this.sequences[which] = ++num;
-  }
-}
 
 
 // Polyfill idle callback functions (for Node)

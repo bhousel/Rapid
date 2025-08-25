@@ -4,8 +4,13 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('LocalizationSystem', () => {
-
   const context = new Rapid.MockContext();
+  context.systems = {
+    assets:   new Rapid.AssetSystem(context),
+    presets:  new Rapid.MockSystem(context),
+    urlhash:  new Rapid.MockSystem(context)
+  };
+
   let _l10n;
 
 
@@ -61,6 +66,61 @@ describe('LocalizationSystem', () => {
         }
       }
     };
+  });
+
+
+  describe('constructor', () => {
+    it('constructs an LocalizationSystem from a context', () => {
+      const l10n = new Rapid.LocalizationSystem(context);
+      assert.instanceOf(l10n, Rapid.LocalizationSystem);
+      assert.strictEqual(l10n.id, 'l10n');
+      assert.strictEqual(l10n.context, context);
+      assert.instanceOf(l10n.dependencies, Set);
+      assert.isTrue(l10n.autoStart);
+    });
+  });
+
+  describe('initAsync', () => {
+    it('returns an promise to init', () => {
+      const l10n = new Rapid.LocalizationSystem(context);
+      const prom = l10n.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+
+    it('rejects if a dependency is missing', () => {
+      const l10n = new Rapid.LocalizationSystem(context);
+      l10n.dependencies.add('missing');
+      const prom = l10n.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+        .catch(err => assert.match(err, /cannot init/i));
+    });
+  });
+
+  describe('startAsync', () => {
+    it('returns a promise to start', () => {
+      const l10n = new Rapid.LocalizationSystem(context);
+      const prom = l10n.initAsync().then(() => l10n.startAsync());
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(l10n.started))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+  });
+
+  describe('resetAsync', () => {
+    it('returns a promise to reset', () => {
+      const l10n = new Rapid.LocalizationSystem(context);
+      const prom = l10n.resetAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
   });
 
 

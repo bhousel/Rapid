@@ -5,45 +5,84 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('FilterSystem', () => {
 
-  class MockEditSystem {
+  class MockEditSystem extends Rapid.MockSystem {
     constructor(context) {
-      this.context = context;
+      super(context);
     }
     get staging() {
       return { graph: new Rapid.Graph(this.context) };
     }
   }
 
-  class MockUrlHashSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    getParam()    { return ''; }
-    setParam()    { }
-    on()          { return this; }
-  }
+  const context = new Rapid.MockContext();
+  context.systems = {
+    editor:  new MockEditSystem(context),
+    l10n:    new Rapid.LocalizationSystem(context),
+    map:     new Rapid.MockSystem(context),
+    storage: new Rapid.StorageSystem(context),
+    urlhash: new Rapid.UrlHashSystem(context)
+  };
 
-  class MockContext {
-    constructor()   {
-      this.viewport = new Rapid.sdk.Viewport();
-      this.sequences = {};
-      this.systems = {
-        editor:  new MockEditSystem(this),
-        storage: new Rapid.StorageSystem(this),
-        urlhash: new MockUrlHashSystem(this)
-      };
-    }
-    next(which) {
-      let num = this.sequences[which] || 0;
-      return this.sequences[which] = ++num;
-    }
-  }
-
-  const context = new MockContext();
   let _filters;
 
   beforeEach(() => {
     _filters = new Rapid.FilterSystem(context);
     return _filters.initAsync();
+  });
+
+
+  describe('constructor', () => {
+    it('constructs an FilterSystem from a context', () => {
+      const filters = new Rapid.FilterSystem(context);
+      assert.instanceOf(filters, Rapid.FilterSystem);
+      assert.strictEqual(filters.id, 'filters');
+      assert.strictEqual(filters.context, context);
+      assert.instanceOf(filters.dependencies, Set);
+      assert.isTrue(filters.autoStart);
+    });
+  });
+
+  describe('initAsync', () => {
+    it('returns an promise to init', () => {
+      const filters = new Rapid.FilterSystem(context);
+      const prom = filters.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+
+    it('rejects if a dependency is missing', () => {
+      const filters = new Rapid.FilterSystem(context);
+      filters.dependencies.add('missing');
+      const prom = filters.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+        .catch(err => assert.match(err, /cannot init/i));
+    });
+  });
+
+  describe('startAsync', () => {
+    it('returns a promise to start', () => {
+      const filters = new Rapid.FilterSystem(context);
+      const prom = filters.initAsync().then(() => filters.startAsync());
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(filters.started))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+  });
+
+  describe('resetAsync', () => {
+    it('returns a promise to reset', () => {
+      const filters = new Rapid.FilterSystem(context);
+      const prom = filters.resetAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
   });
 
 

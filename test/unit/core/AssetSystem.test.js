@@ -71,7 +71,6 @@ describe('AssetSystem', () => {
     });
   });
 
-
   describe('origin', () => {
     it('sets and gets origin', () => {
       const assets = new Rapid.AssetSystem(context);

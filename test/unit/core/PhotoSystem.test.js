@@ -3,38 +3,33 @@ import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
-describe('UrlHashSystem', () => {
+describe('PhotoSystem', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    imagery:  new Rapid.MockSystem(context),
-    editor:   new Rapid.EditSystem(context),
-    gfx:      new Rapid.MockSystem(context),
-    l10n:     new Rapid.LocalizationSystem(context),
+    editor:   new Rapid.MockSystem(context),
+    gfx:      new Rapid.MockGfxSystem(context),
+    l10n:     new Rapid.MockSystem(context),
     map:      new Rapid.MockSystem(context),
-    photos:   new Rapid.MockSystem(context),
-    rapid:    new Rapid.MockSystem(context),
-    spatial:  new Rapid.MockSystem(context),
-    storage:  new Rapid.MockSystem(context),
+    urlhash:  new Rapid.UrlHashSystem(context),
     ui:       new Rapid.MockSystem(context)
   };
-  context.selectedIDs = () => [];
 
 
   describe('constructor', () => {
-    it('constructs an UrlHashSystem from a context', () => {
-      const urlhash = new Rapid.UrlHashSystem(context);
-      assert.instanceOf(urlhash, Rapid.UrlHashSystem);
-      assert.strictEqual(urlhash.id, 'urlhash');
-      assert.strictEqual(urlhash.context, context);
-      assert.instanceOf(urlhash.dependencies, Set);
-      assert.isTrue(urlhash.autoStart);
+    it('constructs an PhotoSystem from a context', () => {
+      const photos = new Rapid.PhotoSystem(context);
+      assert.instanceOf(photos, Rapid.PhotoSystem);
+      assert.strictEqual(photos.id, 'photos');
+      assert.strictEqual(photos.context, context);
+      assert.instanceOf(photos.dependencies, Set);
+      assert.isTrue(photos.autoStart);
     });
   });
 
   describe('initAsync', () => {
     it('returns an promise to init', () => {
-      const urlhash = new Rapid.UrlHashSystem(context);
-      const prom = urlhash.initAsync();
+      const photos = new Rapid.PhotoSystem(context);
+      const prom = photos.initAsync();
       assert.instanceOf(prom, Promise);
       return prom
         .then(val => assert.isTrue(true))
@@ -42,9 +37,9 @@ describe('UrlHashSystem', () => {
     });
 
     it('rejects if a dependency is missing', () => {
-      const urlhash = new Rapid.UrlHashSystem(context);
-      urlhash.dependencies.add('missing');
-      const prom = urlhash.initAsync();
+      const photos = new Rapid.PhotoSystem(context);
+      photos.dependencies.add('missing');
+      const prom = photos.initAsync();
       assert.instanceOf(prom, Promise);
       return prom
         .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
@@ -54,19 +49,19 @@ describe('UrlHashSystem', () => {
 
   describe('startAsync', () => {
     it('returns a promise to start', () => {
-      const urlhash = new Rapid.UrlHashSystem(context);
-      const prom = urlhash.initAsync().then(() => urlhash.startAsync());
+      const photos = new Rapid.PhotoSystem(context);
+      const prom = photos.initAsync().then(() => photos.startAsync());
       assert.instanceOf(prom, Promise);
       return prom
-        .then(val => assert.isTrue(urlhash.started))
+        .then(val => assert.isTrue(photos.started))
         .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
     });
   });
 
   describe('resetAsync', () => {
     it('returns a promise to reset', () => {
-      const urlhash = new Rapid.UrlHashSystem(context);
-      const prom = urlhash.resetAsync();
+      const photos = new Rapid.PhotoSystem(context);
+      const prom = photos.resetAsync();
       assert.instanceOf(prom, Promise);
       return prom
         .then(val => assert.isTrue(true))

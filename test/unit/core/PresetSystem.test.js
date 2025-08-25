@@ -4,28 +4,21 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('PresetSystem', () => {
+  const context = new Rapid.MockContext();
+  context.systems = {
+    assets:     new Rapid.AssetSystem(context),
+    editor:     new Rapid.EditSystem(context),
+    gfx:        new Rapid.MockGfxSystem(context),
+    imagery:    new Rapid.MockSystem(context),
+    l10n:       new Rapid.LocalizationSystem(context),
+    locations:  new Rapid.MockSystem(context),
+    map:        new Rapid.MockSystem(context),
+    photos:     new Rapid.MockSystem(context),
+    spatial:    new Rapid.MockSystem(context),
+    storage:    new Rapid.MockSystem(context),
+    urlhash:    new Rapid.UrlHashSystem(context)
+  };
 
-  class MockContext {
-    constructor()   {
-      this.sequences = {};
-      this.viewport = new Rapid.sdk.Viewport();
-      this.systems = {
-        assets:     new Rapid.AssetSystem(this),
-        editor:     new Rapid.EditSystem(this),
-        l10n:       new Rapid.LocalizationSystem(this),
-        map:        new Rapid.MapSystem(this),
-        locations:  new Rapid.LocationSystem(this),
-        storage:    new Rapid.StorageSystem(this),
-        urlhash:    new Rapid.UrlHashSystem(this)
-      };
-    }
-    next(which) {
-      let num = this.sequences[which] || 0;
-      return this.sequences[which] = ++num;
-    }
-  }
-
-  const context = new MockContext();
   let _savedAreaKeys;
 
   beforeEach(() => {
@@ -36,6 +29,60 @@ describe('PresetSystem', () => {
     Rapid.osmSetAreaKeys(_savedAreaKeys);
   });
 
+
+  describe('constructor', () => {
+    it('constructs an PresetSystem from a context', () => {
+      const presets = new Rapid.PresetSystem(context);
+      assert.instanceOf(presets, Rapid.PresetSystem);
+      assert.strictEqual(presets.id, 'presets');
+      assert.strictEqual(presets.context, context);
+      assert.instanceOf(presets.dependencies, Set);
+      assert.isTrue(presets.autoStart);
+    });
+  });
+
+  describe('initAsync', () => {
+    it('returns an promise to init', () => {
+      const presets = new Rapid.PresetSystem(context);
+      const prom = presets.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+
+    it('rejects if a dependency is missing', () => {
+      const presets = new Rapid.PresetSystem(context);
+      presets.dependencies.add('missing');
+      const prom = presets.initAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+        .catch(err => assert.match(err, /cannot init/i));
+    });
+  });
+
+  describe('startAsync', () => {
+    it('returns a promise to start', () => {
+      const presets = new Rapid.PresetSystem(context);
+      const prom = presets.initAsync().then(() => presets.startAsync());
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(presets.started))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+  });
+
+  describe('resetAsync', () => {
+    it('returns a promise to reset', () => {
+      const presets = new Rapid.PresetSystem(context);
+      const prom = presets.resetAsync();
+      assert.instanceOf(prom, Promise);
+      return prom
+        .then(val => assert.isTrue(true))
+        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    });
+  });
 
   describe('fallbacks', () => {
     it('has a fallback point preset', () => {

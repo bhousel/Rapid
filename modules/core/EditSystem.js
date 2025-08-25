@@ -121,19 +121,24 @@ export class EditSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
+
+    const context = this.context;
+
     for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
+      if (!context.systems[id]) {
         return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
       }
     }
 
-    this._reset();
-
-    const storage = this.context.systems.storage;
-    const prerequisites = storage.initAsync();
+    const storage = context.systems.storage;
+    const prerequisites = Promise.all([
+      storage.initAsync()
+    ]);
 
     return this._initPromise = prerequisites
       .then(() => {
+        this._reset();
+
         const isTestEnvironment = (typeof window === 'undefined' || globalThis.mocha);
         if (isTestEnvironment) return;
 

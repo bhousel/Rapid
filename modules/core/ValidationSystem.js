@@ -36,7 +36,7 @@ export class ValidationSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'validator';
-    this.dependencies = new Set(['editor', 'storage', 'map', 'spatial', 'urlhash']);
+    this.dependencies = new Set(['editor', 'storage', 'map', 'presets', 'spatial', 'urlhash']);
 
     this._rules = new Map();    // Map(ruleID -> validator)
     this._base = new ValidationCache('base');   // issues before any user edits
@@ -84,10 +84,12 @@ export class ValidationSystem extends AbstractSystem {
 
     // Init prerequisites
     const editor = context.systems.editor;
+    const presets = context.systems.presets;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
     const prerequisites = Promise.all([
       editor.initAsync(),
+      presets.initAsync(),
       storage.initAsync(),
       urlhash.initAsync()
     ]);
