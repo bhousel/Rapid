@@ -7,15 +7,18 @@ describe('LocalizationSystem', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     assets:   new Rapid.AssetSystem(context),
+    editor:   new Rapid.MockSystem(context),
+    l10n:     new Rapid.LocalizationSystem(context),
+    map:      new Rapid.MockSystem(context),
     presets:  new Rapid.MockSystem(context),
-    urlhash:  new Rapid.MockSystem(context)
+    urlhash:  new Rapid.UrlHashSystem(context)
   };
 
   let _l10n;
 
 
   beforeEach(() => {
-    _l10n = new Rapid.LocalizationSystem(context);
+    _l10n = context.systems.l10n;
     _l10n._cache = {
       en: {
         core: {

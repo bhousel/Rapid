@@ -978,14 +978,14 @@ export class LocalizationSystem extends AbstractSystem {
       currLocale = 'en';
     }
 
-    const langNamesCurr = this._cache[currLocale].core.languageNames ?? {};
-    const langNamesLang = this._cache[languageCode].core.languageNames ?? {};
-    const langNamesEn = this._cache.en.core.languageNames ?? {};
+    const langNamesCurr = this._cache[currLocale]?.core?.languageNames ?? {};
+    const langNamesLang = this._cache[languageCode]?.core?.languageNames ?? {};
+    const langNamesEn = this._cache?.en?.core?.languageNames ?? {};
     this._currLanguageNames = Object.assign({}, langNamesEn, langNamesLang, langNamesCurr);
 
-    const scriptNamesCurr = this._cache[currLocale].core.scriptNames ?? {};
-    const scriptNamesLang = this._cache[languageCode].core.scriptNames ?? {};
-    const scriptNamesEn = this._cache.en.core.scriptNames ?? {};
+    const scriptNamesCurr = this._cache[currLocale]?.core?.scriptNames ?? {};
+    const scriptNamesLang = this._cache[languageCode]?.core?.scriptNames ?? {};
+    const scriptNamesEn = this._cache?.en?.core?.scriptNames ?? {};
     this._currScriptNames = Object.assign({}, scriptNamesEn, scriptNamesLang, scriptNamesCurr);
 
     this.emit('localechange');

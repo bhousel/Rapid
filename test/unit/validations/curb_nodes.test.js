@@ -1,41 +1,30 @@
-describe('validationCurbNodes', () => {
-  let graph, tree;
+import { beforeEach, describe, it } from 'node:test';
+import { assert } from 'chai';
+import * as Rapid from '../../../modules/headless.js';
 
-  class MockLocalizationSystem {
-    constructor() {}
-    displayLabel(entity)  { return entity.id; }
-    t(id)                 { return id; }
-  }
+
+describe('validationCurbNodes', () => {
+  let graph;
 
   class MockEditSystem {
     constructor() {}
+    initAsync()   { return Promise.resolve(); }
     get staging() { return { graph: graph }; }
-    get tree()    { return tree; }
   }
 
-  class MockContext {
-    constructor() {
-      this.sequences = {};
-      this.viewport = new Rapid.sdk.Viewport();
-      this.services = {};
-      this.systems = {
-        editor: new MockEditSystem(),
-        l10n:   new MockLocalizationSystem()
-      };
-    }
-    next(which) {
-      let num = this.sequences[which] || 0;
-      return this.sequences[which] = ++num;
-    }
-  }
+  const context = new Rapid.MockContext();
+  context.systems = {
+    editor:   new MockEditSystem(context),
+    l10n:     new Rapid.LocalizationSystem(context),
+    spatial:  new Rapid.SpatialSystem(context)
+  };
 
-  const context = new MockContext();
   const validator = Rapid.validationCurbNodes(context);
 
   beforeEach(() => {
-    graph = new Rapid.Graph(context);  // reset
-    tree = new Rapid.Tree(graph);      // reset
+    graph = new Rapid.Graph(context);      // reset
   });
+
 
   function validate() {
     const entities = [ ...graph.base.entities.values() ];
@@ -47,13 +36,14 @@ describe('validationCurbNodes', () => {
     return issues;
   }
 
+
   function createSingleCrossing(w1tags = {}, w2tags = {}, n1tags = {}, n2tags = {}) {
     //
-    //        n2  (w1 = the footway)
-    //        |
-    //  n3 -- n5 -- n4   (w2 = the road)
-    //        |
-    //        n1
+    //      n2       w1:  [n1, n5, n2]  (the foootway)
+    //      |        w2:  [n3, n5, n4]  (the road)
+    //  n3--n5--n4
+    //      |
+    //      n1
     //
     const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, -1], tags: n1tags });
     const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0,  1], tags: n2tags });
@@ -64,29 +54,31 @@ describe('validationCurbNodes', () => {
     const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n5', 'n4'], tags: w2tags });
     const entities = [n1, n2, n3, n4, n5, w1, w2];
     graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph);
-    tree.rebase(entities, true);
   }
 
   function verifySingleCurbNodeIssue(issues) {
-    expect(issues).to.have.lengthOf(1);
+    assert.isArray(issues);
+    assert.lengthOf(issues, 1);
 
-    const issue = issues[0];
-    expect(issue.type).to.eql('curb_nodes');
-    expect(issue.severity).to.eql('suggestion');
-    expect(issue.entityIds).to.have.lengthOf(1);
-    expect(issue.entityIds[0]).to.eql('w1');
+    const expected = {
+      type:      'curb_nodes',
+      severity:  'suggestion',
+      entityIds: ['w1']
+    };
+
+    assert.deepInclude(issues[0], expected);
   }
+
 
   it('has no errors on init', () => {
     const issues = validate();
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
   it('ignores untagged line crossing untagged line', () => {
     createSingleCrossing();  // no tags
     const issues = validate();
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
   for (const type of ['primary', 'secondary', 'tertiary', 'residential']) {
@@ -108,7 +100,7 @@ describe('validationCurbNodes', () => {
       { barrier: 'kerb' }
     );
     const issues = validate();
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
   it('ignores a crossing way with `kerb=*` tags at both ends', () => {
@@ -119,7 +111,7 @@ describe('validationCurbNodes', () => {
       { kerb: 'maybe' }
     );
     const issues = validate();
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
 });

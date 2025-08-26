@@ -1,6 +1,5 @@
-import { after, before, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { assert } from 'chai';
-import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
 

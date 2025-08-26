@@ -19,7 +19,7 @@ export function osmSetVertexTags(value) {
 }
 
 // Tags that are deprecated, some offer replacement/upgrade
-export let osmDeprecatedTags = {};
+export let osmDeprecatedTags = [];
 export function osmSetDeprecatedTags(value) {
   osmDeprecatedTags = value;
 }

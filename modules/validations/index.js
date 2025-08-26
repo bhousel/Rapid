@@ -1,23 +1,23 @@
-export { validationAlmostJunction } from './almost_junction.js';
-export { validationCloseNodes } from './close_nodes.js';
+// export { validationAlmostJunction } from './almost_junction.js';  // TODO FIX Tree.waySegments
 export { validationAmbiguousCrossingTags } from './ambiguous_crossing_tags.js';
-export { validationCrossingWays } from './crossing_ways.js';
+// export { validationCrossingWays } from './crossing_ways.js';   // TODO FIX Tree.waySegments
+export { validationCloseNodes } from './close_nodes.js';
+export { validationCurbNodes } from './curb_nodes.js';
 export { validationDisconnectedWay } from './disconnected_way.js';
 export { validationDuplicateWaySegments } from './duplicate_way_segments.js';
 export { validationFormatting } from './invalid_format.js';
 export { validationHelpRequest } from './help_request.js';
 export { validationImpossibleOneway } from './impossible_oneway.js';
 export { validationIncompatibleSource } from './incompatible_source.js';
-export { validationCurbNodes } from './curb_nodes.js';
 export { validationMismatchedGeometry } from './mismatched_geometry.js';
 export { validationMissingRole } from './missing_role.js';
 export { validationMissingTag } from './missing_tag.js';
 export { validationOutdatedTags } from './outdated_tags.js';
 export { validationPrivateData } from './private_data.js';
 // export { validationShortRoad } from './short_road.js';
-export { validationYShapedConnection } from './y_shaped_connection.js';
 export { validationSuspiciousName } from './suspicious_name.js';
 export { validationUnsquareWay } from './unsquare_way.js';
+export { validationYShapedConnection } from './y_shaped_connection.js';
 
 /**
  *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.

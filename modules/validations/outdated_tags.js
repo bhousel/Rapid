@@ -3,7 +3,7 @@ import { utilHashcode, utilTagDiff } from '@rapid-sdk/util';
 import { actionChangePreset } from '../actions/change_preset.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionUpgradeTags } from '../actions/upgrade_tags.js';
-import { getDeprecatedTags, osmIsOldMultipolygonOuterMember, osmOldMultipolygonOuterMemberOfRelation } from '../models/index.js';
+import { Graph, getDeprecatedTags, osmIsOldMultipolygonOuterMember, osmOldMultipolygonOuterMemberOfRelation } from '../models/index.js';
 import { ValidationIssue } from '../core/lib/ValidationIssue.js';
 import { ValidationFix } from '../core/lib/ValidationFix.js';
 
@@ -44,6 +44,9 @@ export function validationOutdatedTags(context) {
 
     let preset = presets.match(entity, graph);
     if (!preset) return [];
+
+// make a copy
+graph = new Graph(graph);
 
     // Crossings are special, see Rapid#1260
     // This validator can perform preset upgrades on standalone crossing nodes

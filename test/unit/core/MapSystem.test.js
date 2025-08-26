@@ -6,7 +6,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe('MapSystem', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:   new Rapid.MockSystem(context),
+    assets:   new Rapid.AssetSystem(context),
     editor:   new Rapid.MockSystem(context),
     filters:  new Rapid.MockSystem(context),
     gfx:      new Rapid.MockGfxSystem(context),

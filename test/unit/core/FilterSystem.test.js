@@ -158,18 +158,18 @@ describe('FilterSystem', () => {
       _filters.filterScene(all, graph);
       const stats = _filters.getStats();
 
-      expect(stats.boundaries).to.eql(1);
-      expect(stats.buildings).to.eql(1);
-      expect(stats.landuse).to.eql(0);
-      expect(stats.traffic_roads).to.eql(1);
-      expect(stats.service_roads).to.eql(0);
-      expect(stats.others).to.eql(1);
-      expect(stats.past_future).to.eql(1);
-      expect(stats.paths).to.eql(0);
-      expect(stats.points).to.eql(5);
-      expect(stats.power).to.eql(1);
-      expect(stats.rail).to.eql(2);
-      expect(stats.water).to.eql(1);
+      assert.strictEqual(stats.boundaries, 1);
+      assert.strictEqual(stats.buildings, 1);
+      assert.strictEqual(stats.landuse, 0);
+      assert.strictEqual(stats.traffic_roads, 1);
+      assert.strictEqual(stats.service_roads, 0);
+      assert.strictEqual(stats.others, 1);
+      assert.strictEqual(stats.past_future, 1);
+      assert.strictEqual(stats.paths, 0);
+      assert.strictEqual(stats.points, 5);
+      assert.strictEqual(stats.power, 1);
+      assert.strictEqual(stats.rail, 2);
+      assert.strictEqual(stats.water, 1);
     });
   });
 

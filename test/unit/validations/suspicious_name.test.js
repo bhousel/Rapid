@@ -1,3 +1,8 @@
+import { describe, it } from 'node:test';
+import { assert } from 'chai';
+import * as Rapid from '../../../modules/headless.js';
+
+
 describe('validationSuspiciousName', () => {
 
   class MockNsi {
@@ -14,133 +19,129 @@ describe('validationSuspiciousName', () => {
     }
   }
 
-  class MockLocalizationSystem {
-    constructor() {}
-    displayLabel(entity)  { return entity.id; }
-    t(id)                 { return id; }
-  }
-
-  class MockContext {
-    constructor() {
-      this.sequences = {};
-      this.viewport = new Rapid.sdk.Viewport();
-      this.services = {
-        nsi: new MockNsi()
-      };
-      this.systems = {
-        l10n: new MockLocalizationSystem()
-      };
-    }
-    next(which) {
-      let num = this.sequences[which] || 0;
-      return this.sequences[which] = ++num;
-    }
-  }
+  const context = new Rapid.MockContext();
+  context.systems = {
+    l10n:  new Rapid.LocalizationSystem(context)
+  };
+  context.services = {
+    nsi:   new MockNsi(context)
+  };
 
 
-  const context = new MockContext();
   const validator = Rapid.validationSuspiciousName(context);
 
   it('ignores feature with no tags', () => {
     const n = new Rapid.OsmNode(context);
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
   it('ignores feature with no name', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
   it('ignores feature with a specific name', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lou\'s' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
   it('ignores feature with a specific name that includes a generic name', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lou\'s Store' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
   it('ignores feature matching excludeNamed pattern in name-suggestion-index', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'famiglia cooperativa' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
   it('flags feature matching a excludeGeneric pattern in name-suggestion-index', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'super mercado' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(1);
-    const issue = issues[0];
-    expect(issue.type).to.eql('suspicious_name');
-    expect(issue.subtype).to.eql('generic_name');
-    expect(issue.entityIds).to.have.lengthOf(1);
-    expect(issue.entityIds[0]).to.eql(n.id);
+    assert.isArray(issues);
+    assert.lengthOf(issues, 1);
+    const expected = {
+      type:      'suspicious_name',
+      subtype:   'generic_name',
+      entityIds: [n.id]
+    };
+    assert.deepInclude(issues[0], expected);
   });
 
   it('flags feature matching a global exclude pattern in name-suggestion-index', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'store' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(1);
-    const issue = issues[0];
-    expect(issue.type).to.eql('suspicious_name');
-    expect(issue.subtype).to.eql('generic_name');
-    expect(issue.entityIds).to.have.lengthOf(1);
-    expect(issue.entityIds[0]).to.eql(n.id);
+    assert.isArray(issues);
+    assert.lengthOf(issues, 1);
+    const expected = {
+      type:      'suspicious_name',
+      subtype:   'generic_name',
+      entityIds: [n.id]
+    };
+    assert.deepInclude(issues[0], expected);
   });
 
   it('flags feature with a name that is just a defining tag key', () => {
     const n = new Rapid.OsmNode(context, { tags: { amenity: 'drinking_water', name: 'Amenity' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(1);
-    const issue = issues[0];
-    expect(issue.type).to.eql('suspicious_name');
-    expect(issue.subtype).to.eql('generic_name');
-    expect(issue.entityIds).to.have.lengthOf(1);
-    expect(issue.entityIds[0]).to.eql(n.id);
+    assert.isArray(issues);
+    assert.lengthOf(issues, 1);
+    const expected = {
+      type:      'suspicious_name',
+      subtype:   'generic_name',
+      entityIds: [n.id]
+    };
+    assert.deepInclude(issues[0], expected);
   });
 
   it('flags feature with a name that is just a defining tag value', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'red_bicycle_emporium', name: 'Red Bicycle Emporium' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(1);
-    const issue = issues[0];
-    expect(issue.type).to.eql('suspicious_name');
-    expect(issue.subtype).to.eql('generic_name');
-    expect(issue.entityIds).to.have.lengthOf(1);
-    expect(issue.entityIds[0]).to.eql(n.id);
+    assert.isArray(issues);
+    assert.lengthOf(issues, 1);
+    const expected = {
+      type:      'suspicious_name',
+      subtype:   'generic_name',
+      entityIds: [n.id]
+    };
+    assert.deepInclude(issues[0], expected);
   });
 
   it('ignores feature with a non-matching `not:name` tag', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lou\'s', 'not:name': 'Lous' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(0);
+    assert.deepEqual(issues, []);
   });
 
   it('flags feature with a matching `not:name` tag', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lous', 'not:name': 'Lous' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(1);
-    const issue = issues[0];
-    expect(issue.type).to.eql('suspicious_name');
-    expect(issue.subtype).to.eql('not_name');
-    expect(issue.entityIds).to.have.lengthOf(1);
-    expect(issue.entityIds[0]).to.eql(n.id);
+    assert.isArray(issues);
+    assert.lengthOf(issues, 1);
+    const expected = {
+      type:      'suspicious_name',
+      subtype:   'not_name',
+      entityIds: [n.id]
+    };
+    assert.deepInclude(issues[0], expected);
   });
 
   it('flags feature with a matching a semicolon-separated `not:name` tag', () => {
     const n = new Rapid.OsmNode(context, { tags: { shop: 'supermarket', name: 'Lous', 'not:name': 'Louis\';Lous;Louis\'s' }});
     const issues = validator(n);
-    expect(issues).to.have.lengthOf(1);
-    const issue = issues[0];
-    expect(issue.type).to.eql('suspicious_name');
-    expect(issue.subtype).to.eql('not_name');
-    expect(issue.entityIds).to.have.lengthOf(1);
-    expect(issue.entityIds[0]).to.eql(n.id);
+    assert.isArray(issues);
+    assert.lengthOf(issues, 1);
+    const expected = {
+      type:      'suspicious_name',
+      subtype:   'not_name',
+      entityIds: [n.id]
+    };
+    assert.deepInclude(issues[0], expected);
   });
 
 });
