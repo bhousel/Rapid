@@ -6,13 +6,8 @@ import * as Rapid from '../../../modules/headless.js';
 describe('RapidSystem', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:   new Rapid.AssetSystem(context),
-    editor:   new Rapid.MockSystem(context),
-    l10n:     new Rapid.MockSystem(context),
-    map:      new Rapid.MockSystem(context),
-    urlhash:  new Rapid.UrlHashSystem(context),
+    editor:   new Rapid.MockSystem(context)
   };
-
 
   describe('constructor', () => {
     it('constructs an RapidSystem from a context', () => {

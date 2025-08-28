@@ -8,18 +8,9 @@ describe('MapSystem', () => {
   context.systems = {
     assets:   new Rapid.AssetSystem(context),
     editor:   new Rapid.MockSystem(context),
-    filters:  new Rapid.MockSystem(context),
     gfx:      new Rapid.MockGfxSystem(context),
-    imagery:  new Rapid.MockSystem(context),
-    map:      new Rapid.MapSystem(context),
-    photos:   new Rapid.MockSystem(context),
-    presets:  new Rapid.MockSystem(context),
-    rapid:    new Rapid.MockSystem(context),
     l10n:     new Rapid.LocalizationSystem(context),
-    spatial:  new Rapid.MockSystem(context),
-    storage:  new Rapid.StorageSystem(context),
-    styles:   new Rapid.MockSystem(context),
-    urlhash:  new Rapid.UrlHashSystem(context)
+    map:      new Rapid.MapSystem(context)
   };
 
 

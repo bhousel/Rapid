@@ -4,24 +4,16 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('ValidationSystem', () => {
-
   const context = new Rapid.MockContext();
   context.systems = {
     assets:     new Rapid.AssetSystem(context),
     editor:     new Rapid.EditSystem(context),
-    gfx:        new Rapid.MockGfxSystem(context),
-    imagery:    new Rapid.ImagerySystem(context),
     l10n:       new Rapid.LocalizationSystem(context),
     locations:  new Rapid.LocationSystem(context),
-    map:        new Rapid.MapSystem(context),
-    photos:     new Rapid.PhotoSystem(context),
     presets:    new Rapid.PresetSystem(context),
-    rapid:      new Rapid.RapidSystem(context),
     spatial:    new Rapid.SpatialSystem(context),
-    storage:    new Rapid.StorageSystem(context),
-    urlhash:    new Rapid.UrlHashSystem(context)
+    storage:    new Rapid.StorageSystem(context)
   };
-
 
   describe('constructor', () => {
     it('constructs an ValidationSystem from a context', () => {

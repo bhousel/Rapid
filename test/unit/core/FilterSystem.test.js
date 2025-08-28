@@ -16,11 +16,7 @@ describe('FilterSystem', () => {
 
   const context = new Rapid.MockContext();
   context.systems = {
-    editor:  new MockEditSystem(context),
-    l10n:    new Rapid.LocalizationSystem(context),
-    map:     new Rapid.MockSystem(context),
-    storage: new Rapid.StorageSystem(context),
-    urlhash: new Rapid.UrlHashSystem(context)
+    editor:  new MockEditSystem(context)
   };
 
   let _filters;

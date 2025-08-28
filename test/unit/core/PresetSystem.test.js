@@ -7,16 +7,7 @@ describe('PresetSystem', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     assets:     new Rapid.AssetSystem(context),
-    editor:     new Rapid.EditSystem(context),
-    gfx:        new Rapid.MockGfxSystem(context),
-    imagery:    new Rapid.MockSystem(context),
-    l10n:       new Rapid.LocalizationSystem(context),
-    locations:  new Rapid.MockSystem(context),
-    map:        new Rapid.MockSystem(context),
-    photos:     new Rapid.MockSystem(context),
-    spatial:    new Rapid.MockSystem(context),
-    storage:    new Rapid.MockSystem(context),
-    urlhash:    new Rapid.UrlHashSystem(context)
+    l10n:       new Rapid.LocalizationSystem(context)
   };
 
   let _savedAreaKeys;

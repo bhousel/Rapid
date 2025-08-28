@@ -7,12 +7,7 @@ describe('ImagerySystem', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     assets:   new Rapid.AssetSystem(context),
-    editor:   new Rapid.MockSystem(context),
-    gfx:      new Rapid.MockGfxSystem(context),
-    l10n:     new Rapid.LocalizationSystem(context),
-    map:      new Rapid.MockSystem(context),
-    storage:  new Rapid.StorageSystem(context),
-    urlhash:  new Rapid.UrlHashSystem(context)
+    l10n:     new Rapid.LocalizationSystem(context)
   };
 
 

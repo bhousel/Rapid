@@ -5,10 +5,6 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('StyleSystem', () => {
   const context = new Rapid.MockContext();
-  context.systems = {
-    assets: new Rapid.MockSystem(context)
-  };
-
 
   describe('constructor', () => {
     it('constructs an StyleSystem from a context', () => {

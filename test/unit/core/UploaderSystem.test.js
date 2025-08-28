@@ -8,8 +8,7 @@ describe('UploaderSystem', () => {
   context.systems = {
     assets:   new Rapid.AssetSystem(context),
     editor:   new Rapid.MockSystem(context),
-    l10n:     new Rapid.MockSystem(context),
-    spatial:  new Rapid.MockSystem(context)
+    l10n:     new Rapid.MockSystem(context)
   };
 
 

@@ -6,16 +6,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe('UrlHashSystem', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    imagery:  new Rapid.MockSystem(context),
-    editor:   new Rapid.EditSystem(context),
-    gfx:      new Rapid.MockSystem(context),
-    l10n:     new Rapid.LocalizationSystem(context),
-    map:      new Rapid.MockSystem(context),
-    photos:   new Rapid.MockSystem(context),
-    rapid:    new Rapid.MockSystem(context),
-    spatial:  new Rapid.MockSystem(context),
-    storage:  new Rapid.MockSystem(context),
-    ui:       new Rapid.MockSystem(context)
+    l10n: new Rapid.LocalizationSystem(context),
   };
   context.selectedIDs = () => [];
 

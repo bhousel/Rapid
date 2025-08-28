@@ -6,7 +6,6 @@ import * as Rapid from '../../../modules/headless.js';
 describe('SpatialSystem', () => {
   const context = new Rapid.MockContext();
 
-
   describe('constructor', () => {
     it('constructs an SpatialSystem from a context', () => {
       const spatial = new Rapid.SpatialSystem(context);

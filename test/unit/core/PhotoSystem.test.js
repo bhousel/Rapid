@@ -5,14 +5,6 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('PhotoSystem', () => {
   const context = new Rapid.MockContext();
-  context.systems = {
-    editor:   new Rapid.MockSystem(context),
-    gfx:      new Rapid.MockGfxSystem(context),
-    l10n:     new Rapid.MockSystem(context),
-    map:      new Rapid.MockSystem(context),
-    urlhash:  new Rapid.UrlHashSystem(context),
-    ui:       new Rapid.MockSystem(context)
-  };
 
 
   describe('constructor', () => {

@@ -6,7 +6,6 @@ import * as Rapid from '../../../modules/headless.js';
 describe('StorageSystem', () => {
   const context = new Rapid.MockContext();
 
-
   describe('constructor', () => {
     it('constructs an StorageSystem from a context', () => {
       const storage = new Rapid.StorageSystem(context);
