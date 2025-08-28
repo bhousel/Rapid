@@ -7,6 +7,10 @@ import { EventEmitter } from 'pixi.js';
  * "Services" are extension components that connect to other web services and fetch data.
  * They are owned by the Context. All systems are EventEmitters
  *
+ * Systems have some built-in dependency tracking.  You can add systemIDs to
+ * the `requiredDependencies` or `optionalDependencies` sets.  At init time
+ * an exception will be thrown if a required depencency is not met.
+ *
  * System Components all go through a standard lifecycle.
  * `constructor()` -> `initAsync()` -> `startAsync()`
  *
@@ -57,8 +61,12 @@ export class AbstractSystem extends EventEmitter {
     super();
     this.id = '';
     this.context = context;
-    this.dependencies = new Set();
+    this.requiredDependencies = new Set();
+    this.optionalDependencies = new Set();
     this.autoStart = true;
+
+    this._initPromise = null;
+    this._startPromise = null;
 
     this._started = false;
     this._paused = false;
@@ -110,15 +118,19 @@ export class AbstractSystem extends EventEmitter {
   /**
    * initAsync
    * Called after all core objects have been constructed.
+   * Will return a rejected promise if any required system is not available.
    * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @abstract
    */
   initAsync() {
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
+    if (this._initPromise) return this._initPromise;
+
+    for (const requiredID of this.requiredDependencies) {
+      if (!this.context.systems[requiredID]) {
+        return Promise.reject(`Cannot init:  ${this.id} requires ${requiredID}`);
       }
     }
-    return Promise.resolve();
+    return this._initPromise = Promise.resolve();
   }
 
 
@@ -126,10 +138,13 @@ export class AbstractSystem extends EventEmitter {
    * startAsync
    * Called after all core objects have been initialized.
    * @return  {Promise}  Promise resolved when this component has completed startup
+   * @abstract
    */
   startAsync() {
+    if (this._startPromise) return this._startPromise;
+
     this._started = true;
-    return Promise.resolve();
+    return this.startPromise = Promise.resolve();
   }
 
 
@@ -137,6 +152,7 @@ export class AbstractSystem extends EventEmitter {
    * resetAsync
    * Called after completing an edit session to reset any internal state.
    * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @abstract
    */
   resetAsync() {
     return Promise.resolve();

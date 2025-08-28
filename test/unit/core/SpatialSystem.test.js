@@ -13,7 +13,8 @@ describe('SpatialSystem', () => {
       assert.instanceOf(spatial, Rapid.SpatialSystem);
       assert.strictEqual(spatial.id, 'spatial');
       assert.strictEqual(spatial.context, context);
-      assert.instanceOf(spatial.dependencies, Set);
+      assert.instanceOf(spatial.requiredDependencies, Set);
+      assert.instanceOf(spatial.optionalDependencies, Set);
       assert.isTrue(spatial.autoStart);
     });
   });
@@ -30,7 +31,7 @@ describe('SpatialSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const spatial = new Rapid.SpatialSystem(context);
-      spatial.dependencies.add('missing');
+      spatial.requiredDependencies.add('missing');
       const prom = spatial.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

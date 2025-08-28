@@ -23,13 +23,12 @@ export class Map3dSystem extends AbstractSystem {
     super(context);
     this.id = 'map3d';
     this.autoStart = false;
-    this.dependencies = new Set(['editor', 'gfx', 'l10n', 'map', 'styles', 'ui', 'urlhash']);
+    this.requiredDependencies = new Set(['editor', 'gfx', 'map', 'styles', 'ui', 'urlhash']);
+    this.optionalDependencies = new Set(['l10n']);
     this.maplibre = null;
     this.containerID = 'map3d_container';
 
     this._loadPromise = null;
-    this._initPromise = null;
-    this._startPromise = null;
     this._keys = null;
 
     // The 3d Map will stay close to the main map, but with an offset zoom and rotation
@@ -59,26 +58,24 @@ export class Map3dSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
+    if (this._initPromise) return this._initPromise;
 
     const context = this.context;
     const l10n = context.systems.l10n;
     const urlhash = context.systems.urlhash;
 
-    const prerequisites = Promise.all([
-      l10n.initAsync(),
-      urlhash.initAsync()
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [
+          l10n?.initAsync(),
+          urlhash?.initAsync()
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => {
         // Setup event handlers..
-        urlhash.on('hashchange', this._hashchange);
-        l10n.on('localechange', this._setupKeybinding);
+        urlhash?.on('hashchange', this._hashchange);
+        l10n?.on('localechange', this._setupKeybinding);
         this._setupKeybinding();
       });
   }

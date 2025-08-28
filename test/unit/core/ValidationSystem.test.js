@@ -29,7 +29,8 @@ describe('ValidationSystem', () => {
       assert.instanceOf(validator, Rapid.ValidationSystem);
       assert.strictEqual(validator.id, 'validator');
       assert.strictEqual(validator.context, context);
-      assert.instanceOf(validator.dependencies, Set);
+      assert.instanceOf(validator.requiredDependencies, Set);
+      assert.instanceOf(validator.optionalDependencies, Set);
       assert.isTrue(validator.autoStart);
     });
   });
@@ -46,7 +47,7 @@ describe('ValidationSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const validator = new Rapid.ValidationSystem(context);
-      validator.dependencies.add('missing');
+      validator.requiredDependencies.add('missing');
       const prom = validator.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

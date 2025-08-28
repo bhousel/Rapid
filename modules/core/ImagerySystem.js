@@ -31,9 +31,9 @@ export class ImagerySystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'imagery';
-    this.dependencies = new Set(['assets', 'editor', 'gfx', 'l10n', 'map', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set(['assets', 'l10n']);
+    this.optionalDependencies = new Set(['gfx', 'storage', 'urlhash']);
 
-    this._initPromise = null;
     this._imageryIndex = null;
     this._baseLayer = null;
     this._overlayLayers = new Map();   // Map<sourceID, ImagerySource>
@@ -60,12 +60,6 @@ export class ImagerySystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
     const context = this.context;
     const assets = context.systems.assets;
     const gfx = context.systems.gfx;
@@ -73,19 +67,21 @@ export class ImagerySystem extends AbstractSystem {
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
 
-    const prerequisites = Promise.all([
-      assets.initAsync(),
-      gfx.initAsync(),   // `gfx.scene` will exist after `initAsync`
-      map.initAsync(),   // `ImagerySystem` should listen for 'hashchange' after `MapSystem`
-      storage.initAsync(),
-      urlhash.initAsync()
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [
+          assets?.initAsync(),
+          gfx?.initAsync(),   // `gfx.scene` will exist after `initAsync`
+          map?.initAsync(),   // `ImagerySystem` should listen for 'hashchange' after `MapSystem`
+          storage?.initAsync(),
+          urlhash?.initAsync()
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => {
         // Setup event handlers..
-        urlhash.on('hashchange', this._hashchange);
-        gfx.scene.on('layerchange', this._imageryChanged);
+        urlhash?.on('hashchange', this._hashchange);
+        gfx?.scene?.on('layerchange', this._imageryChanged);
       })
       .then(() => assets.loadAssetAsync('imagery'))
       .then(data => this._initImageryIndex(data))
@@ -109,6 +105,8 @@ export class ImagerySystem extends AbstractSystem {
    */
   _initImageryIndex(data) {
     const context = this.context;
+    const storage = context.systems.storage;
+
     const arr = data.imagery || [];
 
     this._imageryIndex = {
@@ -172,8 +170,7 @@ export class ImagerySystem extends AbstractSystem {
 
     // Add 'Custom' - seed it with whatever template the user has used previously
     const custom = new ImagerySourceCustom(context);
-    const storage = this.context.systems.storage;
-    custom.template = storage.getItem('background-custom-template') || '';
+    custom.template = storage?.getItem('background-custom-template') || '';
     this._imageryIndex.sources.set(custom.id.toLowerCase(), custom);
 
     // Default the locator overlay to "on"..
@@ -202,8 +199,7 @@ export class ImagerySystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -275,6 +271,9 @@ export class ImagerySystem extends AbstractSystem {
     const baseLayer = this._baseLayer;
     if (this.context.inIntro || !baseLayer) return;
 
+    const urlhash = this.context.systems.urlhash;
+    if (!urlhash) return;
+
     // Gather info about enabled base imagery
     let baseLayerID = baseLayer.key;  // note: use `key` here - for Wayback it will include the date
     if (baseLayerID === 'custom') {
@@ -289,7 +288,6 @@ export class ImagerySystem extends AbstractSystem {
     }
 
     // Update hash params: 'background', 'overlays', 'offset'
-    const urlhash = this.context.systems.urlhash;
     urlhash.setParam('background', baseLayerID);
     urlhash.setParam('overlays', overlayIDs.length ? overlayIDs.join(',') : null);
 
@@ -421,7 +419,7 @@ export class ImagerySystem extends AbstractSystem {
     const best = available.find(s => s.best);
 
     // Consider previously chosen imagery unless it was 'none'
-    let previousID = storage.getItem('background-last-used') || 'none';
+    let previousID = storage?.getItem('background-last-used') || 'none';
     const previous = (previousID !== 'none') && this.getSourceByID(previousID);
 
     return best ||
@@ -577,8 +575,8 @@ export class ImagerySystem extends AbstractSystem {
     this._brightness = val;
 
     const context = this.context;
-    const scene = context.systems.gfx.scene;
-    scene.layers.get('background')?.setBrightness(val);
+    const layer = context.systems.gfx?.scene?.layers?.get('background');
+    layer?.setBrightness(val);
     this.emit('imagerychange');
   }
 
@@ -594,8 +592,8 @@ export class ImagerySystem extends AbstractSystem {
     this._contrast = val;
 
     const context = this.context;
-    const scene = context.systems.gfx.scene;
-    scene.layers.get('background')?.setContrast(val);
+    const layer = context.systems.gfx?.scene?.layers?.get('background');
+    layer?.setContrast(val);
     this.emit('imagerychange');
   }
 
@@ -611,8 +609,8 @@ export class ImagerySystem extends AbstractSystem {
     this._saturation = val;
 
     const context = this.context;
-    const scene = context.systems.gfx.scene;
-    scene.layers.get('background')?.setSaturation(val);
+    const layer = context.systems.gfx?.scene?.layers?.get('background');
+    layer?.setSaturation(val);
     this.emit('imagerychange');
   }
 
@@ -628,8 +626,8 @@ export class ImagerySystem extends AbstractSystem {
     this._sharpness = val;
 
     const context = this.context;
-    const scene = context.systems.gfx.scene;
-    scene.layers.get('background')?.setSharpness(val);
+    const layer = context.systems.gfx?.scene?.layers?.get('background');
+    layer?.setSharpness(val);
     this.emit('imagerychange');
   }
 

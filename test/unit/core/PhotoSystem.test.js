@@ -21,7 +21,8 @@ describe('PhotoSystem', () => {
       assert.instanceOf(photos, Rapid.PhotoSystem);
       assert.strictEqual(photos.id, 'photos');
       assert.strictEqual(photos.context, context);
-      assert.instanceOf(photos.dependencies, Set);
+      assert.instanceOf(photos.requiredDependencies, Set);
+      assert.instanceOf(photos.optionalDependencies, Set);
       assert.isTrue(photos.autoStart);
     });
   });
@@ -38,7 +39,7 @@ describe('PhotoSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const photos = new Rapid.PhotoSystem(context);
-      photos.dependencies.add('missing');
+      photos.requiredDependencies.add('missing');
       const prom = photos.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

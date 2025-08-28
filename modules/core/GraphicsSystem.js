@@ -43,7 +43,8 @@ export class GraphicsSystem extends AbstractSystem {
     super(context);
 
     this.id = 'gfx';
-    this.dependencies = new Set(['assets', 'map', 'ui', 'urlhash']);
+    this.requiredDependencies = new Set(['map']);
+    this.optionalDependencies = new Set(['assets', 'ui', 'urlhash']);
     this.highQuality = true;  // this can go false if we detect poor performance
 
     // Create these early
@@ -70,8 +71,6 @@ export class GraphicsSystem extends AbstractSystem {
     this._timeToNextRender = 0;   // milliseconds of time to defer rendering
     this._appPending = false;
     this._drawPending = false;
-    this._initPromise = null;
-    this._startPromise = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -135,23 +134,14 @@ export class GraphicsSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
-    // Init prerequisites
     const context = this.context;
-    const assets = context.systems.assets;
     const urlhash = context.systems.urlhash;
 
-    const prerequisites = Promise.all([
-      assets.initAsync(),
-      urlhash.initAsync()
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [ urlhash?.initAsync() ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => this._initPixiAsync())
       .then(() => this._afterPixiInit());
   }
@@ -168,11 +158,11 @@ export class GraphicsSystem extends AbstractSystem {
     const context = this.context;
     const urlhash = context.systems.urlhash;
 
-    // Wait for everything to be ready - urlhash will emit hash change that
-    // sets the map location, among other things.  Then start the ticker.
-    const prerequisites = urlhash.startAsync();
-
-    return this._startPromise = prerequisites
+    return this._startPromise = Promise.resolve()
+      .then(() => {
+        const prerequisites = [ urlhash?.startAsync() ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => {
         this._started = true;
         this.ticker.start();
@@ -668,13 +658,15 @@ export class GraphicsSystem extends AbstractSystem {
   _initPixiAsync() {
     if (this.pixi) return Promise.resolve();   // was done already?
 
-    const urlhash = this.context.systems.urlhash;
+    const context = this.context;
+    const urlhash = context.systems.urlhash;
+    const renderParam = urlhash?.initialHashParams.get('renderer') ?? '';
 
     // For testing, allow user to override the renderer preference:
     // `renderer=val` one of `webgl1`, `webgl2`/`webgl`, `webgpu`
     let renderPreference = 'webgl';
     let renderGLVersion = 2;
-    switch (urlhash.initialHashParams.get('renderer')) {
+    switch (renderParam) {
       case 'webgpu':
         renderPreference = 'webgpu';
         break;

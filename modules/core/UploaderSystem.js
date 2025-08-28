@@ -34,7 +34,7 @@ export class UploaderSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'uploader';
-    this.dependencies = new Set(['assets', 'editor', 'spatial', 'l10n']);
+    this.requiredDependencies = new Set(['assets', 'editor', 'l10n']);
 
     this.changeset = null;    // uiCommit will create it
 
@@ -50,7 +50,6 @@ export class UploaderSystem extends AbstractSystem {
     this._loadedIDs = new Set();
     this._conflicts = [];
     this._errors = [];
-    this._initPromise = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._loadedSome = this._loadedSome.bind(this);
@@ -66,16 +65,20 @@ export class UploaderSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
+    const context = this.context;
+    const assets = context.systems.assets;
+    const editor = context.systems.editor;
+    const l10n = context.systems.l10n;
 
-    const assets = this.context.systems.assets;
-    const prerequisites = assets.initAsync();
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [
+          assets?.initAsync(),
+          editor?.initAsync(),
+          l10n?.initAsync()
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => assets.loadAssetAsync('tagging_discarded'))
       .then(d => this._discardTags = d);
   }
@@ -87,8 +90,7 @@ export class UploaderSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 

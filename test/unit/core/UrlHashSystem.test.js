@@ -26,7 +26,8 @@ describe('UrlHashSystem', () => {
       assert.instanceOf(urlhash, Rapid.UrlHashSystem);
       assert.strictEqual(urlhash.id, 'urlhash');
       assert.strictEqual(urlhash.context, context);
-      assert.instanceOf(urlhash.dependencies, Set);
+      assert.instanceOf(urlhash.requiredDependencies, Set);
+      assert.instanceOf(urlhash.optionalDependencies, Set);
       assert.isTrue(urlhash.autoStart);
     });
   });
@@ -43,7 +44,7 @@ describe('UrlHashSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const urlhash = new Rapid.UrlHashSystem(context);
-      urlhash.dependencies.add('missing');
+      urlhash.requiredDependencies.add('missing');
       const prom = urlhash.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

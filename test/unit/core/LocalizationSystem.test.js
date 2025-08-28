@@ -78,7 +78,8 @@ describe('LocalizationSystem', () => {
       assert.instanceOf(l10n, Rapid.LocalizationSystem);
       assert.strictEqual(l10n.id, 'l10n');
       assert.strictEqual(l10n.context, context);
-      assert.instanceOf(l10n.dependencies, Set);
+      assert.instanceOf(l10n.requiredDependencies, Set);
+      assert.instanceOf(l10n.optionalDependencies, Set);
       assert.isTrue(l10n.autoStart);
     });
   });
@@ -95,7 +96,7 @@ describe('LocalizationSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const l10n = new Rapid.LocalizationSystem(context);
-      l10n.dependencies.add('missing');
+      l10n.requiredDependencies.add('missing');
       const prom = l10n.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

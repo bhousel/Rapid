@@ -22,7 +22,8 @@ describe('ImagerySystem', () => {
       assert.instanceOf(imagery, Rapid.ImagerySystem);
       assert.strictEqual(imagery.id, 'imagery');
       assert.strictEqual(imagery.context, context);
-      assert.instanceOf(imagery.dependencies, Set);
+      assert.instanceOf(imagery.requiredDependencies, Set);
+      assert.instanceOf(imagery.optionalDependencies, Set);
       assert.isTrue(imagery.autoStart);
     });
   });
@@ -39,7 +40,7 @@ describe('ImagerySystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const imagery = new Rapid.ImagerySystem(context);
-      imagery.dependencies.add('missing');
+      imagery.requiredDependencies.add('missing');
       const prom = imagery.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

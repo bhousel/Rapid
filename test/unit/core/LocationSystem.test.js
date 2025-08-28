@@ -40,7 +40,8 @@ describe('LocationSystem', () => {
       assert.instanceOf(locations, Rapid.LocationSystem);
       assert.strictEqual(locations.id, 'locations');
       assert.strictEqual(locations.context, context);
-      assert.instanceOf(locations.dependencies, Set);
+      assert.instanceOf(locations.requiredDependencies, Set);
+      assert.instanceOf(locations.optionalDependencies, Set);
       assert.isTrue(locations.autoStart);
     });
   });
@@ -57,7 +58,7 @@ describe('LocationSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const locations = new Rapid.LocationSystem(context);
-      locations.dependencies.add('missing');
+      locations.requiredDependencies.add('missing');
       const prom = locations.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

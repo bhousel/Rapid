@@ -63,7 +63,8 @@ export class UrlHashSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'urlhash';
-    this.dependencies = new Set(['editor', 'l10n', 'map']);
+    this.requiredDependencies = new Set(['l10n']);
+    this.optionalDependencies = new Set(['editor', 'map']);
 
     this.doUpdateTitle = true;
     this.titleBase = 'Rapid';
@@ -94,7 +95,6 @@ export class UrlHashSystem extends AbstractSystem {
     this._currParams = new Map(this._initParams);  // make copy
     this._currHash = null;   // cached window.location.hash
     this._prevParams = null;
-    this._startPromise = null;
 
     // Make sure the event handlers have `this` bound correctly
     this._hashchange = this._hashchange.bind(this);
@@ -113,20 +113,10 @@ export class UrlHashSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    const context = this.context;
-
-    for (const id of this.dependencies) {
-      if (!context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
-    const editor = context.systems.editor;
-    const prerequisites = Promise.all([
-      editor.initAsync()
-    ]);
-
-    return prerequisites;
+    return super.initAsync()
+      .then(() => {
+        _window.addEventListener('hashchange', this._hashchange);
+      });
   }
 
 
@@ -148,21 +138,20 @@ export class UrlHashSystem extends AbstractSystem {
     const ui = context.systems.ui;
 
     const prerequisites = Promise.all([
-      imagery.startAsync(),
-      editor.startAsync(),
-      l10n.startAsync(),
-      map.startAsync(),
-      photos.startAsync(),
-      rapid.startAsync(),
-      ui.startAsync()
+      imagery?.startAsync(),
+      editor?.startAsync(),
+      l10n?.startAsync(),
+      map?.startAsync(),
+      photos?.startAsync(),
+      rapid?.startAsync(),
+      ui?.startAsync()
     ]);
 
     return this._startPromise = prerequisites
       .then(() => {
         // Register event handlers here
-        editor.on('stablechange', this.deferredUpdateTitle);
+        editor?.on('stablechange', this.deferredUpdateTitle);
         context.on('modechange', this.deferredUpdateTitle);
-        _window.addEventListener('hashchange', this._hashchange);
 
         this._started = true;
         this.resume();  // Emits 'hashchange'
@@ -284,8 +273,10 @@ export class UrlHashSystem extends AbstractSystem {
 
     const context = this.context;
     const editor = context.systems.editor;
-    const graph = editor.staging.graph;
     const l10n = context.systems.l10n;
+    const graph = editor?.staging?.graph;
+    if (!editor || !l10n || !graph) return;
+
     const changeCount = editor.difference().summary().size;
 
     // Currently only support OSM ids

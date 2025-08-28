@@ -37,7 +37,8 @@ describe('FilterSystem', () => {
       assert.instanceOf(filters, Rapid.FilterSystem);
       assert.strictEqual(filters.id, 'filters');
       assert.strictEqual(filters.context, context);
-      assert.instanceOf(filters.dependencies, Set);
+      assert.instanceOf(filters.requiredDependencies, Set);
+      assert.instanceOf(filters.optionalDependencies, Set);
       assert.isTrue(filters.autoStart);
     });
   });
@@ -54,7 +55,7 @@ describe('FilterSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const filters = new Rapid.FilterSystem(context);
-      filters.dependencies.add('missing');
+      filters.requiredDependencies.add('missing');
       const prom = filters.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

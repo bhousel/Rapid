@@ -65,7 +65,8 @@ describe('EditSystem', () => {
       assert.instanceOf(editor, Rapid.EditSystem);
       assert.strictEqual(editor.id, 'editor');
       assert.strictEqual(editor.context, context);
-      assert.instanceOf(editor.dependencies, Set);
+      assert.instanceOf(editor.requiredDependencies, Set);
+      assert.instanceOf(editor.optionalDependencies, Set);
       assert.isTrue(editor.autoStart);
     });
   });
@@ -82,7 +83,7 @@ describe('EditSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const editor = new Rapid.EditSystem(context);
-      editor.dependencies.add('missing');
+      editor.requiredDependencies.add('missing');
       const prom = editor.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

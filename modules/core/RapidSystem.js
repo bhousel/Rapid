@@ -36,7 +36,8 @@ export class RapidSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'rapid';
-    this.dependencies = new Set(['assets', 'editor', 'l10n', 'map', 'urlhash']);
+    this.requiredDependencies = new Set(['editor']);
+    this.optionalDependencies = new Set(['map', 'urlhash']);
 
     this.catalog = new Map();             // Map<datasetID, RapidDataset> - all the datasets we know about
     this.categories = new Set();          // Set<string> - all the dataset 'categories' we know about
@@ -53,9 +54,6 @@ export class RapidSystem extends AbstractSystem {
     this._isTaskBoundsRect = null;
     this._hadPoweruser = false;   // true if the user had poweruser mode at any point in their editing
 
-    this._initPromise = null;
-    this._startPromise = null;
-
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashchange = this._hashchange.bind(this);
     this._stablechange = this._stablechange.bind(this);
@@ -70,27 +68,23 @@ export class RapidSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
     const context = this.context;
     const editor = context.systems.editor;
     const map = context.systems.map;
     const urlhash = context.systems.urlhash;
 
-    const prerequisites = Promise.all([
-      editor.initAsync(),
-      map.initAsync(),   // RapidSystem should listen for hashchange after MapSystem
-      urlhash.initAsync()
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
       .then(() => {
-        urlhash.on('hashchange', this._hashchange);
-        editor.on('stablechange', this._stablechange);
+        const prerequisites = [
+          editor?.initAsync(),
+          map?.initAsync(),   // RapidSystem should listen for hashchange after MapSystem
+          urlhash?.initAsync()
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
+      .then(() => {
+        urlhash?.on('hashchange', this._hashchange);
+        editor?.on('stablechange', this._stablechange);
      });
   }
 
@@ -133,8 +127,8 @@ export class RapidSystem extends AbstractSystem {
           }
         }
 
-        // Set some defaults
-        if (!urlhash.initialHashParams.has('datasets')) {
+        // Set some defaults if urlhash doesn't have them
+        if (!urlhash?.initialHashParams.has('datasets')) {
           this._addedDatasetIDs = new Set(['fbRoads', 'msBuildings', 'overture-places', 'omdFootways']);  // on menu
           this._enabledDatasetIDs = new Set(['fbRoads', 'msBuildings']);  // checked
           this._datasetsChanged();
@@ -414,7 +408,7 @@ export class RapidSystem extends AbstractSystem {
     }
 
     // datasets
-    urlhash.setParam('datasets', enabledIDs.length ? enabledIDs.join(',') : null);
+    urlhash?.setParam('datasets', enabledIDs.length ? enabledIDs.join(',') : null);
 
     this.emit('datasetchange');
   }

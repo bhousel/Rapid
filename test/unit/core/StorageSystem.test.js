@@ -13,7 +13,8 @@ describe('StorageSystem', () => {
       assert.instanceOf(storage, Rapid.StorageSystem);
       assert.strictEqual(storage.id, 'storage');
       assert.strictEqual(storage.context, context);
-      assert.instanceOf(storage.dependencies, Set);
+      assert.instanceOf(storage.requiredDependencies, Set);
+      assert.instanceOf(storage.optionalDependencies, Set);
       assert.isTrue(storage.autoStart);
     });
   });
@@ -30,7 +31,7 @@ describe('StorageSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const storage = new Rapid.StorageSystem(context);
-      storage.dependencies.add('missing');
+      storage.requiredDependencies.add('missing');
       const prom = storage.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

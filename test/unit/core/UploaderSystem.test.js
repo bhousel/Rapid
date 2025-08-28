@@ -19,7 +19,8 @@ describe('UploaderSystem', () => {
       assert.instanceOf(uploader, Rapid.UploaderSystem);
       assert.strictEqual(uploader.id, 'uploader');
       assert.strictEqual(uploader.context, context);
-      assert.instanceOf(uploader.dependencies, Set);
+      assert.instanceOf(uploader.requiredDependencies, Set);
+      assert.instanceOf(uploader.optionalDependencies, Set);
       assert.isTrue(uploader.autoStart);
     });
   });
@@ -36,7 +37,7 @@ describe('UploaderSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const uploader = new Rapid.UploaderSystem(context);
-      uploader.dependencies.add('missing');
+      uploader.requiredDependencies.add('missing');
       const prom = uploader.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

@@ -22,7 +22,7 @@ export function utilDetect(refresh) {
   if (_cached && !refresh) return _cached;
   _cached = {};
 
-  const ua = navigator.userAgent;
+  const ua = globalThis.navigator?.userAgent || '';
   let m = null;
 
   /* Browser */
@@ -55,8 +55,8 @@ export function utilDetect(refresh) {
     }
   }
   if (!_cached.browser) {
-    _cached.browser = navigator.appName;
-    _cached.version = navigator.appVersion;
+    _cached.browser = globalThis.navigator?.appName || '';
+    _cached.version = globalThis.navigator?.appVersion || '';
   }
 
   // Keep major.minor version only..
@@ -84,7 +84,7 @@ export function utilDetect(refresh) {
   }
 
   /* Locale */
-  _cached.locales = navigator.languages.slice();  // shallow copy
+  _cached.locales = globalThis.navigator?.languages?.slice() || ['en-US'];  // shallow copy
 
   _cached.isTestEnvironment = (typeof window === 'undefined' || globalThis.mocha);
 

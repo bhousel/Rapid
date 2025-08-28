@@ -27,7 +27,8 @@ export class PhotoSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'photos';
-    this.dependencies = new Set(['gfx', 'map', 'urlhash', 'ui']);
+    this.requiredDependencies = new Set();
+    this.optionalDependencies = new Set(['gfx', 'map', 'urlhash', 'ui']);
 
     this._currPhotoLayerID = null;
     this._currPhotoID = null;
@@ -38,8 +39,6 @@ export class PhotoSystem extends AbstractSystem {
     this._filterFromDate = null;
     this._filterToDate = null;
     this._filterUsernames = null;
-
-    this._initPromise = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashchange = this._hashchange.bind(this);
@@ -56,28 +55,24 @@ export class PhotoSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
     const context = this.context;
     const gfx = context.systems.gfx;
     const map = context.systems.map;
     const urlhash = context.systems.urlhash;
 
-    const prerequisites = Promise.all([
-      gfx.initAsync(),   // `gfx.scene` will exist after `initAsync`
-      map.initAsync(),   // `PhotoSystem` should listen for 'hashchange' after `MapSystem`
-      urlhash.initAsync()
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [
+          gfx?.initAsync(),   // `gfx.scene` will exist after `initAsync`
+          map?.initAsync(),   // `PhotoSystem` should listen for 'hashchange' after `MapSystem`
+          urlhash?.initAsync(),
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => {
         // Setup event handlers..
-        urlhash.on('hashchange', this._hashchange);
-        gfx.scene.on('layerchange', this._layerchange);
+        urlhash?.on('hashchange', this._hashchange);
+        gfx?.scene?.on('layerchange', this._layerchange);
       });
   }
 
@@ -88,8 +83,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -110,13 +104,14 @@ export class PhotoSystem extends AbstractSystem {
    * @param  {Map<string, string>}  prevParams - The previous hash parameters
    */
   _hashchange(currParams, prevParams) {
-    const scene = this.context.systems.gfx.scene;
+    const context = this.context;
+    const scene = context.systems.gfx?.scene;
 
     // photo_overlay
     // support enabling photo layers by default via a URL parameter, e.g. `photo_overlay=kartaview;mapillary;streetside`
     const newPhotoOverlay = currParams.get('photo_overlay');
     const oldPhotoOverlay = prevParams.get('photo_overlay');
-    if (newPhotoOverlay !== oldPhotoOverlay) {
+    if (scene && newPhotoOverlay !== oldPhotoOverlay) {
       let toEnableIDs = new Set();
       if (typeof newPhotoOverlay === 'string') {
         toEnableIDs = new Set(newPhotoOverlay.replace(/;/g, ',').split(','));
@@ -183,7 +178,8 @@ export class PhotoSystem extends AbstractSystem {
    */
   _layerchange() {
     const context = this.context;
-    const scene = context.systems.gfx.scene;
+    const scene = context.systems.gfx?.scene;
+    if (!scene) return;
 
     // Update detections
     // If there is a currently selected detection, return to browse mode.
@@ -227,41 +223,44 @@ export class PhotoSystem extends AbstractSystem {
   _photoChanged() {
     const context = this.context;
     const urlhash = context.systems.urlhash;
-    const scene = context.systems.gfx.scene;
+    const scene = context.systems.gfx?.scene;
+
 
     // photo_overlay
     let enabledIDs = [];
-    for (const layerID of this.layerIDs) {
-      const layer = scene.layers.get(layerID);
-      if (layer && layer.supported && layer.enabled) {
-        enabledIDs.push(layerID);
+    if (scene) {
+      for (const layerID of this.layerIDs) {
+        const layer = scene.layers.get(layerID);
+        if (layer && layer.supported && layer.enabled) {
+          enabledIDs.push(layerID);
+        }
       }
     }
-    urlhash.setParam('photo_overlay', enabledIDs.length ? enabledIDs.join(',') : null);
+    urlhash?.setParam('photo_overlay', enabledIDs.length ? enabledIDs.join(',') : null);
 
     // photo_dates
     let rangeString;
     if (this._filterFromDate || this._filterToDate) {
       rangeString = (this._filterFromDate || '') + '_' + (this._filterToDate || '');
     }
-    urlhash.setParam('photo_dates', rangeString);
+    urlhash?.setParam('photo_dates', rangeString);
 
     // photo_username
-    urlhash.setParam('photo_username', this._filterUsernames ? this._filterUsernames.join(',') : null);
+    urlhash?.setParam('photo_username', this._filterUsernames ? this._filterUsernames.join(',') : null);
 
     // current photo
     let photoString;
     if (this._currPhotoLayerID && this._currPhotoID) {
       photoString = `${this._currPhotoLayerID}/${this._currPhotoID}`;
     }
-    urlhash.setParam('photo', photoString);
+    urlhash?.setParam('photo', photoString);
 
     // current detection
     let detectionString;
     if (this._currDetectionLayerID && this._currDetectionID) {
       detectionString = `${this._currDetectionLayerID}/${this._currDetectionID}`;
     }
-    urlhash.setParam('detection', detectionString);
+    urlhash?.setParam('detection', detectionString);
 
     this.emit('photochange');
   }
@@ -417,12 +416,12 @@ export class PhotoSystem extends AbstractSystem {
   selectPhoto(layerID = null, photoID = null) {
     const context = this.context;
     const map = context.systems.map;
-    const scene = context.systems.gfx.scene;
+    const scene = context.systems.gfx?.scene;
 
     const didChange = (this._currPhotoLayerID !== layerID || this._currPhotoID !== photoID);
 
     // If we're selecting a photo then make sure its layer is enabled too.
-    if (this.photoLayerIDs.includes(layerID) && !this.isLayerEnabled(layerID)) {
+    if (scene && this.photoLayerIDs.includes(layerID) && !this.isLayerEnabled(layerID)) {
       scene.enableLayers(layerID);
       return;  // exit to avoid infinite loop, we will be right back in here via `_layerchange` handler.
     }
@@ -430,7 +429,7 @@ export class PhotoSystem extends AbstractSystem {
     // Clear out any existing selection..
     this._currPhotoLayerID = null;
     this._currPhotoID = null;
-    scene.clearClass('selectphoto');
+    scene?.clearClass('selectphoto');
 
     // Apply the new selection..
     if (photoID && this.photoLayerIDs.includes(layerID)) {
@@ -439,7 +438,7 @@ export class PhotoSystem extends AbstractSystem {
 
       this._currPhotoLayerID = layerID;
       this._currPhotoID = photoID;
-      scene.setClass('selectphoto', layerID, photoID);
+      scene?.setClass('selectphoto', layerID, photoID);
 
       // Try to show the viewer with the image selected..
       service.selectImageAsync(photoID)
@@ -449,7 +448,7 @@ export class PhotoSystem extends AbstractSystem {
           if (this._currDetectionID) return;  // don't adjust the map if a detection is already selected
 
           if (didChange) {
-            map.centerEase(photo.loc);
+            map?.centerEase(photo.loc);
           }
         })
         .then(() => this.showViewer());
@@ -471,7 +470,7 @@ export class PhotoSystem extends AbstractSystem {
     const scene = context.systems.gfx.scene;
 
     // If we're selecting a detection then make sure its layer is enabled too.
-    if (this.detectionLayerIDs.includes(layerID) && !this.isLayerEnabled(layerID)) {
+    if (scene && this.detectionLayerIDs.includes(layerID) && !this.isLayerEnabled(layerID)) {
       scene.enableLayers(layerID);
       return;  // exit to avoid infinite loop, we will be right back in here via `_layerchange` handler.
     }
@@ -479,8 +478,8 @@ export class PhotoSystem extends AbstractSystem {
     // Clear out any existing selection..
     this._currDetectionLayerID = null;
     this._currDetectionID = null;
-    scene.clearClass('selectdetection');
-    scene.clearClass('highlightphoto');
+    scene?.clearClass('selectdetection');
+    scene?.clearClass('highlightphoto');
 
     // Apply the new selection..
     if (detectionID && this.detectionLayerIDs.includes(layerID)) {
@@ -490,7 +489,7 @@ export class PhotoSystem extends AbstractSystem {
 
       this._currDetectionLayerID = layerID;
       this._currDetectionID = detectionID;
-      scene.setClass('selectdetection', layerID, detectionID);
+      scene?.setClass('selectdetection', layerID, detectionID);
 
       // Try to highlight any photos that show this detection,
       // And try to select a photo in the viewer that shows it.
@@ -511,7 +510,7 @@ export class PhotoSystem extends AbstractSystem {
           // Highlight any images that show this detection..
           const highlightPhotoIDs = (detection.props.images ?? []).map(image => image.id);
           for (const photoID of highlightPhotoIDs) {
-            scene.setClass('highlightphoto', photoLayerID, photoID);
+            scene?.setClass('highlightphoto', photoLayerID, photoID);
           }
 
           // Try to select a photo that shows this detection..
@@ -538,7 +537,7 @@ export class PhotoSystem extends AbstractSystem {
             // Need to zoom out a little to see both things?
             const needZoom = map.trimmedExtentZoom(extent) - 0.5;  // little extra so the things aren't at the map edges
             const currZoom = context.viewport.transform.zoom;
-            map.centerZoomEase(extent.center(), Math.min(needZoom, currZoom));
+            map?.centerZoomEase(extent.center(), Math.min(needZoom, currZoom));
           }
 
           // Select the best photo (if any)
@@ -650,8 +649,7 @@ export class PhotoSystem extends AbstractSystem {
    */
   isLayerEnabled(layerID) {
     const context = this.context;
-    const scene = context.systems.gfx.scene;
-    const layer = scene.layers.get(layerID);
+    const layer = context.systems.gfx?.scene?.layers?.get(layerID);
     return layer?.enabled;
   }
 

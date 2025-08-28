@@ -14,7 +14,8 @@ describe('AssetSystem', () => {
       assert.instanceOf(assets, Rapid.AssetSystem);
       assert.strictEqual(assets.id, 'assets');
       assert.strictEqual(assets.context, context);
-      assert.isEmpty(assets.dependencies);
+      assert.instanceOf(assets.requiredDependencies, Set);
+      assert.instanceOf(assets.optionalDependencies, Set);
       assert.isTrue(assets.autoStart);
 
       assert.isObject(assets.sources);
@@ -40,7 +41,7 @@ describe('AssetSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const assets = new Rapid.AssetSystem(context);
-      assets.dependencies.add('missing');
+      assets.requiredDependencies.add('missing');
       const prom = assets.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

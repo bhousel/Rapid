@@ -12,7 +12,8 @@ describe('AbstractSystem', () => {
       assert.instanceOf(a, Rapid.AbstractSystem);
       assert.strictEqual(a.id, '');
       assert.strictEqual(a.context, context);
-      assert.deepEqual(a.dependencies, new Set());
+      assert.instanceOf(a.requiredDependencies, Set);
+      assert.instanceOf(a.optionalDependencies, Set);
       assert.isTrue(a.autoStart);
     });
   });
@@ -49,7 +50,7 @@ describe('AbstractSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const a = new Rapid.AbstractSystem(context);
-      a.dependencies.add('missing');
+      a.requiredDependencies.add('missing');
       const prom = a.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

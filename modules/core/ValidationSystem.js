@@ -36,7 +36,8 @@ export class ValidationSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'validator';
-    this.dependencies = new Set(['editor', 'storage', 'map', 'presets', 'spatial', 'urlhash']);
+    this.requiredDependencies = new Set(['editor', 'spatial']);
+    this.optionalDependencies = new Set(['map', 'presets', 'storage', 'urlhash']);
 
     this._rules = new Map();    // Map(ruleID -> validator)
     this._base = new ValidationCache('base');   // issues before any user edits
@@ -52,7 +53,6 @@ export class ValidationSystem extends AbstractSystem {
     this._warningOverrides = [];
     this._disableOverrides = [];
 
-    this._initPromise = null;
     this._validationPromise = null;    // Promise fulfilled when validation caught up to `stable` snapshot
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -68,12 +68,6 @@ export class ValidationSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
     // Create the validation rules
     const context = this.context;
     Object.values(Validations).forEach(validation => {
@@ -82,19 +76,21 @@ export class ValidationSystem extends AbstractSystem {
       this._rules.set(fn.type, fn);
     });
 
-    // Init prerequisites
     const editor = context.systems.editor;
     const presets = context.systems.presets;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
-    const prerequisites = Promise.all([
-      editor.initAsync(),
-      presets.initAsync(),
-      storage.initAsync(),
-      urlhash.initAsync()
-    ]);
 
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [
+          editor?.initAsync(),
+          presets?.initAsync(),
+          storage?.initAsync(),
+          urlhash?.initAsync()
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() =>  {
         // Allow validation severity to be overridden by url queryparams...
         // See: https://github.com/openstreetmap/iD/pull/8243
@@ -106,11 +102,12 @@ export class ValidationSystem extends AbstractSystem {
         //  `validationError=disconnected_way/highway`
         //  `validationError=crossing_ways/bridge*`
         //  `validationError=crossing_ways/bridge*,crossing_ways/tunnel*`
-        this._errorOverrides = this._parseHashParam(urlhash.initialHashParams.get('validationError'));
-        this._warningOverrides = this._parseHashParam(urlhash.initialHashParams.get('validationWarning'));
-        this._disableOverrides = this._parseHashParam(urlhash.initialHashParams.get('validationDisable'));
+        const hash = urlhash?.initialHashParams || new Map();
+        this._errorOverrides = this._parseHashParam(hash.get('validationError'));
+        this._warningOverrides = this._parseHashParam(hash.get('validationWarning'));
+        this._disableOverrides = this._parseHashParam(hash.get('validationDisable'));
 
-        const disabledRules = storage.getItem('validate-disabledRules');
+        const disabledRules = storage?.getItem('validate-disabledRules');
         if (disabledRules) {
           const ruleIDs = disabledRules.split(',').map(s => s.trim()).filter(Boolean);
           this._disabledRuleIDs = new Set(ruleIDs);
@@ -131,8 +128,7 @@ export class ValidationSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -343,9 +339,9 @@ export class ValidationSystem extends AbstractSystem {
 
     // Try to adjust the map view
     if (issue.loc) {
-      map.centerZoomEase(issue.loc, 19);
+      map?.centerZoomEase(issue.loc, 19);
     } else if (entityIDs.length) {
-      map.fitEntitiesEase(entityIDs);
+      map?.fitEntitiesEase(entityIDs);
     }
 
     // Select the first entity in the issue.
@@ -481,7 +477,7 @@ export class ValidationSystem extends AbstractSystem {
     }
 
     const storage = this.context.systems.storage;
-    storage.setItem('validate-disabledRules', [...this._disabledRuleIDs].join(','));
+    storage?.setItem('validate-disabledRules', [...this._disabledRuleIDs].join(','));
     this.validateAsync();
   }
 
@@ -496,7 +492,7 @@ export class ValidationSystem extends AbstractSystem {
     this._disabledRuleIDs = new Set(ruleIDs);
 
     const storage = this.context.systems.storage;
-    storage.setItem('validate-disabledRules', [...this._disabledRuleIDs].join(','));
+    storage?.setItem('validate-disabledRules', [...this._disabledRuleIDs].join(','));
     this.validateAsync();
   }
 

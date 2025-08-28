@@ -18,7 +18,6 @@ export class AssetSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'assets';
-    this.dependencies = new Set();
 
     //
     // Rapid's asset map contains all of the data files that we may need to load.
@@ -179,12 +178,7 @@ export class AssetSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-    return Promise.resolve();
+    return super.initAsync();
   }
 
 
@@ -194,8 +188,7 @@ export class AssetSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -205,7 +198,7 @@ export class AssetSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
-    return Promise.resolve();
+    return super.resetAsync();
   }
 
 

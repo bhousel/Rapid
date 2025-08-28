@@ -16,7 +16,8 @@ describe('StyleSystem', () => {
       assert.instanceOf(styles, Rapid.StyleSystem);
       assert.strictEqual(styles.id, 'styles');
       assert.strictEqual(styles.context, context);
-      assert.instanceOf(styles.dependencies, Set);
+      assert.instanceOf(styles.requiredDependencies, Set);
+      assert.instanceOf(styles.optionalDependencies, Set);
       assert.isTrue(styles.autoStart);
     });
   });
@@ -33,7 +34,7 @@ describe('StyleSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const styles = new Rapid.StyleSystem(context);
-      styles.dependencies.add('missing');
+      styles.requiredDependencies.add('missing');
       const prom = styles.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

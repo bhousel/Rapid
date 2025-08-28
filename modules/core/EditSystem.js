@@ -83,7 +83,8 @@ export class EditSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'editor';   // was: 'history'
-    this.dependencies = new Set(['gfx', 'imagery', 'map', 'photos', 'spatial', 'storage']);
+    this.requiredDependencies = new Set(['spatial', 'storage']);
+    this.optionalDependencies = new Set(['gfx', 'imagery', 'photos']);
 
     this._mutex = utilSessionMutex('lock');
     this._canRestoreBackup = false;
@@ -105,8 +106,6 @@ export class EditSystem extends AbstractSystem {
     this._stagingSnapshot = null;
     this._fullDifference = null;
 
-    this._initPromise = null;
-
     // Make sure the event handlers have `this` bound correctly
     this.saveBackup = this.saveBackup.bind(this);
     this.deferredBackup = debounce(this.saveBackup, 1000, { leading: false, trailing: true });
@@ -121,21 +120,14 @@ export class EditSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-
     const context = this.context;
-
-    for (const id of this.dependencies) {
-      if (!context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
     const storage = context.systems.storage;
-    const prerequisites = Promise.all([
-      storage.initAsync()
-    ]);
 
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [ storage?.initAsync() ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => {
         this._reset();
 
@@ -165,8 +157,7 @@ export class EditSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -1032,7 +1023,7 @@ export class EditSystem extends AbstractSystem {
     // should we assert that the history has been reset?
     // we expect to chain after context.resetAsync() ? we could just call this._reset() ?
 
-    gfx.pause();  // block rendering
+    gfx?.pause();  // block rendering
 
     let loading;
     const isTestEnvironment = (typeof window === 'undefined' || globalThis.mocha);
@@ -1178,7 +1169,7 @@ export class EditSystem extends AbstractSystem {
       this._index = backup.index;
       this._replaceStaging();
 
-      gfx.resume();       // unbock rendering, events will start firing now
+      gfx?.resume();       // unbock rendering, events will start firing now
       loading?.close();   // unblock ui
 
       // emit events
@@ -1302,22 +1293,29 @@ export class EditSystem extends AbstractSystem {
     const photos = context.systems.photos;
 
     const sources = {};
-    const imageryUsed = imagery.imageryUsed();
-    if (imageryUsed.length)  {
-      sources.imagery = imageryUsed;
+
+    if (imagery) {
+      const imageryUsed = imagery.imageryUsed();
+      if (imageryUsed.length)  {
+        sources.imagery = imageryUsed;
+      }
     }
 
-    const photosUsed = photos.photosUsed();
-    if (photosUsed.length) {
-      sources.photos = photosUsed;
+    if (photos) {
+      const photosUsed = photos.photosUsed();
+      if (photosUsed.length) {
+        sources.photos = photosUsed;
+      }
     }
 
-    const customLayer = gfx.scene.layers.get('custom-data');
-    const customDataUsed = customLayer?.dataUsed() ?? [];
-    const rapidDataUsed = annotation?.dataUsed ?? [];
-    const dataUsed = [...rapidDataUsed, ...customDataUsed];
-    if (dataUsed.length) {
-      sources.data = dataUsed;
+    if (gfx) {
+      const customLayer = gfx.scene.layers.get('custom-data');
+      const customDataUsed = customLayer?.dataUsed() ?? [];
+      const rapidDataUsed = annotation?.dataUsed ?? [];
+      const dataUsed = [...rapidDataUsed, ...customDataUsed];
+      if (dataUsed.length) {
+        sources.data = dataUsed;
+      }
     }
 
     return sources;

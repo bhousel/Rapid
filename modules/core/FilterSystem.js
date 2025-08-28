@@ -64,13 +64,13 @@ export class FilterSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'filters';
-    this.dependencies = new Set(['editor', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set(['editor']);
+    this.optionalDependencies = new Set(['storage', 'urlhash']);
 
     this._filters = new Map();        // Map(filterID -> Filter)
     this._hidden = new Set();         // Set(filterID) to hide
     this._forceVisible = new Set();   // Set(entityIDs) to show
     this._cache = {};                 // Cache of entity.key to matched filterIDs
-    this._initPromise = null;
 //    this._deferred = new Set();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -104,23 +104,17 @@ export class FilterSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
     const context = this.context;
     const urlhash = context.systems.urlhash;
 
-    const prerequisites = Promise.all([
-      urlhash.initAsync()
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [ urlhash?.initAsync() ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => {
         // Setup event handlers..
-        urlhash.on('hashchange', this._hashchange);
+        urlhash?.on('hashchange', this._hashchange);
       });
 
 //    // warm up the feature matching cache upon merging fetched data
@@ -148,13 +142,15 @@ export class FilterSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
+    if (this._startPromise) return this._startPromise;
+
     const context = this.context;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
 
     // Take filter values from urlhash first, localstorage second,
     // Default to having boundaries hidden
-    const toHide = urlhash.getParam('disable_features') ?? storage.getItem('disabled-features') ?? 'boundaries';
+    const toHide = urlhash?.getParam('disable_features') ?? storage?.getItem('disabled-features') ?? 'boundaries';
     const filterIDs = toHide.replace(/;/g, ',').split(',').map(s => s.trim()).filter(Boolean);
     for (const filterID of filterIDs) {
       this._hidden.add(filterID);
@@ -164,7 +160,7 @@ export class FilterSystem extends AbstractSystem {
     this._update();
     this._started = true;
 
-    return Promise.resolve();
+    return this._startPromise = super.startAsync();
   }
 
 
@@ -708,10 +704,10 @@ export class FilterSystem extends AbstractSystem {
     const filterIDs = [...this._hidden].join(',');
 
     // update url hash
-    urlhash.setParam('disable_features', filterIDs.length ? filterIDs : null);
+    urlhash?.setParam('disable_features', filterIDs.length ? filterIDs : null);
 
     // update localstorage
-    storage.setItem('disabled-features', filterIDs);
+    storage?.setItem('disabled-features', filterIDs);
 
     this.emit('filterchange');
   }

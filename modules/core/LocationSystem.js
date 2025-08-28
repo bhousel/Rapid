@@ -37,7 +37,6 @@ export class LocationSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'locations';
-    this.dependencies = new Set();
 
     this._loco = new LocationConflation();  // A location-conflation resolver
     this._wp = null;                        // A which-polygon index
@@ -63,29 +62,26 @@ export class LocationSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
+    if (this._initPromise) return this._initPromise;
 
-    // Pre-resolve the worldwide locationSet
-    const world = { locationSet: { include: ['Q2'] } };
-    this._resolveLocationSet(world);
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        // Pre-resolve the worldwide locationSet
+        const world = { locationSet: { include: ['Q2'] } };
+        this._resolveLocationSet(world);
 
-    // Pre-resolve any blocked region locationSets
-    const blockedFeatures = this._blocks.map(block => {
-      const data = this._resolveLocationSet(block);
-      Object.assign(data.props, block);   // Update props in-place to include the block information.
-      return data.asGeoJSON();
-    });
+        // Pre-resolve any blocked region locationSets
+        const blockedFeatures = this._blocks.map(block => {
+          const data = this._resolveLocationSet(block);
+          Object.assign(data.props, block);   // Update props in-place to include the block information.
+          return data.asGeoJSON();
+        });
 
-    // Make a separate which-polygon just for these (static, very few features, very frequent lookups)
-    this._wpblocks = whichPolygon({ type: 'FeatureCollection', features: blockedFeatures });
+        // Make a separate which-polygon just for these (static, very few features, very frequent lookups)
+        this._wpblocks = whichPolygon({ type: 'FeatureCollection', features: blockedFeatures });
 
-    this._rebuildIndex();
-
-    return Promise.resolve();
+        this._rebuildIndex();
+      });
   }
 
 
@@ -95,8 +91,7 @@ export class LocationSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 

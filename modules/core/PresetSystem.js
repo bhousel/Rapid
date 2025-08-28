@@ -22,7 +22,8 @@ export class PresetSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'presets';
-    this.dependencies = new Set(['assets', 'l10n', 'locations', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set(['assets', 'l10n']);
+    this.optionalDependencies = new Set(['locations', 'storage', 'urlhash']);
     this.geometries = ['point', 'vertex', 'line', 'area', 'relation'];
 
     // Create geometry fallbacks
@@ -55,7 +56,6 @@ export class PresetSystem extends AbstractSystem {
 
     // Index of presets by (geometry, tag key).
     this._geometryIndex = { point: {}, vertex: {}, line: {}, area: {}, relation: {} };
-    this._initPromise = null;
   }
 
 
@@ -67,27 +67,23 @@ export class PresetSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
     const context = this.context;
     const assets = context.systems.assets;
     const locations = context.systems.locations;
     const urlhash = context.systems.urlhash;
 
-    const prerequisites = Promise.all([
-      assets.initAsync(),
-      locations.initAsync(),
-      urlhash.initAsync()
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [
+          assets?.initAsync(),
+          locations?.initAsync(),
+          urlhash?.initAsync(),
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => {
         // If we received a subset of addable presetIDs specified in the url hash, save them.
-        const presetIDs = urlhash.initialHashParams.get('presets');
+        const presetIDs = urlhash?.initialHashParams.get('presets');
         if (presetIDs) {
           const arr = presetIDs.split(',').map(s => s.trim()).filter(Boolean);
           this.addablePresetIDs = new Set(arr);
@@ -120,8 +116,7 @@ export class PresetSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -251,14 +246,16 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       });
     });
 
-    // Merge Custom Features
-    if (src.featureCollection && Array.isArray(src.featureCollection.features)) {
-      locations.mergeCustomGeoJSON(src.featureCollection);
-    }
+    if (locations) {
+      // Merge Custom Features
+      if (src.featureCollection && Array.isArray(src.featureCollection.features)) {
+        locations.mergeCustomGeoJSON(src.featureCollection);
+      }
 
-    // Resolve all locationSet features.
-    if (newLocationSets.length) {
-      locations.mergeLocationSets(newLocationSets);
+      // Resolve all locationSet features.
+      if (newLocationSets.length) {
+        locations.mergeLocationSets(newLocationSets);
+      }
     }
 
     return this;
@@ -300,12 +297,13 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    * @return  {Preset}         Preset that best matches
    */
   matchTags(tags, geometry, loc) {
-    const keyIndex = this._geometryIndex[geometry];
     const context = this.context;
     const locations = context.systems.locations;
 
+    const keyIndex = this._geometryIndex[geometry];
+
     // If we care about location, gather the locationSets allowed at this location
-    const validHere = Array.isArray(loc) ? locations.locationSetsAt(loc) : null;
+    const validHere = Array.isArray(loc) ? locations?.locationSetsAt(loc) : null;
 
     let bestScore = -1;
     let bestMatch = null;
@@ -490,6 +488,9 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    * @return  {Collection}      Collection
    */
   defaults(geometry, limit = 10, startWithRecents = true, loc = null) {
+    const context = this.context;
+    const locations = context.systems.locations;
+
     let results = new Map();   // Map<itemID, item>  (may be a Preset or a Category)
 
     if (startWithRecents) {
@@ -523,8 +524,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
 
     // If a location was provided, filter results to only those valid here.
     let arr = [...results.values()];
-    if (Array.isArray(loc)) {
-      const locations = this.context.systems.locations;
+    if (locations && Array.isArray(loc)) {
       const validHere = locations.locationSetsAt(loc);
       arr = arr.filter(item => !item.locationSetID || validHere[item.locationSetID]);
     }
@@ -540,9 +540,11 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    * @return  {Array<Preset>}  An Array of recent presets
    */
   getRecents() {
+    const context = this.context;
+    const storage = context.systems.storage;
+
     let presetIDs = this._recentIDs;
-    if (!presetIDs) {  // first time, try to get them from localStorage
-      const storage = this.context.systems.storage;
+    if (storage && !presetIDs) {  // first time, try to get them from localStorage
       presetIDs = JSON.parse(storage.getItem('preset_recents')) || [];
     }
 
@@ -573,7 +575,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     this._recentIDs = utilArrayUniq(this._recentIDs).slice(0, MAXRECENTS);
 
     const storage = this.context.systems.storage;
-    storage.setItem('preset_recents', JSON.stringify(this._recentIDs));
+    storage?.setItem('preset_recents', JSON.stringify(this._recentIDs));
   }
 
 }

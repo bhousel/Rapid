@@ -26,12 +26,11 @@ export class UiSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'ui';
-    this.dependencies = new Set(['assets', 'editor', 'gfx', 'imagery', 'l10n', 'map', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set(['assets', 'editor', 'gfx', 'imagery', 'l10n', 'map', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set();
 
     this._mapRect = null;
     this._needWidth = {};
-    this._initPromise = null;
-    this._startPromise = null;
     this._resizeTimeout = null;
 
     // Child components, we will defer creating these until after some other things have initted.
@@ -70,12 +69,6 @@ export class UiSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
     const context = this.context;
     const assets = context.systems.assets;
     const gfx = context.systems.gfx;
@@ -83,14 +76,17 @@ export class UiSystem extends AbstractSystem {
     const urlhash = context.systems.urlhash;
 
     // Many UI components require l10n and gfx (for scene/layers)
-    const prerequisites = Promise.all([
-      assets.initAsync(),
-      l10n.initAsync(),
-      gfx.initAsync(),
-      urlhash.initAsync(),
-    ]);
 
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [
+          assets.initAsync(),
+          l10n.initAsync(),
+          gfx.initAsync(),
+          urlhash.initAsync()
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => {
         window.addEventListener('resize', this.resize);
 

@@ -54,7 +54,8 @@ describe('MapSystem', () => {
       assert.instanceOf(map, Rapid.MapSystem);
       assert.strictEqual(map.id, 'map');
       assert.strictEqual(map.context, context);
-      assert.instanceOf(map.dependencies, Set);
+      assert.instanceOf(map.requiredDependencies, Set);
+      assert.instanceOf(map.optionalDependencies, Set);
       assert.isTrue(map.autoStart);
     });
   });
@@ -71,7 +72,7 @@ describe('MapSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const map = new Rapid.MapSystem(context);
-      map.dependencies.add('missing');
+      map.requiredDependencies.add('missing');
       const prom = map.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

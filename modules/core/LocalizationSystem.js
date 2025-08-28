@@ -19,12 +19,11 @@ export class LocalizationSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'l10n';
-    this.dependencies = new Set(['assets', 'presets', 'urlhash']);
+    this.requiredDependencies = new Set(['assets']);
+    this.optionalDependencies = new Set(['presets', 'urlhash']);
 
     // These are the different language packs that can be loaded..
     this._scopes = new Set(['core', 'tagging', 'imagery', 'community']);
-
-    this._initPromise = null;
 
     // Preferred locale codes can be used to override the detected locale, if they are set before init
     this._preferredLocaleCodes = [];
@@ -134,20 +133,18 @@ export class LocalizationSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
+    const context = this.context;
+    const assets = context.systems.assets;
+    const urlhash = context.systems.urlhash;
 
-    const assets = this.context.systems.assets;
-    const urlhash = this.context.systems.urlhash;
-    const prerequisites = Promise.all([
-      assets.initAsync(),
-      urlhash.initAsync()
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [
+          assets?.initAsync(),
+          urlhash?.initAsync()
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
       .then(() => {
         return Promise.all([
           assets.loadAssetAsync('languages'),
@@ -159,11 +156,11 @@ export class LocalizationSystem extends AbstractSystem {
         this._locales = results[1].locales;
 
         // Setup event handlers..
-        urlhash.on('hashchange', this._hashchange);
+        urlhash?.on('hashchange', this._hashchange);
 
         return this.selectLocaleAsync();
-      })
-      .catch(e => console.error(e));  // eslint-disable-line
+      });
+//      .catch(e => console.error(e));  // eslint-disable-line
   }
 
 
@@ -173,8 +170,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -194,8 +190,10 @@ export class LocalizationSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when the locale has been selected and strings loaded
    */
   selectLocaleAsync() {
-    const urlhash = this.context.systems.urlhash;
-    const urlLocale = urlhash.getParam('locale');
+    const context = this.context;
+    const urlhash = context.systems.urlhash;
+
+    const urlLocale = urlhash?.getParam('locale');
     let urlLocaleCodes = [];
     if (typeof urlLocale === 'string') {
       urlLocaleCodes = urlLocale.split(',').map(s => s.trim()).filter(Boolean);
@@ -231,6 +229,9 @@ export class LocalizationSystem extends AbstractSystem {
    * @return {Promise}  Promise resolved when all string loading has settled
    */
   _loadStringsAsync(locale) {
+    const context = this.context;
+    const assets = context.systems.assets;
+
     if (locale.toLowerCase() === 'en-us') {  // `en-US` strings are stored as `en`
       locale = 'en';
     }
@@ -243,7 +244,6 @@ export class LocalizationSystem extends AbstractSystem {
     }
 
     // Add the language packs to the AssetSystem's list of sources
-    const assets = this.context.systems.assets;
     const origin = assets.origin;          // 'local' or 'latest'
     const sources = assets.sources[origin];
     if (!sources) {
@@ -275,7 +275,8 @@ export class LocalizationSystem extends AbstractSystem {
    * @param  {Map<string, string>}  prevParams - The previous hash parameters
    */
   _hashchange(currParams, prevParams) {
-    const urlhash = this.context.systems.urlhash;
+    const context = this.context;
+    const urlhash = context.systems.urlhash;
 
     // rtl
     const newRTL = currParams.get('rtl');
@@ -286,7 +287,7 @@ export class LocalizationSystem extends AbstractSystem {
         cleaned = newRTL.trim().toLowerCase();
         if (cleaned !== 'true' && cleaned !== 'false') cleaned = null;
       }
-      urlhash.setParam('rtl', cleaned);
+      urlhash?.setParam('rtl', cleaned);
       this._localeChanged();
     }
 
@@ -299,7 +300,7 @@ export class LocalizationSystem extends AbstractSystem {
         const requested = newLocale.split(',').map(s => s.trim()).filter(Boolean);
         cleaned = this._getSupportedLocales(requested);
       }
-      urlhash.setParam('locale', cleaned.length ? cleaned.join(',') : null);
+      urlhash?.setParam('locale', cleaned.length ? cleaned.join(',') : null);
       this.selectLocaleAsync();
     }
   }
@@ -683,12 +684,20 @@ export class LocalizationSystem extends AbstractSystem {
    * @return {string}  A name string suitable for display
    */
   displayLabel(entity, graphOrGeometry, verbose) {
+    const context = this.context;
+    const presets = context.systems.presets;
+
+    // Choose the display name, if possible
     const displayName = this.displayName(entity.tags);
-    const presetSystem = this.context.systems.presets;
-    const preset = typeof graphOrGeometry === 'string' ?
-      presetSystem.matchTags(entity.tags, graphOrGeometry) :
-      presetSystem.match(entity, graphOrGeometry);
-    const presetName = preset && (preset.suggestion ? preset.subtitle() : preset.name());
+
+    // Choose the preset name, if possible.
+    let presetName;
+    if (presets) {
+      const preset = typeof graphOrGeometry === 'string' ?
+        presets.matchTags(entity.tags, graphOrGeometry) :
+        presets.match(entity, graphOrGeometry);
+      presetName = preset && (preset.suggestion ? preset.subtitle() : preset.name());
+    }
 
     let result;
     if (verbose) {
@@ -949,6 +958,9 @@ export class LocalizationSystem extends AbstractSystem {
    * This should happen after all locale files have been fetched.
    */
   _localeChanged() {
+    const context = this.context;
+    const urlhash = context.systems.urlhash;
+
     if (!this._currLocaleCode) {       // no current locale?  shouldn't happen, reset to defaults
       this._currLocaleCode = 'en-US';
       this._currLocaleCodes = ['en-US', 'en'];
@@ -960,8 +972,7 @@ export class LocalizationSystem extends AbstractSystem {
 
     // Determine text direction
     // If an `rtl` param is present in the urlhash, use that instead
-    const urlhash = this.context.systems.urlhash;
-    const urlRTL = urlhash.getParam('rtl');
+    const urlRTL = urlhash?.getParam('rtl');
     if (urlRTL === 'true') {
       this._currTextDirection = 'rtl';
     } else if (urlRTL === 'false') {

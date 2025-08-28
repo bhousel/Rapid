@@ -35,9 +35,8 @@ export class MapSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'map';
-    this.dependencies = new Set([
-      'editor', 'filters', 'gfx', 'imagery', 'l10n', 'photos', 'rapid', 'spatial', 'storage', 'styles', 'urlhash'
-    ]);
+    this.requiredDependencies = new Set(['editor', 'gfx']);
+    this.optionalDependencies = new Set(['filters', 'imagery', 'l10n', 'photos', 'rapid', 'storage', 'styles', 'urlhash']);
 
     // display options
     this.areaFillOptions = ['wireframe', 'partial', 'full'];
@@ -45,8 +44,6 @@ export class MapSystem extends AbstractSystem {
     this._currFillMode = 'partial';    // the current fill mode
     this._toggleFillMode = 'partial';  // the previous *non-wireframe* fill mode
 
-    this._initPromise = null;
-    this._startPromise = null;
     this._keys = null;
 
     // D3 selections
@@ -71,12 +68,6 @@ export class MapSystem extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-
     const context = this.context;
     const editor = context.systems.editor;
     const filters = context.systems.filters;
@@ -92,18 +83,20 @@ export class MapSystem extends AbstractSystem {
     // Note: We want MapSystem's hashchange listener registered as early as possible
     // because so many other parts of Rapid rely on the map location being set correctly.
     // Other systems should register their hashchange listener after MapSystem.initAsync.
-    urlhash.on('hashchange', this._hashchange);
+    urlhash?.on('hashchange', this._hashchange);
 
-    const prerequisites = Promise.all([
-      gfx.initAsync(),
-      l10n.initAsync(),
-      storage.initAsync(),
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
       .then(() => {
-        this._currFillMode = storage.getItem('area-fill') || 'partial';           // the current fill mode
-        this._toggleFillMode = storage.getItem('area-fill-toggle') || 'partial';  // the previous *non-wireframe* fill mode
+        const prerequisites = [
+          gfx?.initAsync(),
+          l10n?.initAsync(),
+          storage?.initAsync(),
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
+      .then(() => {
+        this._currFillMode = storage?.getItem('area-fill') || 'partial';           // the current fill mode
+        this._toggleFillMode = storage?.getItem('area-fill-toggle') || 'partial';  // the previous *non-wireframe* fill mode
 
         // Scene will exist after gfx init
         const scene = gfx.scene;
@@ -173,35 +166,30 @@ export class MapSystem extends AbstractSystem {
             }
           });
 
-        filters
-          .on('filterchange', () => {
-            scene.dirtyLayers('osm');
-            gfx.immediateRedraw();
-          });
+        filters?.on('filterchange', () => {
+          scene.dirtyLayers('osm');
+          gfx.immediateRedraw();
+        });
 
-        rapid
-          .on('datasetchange', () => {
-            scene.dirtyLayers(['rapid', 'rapidoverlay']);
-            gfx.immediateRedraw();
-          });
+        rapid?.on('datasetchange', () => {
+          scene.dirtyLayers(['rapid', 'rapidoverlay']);
+          gfx.immediateRedraw();
+        });
 
-        l10n
-          .on('localechange', () => {
-            this._setupKeybinding();
-            scene.dirtyScene();    // labeled features can be on any layer
-            gfx.immediateRedraw();
-          });
+        l10n?.on('localechange', () => {
+          this._setupKeybinding();
+          scene.dirtyScene();    // labeled features can be on any layer
+          gfx.immediateRedraw();
+        });
 
         context.on('modechange', gfx.immediateRedraw);
-        imagery.on('imagerychange', gfx.immediateRedraw);
-        photos.on('photochange', gfx.immediateRedraw);
         scene.on('layerchange', gfx.immediateRedraw);
-        styles.on('stylechange', gfx.immediateRedraw);
+        imagery?.on('imagerychange', gfx.immediateRedraw);
+        photos?.on('photochange', gfx.immediateRedraw);
+        styles?.on('stylechange', gfx.immediateRedraw);
 
         const osm = context.services.osm;
-        if (osm) {
-          osm.on('authchange', gfx.immediateRedraw);
-        }
+        osm?.on('authchange', gfx.immediateRedraw);
 
         this._setupKeybinding();
       });
@@ -214,8 +202,7 @@ export class MapSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -294,6 +281,7 @@ export class MapSystem extends AbstractSystem {
     const context = this.context;
     const keybinding = context.keybinding();
     const l10n = context.systems.l10n;
+    if (!l10n) return;
 
     if (Array.isArray(this._keys)) {
       keybinding.off(this._keys);
@@ -408,6 +396,7 @@ export class MapSystem extends AbstractSystem {
     const scene = context.systems.gfx.scene;
     const urlhash = context.systems.urlhash;
     const viewport = context.viewport;
+    if (!urlhash) return;
 
     // map
     const [lon, lat] = viewport.centerLoc();
@@ -976,11 +965,11 @@ export class MapSystem extends AbstractSystem {
 
     if (current !== 'wireframe') {
       this._toggleFillMode = current;
-      storage.setItem('area-fill-toggle', current);  // remember the previous *non-wireframe* fill mode
+      storage?.setItem('area-fill-toggle', current);  // remember the previous *non-wireframe* fill mode
     }
 
     this._currFillMode = val;
-    storage.setItem('area-fill', val);
+    storage?.setItem('area-fill', val);
 
     gfx.scene.dirtyScene();
     gfx.immediateRedraw();

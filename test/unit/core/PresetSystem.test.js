@@ -36,7 +36,8 @@ describe('PresetSystem', () => {
       assert.instanceOf(presets, Rapid.PresetSystem);
       assert.strictEqual(presets.id, 'presets');
       assert.strictEqual(presets.context, context);
-      assert.instanceOf(presets.dependencies, Set);
+      assert.instanceOf(presets.requiredDependencies, Set);
+      assert.instanceOf(presets.optionalDependencies, Set);
       assert.isTrue(presets.autoStart);
     });
   });
@@ -53,7 +54,7 @@ describe('PresetSystem', () => {
 
     it('rejects if a dependency is missing', () => {
       const presets = new Rapid.PresetSystem(context);
-      presets.dependencies.add('missing');
+      presets.requiredDependencies.add('missing');
       const prom = presets.initAsync();
       assert.instanceOf(prom, Promise);
       return prom

@@ -20,7 +20,6 @@ export class StorageSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'storage';   // was: 'prefs'
-    this.dependencies = new Set();
 
     this._storage = null;
 
@@ -48,12 +47,7 @@ export class StorageSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    for (const id of this.dependencies) {
-      if (!this.context.systems[id]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${id}`);
-      }
-    }
-    return Promise.resolve();
+    return super.initAsync();
   }
 
 
@@ -63,8 +57,7 @@ export class StorageSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
