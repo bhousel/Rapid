@@ -50,8 +50,7 @@ export class TaginfoService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'taginfo';
-
-    this._startPromise = null;
+    this.optionalDependencies = new Set(['l10n']);
 
     this._inflight = {};
     this._cache = {};
@@ -86,7 +85,7 @@ export class TaginfoService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return Promise.resolve();
+    return super.initAsync();
   }
 
 
@@ -98,7 +97,8 @@ export class TaginfoService extends AbstractSystem {
   startAsync() {
     if (this._startPromise) return this._startPromise;
 
-    const langCode = this.context.systems.l10n.languageCode();
+    const l10n = this.context.systems.l10n;
+    const langCode = l10n?.languageCode() || 'en';
 
     // Fetch popular keys.  We'll exclude these from `values`
     // lookups because they stress taginfo, and they aren't likely
@@ -153,7 +153,9 @@ export class TaginfoService extends AbstractSystem {
    * @param  {function}  callback - errback-style callback function to call with results
    */
   keys(params, callback) {
-    const langCode = this.context.systems.l10n.languageCode();
+    const l10n = this.context.systems.l10n;
+    const langCode = l10n?.languageCode() || 'en';
+
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
     params = this._clean(this._setSort(params));
     params = Object.assign({
@@ -184,7 +186,9 @@ export class TaginfoService extends AbstractSystem {
    * @param  {function}  callback - errback-style callback function to call with results
    */
   multikeys(params, callback) {
-    const langCode = this.context.systems.l10n.languageCode();
+    const l10n = this.context.systems.l10n;
+    const langCode = l10n?.languageCode() || 'en';
+
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
     params = this._clean(this._setSort(params));
     params = Object.assign({
@@ -223,7 +227,9 @@ export class TaginfoService extends AbstractSystem {
       return;
     }
 
-    const langCode = this.context.systems.l10n.languageCode();
+    const l10n = this.context.systems.l10n;
+    const langCode = l10n?.languageCode() || 'en';
+
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
     params = this._clean(this._setSort(this._setFilter(params)));
     params = Object.assign({
@@ -261,7 +267,9 @@ export class TaginfoService extends AbstractSystem {
    * @param  {function}  callback - errback-style callback function to call with results
    */
   roles(params, callback) {
-    const langCode = this.context.systems.l10n.languageCode();
+    const l10n = this.context.systems.l10n;
+    const langCode = l10n?.languageCode() || 'en';
+
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
     const geometry = params.geometry;
     params = this._clean(this._setSortMembers(params));

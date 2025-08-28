@@ -38,10 +38,11 @@ export class StreetsideService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'streetside';
+    this.requiredDependencies = new Set(['assets', 'l10n', 'photos', 'spatial']);
+    this.optionalDependencies = new Set(['gfx', 'ui']);
     this.autoStart = false;
 
     this._loadPromise = null;
-    this._startPromise = null;
 
     this._cache = {};
     this._hires = false;
@@ -81,7 +82,10 @@ export class StreetsideService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return this.resetAsync();
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = super.initAsync()
+      .then(() => this.resetAsync());
   }
 
 
@@ -94,7 +98,7 @@ export class StreetsideService extends AbstractSystem {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx?.events;
     const ui = context.systems.ui;
 
     // create ms-wrapper, a photo wrapper class
@@ -147,18 +151,18 @@ export class StreetsideService extends AbstractSystem {
       .call(this._setupCanvas);
 
     // Register viewer resize handler
-    ui.PhotoViewer.on('resize', () => {
+    ui?.PhotoViewer.on('resize', () => {
       if (this._viewer) this._viewer.resize();
     });
 
-    eventManager.on('keydown', this._keydown);
+    eventManager?.on('keydown', this._keydown);
 
     return this._startPromise = this._loadAssetsAsync()
-      .then(() => this._started = true)
-      .catch(err => {
-        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-        this._startPromise = null;
-      });
+      .then(() => this._started = true);
+//      .catch(err => {
+//        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
+//        this._startPromise = null;
+//      });
   }
 
 
@@ -576,9 +580,11 @@ export class StreetsideService extends AbstractSystem {
    */
   _keydown(e) {
     const context = this.context;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx?.events;
     const photos = context.systems.photos;
 
+    // Test environment?
+    if (!eventManager) return;
     // Ignore keypresses unless we actually have a Mapillary photo showing
     if (!photos.isViewerShowing() || photos.currPhotoLayerID !== 'streetside') return;
     // Ignore modified keypresses (user might be panning or rotating)

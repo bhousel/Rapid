@@ -37,6 +37,8 @@ export class KartaviewService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'kartaview';
+    this.requiredDependencies = new Set(['l10n', 'photos', 'spatial']);
+    this.optionalDependencies = new Set(['gfx', 'ui']);
     this.autoStart = false;
 
     this._imgZoom = d3_zoom()
@@ -46,7 +48,6 @@ export class KartaviewService extends AbstractSystem {
 
     this._cache = {};
     this._hires = false;
-    this._startPromise = null;
     this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -63,7 +64,10 @@ export class KartaviewService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return this.resetAsync();
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = super.initAsync()
+      .then(() => this.resetAsync());
   }
 
 
@@ -76,7 +80,7 @@ export class KartaviewService extends AbstractSystem {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx?.events;
     const ui = context.systems.ui;
 
     // add osc-wrapper
@@ -138,7 +142,7 @@ export class KartaviewService extends AbstractSystem {
 
 
     // Register viewer resize handler
-    ui.PhotoViewer.on('resize', dimensions => {
+    ui?.PhotoViewer.on('resize', dimensions => {
       this._imgZoom = d3_zoom()
         .extent([[0, 0], dimensions])
         .translateExtent([[0, 0], dimensions])
@@ -146,7 +150,7 @@ export class KartaviewService extends AbstractSystem {
         .on('zoom', this._zoomPan);
     });
 
-    eventManager.on('keydown', this._keydown);
+    eventManager?.on('keydown', this._keydown);
 
     // don't need any async loading so resolve immediately
     this._started = true;
@@ -409,7 +413,7 @@ export class KartaviewService extends AbstractSystem {
       const d = new Date(s);
       if (isNaN(d.getTime())) return null;
 
-      const localeCode = context.systems.l10n.localeCode();
+      const localeCode = l10n.localeCode();
       return d.toLocaleDateString(localeCode, options);
     }
   }
@@ -523,7 +527,7 @@ export class KartaviewService extends AbstractSystem {
           sequence.updateGeometry().touch();
         }
 
-        gfx.deferredRedraw();
+        gfx?.deferredRedraw();
         this.emit('loadedData');
 
         if (data.length === MAXRESULTS) {
@@ -604,7 +608,7 @@ export class KartaviewService extends AbstractSystem {
         }).filter(Boolean);
         sequence.updateGeometry().touch();
 
-        gfx.deferredRedraw();
+        gfx?.deferredRedraw();
         this.emit('loadedData');
 
         return image;
@@ -677,9 +681,11 @@ export class KartaviewService extends AbstractSystem {
    */
   _keydown(e) {
     const context = this.context;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx?.events;
     const photos = context.systems.photos;
 
+    // Test environment?
+    if (!eventManager) return;
     // Ignore keypresses unless we actually have a Mapillary photo showing
     if (!photos.isViewerShowing() || photos.currPhotoLayerID !== 'kartaview') return;
     // Ignore modified keypresses (user might be panning or rotating)

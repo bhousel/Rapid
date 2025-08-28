@@ -29,7 +29,7 @@ export class WikipediaService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return Promise.resolve();
+    return super.initAsync();
   }
 
 
@@ -39,8 +39,7 @@ export class WikipediaService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 

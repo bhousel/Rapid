@@ -58,6 +58,8 @@ export class KeepRightService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'keepright';
+    this.requiredDependencies = new Set(['assets', 'l10n', 'spatial']);
+    this.optionalDependencies = new Set(['gfx']);
     this.autoStart = false;
 
     // persistent data - loaded at init
@@ -74,7 +76,10 @@ export class KeepRightService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return this.resetAsync();
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = super.initAsync()
+      .then(() => this.resetAsync());
   }
 
 
@@ -84,8 +89,10 @@ export class KeepRightService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
+    if (this._startPromise) return this._startPromise;
+
     const assets = this.context.systems.assets;
-    return assets.loadAssetAsync('qa_data')
+    return this._startPromise = assets.loadAssetAsync('qa_data')
       .then(data => {
         this._krData = data.keepRight;
         this._started = true;
@@ -291,7 +298,7 @@ export class KeepRightService extends AbstractSystem {
     }
 
 
-    gfx.deferredRedraw();
+    gfx?.deferredRedraw();
     this.emit('loadedData');
   }
 

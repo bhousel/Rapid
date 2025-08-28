@@ -29,8 +29,9 @@ export class OsmoseService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'osmose';
+    this.requiredDependencies = new Set(['assets', 'spatial']);
+    this.optionalDependencies = new Set(['gfx', 'l10n']);
     this.autoStart = false;
-    this._startPromise = null;
 
     // persistent data - loaded at start
     this._osmoseColors = new Map();    // Map<itemType, hex color>
@@ -48,7 +49,10 @@ export class OsmoseService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return this.resetAsync();
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = super.initAsync()
+      .then(() => this.resetAsync());
   }
 
 
@@ -217,7 +221,7 @@ export class OsmoseService extends AbstractSystem {
       spatial.addData('osmose', new Marker(context, props));
     }
 
-    gfx.deferredRedraw();
+    gfx?.deferredRedraw();
     this.emit('loadedData');
   }
 
@@ -232,7 +236,9 @@ export class OsmoseService extends AbstractSystem {
     // Issue details only need to be fetched once
     if (issue.props.elems !== undefined) return Promise.resolve(issue);
 
-    const localeCode = this.context.systems.l10n.localeCode();
+    const l10n = this.context.systems.l10n;
+    const localeCode = l10n?.localeCode() || 'en-US';
+
     const url = `${OSMOSE_API}/issue/${issue.id}?langs=${localeCode}`;
 
     return fetch(url)
@@ -260,7 +266,8 @@ export class OsmoseService extends AbstractSystem {
    * @return  {Object}  stringdata
    */
   getStrings(itemType, locale) {
-    locale = locale || this.context.systems.l10n.localeCode();
+    const l10n = this.context.systems.l10n;
+    locale = locale || l10n?.localeCode() || 'en-US';
 
     const stringData = this._osmoseStrings.get(locale) ?? {};
     return stringData[itemType] ?? {};
@@ -409,7 +416,9 @@ export class OsmoseService extends AbstractSystem {
     // For now, we only do this one time at init.
     // Todo: support switching locales
     let stringData = {};
-    const localeCode = this.context.systems.l10n.localeCode();
+
+    const l10n = this.context.systems.l10n;
+    const localeCode = l10n?.localeCode() || 'en-US';
     this._osmoseStrings.set(localeCode, stringData);
 
     // Using multiple individual item + class requests to reduce fetched data size

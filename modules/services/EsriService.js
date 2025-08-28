@@ -33,12 +33,12 @@ export class EsriService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'esri';
-    this.context = context;
+    this.requiredDependencies = new Set(['spatial']);
+    this.optionalDependencies = new Set(['gfx', 'locations']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM);
     this._datasets = {};
 
-    this._initPromise = null;
     this._datasetsPromise = null;
   }
 
@@ -51,7 +51,8 @@ export class EsriService extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    return this._initPromise = this.resetAsync()
+    return this._initPromise = super.initAsync()
+      .then(() => this.resetAsync())
       .then(() => this._loadDatasetsAsync());
   }
 
@@ -62,8 +63,7 @@ export class EsriService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -203,9 +203,10 @@ export class EsriService extends AbstractSystem {
     }
 
     const cache = ds.cache;
-    const locations = this.context.systems.locations;
+    const context = this.context;
+    const locations = context.systems.locations;
+    const viewport = context.viewport;
 
-    const viewport = this.context.viewport;
     if (ds.lastv === viewport.v) return;  // exit early if the view is unchanged
     ds.lastv = viewport.v;
 
@@ -225,12 +226,14 @@ export class EsriService extends AbstractSystem {
       const tileID = tile.id;
       if (cache.loaded.has(tileID) || cache.inflight.has(tileID)) continue;
 
-      // Exit if this tile covers a blocked region (all corners are blocked)
-      const corners = tile.wgs84Extent.polygon().slice(0, 4);
-      const isBlocked = corners.every(loc => locations.isBlockedAt(loc));
-      if (isBlocked) {
-        cache.loaded.set(tileID, tile);  // don't try again
-        continue;
+      if (locations) {
+        // Skip if this tile covers a blocked region (all corners are blocked)
+        const corners = tile.wgs84Extent.polygon().slice(0, 4);
+        const isBlocked = corners.every(loc => locations.isBlockedAt(loc));
+        if (isBlocked) {
+          cache.loaded.set(tileID, tile);  // don't try again
+          continue;
+        }
       }
 
       this._loadTilePage(ds, tile, 0);
@@ -451,7 +454,7 @@ export class EsriService extends AbstractSystem {
           cache.loaded.set(tileID, tile);
 
           const gfx = this.context.systems.gfx;
-          gfx.deferredRedraw();
+          gfx?.deferredRedraw();
           this.emit('loadedData');
         }
       })

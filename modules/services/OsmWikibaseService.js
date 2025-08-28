@@ -20,6 +20,7 @@ export class OsmWikibaseService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'osmwikibase';
+    this.optionalDependencies = new Set(['l10n']);
     this.apibase = 'https://wiki.openstreetmap.org/w/api.php';
 
     this._cache = {};
@@ -43,7 +44,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return Promise.resolve();
+    return super.initAsync();
   }
 
 
@@ -53,8 +54,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -280,8 +280,8 @@ export class OsmWikibaseService extends AbstractSystem {
    */
   getDocs(params, callback) {
     const l10n = this.context.systems.l10n;
-    const langCodes = l10n.localeCodes().map(code => code.toLowerCase());
-    params.langCodes = langCodes;
+    const langCodes = l10n?.localeCodes() || ['en-US', 'en'];
+    params.langCodes = langCodes.map(code => code.toLowerCase());
 
     this.getEntity(params, (err, data) => {
       if (err) {

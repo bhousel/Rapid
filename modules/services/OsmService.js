@@ -33,6 +33,8 @@ export class OsmService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'osm';
+    this.requiredDependencies = new Set(['spatial']);
+    this.optionalDependencies = new Set(['editor', 'gfx', 'l10n', 'locations']);
 
     // Some defaults that we will replace with whatever we fetch from the OSM API capabilities result.
     this._maxWayNodes = 2000;
@@ -132,7 +134,10 @@ export class OsmService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return this.resetAsync();
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = super.initAsync()
+      .then(() => this.resetAsync());
   }
 
 
@@ -142,8 +147,7 @@ export class OsmService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -531,7 +535,7 @@ export class OsmService extends AbstractSystem {
     // Some users will refresh their tab as soon as the changeset is inflight.
     // We don't want to offer to restore these same changes when their browser refreshes.
     const editor = this.context.systems.editor;
-    editor.clearBackup();
+    editor?.clearBackup();
 
     this._oauth.fetch(resource, options)
       .then(utilFetchResponse)
@@ -936,12 +940,14 @@ export class OsmService extends AbstractSystem {
     if (spatial.hasTile('osm-data', tile.id)) return;
     if (cache.inflight[tile.id]) return;
 
-    // Exit if this tile covers a blocked region (all corners are blocked)
-    const corners = tile.wgs84Extent.polygon().slice(0, 4);
-    const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
-    if (tileBlocked) {
-      spatial.addTiles('osm-data', tile);   // don't try again
-      return;
+    if (locations) {
+      // Exit if this tile covers a blocked region (all corners are blocked)
+      const corners = tile.wgs84Extent.polygon().slice(0, 4);
+      const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
+      if (tileBlocked) {
+        spatial.addTiles('osm-data', tile);   // don't try again
+        return;
+      }
     }
 
     if (!this._hasInflightRequests(cache)) {
@@ -1048,12 +1054,14 @@ export class OsmService extends AbstractSystem {
       if (spatial.hasTile('osm-notes', tileID)) continue;
       if (cache.inflight[tileID]) continue;
 
-      // Skip if this tile covers a blocked region (all corners are blocked)
-      const corners = tile.wgs84Extent.polygon().slice(0, 4);
-      const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
-      if (tileBlocked) {
-        spatial.addTiles('osm-notes', [tile]);   // don't try again
-        continue;
+      if (locations) {
+        // Skip if this tile covers a blocked region (all corners are blocked)
+        const corners = tile.wgs84Extent.polygon().slice(0, 4);
+        const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
+        if (tileBlocked) {
+          spatial.addTiles('osm-notes', [tile]);   // don't try again
+          continue;
+        }
       }
 
       const options = { skipSeen: false };
@@ -1065,7 +1073,7 @@ export class OsmService extends AbstractSystem {
             spatial.addTiles('osm-notes', [tile]);
           }
           // deferLoadUsers();
-          gfx.deferredRedraw();
+          gfx?.deferredRedraw();
           that.emit('loadedNotes');
         },
         options
@@ -1080,10 +1088,10 @@ export class OsmService extends AbstractSystem {
     const gotNote = (err, results) => {
       if (callback) {
         callback(err, { data: results });
-        const gfx = this.context.systems.gfx;
-        gfx.deferredRedraw();
-        this.emit('loadedNotes');
       }
+      const gfx = this.context.systems.gfx;
+      gfx?.deferredRedraw();
+      this.emit('loadedNotes');
     };
 
     this.loadFromAPI(
@@ -1120,7 +1128,7 @@ export class OsmService extends AbstractSystem {
           return callback(err);
         } else {
           const gfx = this.context.systems.gfx;
-          gfx.deferredRedraw();
+          gfx?.deferredRedraw();
           this.emit('loadedNotes');
           return callback(null, results.data[0]);
         }
@@ -1193,7 +1201,7 @@ export class OsmService extends AbstractSystem {
           return callback(err);
         } else {
           const gfx = this.context.systems.gfx;
-          gfx.deferredRedraw();
+          gfx?.deferredRedraw();
           this.emit('loadedNotes');
           return callback(null, results.data[0]);
         }
@@ -1305,10 +1313,12 @@ export class OsmService extends AbstractSystem {
     };
 
     // Ensure the locale is correctly set before opening the popup
-    const locale = this.context.systems.l10n.localeCode();
+    const l10n = this.context.systems.l10n;
+    const localeCode = l10n?.localeCode() || 'en-US';
+
     this._oauth.options({
       ...this._oauth.options(),
-      locale: locale
+      locale: localeCode
     });
     this._oauth.authenticate(gotResult);
     this._oauth.bringPopupWindowToFront();  // no guarantees, but we can try

@@ -27,7 +27,6 @@ export class OvertureService extends AbstractSystem {
     this.pmTilesCatalog = {};
 
     this.latestRelease = '';
-    this._initPromise = null;
   }
 
 
@@ -62,7 +61,9 @@ export class OvertureService extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const vtService = this.context.services.vectortile;
-    return this._initPromise = vtService.initAsync()
+
+    return this._initPromise = super.initAsync()
+      .then(() => vtService.initAsync())
       .then(() => this._loadS3CatalogAsync());
   }
 
@@ -73,10 +74,13 @@ export class OvertureService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
+    if (this._startPromise) return this._startPromise;
 
     const vtService = this.context.services.vectortile;
-    return vtService.startAsync();
+
+    return this._startPromise = Promise.resolve()
+      .then(() => vtService.startAsync())
+      .then(() => this._started = true);
   }
 
 

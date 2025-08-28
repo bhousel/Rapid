@@ -20,6 +20,7 @@ export class NominatimService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'nominatim';
+    this.optionalDependencies = new Set(['l10n']);
 
     this.apibase = 'https://nominatim.openstreetmap.org/';
     this._inflight = {};
@@ -38,7 +39,7 @@ export class NominatimService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return Promise.resolve();
+    return super.initAsync();
   }
 
 
@@ -48,8 +49,7 @@ export class NominatimService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -108,10 +108,13 @@ export class NominatimService extends AbstractSystem {
     const controller = new AbortController();
     this._inflight[url] = controller;
 
-    const l10n = this.context.systems.l10n;
+    const context = this.context;
+    const l10n = context.systems.l10n;
+    const localeCodes = l10n?.localeCodes() || ['en-US', 'en'];
+
     const opts = {
       signal: controller.signal,
-      headers: { 'Accept-Language': l10n.localeCodes().join(',') }
+      headers: { 'Accept-Language': localeCodes.join(',') }
     };
 
     fetch(url, opts)
@@ -147,10 +150,13 @@ export class NominatimService extends AbstractSystem {
     const controller = new AbortController();
     this._inflight[url] = controller;
 
-    const l10n = this.context.systems.l10n;
+    const context = this.context;
+    const l10n = context.systems.l10n;
+    const localeCodes = l10n?.localeCodes() || ['en-US', 'en'];
+
     const opts = {
       signal: controller.signal,
-      headers: { 'Accept-Language': l10n.localeCodes().join(',') }
+      headers: { 'Accept-Language': localeCodes.join(',') }
     };
 
     fetch(url, opts)

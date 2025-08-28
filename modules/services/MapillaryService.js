@@ -45,10 +45,11 @@ export class MapillaryService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'mapillary';
+    this.requiredDependencies = new Set(['l10n', 'photos', 'spatial']);
+    this.optionalDependencies = new Set(['gfx', 'ui']);
     this.autoStart = false;
 
     this._loadPromise = null;
-    this._startPromise = null;
 
     this._cache = {};
     this._selectedImageID = null;
@@ -69,7 +70,10 @@ export class MapillaryService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return this.resetAsync();
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = super.initAsync()
+      .then(() => this.resetAsync());
   }
 
 
@@ -82,7 +86,7 @@ export class MapillaryService extends AbstractSystem {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx?.events;
 
     // add mly-wrapper
     const $$wrapper = context.container().select('.photoviewer .middle-middle')
@@ -108,15 +112,15 @@ export class MapillaryService extends AbstractSystem {
       .attr('class', 'photo-attribution');
 
 
-    eventManager.on('keydown', this._keydown);
+    eventManager?.on('keydown', this._keydown);
 
     return this._startPromise = this._loadAssetsAsync()
       .then(() => this._initViewer())
-      .then(() => this._started = true)
-      .catch(err => {
-        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-        this._startPromise = null;
-      });
+      .then(() => this._started = true);
+//      .catch(err => {
+//        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
+//        this._startPromise = null;
+//      });
   }
 
 
@@ -157,16 +161,19 @@ export class MapillaryService extends AbstractSystem {
    * @return  {string}  The url
    */
   imageURL(imageID) {
-    const gfx = this.context.systems.gfx;
-    const layers = gfx.scene.layers;
-
-    // are either of these layers enabled?
-    const detectionsLayer = layers.get('mapillary-detections');
-    const signsLayer = layers.get('mapillary-signs');
+    const context = this.context;
+    const gfx = context.systems.gfx;
 
     let extras = '';
-    if (detectionsLayer?.enabled)  extras += '&mapFeature=all';
-    if (signsLayer?.enabled)       extras += '&trafficSign=all';
+    if (gfx) {
+      // are either of these layers enabled?
+      const layers = gfx.scene.layers;
+      const detectionsLayer = layers.get('mapillary-detections');
+      const signsLayer = layers.get('mapillary-signs');
+
+      if (detectionsLayer?.enabled)  extras += '&mapFeature=all';
+      if (signsLayer?.enabled)       extras += '&trafficSign=all';
+    }
 
     return `https://www.mapillary.com/app/?pKey=${imageID}&focus=photo${extras}`;
   }
@@ -527,9 +534,11 @@ export class MapillaryService extends AbstractSystem {
    */
   _keydown(e) {
     const context = this.context;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx?.events;
     const photos = context.systems.photos;
 
+    // Test environment?
+    if (!eventManager) return;
     // Ignore keypresses unless we actually have a Mapillary photo showing
     if (!photos.isViewerShowing() || photos.currPhotoLayerID !== 'mapillary') return;
     // Ignore modified keypresses (user might be panning or rotating)
@@ -557,6 +566,7 @@ export class MapillaryService extends AbstractSystem {
    */
   _updatePhotoFooter(imageID) {
     const context = this.context;
+    const l10n = context.systems.l10n;
     const spatial = context.systems.spatial;
     const $wrapper = context.container().select('.photoviewer .mly-wrapper');
     const $attribution = $wrapper.selectAll('.photo-attribution').html('&nbsp;');  // clear DOM content
@@ -600,7 +610,7 @@ export class MapillaryService extends AbstractSystem {
       const d = new Date(s);
       if (isNaN(d.getTime())) return null;
 
-      const localeCode = context.systems.l10n.localeCode();
+      const localeCode = l10n.localeCode();
       return d.toLocaleDateString(localeCode, options);
     }
   }
@@ -613,9 +623,10 @@ export class MapillaryService extends AbstractSystem {
    */
   _shouldShowSegmentations() {
     const gfx = this.context.systems.gfx;
-    const layers = gfx.scene.layers;
+    if (!gfx) return false;
 
     // are either of these layers enabled?
+    const layers = gfx.scene.layers;
     const layerIDs = ['mapillary-detections', 'mapillary-signs'];
     return layerIDs.some(layerID => {
       const layer = layers.get(layerID);
@@ -757,7 +768,7 @@ export class MapillaryService extends AbstractSystem {
 
         this._gotTile(buffer, tile);
 
-        gfx.deferredRedraw();
+        gfx?.deferredRedraw();
 
         if (datasetID === 'images') {
           spatial.addTiles('mapillary-images', [tile]);
@@ -910,7 +921,7 @@ export class MapillaryService extends AbstractSystem {
           object_type:        type
         });
 
-        gfx.immediateRedraw();
+        gfx?.immediateRedraw();
         return detection;
       })
       .catch(err => {
@@ -1144,7 +1155,7 @@ export class MapillaryService extends AbstractSystem {
     }
 
     // Register viewer resize handler
-    ui.PhotoViewer.on('resize', () => {
+    ui?.PhotoViewer.on('resize', () => {
       if (this._viewer) this._viewer.resize();
     });
   }

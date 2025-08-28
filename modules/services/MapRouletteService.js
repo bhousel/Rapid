@@ -27,9 +27,10 @@ export class MapRouletteService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'maproulette';
+    this.requiredDependencies = new Set(['spatial']);
+    this.optionalDependencies = new Set(['map', 'gfx', 'urlhash']);
     this.autoStart = false;
 
-    this._initPromise = null;
     this._challengeIDs = new Set();  // Set<string> - if we want to filter only a specific challengeID
 
     this._cache = {};
@@ -49,21 +50,16 @@ export class MapRouletteService extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
-    const context = this.context;
-    const gfx = context.systems.gfx;
-    const urlhash = context.systems.urlhash;
-
-    const prerequisites = Promise.all([
-      gfx.initAsync(),   // `gfx.scene` will exist after `initAsync`
-      urlhash.initAsync()
-    ]);
-
-    return this._initPromise = prerequisites
+    return this._initPromise = super.initAsync()
       .then(() => this.resetAsync())
       .then(() => {
+        const context = this.context;
+        const gfx = context.systems.gfx;
+        const urlhash = context.systems.urlhash;
+
         // Setup event handlers..
-        gfx.scene.on('layerchange', this._mapRouletteChanged);
-        urlhash.on('hashchange', this._hashchange);
+        gfx?.scene?.on('layerchange', this._mapRouletteChanged);
+        urlhash?.on('hashchange', this._hashchange);
       });
   }
 
@@ -71,18 +67,17 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return {Promise} Promise resolved when this component has completed startup
+   * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
     if (this._cache.inflight) {
@@ -130,7 +125,7 @@ export class MapRouletteService extends AbstractSystem {
       }
     }
     const gfx = this.context.systems.gfx;
-    gfx.immediateRedraw();
+    gfx?.immediateRedraw();
     this._mapRouletteChanged();
   }
 
@@ -303,7 +298,7 @@ export class MapRouletteService extends AbstractSystem {
           // save the challenge
           cache.challenges.set(challengeID, challenge);
 
-          gfx.deferredRedraw();
+          gfx?.deferredRedraw();
           this.emit('loadedData');
         })
         .catch(err => {
@@ -565,10 +560,8 @@ export class MapRouletteService extends AbstractSystem {
             task.touch();
 
             const map = this.context.systems.map;
-            if (map) {
-              map.centerZoomEase(task.loc, zoom);
-              this.selectAndDisplayTask(task);
-            }
+            map?.centerZoomEase(task.loc, zoom);
+            this.selectAndDisplayTask(task);
           });
       })
       .catch(err => {
@@ -648,7 +641,8 @@ export class MapRouletteService extends AbstractSystem {
    * @param  {Map<string, string>}  prevParams - The previous hash parameters
    */
   _hashchange(currParams, prevParams) {
-    const scene = this.context.systems.gfx.scene;
+    const scene = this.context.systems.gfx?.scene;
+    if (!scene) return;  // test environment?
 
     // maproulette
     // Support opening maproulette layer with a URL parameter:
@@ -691,10 +685,11 @@ export class MapRouletteService extends AbstractSystem {
   _mapRouletteChanged() {
     const context = this.context;
     const urlhash = context.systems.urlhash;
-    const scene = context.systems.gfx.scene;
-    const layer = scene.layers.get('maproulette');
+    const scene = context.systems.gfx?.scene;
+    if (!urlhash || !scene) return;  // test environment?
 
     // `maproulette=true` -or- `maproulette=<challengeIDs>`
+    const layer = scene.layers.get('maproulette');
     if (layer?.enabled) {
       const ids = this.challengeIDs;
       if (ids) {

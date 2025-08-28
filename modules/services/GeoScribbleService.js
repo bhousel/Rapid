@@ -30,6 +30,8 @@ export class GeoScribbleService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'geoscribble';
+    this.requiredDependencies = new Set(['spatial']);
+    this.optionalDependencies = new Set(['gfx']);
     this.autoStart = false;
 
     this._cache = {};
@@ -43,7 +45,10 @@ export class GeoScribbleService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return this.resetAsync();
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = super.initAsync()
+      .then(() => this.resetAsync());
   }
 
 
@@ -53,8 +58,7 @@ export class GeoScribbleService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -167,7 +171,7 @@ export class GeoScribbleService extends AbstractSystem {
 
     spatial.addData('geoscribble', toLoad);
 
-    gfx.deferredRedraw();
+    gfx?.deferredRedraw();
     this.emit('loadedData');
   }
 

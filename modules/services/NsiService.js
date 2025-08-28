@@ -42,6 +42,8 @@ export class NsiService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'nsi';
+    this.requiredDependencies = new Set(['assets', 'presets', 'locations']);
+
     this.status = 'loading';  // 'loading', 'ok', 'failed'
 
     this._nsi = {};
@@ -54,14 +56,17 @@ export class NsiService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    const presets = this.context.systems.presets;
-    return presets.initAsync()
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = super.initAsync()
+        // check for presets init here?  all services are initted after all systems, idk.
       .then(() => this._loadNsiPresetsAsync())
       .then(() => this._loadNsiDataAsync())
       .then(() => this.status = 'ok')
-      .catch(e => {
-        console.error(e);  // eslint-disable-line
+      .catch(err => {
+        console.error(err);  // eslint-disable-line
         this.status = 'failed';
+        throw err;  // rethrow, promise chain should reject
       });
   }
 
@@ -72,8 +77,7 @@ export class NsiService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -324,7 +328,9 @@ export class NsiService extends AbstractSystem {
    * @return  {Promise} Promise fulfilled when the presets have been downloaded and merged into Rapid.
    */
   _loadNsiPresetsAsync() {
-    const assets = this.context.systems.assets;
+    const context = this.context;
+    const assets = context.systems.assets;
+    const presets = context.systems.presets;
 
     return (
       Promise.all([
@@ -336,7 +342,6 @@ export class NsiService extends AbstractSystem {
         // The preset json schema doesn't include it, but the Rapid code still uses it
         Object.values(vals[0].presets).forEach(preset => preset.suggestion = true);
 
-        const presets = this.context.systems.presets;
         presets.merge({ presets: vals[0].presets, featureCollection: vals[1] });
       })
     );

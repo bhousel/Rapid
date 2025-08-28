@@ -1,5 +1,4 @@
 import { Tiler } from '@rapid-sdk/math';
-import { utilStringQs } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { RapidDataset } from '../core/lib/index.js';
@@ -27,6 +26,8 @@ export class MapWithAIService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'mapwithai';
+    this.requiredDependencies = new Set(['spatial']);
+    this.optionalDependencies = new Set(['gfx', 'locations', 'rapid', 'urlhash']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM);
     this._datasets = {};
@@ -44,7 +45,10 @@ export class MapWithAIService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return this.resetAsync()
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = super.initAsync()
+      .then(() => this.resetAsync())
       .then(() => {
         // allocate a special dataset for the rapid intro graph.
         const datasetID = 'rapid_intro_graph';
@@ -75,8 +79,7 @@ export class MapWithAIService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -266,12 +269,14 @@ export class MapWithAIService extends AbstractSystem {
     for (const tile of tiles) {
       if (cache.loaded.has(tile.id) || cache.inflight[tile.id]) continue;
 
-      // Exit if this tile covers a blocked region (all corners are blocked)
-      const corners = tile.wgs84Extent.polygon().slice(0, 4);
-      const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
-      if (tileBlocked) {
-        cache.loaded.add(tile.id);  // don't try again
-        continue;
+      if (locations) {
+        // Exit if this tile covers a blocked region (all corners are blocked)
+        const corners = tile.wgs84Extent.polygon().slice(0, 4);
+        const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
+        if (tileBlocked) {
+          cache.loaded.add(tile.id);  // don't try again
+          continue;
+        }
       }
 
       const resource = this._tileURL(ds, tile.wgs84Extent);
@@ -287,7 +292,7 @@ export class MapWithAIService extends AbstractSystem {
             tree.rebase(result, true);
             cache.loaded.add(tile.id);
 
-            gfx.deferredRedraw();
+            gfx?.deferredRedraw();
             this.emit('loadedData');
           });
         })
@@ -322,6 +327,10 @@ export class MapWithAIService extends AbstractSystem {
 
 
   _tileURL(dataset, extent) {
+    const context = this.context;
+    const rapid = context.systems.rapid;
+    const urlhash = context.systems.urlhash;
+
     // Conflated datasets have a different ID, so they get stored in their own graph/tree
     const isConflated = /-conflated$/.test(dataset.id);
     const datasetID = dataset.id.replace('-conflated', '');
@@ -352,13 +361,11 @@ export class MapWithAIService extends AbstractSystem {
 
     qs.bbox = extent.toParam();
 
-    const taskExtent = this.context.systems.rapid.taskExtent;
-    if (taskExtent) {
-      qs.crop_bbox = taskExtent.toParam();
+    if (rapid?.taskExtent) {
+      qs.crop_bbox = rapid.taskExtent.toParam();
     }
 
-    const customUrlRoot = utilStringQs(window.location.hash).fb_ml_road_url;
-
+    const customUrlRoot = urlhash?.getParam('fb_ml_road_url');
     const urlRoot = customUrlRoot || APIROOT;
     const url = urlRoot + '?' + mapwithaiQsString(qs, true);  // true = noencode
     return url;

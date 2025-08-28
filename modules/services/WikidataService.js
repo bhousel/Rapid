@@ -20,6 +20,7 @@ export class WikidataService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'wikidata';
+    this.optionalDependencies = new Set(['l10n']);
 
     this._cache = new Map();  // Map<qid, entitydata>
   }
@@ -31,7 +32,7 @@ export class WikidataService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return Promise.resolve();
+    return super.initAsync();
   }
 
 
@@ -41,8 +42,7 @@ export class WikidataService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -139,7 +139,9 @@ export class WikidataService extends AbstractSystem {
    * languagesToQuery
    */
   languagesToQuery() {
-    const localeCodes = this.context.systems.l10n.localeCodes();
+    const l10n = this.context.systems.l10n;
+    const localeCodes = l10n?.localeCodes() || ['en'];
+
     return localeCodes
       .map(code => code.toLowerCase())
       .filter(code => code !== 'en-us');
@@ -258,7 +260,8 @@ export class WikidataService extends AbstractSystem {
 
       // add wiki sitelink
       if (entity.sitelinks) {
-        const languageCode = this.context.systems.l10n.languageCode();
+        const l10n = this.context.systems.l10n;
+        const languageCode = l10n?.languageCode() || 'en';
         const isEn = languageCode.toLowerCase() === 'en';
 
         // must be one of these that we requested..

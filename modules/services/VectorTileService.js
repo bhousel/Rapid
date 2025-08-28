@@ -37,6 +37,7 @@ export class VectorTileService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'vectortile';
+    this.optionalDependencies = new Set(['gfx']);
 
     // Sources are identified by their URL template..
     this._sources = new Map();   // Map<template, source>
@@ -50,7 +51,7 @@ export class VectorTileService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return Promise.resolve();
+    return super.initAsync();
   }
 
 
@@ -60,8 +61,7 @@ export class VectorTileService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    this._started = true;
-    return Promise.resolve();
+    return super.startAsync();
   }
 
 
@@ -393,7 +393,7 @@ export class VectorTileService extends AbstractSystem {
     if (newFeatures.length) {
       this._cacheFeatures(cache, newFeatures);
       const gfx = this.context.systems.gfx;
-      gfx.deferredRedraw();
+      gfx?.deferredRedraw();
       this.emit('loadedData');
     }
   }
@@ -592,7 +592,7 @@ export class VectorTileService extends AbstractSystem {
     if (newFeatures.length) {
       this._cacheFeatures(cache, newFeatures);
       const gfx = this.context.systems.gfx;
-      gfx.deferredRedraw();
+      gfx?.deferredRedraw();
     }
   }
 
