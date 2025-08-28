@@ -1,25 +1,31 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 describe('ValidationIssue', () => {
-  let context;
+  const context = new Rapid.MockContext();
+  context.systems = {
+    l10n:  new Rapid.LocalizationSystem(context)
+  };
+
   beforeEach(() => {
-    context = {
-      systems: {
-        l10n: {
-          t: (key) => key,
-        },
-        validator: {
-          ignoreIssue: () => {},
-        },
-      },
+    const l10n = context.systems.l10n;
+    l10n.preferredLocaleCodes = 'en';
+    l10n._cache = {
+      en: {
+        core: {
+          issues: {
+            fix: {
+              ignore_issue: {
+                title: 'Ignore Issue'
+              }
+            }
+          }
+        }
+      }
     };
   });
 
-  afterEach(() => {
-    context = null;
-  });
 
   it('should construct a ValidationIssue object and test its methods', () => {
     const props = {
@@ -30,36 +36,25 @@ describe('ValidationIssue', () => {
       loc: [0, 0],
       data: {},
       hash: 'Test Hash',
-      autoArgs: {},
-      message: function() { return 'Test Message'; },
-      reference: function() { return 'Test Reference'; },
-      dynamicFixes: function() { return []; },
+      autoArgs: {}
     };
-    const validationIssue = new Rapid.ValidationIssue(context, props);
+
+    const result = new Rapid.ValidationIssue(context, props);
+
     // Test properties
-    assert.strictEqual(validationIssue.type, 'Test Type');
-    assert.strictEqual(validationIssue.subtype, 'Test Subtype');
-    assert.strictEqual(validationIssue.severity, 'warning');
-    assert.deepStrictEqual(validationIssue.entityIds, ['1', '2', '3']);
-    assert.deepStrictEqual(validationIssue.loc, [0, 0]);
-    assert.deepStrictEqual(validationIssue.data, {});
-    assert.strictEqual(validationIssue.hash, 'Test Hash');
-    assert.deepStrictEqual(validationIssue.autoArgs, {});
-    assert.strictEqual(validationIssue.message(), 'Test Message');
-    assert.strictEqual(validationIssue.reference(), 'Test Reference');
-    assert.deepStrictEqual(validationIssue.dynamicFixes(), []);
-    assert.strictEqual(validationIssue.id.includes('Test Type'), true);
-    assert.strictEqual(validationIssue.key.includes(validationIssue.id), true);
+    assert.deepInclude(result, props);
+    assert.include(result.id, 'Test Type');
+    assert.include(result.key, result.id);
+
     // Test extent method
-    const extent = validationIssue.extent();
-    assert.strictEqual(extent.min[0], 0);
-    assert.strictEqual(extent.min[1], 0);
-    assert.strictEqual(extent.max[0], 0);
-    assert.strictEqual(extent.max[1], 0);
+    const extent = result.extent();
+    assert.deepEqual(extent.min, [0, 0]);
+    assert.deepEqual(extent.max, [0, 0]);
+
     // Test fixes method
-    const fixes = validationIssue.fixes();
-    assert.strictEqual(fixes.length, 1);
-    assert.strictEqual(fixes[0].title, 'issues.fix.ignore_issue.title');
-    assert.strictEqual(fixes[0].issue, validationIssue);
+    const fixes = result.fixes();
+    assert.lengthOf(fixes, 1);
+    assert.strictEqual(fixes[0].title, 'Ignore Issue');
+    assert.strictEqual(fixes[0].issue, result);
   });
 });

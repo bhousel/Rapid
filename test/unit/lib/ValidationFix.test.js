@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+
 
 describe('ValidationFix', () => {
   it('constructs a ValidationFix object', () => {
@@ -12,12 +13,9 @@ describe('ValidationFix', () => {
       icon: 'Test Icon',
       entityIds: ['1', '2', '3']
     };
-    const validationFix = new Rapid.ValidationFix(props);
-    assert.strictEqual(validationFix.title, 'Test Title');
-    assert.strictEqual(typeof validationFix.onClick, 'function');
-    assert.strictEqual(validationFix.disabledReason, 'Test Reason');
-    assert.strictEqual(validationFix.icon, 'Test Icon');
-    assert.deepStrictEqual(validationFix.entityIds, ['1', '2', '3']);
-    assert.strictEqual(validationFix.issue, null);
+
+    const result = new Rapid.ValidationFix(props);
+    assert.deepInclude(result, props);
+    assert.isNull(result.issue);
   });
 });

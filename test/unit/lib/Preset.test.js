@@ -1,5 +1,5 @@
 import { after, before, describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -25,12 +25,12 @@ describe('Preset', () => {
   describe('matchGeometry', () => {
     it('returns false if it doesn\'t match', () => {
       const preset = new Rapid.Preset(context, 'test', { geometry: ['line'] });
-      assert.equal(preset.matchGeometry('point'), false);
+      assert.isFalse(preset.matchGeometry('point'));
     });
 
     it('returns true if it does match', () => {
       const preset = new Rapid.Preset(context, 'test', { geometry: ['point', 'line'] });
-      assert.equal(preset.matchGeometry('point'), true);
+      assert.isTrue(preset.matchGeometry('point'));
     });
   });
 
@@ -38,12 +38,12 @@ describe('Preset', () => {
   describe('matchAllGeometry', () => {
     it('returns false if they don\'t all match', () => {
       const preset = new Rapid.Preset(context, 'test', { geometry: ['line'] });
-      assert.equal(preset.matchAllGeometry(['point', 'line']), false);
+      assert.isFalse(preset.matchAllGeometry(['point', 'line']));
     });
 
     it('returns true if they do all match', () => {
       const preset = new Rapid.Preset(context, 'test', { geometry: ['point', 'line'] });
-      assert.equal(preset.matchAllGeometry(['point', 'line']), true);
+      assert.isTrue(preset.matchAllGeometry(['point', 'line']));
     });
   });
 
@@ -52,29 +52,29 @@ describe('Preset', () => {
     it('returns -1 if preset does not match tags', () => {
       const preset = new Rapid.Preset(context, 'test', { tags: { foo: 'bar' } });
       const entity = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
-      assert.equal(preset.matchScore(entity.tags), -1);
+      assert.strictEqual(preset.matchScore(entity.tags), -1);
     });
 
     it('returns the value of the matchScore property when matched', () => {
       const preset = new Rapid.Preset(context, 'test', { tags: { highway: 'motorway' }, matchScore: 0.2 });
       const entity = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
-      assert.equal(preset.matchScore(entity.tags), 0.2);
+      assert.strictEqual(preset.matchScore(entity.tags), 0.2);
     });
 
     it('defaults to the number of matched tags', () => {
       let preset = new Rapid.Preset(context, 'test', { tags: { highway: 'residential' } });
       let entity = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
-      assert.equal(preset.matchScore(entity.tags), 1);
+      assert.strictEqual(preset.matchScore(entity.tags), 1);
 
       preset = new Rapid.Preset(context, 'test', { tags: { highway: 'service', service: 'alley' } });
       entity = new Rapid.OsmWay(context, { tags: { highway: 'service', service: 'alley' } });
-      assert.equal(preset.matchScore(entity.tags), 2);
+      assert.strictEqual(preset.matchScore(entity.tags), 2);
     });
 
     it('counts * as a match for any value with score 0.5', () => {
       const preset = new Rapid.Preset(context, 'test', { tags: { building: '*' } });
       const entity = new Rapid.OsmWay(context, { tags: { building: 'yep' } });
-      assert.equal(preset.matchScore(entity.tags), 0.5);
+      assert.strictEqual(preset.matchScore(entity.tags), 0.5);
     });
 
     it('boosts matchScore for additional matches in addTags', () => {
@@ -100,11 +100,11 @@ describe('Preset', () => {
 
       const centerMatchCenter = presetSupercenter.matchScore(supercenter.tags);
       const centerMatchMarket = presetMarket.matchScore(supercenter.tags);
-      assert.ok(centerMatchCenter > centerMatchMarket);
+      assert.isAbove(centerMatchCenter, centerMatchMarket);
 
       const marketMatchCenter = presetSupercenter.matchScore(market.tags);
       const marketMatchMarket = presetMarket.matchScore(market.tags);
-      assert.ok(marketMatchMarket > marketMatchCenter);
+      assert.isAbove(marketMatchMarket, marketMatchCenter);
     });
   });
 
@@ -112,22 +112,22 @@ describe('Preset', () => {
   describe('isFallback', () => {
     it('returns true if preset has no tags', () => {
       const preset = new Rapid.Preset(context, 'point', { tags: {} });
-      assert.equal(preset.isFallback(), true);
+      assert.isTrue(preset.isFallback());
     });
 
     it('returns true if preset has a single \'area\' tag', () => {
       const preset = new Rapid.Preset(context, 'area', { tags: { area: 'yes' } });
-      assert.equal(preset.isFallback(), true);
+      assert.isTrue(preset.isFallback());
     });
 
     it('returns false if preset has a single non-\'area\' tag', () => {
       const preset = new Rapid.Preset(context, 'building', { tags: { building: 'yes' } });
-      assert.equal(preset.isFallback(), false);
+      assert.isFalse(preset.isFallback());
     });
 
     it('returns false if preset has multiple tags', () => {
       const preset = new Rapid.Preset(context, 'building', { tags: { area: 'yes', building: 'yes' } });
-      assert.equal(preset.isFallback(), false);
+      assert.isFalse(preset.isFallback());
     });
   });
 

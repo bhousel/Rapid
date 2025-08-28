@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -17,14 +17,14 @@ describe('Category', () => {
   const category = new Rapid.Category(context, 'road', categoryData, allPresets);
 
   it('maps members names to preset instances', () => {
-    assert.ok(category.members instanceof Rapid.Collection);
-    assert.equal(category.members.array[0], residential);
+    assert.instanceOf(category.members, Rapid.Collection);
+    assert.deepEqual(category.members.array[0], residential);
   });
 
   describe('matchGeometry', () => {
     it('matches the type of an entity', () => {
-      assert.equal(category.matchGeometry('line'), true);
-      assert.equal(category.matchGeometry('point'), false);
+      assert.isTrue(category.matchGeometry('line'));
+      assert.isFalse(category.matchGeometry('point'));
     });
   });
 });

@@ -1,26 +1,10 @@
 import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('Collection', () => {
-
-  class MockLocalizationSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    t(id)         { return id; }
-    tHtml(id)     { return id; }
-  }
-
-  class MockContext {
-    constructor()  {
-      this.systems = {
-        l10n:  new MockLocalizationSystem(this)
-      };
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
 
   const p = {
     grill: new Rapid.Preset(context, 'amenity/bbq',
@@ -62,23 +46,21 @@ describe('Collection', () => {
 
   describe('item', () => {
     it('fetches a preset by id', () => {
-      assert.equal(collection.item('highway/residential'), p.residential);
+      assert.strictEqual(collection.item('highway/residential'), p.residential);
     });
   });
 
   describe('index', () => {
     it('return -1 when given id for preset not in the collection', () => {
-      assert.equal(collection.index('foobar'), -1);
+      assert.strictEqual(collection.index('foobar'), -1);
     });
   });
 
   describe('matchGeometry', () => {
     it('returns a new collection only containing presets matching a geometry', () => {
       const arr = collection.matchGeometry('area').array;
-      assert.ok(arr.includes(p.residential));
-      assert.ok(arr.includes(p.park));
-      assert.ok(arr.includes(p.soccer));
-      assert.ok(arr.includes(p.football));
+      assert.includeMembers(arr, [ p.residential, p.park, p.soccer, p.football ]);
+      assert.notIncludeMembers(arr, [ p.grill, p.sandpit,, p.excluded ]);
     });
   });
 
