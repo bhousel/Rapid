@@ -1,4 +1,4 @@
-import { EventEmitter } from 'pixi.js';
+import { EventEmitter } from 'tseep';
 import { vecRotate } from '@rapid-sdk/math';
 
 

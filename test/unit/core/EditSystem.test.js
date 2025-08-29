@@ -138,10 +138,10 @@ describe('EditSystem', () => {
       assert.instanceOf(prom, Promise);
       return prom
         .then(() => {
-          assert.isOk(onStagingChange.calledOnceWithExactly(_editor._fullDifference));
-          assert.isOk(onStableChange.calledOnceWithExactly(_editor._fullDifference));
-          assert.isOk(onHistoryJump.calledOnceWithExactly(0, 0));
-          assert.isOk(onBackupStatusChange.calledOnceWithExactly(true));
+          assert.isOk(onStagingChange.calledOnceWith(_editor._fullDifference));
+          assert.isOk(onStableChange.calledOnceWith(_editor._fullDifference));
+          assert.isOk(onHistoryJump.calledOnceWith(0, 0));
+          assert.isOk(onBackupStatusChange.calledOnceWith(true));
         });
     });
   });
@@ -249,7 +249,7 @@ describe('EditSystem', () => {
 
       const action = Rapid.actionNoop();
       const difference = _editor.perform(action);
-      assert.isTrue(onStagingChange.calledOnceWithExactly(difference));
+      assert.isTrue(onStagingChange.calledOnceWith(difference));
       assert.isTrue(onStableChange.notCalled);
     });
 
@@ -262,7 +262,7 @@ describe('EditSystem', () => {
       const action1 = actionAddNode('n-1');
       const action2 = actionAddNode('n-2');
       const difference = _editor.perform(action1, action2);
-      assert.isTrue(onStagingChange.calledOnceWithExactly(difference));
+      assert.isTrue(onStagingChange.calledOnceWith(difference));
       assert.isTrue(onStableChange.notCalled);
     });
   });

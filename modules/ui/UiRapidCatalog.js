@@ -1,4 +1,4 @@
-import { EventEmitter } from 'pixi.js';
+import { EventEmitter } from 'tseep';
 import { select } from 'd3-selection';
 import { marked } from 'marked';
 

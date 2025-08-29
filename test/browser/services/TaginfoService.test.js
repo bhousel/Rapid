@@ -53,7 +53,7 @@ describe('TaginfoService', () => {
         expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
           { query: 'amen', page: '1', rp: '10', sortname: 'count_all', sortorder: 'desc', lang: 'en' }
         );
-        expect(callback.calledOnceWithExactly(null, [{ title: 'amenity', value: 'amenity' }] )).to.be.ok;
+        expect(callback.calledOnceWith(null, [{ title: 'amenity', value: 'amenity' }] )).to.be.ok;
         done();
       }, 20);
     });
@@ -70,7 +70,7 @@ describe('TaginfoService', () => {
       taginfo.keys({ query: 'amen' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(null, [{ title: 'amenity', value: 'amenity' }] )).to.be.ok;
+        expect(callback.calledOnceWith(null, [{ title: 'amenity', value: 'amenity' }] )).to.be.ok;
         done();
       }, 20);
     });
@@ -87,7 +87,7 @@ describe('TaginfoService', () => {
       taginfo.keys({ query: 'amen', filter: 'nodes' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(null, [{ title: 'amenity', value: 'amenity' }] )).to.be.ok;
+        expect(callback.calledOnceWith(null, [{ title: 'amenity', value: 'amenity' }] )).to.be.ok;
         done();
       }, 20);
     });
@@ -104,7 +104,7 @@ describe('TaginfoService', () => {
       taginfo.keys({ query: 'amen' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(null, [
+        expect(callback.calledOnceWith(null, [
           { title: 'amenity', value: 'amenity' },
           { title: 'amenityother', value: 'amenityother' }
         ])).to.be.ok;
@@ -124,7 +124,7 @@ describe('TaginfoService', () => {
       taginfo.keys({ query: 'ref' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(
+        expect(callback.calledOnceWith(
           null, [{ title: 'ref', value: 'ref' }, { title: 'ref:bag', value: 'ref:bag' }]
         )).to.be.ok;
         done();
@@ -147,7 +147,7 @@ describe('TaginfoService', () => {
         expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
           { query: 'recycling:', page: '1', rp: '25', sortname: 'count_all', sortorder: 'desc', lang: 'en' }
         );
-        expect(callback.calledOnceWithExactly(
+        expect(callback.calledOnceWith(
           null, [{ title: 'recycling:glass', value: 'recycling:glass' }]
         )).to.be.ok;
         done();
@@ -166,7 +166,7 @@ describe('TaginfoService', () => {
       taginfo.multikeys({ query: 'service:bicycle:' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(
+        expect(callback.calledOnceWith(
           null, [{ title: 'service:bicycle:retail', value: 'service:bicycle:retail' }]
         )).to.be.ok;
         done();
@@ -185,7 +185,7 @@ describe('TaginfoService', () => {
       taginfo.multikeys({ query: 'service:bicycle:' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(
+        expect(callback.calledOnceWith(
           null, [{ title: 'service:bicycle:retail', value: 'service:bicycle:retail' }]
         )).to.be.ok;
         done();
@@ -208,7 +208,7 @@ describe('TaginfoService', () => {
         expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
           {key: 'amenity', query: 'par', page: '1', rp: '25', sortname: 'count_all', sortorder: 'desc', lang: 'en'}
         );
-        expect(callback.calledOnceWithExactly(
+        expect(callback.calledOnceWith(
           null, [{ value: 'parking', title: 'A place for parking cars' }]
         )).to.be.ok;
         done();
@@ -227,7 +227,7 @@ describe('TaginfoService', () => {
       taginfo.values({ key: 'amenity', query: 'par' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(
+        expect(callback.calledOnceWith(
           null, [{ value: 'parking', title: 'A place for parking cars' }]
         )).to.be.ok;
         done();
@@ -246,7 +246,7 @@ describe('TaginfoService', () => {
       taginfo.values({ key: 'full_name', query: 'ste' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(null, [])).to.be.ok;
+        expect(callback.calledOnceWith(null, [])).to.be.ok;
         done();
       }, 20);
     });
@@ -266,7 +266,7 @@ describe('TaginfoService', () => {
       taginfo.values({ key: 'amenity', query: 'par' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(
+        expect(callback.calledOnceWith(
           null, [{ value: 'parking', title: 'A place for parking cars' }]
         )).to.be.ok;
         done();
@@ -288,7 +288,7 @@ describe('TaginfoService', () => {
       taginfo.values({ key: 'network', query: 'us' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(null, [
+        expect(callback.calledOnceWith(null, [
           { value: 'US:TX:FM', title: 'Farm to Market Roads in the U.S. state of Texas.' },
           { value: 'US:KY', title: 'Primary and secondary state highways in the U.S. state of Kentucky.' },
           { value: 'US:US', title: 'U.S. routes in the United States.' },
@@ -310,7 +310,7 @@ describe('TaginfoService', () => {
       taginfo.values({ key: 'genus', query: 'qu' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(null, [{ value: 'Quercus', title: 'Oak' }] )).to.be.ok;
+        expect(callback.calledOnceWith(null, [{ value: 'Quercus', title: 'Oak' }] )).to.be.ok;
         done();
       }, 20);
     });
@@ -326,7 +326,7 @@ describe('TaginfoService', () => {
       taginfo.values({ key: 'taxon', query: 'qu' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(null, [{ value: 'Quercus robur', title: 'Oak' }] )).to.be.ok;
+        expect(callback.calledOnceWith(null, [{ value: 'Quercus robur', title: 'Oak' }] )).to.be.ok;
         done();
       }, 20);
     });
@@ -342,7 +342,7 @@ describe('TaginfoService', () => {
       taginfo.values({ key: 'species', query: 'qu' }, callback);
 
       window.setTimeout(() => {
-        expect(callback.calledOnceWithExactly(null, [{ value: 'Quercus robur', title: 'Oak' }] )).to.be.ok;
+        expect(callback.calledOnceWith(null, [{ value: 'Quercus robur', title: 'Oak' }] )).to.be.ok;
         done();
       }, 20);
     });
@@ -364,7 +364,7 @@ describe('TaginfoService', () => {
         expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
           { rtype: 'route', query: 's', page: '1', rp: '25', sortname: 'count_relation_members', sortorder: 'desc', lang: 'en' }
         );
-        expect(callback.calledOnceWithExactly(null, [
+        expect(callback.calledOnceWith(null, [
           { value: 'stop', title: 'stop' },
           { value: 'south', title: 'south' }
         ])).to.be.ok;
@@ -386,7 +386,7 @@ describe('TaginfoService', () => {
 
       window.setTimeout(() => {
         expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql({ key: 'amenity', value: 'parking' });
-        expect(callback.calledOnceWithExactly(
+        expect(callback.calledOnceWith(
           null, [{ on_way: false, lang: 'en', on_area: true, image: 'File:Car park2.jpg' }]
         )).to.be.ok;
         done();

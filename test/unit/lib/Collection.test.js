@@ -60,7 +60,7 @@ describe('Collection', () => {
     it('returns a new collection only containing presets matching a geometry', () => {
       const arr = collection.matchGeometry('area').array;
       assert.includeMembers(arr, [ p.residential, p.park, p.soccer, p.football ]);
-      assert.notIncludeMembers(arr, [ p.grill, p.sandpit,, p.excluded ]);
+      assert.notIncludeMembers(arr, [ p.grill, p.sandpit, p.excluded ]);
     });
   });
 

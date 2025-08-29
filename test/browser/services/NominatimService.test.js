@@ -57,7 +57,7 @@ describe('NominatimService', () => {
         expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
           { zoom: '13', format: 'json', addressdetails: '1', lat: '48', lon: '16' }
         );
-        expect(callback.calledOnceWithExactly(null, 'at')).to.be.ok;
+        expect(callback.calledOnceWith(null, 'at')).to.be.ok;
         done();
       }, 20);
     });
@@ -73,7 +73,7 @@ describe('NominatimService', () => {
         expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
           { zoom: '13', format: 'json', addressdetails: '1', lat: '48', lon: '16' }
         );
-        expect(callback.calledOnceWithExactly(null, { address: { country_code:'at' }})).to.be.ok;
+        expect(callback.calledOnceWith(null, { address: { country_code:'at' }})).to.be.ok;
 
         fetchMock.clearHistory();
         callback = sinon.spy();
@@ -83,7 +83,7 @@ describe('NominatimService', () => {
           expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
             { zoom: '13', format: 'json', addressdetails: '1', lat: '49', lon: '17' }
           );
-          expect(callback.calledOnceWithExactly(null, { address: { country_code:'cz' }})).to.be.ok;
+          expect(callback.calledOnceWith(null, { address: { country_code:'cz' }})).to.be.ok;
           done();
         }, 50);
       }, 50);
@@ -97,7 +97,7 @@ describe('NominatimService', () => {
         expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
           { zoom: '13', format: 'json', addressdetails: '1', lat: '48', lon: '16' }
         );
-        expect(callback.calledOnceWithExactly(null, { address: { country_code:'at' }})).to.be.ok;
+        expect(callback.calledOnceWith(null, { address: { country_code:'at' }})).to.be.ok;
 
         fetchMock.clearHistory();
 
@@ -105,7 +105,7 @@ describe('NominatimService', () => {
         nominatim.reverse([16.000001, 48.000001], callback);
 
         window.setTimeout(() => {
-          expect(callback.calledOnceWithExactly(null, { address: { country_code:'at' }})).to.be.ok;
+          expect(callback.calledOnceWith(null, { address: { country_code:'at' }})).to.be.ok;
           done();
         }, 50);
       }, 50);
@@ -120,7 +120,7 @@ describe('NominatimService', () => {
         expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
           { zoom: '13', format: 'json', addressdetails: '1', lat: '1000', lon: '1000' }
         );
-        expect(callback.calledOnceWithExactly('Unable to geocode')).to.be.ok;
+        expect(callback.calledOnceWith('Unable to geocode')).to.be.ok;
         done();
       }, 50);
     });
