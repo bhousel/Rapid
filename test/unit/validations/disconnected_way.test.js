@@ -6,12 +6,10 @@ import * as Rapid from '../../../modules/headless.js';
 describe('validationDisconnectedWay', () => {
   let graph;
 
-  // class MockEditSystem {
-  //   constructor() {}
-  //   initAsync()   { return Promise.resolve(); }
-  //   get staging() { return { graph: graph }; }
-  //   get tree()    { return tree; }
-  // }
+//  class MockEditSystem extends Rapid.MockSystem {
+//    get staging() { return { graph: graph }; }
+//    get tree()    { return tree; }
+//  }
 
   const context = new Rapid.MockContext();
   context.systems = {

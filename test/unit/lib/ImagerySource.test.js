@@ -1,4 +1,4 @@
-import { afterEach, describe, it } from 'node:test';
+import { /*afterEach,*/ describe, it } from 'node:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import { geoArea as d3_geoArea } from 'd3-geo';

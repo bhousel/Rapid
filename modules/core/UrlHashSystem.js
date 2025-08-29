@@ -104,6 +104,10 @@ export class UrlHashSystem extends AbstractSystem {
     // `leading: false` means that we wait a bit for more updates to sneak in.
     this.deferredUpdateHash = throttle(this._updateHash, 500, { leading: false });
     this.deferredUpdateTitle = throttle(this._updateTitle, 500, { leading: false });
+
+    // Start paused, we will resume after all other components
+    // are started and ready to receive the hashchange event.
+    this.pause();
   }
 
 
@@ -113,9 +117,23 @@ export class UrlHashSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed initialization
    */
   initAsync() {
-    return super.initAsync()
+    if (this._initPromise) return this._initPromise;
+
+    const context = this.context;
+    const editor = context.systems.editor;
+
+    return this._initPromise = super.initAsync()
       .then(() => {
+        // Register event handlers here
+        editor?.on('stablechange', this.deferredUpdateTitle);
+        context.on('modechange', this.deferredUpdateTitle);
         _window.addEventListener('hashchange', this._hashchange);
+
+        // A lot of things will start happening when urlhash emits its
+        // first hashchange event.  Chain off Context's initAsync Promise
+        // to know when everything has started up and it is ok to do this.
+        context.initAsync()
+          .then(() => this.resume());  // Emits 'hashchange'
       });
   }
 
@@ -126,36 +144,7 @@ export class UrlHashSystem extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed startup
    */
   startAsync() {
-    if (this._startPromise) return this._startPromise;
-
-    const context = this.context;
-    const imagery = context.systems.imagery;
-    const editor = context.systems.editor;
-    const l10n = context.systems.l10n;
-    const photos = context.systems.photos;
-    const rapid = context.systems.rapid;
-    const map = context.systems.map;
-    const ui = context.systems.ui;
-
-    const prerequisites = Promise.all([
-      imagery?.startAsync(),
-      editor?.startAsync(),
-      l10n?.startAsync(),
-      map?.startAsync(),
-      photos?.startAsync(),
-      rapid?.startAsync(),
-      ui?.startAsync()
-    ]);
-
-    return this._startPromise = prerequisites
-      .then(() => {
-        // Register event handlers here
-        editor?.on('stablechange', this.deferredUpdateTitle);
-        context.on('modechange', this.deferredUpdateTitle);
-
-        this._started = true;
-        this.resume();  // Emits 'hashchange'
-      });
+    return super.startAsync();
   }
 
 

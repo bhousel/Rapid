@@ -6,9 +6,6 @@ import * as Rapid from '../../../modules/headless.js';
 describe('FilterSystem', () => {
 
   class MockEditSystem extends Rapid.MockSystem {
-    constructor(context) {
-      super(context);
-    }
     get staging() {
       return { graph: new Rapid.Graph(this.context) };
     }

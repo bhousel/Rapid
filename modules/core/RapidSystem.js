@@ -37,7 +37,7 @@ export class RapidSystem extends AbstractSystem {
     super(context);
     this.id = 'rapid';
     this.requiredDependencies = new Set();
-    this.optionalDependencies = new Set(['editor', 'map', 'urlhash']);
+    this.optionalDependencies = new Set(['editor', 'urlhash']);
 
     this.catalog = new Map();             // Map<datasetID, RapidDataset> - all the datasets we know about
     this.categories = new Set();          // Set<string> - all the dataset 'categories' we know about
@@ -70,14 +70,12 @@ export class RapidSystem extends AbstractSystem {
 
     const context = this.context;
     const editor = context.systems.editor;
-    const map = context.systems.map;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
           editor?.initAsync(),
-          map?.initAsync(),   // RapidSystem should listen for hashchange after MapSystem
           urlhash?.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));

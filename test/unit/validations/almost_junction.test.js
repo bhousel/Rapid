@@ -7,9 +7,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe.skip('validationAlmostJunction', () => {
   let graph, tree;
 
-  class MockEditSystem {
-    constructor() {}
-    initAsync()   { return Promise.resolve(); }
+  class MockEditSystem extends Rapid.MockSystem {
     get staging() { return { graph: graph }; }
     get tree()    { return tree; }
   }

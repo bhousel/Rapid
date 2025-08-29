@@ -7,9 +7,7 @@ describe('validationMismatchedGeometry', () => {
   let graph;
   let _savedAreaKeys;
 
-  class MockEditSystem {
-    constructor() {}
-    initAsync()   { return Promise.resolve(); }
+  class MockEditSystem extends Rapid.MockSystem {
     get staging() { return { graph: graph }; }
   }
 

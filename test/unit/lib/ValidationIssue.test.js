@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -8,23 +8,21 @@ describe('ValidationIssue', () => {
     l10n:  new Rapid.LocalizationSystem(context)
   };
 
-  beforeEach(() => {
-    const l10n = context.systems.l10n;
-    l10n.preferredLocaleCodes = 'en';
-    l10n._cache = {
-      en: {
-        core: {
-          issues: {
-            fix: {
-              ignore_issue: {
-                title: 'Ignore Issue'
-              }
+  const l10n = context.systems.l10n;
+  l10n.preferredLocaleCodes = 'en';
+  l10n._cache = {
+    en: {
+      core: {
+        issues: {
+          fix: {
+            ignore_issue: {
+              title: 'Ignore Issue'
             }
           }
         }
       }
-    };
-  });
+    }
+  };
 
 
   it('should construct a ValidationIssue object and test its methods', () => {

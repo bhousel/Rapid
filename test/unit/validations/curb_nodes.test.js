@@ -6,9 +6,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe('validationCurbNodes', () => {
   let graph;
 
-  class MockEditSystem {
-    constructor() {}
-    initAsync()   { return Promise.resolve(); }
+  class MockEditSystem extends Rapid.MockSystem {
     get staging() { return { graph: graph }; }
   }
 

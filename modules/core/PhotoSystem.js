@@ -57,14 +57,12 @@ export class PhotoSystem extends AbstractSystem {
 
     const context = this.context;
     const gfx = context.systems.gfx;
-    const map = context.systems.map;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
           gfx?.initAsync(),   // `gfx.scene` will exist after `initAsync`
-          map?.initAsync(),   // `PhotoSystem` should listen for 'hashchange' after `MapSystem`
           urlhash?.initAsync(),
         ];
         return Promise.all(prerequisites.filter(Boolean));
@@ -535,9 +533,11 @@ export class PhotoSystem extends AbstractSystem {
             }
 
             // Need to zoom out a little to see both things?
-            const needZoom = map.trimmedExtentZoom(extent) - 0.5;  // little extra so the things aren't at the map edges
-            const currZoom = context.viewport.transform.zoom;
-            map?.centerZoomEase(extent.center(), Math.min(needZoom, currZoom));
+            if (map) {
+              const needZoom = map.trimmedExtentZoom(extent) - 0.5;  // little extra so the things aren't at the map edges
+              const currZoom = context.viewport.transform.zoom;
+              map.centerZoomEase(extent.center(), Math.min(needZoom, currZoom));
+            }
           }
 
           // Select the best photo (if any)

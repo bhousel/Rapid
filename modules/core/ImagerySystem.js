@@ -63,7 +63,6 @@ export class ImagerySystem extends AbstractSystem {
     const context = this.context;
     const assets = context.systems.assets;
     const gfx = context.systems.gfx;
-    const map = context.systems.map;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
 
@@ -71,8 +70,7 @@ export class ImagerySystem extends AbstractSystem {
       .then(() => {
         const prerequisites = [
           assets?.initAsync(),
-          gfx?.initAsync(),   // `gfx.scene` will exist after `initAsync`
-          map?.initAsync(),   // `ImagerySystem` should listen for 'hashchange' after `MapSystem`
+          gfx?.initAsync(),      // `gfx.scene` will exist after `initAsync`
           storage?.initAsync(),
           urlhash?.initAsync()
         ];
@@ -86,9 +84,6 @@ export class ImagerySystem extends AbstractSystem {
       .then(() => assets.loadAssetAsync('imagery'))
       .then(data => this._initImageryIndex(data))
       .then(() => this._initWaybackAsync());
-      // .catch(e => {
-        // if (e instanceof Error) console.error(e);  // eslint-disable-line no-console
-      // });
   }
 
 

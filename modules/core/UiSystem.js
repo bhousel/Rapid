@@ -80,10 +80,10 @@ export class UiSystem extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          assets.initAsync(),
-          l10n.initAsync(),
-          gfx.initAsync(),
-          urlhash.initAsync()
+          assets?.initAsync(),
+          l10n?.initAsync(),
+          gfx?.initAsync(),
+          urlhash?.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })

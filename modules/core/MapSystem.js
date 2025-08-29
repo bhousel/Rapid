@@ -80,17 +80,13 @@ export class MapSystem extends AbstractSystem {
     const styles = context.systems.styles;
     const urlhash = context.systems.urlhash;
 
-    // Note: We want MapSystem's hashchange listener registered as early as possible
-    // because so many other parts of Rapid rely on the map location being set correctly.
-    // Other systems should register their hashchange listener after MapSystem.initAsync.
-    urlhash?.on('hashchange', this._hashchange);
-
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
           gfx?.initAsync(),
           l10n?.initAsync(),
           storage?.initAsync(),
+          urlhash?.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })
@@ -102,6 +98,10 @@ export class MapSystem extends AbstractSystem {
         const scene = gfx.scene;
 
         // Setup Event Handlers..
+        // Note: We want MapSystem's hashchange listener registered as early as possible
+        // because so many other parts of Rapid rely on the map location being set correctly.
+        urlhash?.prependListener('hashchange', this._hashchange);
+
         // Forward the 'move' and 'draw' events from the GraphicsSystem
         gfx
           .on('move', () => this.emit('move'))
