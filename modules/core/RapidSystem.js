@@ -36,8 +36,8 @@ export class RapidSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'rapid';
-    this.requiredDependencies = new Set(['editor']);
-    this.optionalDependencies = new Set(['map', 'urlhash']);
+    this.requiredDependencies = new Set();
+    this.optionalDependencies = new Set(['editor', 'map', 'urlhash']);
 
     this.catalog = new Map();             // Map<datasetID, RapidDataset> - all the datasets we know about
     this.categories = new Set();          // Set<string> - all the dataset 'categories' we know about
@@ -322,6 +322,7 @@ export class RapidSystem extends AbstractSystem {
   _stablechange() {
     const context = this.context;
     const editor = context.systems.editor;
+    if (!editor) return;
 
     this.acceptIDs.clear();
     this.ignoreIDs.clear();

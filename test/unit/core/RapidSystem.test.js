@@ -5,9 +5,6 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('RapidSystem', () => {
   const context = new Rapid.MockContext();
-  context.systems = {
-    editor:   new Rapid.MockSystem(context)
-  };
 
   describe('constructor', () => {
     it('constructs an RapidSystem from a context', () => {
