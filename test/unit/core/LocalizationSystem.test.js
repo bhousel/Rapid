@@ -81,7 +81,7 @@ describe('LocalizationSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const l10n = new Rapid.LocalizationSystem(context);
       const prom = l10n.initAsync();
       assert.instanceOf(prom, Promise);

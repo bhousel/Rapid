@@ -19,7 +19,7 @@ describe('SpatialSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const spatial = new Rapid.SpatialSystem(context);
       const prom = spatial.initAsync();
       assert.instanceOf(prom, Promise);

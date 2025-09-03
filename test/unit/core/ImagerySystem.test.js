@@ -24,7 +24,7 @@ describe('ImagerySystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const imagery = new Rapid.ImagerySystem(context);
       const prom = imagery.initAsync();
       assert.instanceOf(prom, Promise);

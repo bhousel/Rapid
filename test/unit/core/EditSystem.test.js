@@ -67,7 +67,7 @@ describe('EditSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const editor = new Rapid.EditSystem(context);
       const prom = editor.initAsync();
       assert.instanceOf(prom, Promise);

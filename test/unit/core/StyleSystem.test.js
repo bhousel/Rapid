@@ -19,7 +19,7 @@ describe('StyleSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const styles = new Rapid.StyleSystem(context);
       const prom = styles.initAsync();
       assert.instanceOf(prom, Promise);

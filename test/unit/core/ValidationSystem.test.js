@@ -28,7 +28,7 @@ describe('ValidationSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const validator = new Rapid.ValidationSystem(context);
       const prom = validator.initAsync();
       assert.instanceOf(prom, Promise);

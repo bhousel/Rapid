@@ -34,7 +34,7 @@ describe('PresetSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const presets = new Rapid.PresetSystem(context);
       const prom = presets.initAsync();
       assert.instanceOf(prom, Promise);

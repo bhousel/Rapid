@@ -1,8 +1,8 @@
 import { Tiler } from '@rapid-sdk/math';
 
-import { AbstractSystem } from '../core/AbstractSystem';
+import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker } from '../models/Marker.js';
-import { utilFetchResponse } from '../util';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 const TILEZOOM = 14;
 const MAPROULETTE_API = 'https://maproulette.org/api/v2';

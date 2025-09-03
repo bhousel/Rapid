@@ -88,8 +88,14 @@ export class OsmService extends AbstractSystem {
     // - If your custom Rapid installation wants to use OSM's dev server 'api06.dev.openstreetmap.org',
     //   you will need to register a custom application on their dev server too.
     // - For more info see:  https://github.com/osmlab/osm-auth?tab=readme-ov-file#registering-an-application
-    let redirect_uri;
-    const origin = window.location.origin;
+    let redirect_uri, origin, pathname;
+    try {
+      origin = window.location.origin;
+      pathname = window.location.pathname;
+    } catch (e) {  // test environment, no window?
+      origin = 'https://127.0.0.1';
+      pathname = '/';
+    }
 
     // Anything served from `https://mapwith.ai` or `https://rapideditor.org`,
     // redirect to the common `/rapid/land.html` on that same origin
@@ -97,13 +103,12 @@ export class OsmService extends AbstractSystem {
       redirect_uri = `${origin}/rapid/land.html`;
 
     // Local testing, redirect to `dist/land.html`
-    } else if (/^https?:\/\/127.0.0.1:8080/i.test(origin)) {
+    } else if (/^https?:\/\/127\.0\.0\.1:?\d*?/i.test(origin)) {
       redirect_uri = `${origin}/dist/land.html`;
 
     // Pick a reasonable default, expect a `land.html` file to exist in the same folder as `index.html`.
     // You'll need to register your own OAuth2 application, our OAuth2 application won't redirect to your origin.
     } else {
-      let pathname = window.location.pathname;
       let path = pathname.split('/');
       if (path.at(-1).includes('.')) {   // looks like a filename, like `index.html`
         path.pop();                      // we want the path without that file
@@ -158,7 +163,7 @@ export class OsmService extends AbstractSystem {
    */
   resetAsync() {
     for (const handle of this._deferred) {
-      window.cancelIdleCallback(handle);
+      globalThis.cancelIdleCallback(handle);
       this._deferred.delete(handle);
     }
 
@@ -366,7 +371,7 @@ export class OsmService extends AbstractSystem {
 
     const resource = this._apiroot + path;
     const controller = new AbortController();
-    const _fetch = this.authenticated() ? this._oauth.fetch : window.fetch;
+    const _fetch = this.authenticated() ? this._oauth.fetch : globalThis.fetch;
 
     _fetch(resource, { signal: controller.signal })
       .then(utilFetchResponse)
@@ -614,7 +619,7 @@ export class OsmService extends AbstractSystem {
 
         // Upload was successful, it is safe to call the callback.
         // Add delay to allow for postgres replication iD#1646 iD#2678
-        window.setTimeout(() => {
+        globalThis.setTimeout(() => {
           this._changeset.openChangesetID = null;
           callback(null, changeset);
         }, 2500);
@@ -1533,7 +1538,7 @@ export class OsmService extends AbstractSystem {
     }
 
     // Defer parsing until later (todo: move all this to a worker)
-    const handle = window.requestIdleCallback(() => {
+    const handle = globalThis.requestIdleCallback(() => {
       this._deferred.delete(handle);
 
       let results = { data: [], seenIDs: new Set() };
@@ -1622,7 +1627,7 @@ export class OsmService extends AbstractSystem {
     }
 
     // Defer parsing until later (todo: move all this to a worker)
-    const handle = window.requestIdleCallback(() => {
+    const handle = globalThis.requestIdleCallback(() => {
       this._deferred.delete(handle);
 
       let results = { data: [], seenIDs: new Set() };

@@ -37,7 +37,7 @@ describe('FilterSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const filters = new Rapid.FilterSystem(context);
       const prom = filters.initAsync();
       assert.instanceOf(prom, Promise);

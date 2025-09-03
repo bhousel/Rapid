@@ -25,7 +25,7 @@ describe('UploaderSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const uploader = new Rapid.UploaderSystem(context);
       const prom = uploader.initAsync();
       assert.instanceOf(prom, Promise);

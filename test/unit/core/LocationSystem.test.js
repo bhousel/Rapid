@@ -47,7 +47,7 @@ describe('LocationSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const locations = new Rapid.LocationSystem(context);
       const prom = locations.initAsync();
       assert.instanceOf(prom, Promise);

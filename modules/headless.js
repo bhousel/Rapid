@@ -3,10 +3,11 @@ export * from './actions/index.js';
 export * from './core/lib/index.js';
 export * from './geo/index.js';
 export * from './models/index.js';
+export * from './services/index.js';
 export * from './util/index.js';
 export * from './validations/index.js';
 
-// These systems can work without browser and UI.
+// These Systems and Services can work without browser and UI.
 export { AbstractSystem } from './core/AbstractSystem.js';
 export { AssetSystem } from './core/AssetSystem.js';
 export { EditSystem } from './core/EditSystem.js';
@@ -24,6 +25,23 @@ export { StyleSystem } from './core/StyleSystem.js';
 export { UploaderSystem } from './core/UploaderSystem.js';
 export { UrlHashSystem } from './core/UrlHashSystem.js';
 export { ValidationSystem } from './core/ValidationSystem.js';
+
+
+// Reexport only what our tests use, see iD#4379
+import * as D3 from 'd3';
+export const d3 = {
+  select: D3.select,
+  polygonArea: D3.polygonArea,
+  polygonCentroid: D3.polygonCentroid,
+  timerFlush: D3.timerFlush
+};
+
+// Reexport the sdk as a single `sdk` namespace.
+// (This works because we know there are no name conflicts)
+import * as SDKMATH from '@rapid-sdk/math';
+import * as SDKUTIL from '@rapid-sdk/util';
+export const sdk = { ...SDKMATH, ...SDKUTIL };
+
 
 // Mocks for testing
 // Headless will not have access to the GraphicsSystem or UiSystem.
@@ -61,6 +79,7 @@ export class MockContext {
   on()          { return this; }
   off()         { return this; }
   keybinding()  { return this._keybinding; }
+  container()   { return d3.select(null); }
   next(which) {
     let num = this.sequences[which] || 0;
     return this.sequences[which] = ++num;
@@ -87,20 +106,6 @@ export class MockGfxSystem extends MockSystem {
   }
 }
 
-
-// Reexport only what our tests use, see iD#4379
-import * as D3 from 'd3';
-export const d3 = {
-  polygonArea: D3.polygonArea,
-  polygonCentroid: D3.polygonCentroid,
-  timerFlush: D3.timerFlush
-};
-
-// Reexport the sdk as a single `sdk` namespace.
-// (This works because we know there are no name conflicts)
-import * as SDKMATH from '@rapid-sdk/math';
-import * as SDKUTIL from '@rapid-sdk/util';
-export const sdk = { ...SDKMATH, ...SDKUTIL };
 
 
 // Polyfill idle callback functions (for Node)

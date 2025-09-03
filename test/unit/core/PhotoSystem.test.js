@@ -20,7 +20,7 @@ describe('PhotoSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const photos = new Rapid.PhotoSystem(context);
       const prom = photos.initAsync();
       assert.instanceOf(prom, Promise);

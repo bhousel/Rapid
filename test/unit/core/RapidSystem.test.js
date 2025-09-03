@@ -19,7 +19,7 @@ describe('RapidSystem', () => {
   });
 
   describe('initAsync', () => {
-    it('returns an promise to init', () => {
+    it('returns a promise to init', () => {
       const rapid = new Rapid.RapidSystem(context);
       const prom = rapid.initAsync();
       assert.instanceOf(prom, Promise);
