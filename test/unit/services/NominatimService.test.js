@@ -1,40 +1,43 @@
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('NominatimService', () => {
+  // Setup context
   const context = new Rapid.MockContext();
   let nominatim;
 
-  beforeEach(() => {
-    fetchMock.hardReset();
-
+  // Setup FetchMock
+  before(() => {
     fetchMock
       .mockGlobal()
-      .route(/reverse\?.*lat=48&lon=16/, {
+      .sticky(/reverse\?.*lat=48&lon=16/, {
         body: '{"address":{"country_code":"at"}}',
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      .route(/reverse\?.*lat=49&lon=17/, {
+      .sticky(/reverse\?.*lat=49&lon=17/, {
         body: '{"address":{"country_code":"cz"}}',
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      .route(/reverse\?.*lat=1000&lon=1000/, {
+      .sticky(/reverse\?.*lat=1000&lon=1000/, {
         body: '{"error":"Unable to geocode"}',
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
-
-    nominatim = new Rapid.NominatimService(context);
-    return nominatim.initAsync();
   });
 
-  afterEach(() => {
-    fetchMock.hardReset();
+  after(() => {
+    fetchMock.hardReset({ includeSticky: true });
+  });
+
+  beforeEach(() => {
+    fetchMock.removeRoutes().clearHistory();
+    nominatim = new Rapid.NominatimService(context);
+    return nominatim.initAsync();
   });
 
 

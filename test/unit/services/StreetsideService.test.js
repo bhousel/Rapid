@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('StreetsideService', () => {
+  // Setup context
   const context = new Rapid.MockContext();
   context.systems = {
     assets:  new Rapid.MockSystem(context),
@@ -15,16 +16,23 @@ describe('StreetsideService', () => {
 
   let _streetside;
 
+  // Setup FetchMock
+  before(() => {
+    fetchMock.mockGlobal();
+  });
+
+  after(() => {
+    fetchMock.hardReset({ includeSticky: true });
+  });
+
   beforeEach(() => {
-    fetchMock.hardReset();
+    fetchMock.removeRoutes().clearHistory();
+
     context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
     context.viewport.dimensions = [64, 64];
     _streetside = new Rapid.StreetsideService(context);
   });
 
-  afterEach(() => {
-    fetchMock.hardReset();
-  });
 
   describe('constructor', () => {
     it('constructs a StreetsideService from a context', () => {

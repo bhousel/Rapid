@@ -6,27 +6,26 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('TaginfoService', () => {
+  // Setup context
   const context = new Rapid.MockContext();
 
+  // Setup FetchMock
   before(() => {
-    fetchMock.hardReset().mockGlobal();
+    fetchMock
+      .mockGlobal()
+      // This matches the query run in `startAsync()` to get the list of popular keys.
+      .sticky(/\/keys\/all.*sortname=values_all/, {
+        body: '{"data":[{"count_all":56136034,"key":"name","count_all_fraction":0.0132}]}',
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
   });
 
   after(() => {
-    fetchMock.hardReset();
+    fetchMock.hardReset({ includeSticky: true });
   });
 
   beforeEach(() => {
-    fetchMock.removeRoutes().clearHistory()
-      // This matches the query run in `startAsync()` to get the list of popular keys.
-     .route(/\/keys\/all.*sortname=values_all/, {
-       body: '{"data":[{"count_all":56136034,"key":"name","count_all_fraction":0.0132}]}',
-       status: 200,
-       headers: { 'Content-Type': 'application/json' }
-     });
-  });
-
-  afterEach(() => {
     fetchMock.removeRoutes().clearHistory();
   });
 

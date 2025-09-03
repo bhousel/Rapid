@@ -1,4 +1,3 @@
-import { select } from 'd3-selection';
 import { Extent, Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
@@ -37,7 +36,7 @@ export class EsriService extends AbstractSystem {
     this.optionalDependencies = new Set(['gfx', 'locations']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM);
-    this._datasets = {};
+    this._datasets = new Map();  // Map<datasetID, Object>
 
     this._datasetsPromise = null;
   }
@@ -73,7 +72,7 @@ export class EsriService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
-    for (const [datasetID, ds] of Object.entries(this._datasets)) {
+    for (const [datasetID, ds] of this._datasets) {
       for (const controller of ds.cache.inflight.values()) {
         controller.abort();
       }
@@ -98,10 +97,10 @@ export class EsriService extends AbstractSystem {
    * @return  {Array<RapidDataset>}  The datasets this service provides
    */
   getAvailableDatasets() {
-    // Convert the internal datasets into "Rapid" datasets for the catalog.
+    // Convert the internal dataset objects into "Rapid" datasets for the catalog.
     // We expect them to be all loaded now because `_loadDatasetsAsync` is called by `initAsync`
     //  and `getAvailableDatasets` is called by RapidSystem's `startAsync`.
-    return Object.values(this._datasets).map(d => {
+    return [...this._datasets.values()].map(d => {
       // gather categories
       const categories = new Set(['esri']);
       for (const c of d.groupCategories) {
@@ -139,11 +138,11 @@ export class EsriService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @param   {string}  datasetID - datasetID to get data for
-   * @return  {Array}   Array of data (OSM Entities)
+   * @param   {string}         datasetID - datasetID to get data for
+   * @return  {Array<Entity>}  Array of data (OSM Entities)
    */
   getData(datasetID) {
-    const ds = this._datasets[datasetID];
+    const ds = this._datasets.get(datasetID);
     if (!ds || !ds.tree || !ds.graph) return [];
 
     const extent = this.context.viewport.visibleExtent();
@@ -158,7 +157,7 @@ export class EsriService extends AbstractSystem {
    * @return  {Graph?}  The graph holding the data, or `undefined` if not found
    */
   graph(datasetID)  {
-    const ds = this._datasets[datasetID];
+    const ds = this._datasets.get(datasetID);
     return ds?.graph;
   }
 
@@ -190,7 +189,7 @@ export class EsriService extends AbstractSystem {
   loadTiles(datasetID) {
     if (this._paused) return;
 
-    const ds = this._datasets[datasetID];
+    const ds = this._datasets.get(datasetID);
     if (!ds)  {
       throw new Error(`Unknown datasetID: ${datasetID}`);
     }
@@ -244,7 +243,7 @@ export class EsriService extends AbstractSystem {
   /**
    * _loadDatasetsAsync
    * Loads all the available datasets from the Esri server
-   * @return  {Promise}  Promise resolved when all pages of data have been loaded
+   * @return  {Promise}  Promise resolved when all pages of datasets have been loaded
    */
   _loadDatasetsAsync() {
     if (this._datasetsPromise) return this._datasetsPromise;
@@ -281,9 +280,9 @@ export class EsriService extends AbstractSystem {
    * @param  {Object}  ds - the dataset metadata
    */
   _parseDataset(ds) {
-    if (this._datasets[ds.id]) return;  // unless we've seen it already
+    if (this._datasets.has(ds.id)) return;  // unless we've seen it already
 
-    this._datasets[ds.id] = ds;
+    this._datasets.set(ds.id, ds);
     ds.graph = new Graph(this.context);
     ds.tree = new Tree(ds.graph, ds.id);
     ds.cache = {
@@ -294,13 +293,15 @@ export class EsriService extends AbstractSystem {
     ds.lastv = null;
     ds.layer = null;   // the schema info will live here
 
-    // Cleanup the `licenseInfo` field by removing styles  (not used currently)
-    const license = select(document.createElement('div'));
-    license.html(ds.licenseInfo);       // set innerHtml
-    license.selectAll('*')
-      .attr('style', null)
-      .attr('size', null);
-    ds.license_html = license.html();   // get innerHtml
+    // Experiment: cleanup the `licenseInfo` field by removing styles. (not used currently)
+    // We had consider showing these to the user, but they could instead click "more info"
+    // and see all of this information and more on the ArcGIS page.
+    //  const license = select(document.createElement('div'));
+    //  license.html(ds.licenseInfo);       // set innerHtml
+    //  license.selectAll('*')
+    //    .attr('style', null)
+    //    .attr('size', null);
+    //  ds.license_html = license.html();   // get innerHtml
   }
 
 

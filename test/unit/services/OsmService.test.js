@@ -6,17 +6,23 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('OsmService', () => {
+  // Setup context
   const context = new Rapid.MockContext();
   context.systems = {
     spatial: new Rapid.SpatialSystem(context)
   };
 
+  // Setup FetchMock
   before(() => {
-    fetchMock.hardReset().mockGlobal();
+    fetchMock.mockGlobal();
   });
 
   after(() => {
-    fetchMock.hardReset();
+    fetchMock.hardReset({ includeSticky: true });
+  });
+
+  beforeEach(() => {
+    fetchMock.removeRoutes().clearHistory();
   });
 
 

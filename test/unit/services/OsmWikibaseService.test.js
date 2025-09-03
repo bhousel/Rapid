@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { promisify } from 'node:util';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
@@ -6,15 +6,22 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('OsmWikibaseService', () => {
+  // Setup context
   const context = new Rapid.MockContext();
 
-  beforeEach(() => {
-    fetchMock.hardReset();
+  // Setup FetchMock
+  before(() => {
+    fetchMock.mockGlobal();
   });
 
-  afterEach(() => {
-    fetchMock.hardReset();
+  after(() => {
+    fetchMock.hardReset({ includeSticky: true });
   });
+
+  beforeEach(() => {
+    fetchMock.removeRoutes().clearHistory();
+  });
+
 
   describe('constructor', () => {
     it('constructs an OsmWikibaseService from a context', () => {

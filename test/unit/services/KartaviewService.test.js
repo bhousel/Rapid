@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('KartaviewService', () => {
+  // Setup context
   const context = new Rapid.MockContext();
   context.systems = {
     l10n:    new Rapid.MockSystem(context),
@@ -14,15 +15,21 @@ describe('KartaviewService', () => {
 
   let _kartaview;
 
+  // Setup FetchMock
+  before(() => {
+    fetchMock.mockGlobal();
+  });
+
+  after(() => {
+    fetchMock.hardReset({ includeSticky: true });
+  });
+
   beforeEach(() => {
-    fetchMock.hardReset();
+    fetchMock.removeRoutes().clearHistory();
+
     context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
     context.viewport.dimensions = [64, 64];
     _kartaview = new Rapid.KartaviewService(context);
-  });
-
-  afterEach(() => {
-    fetchMock.hardReset();
   });
 
 
