@@ -5,70 +5,70 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('AssetSystem', () => {
+  // Setup context..
   const context = new Rapid.MockContext();
 
+  // Test construction and startup of the system..
+  describe('lifecycle', () => {
+    describe('constructor', () => {
+      it('constructs an AssetSystem from a context', () => {
+        const assets = new Rapid.AssetSystem(context);
+        assert.instanceOf(assets, Rapid.AssetSystem);
+        assert.strictEqual(assets.id, 'assets');
+        assert.strictEqual(assets.context, context);
+        assert.instanceOf(assets.requiredDependencies, Set);
+        assert.instanceOf(assets.optionalDependencies, Set);
+        assert.isTrue(assets.autoStart);
 
-  describe('constructor', () => {
-    it('constructs an AssetSystem from a context', () => {
-      const assets = new Rapid.AssetSystem(context);
-      assert.instanceOf(assets, Rapid.AssetSystem);
-      assert.strictEqual(assets.id, 'assets');
-      assert.strictEqual(assets.context, context);
-      assert.instanceOf(assets.requiredDependencies, Set);
-      assert.instanceOf(assets.optionalDependencies, Set);
-      assert.isTrue(assets.autoStart);
+        assert.isObject(assets.sources);
+        assert.hasAllKeys(assets.sources, ['latest', 'local']);
+        assert.strictEqual(assets.origin, 'latest');
+        assert.strictEqual(assets.filePath, '');
+        assert.deepEqual(assets.fileReplacements, {});
 
-      assert.isObject(assets.sources);
-      assert.hasAllKeys(assets.sources, ['latest', 'local']);
-      assert.strictEqual(assets.origin, 'latest');
-      assert.strictEqual(assets.filePath, '');
-      assert.deepEqual(assets.fileReplacements, {});
-
-      assert.isObject(assets._cache);
-      assert.isObject(assets._inflight);
-    });
-  });
-
-  describe('initAsync', () => {
-    it('returns a promise to init', () => {
-      const assets = new Rapid.AssetSystem(context);
-      const prom = assets.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(true))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+        assert.isObject(assets._cache);
+        assert.isObject(assets._inflight);
+      });
     });
 
-    it('rejects if a dependency is missing', () => {
-      const assets = new Rapid.AssetSystem(context);
-      assets.requiredDependencies.add('missing');
-      const prom = assets.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /cannot init/i));
-    });
-  });
+    describe('initAsync', () => {
+      it('returns a promise to init', () => {
+        const assets = new Rapid.AssetSystem(context);
+        const prom = assets.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(true));
+      });
 
-  describe('startAsync', () => {
-    it('returns a promise to start', () => {
-      const assets = new Rapid.AssetSystem(context);
-      const prom = assets.initAsync().then(() => assets.startAsync());
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(assets.started))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+      it('rejects if a dependency is missing', () => {
+        const assets = new Rapid.AssetSystem(context);
+        assets.requiredDependencies.add('missing');
+        const prom = assets.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /cannot init/i));
+      });
     });
-  });
 
-  describe('resetAsync', () => {
-    it('returns a promise to reset', () => {
-      const assets = new Rapid.AssetSystem(context);
-      const prom = assets.resetAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(true))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+    describe('startAsync', () => {
+      it('returns a promise to start', () => {
+        const assets = new Rapid.AssetSystem(context);
+        const prom = assets.initAsync().then(() => assets.startAsync());
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(assets.started));
+      });
+    });
+
+    describe('resetAsync', () => {
+      it('returns a promise to reset', () => {
+        const assets = new Rapid.AssetSystem(context);
+        const prom = assets.resetAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(true));
+      });
     });
   });
 
@@ -110,15 +110,13 @@ describe('AssetSystem', () => {
   });
 
 
+  // Test an already-constructed instance of the system..
   describe('methods', () => {
     let _assets;
 
-    // init and start
     before(() => {
       _assets = new Rapid.AssetSystem(context);
-      return Promise.resolve()
-        .then(() => _assets.initAsync())
-        .then(() => _assets.startAsync());
+      return _assets.initAsync().then(() => _assets.startAsync());
     });
 
     describe('getFileURL', () => {

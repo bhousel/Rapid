@@ -1,15 +1,19 @@
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
 
-describe('NominatimService', () => {
-  // Setup context
-  const context = new Rapid.MockContext();
-  let nominatim;
+function parseQueryString(url) {
+  return Rapid.sdk.utilStringQs(url.substring(url.indexOf('?')));
+}
 
-  // Setup FetchMock
+
+describe('NominatimService', () => {
+  // Setup context..
+  const context = new Rapid.MockContext();
+
+  // Setup fetchMock..
   before(() => {
     fetchMock
       .mockGlobal()
@@ -36,71 +40,78 @@ describe('NominatimService', () => {
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    nominatim = new Rapid.NominatimService(context);
-    return nominatim.initAsync();
   });
 
 
-  function parseQueryString(url) {
-    return Rapid.sdk.utilStringQs(url.substring(url.indexOf('?')));
-  }
+  // Test construction and startup of the service..
+  describe('lifecycle', () => {
+    describe('constructor', () => {
+      it('constructs a NominatimService from a context', () => {
+        const nominatim = new Rapid.NominatimService(context);
+        assert.instanceOf(nominatim, Rapid.NominatimService);
+        assert.strictEqual(nominatim.id, 'nominatim');
+        assert.strictEqual(nominatim.context, context);
+        assert.instanceOf(nominatim.requiredDependencies, Set);
+        assert.instanceOf(nominatim.optionalDependencies, Set);
+        assert.isTrue(nominatim.autoStart);
 
-  describe('constructor', () => {
-    it('constructs a NominatimService from a context', () => {
-      const nominatim = new Rapid.NominatimService(context);
-      assert.instanceOf(nominatim, Rapid.NominatimService);
-      assert.strictEqual(nominatim.id, 'nominatim');
-      assert.strictEqual(nominatim.context, context);
-      assert.instanceOf(nominatim.requiredDependencies, Set);
-      assert.instanceOf(nominatim.optionalDependencies, Set);
-      assert.isTrue(nominatim.autoStart);
+        assert.deepEqual(nominatim._inflight, {});
+      });
+    });
 
-      assert.deepEqual(nominatim._inflight, {});
+    describe('initAsync', () => {
+      it('returns a promise to init', () => {
+        const nominatim = new Rapid.NominatimService(context);
+        const prom = nominatim.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(true));
+      });
+
+      it('rejects if a dependency is missing', () => {
+        const nominatim = new Rapid.NominatimService(context);
+        nominatim.requiredDependencies.add('missing');
+        const prom = nominatim.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /cannot init/i));
+      });
+    });
+
+    describe('startAsync', () => {
+      it('returns a promise to start', () => {
+        const nominatim = new Rapid.NominatimService(context);
+        const prom = nominatim.initAsync().then(() => nominatim.startAsync());
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(nominatim.started));
+      });
+    });
+
+    describe('resetAsync', () => {
+      it('returns a promise to reset', () => {
+        const nominatim = new Rapid.NominatimService(context);
+        const prom = nominatim.resetAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(true));
+      });
     });
   });
 
-  describe('initAsync', () => {
-    it('returns a promise to init', () => {
-      const nominatim = new Rapid.NominatimService(context);
-      const prom = nominatim.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(true))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+
+  // Test an already-constructed instance of the service..
+  describe('methods', () => {
+    let _nominatim;
+
+    before(() => {
+      _nominatim = new Rapid.NominatimService(context);
+      return _nominatim.initAsync().then(() => _nominatim.startAsync());
     });
 
-    it('rejects if a dependency is missing', () => {
-      const nominatim = new Rapid.NominatimService(context);
-      nominatim.requiredDependencies.add('missing');
-      const prom = nominatim.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /cannot init/i));
-    });
   });
 
-  describe('startAsync', () => {
-    it('returns a promise to start', () => {
-      const nominatim = new Rapid.NominatimService(context);
-      const prom = nominatim.initAsync().then(() => nominatim.startAsync());
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(nominatim.started))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
-
-  describe('resetAsync', () => {
-    it('returns a promise to reset', () => {
-      const nominatim = new Rapid.NominatimService(context);
-      const prom = nominatim.resetAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(true))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
 
 //
 //  describe('countryCode', () => {

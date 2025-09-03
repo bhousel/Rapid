@@ -1,11 +1,11 @@
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('StreetsideService', () => {
-  // Setup context
+  // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
     assets:  new Rapid.MockSystem(context),
@@ -14,9 +14,7 @@ describe('StreetsideService', () => {
     spatial: new Rapid.SpatialSystem(context)
   };
 
-  let _streetside;
-
-  // Setup FetchMock
+  // Setup fetchMock..
   before(() => {
     fetchMock.mockGlobal();
   });
@@ -27,79 +25,96 @@ describe('StreetsideService', () => {
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-
-    context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
-    context.viewport.dimensions = [64, 64];
-    _streetside = new Rapid.StreetsideService(context);
   });
 
 
-  describe('constructor', () => {
-    it('constructs a StreetsideService from a context', () => {
-      const streetside = new Rapid.StreetsideService(context);
-      assert.instanceOf(streetside, Rapid.StreetsideService);
-      assert.strictEqual(streetside.id, 'streetside');
-      assert.strictEqual(streetside.context, context);
-      assert.instanceOf(streetside.requiredDependencies, Set);
-      assert.instanceOf(streetside.optionalDependencies, Set);
-      assert.isFalse(streetside.autoStart);
+  // Test construction and startup of the service..
+  describe('lifecycle', () => {
+    describe('constructor', () => {
+      it('constructs a StreetsideService from a context', () => {
+        const streetside = new Rapid.StreetsideService(context);
+        assert.instanceOf(streetside, Rapid.StreetsideService);
+        assert.strictEqual(streetside.id, 'streetside');
+        assert.strictEqual(streetside.context, context);
+        assert.instanceOf(streetside.requiredDependencies, Set);
+        assert.instanceOf(streetside.optionalDependencies, Set);
+        assert.isFalse(streetside.autoStart);
 
-      assert.deepEqual(streetside._cache, {});
+        assert.deepEqual(streetside._cache, {});
+      });
+    });
+
+    describe('initAsync', () => {
+      it('returns a promise to init', () => {
+        const streetside = new Rapid.StreetsideService(context);
+        const prom = streetside.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            const cache = streetside._cache;
+            assert.instanceOf(cache.inflight, Map);
+            assert.isEmpty(cache.inflight);
+            assert.isNull(cache.lastv);
+          });
+      });
+
+      it('rejects if a dependency is missing', () => {
+        const streetside = new Rapid.StreetsideService(context);
+        streetside.requiredDependencies.add('missing');
+        const prom = streetside.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /cannot init/i));
+      });
+    });
+
+    describe('startAsync', () => {
+      it('returns a promise to start', () => {
+        const streetside = new Rapid.StreetsideService(context);
+        const prom = streetside.initAsync().then(() => streetside.startAsync());
+        assert.instanceOf(prom, Promise);
+        return prom
+  // for now, expect this to fail when run headlessly
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /document is not defined/i));
+  //        .then(val => assert.isTrue(streetside.started));
+      });
+    });
+
+    describe('resetAsync', () => {
+      it('returns a promise to reset', () => {
+        const streetside = new Rapid.StreetsideService(context);
+        streetside._cache = {};
+        const prom = streetside.resetAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            const cache = streetside._cache;
+            assert.instanceOf(cache.inflight, Map);
+            assert.isEmpty(cache.inflight);
+            assert.isNull(cache.lastv);
+          });
+      });
     });
   });
 
-  describe('initAsync', () => {
-    it('returns a promise to init', () => {
-      const streetside = new Rapid.StreetsideService(context);
-      const prom = streetside.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          const cache = streetside._cache;
-          assert.instanceOf(cache.inflight, Map);
-          assert.isEmpty(cache.inflight);
-          assert.isNull(cache.lastv);
-        });
+
+  // Test an already-constructed instance of the service..
+  describe('methods', () => {
+    let _streetside;
+
+    before(() => {
+      _streetside = new Rapid.StreetsideService(context);
+      return _streetside.initAsync();
+        //.then(() => _streetside.startAsync());
+        // for now, expect start to fail when run headlessly
     });
 
-    it('rejects if a dependency is missing', () => {
-      const streetside = new Rapid.StreetsideService(context);
-      streetside.requiredDependencies.add('missing');
-      const prom = streetside.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /cannot init/i));
-    });
-  });
-
-  describe('startAsync', () => {
-    it('returns a promise to start', () => {
-      const streetside = new Rapid.StreetsideService(context);
-      const prom = streetside.initAsync().then(() => streetside.startAsync());
-      assert.instanceOf(prom, Promise);
-      return prom
-// for now, expect this to fail when run headlessly
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /document is not defined/i));
-//        .then(val => assert.isTrue(streetside.started))
-//        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
-
-  describe('resetAsync', () => {
-    it('returns a promise to reset', () => {
-      const streetside = new Rapid.StreetsideService(context);
-      streetside._cache = {};
-      const prom = streetside.resetAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          const cache = streetside._cache;
-          assert.instanceOf(cache.inflight, Map);
-          assert.isEmpty(cache.inflight);
-          assert.isNull(cache.lastv);
-        });
+    beforeEach(() => {
+      // reset viewport
+      context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
+      context.viewport.dimensions = [64, 64];
     });
   });
 

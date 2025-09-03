@@ -1,15 +1,20 @@
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import { promisify } from 'node:util';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
 
+function parseQueryString(url) {
+  return Rapid.sdk.utilStringQs(url.substring(url.indexOf('?')));
+}
+
+
 describe('OsmWikibaseService', () => {
-  // Setup context
+  // Setup context..
   const context = new Rapid.MockContext();
 
-  // Setup FetchMock
+  // Setup fetchMock..
   before(() => {
     fetchMock.mockGlobal();
   });
@@ -23,67 +28,69 @@ describe('OsmWikibaseService', () => {
   });
 
 
-  describe('constructor', () => {
-    it('constructs an OsmWikibaseService from a context', () => {
-      const wikibase = new Rapid.OsmWikibaseService(context);
-      assert.instanceOf(wikibase, Rapid.OsmWikibaseService);
-      assert.strictEqual(wikibase.id, 'osmwikibase');
-      assert.strictEqual(wikibase.context, context);
-      assert.instanceOf(wikibase.requiredDependencies, Set);
-      assert.instanceOf(wikibase.optionalDependencies, Set);
-      assert.isTrue(wikibase.autoStart);
+  // Test construction and startup of the service..
+  describe('lifecycle', () => {
+    describe('constructor', () => {
+      it('constructs an OsmWikibaseService from a context', () => {
+        const wikibase = new Rapid.OsmWikibaseService(context);
+        assert.instanceOf(wikibase, Rapid.OsmWikibaseService);
+        assert.strictEqual(wikibase.id, 'osmwikibase');
+        assert.strictEqual(wikibase.context, context);
+        assert.instanceOf(wikibase.requiredDependencies, Set);
+        assert.instanceOf(wikibase.optionalDependencies, Set);
+        assert.isTrue(wikibase.autoStart);
 
-      assert.instanceOf(wikibase._inflight, Map);
+        assert.instanceOf(wikibase._inflight, Map);
+      });
+    });
+
+    describe('initAsync', () => {
+      it('returns a promise to init', () => {
+        const wikibase = new Rapid.OsmWikibaseService(context);
+        const prom = wikibase.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(true));
+      });
+
+      it('rejects if a dependency is missing', () => {
+        const wikibase = new Rapid.OsmWikibaseService(context);
+        wikibase.requiredDependencies.add('missing');
+        const prom = wikibase.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /cannot init/i));
+      });
+    });
+
+    describe('startAsync', () => {
+      it('returns a promise to start', () => {
+        const wikibase = new Rapid.OsmWikibaseService(context);
+        const prom = wikibase.initAsync().then(() => wikibase.startAsync());
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(wikibase.started));
+      });
+    });
+
+    describe('resetAsync', () => {
+      it('returns a promise to reset', () => {
+        const wikibase = new Rapid.OsmWikibaseService(context);
+        const prom = wikibase.resetAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(true));
+      });
     });
   });
 
-  describe('initAsync', () => {
-    it('returns a promise to init', () => {
-      const wikibase = new Rapid.OsmWikibaseService(context);
-      const prom = wikibase.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(true))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
 
-    it('rejects if a dependency is missing', () => {
-      const wikibase = new Rapid.OsmWikibaseService(context);
-      wikibase.requiredDependencies.add('missing');
-      const prom = wikibase.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /cannot init/i));
-    });
-  });
-
-  describe('startAsync', () => {
-    it('returns a promise to start', () => {
-      const wikibase = new Rapid.OsmWikibaseService(context);
-      const prom = wikibase.initAsync().then(() => wikibase.startAsync());
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(wikibase.started))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
-
-  describe('resetAsync', () => {
-    it('returns a promise to reset', () => {
-      const wikibase = new Rapid.OsmWikibaseService(context);
-      const prom = wikibase.resetAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(true))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
-
-
+  // Test an already-constructed instance of the service..
   describe('methods', () => {
     let _wikibase;
-    beforeEach(() => {
+
+    before(() => {
       _wikibase = new Rapid.OsmWikibaseService(context);
       return _wikibase.initAsync().then(() => _wikibase.startAsync());
     });
@@ -94,7 +101,6 @@ describe('OsmWikibaseService', () => {
         const getEntity = promisify(_wikibase.getEntity).bind(_wikibase);
 
         fetchMock
-          .mockGlobal()
           .route(/action=wbgetentities/, {
             body: JSON.stringify({
               entities: {
@@ -123,8 +129,7 @@ describe('OsmWikibaseService', () => {
 
             assert.deepEqual(lastCall, expected);
             assert.deepEqual(data, { key: keyData(), tag: tagData() });
-          })
-          .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
+          });
       });
     });
 
@@ -161,11 +166,6 @@ describe('OsmWikibaseService', () => {
 
   });
 
-
-
-  function parseQueryString(url) {
-    return Rapid.sdk.utilStringQs(url.substring(url.indexOf('?')));
-  }
 
   function keyData() {
     return {

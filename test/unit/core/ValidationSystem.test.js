@@ -4,6 +4,7 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('ValidationSystem', () => {
+  // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
     assets:     new Rapid.AssetSystem(context),
@@ -15,68 +16,70 @@ describe('ValidationSystem', () => {
     storage:    new Rapid.StorageSystem(context)
   };
 
-  describe('constructor', () => {
-    it('constructs an ValidationSystem from a context', () => {
-      const validator = new Rapid.ValidationSystem(context);
-      assert.instanceOf(validator, Rapid.ValidationSystem);
-      assert.strictEqual(validator.id, 'validator');
-      assert.strictEqual(validator.context, context);
-      assert.instanceOf(validator.requiredDependencies, Set);
-      assert.instanceOf(validator.optionalDependencies, Set);
-      assert.isTrue(validator.autoStart);
+  // Test construction and startup of the system..
+  describe('lifecycle', () => {
+    describe('constructor', () => {
+      it('constructs an ValidationSystem from a context', () => {
+        const validator = new Rapid.ValidationSystem(context);
+        assert.instanceOf(validator, Rapid.ValidationSystem);
+        assert.strictEqual(validator.id, 'validator');
+        assert.strictEqual(validator.context, context);
+        assert.instanceOf(validator.requiredDependencies, Set);
+        assert.instanceOf(validator.optionalDependencies, Set);
+        assert.isTrue(validator.autoStart);
+      });
+    });
+
+    describe('initAsync', () => {
+      it('returns a promise to init', () => {
+        const validator = new Rapid.ValidationSystem(context);
+        const prom = validator.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(true));
+      });
+
+      it('rejects if a dependency is missing', () => {
+        const validator = new Rapid.ValidationSystem(context);
+        validator.requiredDependencies.add('missing');
+        const prom = validator.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /cannot init/i));
+      });
+    });
+
+    describe('startAsync', () => {
+      it('returns a promise to start', () => {
+        const validator = new Rapid.ValidationSystem(context);
+        const prom = validator.initAsync().then(() => validator.startAsync());
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(validator.started));
+      });
+    });
+
+    describe('resetAsync', () => {
+      it('returns a promise to reset', () => {
+        const validator = new Rapid.ValidationSystem(context);
+        const prom = validator.resetAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(true));
+      });
     });
   });
 
-  describe('initAsync', () => {
-    it('returns a promise to init', () => {
-      const validator = new Rapid.ValidationSystem(context);
-      const prom = validator.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(true))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
 
-    it('rejects if a dependency is missing', () => {
-      const validator = new Rapid.ValidationSystem(context);
-      validator.requiredDependencies.add('missing');
-      const prom = validator.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /cannot init/i));
-    });
-  });
-
-  describe('startAsync', () => {
-    it('returns a promise to start', () => {
-      const validator = new Rapid.ValidationSystem(context);
-      const prom = validator.initAsync().then(() => validator.startAsync());
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(validator.started))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
-
-  describe('resetAsync', () => {
-    it('returns a promise to reset', () => {
-      const validator = new Rapid.ValidationSystem(context);
-      const prom = validator.resetAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(true))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
-
-
+  // Test an already-constructed instance of the system..
   describe('methods', () => {
     let _validator;
 
     before(() => {
       _validator = new Rapid.ValidationSystem(context);
       return _validator.initAsync()
+        .then(() => _validator.startAsync())
         .then(() => {
           // For now just run the one rule we are testing.
           // Otherwise we need to mock out anything used by any validator.

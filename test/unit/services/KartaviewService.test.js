@@ -1,11 +1,11 @@
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('KartaviewService', () => {
-  // Setup context
+  // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
     l10n:    new Rapid.MockSystem(context),
@@ -13,9 +13,7 @@ describe('KartaviewService', () => {
     spatial: new Rapid.SpatialSystem(context)
   };
 
-  let _kartaview;
-
-  // Setup FetchMock
+  // Setup fetchMock..
   before(() => {
     fetchMock.mockGlobal();
   });
@@ -26,82 +24,100 @@ describe('KartaviewService', () => {
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-
-    context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
-    context.viewport.dimensions = [64, 64];
-    _kartaview = new Rapid.KartaviewService(context);
   });
 
 
-  describe('constructor', () => {
-    it('constructs a KartaviewService from a context', () => {
-      const kartaview = new Rapid.KartaviewService(context);
-      assert.instanceOf(kartaview, Rapid.KartaviewService);
-      assert.strictEqual(kartaview.id, 'kartaview');
-      assert.strictEqual(kartaview.context, context);
-      assert.instanceOf(kartaview.requiredDependencies, Set);
-      assert.instanceOf(kartaview.optionalDependencies, Set);
-      assert.isFalse(kartaview.autoStart);
+  // Test construction and startup of the service..
+  describe('lifecycle', () => {
+    describe('constructor', () => {
+      it('constructs a KartaviewService from a context', () => {
+        const kartaview = new Rapid.KartaviewService(context);
+        assert.instanceOf(kartaview, Rapid.KartaviewService);
+        assert.strictEqual(kartaview.id, 'kartaview');
+        assert.strictEqual(kartaview.context, context);
+        assert.instanceOf(kartaview.requiredDependencies, Set);
+        assert.instanceOf(kartaview.optionalDependencies, Set);
+        assert.isFalse(kartaview.autoStart);
 
-      assert.deepEqual(kartaview._cache, {});
+        assert.deepEqual(kartaview._cache, {});
+      });
+    });
+
+    describe('initAsync', () => {
+      it('returns a promise to init', () => {
+        const kartaview = new Rapid.KartaviewService(context);
+        const prom = kartaview.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            const cache = kartaview._cache;
+            assert.instanceOf(cache.inflight, Map);
+            assert.instanceOf(cache.nextPage, Map);
+            assert.isEmpty(cache.inflight);
+            assert.isEmpty(cache.nextPage);
+            assert.isNull(cache.lastv);
+          });
+      });
+
+      it('rejects if a dependency is missing', () => {
+        const kartaview = new Rapid.KartaviewService(context);
+        kartaview.requiredDependencies.add('missing');
+        const prom = kartaview.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /cannot init/i));
+      });
+    });
+
+    describe('startAsync', () => {
+      it('returns a promise to start', () => {
+        const kartaview = new Rapid.KartaviewService(context);
+        const prom = kartaview.initAsync().then(() => kartaview.startAsync());
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(kartaview.started));
+      });
+    });
+
+    describe('resetAsync', () => {
+      it('returns a promise to reset', () => {
+        const kartaview = new Rapid.KartaviewService(context);
+        kartaview._cache = {};
+        const prom = kartaview.resetAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            const cache = kartaview._cache;
+            assert.instanceOf(cache.inflight, Map);
+            assert.instanceOf(cache.nextPage, Map);
+            assert.isEmpty(cache.inflight);
+            assert.isEmpty(cache.nextPage);
+            assert.isNull(cache.lastv);
+          });
+      });
     });
   });
 
-  describe('initAsync', () => {
-    it('returns a promise to init', () => {
-      const kartaview = new Rapid.KartaviewService(context);
-      const prom = kartaview.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          const cache = kartaview._cache;
-          assert.instanceOf(cache.inflight, Map);
-          assert.instanceOf(cache.nextPage, Map);
-          assert.isEmpty(cache.inflight);
-          assert.isEmpty(cache.nextPage);
-          assert.isNull(cache.lastv);
-        });
+
+  // Test an already-constructed instance of the service..
+  describe('methods', () => {
+    let _kartaview;
+
+    before(() => {
+      _kartaview = new Rapid.KartaviewService(context);
+      return _kartaview.initAsync().then(() => _kartaview.startAsync());
     });
 
-    it('rejects if a dependency is missing', () => {
-      const kartaview = new Rapid.KartaviewService(context);
-      kartaview.requiredDependencies.add('missing');
-      const prom = kartaview.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /cannot init/i));
+    beforeEach(() => {
+      // reset viewport
+      context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
+      context.viewport.dimensions = [64, 64];
     });
+
   });
 
-  describe('startAsync', () => {
-    it('returns a promise to start', () => {
-      const kartaview = new Rapid.KartaviewService(context);
-      const prom = kartaview.initAsync().then(() => kartaview.startAsync());
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(kartaview.started))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
 
-  describe('resetAsync', () => {
-    it('returns a promise to reset', () => {
-      const kartaview = new Rapid.KartaviewService(context);
-      kartaview._cache = {};
-      const prom = kartaview.resetAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          const cache = kartaview._cache;
-          assert.instanceOf(cache.inflight, Map);
-          assert.instanceOf(cache.nextPage, Map);
-          assert.isEmpty(cache.inflight);
-          assert.isEmpty(cache.nextPage);
-          assert.isNull(cache.lastv);
-        });
-    });
-  });
 //
 //  describe('loadTiles', () => {
 //    it('fires loadedData when tiles are loaded', done => {

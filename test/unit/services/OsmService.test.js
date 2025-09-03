@@ -6,15 +6,21 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('OsmService', () => {
-  // Setup context
+  // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
     spatial: new Rapid.SpatialSystem(context)
   };
 
-  // Setup FetchMock
+  // Setup fetchMock..
   before(() => {
-    fetchMock.mockGlobal();
+    fetchMock.mockGlobal()
+      .sticky(/api\/capabilities\.json/, {
+        status: 200, body: capabilitiesJSON, headers: { 'Content-Type': 'application/json' }
+      })
+      .sticky(/api\/capabilities(?!\.json)/, {
+        status: 200, body: capabilitiesXML, headers: { 'Content-Type': 'application/xml' }
+      });
   });
 
   after(() => {
@@ -26,113 +32,115 @@ describe('OsmService', () => {
   });
 
 
-  describe('constructor', () => {
-    it('constructs an OsmService from a context', () => {
-      const osm = new Rapid.OsmService(context);
-      assert.instanceOf(osm, Rapid.OsmService);
-      assert.strictEqual(osm.id, 'osm');
-      assert.strictEqual(osm.context, context);
-      assert.instanceOf(osm.requiredDependencies, Set);
-      assert.instanceOf(osm.optionalDependencies, Set);
-      assert.isTrue(osm.autoStart);
+  // Test construction and startup of the service..
+  describe('lifecycle', () => {
+    describe('constructor', () => {
+      it('constructs an OsmService from a context', () => {
+        const osm = new Rapid.OsmService(context);
+        assert.instanceOf(osm, Rapid.OsmService);
+        assert.strictEqual(osm.id, 'osm');
+        assert.strictEqual(osm.context, context);
+        assert.instanceOf(osm.requiredDependencies, Set);
+        assert.instanceOf(osm.optionalDependencies, Set);
+        assert.isTrue(osm.autoStart);
 
-      assert.deepEqual(osm._tileCache, {});
-      assert.deepEqual(osm._noteCache, {});
-      assert.deepEqual(osm._userCache, {});
-      assert.strictEqual(osm.connectionID, 0);
+        assert.deepEqual(osm._tileCache, {});
+        assert.deepEqual(osm._noteCache, {});
+        assert.deepEqual(osm._userCache, {});
+        assert.strictEqual(osm.connectionID, 0);
+      });
+    });
+
+    describe('initAsync', () => {
+      it('returns a promise to init', () => {
+        const osm = new Rapid.OsmService(context);
+        const prom = osm.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            assert.instanceOf(osm._tileCache.toLoad, Set);
+            assert.instanceOf(osm._noteCache.toLoad, Set);
+            assert.instanceOf(osm._userCache.toLoad, Set);
+            assert.isAbove(osm.connectionID, 0);
+          });
+      });
+
+      it('rejects if a dependency is missing', () => {
+        const osm = new Rapid.OsmService(context);
+        osm.requiredDependencies.add('missing');
+        const prom = osm.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /cannot init/i));
+      });
+    });
+
+    describe('startAsync', () => {
+      it('returns a promise to start', () => {
+        const osm = new Rapid.OsmService(context);
+        const prom = osm.initAsync().then(() => osm.startAsync());
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.isTrue(osm.started));
+      });
+    });
+
+    describe('resetAsync', () => {
+      it('returns a promise to reset', () => {
+        const osm = new Rapid.OsmService(context);
+        osm._tileCache = {};
+        osm._noteCache = {};
+        osm._userCache = {};
+
+        const prom = osm.resetAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            assert.instanceOf(osm._tileCache.toLoad, Set);
+            assert.instanceOf(osm._noteCache.toLoad, Set);
+            assert.instanceOf(osm._userCache.toLoad, Set);
+          });
+      });
+    });
+
+    describe('switchAsync', () => {
+      it('returns a promise to switch connection and reset', () => {
+        const osm = new Rapid.OsmService(context);
+        const opts = {
+          url: 'https://www.example.com',
+          apiUrl: 'https://api.example.com'
+        };
+
+        const prom = osm.switchAsync(opts);
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            assert.strictEqual(osm.wwwroot, 'https://www.example.com');
+          });
+      });
+
+      it('emits a change event', () => {
+        const osm = new Rapid.OsmService(context);
+        const spyAuthChange = mock.fn();
+        osm.on('authchange', spyAuthChange);
+        const opts = {
+          url: 'https://www.example.com',
+          apiUrl: 'https://api.example.com'
+        };
+
+        const prom = osm.switchAsync(opts);
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            assert.strictEqual(spyAuthChange.mock.callCount(), 1);
+          });
+      });
     });
   });
 
-  describe('initAsync', () => {
-    it('returns a promise to init', () => {
-      const osm = new Rapid.OsmService(context);
-      const prom = osm.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          assert.instanceOf(osm._tileCache.toLoad, Set);
-          assert.instanceOf(osm._noteCache.toLoad, Set);
-          assert.instanceOf(osm._userCache.toLoad, Set);
-          assert.isAbove(osm.connectionID, 0);
-        });
-    });
 
-    it('rejects if a dependency is missing', () => {
-      const osm = new Rapid.OsmService(context);
-      osm.requiredDependencies.add('missing');
-      const prom = osm.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /cannot init/i));
-    });
-  });
-
-  describe('startAsync', () => {
-    it('returns a promise to start', () => {
-      const osm = new Rapid.OsmService(context);
-      const prom = osm.initAsync().then(() => osm.startAsync());
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.isTrue(osm.started))
-        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
-
-  describe('resetAsync', () => {
-    it('returns a promise to reset', () => {
-      const osm = new Rapid.OsmService(context);
-      osm._tileCache = {};
-      osm._noteCache = {};
-      osm._userCache = {};
-
-      const prom = osm.resetAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          assert.instanceOf(osm._tileCache.toLoad, Set);
-          assert.instanceOf(osm._noteCache.toLoad, Set);
-          assert.instanceOf(osm._userCache.toLoad, Set);
-        });
-    });
-  });
-
-
-  describe('switchAsync', () => {
-    it('returns a promise to switch connection and reset', () => {
-      const osm = new Rapid.OsmService(context);
-      const opts = {
-        url: 'https://www.example.com',
-        apiUrl: 'https://api.example.com'
-      };
-
-      const prom = osm.switchAsync(opts);
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          assert.strictEqual(osm.wwwroot, 'https://www.example.com');
-        });
-    });
-
-    it('emits a change event', () => {
-      const osm = new Rapid.OsmService(context);
-      const spyAuthChange = mock.fn();
-      osm.on('authchange', spyAuthChange);
-      const opts = {
-        url: 'https://www.example.com',
-        apiUrl: 'https://api.example.com'
-      };
-
-      const prom = osm.switchAsync(opts);
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          assert.strictEqual(spyAuthChange.mock.callCount(), 1);
-        });
-    });
-  });
-
-
+  // Test an already-constructed instance of the service..
   describe('methods', () => {
     let _osm;
 
@@ -147,9 +155,7 @@ describe('OsmService', () => {
     }
 
     beforeEach(() => {
-      fetchMock.removeRoutes().clearHistory()
-        .route(/api\/capabilities\.json/, { status: 200, body: capabilitiesJSON, headers: { 'Content-Type': 'application/json' } })
-        .route(/api\/capabilities(?!\.json)/, { status: 200, body: capabilitiesXML, headers: { 'Content-Type': 'application/xml' } })
+      fetchMock
         .route(/user\/details\.json/, { status: 200, body: userJSON, headers: { 'Content-Type': 'application/json' } })
         .route(/changesets\.json/, { status: 200, body: changesetJSON, headers: { 'Content-Type': 'application/json' } });
 
@@ -159,7 +165,6 @@ describe('OsmService', () => {
 
     afterEach(() => {
       _osm.throttledReloadApiStatus.cancel();
-      fetchMock.removeRoutes().clearHistory();
     });
 
 
@@ -267,7 +272,7 @@ describe('OsmService', () => {
         return loadFromAPI(path)
           .then(result => {
             assert.isObject(result);
-          })
+          });
       });
 
       it('retries an authenticated call unauthenticated if 400 Bad Request', () => {

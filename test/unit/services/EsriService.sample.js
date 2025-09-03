@@ -1,3 +1,5 @@
+/* eslint-disable quotes */
+
 export const datasetsPage1 = {
   "total": 198,
   "start": 1,
@@ -4186,7 +4188,7 @@ export const datasetsPage1 = {
       "scoreCompleteness": 100
     }
   ]
-}
+};
 
 export const datasetsPage2 = {
   "total": 198,

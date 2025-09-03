@@ -1,11 +1,11 @@
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('MapillaryService', () => {
-  // Setup context
+  // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
     l10n:    new Rapid.MockSystem(context),
@@ -13,9 +13,7 @@ describe('MapillaryService', () => {
     spatial: new Rapid.SpatialSystem(context)
   };
 
-  let _mapillary;
-
-  // Setup FetchMock
+  // Setup fetchMock..
   before(() => {
     fetchMock.mockGlobal();
   });
@@ -26,89 +24,105 @@ describe('MapillaryService', () => {
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
+  });
 
-    context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
-    context.viewport.dimensions = [64, 64];
-    _mapillary = new Rapid.MapillaryService(context);
+
+  // Test construction and startup of the service..
+  describe('lifecycle', () => {
+    describe('constructor', () => {
+      it('constructs a MapillaryService from a context', () => {
+        const mapillary = new Rapid.MapillaryService(context);
+        assert.instanceOf(mapillary, Rapid.MapillaryService);
+        assert.strictEqual(mapillary.id, 'mapillary');
+        assert.strictEqual(mapillary.context, context);
+        assert.instanceOf(mapillary.requiredDependencies, Set);
+        assert.instanceOf(mapillary.optionalDependencies, Set);
+        assert.isFalse(mapillary.autoStart);
+
+        assert.deepEqual(mapillary._cache, {});
+      });
+    });
+
+    describe('initAsync', () => {
+      it('returns a promise to init', () => {
+        const mapillary = new Rapid.MapillaryService(context);
+        const prom = mapillary.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            const cache = mapillary._cache;
+            assert.instanceOf(cache.inflight, Map);
+            assert.isEmpty(cache.inflight);
+            assert.isNull(cache.images.lastv);
+            assert.isNull(cache.detections.lastv);
+            assert.isNull(cache.signs.lastv);
+          });
+      });
+
+      it('rejects if a dependency is missing', () => {
+        const mapillary = new Rapid.MapillaryService(context);
+        mapillary.requiredDependencies.add('missing');
+        const prom = mapillary.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /cannot init/i));
+      });
+    });
+
+    describe('startAsync', () => {
+      it('returns a promise to start', () => {
+        const mapillary = new Rapid.MapillaryService(context);
+        const prom = mapillary.initAsync().then(() => mapillary.startAsync());
+        assert.instanceOf(prom, Promise);
+        return prom
+  // for now, expect this to fail when run headlessly
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /document is not defined/i));
+  //        .then(val => assert.isTrue(mapillary.started));
+      });
+    });
+
+    describe('resetAsync', () => {
+      it('returns a promise to reset', () => {
+        const mapillary = new Rapid.MapillaryService(context);
+        mapillary._cache = {};
+        const prom = mapillary.resetAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            const cache = mapillary._cache;
+            assert.instanceOf(cache.inflight, Map);
+            assert.isEmpty(cache.inflight);
+            assert.isNull(cache.images.lastv);
+            assert.isNull(cache.detections.lastv);
+            assert.isNull(cache.signs.lastv);
+          });
+      });
+    });
+  });
+
+
+  // Test an already-constructed instance of the service..
+  describe('methods', () => {
+    let _mapillary;
+
+    before(() => {
+      _mapillary = new Rapid.MapillaryService(context);
 //    // Mock function for retrieving tile data.. The original expects a protobuffer vector tile.
 //    _mapillary._loadTileDataToCache = () => { };
-//    return _mapillary.initAsync();
-  });
 
-
-  describe('constructor', () => {
-    it('constructs a MapillaryService from a context', () => {
-      const mapillary = new Rapid.MapillaryService(context);
-      assert.instanceOf(mapillary, Rapid.MapillaryService);
-      assert.strictEqual(mapillary.id, 'mapillary');
-      assert.strictEqual(mapillary.context, context);
-      assert.instanceOf(mapillary.requiredDependencies, Set);
-      assert.instanceOf(mapillary.optionalDependencies, Set);
-      assert.isFalse(mapillary.autoStart);
-
-      assert.deepEqual(mapillary._cache, {});
-    });
-  });
-
-  describe('initAsync', () => {
-    it('returns a promise to init', () => {
-      const mapillary = new Rapid.MapillaryService(context);
-      const prom = mapillary.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          const cache = mapillary._cache;
-          assert.instanceOf(cache.inflight, Map);
-          assert.isEmpty(cache.inflight);
-          assert.isNull(cache.images.lastv);
-          assert.isNull(cache.detections.lastv);
-          assert.isNull(cache.signs.lastv);
-        });
+      return _mapillary.initAsync();
+        //.then(() => _mapillary.startAsync());
+        // for now, expect start to fail when run headlessly
     });
 
-    it('rejects if a dependency is missing', () => {
-      const mapillary = new Rapid.MapillaryService(context);
-      mapillary.requiredDependencies.add('missing');
-      const prom = mapillary.initAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /cannot init/i));
+    beforeEach(() => {
+      // reset viewport
+      context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
+      context.viewport.dimensions = [64, 64];
     });
   });
-
-  describe('startAsync', () => {
-    it('returns a promise to start', () => {
-      const mapillary = new Rapid.MapillaryService(context);
-      const prom = mapillary.initAsync().then(() => mapillary.startAsync());
-      assert.instanceOf(prom, Promise);
-      return prom
-// for now, expect this to fail when run headlessly
-        .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-        .catch(err => assert.match(err, /document is not defined/i));
-//        .then(val => assert.isTrue(mapillary.started))
-//        .catch(err => assert.fail(`Promise was rejected but should have been fulfilled: ${err}`));
-    });
-  });
-
-  describe('resetAsync', () => {
-    it('returns a promise to reset', () => {
-      const mapillary = new Rapid.MapillaryService(context);
-      mapillary._cache = {};
-      const prom = mapillary.resetAsync();
-      assert.instanceOf(prom, Promise);
-      return prom
-        .then(() => {
-          const cache = mapillary._cache;
-          assert.instanceOf(cache.inflight, Map);
-          assert.isEmpty(cache.inflight);
-          assert.isNull(cache.images.lastv);
-          assert.isNull(cache.detections.lastv);
-          assert.isNull(cache.signs.lastv);
-        });
-    });
-  });
-
 
   //
 //
