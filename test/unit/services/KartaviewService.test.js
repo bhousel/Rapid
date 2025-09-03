@@ -1,7 +1,8 @@
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it, mock } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
+import * as sample from './KartaviewService.sample.js';
 
 
 describe('KartaviewService', () => {
@@ -113,183 +114,101 @@ describe('KartaviewService', () => {
       // reset viewport
       context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       context.viewport.dimensions = [64, 64];
+      _kartaview.removeAllListeners();
+      return _kartaview.resetAsync();
+    });
+
+
+    describe('loadTiles', () => {
+      it('fires loadedData when tiles are loaded', (t, done) => {
+        fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
+
+        const spyLoadedData = mock.fn();
+        _kartaview.on('loadedData', spyLoadedData);
+
+        globalThis.setTimeout(() => {
+          assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
+          assert.lengthOf(spyLoadedData.mock.calls, 1);       // loadedData emitted once
+
+          const spatial = context.systems.spatial;
+          assert.isTrue(spatial.hasTileAtLoc('kartaview-images', [10, 0]));  // tile is loaded here
+          done();
+        }, 10);
+
+        _kartaview.loadTiles();
+      });
+
+      it('does not load tiles around Null Island', (t, done) => {
+        context.viewport.transform.translation = [0, 0];  // move map to Null Island
+        fetchMock.route(/nearby-photos/, sample.nearbyPhotos0);
+
+        const spyLoadedData = mock.fn();
+        _kartaview.on('loadedData', spyLoadedData);
+
+        globalThis.setTimeout(() => {
+          assert.lengthOf(fetchMock.callHistory.calls(), 0);  // fetch not called
+          assert.lengthOf(spyLoadedData.mock.calls, 0);       // loadedData not emitted
+
+          const spatial = context.systems.spatial;
+          assert.isFalse(spatial.hasTileAtLoc('kartaview-images', [0, 0]));  // tile is not loaded here
+          done();
+        }, 10);
+
+        _kartaview.loadTiles();
+      });
+    });
+
+
+    describe('getImages', () => {
+      beforeEach(() => {
+        // load the images
+        fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
+        return new Promise(resolve => {
+          _kartaview.on('loadedData', () => resolve());
+          _kartaview.loadTiles();
+        });
+      });
+
+      it('returns images in the visible map area', () => {
+        const result = _kartaview.getImages();
+        assert.isArray(result);
+        assert.lengthOf(result, 3);
+
+        const m1 = result[0];
+        assert.instanceOf(m1, Rapid.Marker);
+        assert.strictEqual(m1.id, '1');
+
+        const m2 = result[1];
+        assert.instanceOf(m2, Rapid.Marker);
+        assert.strictEqual(m2.id, '2');
+
+        const m3 = result[2];
+        assert.instanceOf(m3, Rapid.Marker);
+        assert.strictEqual(m3.id, '3');
+      });
+    });
+
+
+    describe('getSequences', () => {
+      beforeEach(() => {
+        // load the images
+        fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
+        return new Promise(resolve => {
+          _kartaview.on('loadedData', () => resolve());
+          _kartaview.loadTiles();
+        });
+      });
+
+      it('returns sequences in the visible map area', () => {
+        const result = _kartaview.getSequences();
+        assert.isArray(result);
+        assert.lengthOf(result, 1);
+
+        const s1 = result[0];
+        assert.instanceOf(s1, Rapid.GeoJSON);
+        assert.strictEqual(s1.id, '100');
+      });
     });
 
   });
-
-
-//
-//  describe('loadTiles', () => {
-//    it('fires loadedData when tiles are loaded', done => {
-//      const nearbyResponse = {
-//        status: { apiCode: '600', httpCode: 200, httpMessage: 'Success' },
-//        currentPageItems:[{
-//          id: '1',
-//          sequence_id: '100',
-//          sequence_index: '1',
-//          lat: '0',
-//          lng: '10.001',
-//          shot_date: '2017-09-24 23:58:07',
-//          heading: '90',
-//          username: 'test'
-//        }, {
-//          id: '2',
-//          sequence_id: '100',
-//          sequence_index: '2',
-//          lat: '0',
-//          lng: '10.002',
-//          shot_date: '2017-09-24 23:58:07',
-//          heading: '90',
-//          username: 'test'
-//        }, {
-//          id: '3',
-//          sequence_id: '100',
-//          sequence_index: '3',
-//          lat: '0',
-//          lng: '10.003',
-//          shot_date: '2017-09-24 23:58:07',
-//          heading: '90',
-//          username: 'test'
-//        }],
-//        totalFilteredItems: ['3']
-//      };
-//
-//      fetchMock.route(/nearby-photos/, {
-//        body: JSON.stringify(nearbyResponse),
-//        status: 200,
-//        headers: { 'Content-Type': 'application/json' }
-//      });
-//
-//      _kartaview.on('loadedData', () => {
-//        expect(fetchMock.callHistory.calls().length).to.eql(1);  // after /photo/?sequenceId=100
-//        done();
-//      });
-//
-//      _kartaview.loadTiles();
-//    });
-//
-//
-//    it('does not load tiles around Null Island', done => {
-//      const nearbyResponse = {
-//        status: { apiCode: '600', httpCode: 200, httpMessage: 'Success' },
-//        currentPageItems:[{
-//          id: '1',
-//          sequence_id: '100',
-//          sequence_index: '1',
-//          lat: '0',
-//          lng: '0.001',
-//          shot_date: '2017-09-24 23:58:07',
-//          heading: '90',
-//          username: 'test'
-//        }, {
-//          id: '2',
-//          sequence_id: '100',
-//          sequence_index: '2',
-//          lat: '0',
-//          lng: '0.002',
-//          shot_date: '2017-09-24 23:58:07',
-//          heading: '90',
-//          username: 'test'
-//        }, {
-//          id: '3',
-//          sequence_id: '100',
-//          sequence_index: '3',
-//          lat: '0',
-//          lng: '0.003',
-//          shot_date: '2017-09-24 23:58:07',
-//          heading: '90',
-//          username: 'test'
-//        }],
-//        totalFilteredItems: ['3']
-//      };
-//
-//      fetchMock.route(/nearby-photos/, {
-//        body: JSON.stringify(nearbyResponse),
-//        status: 200,
-//        headers: { 'Content-Type': 'application/json' }
-//      });
-//
-//      const spy = sinon.spy();
-//
-//      _kartaview.context.viewport.transform.translation = [0, 0];  // move map to Null Island
-//      _kartaview.on('loadedData', spy);
-//      _kartaview.loadTiles();
-//
-//      window.setTimeout(() => {
-//        expect(spy.notCalled).to.be.ok;
-//        expect(fetchMock.callHistory.calls().length).to.eql(0);   // no tile requests of any kind
-//        done();
-//      }, 20);
-//    });
-//  });
-//
-//
-//  describe('getImages', () => {
-//    it('returns images in the visible map area', () => {
-//      const photos = [
-//        new Rapid.Marker(context, { type: 'photo', id: '0', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 0 }),
-//        new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 1 }),
-//        new Rapid.Marker(context, { type: 'photo', id: '2', loc: [10,1], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 2 })
-//      ];
-//      const boxes = [
-//        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: photos[0] },
-//        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: photos[1] },
-//        { minX: 10, minY: 1, maxX: 10, maxY: 1, data: photos[2] }
-//      ];
-//
-//      const cache = _kartaview._cache;
-//      for (const d of photos) {
-//        cache.images.set(d.id, d);
-//      }
-//      cache.rbush.load(boxes);
-//
-//      const result = _kartaview.getImages();
-//      expect(result).to.deep.eql([photos[0], photos[1]]);
-//    });
-//  });
-//
-//
-//  describe('getSequences', () => {
-//    it('returns sequence linestrings in the visible map area', () => {
-//      const photos = [
-//        new Rapid.Marker(context, { type: 'photo', id: '0', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 0 }),
-//        new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10,0], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 1 }),
-//        new Rapid.Marker(context, { type: 'photo', id: '2', loc: [10,1], ca: 90, isPano: false, sequenceID: '100', sequenceIndex: 2 })
-//      ];
-//      const boxes = [
-//        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: photos[0] },
-//        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: photos[1] },
-//        { minX: 10, minY: 1, maxX: 10, maxY: 1, data: photos[2] }
-//      ];
-//
-//      const sequence = new Rapid.GeoJSON(context, {
-//        type: 'Feature',
-//        id: '100',
-//        properties: {
-//          type: 'sequence',
-//          serviceID: 'kartaview',
-//          id: '100',
-//          rotation: 0,
-//          isPano: false,
-//          images: [ photos[0], photos[1], photos[2] ],
-//          v: 1
-//        },
-//        geometry: {
-//          type: 'LineString',
-//          coordinates: [ [10,0], [10,0], [10,1] ],
-//        }
-//      });
-//
-//      const cache = _kartaview._cache;
-//      for (const d of photos) {
-//        cache.images.set(d.id, d);
-//      }
-//      cache.rbush.load(boxes);
-//      cache.sequences.set(sequence.id, sequence);
-//
-//      const result = _kartaview.getSequences();
-//      expect(result).to.deep.eql([sequence]);
-//    });
-//  });
-
 });

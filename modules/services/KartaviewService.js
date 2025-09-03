@@ -525,6 +525,7 @@ export class KartaviewService extends AbstractSystem {
             return image?.loc;
           }).filter(Boolean);
           sequence.updateGeometry().touch();
+          spatial.replaceData('kartaview-sequences', sequence);
         }
 
         gfx?.deferredRedraw();
@@ -607,6 +608,7 @@ export class KartaviewService extends AbstractSystem {
           return image?.loc;
         }).filter(Boolean);
         sequence.updateGeometry().touch();
+        spatial.replaceData('kartaview-sequences', sequence);
 
         gfx?.deferredRedraw();
         this.emit('loadedData');
