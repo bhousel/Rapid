@@ -123,103 +123,81 @@ describe('KartaviewService', () => {
       // reset viewport
       context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       context.viewport.dimensions = [64, 64];
-      _kartaview.removeAllListeners();
       return _kartaview.resetAsync();
     });
 
 
     describe('loadTiles', () => {
-      it('fires loadedData when tiles are loaded', (t, done) => {
+      it('loads a tile of data and requests a redraw', (t, done) => {
         fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
-
-        const spyLoadedData = mock.fn();
-        _kartaview.on('loadedData', spyLoadedData);
-
-        globalThis.setTimeout(() => {
+        _kartaview.loadTiles();
+        setImmediate(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
           assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
-          assert.lengthOf(spyLoadedData.mock.calls, 1);       // loadedData emitted once
 
           const spatial = context.systems.spatial;
           assert.isTrue(spatial.hasTileAtLoc('kartaview-images', [10, 0]));  // tile is loaded here
           done();
-        }, 10);
-
-        _kartaview.loadTiles();
+        });
       });
 
       it('does not load tiles around Null Island', (t, done) => {
         context.viewport.transform.translation = [0, 0];  // move map to Null Island
         fetchMock.route(/nearby-photos/, sample.nearbyPhotos0);
-
-        const spyLoadedData = mock.fn();
-        _kartaview.on('loadedData', spyLoadedData);
-
-        globalThis.setTimeout(() => {
+        _kartaview.loadTiles();
+        setImmediate(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 0);  // fetch not called
           assert.lengthOf(spyRedraw.mock.calls, 0);           // redraw not called
-          assert.lengthOf(spyLoadedData.mock.calls, 0);       // loadedData not emitted
 
           const spatial = context.systems.spatial;
           assert.isFalse(spatial.hasTileAtLoc('kartaview-images', [0, 0]));  // tile is not loaded here
           done();
-        }, 10);
+        });
+      });
+    });
 
+
+    describe('with data loaded', () => {
+      beforeEach(() => {
+        // load the images around [10°, 0°]
+        // (this needs to be beforeEach because the parent beforeEach resets)
+        fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
         _kartaview.loadTiles();
+        return new Promise(resolve => setImmediate(resolve));
       });
-    });
 
+      describe('getImages', () => {
+        it('returns images in the visible map area', () => {
+          const result = _kartaview.getImages();
+          assert.isArray(result);
+          assert.lengthOf(result, 3);
 
-    describe('getImages', () => {
-      beforeEach(() => {
-        // load the images
-        fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
-        return new Promise(resolve => {
-          _kartaview.on('loadedData', () => resolve());
-          _kartaview.loadTiles();
+          const m1 = result[0];
+          assert.instanceOf(m1, Rapid.Marker);
+          assert.strictEqual(m1.id, '1');
+
+          const m2 = result[1];
+          assert.instanceOf(m2, Rapid.Marker);
+          assert.strictEqual(m2.id, '2');
+
+          const m3 = result[2];
+          assert.instanceOf(m3, Rapid.Marker);
+          assert.strictEqual(m3.id, '3');
         });
       });
 
-      it('returns images in the visible map area', () => {
-        const result = _kartaview.getImages();
-        assert.isArray(result);
-        assert.lengthOf(result, 3);
+      describe('getSequences', () => {
+        it('returns sequences in the visible map area', () => {
+          const result = _kartaview.getSequences();
+          assert.isArray(result);
+          assert.lengthOf(result, 1);
 
-        const m1 = result[0];
-        assert.instanceOf(m1, Rapid.Marker);
-        assert.strictEqual(m1.id, '1');
-
-        const m2 = result[1];
-        assert.instanceOf(m2, Rapid.Marker);
-        assert.strictEqual(m2.id, '2');
-
-        const m3 = result[2];
-        assert.instanceOf(m3, Rapid.Marker);
-        assert.strictEqual(m3.id, '3');
-      });
-    });
-
-
-    describe('getSequences', () => {
-      beforeEach(() => {
-        // load the images
-        fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
-        return new Promise(resolve => {
-          _kartaview.on('loadedData', () => resolve());
-          _kartaview.loadTiles();
+          const s1 = result[0];
+          assert.instanceOf(s1, Rapid.GeoJSON);
+          assert.strictEqual(s1.id, '100');
         });
       });
 
-      it('returns sequences in the visible map area', () => {
-        const result = _kartaview.getSequences();
-        assert.isArray(result);
-        assert.lengthOf(result, 1);
-
-        const s1 = result[0];
-        assert.instanceOf(s1, Rapid.GeoJSON);
-        assert.strictEqual(s1.id, '100');
-      });
     });
-
   });
 });

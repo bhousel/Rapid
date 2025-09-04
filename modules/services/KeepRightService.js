@@ -45,9 +45,6 @@ KR_COLORS.set('400', 0xcc3355);
  * This service connects to the KeepRight API to fetch detected QA issues.
  * @see https://wiki.openstreetmap.org/wiki/Keep_Right
  * @see https://keepright.at/interfacing.php
- *
- * Events available:
- *   `loadedData`
  */
 export class KeepRightService extends AbstractSystem {
 
@@ -297,9 +294,7 @@ export class KeepRightService extends AbstractSystem {
       spatial.addData('keepright', new Marker(context, props));
     }
 
-
     gfx?.deferredRedraw();
-    this.emit('loadedData');
   }
 
 

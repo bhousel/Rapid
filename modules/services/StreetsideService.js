@@ -27,7 +27,6 @@ const TILEZOOM = 16.5;
  *   `imageChanged`   - fired when a new image is visible in the viewer
  *   `bearingChanged` - fired when the viewer has been panned, receives the bearing value in degrees.
  *   `fovChanged`     - fired when the viewer has been zoomed, receives the fov value in degrees.
- *   'loadedData'
  */
 export class StreetsideService extends AbstractSystem {
 
@@ -760,7 +759,6 @@ export class StreetsideService extends AbstractSystem {
     }
 
     gfx?.deferredRedraw();
-    this.emit('loadedData');
   }
 
 

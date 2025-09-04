@@ -20,9 +20,6 @@ import { utilFetchResponse } from '../util/index.js';
  *   'authLoading'
  *   'authDone'
  *   'authchange'
- *   'loading'
- *   'loaded'
- *   'loadedNotes'
  */
 export class OsmService extends AbstractSystem {
 
@@ -854,11 +851,7 @@ export class OsmService extends AbstractSystem {
     const tiles = this._tiler.zoomRange(this._tileZoom).getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const hadRequests = this._hasInflightRequests(cache);
     this._abortUnwantedRequests(cache, tiles);
-    if (hadRequests && !this._hasInflightRequests(cache)) {
-      this.emit('loaded');    // stop the spinner
-    }
 
     // Issue new requests..
     for (const tile of tiles) {
@@ -955,10 +948,6 @@ export class OsmService extends AbstractSystem {
       }
     }
 
-    if (!this._hasInflightRequests(cache)) {
-      this.emit('loading');   // start the spinner
-    }
-
     const gotTile = (err, results) => {
       delete cache.inflight[tile.id];
       if (!err) {
@@ -967,9 +956,6 @@ export class OsmService extends AbstractSystem {
       }
       if (callback) {
         callback(err, Object.assign({}, results, { tile: tile }));
-      }
-      if (!this._hasInflightRequests(cache)) {
-        this.emit('loaded');     // stop the spinner
       }
     };
 
@@ -1079,7 +1065,6 @@ export class OsmService extends AbstractSystem {
           }
           // deferLoadUsers();
           gfx?.deferredRedraw();
-          that.emit('loadedNotes');
         },
         options
       );
@@ -1096,7 +1081,6 @@ export class OsmService extends AbstractSystem {
       }
       const gfx = this.context.systems.gfx;
       gfx?.deferredRedraw();
-      this.emit('loadedNotes');
     };
 
     this.loadFromAPI(
@@ -1134,7 +1118,6 @@ export class OsmService extends AbstractSystem {
         } else {
           const gfx = this.context.systems.gfx;
           gfx?.deferredRedraw();
-          this.emit('loadedNotes');
           return callback(null, results.data[0]);
         }
       }, options);
@@ -1207,7 +1190,6 @@ export class OsmService extends AbstractSystem {
         } else {
           const gfx = this.context.systems.gfx;
           gfx?.deferredRedraw();
-          this.emit('loadedNotes');
           return callback(null, results.data[0]);
         }
       }, options);
@@ -1402,11 +1384,6 @@ export class OsmService extends AbstractSystem {
     if (controller) {
       controller.abort();
     }
-  }
-
-
-  _hasInflightRequests(cache) {
-    return Object.keys(cache.inflight).length;
   }
 
 

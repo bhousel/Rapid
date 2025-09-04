@@ -24,9 +24,6 @@ import { utilFetchResponse } from '../util/index.js';
  * - Protomaps .pmtiles single-file archive containing MVT
  *    https://protomaps.com/docs/pmtiles
  *    https://github.com/protomaps/PMTiles
- *
- * Events available:
- *   'loadedData'
  */
 export class VectorTileService extends AbstractSystem {
 
@@ -394,7 +391,6 @@ export class VectorTileService extends AbstractSystem {
       this._cacheFeatures(cache, newFeatures);
       const gfx = this.context.systems.gfx;
       gfx?.deferredRedraw();
-      this.emit('loadedData');
     }
   }
 

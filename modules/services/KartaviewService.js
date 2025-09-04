@@ -26,7 +26,6 @@ const TILEZOOM = 14;
  *
  * Events available:
  *   `imageChanged`
- *   `loadedData`
  */
 export class KartaviewService extends AbstractSystem {
 
@@ -529,7 +528,6 @@ export class KartaviewService extends AbstractSystem {
         }
 
         gfx?.deferredRedraw();
-        this.emit('loadedData');
 
         if (data.length === MAXRESULTS) {
           cache.nextPage.set(tile.origID, nextPage + 1);
@@ -611,7 +609,6 @@ export class KartaviewService extends AbstractSystem {
         spatial.replaceData('kartaview-sequences', sequence);
 
         gfx?.deferredRedraw();
-        this.emit('loadedData');
 
         return image;
       })

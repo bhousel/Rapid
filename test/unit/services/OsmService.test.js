@@ -120,7 +120,7 @@ describe('OsmService', () => {
           });
       });
 
-      it('emits a change event', () => {
+      it('emits an authchange event', () => {
         const osm = new Rapid.OsmService(context);
         const spyAuthChange = mock.fn();
         osm.on('authchange', spyAuthChange);
@@ -609,7 +609,7 @@ describe('OsmService', () => {
 </note>
 </osm>`;
 
-      it('emits loadedNotes when notes are loaded', done => {
+      it.todo('emits loadedNotes when notes are loaded', done => {
         fetchMock.route(/notes\?/, {
           body: notesBody,
           status: 200,

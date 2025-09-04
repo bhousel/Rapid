@@ -14,9 +14,6 @@ const MAPROULETTE_API = 'https://maproulette.org/api/v2';
  * This service connects to the MapRoulette API to fetch about challenges and tasks.
  * @see https://wiki.openstreetmap.org/wiki/MapRoulette
  * @see https://maproulette.org/docs/swagger-ui/index.html
- *
- * Events available:
- *   'loadedData'
  */
 export class MapRouletteService extends AbstractSystem {
 
@@ -299,7 +296,6 @@ export class MapRouletteService extends AbstractSystem {
           cache.challenges.set(challengeID, challenge);
 
           gfx?.deferredRedraw();
-          this.emit('loadedData');
         })
         .catch(err => {
           if (err.name === 'AbortError') {

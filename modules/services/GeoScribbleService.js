@@ -17,9 +17,6 @@ const GEOSCRIBBLE_API = 'https://geoscribble.osmz.ru/geojson';
  * @see https://wiki.openstreetmap.org/wiki/GeoScribble
  * @see https://geoscribble.osmz.ru/docs
  * @see https://github.com/Zverik/geoscribble
- *
- * Events available:
- *   'loadedData'
  */
 export class GeoScribbleService extends AbstractSystem {
 
@@ -172,7 +169,6 @@ export class GeoScribbleService extends AbstractSystem {
     spatial.addData('geoscribble', toLoad);
 
     gfx?.deferredRedraw();
-    this.emit('loadedData');
   }
 
 }

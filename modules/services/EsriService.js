@@ -19,9 +19,6 @@ const TILEZOOM = 14;
  *
  * @see https://openstreetmap.maps.arcgis.com/home/index.html
  * @see https://developers.arcgis.com/rest/
- *
- * Events available:
- *   `loadedData`
  */
 export class EsriService extends AbstractSystem {
 
@@ -456,7 +453,6 @@ export class EsriService extends AbstractSystem {
 
           const gfx = this.context.systems.gfx;
           gfx?.deferredRedraw();
-          this.emit('loadedData');
         }
       })
       .catch(e => {
