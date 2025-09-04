@@ -9,10 +9,17 @@ describe('KartaviewService', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
+    gfx:     new Rapid.MockGfxSystem(context),
     l10n:    new Rapid.MockSystem(context),
     photos:  new Rapid.MockSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
+
+  // Spy on redraws
+  const gfx = context.systems.gfx;
+  const spyRedraw = mock.fn();
+  gfx.immediateRedraw = spyRedraw;
+  gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
   before(() => {
@@ -21,10 +28,12 @@ describe('KartaviewService', () => {
 
   after(() => {
     fetchMock.hardReset({ includeSticky: true });
+    mock.reset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
+    spyRedraw.mock.resetCalls();
   });
 
 
@@ -128,6 +137,7 @@ describe('KartaviewService', () => {
 
         globalThis.setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
+          assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
           assert.lengthOf(spyLoadedData.mock.calls, 1);       // loadedData emitted once
 
           const spatial = context.systems.spatial;
@@ -147,6 +157,7 @@ describe('KartaviewService', () => {
 
         globalThis.setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 0);  // fetch not called
+          assert.lengthOf(spyRedraw.mock.calls, 0);           // redraw not called
           assert.lengthOf(spyLoadedData.mock.calls, 0);       // loadedData not emitted
 
           const spatial = context.systems.spatial;
