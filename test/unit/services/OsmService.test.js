@@ -546,6 +546,41 @@ describe('OsmService', () => {
       });
     });
 
+
+    describe('with data loaded', () => {
+      beforeEach(() => {
+        // load the notes around [10°, 0°]
+        // (this needs to be beforeEach because the parent beforeEach resets)
+        fetchMock.route(/notes\?/, { body: sample.noteXML, headers: { 'Content-Type': 'text/xml' } });
+        _osm.loadNotes({ /*no options*/ });
+        return new Promise(resolve => setTimeout(() => { resolve(); }, 10));
+      });
+
+      describe('getNotes', () => {
+        it('returns notes in the visible map area', () => {
+          const result = _osm.getNotes();
+          assert.isArray(result);
+          assert.lengthOf(result, 1);
+
+          const m1 = result[0];
+          assert.instanceOf(m1, Rapid.Marker);
+          assert.deepInclude(m1.props, {
+            id: '1', type: 'note', serviceID: 'osm'
+          });
+        });
+      });
+
+      describe('getNote', () => {
+        it('returns a note with the given id', () => {
+          const result = _osm.getNote('1');
+          assert.instanceOf(result, Rapid.Marker);
+          assert.deepInclude(result.props, {
+            id: '1', type: 'note', serviceID: 'osm'
+          });
+        });
+      });
+    });
+
   });
 
 //

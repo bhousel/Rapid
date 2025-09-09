@@ -1403,15 +1403,15 @@ export class OsmService extends AbstractSystem {
 
 
   _getLoc(attrs) {
-    const lon = attrs.lon?.value;
-    const lat = attrs.lat?.value;
+    const lon = attrs.getNamedItem('lon')?.value;
+    const lat = attrs.getNamedItem('lat')?.value;
     return [ parseFloat(lon), parseFloat(lat) ];
   }
 
 
   _getNodes(xml) {
     const elems = Array.from(xml.getElementsByTagName('nd'));
-    return elems.map(elem => 'n' + elem.attributes.ref.value);
+    return elems.map(elem => 'n' + elem.attributes.getNamedItem('ref').value);
   }
 
 
@@ -1425,8 +1425,8 @@ export class OsmService extends AbstractSystem {
     let tags = {};
     for (const elem of elems) {
       const attrs = elem.attributes;
-      const k = (attrs.k.value ?? '').trim();
-      const v = (attrs.v.value ?? '').trim();
+      const k = (attrs.getNamedItem('k')?.value ?? '').trim();
+      const v = (attrs.getNamedItem('v')?.value ?? '').trim();
       if (k) {
         tags[k] = v;
       }
@@ -1440,9 +1440,9 @@ export class OsmService extends AbstractSystem {
     return elems.map(elem => {
       const attrs = elem.attributes;
       return {
-        id: attrs.type.value[0] + attrs.ref.value,
-        type: attrs.type.value,
-        role: attrs.role.value
+        id: attrs.getNamedItem('type').value[0] + attrs.getNamedItem('ref').value,
+        type: attrs.getNamedItem('type').value,
+        role: attrs.getNamedItem('role').value
       };
     });
   }
@@ -1634,7 +1634,7 @@ export class OsmService extends AbstractSystem {
 
         let uid;
         if (child.nodeName === 'user') {
-          uid = child.attributes.id.value;
+          uid = child.attributes.getNamedItem('id').value;
           results.seenIDs.add(uid);
 
           if (options.skipSeen && this._userCache.user[uid]) {  // avoid reparsing a "seen" entity
@@ -1647,7 +1647,7 @@ export class OsmService extends AbstractSystem {
           results.seenIDs.add(uid);
 
         } else {
-          uid = OsmEntity.fromOSM(child.nodeName, child.attributes.id.value);
+          uid = OsmEntity.fromOSM(child.nodeName, child.attributes.getNamedItem('id').value);
           results.seenIDs.add(uid);
 
           if (options.skipSeen) {
@@ -1793,8 +1793,8 @@ export class OsmService extends AbstractSystem {
     const attrs = xml.attributes;
     let user = {
       id: uid,
-      display_name: attrs.display_name?.value,
-      account_created: attrs.account_created?.value,
+      display_name: attrs.getNamedItem('display_name')?.value,
+      account_created: attrs.getNamedItem('account_created')?.value,
       changesets_count: '0',
       active_blocks: '0'
     };
