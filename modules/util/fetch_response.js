@@ -32,11 +32,12 @@ export class FetchError extends Error {
  *      if (err.name === 'FetchError') …        // deal with error
  *   })
  *
- * @param    {Response}   The `Response` from a `fetch`
+ * @param    {Response}   response  - The `Response` from a `fetch`
+ * @param    {DOMParser}  domParser - Optional, specify a DOMParser to handle XML with
  * @returns  {*}          Result suitable to be returned to a `.then()` (a value or Promise)
  * @throws   {FetchError}
  */
-export function utilFetchResponse(response) {
+export function utilFetchResponse(response, domParser) {
   if (!response.ok) {
     throw new FetchError(response);
   }
@@ -104,7 +105,10 @@ export function utilFetchResponse(response) {
     case 'text/html':
     case 'text/xml':
       return response.text()
-        .then(txt => new DOMParser().parseFromString(txt, contentType));
+        .then(txt => {
+          if (!domParser) domParser = new DOMParser();  // use xmldom parser unless specified
+          return domParser.parseFromString(txt, contentType)
+        });
 
     case 'application/octet-stream':
     case 'application/protobuf':

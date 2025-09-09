@@ -77,7 +77,8 @@ export class UiDefs {
         const $group = select(nodes[i]);
         const url = assets.getFileURL(`img/${d}-sprite.svg`);
         fetch(url)
-          .then(utilFetchResponse)
+          // We need the browser's DOMParser here, so we can insert this spritesheet into the document.
+          .then(response => utilFetchResponse(response, new window.DOMParser()))
           .then(svg => $group.call(this._spritesheetLoaded, d, svg))
           .catch(e => console.error(e));  // eslint-disable-line
       });
