@@ -2,6 +2,7 @@ import { after, before, beforeEach, describe, it, mock } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
+import * as sample from './StreetsideService.sample.js';
 
 
 describe('StreetsideService', () => {
@@ -115,6 +116,12 @@ describe('StreetsideService', () => {
 
     before(() => {
       _streetside = new Rapid.StreetsideService(context);
+
+      // We will replace the tiler to make testing a little easier.
+      // The default StreetsideService tiler is zoomed into 16.5 and fetches margin tiles.
+      // This tiler mimics what the Mapillary and Kartaview do.
+      _streetside._tiler = new Rapid.sdk.Tiler().zoomRange(14).skipNullIsland(true);
+
       return _streetside.initAsync();
         //.then(() => _streetside.startAsync());
         // for now, expect start to fail when run headlessly
@@ -124,160 +131,109 @@ describe('StreetsideService', () => {
       // reset viewport
       context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       context.viewport.dimensions = [64, 64];
+      return _streetside.resetAsync();
+    });
+
+    describe('loadTiles', () => {
+      it('loads a tile of data and requests a redraw', (t, done) => {
+        fetchMock
+          .route(/StreetSideBubbleMetaData/, {
+            body: JSON.stringify(sample.nearbyPhotos10),
+            status: 200,
+            headers: { 'Content-Type': 'text/plain' }
+          });
+
+        _streetside.loadTiles();
+
+        setImmediate(() => {
+          assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
+          assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
+
+          const spatial = context.systems.spatial;
+          assert.isTrue(spatial.hasTileAtLoc('streetside-images', [10, 0]));  // tile is loaded here
+          done();
+        });
+      });
+
+      it('does not load tiles around Null Island', (t, done) => {
+        context.viewport.transform.translation = [0, 0];  // move map to Null Island
+
+        fetchMock
+          .route(/StreetSideBubbleMetaData/, {
+            body: JSON.stringify(sample.nearbyPhotos0),
+            status: 200,
+            headers: { 'Content-Type': 'text/plain' }
+          });
+
+        _streetside.loadTiles();
+
+        setImmediate(() => {
+          assert.lengthOf(fetchMock.callHistory.calls(), 0);  // fetch not called
+          assert.lengthOf(spyRedraw.mock.calls, 0);           // redraw not called
+
+          const spatial = context.systems.spatial;
+          assert.isFalse(spatial.hasTileAtLoc('streetside-images', [0, 0]));  // tile is not loaded here
+          done();
+        });
+      });
+    });
+
+
+    describe('with data loaded', () => {
+      beforeEach(() => {
+        // load the images around [10°, 0°]
+        // (this needs to be beforeEach because the parent beforeEach resets)
+       fetchMock
+          .route(/StreetSideBubbleMetaData/, {
+            body: JSON.stringify(sample.nearbyPhotos10),
+            status: 200,
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        _streetside.loadTiles();
+        return new Promise(resolve => setImmediate(resolve));
+      });
+
+      describe('getImages', () => {
+        it('returns images in the visible map area', () => {
+          const result = _streetside.getImages();
+          assert.isArray(result);
+          assert.lengthOf(result, 3);
+
+          const m1 = result[0];
+          assert.instanceOf(m1, Rapid.Marker);
+          assert.deepInclude(m1.props, {
+            id: '1', type: 'photo', serviceID: 'streetside', isPano: true
+          });
+
+          const m2 = result[1];
+          assert.instanceOf(m2, Rapid.Marker);
+          assert.deepInclude(m2.props, {
+            id: '2', type: 'photo', serviceID: 'streetside', isPano: true
+          });
+
+          const m3 = result[2];
+          assert.instanceOf(m3, Rapid.Marker);
+          assert.deepInclude(m3.props, {
+            id: '3', type: 'photo', serviceID: 'streetside', isPano: true
+          });
+        });
+      });
+
+      describe('getSequences', () => {
+        it('returns sequences in the visible map area', () => {
+          const result = _streetside.getSequences();
+          assert.isArray(result);
+          assert.lengthOf(result, 1);
+
+          const seq = result[0];
+          assert.instanceOf(seq, Rapid.GeoJSON);
+          assert.deepInclude(seq.props, {
+            type: 'sequence', serviceID: 'streetside', isPano: true, bubbleIDs: ['1', '2', '3']
+          });
+        });
+      });
+
     });
   });
-
-
-//
-//  describe('loadTiles', () => {
-//    it('fires loadedData when tiles are loaded', done => {
-//      const spy = sinon.spy();
-//      _streetside.on('loadedData', spy);
-//
-//      const data = [
-//        {
-//          elapsed: 0.001
-//        }, {
-//          id: 1, la: 0, lo: 10.001, al: 0, ro: 0, pi: 0, he: 0, bl: '',
-//          cd: '1/1/2018 12:00:00 PM', ml: 3, nbn: [], pbn: [], rn: [],
-//          pr: undefined, ne: 2
-//        }, {
-//          id: 2, la: 0, lo: 10.002, al: 0, ro: 0, pi: 0, he: 0, bl: '',
-//          cd: '1/1/2018 12:00:01 PM', ml: 3, nbn: [], pbn: [], rn: [],
-//          pr: 1, ne: 3
-//        }, {
-//          id: 3, la: 0, lo: 10.003, al: 0, ro: 0, pi: 0, he: 0, bl: '',
-//          cd: '1/1/2018 12:00:02 PM', ml: 3, nbn: [], pbn: [], rn: [],
-//          pr: 2, ne: undefined
-//        }
-//      ];
-//
-//      fetchMock.route(/StreetSideBubbleMetaData/, {
-//        body: JSON.stringify(data),
-//        status: 200,
-//        headers: { 'Content-Type': 'text/plain' }
-//      });
-//
-//      _streetside.loadTiles();
-//
-//      window.setTimeout(() => {
-//        expect(spy.called).to.be.ok;   // called many times because of margin tiles
-//        done();
-//      }, 20);
-//    });
-//
-//
-//    it('does not load tiles around Null Island', done => {
-//      _streetside.context.viewport.transform.translation = [0, 0];  // move map to Null Island
-//
-//      const spy = sinon.spy();
-//      _streetside.on('loadedData', spy);
-//
-//      const data = [
-//        {
-//          elapsed: 0.001
-//        }, {
-//          id: 1, la: 0, lo: 0, al: 0, ro: 0, pi: 0, he: 0, bl: '',
-//          cd: '1/1/2018 12:00:00 PM', ml: 3, nbn: [], pbn: [], rn: [],
-//          pr: undefined, ne: 2
-//        }, {
-//          id: 2, la: 0, lo: 0, al: 0, ro: 0, pi: 0, he: 0, bl: '',
-//          cd: '1/1/2018 12:00:01 PM', ml: 3, nbn: [], pbn: [], rn: [],
-//          pr: 1, ne: 3
-//        }, {
-//          id: 3, la: 0, lo: 0, al: 0, ro: 0, pi: 0, he: 0, bl: '',
-//          cd: '1/1/2018 12:00:02 PM', ml: 3, nbn: [], pbn: [], rn: [],
-//          pr: 2, ne: undefined
-//        }
-//      ];
-//
-//      fetchMock.route(/StreetSideBubbleMetaData/, {
-//        body: JSON.stringify(data),
-//        status: 200,
-//        headers: { 'Content-Type': 'text/plain' }
-//      });
-//
-//      _streetside.loadTiles();
-//
-//      window.setTimeout(() => {
-//        expect(spy.notCalled).to.be.ok;
-//        expect(fetchMock.callHistory.calls().length).to.eql(0);   // no tile requests of any kind
-//        done();
-//      }, 20);
-//    });
-//  });
-//
-//
-//  describe('getImages', () => {
-//    it('returns images in the visible map area', () => {
-//      const bubbles = [
-//        new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10, 0], ca: 90, pr: undefined, ne: '2', isPano: true }),
-//        new Rapid.Marker(context, { type: 'photo', id: '2', loc: [10, 0], ca: 90, pr: '1', ne: '3', isPano: true }),
-//        new Rapid.Marker(context, { type: 'photo', id: '3', loc: [10, 1], ca: 90, pr: '2', ne: undefined, isPano: true })
-//      ];
-//      const boxes = [
-//        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: bubbles[0] },
-//        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: bubbles[1] },
-//        { minX: 10, minY: 1, maxX: 10, maxY: 1, data: bubbles[2] }
-//      ];
-//
-//      const cache = _streetside._cache;
-//      for (const d of bubbles) {
-//        cache.bubbles.set(d.id, d);
-//      }
-//      cache.rbush.load(boxes);
-//
-//      const result = _streetside.getImages();
-//      expect(result).to.deep.eql([bubbles[0], bubbles[1]]);
-//    });
-//  });
-//
-//
-//  describe('getSequences', () => {
-//    it('returns sequence linestrings in the visible map area', () => {
-//      const bubbles = [
-//        new Rapid.Marker(context, { type: 'photo', id: '1', loc: [10, 0], ca: 90, pr: undefined, ne: '2', isPano: true }),
-//        new Rapid.Marker(context, { type: 'photo', id: '2', loc: [10, 0], ca: 90, pr: '1', ne: '3', isPano: true }),
-//        new Rapid.Marker(context, { type: 'photo', id: '3', loc: [10, 1], ca: 90, pr: '2', ne: undefined, isPano: true })
-//      ];
-//      const boxes = [
-//        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: bubbles[0] },
-//        { minX: 10, minY: 0, maxX: 10, maxY: 0, data: bubbles[1] },
-//        { minX: 10, minY: 1, maxX: 10, maxY: 1, data: bubbles[2] }
-//      ];
-//
-//      const sequence = new Rapid.GeoJSON(context, {
-//        type: 'Feature',
-//        id: 's1',
-//        serviceID:  'streetside',
-//        properties: {
-//          type:       'sequence',
-//          serviceID:  'streetside',
-//          id:         's1',
-//          bubbleIDs:  bubbles.map(d => d.id),
-//          isPano:     true
-//        },
-//        geometry: {
-//          type: 'LineString',
-//          coordinates: bubbles.map(d => d.loc)
-//        }
-//      });
-//
-//
-//      const cache = _streetside._cache;
-//      for (const d of bubbles) {
-//        cache.bubbles.set(d.id, d);
-//      }
-//      cache.rbush.load(boxes);
-//      cache.sequences.set('s1', sequence);
-//
-//      cache.bubbleHasSequences.set('1', ['s1']);
-//      cache.bubbleHasSequences.set('2', ['s1']);
-//      cache.bubbleHasSequences.set('3', ['s1']);
-//
-//      const result = _streetside.getSequences();
-//      expect(result).to.deep.eql([sequence]);
-//    });
-//  });
 
 });

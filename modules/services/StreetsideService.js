@@ -13,6 +13,8 @@ import { uiIcon } from '../ui/icon.js';
 import { utilFetchResponse } from '../util/index.js';
 
 const TILEZOOM = 16.5;
+// By default: request 2 nearby tiles so we can connect sequences.
+const TILEMARGIN = 2;
 
 
 /**
@@ -71,7 +73,7 @@ export class StreetsideService extends AbstractSystem {
     this._step = this._step.bind(this);
     this._setupCanvas = this._setupCanvas.bind(this);
 
-    this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
+    this._tiler = new Tiler().zoomRange(TILEZOOM).margin(TILEMARGIN).skipNullIsland(true);
   }
 
 
@@ -180,7 +182,7 @@ export class StreetsideService extends AbstractSystem {
     this._cache = {
       inflight:            new Map(),  // Map<tileID, {Promise, AbortController}>
       unattachedBubbles:   new Set(),  // Set<bubbleID>
-      bubbleHasSequences:  new Map(),  // Map<bubbleID, Array<sequenceID>>
+      bubbleHasSequences:  new Map(),  // Map<bubbleID, Set<sequenceID>>
       metadataPromise:     null,
       lastv:               null
     };
@@ -229,9 +231,7 @@ export class StreetsideService extends AbstractSystem {
     cache.lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
-    // By default: request 2 nearby tiles so we can connect sequences.
-    const MARGIN = 2;
-    const needTiles = this._tiler.zoomRange(TILEZOOM).margin(MARGIN).getTiles(viewport).tiles;
+    const needTiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
     for (const [tileID, inflight] of cache.inflight) {
@@ -701,25 +701,25 @@ export class StreetsideService extends AbstractSystem {
 
   /**
    * _gotTile
-   * Processes the results of the tile data fetch.
-   * @param  {Array<Object>}  results
+   * Process the response from the tile fetch.
+   * @param  {Tile}    tile - Tile data
+   * @param  {Object}  bubbles - Response data
    */
-  _gotTile(results) {
+  _gotTile(tile, bubbles) {
     const context = this.context;
     const gfx = context.systems.gfx;
     const photos = context.systems.photos;
     const spatial = context.systems.spatial;
     const cache = this._cache;
 
-    const tile = results.tile;
     spatial.addTiles('streetside-images', [tile]);   // mark as loaded
 
-    const bubbles = results.data;
-    if (!bubbles) return;
+    if (!Array.isArray(bubbles)) return;
     if (bubbles.error) throw new Error(bubbles.error);
 
     // [].shift() removes the first element, some statistics info, not a bubble point
     bubbles.shift();
+    if (!bubbles.length) return;
 
     let selectBubbleID = null;
     const toLoad = [];
@@ -771,95 +771,100 @@ export class StreetsideService extends AbstractSystem {
   _connectSequences() {
     const context = this.context;
     const spatial = context.systems.spatial;
-    const cache = this._cache;
-
+    const unattachedBubbles = this._cache.unattachedBubbles;     // Set<bubbleID>
+    const bubbleHasSequences = this._cache.bubbleHasSequences;   // Map<bubbleID, Set<sequenceID>>
     const touchedSequenceIDs = new Set();  // sequences that we touched will need recalculation
 
-    // bubbles that haven't been added to a sequence yet.
-    // note: sort numerically to minimize the chance that we'll start assembling mid-sequence.
+    // Get bubbles that haven't been added to a sequence yet.
+    // Note: sort numerically to minimize the chance that we'll start assembling mid-sequence.
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-    const toAttach = Array.from(cache.unattachedBubbles).sort(collator.compare);
+    const toAttach = Array.from(unattachedBubbles).sort(collator.compare);
 
-    const _updateCaches = (sequenceID, bubbleID) => {
+    const _updateCaches = (sequence, bubble) => {
+      const sequenceID = sequence.id;
+      const bubbleID = bubble.id;
       touchedSequenceIDs.add(sequenceID);
-      cache.unattachedBubbles.delete(bubbleID);
+      unattachedBubbles.delete(bubbleID);
 
-      let seqs = cache.bubbleHasSequences.get(bubbleID);
+      let seqs = bubbleHasSequences.get(bubbleID);
       if (!seqs) {
-        seqs = [];
-        cache.bubbleHasSequences.set(bubbleID, seqs);
+        seqs = new Set();
+        bubbleHasSequences.set(bubbleID, seqs);
       }
-      seqs.push(sequenceID);
+      seqs.add(sequenceID);
     };
 
 
     for (const currBubbleID of toAttach) {
-      const isUnattached = cache.unattachedBubbles.has(currBubbleID);
-      const currBubble = spatial.getData('streetside-images', currBubbleID);
-      if (!currBubble || !isUnattached) continue;   // done already
+      if (!unattachedBubbles.has(currBubbleID)) continue;  // done already
 
-      // Look at adjacent bubbles
-      const nextBubbleID = currBubble.props.ne;
-      const nextBubble = nextBubbleID && spatial.getData('streetside-images', nextBubbleID);
+      // Get current bubble (the one we are trying to attach)
+      const currBubble = spatial.getData('streetside-images', currBubbleID);
+      if (!currBubble) {  // missing? shouldn't happen
+        unattachedBubbles.delete(currBubbleID);
+        continue;
+      }
+
+      // Get adjacent bubbles (if possible)
       const prevBubbleID = currBubble.props.pr;
       const prevBubble = prevBubbleID && spatial.getData('streetside-images', prevBubbleID);
+      const nextBubbleID = currBubble.props.ne;
+      const nextBubble = nextBubbleID && spatial.getData('streetside-images', nextBubbleID);
 
-      // Try to link next bubble back to current bubble.
-      // Prefer a sequence where next.pr === currentBubbleID
+      // Try to link current bubble to the previous bubble's sequence.
+      // Prefer a sequence where the current bubble follows the previous bubble at the end of the sequnce.
+      // But accept any sequence we can make, they don't always link in both directions.
+      if (prevBubbleID && prevBubble) {
+        const trySequenceIDs = bubbleHasSequences.get(prevBubbleID) || new Set();
+        for (const sequenceID of trySequenceIDs) {
+          const sequence = spatial.getData('streetside-sequences', sequenceID);
+          const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
+          const beginID = bubbleIDs.at(0);
+          const endID = bubbleIDs.at(-1);
+          if (prevBubbleID === endID) {
+            bubbleIDs.push(currBubbleID);   // append current bubble to end
+            _updateCaches(sequence, currBubble);
+            break;
+          } else if (prevBubbleID === beginID) {
+            bubbleIDs.unshift(currBubbleID);  // prepend current bubble to beginning
+            _updateCaches(sequence, currBubble);
+            break;
+          }
+        }
+      }
+
+      // Try to link current bubble to the next bubble's sequence.
+      // Prefer a sequence where the current bubble precedes the next bubble at the beginning of the sequnce.
       // But accept any sequence we can make, they don't always link in both directions.
       if (nextBubbleID && nextBubble) {
-        let sequenceID, sequence;
-        const trySequenceIDs = (nextBubble && cache.bubbleHasSequences.get(nextBubbleID)) || [];
-        for (sequenceID of trySequenceIDs) {
-          sequence = spatial.getData('streetside-sequences', sequenceID);
-          const bubbleIDs = sequence.props.bubbleIDs;
-          const firstID = bubbleIDs.at(0);
-          const lastID = bubbleIDs.at(-1);
-          if (nextBubbleID === lastID) {
-            bubbleIDs.push(currBubbleID);   // add current bubble to end of sequence
-            _updateCaches(sequenceID, currBubbleID);
+        const trySequenceIDs = bubbleHasSequences.get(nextBubbleID) || new Set();
+        for (const sequenceID of trySequenceIDs) {
+          const sequence = spatial.getData('streetside-sequences', sequenceID);
+          const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
+          const beginID = bubbleIDs.at(0);
+          const endID = bubbleIDs.at(-1);
+          if (nextBubbleID === beginID) {
+            bubbleIDs.unshift(currBubbleID);  // prepend current bubble to beginning
+            _updateCaches(sequence, currBubble);
             break;
-          } else if (nextBubbleID === firstID) {
-            bubbleIDs.unshift(currBubbleID);  // add current bubble to beginning of sequence
-            _updateCaches(sequenceID, currBubbleID);
-            break;
-          }
-        }
-      }
-
-      // Try to link previous bubble forward to current bubble.
-      if (prevBubbleID && prevBubble) {
-        let sequenceID, sequence;
-        const trySequenceIDs = (prevBubble && cache.bubbleHasSequences.get(prevBubbleID)) || [];
-        for (sequenceID of trySequenceIDs) {
-          sequence = spatial.getData('streetside-sequences', sequenceID);
-          const bubbleIDs = sequence.props.bubbleIDs;
-          const firstID = bubbleIDs.at(0);
-          const lastID = bubbleIDs.at(-1);
-          if (prevBubbleID === lastID) {
-            bubbleIDs.push(currBubbleID);   // add current bubble to end of sequence
-            _updateCaches(sequenceID, currBubbleID);
-            break;
-          } else if (prevBubbleID === firstID) {
-            bubbleIDs.unshift(currBubbleID);  // add current bubble to beginning of sequence
-            _updateCaches(sequenceID, currBubbleID);
+          } else if (nextBubbleID === endID) {
+            bubbleIDs.push(currBubbleID);   // apppend current bubble to end
+            _updateCaches(sequence, currBubble);
             break;
           }
         }
       }
 
-      // If neither of those worked (current bubble still "unattached"),
+      // If neither of those worked (i.e. current bubble still "unattached"),
       // Start a new sequence at the current bubble.
-      if (cache.unattachedBubbles.has(currBubbleID)) {
+      if (unattachedBubbles.has(currBubbleID)) {
         const sequenceNum = this._nextSequenceID++;
         const sequenceID = `s${sequenceNum}`;
-        const bubbleIDs = [currBubbleID];
-
         const props = {
           id:         sequenceID,
           type:       'sequence',
           serviceID:  this.id,
-          bubbleIDs:  bubbleIDs,
+          bubbleIDs:  [],
           isPano:     true,
           geojson: {
             type: 'Feature',
@@ -872,16 +877,19 @@ export class StreetsideService extends AbstractSystem {
 
         const sequence = new GeoJSON(this.context, props);
         spatial.addData('streetside-sequences', sequence);
-        _updateCaches(sequenceID, currBubbleID);
+
+        const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
+        bubbleIDs.push(currBubbleID);
+        _updateCaches(sequence, currBubble);
 
         // Include previous and next bubbles if we have them loaded
         if (prevBubbleID && prevBubble) {
-          bubbleIDs.unshift(prevBubbleID);  // add previous to beginning
-          _updateCaches(sequenceID, prevBubbleID);
+          bubbleIDs.unshift(prevBubbleID);  // prepend previous bubble to beginning
+          _updateCaches(sequence, prevBubble);
         }
         if (nextBubbleID && nextBubble) {
-          bubbleIDs.push(nextBubbleID);  // add next to end
-          _updateCaches(sequenceID, nextBubbleID);
+          bubbleIDs.push(nextBubbleID);  // append next bubble to end
+          _updateCaches(sequence, nextBubble);
         }
       }
     }
@@ -945,12 +953,7 @@ export class StreetsideService extends AbstractSystem {
     const controller = new AbortController();
     const promise = fetch(bubbleURL, { signal: controller.signal })
       .then(utilFetchResponse)
-      .then(data => {
-        this._gotTile({
-          data: JSON.parse(data),  // Content-Type is 'text/plain' for some reason
-          tile: tile
-        });
-      })
+      .then(data => this._gotTile(tile, JSON.parse(data)))  // Content-Type is 'text/plain' for some reason
       .catch(err => {
         if (err.name === 'AbortError') return;  // ok
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
