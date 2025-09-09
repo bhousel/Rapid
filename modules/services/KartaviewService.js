@@ -753,11 +753,12 @@ export class KartaviewService extends AbstractSystem {
 
     // Allow 0, but not things like NaN, null, Infinity
     const caIsNumber = (!isNaN(source.ca) && isFinite(source.ca));
+    const indexIsNumber = (!isNaN(source.sequenceIndex) && isFinite(source.sequenceIndex));
 
     // Update whatever additional props we were passed..
     const props = image.props;
     if (source.sequenceID)     props.sequenceID     = source.sequenceID;
-    if (source.sequenceIndex)  props.sequenceIndex  = source.sequenceIndex;
+    if (indexIsNumber)         props.sequenceIndex  = source.sequenceIndex;
     if (source.captured_at)    props.captured_at    = source.captured_at;
     if (source.captured_by)    props.captured_by    = source.captured_by;
     if (caIsNumber)            props.ca             = source.ca;
@@ -766,6 +767,7 @@ export class KartaviewService extends AbstractSystem {
     if (source.imageMedUrl)    props.imageMedUrl    = source.imageMedUrl;   // large thumbnail
     if (source.imageHighUrl)   props.imageHighUrl   = source.imageHighUrl;  // full resolution
 
+    if (!props.isPano)  props.isPano = false;
     spatial.replaceData('kartaview-images', image);
 
     return image.touch();

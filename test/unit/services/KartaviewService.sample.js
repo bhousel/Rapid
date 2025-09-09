@@ -6,7 +6,7 @@ export const nearbyPhotos10 = {
   currentPageItems:[{
     id: '1',
     sequence_id: '100',
-    sequence_index: '1',
+    sequence_index: '0',
     lat: '0',
     lng: '10.001',
     shot_date: '2017-09-24 23:58:07',
@@ -15,7 +15,7 @@ export const nearbyPhotos10 = {
   }, {
     id: '2',
     sequence_id: '100',
-    sequence_index: '2',
+    sequence_index: '1',
     lat: '0',
     lng: '10.002',
     shot_date: '2017-09-24 23:58:07',
@@ -24,7 +24,7 @@ export const nearbyPhotos10 = {
   }, {
     id: '3',
     sequence_id: '100',
-    sequence_index: '3',
+    sequence_index: '2',
     lat: '0',
     lng: '10.003',
     shot_date: '2017-09-24 23:58:07',
@@ -40,7 +40,7 @@ export const nearbyPhotos0 = {
   currentPageItems:[{
     id: '1',
     sequence_id: '100',
-    sequence_index: '1',
+    sequence_index: '0',
     lat: '0',
     lng: '0.001',
     shot_date: '2017-09-24 23:58:07',
@@ -49,7 +49,7 @@ export const nearbyPhotos0 = {
   }, {
     id: '2',
     sequence_id: '100',
-    sequence_index: '2',
+    sequence_index: '1',
     lat: '0',
     lng: '0.002',
     shot_date: '2017-09-24 23:58:07',
@@ -58,7 +58,7 @@ export const nearbyPhotos0 = {
   }, {
     id: '3',
     sequence_id: '100',
-    sequence_index: '3',
+    sequence_index: '2',
     lat: '0',
     lng: '0.003',
     shot_date: '2017-09-24 23:58:07',

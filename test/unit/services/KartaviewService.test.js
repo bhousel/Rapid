@@ -174,15 +174,21 @@ describe('KartaviewService', () => {
 
           const m1 = result[0];
           assert.instanceOf(m1, Rapid.Marker);
-          assert.strictEqual(m1.id, '1');
+          assert.deepInclude(m1.props, {
+            id: '1', type: 'photo', serviceID: 'kartaview', isPano: false
+          });
 
           const m2 = result[1];
           assert.instanceOf(m2, Rapid.Marker);
-          assert.strictEqual(m2.id, '2');
+          assert.deepInclude(m2.props, {
+            id: '2', type: 'photo', serviceID: 'kartaview', isPano: false
+          });
 
           const m3 = result[2];
           assert.instanceOf(m3, Rapid.Marker);
-          assert.strictEqual(m3.id, '3');
+          assert.deepInclude(m3.props, {
+            id: '3', type: 'photo', serviceID: 'kartaview', isPano: false
+          });
         });
       });
 
@@ -192,12 +198,14 @@ describe('KartaviewService', () => {
           assert.isArray(result);
           assert.lengthOf(result, 1);
 
-          const s1 = result[0];
-          assert.instanceOf(s1, Rapid.GeoJSON);
-          assert.strictEqual(s1.id, '100');
+          const seq = result[0];
+          assert.instanceOf(seq, Rapid.GeoJSON);
+          assert.deepInclude(seq.props, {
+            id: '100', type: 'sequence', serviceID: 'kartaview', isPano: false, imageIDs: ['1', '2', '3']
+          });
         });
       });
-
     });
+
   });
 });
