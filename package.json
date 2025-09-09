@@ -69,6 +69,7 @@
     "@rapideditor/wayback-core": "^1.0.7",
     "@tmcw/togeojson": "^7.1.2",
     "@types/chai": "^5.2.2",
+    "@xmldom/xmldom": "^0.8.11",
     "d3": "~7.9.0",
     "editor-layer-index": "github:osmlab/editor-layer-index#gh-pages",
     "fast-deep-equal": "~3.1.3",

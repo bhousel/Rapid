@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it, mock } from 'node:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -8,10 +8,17 @@ describe('MapillaryService', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
+    gfx:     new Rapid.MockGfxSystem(context),
     l10n:    new Rapid.MockSystem(context),
     photos:  new Rapid.MockSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
+
+  // Spy on redraws..
+  const gfx = context.systems.gfx;
+  const spyRedraw = mock.fn();
+  gfx.immediateRedraw = spyRedraw;
+  gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
   before(() => {
@@ -20,10 +27,12 @@ describe('MapillaryService', () => {
 
   after(() => {
     fetchMock.hardReset({ includeSticky: true });
+    mock.reset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
+    spyRedraw.mock.resetCalls();
   });
 
 

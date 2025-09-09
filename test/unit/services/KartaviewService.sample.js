@@ -1,3 +1,4 @@
+/* eslint-disable quotes */
 
 // photos near [10°, 0°]
 export const nearbyPhotos10 = {

@@ -107,7 +107,6 @@ export class MockGfxSystem extends MockSystem {
 }
 
 
-
 // Polyfill idle callback functions (for Node)
 if (!globalThis.requestIdleCallback) {
   globalThis.requestIdleCallback = (callback) => {

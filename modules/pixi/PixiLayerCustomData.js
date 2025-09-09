@@ -1,3 +1,4 @@
+import { DOMParser } from '@xmldom/xmldom';
 import { Extent } from '@rapid-sdk/math';
 import { gpx, kml } from '@tmcw/togeojson';
 import { parse as wktParse } from 'wkt';

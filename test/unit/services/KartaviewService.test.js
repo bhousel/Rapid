@@ -15,7 +15,7 @@ describe('KartaviewService', () => {
     spatial: new Rapid.SpatialSystem(context)
   };
 
-  // Spy on redraws
+  // Spy on redraws..
   const gfx = context.systems.gfx;
   const spyRedraw = mock.fn();
   gfx.immediateRedraw = spyRedraw;

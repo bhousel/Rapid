@@ -1,3 +1,4 @@
+import { DOMParser } from '@xmldom/xmldom';
 
 
 /**
@@ -91,6 +92,11 @@ export function utilFetchResponse(response) {
       if (response.status === 204 || response.status === 205) return;  // No Content, Reset Content
       return response.json();
 
+    // bhousel note 9/8/25:  Now prefer xmldom instead of builtin browser DOMParser,
+    // 1. to better handle the togeojson usecases:
+    // 2. and also to support browserless environments (node testing, etc)
+    // see https://github.com/placemark/togeojson?tab=readme-ov-file#protips
+    // see https://github.com/xmldom/xmldom
     // see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString
     case 'application/xhtml+xml':
     case 'application/xml':
@@ -98,7 +104,7 @@ export function utilFetchResponse(response) {
     case 'text/html':
     case 'text/xml':
       return response.text()
-        .then(txt => new window.DOMParser().parseFromString(txt, contentType));
+        .then(txt => new DOMParser().parseFromString(txt, contentType));
 
     case 'application/octet-stream':
     case 'application/protobuf':

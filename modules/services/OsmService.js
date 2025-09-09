@@ -932,6 +932,7 @@ export class OsmService extends AbstractSystem {
 
     const context = this.context;
     const cache = this._tileCache;
+    const gfx = context.systems.gfx;
     const spatial = context.systems.spatial;
     const locations = context.systems.locations;
 
@@ -954,6 +955,9 @@ export class OsmService extends AbstractSystem {
         cache.toLoad.delete(tile.id);
         spatial.addTiles('osm-data', [tile]);
       }
+
+      gfx?.deferredRedraw();
+
       if (callback) {
         callback(err, Object.assign({}, results, { tile: tile }));
       }
@@ -1458,11 +1462,11 @@ export class OsmService extends AbstractSystem {
   _parseComments(comments) {
     let parsedComments = [];
 
-    for (const comment of comments) {
+    for (const comment of Array.from(comments)) {
       if (comment.nodeName === 'comment') {
         let parsedComment = {};
 
-        for (const node of comment.childNodes) {
+        for (const node of Array.from(comment.childNodes)) {
           const nodeName = node.nodeName;
           if (nodeName === '#text') continue;
           parsedComment[nodeName] = node.textContent;
@@ -1593,12 +1597,16 @@ export class OsmService extends AbstractSystem {
   _parseXML(xml, callback, options) {
     options = Object.assign({ skipSeen: true }, options);
 
-    if (!xml || !xml.childNodes) {
+    if (!xml?.childNodes) {
       return callback({ message: 'No XML', status: -1 });
     }
 
-    const root = xml.childNodes[0];
-    const children = Array.from(root.childNodes);
+    const osmElement = Array.from(xml.childNodes).find(child => child.nodeName === 'osm');
+    if (!osmElement?.childNodes) {
+      return callback({ message: 'No OSM Element', status: -1 });
+    }
+
+    const children = Array.from(osmElement.childNodes);
     if (children.some(child => child.nodename === 'error')) {
       return callback({ message: 'Partial XML', status: -1 });
     }
@@ -1752,8 +1760,6 @@ export class OsmService extends AbstractSystem {
     const context = this.context;
     const spatial = context.systems.spatial;
 
-    const attrs = xml.attributes;
-    const childNodes = xml.childNodes;
     const props = {
       id: uid,
       serviceID: this.id,
@@ -1761,10 +1767,11 @@ export class OsmService extends AbstractSystem {
     };
 
     // If notes are coincident, move them apart slightly..
+    const attrs = xml.attributes;
     props.loc = spatial.preventCoincidentLoc('osm-notes', this._getLoc(attrs));
 
     // parse note contents
-    for (const node of childNodes) {
+    for (const node of Array.from(xml.childNodes)) {
       const nodeName = node.nodeName;
       if (nodeName === '#text') continue;
 
