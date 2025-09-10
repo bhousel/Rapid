@@ -837,6 +837,7 @@ export class MapillaryService extends AbstractSystem {
           const props = {
             id:         sequenceID,
             serviceID:  this.id,
+            type:       'sequence',
             geojson: {
               type:      'FeatureCollection',
               features:  []
@@ -1194,7 +1195,9 @@ export class MapillaryService extends AbstractSystem {
     if (caIsNumber)          props.ca          = source.ca;
     if (source.isPano)       props.isPano      = source.isPano;
 
+    if (!props.isPano)  props.isPano = false;
     spatial.replaceData('mapillary-images', image);
+
     return image.touch();
   }
 
