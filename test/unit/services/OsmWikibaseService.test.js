@@ -1,6 +1,6 @@
 import { after, before, beforeEach, describe, it } from 'node:test';
-import { promisify } from 'node:util';
 import { assert } from 'chai';
+import { promisify } from 'node:util';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './OsmWikibaseService.sample.js';
@@ -94,6 +94,10 @@ describe('OsmWikibaseService', () => {
     before(() => {
       _wikibase = new Rapid.OsmWikibaseService(context);
       return _wikibase.initAsync().then(() => _wikibase.startAsync());
+    });
+
+    beforeEach(() => {
+      return _wikibase.resetAsync();
     });
 
 

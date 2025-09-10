@@ -553,7 +553,7 @@ describe('OsmService', () => {
         // (this needs to be beforeEach because the parent beforeEach resets)
         fetchMock.route(/notes\?/, { body: sample.noteXML, headers: { 'Content-Type': 'text/xml' } });
         _osm.loadNotes({ /*no options*/ });
-        return new Promise(resolve => setTimeout(() => { resolve(); }, 10));
+        return new Promise(resolve => { setTimeout(() => { resolve(); }, 10); });
       });
 
       describe('getNotes', () => {

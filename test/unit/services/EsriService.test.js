@@ -112,6 +112,11 @@ describe('EsriService', () => {
       _esri = new Rapid.EsriService(context);
       return _esri.initAsync().then(() => _esri.startAsync());
     });
+
+    beforeEach(() => {
+      return _esri.resetAsync();
+    });
+
   });
 
 });

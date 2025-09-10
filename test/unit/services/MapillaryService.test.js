@@ -130,6 +130,7 @@ describe('MapillaryService', () => {
       // reset viewport
       context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       context.viewport.dimensions = [64, 64];
+      return _mapillary.resetAsync();
     });
   });
 

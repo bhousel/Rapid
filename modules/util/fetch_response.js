@@ -107,7 +107,7 @@ export function utilFetchResponse(response, domParser) {
       return response.text()
         .then(txt => {
           if (!domParser) domParser = new DOMParser();  // use xmldom parser unless specified
-          return domParser.parseFromString(txt, contentType)
+          return domParser.parseFromString(txt, contentType);
         });
 
     case 'application/octet-stream':

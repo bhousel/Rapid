@@ -163,7 +163,7 @@ describe('KartaviewService', () => {
         // (this needs to be beforeEach because the parent beforeEach resets)
         fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
         _kartaview.loadTiles();
-        return new Promise(resolve => setImmediate(resolve));
+        return new Promise(resolve => { setImmediate(resolve); });
       });
 
       describe('getImages', () => {

@@ -1,5 +1,6 @@
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { assert } from 'chai';
+import { promisify } from 'node:util';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -17,21 +18,9 @@ describe('NominatimService', () => {
   before(() => {
     fetchMock
       .mockGlobal()
-      .sticky(/reverse\?.*lat=48&lon=16/, {
-        body: '{"address":{"country_code":"at"}}',
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
-      .sticky(/reverse\?.*lat=49&lon=17/, {
-        body: '{"address":{"country_code":"cz"}}',
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
-      .sticky(/reverse\?.*lat=1000&lon=1000/, {
-        body: '{"error":"Unable to geocode"}',
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      .sticky(/reverse\?.*lat=48&lon=16/, { address: { country_code: 'at' }})
+      .sticky(/reverse\?.*lat=49&lon=17/, { address: { country_code: 'cz' }})
+      .sticky(/reverse\?.*lat=1000&lon=1000/, { error: 'Unable to geocode' });
   });
 
   after(() => {
@@ -110,106 +99,103 @@ describe('NominatimService', () => {
       return _nominatim.initAsync().then(() => _nominatim.startAsync());
     });
 
+    beforeEach(() => {
+      return _nominatim.resetAsync();
+    });
+
+
+    describe('countryCode', () => {
+      it('calls the given callback with the results of the country code query', () => {
+        const countryCode = promisify(_nominatim.countryCode).bind(_nominatim);
+
+        return countryCode([16, 48])
+          .then(data => {
+            const lastCall = parseQueryString(fetchMock.callHistory.lastCall().url);
+            const expected = { addressdetails: '1', format: 'json', lon: '16', lat: '48', zoom: '13' };
+            assert.deepEqual(lastCall, expected);
+            assert.deepEqual(data, 'at');
+          });
+      });
+    });
+
+
+    describe('reverse', () => {
+      it('should not cache distant result', () => {
+        const reverse = promisify(_nominatim.reverse).bind(_nominatim);
+
+        return reverse([16, 48])
+          .then(data => {
+            const lastCall = parseQueryString(fetchMock.callHistory.lastCall().url);
+            const expected = { addressdetails: '1', format: 'json', lon: '16', lat: '48', zoom: '13' };
+            assert.deepEqual(lastCall, expected);
+            assert.deepEqual(data, { address: { country_code: 'at' }});
+          })
+          .then(() => reverse([17, 49]))
+          .then(data => {
+            const lastCall = parseQueryString(fetchMock.callHistory.lastCall().url);
+            const expected = { addressdetails: '1', format: 'json', lon: '17', lat: '49', zoom: '13' };
+            assert.deepEqual(lastCall, expected);
+            assert.deepEqual(data, { address: { country_code: 'cz' }});
+          });
+      });
+
+      it('should cache nearby result', () => {
+        const reverse = promisify(_nominatim.reverse).bind(_nominatim);
+        let callCount1, callCount2;
+
+        return reverse([16, 48])
+          .then(data => {
+            callCount1 = fetchMock.callHistory.calls().length;
+            const lastCall = parseQueryString(fetchMock.callHistory.lastCall().url);
+            const expected = { addressdetails: '1', format: 'json', lon: '16', lat: '48', zoom: '13' };
+            assert.deepEqual(lastCall, expected);
+            assert.deepEqual(data, { address: { country_code: 'at' }});
+          })
+          .then(() => reverse([16.000001, 48.000001]))
+          .then(data => {
+            callCount2 = fetchMock.callHistory.calls().length;
+            assert.strictEqual(callCount1, callCount2);  // not called again
+            assert.deepEqual(data, { address: { country_code: 'at' }});
+          });
+      });
+
+      it('handles "unable to geocode" result as an error', () => {
+        const reverse = promisify(_nominatim.reverse).bind(_nominatim);
+        return reverse([1000, 1000])
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /unable to geocode/i));
+      });
+    });
+
+
+    describe('search', () => {
+      it('calls the given callback with the results of the search query', () => {
+        const response = [{
+          place_id: '158484588',
+          osm_type: 'relation',
+          osm_id: '188022',
+          boundingbox: [ '39.867005', '40.1379593', '-75.2802976', '-74.9558313' ],
+          lat: '39.9523993',
+          lon: '-75.1635898',
+          display_name: 'Philadelphia, Philadelphia County, Pennsylvania, United States of America',
+          class: 'place',
+          type: 'city',
+          importance: 0.83238050437778
+        }];
+
+        fetchMock.route(/search/, response);
+        const search = promisify(_nominatim.search).bind(_nominatim);
+
+        return search('philadelphia')
+          .then(data => {
+            const lastCall = parseQueryString(fetchMock.callHistory.lastCall().url);
+            const expected = { q: 'philadelphia', format: 'json', limit: '10' };
+            assert.deepEqual(lastCall, expected);
+            assert.deepEqual(data, response);
+          });
+      });
+    });
+
   });
-
-
-//
-//  describe('countryCode', () => {
-//    it('calls the given callback with the results of the country code query', done => {
-//      const callback = sinon.spy();
-//      nominatim.countryCode([16, 48], callback);
-//
-//      window.setTimeout(() => {
-//        expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
-//          { zoom: '13', format: 'json', addressdetails: '1', lat: '48', lon: '16' }
-//        );
-//        expect(callback.calledOnceWith(null, 'at')).to.be.ok;
-//        done();
-//      }, 20);
-//    });
-//  });
-//
-//
-//  describe('reverse', () => {
-//    it('should not cache distant result', done => {
-//      let callback = sinon.spy();
-//      nominatim.reverse([16, 48], callback);
-//
-//      window.setTimeout(() => {
-//        expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
-//          { zoom: '13', format: 'json', addressdetails: '1', lat: '48', lon: '16' }
-//        );
-//        expect(callback.calledOnceWith(null, { address: { country_code:'at' }})).to.be.ok;
-//
-//        fetchMock.clearHistory();
-//        callback = sinon.spy();
-//        nominatim.reverse([17, 49], callback);
-//
-//        window.setTimeout(() => {
-//          expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
-//            { zoom: '13', format: 'json', addressdetails: '1', lat: '49', lon: '17' }
-//          );
-//          expect(callback.calledOnceWith(null, { address: { country_code:'cz' }})).to.be.ok;
-//          done();
-//        }, 50);
-//      }, 50);
-//    });
-//
-//    it('should cache nearby result', done => {
-//      let callback = sinon.spy();
-//      nominatim.reverse([16, 48], callback);
-//
-//      window.setTimeout(() => {
-//        expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
-//          { zoom: '13', format: 'json', addressdetails: '1', lat: '48', lon: '16' }
-//        );
-//        expect(callback.calledOnceWith(null, { address: { country_code:'at' }})).to.be.ok;
-//
-//        fetchMock.clearHistory();
-//
-//        callback = sinon.spy();
-//        nominatim.reverse([16.000001, 48.000001], callback);
-//
-//        window.setTimeout(() => {
-//          expect(callback.calledOnceWith(null, { address: { country_code:'at' }})).to.be.ok;
-//          done();
-//        }, 50);
-//      }, 50);
-//    });
-//
-//
-//    it('handles "unable to geocode" result as an error', done => {
-//      const callback = sinon.spy();
-//      nominatim.reverse([1000, 1000], callback);
-//
-//      window.setTimeout(() => {
-//        expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql(
-//          { zoom: '13', format: 'json', addressdetails: '1', lat: '1000', lon: '1000' }
-//        );
-//        expect(callback.calledOnceWith('Unable to geocode')).to.be.ok;
-//        done();
-//      }, 50);
-//    });
-//  });
-//
-//
-//  describe('search', () => {
-//    it('calls the given callback with the results of the search query', done => {
-//      const callback = sinon.spy();
-//      fetchMock.route(/search/, {
-//        body: '[{"place_id":"158484588","osm_type":"relation","osm_id":"188022","boundingbox":["39.867005","40.1379593","-75.2802976","-74.9558313"],"lat":"39.9523993","lon":"-75.1635898","display_name":"Philadelphia, Philadelphia County, Pennsylvania, United States of America","class":"place","type":"city","importance":0.83238050437778}]',
-//        status: 200,
-//        headers: { 'Content-Type': 'application/json' }
-//      });
-//
-//      nominatim.search('philadelphia', callback);
-//
-//      window.setTimeout(() => {
-//        expect(parseQueryString(fetchMock.callHistory.lastCall().url)).to.eql({q: 'philadelphia', format: 'json', limit: '10' });
-//        expect(callback.calledOnce).to.be.ok;
-//        done();
-//      }, 50);
-//    });
-//  });
 
 });

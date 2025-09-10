@@ -190,7 +190,7 @@ describe('StreetsideService', () => {
             headers: { 'Content-Type': 'text/plain' }
           });
         _streetside.loadTiles();
-        return new Promise(resolve => setImmediate(resolve));
+        return new Promise(resolve => { setImmediate(resolve); });
       });
 
       describe('getImages', () => {

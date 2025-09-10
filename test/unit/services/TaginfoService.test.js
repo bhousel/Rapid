@@ -104,7 +104,9 @@ describe('TaginfoService', () => {
 
     beforeEach(() => {
       _taginfo._cache = {};
+      return _taginfo.resetAsync();
     });
+
 
     describe('keys', () => {
       it('calls the given callback with the results of the keys query', () => {
