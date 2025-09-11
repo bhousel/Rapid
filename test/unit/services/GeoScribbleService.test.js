@@ -10,8 +10,6 @@ describe('GeoScribbleService', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     gfx:     new Rapid.MockGfxSystem(context),
-    l10n:    new Rapid.MockSystem(context),
-    photos:  new Rapid.MockSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
 
@@ -125,7 +123,7 @@ describe('GeoScribbleService', () => {
 
     describe('loadTiles', () => {
       it('loads a tile of data and requests a redraw', (t, done) => {
-        fetchMock.route(/geojson/, sample.scribbles10);
+        fetchMock.route(/geojson/, sample.data10);
         _geoscribble.loadTiles();
         setImmediate(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
@@ -143,7 +141,7 @@ describe('GeoScribbleService', () => {
       beforeEach(() => {
         // load the data around [10°, 0°]
         // (this needs to be beforeEach because the parent beforeEach resets)
-        fetchMock.route(/geojson/, sample.scribbles10);
+        fetchMock.route(/geojson/, sample.data10);
         _geoscribble.loadTiles();
         return new Promise(resolve => { setImmediate(resolve); });
       });

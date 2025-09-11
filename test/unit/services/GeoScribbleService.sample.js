@@ -1,5 +1,5 @@
-// scribbles near [10°, 0°]
-export const scribbles10 = {
+// data near [10°, 0°]
+export const data10 = {
   features: [
     {
       type: 'Feature',
