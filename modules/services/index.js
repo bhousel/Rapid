@@ -1,4 +1,5 @@
 import { EsriService } from './EsriService.js';
+import { GeoScribbleService } from './GeoScribbleService.js';
 import { KartaviewService } from './KartaviewService.js';
 import { KeepRightService } from './KeepRightService.js';
 import { MapillaryService } from './MapillaryService.js';
@@ -15,10 +16,10 @@ import { TaginfoService } from './TaginfoService.js';
 import { VectorTileService } from './VectorTileService.js';
 import { WikidataService } from './WikidataService.js';
 import { WikipediaService } from './WikipediaService.js';
-import { GeoScribbleService } from './GeoScribbleService.js';
 
 export {
   EsriService,
+  GeoScribbleService,
   KartaviewService,
   KeepRightService,
   MapillaryService,

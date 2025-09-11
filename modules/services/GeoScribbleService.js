@@ -6,7 +6,7 @@ import { GeoJSON } from '../models/GeoJSON.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
-const TILEZOOM = 16.5;
+const TILEZOOM = 14;
 const GEOSCRIBBLE_API = 'https://geoscribble.osmz.ru/geojson';
 
 

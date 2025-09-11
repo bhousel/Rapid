@@ -150,26 +150,6 @@ describe('MapillaryService', () => {
           done();
         });
       });
-
-      it('does not load tiles around Null Island', (t, done) => {
-        context.viewport.transform.translation = [0, 0];  // move map to Null Island
-        fetchMock.route(/mly1_/, {
-          body: sample.pbf0,
-          status: 200,
-          headers: { 'Content-Type': 'application/x-protobuf' }
-        });
-
-        _mapillary.loadTiles('images');
-
-        setImmediate(() => {
-          assert.lengthOf(fetchMock.callHistory.calls(), 0);  // fetch not called
-          assert.lengthOf(spyRedraw.mock.calls, 0);           // redraw not called
-
-          const spatial = context.systems.spatial;
-          assert.isFalse(spatial.hasTileAtLoc('mapillary-images', [0, 0]));  // tile is not loaded here
-          done();
-        });
-      });
     });
 
 

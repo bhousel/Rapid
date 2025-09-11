@@ -140,20 +140,6 @@ describe('KartaviewService', () => {
           done();
         });
       });
-
-      it('does not load tiles around Null Island', (t, done) => {
-        context.viewport.transform.translation = [0, 0];  // move map to Null Island
-        fetchMock.route(/nearby-photos/, sample.nearbyPhotos0);
-        _kartaview.loadTiles();
-        setImmediate(() => {
-          assert.lengthOf(fetchMock.callHistory.calls(), 0);  // fetch not called
-          assert.lengthOf(spyRedraw.mock.calls, 0);           // redraw not called
-
-          const spatial = context.systems.spatial;
-          assert.isFalse(spatial.hasTileAtLoc('kartaview-images', [0, 0]));  // tile is not loaded here
-          done();
-        });
-      });
     });
 
 

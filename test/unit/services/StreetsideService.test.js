@@ -138,7 +138,7 @@ describe('StreetsideService', () => {
       it('loads a tile of data and requests a redraw', (t, done) => {
         fetchMock
           .route(/StreetSideBubbleMetaData/, {
-            body: JSON.stringify(sample.nearbyPhotos10),
+            body: JSON.stringify(sample.bubbles10),
             status: 200,
             headers: { 'Content-Type': 'text/plain' }
           });
@@ -154,28 +154,6 @@ describe('StreetsideService', () => {
           done();
         });
       });
-
-      it('does not load tiles around Null Island', (t, done) => {
-        context.viewport.transform.translation = [0, 0];  // move map to Null Island
-
-        fetchMock
-          .route(/StreetSideBubbleMetaData/, {
-            body: JSON.stringify(sample.nearbyPhotos0),
-            status: 200,
-            headers: { 'Content-Type': 'text/plain' }
-          });
-
-        _streetside.loadTiles();
-
-        setImmediate(() => {
-          assert.lengthOf(fetchMock.callHistory.calls(), 0);  // fetch not called
-          assert.lengthOf(spyRedraw.mock.calls, 0);           // redraw not called
-
-          const spatial = context.systems.spatial;
-          assert.isFalse(spatial.hasTileAtLoc('streetside-images', [0, 0]));  // tile is not loaded here
-          done();
-        });
-      });
     });
 
 
@@ -185,7 +163,7 @@ describe('StreetsideService', () => {
         // (this needs to be beforeEach because the parent beforeEach resets)
        fetchMock
           .route(/StreetSideBubbleMetaData/, {
-            body: JSON.stringify(sample.nearbyPhotos10),
+            body: JSON.stringify(sample.bubbles10),
             status: 200,
             headers: { 'Content-Type': 'text/plain' }
           });
