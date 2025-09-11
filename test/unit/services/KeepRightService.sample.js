@@ -53,3 +53,48 @@ export const data10 = {
     }
   ]
 };
+
+
+export const qa_data = {
+  keepRight: {
+    localizeStrings: {
+      'this highway': 'this_highway',
+    },
+    errorTypes: {
+      '50': {
+        title: 'almost-junctions',
+        severity: 'error',
+        description: 'This node is very close but not connected to way #$1',
+        IDs: ['this', 'w'],
+        regex: '(this node) is very close but not connected to way #(\\d+)'
+      },
+      '300': {
+        title: 'missing maxspeed',
+        severity: 'warning',
+        description: 'This highway is missing a maxspeed tag',
+        IDs: ['this'],
+        regex: '(this highway)'
+      },
+      '390': {
+        title: 'missing tracktype',
+        severity: 'warning',
+        description: 'This track doesn\'t have a tracktype',
+        IDs: ['this'],
+        regex: '(this track)'
+      }
+    }
+  }
+};
+
+
+export const l10n_data = {
+  core: {
+    QA: {
+      keepRight: {
+        error_parts: {
+          this_highway: 'this highway'
+        }
+      }
+    }
+  }
+};

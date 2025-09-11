@@ -157,7 +157,7 @@ export class OsmoseService extends AbstractSystem {
 
     const [x, y, z] = tile.xyz;
     const params = { item: this._osmoseData.types };   // Only request the types that we support
-    const url = `${OSMOSE_API}/issues/${z}/${x}/${y}.json?` + utilQsString(params);
+    const url = `${OSMOSE_API}/issues/${z}/${x}/${y}.geojson?` + utilQsString(params);
 
     const controller = new AbortController();
     cache.inflightTile.set(tileID, controller);
