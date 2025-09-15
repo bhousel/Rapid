@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import { assert } from 'chai';
-import * as Rapid from '../../../modules/headless.js';
+import * as Rapid from '../../../../modules/headless.js';
 
 
 describe('osmIntersection', () => {

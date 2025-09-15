@@ -5,7 +5,7 @@ import { actionAddEntity } from '../../actions/add_entity.js';
 import { actionAddMember } from '../../actions/add_member.js';
 import { actionChangeMember } from '../../actions/change_member.js';
 import { actionDeleteMembers } from '../../actions/delete_members.js';
-import { OsmEntity, OsmRelation } from '../../models/index.js';
+import { OsmEntity, OsmRelation } from '../../data/index.js';
 import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
 import { uiSection } from '../section.js';

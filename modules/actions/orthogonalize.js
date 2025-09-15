@@ -3,7 +3,7 @@ import {
   vecNormalize, vecProject, vecScale, vecSubtract
 } from '@rapid-sdk/math';
 
-import { Graph } from '../models/Graph.js';
+import { Graph } from '../data/lib/Graph.js';
 import { actionDeleteNode } from './delete_node.js';
 import { geoOrthoNormalizedDotProduct, geoOrthoCalcScore, geoOrthoCanOrthogonalize } from '../geo/index.js';
 

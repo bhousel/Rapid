@@ -3,7 +3,7 @@ import { Extent, geoMetersToLat, geoMetersToLon, geoSphericalDistance } from '@r
 import { actionMergeNodes } from '../actions/merge_nodes.js';
 import { ValidationIssue } from '../core/lib/ValidationIssue.js';
 import { ValidationFix } from '../core/lib/ValidationFix.js';
-import { osmPathHighwayTagValues } from '../models/tags.js';
+import { osmPathHighwayTagValues } from '../data/lib/tags.js';
 
 
 export function validationCloseNodes(context) {

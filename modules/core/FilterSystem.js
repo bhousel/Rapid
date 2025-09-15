@@ -1,7 +1,7 @@
 import { /* utilArrayGroupBy,*/ utilArrayUnion } from '@rapid-sdk/util';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { osmLifecyclePrefixes } from '../models/index.js';
+import { osmLifecyclePrefixes } from '../data/lib/index.js';
 
 
 const traffic_roads = {

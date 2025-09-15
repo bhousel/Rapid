@@ -1,7 +1,7 @@
 import { geomPolygonContainsPolygon } from '@rapid-sdk/math';
 import { utilArrayGroupBy, utilArrayIntersection, utilObjectOmit } from '@rapid-sdk/util';
 
-import { osmJoinWays, OsmRelation } from '../models/index.js';
+import { osmJoinWays, OsmRelation } from '../data/index.js';
 
 
 export function actionMergePolygon(ids, newRelationID) {

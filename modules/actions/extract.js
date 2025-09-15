@@ -1,4 +1,4 @@
-import { OsmNode } from '../models/OsmNode.js';
+import { OsmNode } from '../data/OsmNode.js';
 
 
 export function actionExtract(entityID, viewport) {

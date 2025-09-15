@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 import { utilTagDiff } from '@rapid-sdk/util';
 
 import { actionChangePreset, actionChangeTags, actionSyncCrossingTags } from '../actions/index.js';
-import { Difference } from '../models/Difference.js';
+import { Difference } from '../data/lib/Difference.js';
 import { ValidationIssue } from '../core/lib/ValidationIssue.js';
 import { ValidationFix } from '../core/lib/ValidationFix.js';
 

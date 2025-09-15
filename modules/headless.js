@@ -1,8 +1,8 @@
 // Core components to support a headless (no browser) Rapid for testing.
 export * from './actions/index.js';
 export * from './core/lib/index.js';
+export * from './data/index.js';
 export * from './geo/index.js';
-export * from './models/index.js';
 export * from './services/index.js';
 export * from './util/index.js';
 export * from './validations/index.js';

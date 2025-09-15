@@ -1,6 +1,6 @@
 import { utilArrayGroupBy, utilArrayUniq } from '@rapid-sdk/util';
 
-import { osmTagSuggestingArea } from '../models/tags.js';
+import { osmTagSuggestingArea } from '../data/lib/tags.js';
 
 
 export function actionMerge(ids) {

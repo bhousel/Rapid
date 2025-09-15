@@ -4,7 +4,7 @@ import { gpx, kml } from '@tmcw/togeojson';
 import { parse as wktParse } from 'wkt';
 
 import { geojsonFeatures } from '../util/util.js';
-import { GeoJSON } from '../models/GeoJSON.js';
+import { GeoJSON } from '../data/GeoJSON.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeatureLine } from './PixiFeatureLine.js';
 import { PixiFeaturePoint } from './PixiFeaturePoint.js';

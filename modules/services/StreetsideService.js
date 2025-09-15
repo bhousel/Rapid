@@ -8,7 +8,7 @@ import {
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { Marker, GeoJSON } from '../models/index.js';
+import { Marker, GeoJSON } from '../data/index.js';
 import { uiIcon } from '../ui/icon.js';
 import { utilFetchResponse } from '../util/index.js';
 

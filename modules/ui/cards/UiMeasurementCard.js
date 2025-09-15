@@ -5,7 +5,7 @@ import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilGetAllNodes } from '@rapid-sdk/util';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
-import { Marker } from '../../models/Marker.js';
+import { Marker } from '../../data/Marker.js';
 import { uiIcon } from '../icon.js';
 import { utilCmd } from '../../util/cmd.js';
 

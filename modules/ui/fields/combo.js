@@ -4,7 +4,7 @@ import { drag as d3_drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-import { deprecatedTagValuesByKey } from '../../models/tags.js';
+import { deprecatedTagValuesByKey } from '../../data/lib/tags.js';
 import { uiCombobox } from '../combobox.js';
 import { utilKeybinding } from '../../util/keybinding.js';
 import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.js';

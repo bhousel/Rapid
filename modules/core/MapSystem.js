@@ -5,7 +5,7 @@ import {
 } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { Marker } from '../models/Marker.js';
+import { Marker } from '../data/Marker.js';
 import { utilTotalExtent } from '../util/index.js';
 
 const MIN_Z = 2;

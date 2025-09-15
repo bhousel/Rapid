@@ -2,7 +2,7 @@ import { selection, select } from 'd3-selection';
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import * as sexagesimal from '@mapbox/sexagesimal';
 
-import { Graph, createOsmFeature } from '../models/index.js';
+import { Graph, createOsmFeature } from '../data/index.js';
 import { uiIcon } from './icon.js';
 import { utilCmd, utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../util/index.js';
 

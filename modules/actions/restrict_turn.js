@@ -1,4 +1,4 @@
-import { OsmRelation } from '../models/OsmRelation.js';
+import { OsmRelation } from '../data/OsmRelation.js';
 
 
 // `actionRestrictTurn` creates a turn restriction relation.

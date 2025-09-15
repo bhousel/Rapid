@@ -2,9 +2,9 @@ import { geoSphericalDistance, numWrap } from '@rapid-sdk/math';
 import { utilArrayIntersection, utilArrayUniq } from '@rapid-sdk/util';
 
 import { actionAddMember } from './add_member.js';
-import { osmIsOldMultipolygonOuterMember } from '../models/multipolygon.js';
-import { OsmRelation } from '../models/OsmRelation.js';
-import { OsmWay } from '../models/OsmWay.js';
+import { osmIsOldMultipolygonOuterMember } from '../data/lib/multipolygon.js';
+import { OsmRelation } from '../data/OsmRelation.js';
+import { OsmWay } from '../data/OsmWay.js';
 
 
 // Split a way at the given node.

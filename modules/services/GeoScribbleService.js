@@ -2,7 +2,7 @@ import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { GeoJSON } from '../models/GeoJSON.js';
+import { GeoJSON } from '../data/GeoJSON.js';
 import { utilFetchResponse } from '../util/index.js';
 
 

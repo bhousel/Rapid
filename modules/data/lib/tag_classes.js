@@ -1,6 +1,6 @@
 import { select as d3_select } from 'd3-selection';
 
-import { osmPathHighwayTagValues, osmPavedTags, osmSemipavedTags, osmLifecyclePrefixes } from '../models/tags.js';
+import { osmPathHighwayTagValues, osmPavedTags, osmSemipavedTags, osmLifecyclePrefixes } from './tags.js';
 
 //
 // This code is no longer used in Rapid, and we should remove it eventually.

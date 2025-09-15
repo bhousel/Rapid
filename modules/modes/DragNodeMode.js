@@ -6,7 +6,7 @@ import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { actionConnect } from '../actions/connect.js';
 import { actionMoveNode } from '../actions/move_node.js';
 import { geoChooseEdge } from '../geo/index.js';
-import { OsmNode } from '../models/OsmNode.js';
+import { OsmNode } from '../data/OsmNode.js';
 
 
 /**

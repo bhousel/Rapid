@@ -6,7 +6,7 @@ import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { actionAddVertex } from '../actions/add_vertex.js';
 import { actionMoveNode } from '../actions/move_node.js';
 import { geoChooseEdge } from '../geo/index.js';
-import { OsmNode, OsmWay } from '../models/index.js';
+import { OsmNode, OsmWay } from '../data/index.js';
 
 const DEBUG = false;
 

@@ -2,7 +2,7 @@ import { Tiler } from '@rapid-sdk/math';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { RapidDataset } from '../core/lib/index.js';
-import { Graph, OsmEntity, OsmNode, OsmWay, Tree } from '../models/index.js';
+import { Graph, OsmEntity, OsmNode, OsmWay, Tree } from '../data/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 

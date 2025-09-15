@@ -5,7 +5,7 @@ import { osmAuth } from 'osm-auth';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { JXON } from '../util/jxon.js';
-import { OsmEntity, OsmNode, OsmRelation, OsmWay, Marker } from '../models/index.js';
+import { OsmEntity, OsmNode, OsmRelation, OsmWay, Marker } from '../data/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 

@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 
 import { utilRebind } from '../../util/rebind.js';
 import { actionReverse } from '../../actions/reverse.js';
-import { osmOneWayTags } from '../../models/tags.js';
+import { osmOneWayTags } from '../../data/lib/tags.js';
 import { uiIcon } from '../icon.js';
 
 export { uiFieldCheck as uiFieldDefaultCheck };

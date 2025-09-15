@@ -1,7 +1,7 @@
 import { DEG2RAD, numClamp, vecLength, vecSubtract } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
-import { OsmNode } from '../models/OsmNode.js';
+import { OsmNode } from '../data/OsmNode.js';
 
 const NEAR_TOLERANCE = 1;
 const FAR_TOLERANCE = 4;

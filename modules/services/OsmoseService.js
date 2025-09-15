@@ -4,7 +4,7 @@ import { utilQsString } from '@rapid-sdk/util';
 import { marked } from 'marked';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { Marker } from '../models/Marker.js';
+import { Marker } from '../data/Marker.js';
 import { utilFetchResponse } from '../util/index.js';
 
 

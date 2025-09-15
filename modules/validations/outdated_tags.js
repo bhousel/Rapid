@@ -3,7 +3,11 @@ import { utilHashcode, utilTagDiff } from '@rapid-sdk/util';
 import { actionChangePreset } from '../actions/change_preset.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionUpgradeTags } from '../actions/upgrade_tags.js';
-import { Graph, getDeprecatedTags, osmIsOldMultipolygonOuterMember, osmOldMultipolygonOuterMemberOfRelation } from '../models/index.js';
+
+import {
+  Graph, getDeprecatedTags, osmIsOldMultipolygonOuterMember, osmOldMultipolygonOuterMemberOfRelation
+} from '../data/lib/index.js';
+
 import { ValidationIssue } from '../core/lib/ValidationIssue.js';
 import { ValidationFix } from '../core/lib/ValidationFix.js';
 

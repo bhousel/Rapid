@@ -1,7 +1,7 @@
 import { utilArrayUnion, utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
 import { AbstractData } from './AbstractData.js';
-import { osmIsInterestingTag } from './tags.js';
+import { osmIsInterestingTag } from './lib/tags.js';
 
 
 /**

@@ -2,7 +2,7 @@ import { median } from 'd3-array';
 import { DEG2RAD, vecAngle, vecInterp, vecLength, vecLengthSquare } from '@rapid-sdk/math';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
-import { OsmNode } from '../models/OsmNode.js';
+import { OsmNode } from '../data/OsmNode.js';
 
 
 export function actionCircularize(wayID, viewport, maxDegrees = 20) {

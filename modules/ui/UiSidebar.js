@@ -3,7 +3,7 @@ import { interpolateNumber } from 'd3-interpolate';
 import { Extent, vecLength } from '@rapid-sdk/math';
 import _throttle from 'lodash-es/throttle.js';
 
-import { GeoJSON, Marker, OsmEntity } from '../models/index.js';
+import { GeoJSON, Marker, OsmEntity } from '../data/index.js';
 import { uiDataEditor } from './data_editor.js';
 import { UiFeatureList } from './UiFeatureList.js';
 import { UiInspector } from './UiInspector.js';

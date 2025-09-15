@@ -1,7 +1,7 @@
 import { utilArrayDifference, utilArrayUniq } from '@rapid-sdk/util';
 
 import { localize } from './helper.js';
-import { createOsmFeature } from '../../models/index.js';
+import { createOsmFeature } from '../../data/index.js';
 import { uiIcon } from '../icon.js';
 import { UiCurtain } from './UiCurtain.js';
 

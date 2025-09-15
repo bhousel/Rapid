@@ -2,7 +2,7 @@ import { geoArea as d3_geoArea } from 'd3-geo';
 import { geomPolygonContainsPolygon, geomPolygonIntersectsPolygon } from '@rapid-sdk/math';
 
 import { OsmEntity } from './OsmEntity.js';
-import { osmJoinWays } from './multipolygon.js';
+import { osmJoinWays } from './lib/multipolygon.js';
 
 
 /**

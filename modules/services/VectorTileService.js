@@ -9,7 +9,7 @@ import Protobuf from 'pbf';
 import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { GeoJSON } from '../models/GeoJSON.js';
+import { GeoJSON } from '../data/GeoJSON.js';
 import { utilFetchResponse } from '../util/index.js';
 
 

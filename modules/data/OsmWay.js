@@ -2,8 +2,8 @@ import { Extent, vecCross } from '@rapid-sdk/math';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { OsmEntity } from './OsmEntity.js';
-import { osmLanes } from './lanes.js';
-import { osmTagSuggestingArea, osmOneWayTags, osmRightSideIsInsideTags, osmRemoveLifecyclePrefix } from './tags.js';
+import { osmLanes } from './lib/lanes.js';
+import { osmTagSuggestingArea, osmOneWayTags, osmRightSideIsInsideTags, osmRemoveLifecyclePrefix } from './lib/tags.js';
 
 
 // Filter function to eliminate consecutive duplicates.

@@ -4,7 +4,7 @@ import { AbstractSystem } from './AbstractSystem.js';
 import { actionDiscardTags } from '../actions/discard_tags.js';
 import { actionMergeRemoteChanges } from '../actions/merge_remote_changes.js';
 import { actionRevert } from '../actions/revert.js';
-import { Graph } from '../models/Graph.js';
+import { Graph } from '../data/lib/Graph.js';
 
 
 

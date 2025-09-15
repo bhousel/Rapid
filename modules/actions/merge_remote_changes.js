@@ -4,7 +4,7 @@ import deepEqual from 'fast-deep-equal';
 import { diff3Merge } from 'node-diff3';
 
 import { actionDeleteMultiple } from './delete_multiple.js';
-import { createOsmFeature } from '../models/index.js';
+import { createOsmFeature } from '../data/index.js';
 
 
 export function actionMergeRemoteChanges(id, options = {}) {
