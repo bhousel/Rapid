@@ -495,25 +495,30 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
   /**
    * _setFile
-   * This function is either called from the `FileReader` or the `fetch` then chain.
-   * All files get converted to GeoJSON
-   * @param  {string|Object}  data       The file data
-   * @param  {string}         extension  The file extension
+   * This function is either called from the `FileReader` onload callback, or the `fetch` then chain.
+   * It can accept:
+   *  - a `string` of text data, in which case it will be parsed according to the given extension.
+   *  - a `Document` parsed by `xmldom.DOMParser` (like we would receive from `utilFetchResponse`),
+   *  - an `Object`, in the case of JSON/GeoJSON.
+   * All files get converted to GeoJSON.
+   * @param  {string|Object|Document}   data        The file data
+   * @param  {string}                   extension   The file extension
    */
   _setFile(data, extension) {
     if (!data) return;
 
+    const isString = (typeof data === 'string');
     let geojson;
     switch (extension) {
       case '.gpx':
-        geojson = gpx( (data instanceof Document) ? data : _toXML(data) );
+        geojson = gpx(isString ? _parseXML(data) : data);
         break;
       case '.kml':
-        geojson = kml( (data instanceof Document) ? data : _toXML(data) );
+        geojson = kml(isString ? _parseXML(data) : data);
         break;
       case '.geojson':
       case '.json':
-        geojson = (data instanceof Object) ? data : JSON.parse(data);
+        geojson = isString ? JSON.parse(data) : data;
         break;
     }
 
@@ -539,7 +544,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
     }
 
-    function _toXML(text) {
+    function _parseXML(text) {
       return (new DOMParser()).parseFromString(text, 'text/xml');
     }
   }
