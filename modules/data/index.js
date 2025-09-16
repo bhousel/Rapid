@@ -1,4 +1,5 @@
 export * from './lib/index.js';
+export * from './parsers/index.js';
 
 import { AbstractData } from './AbstractData.js';
 import { GeoJSON } from './GeoJSON.js';
