@@ -16,7 +16,7 @@ export const n1 = {
   uid: 100,
   tags: {
     crossing: "marked",
-    "crossing:markings": "yes",
+    "crossing:markings": "zebra",
     highway: "crossing"
   }
 };

@@ -629,6 +629,13 @@ export class EditSystem extends AbstractSystem {
     const baseGraph = this.base.graph;
     const stagingGraph = this.staging.graph;
 
+    // Note: I'd like to try to find a way to avoid seenIDs, but we probably need it for now.
+    // The emit('merge', seenIDs) below triggers a re-render of all features on a tile,
+    // even the previously seen ones. The reason is because new information could cause
+    // features to render differently.  An example would be a ways that are a members of
+    // a large multipolygon could be part of the outer or a hole, and those ways need to
+    // redraw even if different ways appear.
+    // see https://github.com/facebook/Rapid/commit/4223385
     if (!(seenIDs instanceof Set)) {
       seenIDs = new Set(entities.map(entity => entity.id));
     }

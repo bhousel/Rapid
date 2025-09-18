@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../../modules/headless.js';
 import * as sample from './OsmJSONParser.sample.js';
@@ -6,6 +6,10 @@ import * as sample from './OsmJSONParser.sample.js';
 
 describe('OsmJSONParser', () => {
   const parser = new Rapid.OsmJSONParser();
+
+  beforeEach(() => {
+    parser.reset();
+  });
 
   describe('constructor', () => {
     it('constructs an OsmJSONParser', () => {

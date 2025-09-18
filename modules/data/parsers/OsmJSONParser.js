@@ -4,16 +4,54 @@ import { OsmEntity } from '../OsmEntity.js';
 /**
  * OsmJSONParser
  * This class contains the code for parsing an OSM JSON content.
- *
- * Calling code should call `parseAsync` with the content to parse.
- * `parseAsync` returns a Promise either rejected with an error or resolved with
- * whatever valid data was found in the content, as an Array of Objects.
- *
  * @see https://wiki.openstreetmap.org/wiki/OSM_JSON
  * Note that OSM JSON data can contain slightly different syntax and attributes.
  * History:  The XML-based formats came first, but now the OSM API supports JSON
  *  for many of it's methods.  Using JSON can be much more efficient because it
  *  avoids the overhead of parsing and creating an Document / DOM objects.
+ *
+ * Calling code should call `parseAsync` with the content to parse.
+ * `parseAsync` returns a Promise either rejected with an error or resolved with
+ * whatever valid data was found in the content.
+ *
+ * The job of this code is to convert the OSM JSON into a JavaScript Object,
+ * allowing code elsewhere in Rapid to work with the data in a consistent way.
+ * The JavaScript Object will look a lot like the OSM JSON file format, but
+ * with a consistent structure, as the OSM JSON has its own inconsistencies.
+ *
+ * Parsed results will be returned in an JavaScript Object like this:
+ * @example
+ * {
+ *   osm: {            // Any optional metadata attributes found in the root osm element.
+ *     version: … ,    // 'version', 'generator', 'copyright', 'attribution' are typical.
+ *     generator: …
+ *     …
+ *   },
+ *   data: [         // Array of Objects parsed from the file..
+ *     {
+ *       type: 'node',   // Each object WILL have a 'type' property,
+ *       id: 1,          // along with whatever other properties are present.
+ *       lat: 40.6555,
+ *       lon: -74.5415,
+ *       …
+ *     }, {
+ *       type: 'way',
+ *       id: 1,
+ *       nodes: [1, 2],
+ *       …
+ *     },
+ *     …
+ *   ]
+ * }
+ *
+ * The supported "types" include:
+ *  'node', 'way', 'relation',    (sometimes called "elements")
+ *  'note',
+ *  'user',
+ *  'preferences',
+ *  'changeset',
+ *  'api', 'policy'  (returned from the `/capabilities` API call)
+ *  'bounds'         (returned with the `/map` API call)
  */
 export class OsmJSONParser {
 
@@ -36,6 +74,9 @@ export class OsmJSONParser {
 
   /**
    * parseAsync
+   * Parse the given content and extract whatatever OSM data we find in it.
+   * Note: This really doesn't need to be async, but I made it this way because
+   *  the code is expected to send its result to older errback-style callbacks.
    * @param   {Object|string}  content - the content to parse
    * @param   {Object}         options - parsing options
    * @return  {Promise}  Promise resolved with results of parsed data, or rejected with error.
@@ -49,7 +90,7 @@ export class OsmJSONParser {
         return;
       }
 
-      const results = { data: [], seenIDs: new Set() };
+      const results = { osm: {}, data: [], seenIDs: new Set() };
       const json = (typeof content === 'string' ? JSON.parse(content) : content);
 
       // The json may contain Elements, Users, or Changesets
