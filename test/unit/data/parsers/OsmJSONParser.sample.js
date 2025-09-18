@@ -127,6 +127,7 @@ export const note1 = {
   },
   "properties": {
     "id": 1,
+    "foo": "bar",
     "url": "https://api.openstreetmap.org/api/0.6/notes/1.json",
     "comment_url": "https://api.openstreetmap.org/api/0.6/notes/1/comment.json",
     "close_url": "https://api.openstreetmap.org/api/0.6/notes/1/close.json",
@@ -205,10 +206,9 @@ export const user1 = {
   "description": "Hi",
   "contributor_terms": { "agreed": true, "pd": true },
   "img": { "href": "https://www.gravatar.com/avatar/test.png" },
-  "roles": [],
   "changesets": { "count": 999 },
   "traces": { "count": 999 },
-  "blocks": { "received": {"count": 0, "active": 0 } },
+  "blocks": { "received": { "count": 0, "active": 0 } },
   "home": { "lat": 40, "lon": -74, "zoom": 3 },
   "languages": ["en", "en-US"],
   "messages": {
@@ -402,7 +402,8 @@ export const capabilitiesJSON = {
     "imagery": {
       "blacklist": [
         { "regex": "\.foo\.com" },
-        { "regex": "\.bar\.org" }
+        { "regex": "\.bar\.org" },
+        { "regex": "\\" }   // invalid regex ignored
       ]
     }
   }

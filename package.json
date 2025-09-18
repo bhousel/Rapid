@@ -49,7 +49,7 @@
     "test": "npm-run-all -s lint build test:unit test:browser",
     "test:benchmark": "npm run test:unzip-benchmark-data && npx playwright test --workers=1 --config=test/benchmark/playwright.config.mjs && npm run test:cleanup-benchmark-data",
     "test:browser": "karma start karma.conf.cjs",
-    "test:unit": "dotenvx run --quiet -- c8 node --test-reporter spec --test test/unit/**/*.test.js",
+    "test:unit": "dotenvx run --quiet -- c8 node --test-reporter spec --test test/unit/**/*.test.js test/unit/**/**/*.test.js",
     "test:unit:break": "node --inspect-brk --test-reporter spec --test test/unit/**/*.test.js",
     "test:unzip-benchmark-data": "tar -xvf test/benchmark/tokyo_canned_data.zip -C test/benchmark",
     "test:cleanup-benchmark-data": "rm test/benchmark/tokyo_*_canned_osm_data.js",
