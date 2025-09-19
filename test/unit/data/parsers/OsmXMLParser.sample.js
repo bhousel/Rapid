@@ -1,23 +1,24 @@
-/* eslint-disable quotes */
 
 // ----------------------------------------
 // Elements (nodes, ways, relations, map)
 
-// Node, with tags
+// Node, with tags (default visible)
 export const n1 = `
-<node id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415">
+<node id="1" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415" tags="ignoreme">
   <tag k="crossing" v="marked"/>
   <tag k="crossing:markings" v="zebra"/>
   <tag k="highway" v="crossing"/>
+  <tag k="empty"/>
+  <tag v="ignoreme"/>
 </node>`;
 
-// Node, no tags
+// Node, no tags (default visible)
 export const n2 = `
-<node id="2" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
+<node id="2" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
 
-// Way, with nodes and tags
+// Way, with nodes and tags (default visible)
 export const w1 = `
-<way id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100">
+<way id="1" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
   <nd ref="1"/>
   <nd ref="2"/>
   <tag k="highway" v="tertiary"/>
@@ -26,9 +27,80 @@ export const w1 = `
   <tag k="oneway" v="yes"/>
 </way>`;
 
-// Relation, with members and tags
+// Relation, with members and tags (default visible)
 export const r1 = `
-<relation id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100">
+<relation id="1" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+  <member type="way" ref="1" role="south"/>
+  <tag k="network" v="US:NJ:Somerset"/>
+  <tag k="ref" v="651"/>
+  <tag k="route" v="road"/>
+  <tag k="type" v="route"/>
+</relation>`;
+
+// Node, with tags (visible=true)
+export const n1visible = `
+<node id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415" tags="ignoreme">
+  <tag k="crossing" v="marked"/>
+  <tag k="crossing:markings" v="zebra"/>
+  <tag k="highway" v="crossing"/>
+  <tag k="empty"/>
+  <tag v="ignoreme"/>
+</node>`;
+
+// Node, no tags (visible=true)
+export const n2visible = `
+<node id="2" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
+
+// Way, with nodes and tags (visible=true)
+export const w1visible = `
+<way id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+  <nd ref="1"/>
+  <nd ref="2"/>
+  <tag k="highway" v="tertiary"/>
+  <tag k="lanes" v="1"/>
+  <tag k="name" v="Spring Valley Boulevard"/>
+  <tag k="oneway" v="yes"/>
+</way>`;
+
+// Relation, with members and tags (visible=true)
+export const r1visible = `
+<relation id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+  <member type="way" ref="1" role="south"/>
+  <tag k="network" v="US:NJ:Somerset"/>
+  <tag k="ref" v="651"/>
+  <tag k="route" v="road"/>
+  <tag k="type" v="route"/>
+</relation>`;
+
+
+// Deleted Node, with tags (visible=false)
+export const n1deleted = `
+<node id="1" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415" tags="ignoreme">
+  <tag k="crossing" v="marked"/>
+  <tag k="crossing:markings" v="zebra"/>
+  <tag k="highway" v="crossing"/>
+  <tag k="empty"/>
+  <tag v="ignoreme"/>
+</node>`;
+
+// Deleted Node, no tags (visible=false)
+export const n2deleted = `
+<node id="2" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
+
+// Deleted Way, with nodes and tags (visible=false)
+export const w1deleted = `
+<way id="1" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+  <nd ref="1"/>
+  <nd ref="2"/>
+  <tag k="highway" v="tertiary"/>
+  <tag k="lanes" v="1"/>
+  <tag k="name" v="Spring Valley Boulevard"/>
+  <tag k="oneway" v="yes"/>
+</way>`;
+
+// Deleted Relation, with members and tags (visible=false)
+export const r1deleted = `
+<relation id="1" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
   <member type="way" ref="1" role="south"/>
   <tag k="network" v="US:NJ:Somerset"/>
   <tag k="ref" v="651"/>
@@ -59,7 +131,7 @@ export const mapXML =
 
 // Any error present should invalidate the entire response.
 // see https://wiki.openstreetmap.org/wiki/API_v0.6#Internal_errors_while_generating_a_response
-export const mapXMLpartial =
+export const mapXMLerror1 =
 `<?xml version="1.0" encoding="UTF-8"?>
 <osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
   ${bounds}
@@ -68,13 +140,43 @@ export const mapXMLpartial =
   <error>something went wrong loading postgres</error>
 </osm>`;
 
+export const mapXMLerror2 =
+`<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+  ${bounds}
+  ${n1}
+  ${n2}
+  <error/>
+</osm>`;
+
+// test visible/deleted
+export const mapXMLvisible =
+`<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+  ${bounds}
+  ${n1visible}
+  ${n2visible}
+  ${w1visible}
+  ${r1visible}
+</osm>`;
+
+export const mapXMLdeleted =
+`<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+  ${bounds}
+  ${n1deleted}
+  ${n2deleted}
+  ${w1deleted}
+  ${r1deleted}
+</osm>`;
+
 
 // ----------------------------------------
 // Notes
 
 // Note, opened by a user (action will be opened)
 export const note1 = `
-<note lon="10.0001" lat="0" foo="bar">
+<note lon="10.0001" lat="0" foo="bar" loc="ignoreme" type="ignoreme">
   <id>1</id>
   <url>https://www.openstreetmap.org/api/0.6/notes/1</url>
   <comment_url>https://api.openstreetmap.org/api/0.6/notes/1/comment</comment_url>
@@ -142,7 +244,7 @@ export const notesXML =
 // User, no roles, logged in and with `/details`
 // (includes home, languages, and messages)
 export const user1 = `
-<user id="100" display_name="bhousel" account_created="2000-01-01T00:00:01Z">
+<user id="100" display_name="bhousel" account_created="2000-01-01T00:00:01Z" type="ignoreme">
   <description>Hi</description>
   <contributor-terms agreed="true" pd="true"/>
   <img href="https://www.gravatar.com/avatar/test.png"/>
@@ -204,6 +306,7 @@ export const preferencesXML = `
     <preference k="foo" v="bar"/>
     <preference k="hello" v="world"/>
     <preference k="empty"/>
+    <preference v="ignoreme"/>
   </preferences>
 </osm>`;
 
@@ -338,14 +441,13 @@ export const metadataResult = {
   license: 'http://opendatacommons.org/licenses/odbl/1-0/',
 };
 
-
 export const boundsResult = {
   type: 'bounds',
   minlat: 40.6550000,
   minlon: -74.5420000,
   maxlat: 40.6560000,
   maxlon: -74.5410000
-}
+};
 
 export const n1Result = {
   type: 'node',
@@ -360,7 +462,8 @@ export const n1Result = {
   tags: {
     crossing: 'marked',
     'crossing:markings': 'zebra',
-    highway: 'crossing'
+    highway: 'crossing',
+    empty: ''
   }
 };
 
@@ -374,7 +477,7 @@ export const n2Result = {
   changeset: 1,
   user: 'bhousel',
   uid: 100
-}
+};
 
 export const w1Result = {
   type: 'way',
@@ -413,6 +516,75 @@ export const r1Result = {
     type: 'route'
   }
 };
+
+export const n1ResultDeleted = {
+  type: 'node',
+  id: 'n1',
+  visible: false,
+  loc: [-74.5415, 40.6555],
+  timestamp: new Date('2025-09-01T00:00:01Z'),
+  version: 2,
+  changeset: 1,
+  user: 'bhousel',
+  uid: 100,
+  tags: {
+    crossing: 'marked',
+    'crossing:markings': 'zebra',
+    highway: 'crossing',
+    empty: ''
+  }
+};
+
+export const n2ResultDeleted = {
+  type: 'node',
+  id: 'n2',
+  visible: false,
+  loc: [-74.5416, 40.6556],
+  timestamp: new Date('2025-09-01T00:00:01Z'),
+  version: 2,
+  changeset: 1,
+  user: 'bhousel',
+  uid: 100
+};
+
+export const w1ResultDeleted = {
+  type: 'way',
+  id: 'w1',
+  visible: false,
+  timestamp: new Date('2025-09-01T00:00:01Z'),
+  version: 2,
+  changeset: 1,
+  user: 'bhousel',
+  uid: 100,
+  nodes: ['n1', 'n2'],
+  tags: {
+    highway: 'tertiary',
+    lanes: '1',
+    name: 'Spring Valley Boulevard',
+    oneway: 'yes'
+  }
+};
+
+export const r1ResultDeleted = {
+  type: 'relation',
+  id: 'r1',
+  visible: false,
+  timestamp: new Date('2025-09-01T00:00:01Z'),
+  version: 2,
+  changeset: 1,
+  user: 'bhousel',
+  uid: 100,
+  members: [
+    { type: 'way', id: 'w1', role: 'south' }
+  ],
+  tags: {
+    network: 'US:NJ:Somerset',
+    ref: '651',
+    route: 'road',
+    type: 'route'
+  }
+};
+
 
 export const c1Result  = {
   id: 'c1',

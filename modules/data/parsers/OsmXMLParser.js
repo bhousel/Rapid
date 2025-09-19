@@ -7,10 +7,6 @@ import { DOMParser } from '@xmldom/xmldom';
  * @see https://wiki.openstreetmap.org/wiki/OSM_XML
  * Note that OSM XML data can contain slightly different syntax and attributes.
  *
- * Calling code should call `parseAsync` with the content to parse.
- * `parseAsync` returns a Promise either rejected with an error or resolved with
- * whatever valid data was found in the content.
- *
  * The job of this code is to convert the OSM XML into a JavaScript Object,
  * allowing code elsewhere in Rapid to work with the data in a consistent way.
  * The JavaScript Object will look a lot like the OSM JSON file format, but
@@ -83,112 +79,104 @@ export class OsmXMLParser {
 
 
   /**
-   * parseAsync
+   * parse
    * Parse the given content and extract whatatever OSM data we find in it.
-   * Note: This really doesn't need to be async, but I made it this way because
-   *  the code is expected to send its result to older errback-style callbacks.
    * @param   {Object|string}  content - the content to parse
    * @param   {Object}         options - parsing options
-   * @return  {Promise}  Promise resolved with results of parsed data, or rejected with error.
+   * @return  {Object}   Result object containing the information parsed
+   * @throws  Will throw if nothing could be parsed, or errors found
    */
-  parseAsync(content, options = {}) {
+  parse(content, options = {}) {
     options.skipSeen ??= true;
 
-    return new Promise((resolve, reject) => {
-      if (!content)  {
-        reject(new Error('No content'));
-        return;
+    if (!content)  {
+      throw new Error('No content');
+    }
+
+    // Note: I'd like to try to find a way to avoid seenIDs, See note in EditSystem.merge()..
+    const results = { osm: {}, data: [], seenIDs: new Set() };
+    const xml = (typeof content === 'string' ? new DOMParser().parseFromString(content, 'application/xml') : content);
+
+    if (!xml?.childNodes) {
+      throw new Error('No XML');
+    }
+
+    const osmElement = Array.from(xml.childNodes).find(child => child.nodeName === 'osm');
+    if (!osmElement?.childNodes) {
+      throw new Error('No OSM Element');
+    }
+
+    // Collect metadata
+    Object.assign(results.osm, getCleanAttributes(osmElement));
+
+    // Collect children of the osm element
+    const children = getChildNodes(osmElement);
+
+    // Sometimes an error can be present alongside other elements - Rapid#501
+    const errElement = children.find(child => child.nodeName === 'error');
+    if (errElement) {
+      const message = errElement.textContent || 'unknown error';
+      throw new Error(`Partial Response: ${message}`);
+    }
+
+    for (const child of children) {
+      let parser, id;
+
+      if (child.nodeName === 'node') {
+        id = 'n' + child.attributes.getNamedItem('id').value;
+        results.seenIDs.add(id);
+        parser = this._parseNode;
+
+      } else if (child.nodeName === 'way') {
+        id = 'w' + child.attributes.getNamedItem('id').value;
+        results.seenIDs.add(id);
+        parser = this._parseWay;
+
+      } else if (child.nodeName === 'relation') {
+        id = 'r' + child.attributes.getNamedItem('id').value;
+        results.seenIDs.add(id);
+        parser = this._parseRelation;
+
+      } else if (child.nodeName === 'changeset') {
+        id = 'c' + child.attributes.getNamedItem('id').value;
+        results.seenIDs.add(id);
+        parser = this._parseChangeset;
+
+      } else if (child.nodeName === 'note') {
+        id = 'note' + child.getElementsByTagName('id')[0].textContent;
+        parser = this._parseNote;
+
+      } else if (child.nodeName === 'user') {
+        id = 'user' + child.attributes.getNamedItem('id').value;
+        parser = this._parseUser;
+
+      } else if (child.nodeName === 'preferences') {
+        parser = this._parsePreferences;
+
+      } else if (child.nodeName === 'api') {
+        parser = this._parseApi;
+
+      } else if (child.nodeName === 'policy') {
+        parser = this._parsePolicy;
+
+      } else if (child.nodeName === 'bounds') {
+        parser = this._parseBounds;
       }
 
-      // Note: I'd like to try to find a way to avoid seenIDs, See note in EditSystem.merge()..
-      const results = { osm: {}, data: [], seenIDs: new Set() };
-      const xml = (typeof content === 'string' ? new DOMParser().parseFromString(content, 'application/xml') : content);
+      if (!parser) continue;
 
-      if (!xml?.childNodes) {
-        reject(new Error('No XML'));
-        return;
+      if (options.skipSeen && id !== undefined) {  // skip things we've seen before
+        if (this._seen.has(id)) continue;
+        this._seen.add(id);
       }
 
-      const osmElement = Array.from(xml.childNodes).find(child => child.nodeName === 'osm');
-      if (!osmElement?.childNodes) {
-        reject(new Error('No OSM Element'));
-        return;
+      const parsed = parser(child, id);
+      if (parsed) {
+        results.data.push(parsed);
       }
+    }
 
-      // Collect metadata
-      Object.assign(results.osm, getCleanAttributes(osmElement));
-
-      // Collect children of the osm element
-      const children = getChildNodes(osmElement);
-
-      // Sometimes an error can be present alongside other elements - Rapid#501
-      const errElement = children.find(child => child.nodeName === 'error');
-      if (errElement) {
-        const message = errElement.textContent || 'unknown error';
-        reject(new Error(`Partial Response: ${message}`));
-        return;
-      }
-
-      for (const child of children) {
-        let parser, id;
-
-        if (child.nodeName === 'node') {
-          id = 'n' + child.attributes.getNamedItem('id').value;
-          results.seenIDs.add(id);
-          parser = this._parseNode;
-
-        } else if (child.nodeName === 'way') {
-          id = 'w' + child.attributes.getNamedItem('id').value;
-          results.seenIDs.add(id);
-          parser = this._parseWay;
-
-        } else if (child.nodeName === 'relation') {
-          id = 'r' + child.attributes.getNamedItem('id').value;
-          results.seenIDs.add(id);
-          parser = this._parseRelation;
-
-        } else if (child.nodeName === 'changeset') {
-          id = 'c' + child.attributes.getNamedItem('id').value;
-          results.seenIDs.add(id);
-          parser = this._parseChangeset;
-
-        } else if (child.nodeName === 'note') {
-          id = 'note' + child.getElementsByTagName('id')[0].textContent;
-          parser = this._parseNote;
-
-        } else if (child.nodeName === 'user') {
-          id = 'user' + child.attributes.getNamedItem('id').value;
-          parser = this._parseUser;
-
-        } else if (child.nodeName === 'preferences') {
-          parser = this._parsePreferences;
-
-        } else if (child.nodeName === 'api') {
-          parser = this._parseApi;
-
-        } else if (child.nodeName === 'policy') {
-          parser = this._parsePolicy;
-
-        } else if (child.nodeName === 'bounds') {
-          parser = this._parseBounds;
-        }
-
-        if (!parser) continue;
-
-        if (options.skipSeen && id !== undefined) {  // skip things we've seen before
-          if (this._seen.has(id)) continue;
-          this._seen.add(id);
-        }
-
-        const parsed = parser(child, id);
-        if (parsed) {
-          results.data.push(parsed);
-        }
-      }
-
-      resolve(results);
-      return;
-    });
+    return results;
   }
 
 
@@ -372,7 +360,7 @@ export class OsmXMLParser {
       };
 
       for (const [k, v] of Object.entries(attrs)) {
-        if (props.hasOwnProperty(k)) continue;
+        // if (props.hasOwnProperty(k)) continue;  // can't happen, no props to overwrite
         props[k] = v;
       }
 
@@ -597,7 +585,10 @@ export class OsmXMLParser {
 }
 
 
-// Helper functions...
+// Helper functions.
+// Can c8 ignore these.. Some of the codepaths in here
+// are things we would never see in practice..
+/* c8 ignore start */
 
 /**
  * getCleanAttributes
@@ -650,9 +641,6 @@ function getChildNodes(node) {
   return Array.from(node.childNodes);
 }
 
-// Can c8 ignore unstringify.. Many of the cases in there
-// are things we will never see in `node.textContent`
-/* c8 ignore start */
 /**
  * unstringify
  * All the source xml data arrives as strings.
