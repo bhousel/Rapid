@@ -414,10 +414,7 @@ export class OsmXMLParser {
 
     const img = xml.getElementsByTagName('img')[0];
     if (img) {
-      const href = img.getAttribute('href');
-      if (href) {
-        props.image_url = href;
-      }
+      props.img = getCleanAttributes(img);
     }
 
     const roles = xml.getElementsByTagName('roles')[0];

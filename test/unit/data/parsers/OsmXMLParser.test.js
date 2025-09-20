@@ -74,39 +74,45 @@ describe('OsmXMLParser', () => {
       const results = parser.parse(sample.mapXML);
       const data = results.data;
       assert.isArray(data);
-      assert.lengthOf(data, 5);
+      assert.lengthOf(data, 7);
 
       assert.deepEqual(data[0], sample.boundsResult);
       assert.deepInclude(data[1], sample.n1Result);
       assert.deepInclude(data[2], sample.n2Result);
       assert.deepInclude(data[3], sample.w1Result);
-      assert.deepInclude(data[4], sample.r1Result);
+      assert.deepInclude(data[4], sample.w2Result);
+      assert.deepInclude(data[5], sample.r1Result);
+      assert.deepInclude(data[6], sample.r2Result);
     });
 
     it('handles visible=true', () => {
       const results = parser.parse(sample.mapXMLvisible);
       const data = results.data;
       assert.isArray(data);
-      assert.lengthOf(data, 5);
+      assert.lengthOf(data, 7);
 
       assert.deepEqual(data[0], sample.boundsResult);
       assert.deepInclude(data[1], sample.n1Result);
       assert.deepInclude(data[2], sample.n2Result);
       assert.deepInclude(data[3], sample.w1Result);
-      assert.deepInclude(data[4], sample.r1Result);
+      assert.deepInclude(data[4], sample.w2Result);
+      assert.deepInclude(data[5], sample.r1Result);
+      assert.deepInclude(data[6], sample.r2Result);
     });
 
     it('handles visible=false (deleted)', () => {
       const results = parser.parse(sample.mapXMLdeleted);
       const data = results.data;
       assert.isArray(data);
-      assert.lengthOf(data, 5);
+      assert.lengthOf(data, 7);
 
       assert.deepEqual(data[0], sample.boundsResult);
       assert.deepInclude(data[1], sample.n1ResultDeleted);
       assert.deepInclude(data[2], sample.n2ResultDeleted);
       assert.deepInclude(data[3], sample.w1ResultDeleted);
-      assert.deepInclude(data[4], sample.r1ResultDeleted);
+      assert.deepInclude(data[4], sample.w2ResultDeleted);
+      assert.deepInclude(data[5], sample.r1ResultDeleted);
+      assert.deepInclude(data[6], sample.r2ResultDeleted);
     });
 
     it('parses notes', () => {
@@ -158,7 +164,7 @@ describe('OsmXMLParser', () => {
       const results1 = parser.parse(sample.mapXML);
       const data1 = results1.data;
       assert.isArray(data1);
-      assert.lengthOf(data1, 5);   // bounds + elements
+      assert.lengthOf(data1, 7);   // bounds + elements
 
       const results2 = parser.parse(sample.mapXML);
       const data2 = results2.data;
@@ -171,15 +177,61 @@ describe('OsmXMLParser', () => {
       const results1 = parser.parse(sample.mapXML, { skipSeen: false });
       const data1 = results1.data;
       assert.isArray(data1);
-      assert.lengthOf(data1, 5);   // bounds + elements
+      assert.lengthOf(data1, 7);   // bounds + elements
 
       const results2 = parser.parse(sample.mapXML, { skipSeen: false });
       const data2 = results2.data;
       assert.isArray(data2);
-      assert.lengthOf(data2, 5);
-      assert.lengthOf(data2, 5);   // bounds + elements
+      assert.lengthOf(data2, 7);   // bounds + elements
     });
 
+    it('skips already-seen users by default', () => {
+      const results1 = parser.parse(sample.usersXML);
+      const data1 = results1.data;
+      assert.isArray(data1);
+      assert.lengthOf(data1, 2);
+
+      const results2 = parser.parse(sample.usersXML);
+      const data2 = results2.data;
+      assert.isArray(data2);
+      assert.lengthOf(data2, 0);
+    });
+
+    it('optionally returns already-seen users', () => {
+      const results1 = parser.parse(sample.usersXML, { skipSeen: false });
+      const data1 = results1.data;
+      assert.isArray(data1);
+      assert.lengthOf(data1, 2);
+
+      const results2 = parser.parse(sample.usersXML, { skipSeen: false });
+      const data2 = results2.data;
+      assert.isArray(data2);
+      assert.lengthOf(data2, 2);
+    });
+
+    it('skips already-seen changesets by default', () => {
+      const results1 = parser.parse(sample.changesetsXML);
+      const data1 = results1.data;
+      assert.isArray(data1);
+      assert.lengthOf(data1, 3);
+
+      const results2 = parser.parse(sample.changesetsXML);
+      const data2 = results2.data;
+      assert.isArray(data2);
+      assert.lengthOf(data2, 0);
+    });
+
+    it('optionally returns already-seen changesets', () => {
+      const results1 = parser.parse(sample.changesetsXML, { skipSeen: false });
+      const data1 = results1.data;
+      assert.isArray(data1);
+      assert.lengthOf(data1, 3);
+
+      const results2 = parser.parse(sample.changesetsXML, { skipSeen: false });
+      const data2 = results2.data;
+      assert.isArray(data2);
+      assert.lengthOf(data2, 3);
+    });
   });
 
 });

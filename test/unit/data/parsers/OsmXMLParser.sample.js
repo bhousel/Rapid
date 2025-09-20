@@ -27,6 +27,10 @@ export const w1 = `
   <tag k="oneway" v="yes"/>
 </way>`;
 
+// Way, no nodes or tags (default visible)
+export const w2 = `
+<way id="2" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+
 // Relation, with members and tags (default visible)
 export const r1 = `
 <relation id="1" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
@@ -36,6 +40,11 @@ export const r1 = `
   <tag k="route" v="road"/>
   <tag k="type" v="route"/>
 </relation>`;
+
+// Relation, no members or tags (default visible)
+export const r2 = `
+<relation id="2" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+
 
 // Node, with tags (visible=true)
 export const n1visible = `
@@ -62,6 +71,10 @@ export const w1visible = `
   <tag k="oneway" v="yes"/>
 </way>`;
 
+// Way, no nodes or tags (visible=true)
+export const w2visible = `
+<way id="2" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+
 // Relation, with members and tags (visible=true)
 export const r1visible = `
 <relation id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
@@ -71,6 +84,10 @@ export const r1visible = `
   <tag k="route" v="road"/>
   <tag k="type" v="route"/>
 </relation>`;
+
+// Relation, no members or tags (visible=true)
+export const r2visible = `
+<relation id="2" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
 
 
 // Deleted Node, with tags (visible=false)
@@ -98,6 +115,10 @@ export const w1deleted = `
   <tag k="oneway" v="yes"/>
 </way>`;
 
+// Deleted Way, no nodes or tags (visible=false)
+export const w2deleted = `
+<way id="2" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+
 // Deleted Relation, with members and tags (visible=false)
 export const r1deleted = `
 <relation id="1" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
@@ -107,6 +128,10 @@ export const r1deleted = `
   <tag k="route" v="road"/>
   <tag k="type" v="route"/>
 </relation>`;
+
+// Deleted Relation, no members or tags (visible=false)
+export const r2deleted = `
+<relation id="2" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
 
 // Bounds (present for map calls)
 export const bounds = `
@@ -126,7 +151,10 @@ export const mapXML =
   ${n1}
   ${n2}
   ${w1}
+  ${w2}
   ${r1}
+  ${r2}
+  <ignoreme unsupported="true"/>
 </osm>`;
 
 // Any error present should invalidate the entire response.
@@ -157,7 +185,9 @@ export const mapXMLvisible =
   ${n1visible}
   ${n2visible}
   ${w1visible}
+  ${w2visible}
   ${r1visible}
+  ${r2visible}
 </osm>`;
 
 export const mapXMLdeleted =
@@ -167,7 +197,9 @@ export const mapXMLdeleted =
   ${n1deleted}
   ${n2deleted}
   ${w1deleted}
+  ${w2deleted}
   ${r1deleted}
+  ${r2deleted}
 </osm>`;
 
 
@@ -395,7 +427,7 @@ export const c3 = `
 // GET /api/0.6/changeset/#id  (with or without `?include_discussion=true`)
 export const changesetsXML =
 `<?xml version="1.0" encoding="UTF-8"?>
-<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (318545 spike-06.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
   ${c1}
   ${c2}
   ${c3}
@@ -497,6 +529,18 @@ export const w1Result = {
   }
 };
 
+export const w2Result = {
+  type: 'way',
+  id: 'w2',
+  visible: true,
+  timestamp: new Date('2025-09-01T00:00:01Z'),
+  version: 2,
+  changeset: 1,
+  user: 'bhousel',
+  uid: 100,
+  nodes: []
+};
+
 export const r1Result = {
   type: 'relation',
   id: 'r1',
@@ -515,6 +559,18 @@ export const r1Result = {
     route: 'road',
     type: 'route'
   }
+};
+
+export const r2Result = {
+  type: 'relation',
+  id: 'r2',
+  visible: true,
+  timestamp: new Date('2025-09-01T00:00:01Z'),
+  version: 2,
+  changeset: 1,
+  user: 'bhousel',
+  uid: 100,
+  members: []
 };
 
 export const n1ResultDeleted = {
@@ -565,6 +621,18 @@ export const w1ResultDeleted = {
   }
 };
 
+export const w2ResultDeleted = {
+  type: 'way',
+  id: 'w2',
+  visible: false,
+  timestamp: new Date('2025-09-01T00:00:01Z'),
+  version: 2,
+  changeset: 1,
+  user: 'bhousel',
+  uid: 100,
+  nodes: []
+};
+
 export const r1ResultDeleted = {
   type: 'relation',
   id: 'r1',
@@ -583,6 +651,18 @@ export const r1ResultDeleted = {
     route: 'road',
     type: 'route'
   }
+};
+
+export const r2ResultDeleted = {
+  type: 'relation',
+  id: 'r2',
+  visible: false,
+  timestamp: new Date('2025-09-01T00:00:01Z'),
+  version: 2,
+  changeset: 1,
+  user: 'bhousel',
+  uid: 100,
+  members: []
 };
 
 
@@ -722,7 +802,7 @@ export const user1Result = {
   account_created: new Date('2000-01-01T00:00:01Z'),
   description: 'Hi',
   contributor_terms: { agreed: true, pd: true },
-  image_url: 'https://www.gravatar.com/avatar/test.png',
+  img: { href: 'https://www.gravatar.com/avatar/test.png' },
   roles: [],
   changesets: { count: 999 },
   traces: { count: 999 },
@@ -742,7 +822,7 @@ export const user2Result = {
   account_created: new Date('2000-01-01T00:00:01Z'),
   description: 'LGTM!',
   contributor_terms: { agreed: true, pd: true },
-  image_url: 'https://www.gravatar.com/avatar/test.png',
+  img: { href: 'https://www.gravatar.com/avatar/test.png' },
   roles: [ 'moderator' ],
   changesets: { count: 999 },
   traces: { count: 999 },

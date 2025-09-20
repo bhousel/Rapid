@@ -3,7 +3,7 @@
 // ----------------------------------------
 // Elements (nodes, ways, relations, map)
 
-// Node, with tags
+// Node, with tags (default visible)
 export const n1 = {
   type: "node",
   id: 1,
@@ -17,11 +17,12 @@ export const n1 = {
   tags: {
     crossing: "marked",
     "crossing:markings": "zebra",
-    highway: "crossing"
+    highway: "crossing",
+    empty: ""
   }
 };
 
-// Node, no tags
+// Node, no tags (default visible)
 export const n2 = {
   type: "node",
   id: 2,
@@ -34,7 +35,7 @@ export const n2 = {
   uid: 100
 };
 
-// Way, with nodes and tags
+// Way, with nodes and tags (default visible)
 export const w1 = {
   type: "way",
   id: 1,
@@ -52,7 +53,18 @@ export const w1 = {
   }
 };
 
-// Relation, with members and tags
+// Way, no nodes or tags (default visible)
+export const w2 = {
+  type: "way",
+  id: 2,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100
+};
+
+// Relation, with members and tags (default visible)
 export const r1 = {
   type: "relation",
   id: 1,
@@ -72,12 +84,219 @@ export const r1 = {
   }
 };
 
+// Relation, no members or tags (default visible)
+export const r2 = {
+  type: "relation",
+  id: 2,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100
+};
+
+// Node, with tags (visible=true)
+export const n1visible = {
+  type: "node",
+  id: 1,
+  visible: true,
+  lat: 40.6555,
+  lon: -74.5415,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100,
+  tags: {
+    crossing: "marked",
+    "crossing:markings": "zebra",
+    highway: "crossing",
+    empty: ""
+  }
+};
+
+// Node, no tags (visible=true)
+export const n2visible = {
+  type: "node",
+  id: 2,
+  visible: true,
+  lat: 40.6556,
+  lon: -74.5416,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100
+};
+
+// Way, with nodes and tags (visible=true)
+export const w1visible = {
+  type: "way",
+  id: 1,
+  visible: true,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100,
+  nodes: [1, 2],
+  tags: {
+    highway: "tertiary",
+    lanes: "1",
+    name: "Spring Valley Boulevard",
+    oneway: "yes"
+  }
+};
+
+// Way, no nodes or tags (visible=true)
+export const w2visible = {
+  type: "way",
+  id: 2,
+  visible: true,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100
+};
+
+// Relation, with members and tags (visible=true)
+export const r1visible = {
+  type: "relation",
+  id: 1,
+  visible: true,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100,
+  members: [
+    { type: "way", ref: 1, role: "south" }
+  ],
+  tags: {
+    network: "US:NJ:Somerset",
+    ref: "651",
+    route: "road",
+    type: "route"
+  }
+};
+
+// Relation, no members or tags (visible=true)
+export const r2visible = {
+  type: "relation",
+  id: 2,
+  visible: true,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100
+};
+
+// Node, with tags (visible=false)
+export const n1deleted = {
+  type: "node",
+  id: 1,
+  visible: false,
+  lat: 40.6555,
+  lon: -74.5415,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100,
+  tags: {
+    crossing: "marked",
+    "crossing:markings": "zebra",
+    highway: "crossing",
+    empty: ""
+  }
+};
+
+// Node, no tags (visible=false)
+export const n2deleted = {
+  type: "node",
+  id: 2,
+  visible: false,
+  lat: 40.6556,
+  lon: -74.5416,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100
+};
+
+// Way, with nodes and tags (visible=false)
+export const w1deleted = {
+  type: "way",
+  id: 1,
+  visible: false,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100,
+  nodes: [1, 2],
+  tags: {
+    highway: "tertiary",
+    lanes: "1",
+    name: "Spring Valley Boulevard",
+    oneway: "yes"
+  }
+};
+
+// Deleted Way, no nodes or tags (visible=false)
+export const w2deleted = {
+  type: "way",
+  id: 2,
+  visible: false,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100
+};
+
+// Relation, with members and tags (visible=false)
+export const r1deleted = {
+  type: "relation",
+  id: 1,
+  visible: false,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100,
+  members: [
+    { type: "way", ref: 1, role: "south" }
+  ],
+  tags: {
+    network: "US:NJ:Somerset",
+    ref: "651",
+    route: "road",
+    type: "route"
+  }
+};
+
+// Relation, no members or tags (visible=false)
+export const r2deleted = {
+  type: "relation",
+  id: 2,
+  visible: false,
+  timestamp: "2025-09-01T00:00:01Z",
+  version: 2,
+  changeset: 1,
+  user: "bhousel",
+  uid: 100
+};
+
 // Bounds (present for map calls)
 export const bounds = {
-  "minlat": 40.6550000,
-  "minlon": -74.5420000,
-  "maxlat": 40.6560000,
-  "maxlon": -74.5410000
+  minlat: 40.6550000,
+  minlon: -74.5420000,
+  maxlat: 40.6560000,
+  maxlon: -74.5410000
 };
 
 // Elements are returned in an `elements` Array property.
@@ -88,19 +307,24 @@ export const bounds = {
 // GET /api/0.6/relation/#id  (with or without /full)
 export const mapJSON = {
   "version": "0.6",
-  "generator": "openstreetmap-cgimap 2.1.0 (3662880 spike-06.openstreetmap.org)",
+  "generator": "openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)",
   "copyright": "OpenStreetMap and contributors",
   "attribution": "http://www.openstreetmap.org/copyright",
   "license": "http://opendatacommons.org/licenses/odbl/1-0/",
   "bounds": bounds,
-  "elements": [ n1, n2, w1, r1 ]
+  "elements": [ n1, n2, w1, w2, r1, r2,
+    {
+      "type": "ignoreme",
+      "unsupported": "true"
+    }
+  ]
 };
 
 // Any error present should invalidate the entire response.
 // see https://wiki.openstreetmap.org/wiki/API_v0.6#Internal_errors_while_generating_a_response
-export const mapJSONpartial = {
+export const mapJSONerror1 = {
   "version": "0.6",
-  "generator": "openstreetmap-cgimap 2.1.0 (3662880 spike-06.openstreetmap.org)",
+  "generator": "openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)",
   "copyright": "OpenStreetMap and contributors",
   "attribution": "http://www.openstreetmap.org/copyright",
   "license": "http://opendatacommons.org/licenses/odbl/1-0/",
@@ -111,6 +335,41 @@ export const mapJSONpartial = {
       "message": "something went wrong loading postgres",
     }
   ]
+};
+
+export const mapJSONerror2 = {
+  "version": "0.6",
+  "generator": "openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)",
+  "copyright": "OpenStreetMap and contributors",
+  "attribution": "http://www.openstreetmap.org/copyright",
+  "license": "http://opendatacommons.org/licenses/odbl/1-0/",
+  "bounds": bounds,
+  "elements": [ n1, n2,
+    {
+      "type": "error"
+    }
+  ]
+};
+
+// test visible/deleted
+export const mapJSONvisible = {
+  "version": "0.6",
+  "generator": "openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)",
+  "copyright": "OpenStreetMap and contributors",
+  "attribution": "http://www.openstreetmap.org/copyright",
+  "license": "http://opendatacommons.org/licenses/odbl/1-0/",
+  "bounds": bounds,
+  "elements": [ n1visible, n2visible, w1visible, w2visible, r1visible, r2visible ]
+};
+
+export const mapJSONdeleted = {
+  "version": "0.6",
+  "generator": "openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)",
+  "copyright": "OpenStreetMap and contributors",
+  "attribution": "http://www.openstreetmap.org/copyright",
+  "license": "http://opendatacommons.org/licenses/odbl/1-0/",
+  "bounds": bounds,
+  "elements": [ n1deleted, n2deleted, w1deleted, w2deleted, r1deleted, r2deleted ]
 };
 
 
@@ -128,20 +387,20 @@ export const note1 = {
   "properties": {
     "id": 1,
     "foo": "bar",
-    "url": "https://api.openstreetmap.org/api/0.6/notes/1.json",
-    "comment_url": "https://api.openstreetmap.org/api/0.6/notes/1/comment.json",
-    "close_url": "https://api.openstreetmap.org/api/0.6/notes/1/close.json",
-    "date_created": "2025-01-01 00:00:00 UTC",
+    "url": "https://www.openstreetmap.org/api/0.6/notes/1",
+    "comment_url": "https://api.openstreetmap.org/api/0.6/notes/1/comment",
+    "close_url": "https://api.openstreetmap.org/api/0.6/notes/1/close",
+    "date_created": "2025-09-01 00:00:00 UTC",
     "status": "open",
     "comments": [
       {
         "date": "2025-01-01 00:00:00 UTC",
         "uid": 100,
         "user": "bhousel",
-        "user_url": "https://api.openstreetmap.org/user/bhousel",
+        "user_url": "https://www.openstreetmap.org/user/bhousel",
         "action": "opened",
         "text": "This is a note",
-        "html": "\u003cp dir=\"auto\"\u003eThis is a note\u003c/p\u003e"
+        "html": "\u003cp\u003eThis is a note\u003c/p\u003e"
       }
     ]
   }
@@ -156,25 +415,25 @@ export const note2 = {
   },
   "properties": {
     "id": 2,
-    "url": "https://api.openstreetmap.org/api/0.6/notes/2.json",
-    "comment_url": "https://api.openstreetmap.org/api/0.6/notes/2/comment.json",
-    "close_url": "https://api.openstreetmap.org/api/0.6/notes/2/close.json",
-    "date_created": "2025-01-01 00:00:00 UTC",
+    "url": "https://www.openstreetmap.org/api/0.6/notes/2",
+    "comment_url": "https://api.openstreetmap.org/api/0.6/notes/2/comment",
+    "close_url": "https://api.openstreetmap.org/api/0.6/notes/2/close",
+    "date_created": "2025-09-01 00:00:00 UTC",
     "status": "open",
     "comments": [
       {
         "date": "2025-01-01 00:00:00 UTC",
         "action": "opened",
         "text": "This is a note",
-        "html": "\u003cp dir=\"auto\"\u003eThis is a note\u003c/p\u003e"
+        "html": "\u003cp\u003eThis is a note\u003c/p\u003e"
       }, {
         "date": "2025-01-02 00:00:00 UTC",
         "uid": 200,
         "user": "lgtm",
-        "user_url": "https://api.openstreetmap.org/user/lgtm",
+        "user_url": "https://www.openstreetmap.org/user/lgtm",
         "action": "commented",
         "text": "LGTM!",
-        "html": "\u003cp dir=\"auto\"\u003eLGTM!\u003c/p\u003e"
+        "html": "\u003cp\u003eLGTM!\u003c/p\u003e"
       }
     ]
   }
@@ -268,8 +527,9 @@ export const preferencesJSON = {
   "license": "http://opendatacommons.org/licenses/odbl/1-0/",
   "preferences": {
     "foo": "bar",
-    "hello": "world"
-  }
+    "hello": "world",
+    "empty": ""
+   }
 };
 
 
@@ -281,19 +541,19 @@ export const c1  = {
   "id": 1,
   "created_at": "2025-09-01T00:00:01Z",
   "open": false,
-  "comments_count": 0,
+  "comments_count": 1,
   "changes_count": 10,
-  "closed_at": "2025-09-01T00:00:01Z",
+  "closed_at": "2025-09-01T00:00:02Z",
   "min_lat": 40.060883,
-  "min_lon": -75.2392873,
+  "min_lon": -74.2392873,
   "max_lat": 40.060993,
-  "max_lon": -75.2391612,
+  "max_lon": -74.2391612,
   "uid": 100,
   "user": "bhousel",
   "tags": {
     "comment": "Fix unsquare corners",
     "created_by": "Rapid 2.6.0",
-    "host": "http://127.0.0.1:8080/",
+    "host": "http://127.0.0.1:8080",
     "imagery_used": "Bing Maps Aerial",
     "locale": "en-US"
   },
@@ -318,18 +578,19 @@ export const c2 = {
   "changes_count": 10,
   "closed_at": "2025-09-02T00:00:02Z",
   "min_lat": 40.060883,
-  "min_lon": -75.2392873,
+  "min_lon": -74.2392873,
   "max_lat": 40.060993,
-  "max_lon": -75.2391612,
+  "max_lon": -74.2391612,
   "uid": 100,
   "user": "bhousel",
   "tags": {
     "comment": "",
     "created_by": "Rapid 2.6.0",
-    "host": "http://127.0.0.1:8080/",
+    "host": "http://127.0.0.1:8080",
     "imagery_used": "Bing Maps Aerial",
     "locale": "en-US"
-  }
+  },
+  "comments": []
 };
 
 // Changeset, with no comment tag
@@ -341,14 +602,14 @@ export const c3 = {
   "changes_count": 10,
   "closed_at": "2025-09-03T00:00:02Z",
   "min_lat": 40.060883,
-  "min_lon": -75.2392873,
+  "min_lon": -74.2392873,
   "max_lat": 40.060993,
-  "max_lon": -75.2391612,
+  "max_lon": -74.2391612,
   "uid": 100,
   "user": "bhousel",
   "tags": {
     "created_by": "Rapid 2.6.0",
-    "host": "http://127.0.0.1:8080/",
+    "host": "http://127.0.0.1:8080",
     "imagery_used": "Bing Maps Aerial",
     "locale": "en-US"
   }
@@ -409,3 +670,33 @@ export const capabilitiesJSON = {
   }
 };
 
+
+// ----------------------------------------
+// Expected parse results (same as XML)
+
+export {
+  metadataResult,
+  boundsResult,
+  n1Result,
+  n2Result,
+  w1Result,
+  w2Result,
+  r1Result,
+  r2Result,
+  n1ResultDeleted,
+  n2ResultDeleted,
+  w1ResultDeleted,
+  w2ResultDeleted,
+  r1ResultDeleted,
+  r2ResultDeleted,
+  c1Result,
+  c2Result,
+  c3Result,
+  note1Result,
+  note2Result,
+  user1Result,
+  user2Result,
+  preferencesResult,
+  apiResult,
+  policyResult
+} from './OsmXMLParser.sample.js';

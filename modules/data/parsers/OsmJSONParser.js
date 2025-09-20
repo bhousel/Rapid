@@ -1,5 +1,3 @@
-import { OsmEntity } from '../OsmEntity.js';
-
 
 /**
  * OsmJSONParser
@@ -7,12 +5,8 @@ import { OsmEntity } from '../OsmEntity.js';
  * @see https://wiki.openstreetmap.org/wiki/OSM_JSON
  * Note that OSM JSON data can contain slightly different syntax and attributes.
  * History:  The XML-based formats came first, but now the OSM API supports JSON
- *  for many of it's methods.  Using JSON can be much more efficient because it
- *  avoids the overhead of parsing and creating an Document / DOM objects.
- *
- * Calling code should call `parseAsync` with the content to parse.
- * `parseAsync` returns a Promise either rejected with an error or resolved with
- * whatever valid data was found in the content.
+ *  for many of its methods.  Using JSON can be much more efficient because it
+ *  avoids the overhead of parsing and creating a Document and DOM objects.
  *
  * The job of this code is to convert the OSM JSON into a JavaScript Object,
  * allowing code elsewhere in Rapid to work with the data in a consistent way.
@@ -60,6 +54,18 @@ export class OsmJSONParser {
    */
   constructor() {
     this._seen = new Set();   // Set<string>  (unique identifers)
+
+    this._parseNode = this._parseNode.bind(this);
+    this._parseWay = this._parseWay.bind(this);
+    this._parseRelation = this._parseRelation.bind(this);
+    this._parseNote = this._parseNote.bind(this);
+    this._parseComments = this._parseComments.bind(this);
+    this._parseUser = this._parseUser.bind(this);
+    this._parsePreferences = this._parsePreferences.bind(this);
+    this._parseChangeset = this._parseChangeset.bind(this);
+    this._parseApi = this._parseApi.bind(this);
+    this._parsePolicy = this._parsePolicy.bind(this);
+    this._parseBounds = this._parseBounds.bind(this);
   }
 
 
@@ -73,187 +79,480 @@ export class OsmJSONParser {
 
 
   /**
-   * parseAsync
+   * parse
    * Parse the given content and extract whatatever OSM data we find in it.
-   * Note: This really doesn't need to be async, but I made it this way because
-   *  the code is expected to send its result to older errback-style callbacks.
    * @param   {Object|string}  content - the content to parse
    * @param   {Object}         options - parsing options
-   * @return  {Promise}  Promise resolved with results of parsed data, or rejected with error.
+   * @return  {Object}   Result object containing the information parsed
+   * @throws  Will throw if nothing could be parsed, or errors found
    */
-  parseAsync(content, options = {}) {
+  parse(content, options = {}) {
     options.skipSeen ??= true;
 
-    return new Promise((resolve, reject) => {
-      if (!content)  {
-        reject(new Error('No content'));
-        return;
-      }
+    if (!content)  {
+      throw new Error('No content');
+    }
 
-      const results = { osm: {}, data: [], seenIDs: new Set() };
-      const json = (typeof content === 'string' ? JSON.parse(content) : content);
+    const results = { osm: {}, data: [], seenIDs: new Set() };
+    const json = (typeof content === 'string' ? JSON.parse(content) : content);
 
-      // The json may contain Elements, Users, or Changesets
-      const elements = json.elements ?? [];
-      const users = (json.user ? [json.user] : json.users) ?? [];
-      const changesets = json?.changesets || [];
+    if (!isObject(json)) {
+      throw new Error('No JSON');
+    }
 
-      // Sometimes an error can be present alongside other elements - Rapid#501
-      const errElement = elements.find(el => el.error);
-      if (errElement) {
-        const message = errElement.error || 'unknown error';
-        reject(new Error(`Partial JSON: ${message}`));
-        return;
-      }
-
-
-      // Parse elements
-      for (const element of elements) {
-        let parser;
-        if (element.type === 'node') {
-          parser = this._parseNode;
-        } else if (element.type === 'way') {
-          parser = this._parseWay;
-        } else if (element.type === 'relation') {
-          parser = this._parseRelation;
-        }
-        if (!parser) continue;
-
-        const uid = OsmEntity.fromOSM(element.type, element.id);
-        results.seenIDs.add(uid);
-
-        if (options.skipSeen) {
-          if (this._seen.has(uid)) continue;  // avoid reparsing a "seen" entity
-          this._seen.add(uid);
-        }
-
-        const parsed = parser(element, uid);
+    // 'notes'
+    // We're going to handle these first because they are the exception.
+    // OSM Notes data will look like GeoJSON.
+    let notes;
+    if (json.type === 'Feature') {  // a single note
+      notes = [json];
+    } else if (json.type === 'FeatureCollection' && Array.isArray(json.features)) {
+      notes = json.features;
+    }
+    if (notes) {
+      for (const note of notes) {
+        const parsed = this._parseNote(note);
         if (parsed) {
           results.data.push(parsed);
         }
       }
+      return results;  // exit early
+    }
 
-      // Parse users
-      for (const user of users) {
-        const uid = user.id?.toString();
-        if (!uid) continue;
+    // For everything else, check the properties where we expect to find data.
 
-        if (options.skipSeen) {
-          const key = `user-${uid}`;
-          if (this._seen.has(key)) continue;  // avoid reparsing a "seen" user
-          this._seen.add(key);
-        }
+    // Collect metadata
+    for (const prop of ['version', 'generator', 'copyright', 'attribution', 'license']) {
+      if (json.hasOwnProperty(prop)) {
+        results.osm[prop] = unstringify(json[prop]);
+      }
+    }
 
-        const parsed = {
-          id: uid,
-          display_name: user.display_name,
-          account_created: user.account_created,
-          image_url: user.img?.href,
-          changesets_count: user.changesets?.count?.toString() ?? '0',
-          active_blocks: user.blocks?.received?.active?.toString() ?? '0'
-        };
-
-        this._userCache.user[uid] = parsed;
+    // 'api'
+    if (isObject(json.api)) {
+      const parsed = this._parseApi(json.api);
+      if (parsed) {
         results.data.push(parsed);
       }
+    }
 
-      // Parse changesets
-      for (const changeset of changesets) {
-        if (!changeset?.tags?.comment) continue;   // only include changesets with comment
-        results.data.push(changeset);
+    // 'policy'
+    if (isObject(json.policy)) {
+      const parsed = this._parsePolicy(json.policy);
+      if (parsed) {
+        results.data.push(parsed);
+      }
+    }
+
+    // 'bounds'
+    if (isObject(json.bounds)) {
+      const parsed = this._parseBounds(json.bounds);
+      if (parsed) {
+        results.data.push(parsed);
+      }
+    }
+
+    // Elements ('node', 'way', 'relation')
+    const elements = json.elements || [];
+    if (elements.length) {
+      // Sometimes an error can be present alongside other elements - Rapid#501
+      const errElement = elements.find(obj => obj.type === 'error');
+      if (errElement) {
+        const message = errElement.message || 'unknown error';
+        throw new Error(`Partial Response: ${message}`);
       }
 
-      resolve(results);
-      return;
-    });
-  }
+      for (const obj of elements) {
+        let parser, id;
 
+        if (obj.type === 'node') {
+          id = 'n' + obj.id;
+          results.seenIDs.add(id);
+          parser = this._parseNode;
 
-  _parseNode(obj, uid) {
-    return {
-      type: 'node',
-      id: uid,
-      visible: typeof obj.visible === 'boolean' ? obj.visible : true,
-      version: obj.version?.toString(),
-      changeset: obj.changeset?.toString(),
-      timestamp: obj.timestamp,
-      user: obj.user,
-      uid: obj.uid?.toString(),
-      loc: [ parseFloat(obj.lon), parseFloat(obj.lat) ],
-      tags: obj.tags
-    };
-  }
+        } else if (obj.type === 'way') {
+          id = 'w' + obj.id;
+          results.seenIDs.add(id);
+          parser = this._parseWay;
 
-  _parseWay(obj, uid) {
-    return {
-      type: 'way',
-      id: uid,
-      visible: typeof obj.visible === 'boolean' ? obj.visible : true,
-      version: obj.version?.toString(),
-      changeset: obj.changeset?.toString(),
-      timestamp: obj.timestamp,
-      user: obj.user,
-      uid: obj.uid?.toString(),
-      tags: obj.tags,
-      nodes: this._getNodes(obj)
-    };
-  }
+        } else if (obj.type === 'relation') {
+          id = 'r' + obj.id;
+          results.seenIDs.add(id);
+          parser = this._parseRelation;
+        }
 
-  _parseRelation(obj, uid) {
-    return {
-      type: 'relation',
-      id: uid,
-      visible: typeof obj.visible === 'boolean' ? obj.visible : true,
-      version: obj.version?.toString(),
-      changeset: obj.changeset?.toString(),
-      timestamp: obj.timestamp,
-      user: obj.user,
-      uid: obj.uid?.toString(),
-      tags: obj.tags,
-      members: this._getMembers(obj)
-    };
-  }
+        if (!parser) continue;
 
-  _getNodes(obj) {
-    return (obj.nodes ?? []).map(nodeID => `n${nodeID}`);
-  }
+        if (options.skipSeen) {  // skip things we've seen before
+          if (this._seen.has(id)) continue;
+          this._seen.add(id);
+        }
 
-  _getMembers(obj) {
-    return (obj.members ?? []).map(member => {
-      return {
-        id: member.type[0] + member.ref,
-        type: member.type,
-        role: member.role
-      };
-    });
-  }
-
-  _parseCapabilities(json) {
-    // Update blocklists
-    const regexes = [];
-    for (const item of json.policy.imagery.blacklist) {
-      const regexString = item.regex;  // needs unencode?
-      if (regexString) {
-        try {
-          regexes.push(new RegExp(regexString));
-        } catch (e) {
-          /* noop */
+        const parsed = parser(obj, id);
+        if (parsed) {
+          results.data.push(parsed);
         }
       }
     }
-    if (regexes.length) {
-      this._imageryBlocklists = regexes;
+
+    // 'users'
+    const users = (json.user ? [json.user] : json.users) || [];
+    if (users.length) {
+      for (const obj of users) {
+        const id = 'user' + obj.id;
+
+        if (options.skipSeen) {  // skip things we've seen before
+          if (this._seen.has(id)) continue;
+          this._seen.add(id);
+        }
+
+        const parsed = this._parseUser(obj, id);
+        if (parsed) {
+          results.data.push(parsed);
+        }
+      }
     }
 
-    // Update max nodes per way
-    const maxWayNodes = json.api.waynodes.maximum;
-    if (maxWayNodes && isFinite(maxWayNodes)) {
-      this._maxWayNodes = maxWayNodes;
+    // 'changesets'
+    const changesets = (json.changeset ? [json.changeset] : json.changesets) || [];
+    if (changesets.length) {
+      for (const obj of changesets) {
+        const id = 'c' + obj.id;
+
+        if (options.skipSeen) {  // skip things we've seen before
+          if (this._seen.has(id)) continue;
+          this._seen.add(id);
+        }
+
+        const parsed = this._parseChangeset(obj, id);
+        if (parsed) {
+          results.data.push(parsed);
+        }
+      }
     }
 
-    // Return status
-    const apiStatus = json.api.status.api;  // 'online', 'readonly', or 'offline'
-    return apiStatus;
+    // 'preferences'
+    if (isObject(json.preferences)) {
+      const parsed = this._parsePreferences(json.preferences);
+      if (parsed) {
+        results.data.push(parsed);
+      }
+    }
+
+    return results;
+  }
+
+
+  /**
+   * _parseNode
+   * Parse the given `node` object.
+   * @param   {Object}  obj - the source object
+   * @param   {string}  id  - the OSM nodeID (e.g. 'n1')
+   * @return  {Object}  Object of parsed properties
+   */
+  _parseNode(obj, id) {
+    const props = {
+      type: 'node',
+      id: id,
+      visible: obj.visible ?? true,
+      tags: obj.tags,
+      loc: [ obj.lon, obj.lat ]
+    };
+
+    for (const [k, v] of Object.entries(obj)) {  // grab everything else
+      if (k === 'lon' || k === 'lat' || props.hasOwnProperty(k)) continue;
+      props[k] = unstringify(v);
+    }
+    return props;
+  }
+
+
+  /**
+   * _parseWay
+   * Parse the given `way` object.
+   * @param   {Object}  obj - the source object
+   * @param   {string}  id  - the OSM wayID (e.g. 'w1')
+   * @return  {Object}  Object of parsed properties
+   */
+  _parseWay(obj, id) {
+    const props = {
+      type: 'way',
+      id: id,
+      visible: obj.visible ?? true,
+      tags: obj.tags,
+      nodes: (obj.nodes ?? []).map(id => `n${id}`)
+    };
+
+    for (const [k, v] of Object.entries(obj)) {  // grab everything else
+      if (props.hasOwnProperty(k)) continue;
+      props[k] = unstringify(v);
+    }
+
+    return props;
+  }
+
+
+  /**
+   * _parseRelation
+   * Parse the given `relation` object.
+   * @param   {Object}  obj - the source object
+   * @param   {string}  id  - the OSM relationID (e.g. 'r1')
+   * @return  {Object}  Object of parsed properties
+   */
+  _parseRelation(obj, id) {
+    const props = {
+      type: 'relation',
+      id: id,
+      visible: obj.visible ?? true,
+      tags: obj.tags,
+      members: (obj.members ?? []).map(member => {
+        return {
+          id: member.type[0] + member.ref,
+          type: member.type,
+          role: member.role
+        };
+      })
+    };
+
+    for (const [k, v] of Object.entries(obj)) {  // grab everything else
+      if (props.hasOwnProperty(k)) continue;
+      props[k] = unstringify(v);
+    }
+
+    return props;
+  }
+
+
+  /**
+   * _parseChangeset
+   * Parse the given `changeset` object.
+   * @param   {Object}  obj - the source object
+   * @param   {string}  id  - the OSM changesetID (e.g. 'c1')
+   * @return  {Object}  Object of parsed properties
+   */
+  _parseChangeset(obj, id) {
+    const props = {
+      type: 'changeset',
+      id: id,
+      tags: obj.tags
+    };
+
+    // parse changeset comments, if any
+    if (Array.isArray(obj.comments)) {
+      props.comments = this._parseComments(obj.comments);
+    }
+
+    for (const [k, v] of Object.entries(obj)) {  // grab everything else
+      if (props.hasOwnProperty(k)) continue;
+      props[k] = unstringify(v);
+    }
+
+    return props;
+  }
+
+
+  /**
+   * _parseNote
+   * Parse the given `note` object.
+   * @param   {Object}  obj - the source object
+   * @return  {Object}  Object of parsed properties
+   */
+  _parseNote(obj) {
+    const props = {
+      type: 'note',
+      id: obj.properties.id.toString(),   // we want to keep note ids as strings
+      loc: obj.geometry.coordinates
+    };
+
+    // parse note comments, if any
+    if (Array.isArray(obj.properties.comments)) {
+      props.comments = this._parseComments(obj.properties.comments);
+    }
+
+    for (const [k, v] of Object.entries(obj.properties)) {  // grab everything else
+      if (props.hasOwnProperty(k)) continue;
+      props[k] = unstringify(v);
+    }
+
+    return props;
+  }
+
+
+  /**
+   * _parseComments
+   * This parses comments found in notes and changesets under the `comments` Array property.
+   * @param   {Array<Object>}  comments - Array of source comments
+   * @return  {Array<Object>}  Array of parsed comments
+   */
+  _parseComments(comments) {
+    return comments.map(obj => {
+      const props = {
+        visible: obj.visible ?? true
+      };
+
+      for (const [k, v] of Object.entries(obj)) {
+        props[k] = unstringify(v);
+      }
+
+      return props;
+    });
+  }
+
+
+  /**
+   * _parseUser
+   * Parse the given `user` object.
+   * @param   {Object}  obj - the source object
+   * @return  {Object}  Object of parsed properties
+   */
+  _parseUser(obj) {
+    const props = { type: 'user' };
+
+    for (const [k, v] of Object.entries(obj)) {
+      //if (props.hasOwnProperty(k)) continue;  // can't happen, no props to overwrite
+      props[k] = unstringify(v);
+    }
+
+    if (!props.roles) {  // make sure this property always exists
+      props.roles = [];
+    }
+
+    return props;
+  }
+
+
+  /**
+   * _parsePreferences
+   * Parse the given `preferences` object.
+   * @param   {Object}  obj - the source object
+   * @return  {Object}  Object of parsed properties
+   */
+  _parsePreferences(obj) {
+    const props = {
+      type: 'preferences',
+      preferences: obj
+    };
+
+    return props;
+  }
+
+
+  /**
+   * _parseApi
+   * Parse the given `api` object.
+   * @param   {Object}  obj - the source object
+   * @return  {Object}  Object of parsed properties
+   */
+  _parseApi(obj) {
+    const props = { type: 'api' };
+
+    for (const [k, v] of Object.entries(obj)) {
+      //if (props.hasOwnProperty(k)) continue;  // can't happen, no props to overwrite
+      props[k] = unstringify(v);
+    }
+
+    return props;
+  }
+
+
+  /**
+   * _parsePolicy
+   * Parse the given `policy` object.
+   * @param   {Object}  obj - the source object
+   * @return  {Object}  Object of parsed properties
+   */
+  _parsePolicy(obj) {
+    const props = { type: 'policy' };
+
+    const blacklist = obj?.imagery?.blacklist;
+    if (Array.isArray(blacklist)) {
+      props.imagery = { blacklist: [] };
+
+      for (const item of blacklist) {
+        const regex = item.regex;  // needs unencode?
+        if (typeof regex === 'string') {
+          try {
+            props.imagery.blacklist.push(new RegExp(regex));
+          } catch (e) {
+            /* noop */
+          }
+        }
+      }
+    }
+
+    return props;
+  }
+
+
+  /**
+   * _parseBounds
+   * Parse the given `bounds` object.
+   * @param   {Object}  obj - the source object
+   * @return  {Object}  Object of parsed properties
+   */
+  _parseBounds(obj) {
+    return Object.assign({ type: 'bounds' }, obj);
   }
 
 }
+
+
+// Helper functions.
+// Can c8 ignore these.. Some of the codepaths in here
+// are things we would never see in practice..
+/* c8 ignore start */
+
+/**
+ * isObject
+ * Is the given thing an Object?
+ *
+ * This is better than `typeof val === 'object'` because it returns
+ * correct result for Arrays and `null`.  It doesn't catch protoless Objects
+ * created with `Object.create(null)` but we don't care about that.
+ * @param   {*}        val - the thing to test
+ * @return  {boolean}  `true` if it's an Object, `false` if not
+ */
+function isObject(val) {
+  return val?.constructor?.name === 'Object';
+}
+
+/**
+ * unstringify
+ * This will attempt to clean up and cast strings to a better type if possible.
+ * We aren't going to overthink this, just handle a few simple cases.
+ * @param   {string}  s - the source string
+ * @return  {*}       result value
+ */
+function unstringify(s) {
+  if (isObject(s)) {    // if we were passed an object, unstringify whatever is in it.
+    for (const [k, v] of Object.entries(s)) {
+      s[k] = unstringify(v);
+    }
+  }
+  if (typeof s !== 'string') {
+    return s;
+  }
+
+  s = s.trim();
+  if (/^[+-]?\d+$/.test(s)) {   // integers
+    return parseInt(s, 10);
+  } else if (/^[+-]?\d*\.\d*([Ee][+-]?\d+)?$/.test(s) && s !== '.') {   // floats
+    return parseFloat(s);
+  } else if (/^true$/i.test(s)) {   // true
+    return true;
+  } else if (/^false$/i.test(s)) {   // false
+    return false;
+  } else if (/^null$/i.test(s)) {   // null
+    return null;
+  } else if (/^undefined$/i.test(s)) {   // undefined
+    return undefined;
+  } else if (/^\d{4}/.test(s)) {   // starts with 4 digits
+    const d = new Date(s);         // could it be a Date?
+    if (isFinite(d)) {
+      return d;
+    }
+  }
+
+  return s;
+}
+/* c8 ignore end */
