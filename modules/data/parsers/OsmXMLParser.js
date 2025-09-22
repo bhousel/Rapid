@@ -23,13 +23,13 @@ import { DOMParser } from '@xmldom/xmldom';
  *   data: [         // Array of Objects parsed from the file..
  *     {
  *       type: 'node',   // Each object WILL have a 'type' property,
- *       id: 1,          // along with whatever other properties are present.
+ *       id: 'n1',       // along with whatever other properties are present.
  *       lat: 40.6555,
  *       lon: -74.5415,
  *       …
  *     }, {
  *       type: 'way',
- *       id: 1,
+ *       id: 'w1',
  *       nodes: [1, 2],
  *       …
  *     },
@@ -87,7 +87,8 @@ export class OsmXMLParser {
    * @throws  Will throw if nothing could be parsed, or errors found
    */
   parse(content, options = {}) {
-    options.skipSeen ??= true;
+    options.skipSeen ??= true;       // exclude results that we have seen before
+    options.onlyElements ??= false;  // include only elements in the results
 
     if (!content)  {
       throw new Error('No content');
@@ -137,29 +138,29 @@ export class OsmXMLParser {
         results.seenIDs.add(id);
         parser = this._parseRelation;
 
-      } else if (child.nodeName === 'changeset') {
+      } else if (!options.onlyElements && child.nodeName === 'changeset') {
         id = 'c' + child.attributes.getNamedItem('id').value;
         results.seenIDs.add(id);
         parser = this._parseChangeset;
 
-      } else if (child.nodeName === 'note') {
+      } else if (!options.onlyElements && child.nodeName === 'note') {
         id = 'note' + child.getElementsByTagName('id')[0].textContent;
         parser = this._parseNote;
 
-      } else if (child.nodeName === 'user') {
+      } else if (!options.onlyElements && child.nodeName === 'user') {
         id = 'user' + child.attributes.getNamedItem('id').value;
         parser = this._parseUser;
 
-      } else if (child.nodeName === 'preferences') {
+      } else if (!options.onlyElements && child.nodeName === 'preferences') {
         parser = this._parsePreferences;
 
-      } else if (child.nodeName === 'api') {
+      } else if (!options.onlyElements && child.nodeName === 'api') {
         parser = this._parseApi;
 
-      } else if (child.nodeName === 'policy') {
+      } else if (!options.onlyElements && child.nodeName === 'policy') {
         parser = this._parsePolicy;
 
-      } else if (child.nodeName === 'bounds') {
+      } else if (!options.onlyElements && child.nodeName === 'bounds') {
         parser = this._parseBounds;
       }
 
@@ -369,7 +370,7 @@ export class OsmXMLParser {
         const nodeName = node.nodeName;
         if (nodeName === '#text') continue;
 
-        if (/(date|uid)/.test(nodeName)) {
+        if (/date/.test(nodeName)) {
           props[nodeName] = unstringify(node.textContent);
         } else {
           props[nodeName] = node.textContent;
@@ -601,7 +602,12 @@ function getCleanAttributes(node) {
   if (!node?.attributes) return result;
 
   for (const attr of Array.from(node.attributes)) {
-    result[attr.nodeName] = unstringify(attr.nodeValue);
+    const k = attr.nodeName;
+    if (k === 'id' || k === 'uid') {  // ids should remain strings
+      result[attr.nodeName] = attr.nodeValue;
+    } else {
+      result[attr.nodeName] = unstringify(attr.nodeValue);
+    }
   }
   return result;
 }

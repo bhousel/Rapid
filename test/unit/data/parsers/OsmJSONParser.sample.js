@@ -593,7 +593,7 @@ export const c2 = {
   "comments": []
 };
 
-// Changeset, with no comment tag
+// Changeset, with no tags, no comments
 export const c3 = {
   "id": 3,
   "created_at": "2025-09-03T00:00:01Z",
@@ -606,13 +606,7 @@ export const c3 = {
   "max_lat": 40.060993,
   "max_lon": -74.2391612,
   "uid": 100,
-  "user": "bhousel",
-  "tags": {
-    "created_by": "Rapid 2.6.0",
-    "host": "http://127.0.0.1:8080",
-    "imagery_used": "Bing Maps Aerial",
-    "locale": "en-US"
-  }
+  "user": "bhousel"
 };
 
 // A single changeset will be returned in a `changeset` property.

@@ -62,12 +62,12 @@ describe('OsmXMLParser', () => {
       // The sample data is strings, but we should handle content already parsed into an xml document
       const doc = new DOMParser().parseFromString(sample.mapXML, 'application/xml');
       const results = parser.parse(doc);
-      assert.deepInclude(results.osm, sample.metadataResult);
+      assert.deepEqual(results.osm, sample.metadataResult);
     });
 
     it('parses metadata', () => {
       const results = parser.parse(sample.mapXML);
-      assert.deepInclude(results.osm, sample.metadataResult);
+      assert.deepEqual(results.osm, sample.metadataResult);
     });
 
     it('parses elements and bounds, default to visible=true', () => {
@@ -77,12 +77,12 @@ describe('OsmXMLParser', () => {
       assert.lengthOf(data, 7);
 
       assert.deepEqual(data[0], sample.boundsResult);
-      assert.deepInclude(data[1], sample.n1Result);
-      assert.deepInclude(data[2], sample.n2Result);
-      assert.deepInclude(data[3], sample.w1Result);
-      assert.deepInclude(data[4], sample.w2Result);
-      assert.deepInclude(data[5], sample.r1Result);
-      assert.deepInclude(data[6], sample.r2Result);
+      assert.deepEqual(data[1], sample.n1Result);
+      assert.deepEqual(data[2], sample.n2Result);
+      assert.deepEqual(data[3], sample.w1Result);
+      assert.deepEqual(data[4], sample.w2Result);
+      assert.deepEqual(data[5], sample.r1Result);
+      assert.deepEqual(data[6], sample.r2Result);
     });
 
     it('handles visible=true', () => {
@@ -92,12 +92,12 @@ describe('OsmXMLParser', () => {
       assert.lengthOf(data, 7);
 
       assert.deepEqual(data[0], sample.boundsResult);
-      assert.deepInclude(data[1], sample.n1Result);
-      assert.deepInclude(data[2], sample.n2Result);
-      assert.deepInclude(data[3], sample.w1Result);
-      assert.deepInclude(data[4], sample.w2Result);
-      assert.deepInclude(data[5], sample.r1Result);
-      assert.deepInclude(data[6], sample.r2Result);
+      assert.deepEqual(data[1], sample.n1Result);
+      assert.deepEqual(data[2], sample.n2Result);
+      assert.deepEqual(data[3], sample.w1Result);
+      assert.deepEqual(data[4], sample.w2Result);
+      assert.deepEqual(data[5], sample.r1Result);
+      assert.deepEqual(data[6], sample.r2Result);
     });
 
     it('handles visible=false (deleted)', () => {
@@ -107,12 +107,12 @@ describe('OsmXMLParser', () => {
       assert.lengthOf(data, 7);
 
       assert.deepEqual(data[0], sample.boundsResult);
-      assert.deepInclude(data[1], sample.n1ResultDeleted);
-      assert.deepInclude(data[2], sample.n2ResultDeleted);
-      assert.deepInclude(data[3], sample.w1ResultDeleted);
-      assert.deepInclude(data[4], sample.w2ResultDeleted);
-      assert.deepInclude(data[5], sample.r1ResultDeleted);
-      assert.deepInclude(data[6], sample.r2ResultDeleted);
+      assert.deepEqual(data[1], sample.n1ResultDeleted);
+      assert.deepEqual(data[2], sample.n2ResultDeleted);
+      assert.deepEqual(data[3], sample.w1ResultDeleted);
+      assert.deepEqual(data[4], sample.w2ResultDeleted);
+      assert.deepEqual(data[5], sample.r1ResultDeleted);
+      assert.deepEqual(data[6], sample.r2ResultDeleted);
     });
 
     it('parses notes', () => {
@@ -120,8 +120,8 @@ describe('OsmXMLParser', () => {
       const data = results.data;
       assert.isArray(data);
       assert.lengthOf(data, 2);
-      assert.deepInclude(data[0], sample.note1Result);
-      assert.deepInclude(data[1], sample.note2Result);
+      assert.deepEqual(data[0], sample.note1Result);
+      assert.deepEqual(data[1], sample.note2Result);
     });
 
     it('parses users', () => {
@@ -129,8 +129,8 @@ describe('OsmXMLParser', () => {
       const data = results.data;
       assert.isArray(data);
       assert.lengthOf(data, 2);
-      assert.deepInclude(data[0], sample.user1Result);
-      assert.deepInclude(data[1], sample.user2Result);
+      assert.deepEqual(data[0], sample.user1Result);
+      assert.deepEqual(data[1], sample.user2Result);
     });
 
     it('parses preferences', () => {
@@ -138,7 +138,7 @@ describe('OsmXMLParser', () => {
       const data = results.data;
       assert.isArray(data);
       assert.lengthOf(data, 1);
-      assert.deepInclude(data[0], sample.preferencesResult);
+      assert.deepEqual(data[0], sample.preferencesResult);
     });
 
     it('parses changesets', () => {
@@ -146,9 +146,9 @@ describe('OsmXMLParser', () => {
       const data = results.data;
       assert.isArray(data);
       assert.lengthOf(data, 3);
-      assert.deepInclude(data[0], sample.c1Result);
-      assert.deepInclude(data[1], sample.c2Result);
-      assert.deepInclude(data[2], sample.c3Result);
+      assert.deepEqual(data[0], sample.c1Result);
+      assert.deepEqual(data[1], sample.c2Result);
+      assert.deepEqual(data[2], sample.c3Result);
     });
 
     it('parses api and policy', () => {
@@ -156,8 +156,8 @@ describe('OsmXMLParser', () => {
       const data = results.data;
       assert.isArray(data);
       assert.lengthOf(data, 2);
-      assert.deepInclude(data[0], sample.apiResult);
-      assert.deepInclude(data[1], sample.policyResult);
+      assert.deepEqual(data[0], sample.apiResult);
+      assert.deepEqual(data[1], sample.policyResult);
     });
 
     it('skips already-seen elements by default', () => {
@@ -232,6 +232,15 @@ describe('OsmXMLParser', () => {
       assert.isArray(data2);
       assert.lengthOf(data2, 3);
     });
+
+    it('optionally skips non-elements', () => {
+      const results = parser.parse(sample.mapXML, { onlyElements: true });
+      const data = results.data;
+      assert.isArray(data);
+      assert.lengthOf(data, 6);   // no bounds
+      assert.deepEqual(data[0], sample.n1Result);
+    });
+
   });
 
 });

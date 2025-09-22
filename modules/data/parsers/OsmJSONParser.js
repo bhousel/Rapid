@@ -24,13 +24,13 @@
  *   data: [         // Array of Objects parsed from the file..
  *     {
  *       type: 'node',   // Each object WILL have a 'type' property,
- *       id: 1,          // along with whatever other properties are present.
+ *       id: 'n1',       // along with whatever other properties are present.
  *       lat: 40.6555,
  *       lon: -74.5415,
  *       …
  *     }, {
  *       type: 'way',
- *       id: 1,
+ *       id: 'w1',
  *       nodes: [1, 2],
  *       …
  *     },
@@ -87,7 +87,8 @@ export class OsmJSONParser {
    * @throws  Will throw if nothing could be parsed, or errors found
    */
   parse(content, options = {}) {
-    options.skipSeen ??= true;
+    options.skipSeen ??= true;       // exclude results that we have seen before
+    options.onlyElements ??= false;  // include only elements in the results
 
     if (!content)  {
       throw new Error('No content');
@@ -110,10 +111,12 @@ export class OsmJSONParser {
       notes = json.features;
     }
     if (notes) {
-      for (const note of notes) {
-        const parsed = this._parseNote(note);
-        if (parsed) {
-          results.data.push(parsed);
+      if (!options.onlyElements) {
+        for (const note of notes) {
+          const parsed = this._parseNote(note);
+          if (parsed) {
+            results.data.push(parsed);
+          }
         }
       }
       return results;  // exit early
@@ -129,7 +132,7 @@ export class OsmJSONParser {
     }
 
     // 'api'
-    if (isObject(json.api)) {
+    if (!options.onlyElements && isObject(json.api)) {
       const parsed = this._parseApi(json.api);
       if (parsed) {
         results.data.push(parsed);
@@ -137,7 +140,7 @@ export class OsmJSONParser {
     }
 
     // 'policy'
-    if (isObject(json.policy)) {
+    if (!options.onlyElements && isObject(json.policy)) {
       const parsed = this._parsePolicy(json.policy);
       if (parsed) {
         results.data.push(parsed);
@@ -145,7 +148,7 @@ export class OsmJSONParser {
     }
 
     // 'bounds'
-    if (isObject(json.bounds)) {
+    if (!options.onlyElements && isObject(json.bounds)) {
       const parsed = this._parseBounds(json.bounds);
       if (parsed) {
         results.data.push(parsed);
@@ -197,7 +200,7 @@ export class OsmJSONParser {
 
     // 'users'
     const users = (json.user ? [json.user] : json.users) || [];
-    if (users.length) {
+    if (!options.onlyElements && users.length) {
       for (const obj of users) {
         const id = 'user' + obj.id;
 
@@ -215,7 +218,7 @@ export class OsmJSONParser {
 
     // 'changesets'
     const changesets = (json.changeset ? [json.changeset] : json.changesets) || [];
-    if (changesets.length) {
+    if (!options.onlyElements && changesets.length) {
       for (const obj of changesets) {
         const id = 'c' + obj.id;
 
@@ -232,7 +235,7 @@ export class OsmJSONParser {
     }
 
     // 'preferences'
-    if (isObject(json.preferences)) {
+    if (!options.onlyElements && isObject(json.preferences)) {
       const parsed = this._parsePreferences(json.preferences);
       if (parsed) {
         results.data.push(parsed);
@@ -255,14 +258,14 @@ export class OsmJSONParser {
       type: 'node',
       id: id,
       visible: obj.visible ?? true,
-      tags: obj.tags,
+      tags: obj.tags || {},
       loc: [ obj.lon, obj.lat ]
     };
 
-    for (const [k, v] of Object.entries(obj)) {  // grab everything else
-      if (k === 'lon' || k === 'lat' || props.hasOwnProperty(k)) continue;
-      props[k] = unstringify(v);
-    }
+    copyProps(props, obj);  // grab everything else
+    delete props.lon;  // except these
+    delete props.lat;
+
     return props;
   }
 
@@ -279,15 +282,11 @@ export class OsmJSONParser {
       type: 'way',
       id: id,
       visible: obj.visible ?? true,
-      tags: obj.tags,
-      nodes: (obj.nodes ?? []).map(id => `n${id}`)
+      tags: obj.tags || {},
+      nodes: (obj.nodes || []).map(id => `n${id}`)
     };
 
-    for (const [k, v] of Object.entries(obj)) {  // grab everything else
-      if (props.hasOwnProperty(k)) continue;
-      props[k] = unstringify(v);
-    }
-
+    copyProps(props, obj);  // grab everything else
     return props;
   }
 
@@ -304,8 +303,8 @@ export class OsmJSONParser {
       type: 'relation',
       id: id,
       visible: obj.visible ?? true,
-      tags: obj.tags,
-      members: (obj.members ?? []).map(member => {
+      tags: obj.tags || {},
+      members: (obj.members || []).map(member => {
         return {
           id: member.type[0] + member.ref,
           type: member.type,
@@ -314,11 +313,7 @@ export class OsmJSONParser {
       })
     };
 
-    for (const [k, v] of Object.entries(obj)) {  // grab everything else
-      if (props.hasOwnProperty(k)) continue;
-      props[k] = unstringify(v);
-    }
-
+    copyProps(props, obj);  // grab everything else
     return props;
   }
 
@@ -334,7 +329,7 @@ export class OsmJSONParser {
     const props = {
       type: 'changeset',
       id: id,
-      tags: obj.tags
+      tags: obj.tags || {}
     };
 
     // parse changeset comments, if any
@@ -342,11 +337,7 @@ export class OsmJSONParser {
       props.comments = this._parseComments(obj.comments);
     }
 
-    for (const [k, v] of Object.entries(obj)) {  // grab everything else
-      if (props.hasOwnProperty(k)) continue;
-      props[k] = unstringify(v);
-    }
-
+    copyProps(props, obj);  // grab everything else
     return props;
   }
 
@@ -360,7 +351,6 @@ export class OsmJSONParser {
   _parseNote(obj) {
     const props = {
       type: 'note',
-      id: obj.properties.id.toString(),   // we want to keep note ids as strings
       loc: obj.geometry.coordinates
     };
 
@@ -369,11 +359,7 @@ export class OsmJSONParser {
       props.comments = this._parseComments(obj.properties.comments);
     }
 
-    for (const [k, v] of Object.entries(obj.properties)) {  // grab everything else
-      if (props.hasOwnProperty(k)) continue;
-      props[k] = unstringify(v);
-    }
-
+    copyProps(props, obj.properties);  // grab everything else
     return props;
   }
 
@@ -389,11 +375,7 @@ export class OsmJSONParser {
       const props = {
         visible: obj.visible ?? true
       };
-
-      for (const [k, v] of Object.entries(obj)) {
-        props[k] = unstringify(v);
-      }
-
+      copyProps(props, obj);
       return props;
     });
   }
@@ -407,11 +389,7 @@ export class OsmJSONParser {
    */
   _parseUser(obj) {
     const props = { type: 'user' };
-
-    for (const [k, v] of Object.entries(obj)) {
-      //if (props.hasOwnProperty(k)) continue;  // can't happen, no props to overwrite
-      props[k] = unstringify(v);
-    }
+    copyProps(props, obj);
 
     if (!props.roles) {  // make sure this property always exists
       props.roles = [];
@@ -445,12 +423,7 @@ export class OsmJSONParser {
    */
   _parseApi(obj) {
     const props = { type: 'api' };
-
-    for (const [k, v] of Object.entries(obj)) {
-      //if (props.hasOwnProperty(k)) continue;  // can't happen, no props to overwrite
-      props[k] = unstringify(v);
-    }
-
+    copyProps(props, obj);
     return props;
   }
 
@@ -516,6 +489,28 @@ function isObject(val) {
   return val?.constructor?.name === 'Object';
 }
 
+
+/**
+ * copyProps
+ * Copies the properties from source to destination.
+ * While doing so, try to stringify `id` properties and unstringify other properties.
+ * @param   {Object}  dst - the destination Object
+ * @param   {Object}  src - the source Object
+ * @return  {Object}  the destination Object
+ */
+function copyProps(dst, src) {
+  for (const [k, v] of Object.entries(src)) {
+    if (dst.hasOwnProperty(k)) continue;  // don't overwrite an existing property
+    if (k === 'id' || k === 'uid') {   // ids should remain strings
+      dst[k] = v.toString();
+    } else {
+      dst[k] = unstringify(v);
+    }
+  }
+  return dst;
+}
+
+
 /**
  * unstringify
  * This will attempt to clean up and cast strings to a better type if possible.
@@ -526,7 +521,11 @@ function isObject(val) {
 function unstringify(s) {
   if (isObject(s)) {    // if we were passed an object, unstringify whatever is in it.
     for (const [k, v] of Object.entries(s)) {
-      s[k] = unstringify(v);
+      if (k === 'id' || k === 'uid') {  // ids should remain strings
+        s[k] = v.toString();
+      } else {
+        s[k] = unstringify(v);
+      }
     }
   }
   if (typeof s !== 'string') {

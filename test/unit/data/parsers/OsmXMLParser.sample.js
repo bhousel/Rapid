@@ -398,7 +398,7 @@ export const c2 = `
   <discussion/>
 </changeset>`;
 
-// Changeset, with no comment tag, no discussion element
+// Changeset, with no tags, no discussion element
 export const c3 = `
 <changeset
   id="3"
@@ -413,12 +413,7 @@ export const c3 = `
   min_lon="-74.2392873"
   max_lat="40.060993"
   max_lon="-74.2391612"
->
-  <tag k="created_by" v="Rapid 2.6.0"/>
-  <tag k="host" v="http://127.0.0.1:8080"/>
-  <tag k="imagery_used" v="Bing Maps Aerial"/>
-  <tag k="locale" v="en-US"/>
-</changeset>`;
+/>`;
 
 
 // Changesets are returned as direct descendant childNodes of the `osm` element.
@@ -490,7 +485,7 @@ export const n1Result = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
+  uid: '100',
   tags: {
     crossing: 'marked',
     'crossing:markings': 'zebra',
@@ -508,7 +503,8 @@ export const n2Result = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100
+  uid: '100',
+  tags: {}
 };
 
 export const w1Result = {
@@ -519,7 +515,7 @@ export const w1Result = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
+  uid: '100',
   nodes: ['n1', 'n2'],
   tags: {
     highway: 'tertiary',
@@ -537,8 +533,9 @@ export const w2Result = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
-  nodes: []
+  uid: '100',
+  nodes: [],
+  tags: {}
 };
 
 export const r1Result = {
@@ -549,7 +546,7 @@ export const r1Result = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
+  uid: '100',
   members: [
     { type: 'way', id: 'w1', role: 'south' }
   ],
@@ -569,8 +566,9 @@ export const r2Result = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
-  members: []
+  uid: '100',
+  members: [],
+  tags: {}
 };
 
 export const n1ResultDeleted = {
@@ -582,7 +580,7 @@ export const n1ResultDeleted = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
+  uid: '100',
   tags: {
     crossing: 'marked',
     'crossing:markings': 'zebra',
@@ -600,7 +598,8 @@ export const n2ResultDeleted = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100
+  uid: '100',
+  tags: {}
 };
 
 export const w1ResultDeleted = {
@@ -611,7 +610,7 @@ export const w1ResultDeleted = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
+  uid: '100',
   nodes: ['n1', 'n2'],
   tags: {
     highway: 'tertiary',
@@ -629,8 +628,9 @@ export const w2ResultDeleted = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
-  nodes: []
+  uid: '100',
+  nodes: [],
+  tags: {}
 };
 
 export const r1ResultDeleted = {
@@ -641,7 +641,7 @@ export const r1ResultDeleted = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
+  uid: '100',
   members: [
     { type: 'way', id: 'w1', role: 'south' }
   ],
@@ -661,12 +661,14 @@ export const r2ResultDeleted = {
   version: 2,
   changeset: 1,
   user: 'bhousel',
-  uid: 100,
-  members: []
+  uid: '100',
+  members: [],
+  tags: {}
 };
 
 
-export const c1Result  = {
+export const c1Result = {
+  type: 'changeset',
   id: 'c1',
   created_at: new Date('2025-09-01T00:00:01Z'),
   open: false,
@@ -677,7 +679,7 @@ export const c1Result  = {
   min_lon: -74.2392873,
   max_lat: 40.060993,
   max_lon: -74.2391612,
-  uid: 100,
+  uid: '100',
   user: 'bhousel',
   tags: {
     comment: 'Fix unsquare corners',
@@ -688,10 +690,10 @@ export const c1Result  = {
   },
   comments: [
     {
-      id: 1000,
+      id: '1000',
       visible: true,
       date: new Date('2025-09-02T00:00:01Z'),
-      uid: 200,
+      uid: '200',
       user: 'lgtm',
       text: 'LGTM!'
     }
@@ -699,6 +701,7 @@ export const c1Result  = {
 };
 
 export const c2Result = {
+  type: 'changeset',
   id: 'c2',
   created_at: new Date('2025-09-02T00:00:01Z'),
   open: false,
@@ -709,7 +712,7 @@ export const c2Result = {
   min_lon: -74.2392873,
   max_lat: 40.060993,
   max_lon: -74.2391612,
-  uid: 100,
+  uid: '100',
   user: 'bhousel',
   tags: {
     comment: '',
@@ -722,6 +725,7 @@ export const c2Result = {
 };
 
 export const c3Result = {
+  type: 'changeset',
   id: 'c3',
   created_at: new Date('2025-09-03T00:00:01Z'),
   open: false,
@@ -732,14 +736,9 @@ export const c3Result = {
   min_lon: -74.2392873,
   max_lat: 40.060993,
   max_lon: -74.2391612,
-  uid: 100,
+  uid: '100',
   user: 'bhousel',
-  tags: {
-    created_by: 'Rapid 2.6.0',
-    host: 'http://127.0.0.1:8080',
-    imagery_used: 'Bing Maps Aerial',
-    locale: 'en-US'
-  }
+  tags: {}
 };
 
 export const note1Result = {
@@ -756,7 +755,7 @@ export const note1Result = {
     {
       visible: true,
       date: new Date('2025-01-01 00:00:00 UTC'),
-      uid: 100,
+      uid: '100',
       user: 'bhousel',
       user_url: 'https://www.openstreetmap.org/user/bhousel',
       action: 'opened',
@@ -785,7 +784,7 @@ export const note2Result = {
     }, {
       visible: true,
       date: new Date('2025-01-02 00:00:00 UTC'),
-      uid: 200,
+      uid: '200',
       user: 'lgtm',
       user_url: 'https://www.openstreetmap.org/user/lgtm',
       action: 'commented',
@@ -797,7 +796,7 @@ export const note2Result = {
 
 export const user1Result = {
   type: 'user',
-  id: 100,
+  id: '100',
   display_name: 'bhousel',
   account_created: new Date('2000-01-01T00:00:01Z'),
   description: 'Hi',
@@ -817,7 +816,7 @@ export const user1Result = {
 
 export const user2Result = {
   type: 'user',
-  id: 200,
+  id: '200',
   display_name: 'lgtm',
   account_created: new Date('2000-01-01T00:00:01Z'),
   description: 'LGTM!',
