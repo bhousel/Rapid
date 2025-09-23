@@ -66,6 +66,10 @@ export class OsmXMLParser {
     this._parsePolicy = this._parsePolicy.bind(this);
     this._parseBounds = this._parseBounds.bind(this);
     this._getTags = this._getTags.bind(this);
+
+    this.types = new Set([
+      'node', 'way', 'relation', 'note', 'user', 'preferences', 'changeset', 'api', 'policy', 'bounds'
+    ]);
   }
 
 
@@ -87,11 +91,21 @@ export class OsmXMLParser {
    * @throws  Will throw if nothing could be parsed, or errors found
    */
   parse(content, options = {}) {
-    options.skipSeen ??= true;       // exclude results that we have seen before
-    options.onlyElements ??= false;  // include only elements in the results
-
     if (!content)  {
       throw new Error('No content');
+    }
+
+    // exclude results that we have seen before
+    const skipSeen = options.skipSeen ?? true;
+
+    // include only these in the results (e.g. ['node','way','relation'])
+    let filter;
+    if (options.filter instanceof Set) {
+      filter = options.filter;
+    } else if (Array.isArray(options.filter)) {
+      filter = new Set(options.filter);
+    } else {
+      filter = this.types;
     }
 
     // Note: I'd like to try to find a way to avoid seenIDs, See note in EditSystem.merge()..
@@ -123,50 +137,50 @@ export class OsmXMLParser {
     for (const child of children) {
       let parser, id;
 
-      if (child.nodeName === 'node') {
+      if (child.nodeName === 'node' && filter.has('node')) {
         id = 'n' + child.attributes.getNamedItem('id').value;
         results.seenIDs.add(id);
         parser = this._parseNode;
 
-      } else if (child.nodeName === 'way') {
+      } else if (child.nodeName === 'way' && filter.has('way')) {
         id = 'w' + child.attributes.getNamedItem('id').value;
         results.seenIDs.add(id);
         parser = this._parseWay;
 
-      } else if (child.nodeName === 'relation') {
+      } else if (child.nodeName === 'relation' && filter.has('relation')) {
         id = 'r' + child.attributes.getNamedItem('id').value;
         results.seenIDs.add(id);
         parser = this._parseRelation;
 
-      } else if (!options.onlyElements && child.nodeName === 'changeset') {
+      } else if (child.nodeName === 'changeset' && filter.has('changeset')) {
         id = 'c' + child.attributes.getNamedItem('id').value;
         results.seenIDs.add(id);
         parser = this._parseChangeset;
 
-      } else if (!options.onlyElements && child.nodeName === 'note') {
+      } else if (child.nodeName === 'note' && filter.has('note')) {
         id = 'note' + child.getElementsByTagName('id')[0].textContent;
         parser = this._parseNote;
 
-      } else if (!options.onlyElements && child.nodeName === 'user') {
+      } else if (child.nodeName === 'user' && filter.has('user')) {
         id = 'user' + child.attributes.getNamedItem('id').value;
         parser = this._parseUser;
 
-      } else if (!options.onlyElements && child.nodeName === 'preferences') {
+      } else if (child.nodeName === 'preferences' && filter.has('preferences')) {
         parser = this._parsePreferences;
 
-      } else if (!options.onlyElements && child.nodeName === 'api') {
+      } else if (child.nodeName === 'api' && filter.has('api')) {
         parser = this._parseApi;
 
-      } else if (!options.onlyElements && child.nodeName === 'policy') {
+      } else if (child.nodeName === 'policy' && filter.has('policy')) {
         parser = this._parsePolicy;
 
-      } else if (!options.onlyElements && child.nodeName === 'bounds') {
+      } else if (child.nodeName === 'bounds' && filter.has('bounds')) {
         parser = this._parseBounds;
       }
 
       if (!parser) continue;
 
-      if (options.skipSeen && id !== undefined) {  // skip things we've seen before
+      if (skipSeen && id !== undefined) {  // skip things we've seen before
         if (this._seen.has(id)) continue;
         this._seen.add(id);
       }

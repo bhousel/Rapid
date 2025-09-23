@@ -10,7 +10,7 @@ export const n1 = {
   lat: 40.6555,
   lon: -74.5415,
   timestamp: "2025-09-01T00:00:01Z",
-  version: 2,
+  version: 1,
   changeset: 1,
   user: "bhousel",
   uid: 100,
@@ -30,7 +30,7 @@ export const n2 = {
   lon: -74.5416,
   timestamp: "2025-09-01T00:00:01Z",
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: "bhousel",
   uid: 100
 };
@@ -40,7 +40,7 @@ export const w1 = {
   type: "way",
   id: 1,
   timestamp: "2025-09-01T00:00:01Z",
-  version: 2,
+  version: 1,
   changeset: 1,
   user: "bhousel",
   uid: 100,
@@ -59,7 +59,7 @@ export const w2 = {
   id: 2,
   timestamp: "2025-09-01T00:00:01Z",
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: "bhousel",
   uid: 100
 };
@@ -69,7 +69,7 @@ export const r1 = {
   type: "relation",
   id: 1,
   timestamp: "2025-09-01T00:00:01Z",
-  version: 2,
+  version: 1,
   changeset: 1,
   user: "bhousel",
   uid: 100,
@@ -90,7 +90,7 @@ export const r2 = {
   id: 2,
   timestamp: "2025-09-01T00:00:01Z",
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: "bhousel",
   uid: 100
 };
@@ -103,7 +103,7 @@ export const n1visible = {
   lat: 40.6555,
   lon: -74.5415,
   timestamp: "2025-09-01T00:00:01Z",
-  version: 2,
+  version: 1,
   changeset: 1,
   user: "bhousel",
   uid: 100,
@@ -124,7 +124,7 @@ export const n2visible = {
   lon: -74.5416,
   timestamp: "2025-09-01T00:00:01Z",
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: "bhousel",
   uid: 100
 };
@@ -135,7 +135,7 @@ export const w1visible = {
   id: 1,
   visible: true,
   timestamp: "2025-09-01T00:00:01Z",
-  version: 2,
+  version: 1,
   changeset: 1,
   user: "bhousel",
   uid: 100,
@@ -155,7 +155,7 @@ export const w2visible = {
   visible: true,
   timestamp: "2025-09-01T00:00:01Z",
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: "bhousel",
   uid: 100
 };
@@ -166,7 +166,7 @@ export const r1visible = {
   id: 1,
   visible: true,
   timestamp: "2025-09-01T00:00:01Z",
-  version: 2,
+  version: 1,
   changeset: 1,
   user: "bhousel",
   uid: 100,
@@ -188,7 +188,7 @@ export const r2visible = {
   visible: true,
   timestamp: "2025-09-01T00:00:01Z",
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: "bhousel",
   uid: 100
 };
@@ -201,7 +201,7 @@ export const n1deleted = {
   lat: 40.6555,
   lon: -74.5415,
   timestamp: "2025-09-01T00:00:01Z",
-  version: 2,
+  version: 1,
   changeset: 1,
   user: "bhousel",
   uid: 100,
@@ -222,7 +222,7 @@ export const n2deleted = {
   lon: -74.5416,
   timestamp: "2025-09-01T00:00:01Z",
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: "bhousel",
   uid: 100
 };
@@ -233,7 +233,7 @@ export const w1deleted = {
   id: 1,
   visible: false,
   timestamp: "2025-09-01T00:00:01Z",
-  version: 2,
+  version: 1,
   changeset: 1,
   user: "bhousel",
   uid: 100,
@@ -253,7 +253,7 @@ export const w2deleted = {
   visible: false,
   timestamp: "2025-09-01T00:00:01Z",
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: "bhousel",
   uid: 100
 };
@@ -264,7 +264,7 @@ export const r1deleted = {
   id: 1,
   visible: false,
   timestamp: "2025-09-01T00:00:01Z",
-  version: 2,
+  version: 1,
   changeset: 1,
   user: "bhousel",
   uid: 100,
@@ -286,7 +286,7 @@ export const r2deleted = {
   visible: false,
   timestamp: "2025-09-01T00:00:01Z",
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: "bhousel",
   uid: 100
 };
@@ -370,6 +370,33 @@ export const mapJSONdeleted = {
   "license": "http://opendatacommons.org/licenses/odbl/1-0/",
   "bounds": bounds,
   "elements": [ n1deleted, n2deleted, w1deleted, w2deleted, r1deleted, r2deleted ]
+};
+
+export const nodeJSON = {
+  "version": "0.6",
+  "generator": "openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)",
+  "copyright": "OpenStreetMap and contributors",
+  "attribution": "http://www.openstreetmap.org/copyright",
+  "license": "http://opendatacommons.org/licenses/odbl/1-0/",
+  "elements": [ n1 ]
+};
+
+export const wayJSON = {
+  "version": "0.6",
+  "generator": "openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)",
+  "copyright": "OpenStreetMap and contributors",
+  "attribution": "http://www.openstreetmap.org/copyright",
+  "license": "http://opendatacommons.org/licenses/odbl/1-0/",
+  "elements": [ w1 ]
+};
+
+export const relationJSON = {
+  "version": "0.6",
+  "generator": "openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)",
+  "copyright": "OpenStreetMap and contributors",
+  "attribution": "http://www.openstreetmap.org/copyright",
+  "license": "http://opendatacommons.org/licenses/odbl/1-0/",
+  "elements": [ r1 ]
 };
 
 

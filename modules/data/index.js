@@ -22,14 +22,14 @@ export {
 };
 
 /**
- * createOsmFeature
+ * createOsmEntity
  * This function allows us to construct the correct OSM Entity type.
  * If passed another OSM Entity, inspect its constructor.
  * If passed context and properties, inspect its `id` or `type` properties.
  * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
  * @param  {Object}                props - Properties to assign to the data element
  */
-export function createOsmFeature(otherOrContext, props = {}) {
+export function createOsmEntity(otherOrContext, props = {}) {
   if (otherOrContext instanceof AbstractData) {  // copy other
     const Type = otherOrContext.constructor;
     return new Type(otherOrContext, props);

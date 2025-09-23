@@ -5,20 +5,20 @@ import * as Rapid from '../../../modules/headless.js';
 const context = new Rapid.MockContext();
 
 
-describe('createOsmFeature', () => {
+describe('createOsmEntity', () => {
   it('returns a subclass of the appropriate type', () => {
-    assert.isOk(Rapid.createOsmFeature(context, {type: 'node'}) instanceof Rapid.OsmNode);
-    assert.isOk(Rapid.createOsmFeature(context, {type: 'way'}) instanceof Rapid.OsmWay);
-    assert.isOk(Rapid.createOsmFeature(context, {type: 'relation'}) instanceof Rapid.OsmRelation);
-    assert.isOk(Rapid.createOsmFeature(context, {type: 'changeset'}) instanceof Rapid.OsmChangeset);
-    assert.isOk(Rapid.createOsmFeature(context, {id: 'n1'}) instanceof Rapid.OsmNode);
-    assert.isOk(Rapid.createOsmFeature(context, {id: 'w1'}) instanceof Rapid.OsmWay);
-    assert.isOk(Rapid.createOsmFeature(context, {id: 'r1'}) instanceof Rapid.OsmRelation);
-    assert.isOk(Rapid.createOsmFeature(context, {id: 'c1'}) instanceof Rapid.OsmChangeset);
+    assert.isOk(Rapid.createOsmEntity(context, {type: 'node'}) instanceof Rapid.OsmNode);
+    assert.isOk(Rapid.createOsmEntity(context, {type: 'way'}) instanceof Rapid.OsmWay);
+    assert.isOk(Rapid.createOsmEntity(context, {type: 'relation'}) instanceof Rapid.OsmRelation);
+    assert.isOk(Rapid.createOsmEntity(context, {type: 'changeset'}) instanceof Rapid.OsmChangeset);
+    assert.isOk(Rapid.createOsmEntity(context, {id: 'n1'}) instanceof Rapid.OsmNode);
+    assert.isOk(Rapid.createOsmEntity(context, {id: 'w1'}) instanceof Rapid.OsmWay);
+    assert.isOk(Rapid.createOsmEntity(context, {id: 'r1'}) instanceof Rapid.OsmRelation);
+    assert.isOk(Rapid.createOsmEntity(context, {id: 'c1'}) instanceof Rapid.OsmChangeset);
   });
 
   it('returns a generic OsmEntity as a fallback', () => {
-    assert.isOk(Rapid.createOsmFeature(context) instanceof Rapid.OsmEntity);
+    assert.isOk(Rapid.createOsmEntity(context) instanceof Rapid.OsmEntity);
   });
 });
 

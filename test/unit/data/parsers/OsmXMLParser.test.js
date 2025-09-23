@@ -233,12 +233,21 @@ describe('OsmXMLParser', () => {
       assert.lengthOf(data2, 3);
     });
 
-    it('optionally skips non-elements', () => {
-      const results = parser.parse(sample.mapXML, { onlyElements: true });
+    it('filter option accepts Array', () => {
+      const results = parser.parse(sample.mapXML, { filter: ['node', 'way', 'relation'] });
       const data = results.data;
       assert.isArray(data);
       assert.lengthOf(data, 6);   // no bounds
       assert.deepEqual(data[0], sample.n1Result);
+    });
+
+    it('filter option accepts Set', () => {
+      const results = parser.parse(sample.mapXML, { filter: new Set(['way']) });
+      const data = results.data;
+      assert.isArray(data);
+      assert.lengthOf(data, 2);
+      assert.deepEqual(data[0], sample.w1Result);
+      assert.deepEqual(data[1], sample.w2Result);
     });
 
   });

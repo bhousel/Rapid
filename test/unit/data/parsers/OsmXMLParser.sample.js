@@ -4,7 +4,7 @@
 
 // Node, with tags (default visible)
 export const n1 = `
-<node id="1" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415" tags="ignoreme">
+<node id="1" version="1" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415" tags="ignoreme">
   <tag k="crossing" v="marked"/>
   <tag k="crossing:markings" v="zebra"/>
   <tag k="highway" v="crossing"/>
@@ -14,11 +14,11 @@ export const n1 = `
 
 // Node, no tags (default visible)
 export const n2 = `
-<node id="2" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
+<node id="2" version="2" changeset="2" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
 
 // Way, with nodes and tags (default visible)
 export const w1 = `
-<way id="1" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+<way id="1" version="1" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
   <nd ref="1"/>
   <nd ref="2"/>
   <tag k="highway" v="tertiary"/>
@@ -29,11 +29,11 @@ export const w1 = `
 
 // Way, no nodes or tags (default visible)
 export const w2 = `
-<way id="2" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+<way id="2" version="2" changeset="2" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
 
 // Relation, with members and tags (default visible)
 export const r1 = `
-<relation id="1" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+<relation id="1" version="1" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
   <member type="way" ref="1" role="south"/>
   <tag k="network" v="US:NJ:Somerset"/>
   <tag k="ref" v="651"/>
@@ -43,12 +43,12 @@ export const r1 = `
 
 // Relation, no members or tags (default visible)
 export const r2 = `
-<relation id="2" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+<relation id="2" version="2" changeset="2" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
 
 
 // Node, with tags (visible=true)
 export const n1visible = `
-<node id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415" tags="ignoreme">
+<node id="1" visible="true" version="1" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415" tags="ignoreme">
   <tag k="crossing" v="marked"/>
   <tag k="crossing:markings" v="zebra"/>
   <tag k="highway" v="crossing"/>
@@ -58,11 +58,11 @@ export const n1visible = `
 
 // Node, no tags (visible=true)
 export const n2visible = `
-<node id="2" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
+<node id="2" visible="true" version="2" changeset="2" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
 
 // Way, with nodes and tags (visible=true)
 export const w1visible = `
-<way id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+<way id="1" visible="true" version="1" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
   <nd ref="1"/>
   <nd ref="2"/>
   <tag k="highway" v="tertiary"/>
@@ -73,11 +73,11 @@ export const w1visible = `
 
 // Way, no nodes or tags (visible=true)
 export const w2visible = `
-<way id="2" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+<way id="2" visible="true" version="2" changeset="2" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
 
 // Relation, with members and tags (visible=true)
 export const r1visible = `
-<relation id="1" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+<relation id="1" visible="true" version="1" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
   <member type="way" ref="1" role="south"/>
   <tag k="network" v="US:NJ:Somerset"/>
   <tag k="ref" v="651"/>
@@ -87,12 +87,12 @@ export const r1visible = `
 
 // Relation, no members or tags (visible=true)
 export const r2visible = `
-<relation id="2" visible="true" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+<relation id="2" visible="true" version="2" changeset="2" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
 
 
 // Deleted Node, with tags (visible=false)
 export const n1deleted = `
-<node id="1" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415" tags="ignoreme">
+<node id="1" visible="false" version="1" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6555" lon="-74.5415" tags="ignoreme">
   <tag k="crossing" v="marked"/>
   <tag k="crossing:markings" v="zebra"/>
   <tag k="highway" v="crossing"/>
@@ -102,11 +102,11 @@ export const n1deleted = `
 
 // Deleted Node, no tags (visible=false)
 export const n2deleted = `
-<node id="2" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
+<node id="2" visible="false" version="2" changeset="2" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" lat="40.6556" lon="-74.5416"/>`;
 
 // Deleted Way, with nodes and tags (visible=false)
 export const w1deleted = `
-<way id="1" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+<way id="1" visible="false" version="1" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
   <nd ref="1"/>
   <nd ref="2"/>
   <tag k="highway" v="tertiary"/>
@@ -117,11 +117,11 @@ export const w1deleted = `
 
 // Deleted Way, no nodes or tags (visible=false)
 export const w2deleted = `
-<way id="2" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+<way id="2" visible="false" version="2" changeset="2" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
 
 // Deleted Relation, with members and tags (visible=false)
 export const r1deleted = `
-<relation id="1" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
+<relation id="1" visible="false" version="1" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100" tags="ignoreme">
   <member type="way" ref="1" role="south"/>
   <tag k="network" v="US:NJ:Somerset"/>
   <tag k="ref" v="651"/>
@@ -131,7 +131,7 @@ export const r1deleted = `
 
 // Deleted Relation, no members or tags (visible=false)
 export const r2deleted = `
-<relation id="2" visible="false" version="2" changeset="1" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
+<relation id="2" visible="false" version="2" changeset="2" timestamp="2025-09-01T00:00:01Z" user="bhousel" uid="100"/>`;
 
 // Bounds (present for map calls)
 export const bounds = `
@@ -200,6 +200,24 @@ export const mapXMLdeleted =
   ${w2deleted}
   ${r1deleted}
   ${r2deleted}
+</osm>`;
+
+export const nodeXML =
+`<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+  ${n1}
+</osm>`;
+
+export const wayXML =
+`<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+  ${w1}
+</osm>`;
+
+export const relationXML =
+`<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (338846 spike-06.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+  ${r1}
 </osm>`;
 
 
@@ -482,7 +500,7 @@ export const n1Result = {
   visible: true,
   loc: [-74.5415, 40.6555],
   timestamp: new Date('2025-09-01T00:00:01Z'),
-  version: 2,
+  version: 1,
   changeset: 1,
   user: 'bhousel',
   uid: '100',
@@ -501,7 +519,7 @@ export const n2Result = {
   loc: [-74.5416, 40.6556],
   timestamp: new Date('2025-09-01T00:00:01Z'),
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: 'bhousel',
   uid: '100',
   tags: {}
@@ -512,7 +530,7 @@ export const w1Result = {
   id: 'w1',
   visible: true,
   timestamp: new Date('2025-09-01T00:00:01Z'),
-  version: 2,
+  version: 1,
   changeset: 1,
   user: 'bhousel',
   uid: '100',
@@ -531,7 +549,7 @@ export const w2Result = {
   visible: true,
   timestamp: new Date('2025-09-01T00:00:01Z'),
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: 'bhousel',
   uid: '100',
   nodes: [],
@@ -543,7 +561,7 @@ export const r1Result = {
   id: 'r1',
   visible: true,
   timestamp: new Date('2025-09-01T00:00:01Z'),
-  version: 2,
+  version: 1,
   changeset: 1,
   user: 'bhousel',
   uid: '100',
@@ -564,7 +582,7 @@ export const r2Result = {
   visible: true,
   timestamp: new Date('2025-09-01T00:00:01Z'),
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: 'bhousel',
   uid: '100',
   members: [],
@@ -577,7 +595,7 @@ export const n1ResultDeleted = {
   visible: false,
   loc: [-74.5415, 40.6555],
   timestamp: new Date('2025-09-01T00:00:01Z'),
-  version: 2,
+  version: 1,
   changeset: 1,
   user: 'bhousel',
   uid: '100',
@@ -596,7 +614,7 @@ export const n2ResultDeleted = {
   loc: [-74.5416, 40.6556],
   timestamp: new Date('2025-09-01T00:00:01Z'),
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: 'bhousel',
   uid: '100',
   tags: {}
@@ -607,7 +625,7 @@ export const w1ResultDeleted = {
   id: 'w1',
   visible: false,
   timestamp: new Date('2025-09-01T00:00:01Z'),
-  version: 2,
+  version: 1,
   changeset: 1,
   user: 'bhousel',
   uid: '100',
@@ -626,7 +644,7 @@ export const w2ResultDeleted = {
   visible: false,
   timestamp: new Date('2025-09-01T00:00:01Z'),
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: 'bhousel',
   uid: '100',
   nodes: [],
@@ -638,7 +656,7 @@ export const r1ResultDeleted = {
   id: 'r1',
   visible: false,
   timestamp: new Date('2025-09-01T00:00:01Z'),
-  version: 2,
+  version: 1,
   changeset: 1,
   user: 'bhousel',
   uid: '100',
@@ -659,7 +677,7 @@ export const r2ResultDeleted = {
   visible: false,
   timestamp: new Date('2025-09-01T00:00:01Z'),
   version: 2,
-  changeset: 1,
+  changeset: 2,
   user: 'bhousel',
   uid: '100',
   members: [],

@@ -1,4 +1,5 @@
 
+
 /**
  * OsmJSONParser
  * This class contains the code for parsing an OSM JSON content.
@@ -66,6 +67,10 @@ export class OsmJSONParser {
     this._parseApi = this._parseApi.bind(this);
     this._parsePolicy = this._parsePolicy.bind(this);
     this._parseBounds = this._parseBounds.bind(this);
+
+    this.types = new Set([
+      'node', 'way', 'relation', 'note', 'user', 'preferences', 'changeset', 'api', 'policy', 'bounds'
+    ]);
   }
 
 
@@ -87,11 +92,21 @@ export class OsmJSONParser {
    * @throws  Will throw if nothing could be parsed, or errors found
    */
   parse(content, options = {}) {
-    options.skipSeen ??= true;       // exclude results that we have seen before
-    options.onlyElements ??= false;  // include only elements in the results
-
     if (!content)  {
       throw new Error('No content');
+    }
+
+    // exclude results that we have seen before
+    const skipSeen = options.skipSeen ?? true;
+
+    // include only these in the results (e.g. ['node','way','relation'])
+    let filter;
+    if (options.filter instanceof Set) {
+      filter = options.filter;
+    } else if (Array.isArray(options.filter)) {
+      filter = new Set(options.filter);
+    } else {
+      filter = this.types;
     }
 
     const results = { osm: {}, data: [], seenIDs: new Set() };
@@ -111,7 +126,7 @@ export class OsmJSONParser {
       notes = json.features;
     }
     if (notes) {
-      if (!options.onlyElements) {
+      if (filter.has('note')) {
         for (const note of notes) {
           const parsed = this._parseNote(note);
           if (parsed) {
@@ -132,7 +147,7 @@ export class OsmJSONParser {
     }
 
     // 'api'
-    if (!options.onlyElements && isObject(json.api)) {
+    if (isObject(json.api) && filter.has('api')) {
       const parsed = this._parseApi(json.api);
       if (parsed) {
         results.data.push(parsed);
@@ -140,7 +155,7 @@ export class OsmJSONParser {
     }
 
     // 'policy'
-    if (!options.onlyElements && isObject(json.policy)) {
+    if (isObject(json.policy) && filter.has('policy')) {
       const parsed = this._parsePolicy(json.policy);
       if (parsed) {
         results.data.push(parsed);
@@ -148,7 +163,7 @@ export class OsmJSONParser {
     }
 
     // 'bounds'
-    if (!options.onlyElements && isObject(json.bounds)) {
+    if (isObject(json.bounds) && filter.has('bounds')) {
       const parsed = this._parseBounds(json.bounds);
       if (parsed) {
         results.data.push(parsed);
@@ -168,17 +183,17 @@ export class OsmJSONParser {
       for (const obj of elements) {
         let parser, id;
 
-        if (obj.type === 'node') {
+        if (obj.type === 'node' && filter.has('node')) {
           id = 'n' + obj.id;
           results.seenIDs.add(id);
           parser = this._parseNode;
 
-        } else if (obj.type === 'way') {
+        } else if (obj.type === 'way' && filter.has('way')) {
           id = 'w' + obj.id;
           results.seenIDs.add(id);
           parser = this._parseWay;
 
-        } else if (obj.type === 'relation') {
+        } else if (obj.type === 'relation' && filter.has('relation')) {
           id = 'r' + obj.id;
           results.seenIDs.add(id);
           parser = this._parseRelation;
@@ -186,7 +201,7 @@ export class OsmJSONParser {
 
         if (!parser) continue;
 
-        if (options.skipSeen) {  // skip things we've seen before
+        if (skipSeen) {  // skip things we've seen before
           if (this._seen.has(id)) continue;
           this._seen.add(id);
         }
@@ -200,11 +215,11 @@ export class OsmJSONParser {
 
     // 'users'
     const users = (json.user ? [json.user] : json.users) || [];
-    if (!options.onlyElements && users.length) {
+    if (users.length && filter.has('user')) {
       for (const obj of users) {
         const id = 'user' + obj.id;
 
-        if (options.skipSeen) {  // skip things we've seen before
+        if (skipSeen) {  // skip things we've seen before
           if (this._seen.has(id)) continue;
           this._seen.add(id);
         }
@@ -218,11 +233,11 @@ export class OsmJSONParser {
 
     // 'changesets'
     const changesets = (json.changeset ? [json.changeset] : json.changesets) || [];
-    if (!options.onlyElements && changesets.length) {
+    if (changesets.length && filter.has('changeset')) {
       for (const obj of changesets) {
         const id = 'c' + obj.id;
 
-        if (options.skipSeen) {  // skip things we've seen before
+        if (skipSeen) {  // skip things we've seen before
           if (this._seen.has(id)) continue;
           this._seen.add(id);
         }
@@ -235,7 +250,7 @@ export class OsmJSONParser {
     }
 
     // 'preferences'
-    if (!options.onlyElements && isObject(json.preferences)) {
+    if (isObject(json.preferences) && filter.has('preferences')) {
       const parsed = this._parsePreferences(json.preferences);
       if (parsed) {
         results.data.push(parsed);
