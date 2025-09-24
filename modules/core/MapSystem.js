@@ -746,12 +746,12 @@ export class MapSystem extends AbstractSystem {
     if (entity) {   // have it already
       gotEntity(entity);
     } else {   // need to load it first
-      context.loadEntity(entityID, (err, result) => {
-        if (err) return;
-        entity = result.data.find(e => e.id === entityID);
-        if (!entity) return;
-        gotEntity(entity);
-      });
+      context.loadEntityAsync(entityID)
+        .then(() => {  // At this point we expect it to be merged..
+          entity = currGraph.hasEntity(entityID);
+          if (!entity) return;  // give up
+          gotEntity(entity);
+        });
     }
   }
 
@@ -771,25 +771,13 @@ export class MapSystem extends AbstractSystem {
       return;
     }
 
-    const gotNote = (note) => {
-      scene.enableLayers('notes');
-      const selection = new Map().set(note.id, note);
-      context.enter('select', { selection: selection });
-      this.centerZoomEase(note.loc, 19);
-    };
-
-    let note = osm.getNote(noteID);
-    if (note) {
-      gotNote(note);
-    } else {   // need to load it first
-      osm.loadNote(noteID, (err) => {
-        if (err) return;
-        note = osm.getNote(noteID);
-        if (note) {
-          gotNote(note);
-        }
+    osm.loadNoteAsync(noteID)
+      .then(note => {
+        scene.enableLayers('notes');
+        const selection = new Map().set(note.id, note);
+        context.enter('select', { selection: selection });
+        this.centerZoomEase(note.loc, 19);
       });
-    }
   }
 
 

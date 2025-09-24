@@ -26,7 +26,8 @@ describe('OsmService', () => {
       .mockGlobal()
       .sticky(/api\/capabilities\.json/, sample.capabilitiesJSON)
       .sticky(/user\/details\.json/, sample.userJSON)
-      .sticky(/changesets\.json/, sample.changesetJSON);
+      .sticky(/user\/preferences\.json/, sample.preferencesJSON)
+      .sticky(/changesets\.json\?user=/, sample.changesetsJSON);
   });
 
   after(() => {
@@ -149,6 +150,8 @@ describe('OsmService', () => {
 
 
   // Test an already-constructed instance of the service..
+  // Note that `beforeEach` resets and logs out the user.
+  // You'll need to call `loginAsync` if you want to test as a logged-in user.
   describe('methods', () => {
     let _osm;
 
@@ -171,6 +174,7 @@ describe('OsmService', () => {
       // reset viewport
       context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       context.viewport.dimensions = [64, 64];
+      _osm.logout();
       return _osm.resetAsync();
     });
 
@@ -336,12 +340,12 @@ describe('OsmService', () => {
       it('receives an error when receiving a partial response', () => {
         const loadFromAPI = promisify(_osm.loadFromAPI).bind(_osm);
         const path = '/api/0.6/map.json?bbox=-74.542,40.655,-74.541,40.656';
-        fetchMock.route(/map\.json/, sample.mapJSONpartial);
+        fetchMock.route(/map\.json/, sample.mapJSONerror1);
 
         return loginAsync()
           .then(() => loadFromAPI(path))
           .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-          .catch(err => assert.match(err.message, /partial json/i));
+          .catch(err => assert.match(err.message, /partial response:\s+something went wrong loading postgres/i));
       });
     });
 
@@ -380,126 +384,209 @@ describe('OsmService', () => {
 //  });
 
 
-    describe('loadEntity', () => {
+    describe('loadEntityAsync', () => {
       it('loads a node', () => {
-        const loadEntity = promisify(_osm.loadEntity).bind(_osm);
         fetchMock.route(/node\/1\.json/, sample.nodeJSON);
 
         const id = 'n1';
-        return loadEntity(id)
-          .then(result => {
-            const entity = result.data.find(e => e.id === id);
-            assert.instanceOf(entity, Rapid.OsmNode);
+        const prom = _osm.loadEntityAsync(id);
+        assert.instanceOf(prom, Promise);
+
+        return prom
+          .then(results => {
+            const data = results.data;
+            assert.isArray(data);
+            assert.lengthOf(data, 1);
+            assert.strictEqual(data[0].type, 'node');
+            assert.strictEqual(data[0].id, id);
           });
       });
 
-
       it('loads a way', () => {
-        const loadEntity = promisify(_osm.loadEntity).bind(_osm);
         fetchMock.route(/way\/1\/full\.json/, sample.wayJSON);
 
         const id = 'w1';
-        return loadEntity(id)
-          .then(result => {
-            const entity = result.data.find(e => e.id === id);
-            assert.instanceOf(entity, Rapid.OsmWay);
+        const prom = _osm.loadEntityAsync(id);
+        assert.instanceOf(prom, Promise);
+
+        return prom
+          .then(results => {
+            const data = results.data;
+            assert.isArray(data);
+            assert.lengthOf(data, 1);
+            assert.strictEqual(data[0].type, 'way');
+            assert.strictEqual(data[0].id, id);
           });
       });
 
-
-      it('does not ignore repeat requests', () => {
-        const loadEntity = promisify(_osm.loadEntity).bind(_osm);
+      it('does not cache repeat requests', () => {
         fetchMock.route(/node\/1\.json/, sample.nodeJSON);
 
         const id = 'n1';
         let entity1, entity2;
-        return loadEntity(id)
-          .then(result => {
-            entity1 = result.data.find(e => e.id === id);
-            assert.instanceOf(entity1, Rapid.OsmNode);
+        const prom = _osm.loadEntityAsync(id);
+        assert.instanceOf(prom, Promise);
+
+        return prom
+          .then(results => {
+            const data = results.data;
+            assert.isArray(data);
+            assert.lengthOf(data, 1);
+            entity1 = data[0];
+            assert.strictEqual(data[0].id, id);
           })
-          .then(() => loadEntity(id))
-          .then(result => {
-            entity2 = result.data.find(e => e.id === id);
-            assert.instanceOf(entity2, Rapid.OsmNode);
+          .then(() => _osm.loadEntityAsync(id))
+          .then(results => {
+            const data = results.data;
+            assert.isArray(data);
+            assert.lengthOf(data, 1);
+            entity2 = data[0];
+
+            assert.deepEqual(entity1, entity2);
             assert.notStrictEqual(entity1, entity2);  // !==
           });
       });
     });
 
 
-    describe('loadEntityVersion', () => {
+    describe('loadEntityVersionAsync', () => {
       it('loads a node', () => {
-        const loadEntityVersion = promisify(_osm.loadEntityVersion).bind(_osm);
         fetchMock.route(/node\/1\/1\.json/, sample.nodeJSON);
 
         const id = 'n1';
-        return loadEntityVersion(id, 1)
-          .then(result => {
-            const entity = result.data.find(e => e.id === id);
-            assert.instanceOf(entity, Rapid.OsmNode);
+        const prom = _osm.loadEntityVersionAsync(id, 1);
+        assert.instanceOf(prom, Promise);
+
+        return prom
+          .then(results => {
+            const data = results.data;
+            assert.isArray(data);
+            assert.lengthOf(data, 1);
+            assert.strictEqual(data[0].type, 'node');
+            assert.strictEqual(data[0].id, id);
           });
       });
 
-
       it('loads a way', () => {
-        const loadEntityVersion = promisify(_osm.loadEntityVersion).bind(_osm);
         fetchMock.route(/way\/1\/1\.json/, sample.wayJSON);
 
         const id = 'w1';
-        return loadEntityVersion(id, 1)
-          .then(result => {
-            const entity = result.data.find(e => e.id === id);
-            assert.instanceOf(entity, Rapid.OsmWay);
+        const prom = _osm.loadEntityVersionAsync(id, 1);
+        assert.instanceOf(prom, Promise);
+
+        return prom
+          .then(results => {
+            const data = results.data;
+            assert.isArray(data);
+            assert.lengthOf(data, 1);
+            assert.strictEqual(data[0].type, 'way');
+            assert.strictEqual(data[0].id, id);
           });
       });
 
-
-      it('does not ignore repeat requests', () => {
-        const loadEntityVersion = promisify(_osm.loadEntityVersion).bind(_osm);
+      it('does not cache repeat requests', () => {
         fetchMock.route(/node\/1\/1\.json/, sample.nodeJSON);
 
         const id = 'n1';
         let entity1, entity2;
-        return loadEntityVersion(id, 1)
-          .then(result => {
-            entity1 = result.data.find(e => e.id === id);
-            assert.instanceOf(entity1, Rapid.OsmNode);
+        const prom = _osm.loadEntityVersionAsync(id, 1);
+        assert.instanceOf(prom, Promise);
+
+        return prom
+          .then(results => {
+            const data = results.data;
+            assert.isArray(data);
+            assert.lengthOf(data, 1);
+            entity1 = data[0];
+            assert.strictEqual(data[0].id, id);
           })
-          .then(() => loadEntityVersion(id, 1))
-          .then(result => {
-            entity2 = result.data.find(e => e.id === id);
-            assert.instanceOf(entity2, Rapid.OsmNode);
+          .then(() => _osm.loadEntityVersionAsync(id, 1))
+          .then(results => {
+            const data = results.data;
+            assert.isArray(data);
+            assert.lengthOf(data, 1);
+            entity2 = data[0];
+
+            assert.deepEqual(entity1, entity2);
             assert.notStrictEqual(entity1, entity2);  // !==
           });
       });
     });
 
 
-    describe('userDetails', () => {
+    describe('getUserDetailsAsync', () => {
+      it('rejects if not logged in', () => {
+        const prom = _osm.getUserDetailsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /not logged in/i));
+      });
+
       it('retrieves user details', () => {
-        const userDetails = promisify(_osm.userDetails).bind(_osm);
         return loginAsync()
-          .then(() => userDetails())
+          .then(() => _osm.getUserDetailsAsync())
           .then(result => {
+            assert.strictEqual(result.type, 'user');
             assert.strictEqual(result.id, '100');
           });
       });
     });
 
+    describe('getUserPreferencesAsync', () => {
+      it('rejects if not logged in', () => {
+        const prom = _osm.getUserPreferencesAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /not logged in/i));
+      });
 
-    describe('userChangesets', () => {
-      it('retrieves user changesets', () => {
-        const userChangesets = promisify(_osm.userChangesets).bind(_osm);
+      it('retrieves user preferences', () => {
         return loginAsync()
-          .then(() => userChangesets())
+          .then(() => _osm.getUserPreferencesAsync())
           .then(result => {
-            // ignore changesets with empty or missing comment
-            assert.lengthOf(result, 1);
+            assert.strictEqual(result.type, 'preferences');
+            assert.isObject(result.preferences);
+            assert.strictEqual(result.preferences.foo, 'bar');
+          });
+      });
+    });
 
-            const changeset = result[0];
-            assert.strictEqual(changeset.id, 1);
-            assert.strictEqual(changeset.tags.comment, 'Fix unsquare corners');
+    describe('getUserChangesetsAsync', () => {
+      it('rejects if not logged in', () => {
+        const prom = _osm.getUserChangesetsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /not logged in/i));
+      });
+
+      it('retrieves user changesets', () => {
+        return loginAsync()
+          .then(() => _osm.getUserChangesetsAsync())
+          .then(results => {
+            assert.isArray(results);
+            assert.lengthOf(results, 3);
+            assert.strictEqual(results[0].type, 'changeset');
+            assert.strictEqual(results[0].id, 'c1');
+          });
+      });
+    });
+
+
+    describe('getCapabilitiesAsync', () => {
+      it('gets the API capabilities', () => {
+        const prom = _osm.getCapabilitiesAsync();
+        assert.instanceOf(prom, Promise);
+
+        return prom
+          .then(results => {
+            assert.isObject(results);
+            assert.hasAllKeys(results, ['osm', 'api', 'policy']);
+            assert.deepInclude(results.osm, { version: 0.6, generator: 'OpenStreetMap server' });
+            assert.deepEqual(results.api, sample.apiResult);
+            assert.deepEqual(results.policy, sample.policyResult);
           });
       });
     });
@@ -507,7 +594,7 @@ describe('OsmService', () => {
 
     describe('loadNotes', () => {
       it('loads a tile of notes and requests a redraw', (t, done) => {
-        fetchMock.route(/notes\?/, { body: sample.noteXML, headers: { 'Content-Type': 'text/xml' } });
+        fetchMock.route(/notes/, sample.notesJSON);
         _osm.loadNotes({ /*no options*/ });
         // no errback to promisify :-(
 
@@ -523,35 +610,11 @@ describe('OsmService', () => {
     });
 
 
-    describe('API capabilities', () => {
-      describe('status', () => {
-        it('gets API status', () => {
-          const status = promisify(_osm.status).bind(_osm);
-          return status()
-            .then(result => {
-              assert.strictEqual(result, 'online');
-            });
-        });
-      });
-
-      describe('imageryBlocklists', () => {
-        it('updates imagery blocklists', () => {
-          const status = promisify(_osm.status).bind(_osm);
-          return status()
-            .then(result => {
-              const blocklists = _osm.imageryBlocklists;
-              assert.deepEqual(blocklists, [new RegExp('\.foo\.com'), new RegExp('\.bar\.org')]);
-            });
-        });
-      });
-    });
-
-
     describe('with data loaded', () => {
       beforeEach(() => {
         // load the notes around [10°, 0°]
         // (this needs to be beforeEach because the parent beforeEach resets)
-        fetchMock.route(/notes\?/, { body: sample.noteXML, headers: { 'Content-Type': 'text/xml' } });
+        fetchMock.route(/notes/, sample.notesJSON);
         _osm.loadNotes({ /*no options*/ });
         return new Promise(resolve => { setTimeout(() => { resolve(); }, 10); });
       });
@@ -560,13 +623,28 @@ describe('OsmService', () => {
         it('returns notes in the visible map area', () => {
           const result = _osm.getNotes();
           assert.isArray(result);
-          assert.lengthOf(result, 1);
+          assert.lengthOf(result, 2);
 
           const m1 = result[0];
           assert.instanceOf(m1, Rapid.Marker);
-          assert.deepInclude(m1.props, {
-            id: '1', type: 'note', serviceID: 'osm'
-          });
+          assert.deepInclude(m1.props, { id: '1', type: 'note', serviceID: 'osm' });
+
+          const m1comments = m1.props.comments;
+          assert.isArray(m1comments);
+          assert.lengthOf(m1comments, 1);
+          assert.deepEqual(m1comments[0].action, 'opened');
+
+          const m2 = result[1];
+          assert.instanceOf(m2, Rapid.Marker);
+          assert.deepInclude(m2.props, { id: '2', type: 'note', serviceID: 'osm' });
+          assert.isArray(m2.props.comments);
+          assert.lengthOf(m2.props.comments, 2);
+
+          const m2comments = m2.props.comments;
+          assert.isArray(m2comments);
+          assert.lengthOf(m2comments, 2);
+          assert.deepEqual(m2comments[0].action, 'opened');
+          assert.deepEqual(m2comments[1].action, 'commented');
         });
       });
 
@@ -574,9 +652,7 @@ describe('OsmService', () => {
         it('returns a note with the given id', () => {
           const result = _osm.getNote('1');
           assert.instanceOf(result, Rapid.Marker);
-          assert.deepInclude(result.props, {
-            id: '1', type: 'note', serviceID: 'osm'
-          });
+          assert.deepInclude(result.props, { id: '1', type: 'note', serviceID: 'osm' });
         });
       });
     });

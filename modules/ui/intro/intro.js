@@ -1,7 +1,7 @@
 import { utilArrayDifference, utilArrayUniq } from '@rapid-sdk/util';
 
 import { localize } from './helper.js';
-import { createOsmFeature } from '../../data/index.js';
+import { createOsmEntity } from '../../data/index.js';
 import { uiIcon } from '../icon.js';
 import { UiCurtain } from './UiCurtain.js';
 
@@ -78,12 +78,12 @@ export function uiIntro(context, skipToRapid) {
 
       for (const [id, data] of Object.entries(rapidData)) {
         if (!_rapidGraph[id]) {
-          _rapidGraph[id] = createOsmFeature(context, localize(context, data));
+          _rapidGraph[id] = createOsmEntity(context, localize(context, data));
         }
       }
       for (const [id, data] of Object.entries(introData)) {
         if (!_introGraph[id]) {
-          _introGraph[id] = createOsmFeature(context, localize(context, data));
+          _introGraph[id] = createOsmEntity(context, localize(context, data));
         }
       }
 

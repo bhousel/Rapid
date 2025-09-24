@@ -5,7 +5,9 @@ import { osmAuth } from 'osm-auth';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { JXON } from '../util/jxon.js';
-import { OsmEntity, OsmNode, OsmRelation, OsmWay, Marker } from '../data/index.js';
+import { createOsmEntity, OsmEntity, OsmNode, OsmRelation, OsmWay, Marker } from '../data/index.js';
+
+import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -39,6 +41,15 @@ export class OsmService extends AbstractSystem {
     this._wwwroot = 'https://www.openstreetmap.org';
     this._apiroot = 'https://api.openstreetmap.org';
 
+    // Rapid supports both XML and JSON when talking to the OSM API.
+    // @see https://wiki.openstreetmap.org/wiki/OSM_JSON
+    // @see https://wiki.openstreetmap.org/wiki/OSM_XML
+    // Using JSON can be much more efficient because it avoids the overhead
+    // of parsing and creating a Document and DOM objects.
+    this.preferJSON = true;
+    this.JSONParser = new OsmJSONParser();
+    this.XMLParser = new OsmXMLParser();
+
     this._tileCache = {};
     this._noteCache = {};
     this._userCache = {};
@@ -53,20 +64,11 @@ export class OsmService extends AbstractSystem {
     this._rateLimit = null;
     this._userChangesets = null;
     this._userDetails = null;
+    this._userPreferences = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._authLoading = this._authLoading.bind(this);
     this._authDone = this._authDone.bind(this);
-    this._parseCapabilitiesJSON = this._parseCapabilitiesJSON.bind(this);
-    this._parseCapabilitiesXML = this._parseCapabilitiesXML.bind(this);
-    this._parseNodeJSON = this._parseNodeJSON.bind(this);
-    this._parseNodeXML = this._parseNodeXML.bind(this);
-    this._parseNoteXML = this._parseNoteXML.bind(this);
-    this._parseRelationJSON = this._parseRelationJSON.bind(this);
-    this._parseRelationXML = this._parseRelationXML.bind(this);
-    this._parseUserXML = this._parseUserXML.bind(this);
-    this._parseWayJSON = this._parseWayJSON.bind(this);
-    this._parseWayXML = this._parseWayXML.bind(this);
 
     this.reloadApiStatus = this.reloadApiStatus.bind(this);
     this.throttledReloadApiStatus = _throttle(this.reloadApiStatus, 500);
@@ -209,14 +211,17 @@ export class OsmService extends AbstractSystem {
     spatial.clearCache('osm-data');
     spatial.clearCache('osm-notes');
 
+    this.JSONParser.reset();
+    this.XMLParser.reset();
+
     return Promise.resolve();
   }
 
 
   /**
    * switchAsync
-   * Switch connection and credentials , and reset
-   * @return {Promise} Promise resolved when this component has completed resetting
+   * Switch connection and credentials, and reset
+   * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   switchAsync(newOptions) {
     this._wwwroot = newOptions.url;
@@ -229,8 +234,6 @@ export class OsmService extends AbstractSystem {
 
     return this.resetAsync()
       .then(() => {
-// causes major issues for the tests
-//        this.userChangesets(function() {});  // eagerly load user details/changesets
         this.emit('authchange');
       });
   }
@@ -295,15 +298,23 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  // Generic method to load data from the OSM API
-  // Can handle either auth or unauth calls.
-  loadFromAPI(path, callback, options) {
-    options = Object.assign({ skipSeen: true }, options);
+  /**
+   * loadFromAPI
+   * Generic method to load data from the OSM API.
+   * Can handle either auth or unauth calls.
+   * @param   {string}    path - the url path to load data from
+   * @param   {function}  callback - errback-style callback function to call with results
+   * @param   {Object}    options - parsing options
+   * @return  {AbortController}  reference to an AbortController
+   */
+  loadFromAPI(path, callback, options = {}) {
+    options.skipSeen ??= true;
+
     const cid = this._connectionID;
 
-    const gotResult = (err, results) => {
+    const gotResult = (err, content) => {
       // The user switched connection while the request was inflight
-      // Ignore results and raise an error.
+      // Ignore content and raise an error.
       if (this._connectionID !== cid) {
         if (callback) callback({ message: 'Connection Switched', status: -1 });
         return;
@@ -356,21 +367,28 @@ export class OsmService extends AbstractSystem {
           if (err) {
             return callback(err);
           } else {
-            if (path.includes('.json')) {
-              return this._parseJSON(results, callback, options);
-            } else {
-              return this._parseXML(results, callback, options);
+            try {
+              let results;
+              if (path.includes('.json')) {
+                results = this.JSONParser.parse(content, options);
+              } else {
+                results = this.XMLParser.parse(content, options);
+              }
+              return callback(null, results);
+            } catch (err2) {
+              return callback(err2);
             }
           }
         }
       }
     };
 
-    const resource = this._apiroot + path;
+    // Accept absolute or relative paths
+    const url = /^http/i.test(path) ? path : (this._apiroot + path);
     const controller = new AbortController();
     const _fetch = this.authenticated() ? this._oauth.fetch : globalThis.fetch;
 
-    _fetch(resource, { signal: controller.signal })
+    _fetch(url, { signal: controller.signal })
       .then(utilFetchResponse)
       .then(result => gotResult(null, result))
       .catch(err => {
@@ -385,74 +403,425 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  // Load a single entity by id (ways and relations use the `/full` call to include
-  // nodes and members). Parent relations are not included, see `loadEntityRelations`.
-  // GET /api/0.6/node/#id
-  // GET /api/0.6/[way|relation]/#id/full
-  loadEntity(id, callback) {
-    const type = OsmEntity.type(id);    // 'node', 'way', 'relation'
-    const osmID = OsmEntity.toOSM(id);
-    const options = { skipSeen: false };
+  /**
+   * loadEntityAsync
+   * Load a single entity by id (ways and relations use the `/full` call to include
+   * nodes and members).  Parent relations are not included, see `loadEntityRelationsAsync`.
+   * GET /api/0.6/node/#id
+   * GET /api/0.6/[way|relation]/#id/full
+   * @param   {string}   entityID - the entityID to load
+   * @return  {Promise}  Promise resolved with the parsed api results
+   */
+  loadEntityAsync(entityID) {
+    const type = OsmEntity.type(entityID);    // 'node', 'way', 'relation'
+    const osmID = OsmEntity.toOSM(entityID);
+    const options = { skipSeen: false, filter: new Set(['node', 'way', 'relation']) };
     const full = (type !== 'node' ? '/full' : '');
+    const json = (this.preferJSON ? '.json' : '');
 
-    this.loadFromAPI(
-      `/api/0.6/${type}/${osmID}${full}.json`,
-      callback,
-      options
-    );
+    return new Promise((resolve, reject) => {
+      const errback = (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(results);
+        }
+      };
+
+      this.loadFromAPI(`/api/0.6/${type}/${osmID}${full}${json}`, errback, options);
+    });
   }
 
 
-  // Load a single entity with a specific version
-  // GET /api/0.6/[node|way|relation]/#id/#version
-  loadEntityVersion(id, version, callback) {
-    const type = OsmEntity.type(id);    // 'node', 'way', 'relation'
-    const osmID = OsmEntity.toOSM(id);
-    const options = { skipSeen: false };
+  /**
+   * loadEntityVersionAsync
+   * Load a single entity with a specific version
+   * GET /api/0.6/[node|way|relation]/#id/#version
+   * @param   {string}         entityID - the entityID to load
+   * @param   {string|number}  version - version to load
+   * @return  {Promise}  Promise resolved with the parsed api results
+   */
+  loadEntityVersionAsync(entityID, version) {
+    const type = OsmEntity.type(entityID);    // 'node', 'way', 'relation'
+    const osmID = OsmEntity.toOSM(entityID);
+    const options = { skipSeen: false, filter: new Set(['node', 'way', 'relation']) };
+    const json = (this.preferJSON ? '.json' : '');
 
-    this.loadFromAPI(
-      `/api/0.6/${type}/${osmID}/${version}.json`,
-      callback,
-      options
-    );
+    return new Promise((resolve, reject) => {
+      const errback = (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(results);
+        }
+      };
+
+      this.loadFromAPI(`/api/0.6/${type}/${osmID}/${version}${json}`, errback, options);
+    });
   }
 
 
-  // Load the relations of a single entity with the given.
-  // GET /api/0.6/[node|way|relation]/#id/relations
-  loadEntityRelations(id, callback) {
-    const type = OsmEntity.type(id);
-    const osmID = OsmEntity.toOSM(id);
-    const options = { skipSeen: false };
+  /**
+   * loadEntityRelationsAsync
+   * Load the parent relations of a single entity with the given id.
+   * (i.e. relations in which the given entity is used).
+   * GET /api/0.6/[node|way|relation]/#id/relations
+   * @param   {string}   entityID - the entityID to get parent relations
+   * @return  {Promise}  Promise resolved with the parsed api results
+   */
+  loadEntityRelationsAsync(entityID) {
+    const type = OsmEntity.type(entityID);
+    const osmID = OsmEntity.toOSM(entityID);
+    const options = { skipSeen: false, filter: new Set(['relation']) };
+    const json = (this.preferJSON ? '.json' : '');
 
-    this.loadFromAPI(
-      `/api/0.6/${type}/${osmID}/relations.json`,
-      callback,
-      options
-    );
+    return new Promise((resolve, reject) => {
+      const errback = (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(results);
+        }
+      };
+
+      this.loadFromAPI(`/api/0.6/${type}/${osmID}/relations${json}`, errback, options);
+    });
   }
 
 
-  // Load multiple entities in chunks
-  // (note: callback may be called multiple times)
-  // Unlike `loadEntity`, child nodes and members are not fetched
-  // GET /api/0.6/[nodes|ways|relations]?#parameters
-  loadMultiple(ids, callback) {
-    const groups = utilArrayGroupBy(utilArrayUniq(ids), OsmEntity.type);
-    const options = { skipSeen: false };
+  /**
+   * loadMultipleAsync
+   * Load multiple elements in chunks.
+   * Unlike `loadEntityAsync`, child nodes and members are not fetched automatically.
+   * GET /api/0.6/[nodes|ways|relations]?#parameters
+   * @param   {Array<string|number>}  entityIDs - the entityIDs to load
+   * @return  {Promise}               Promise resolved with an Array of entity details
+   */
+  loadMultipleAsync(entityIDs) {
+    const loaded = [];
+    const toLoad = {};
 
-    for (const [k, vals] of Object.entries(groups)) {
-      const type = k + 's';   // nodes, ways, relations
-      const osmIDs = vals.map(id => OsmEntity.toOSM(id));
+    // Group entityIDs into sets by their type
+    for (const entityID of entityIDs) {
+      const k = OsmEntity.type(entityID);  // 'node', 'way', 'relation'
+      let set = toLoad[k];
+      if (!set) {
+        set = toLoad[k] = new Set();
+      }
+      set.add(OsmEntity.toOSM(entityID));  // just the number
+    }
 
-      for (const arr of utilArrayChunk(osmIDs, 150)) {
-        this.loadFromAPI(
-          `/api/0.6/${type}.json?${type}=` + arr.join(),
-          callback,
-          options
-        );
+    let promises;
+    for (const [k, set] of Object.entries(toLoad)) {
+      const chunks = utilArrayChunk(Array.from(set), 150);
+      for (const chunk of chunks) {
+        const prom = new Promise(resolve => {
+          const errback = (err, results) => {
+            // ignore errors here
+            loaded.push.apply(loaded, (results.data || []));
+            resolve();
+          };
+
+          const type = k + 's';   // nodes, ways, relations
+          const options = { skipSeen: false, filter: new Set([k]) };
+          const json = (this.preferJSON ? '.json' : '');
+          this.loadFromAPI(`/api/0.6/${type}${json}?${type}=` + chunk.join(), errback, options);
+        });
+
+        promises.push(prom);
       }
     }
+
+    return Promise.all(promises)
+      .then(() => loaded);
+  }
+
+
+  /**
+   * loadUserAsync
+   * Load a given user by id.
+   * Note that this call requires an auth connection and will return a cached result if unauth.
+   * GET /api/0.6/user/#id
+   * @param   {string|number}  userID - the userID to load
+   * @return  {Promise}        Promise resolved with the user details
+   */
+  loadUserAsync(userID) {
+    const uid = userID.toString();
+
+    // First, try to resolve to a cached result
+    const user = this._userCache.user[uid];
+    if (user || !this.authenticated()) {   // require auth
+      this._userCache.toLoad.delete(uid);
+      if (user) {
+        return Promise.resolve(user);
+      } else {
+        return Promise.reject(new Error(`User ${uid} not found`));
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      const errback = (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          const user = (results?.data || []).find(d => d.id === uid);
+          if (user) {
+            this._userCache.user[uid] = user;
+            resolve(user);
+          } else {
+            reject(new Error(`User ${uid} not found`));
+          }
+        }
+      };
+
+      const options = { skipSeen: false, filter: new Set(['user']) };
+      const json = (this.preferJSON ? '.json' : '');
+      this.loadFromAPI(`/api/0.6/user/${uid}${json}`, errback, options);
+    });
+  }
+
+
+  /**
+   * loadUsersAsync
+   * Load multiple users in chunks.
+   * Note that this call requires an auth connection and will return a cached result if unauth.
+   * GET /api/0.6/users?users=#id1,#id2,...,#idn
+   * @param   {Array<string|number>}  userIDs - the userIDs to load
+   * @return  {Promise}               Promise resolved with an Array of user details
+   */
+  loadUsersAsync(userIDs) {
+    const loaded = [];
+    const toLoad = [];
+
+    // First, collect cached results
+    for (const userID of utilArrayUniq(userIDs)) {
+      const uid = userID.toString();
+      const user = this._userCache.user[uid];
+      if (user) {
+        loaded.push(user);
+      } else {
+        toLoad.push(uid);
+      }
+    }
+
+    if (!toLoad.length || !this.authenticated()) {   // require auth
+      return Promise.resolve(loaded);
+    }
+
+    const options = { skipSeen: false, filter: new Set(['user']) };
+    const json = (this.preferJSON ? '.json' : '');
+    const chunks = utilArrayChunk(toLoad, 150);
+
+    const promises = [];
+    for (const chunk of chunks) {
+      const prom = new Promise(resolve => {
+        const errback = (err, results) => {
+          // ignore errors here
+          for (const user of (results?.data || [])) {
+            this._userCache.user[user.id] = user;
+            loaded.push(user);
+          }
+          resolve();
+        };
+
+        this.loadFromAPI('/api/0.6/users${json}?users=' + chunk.join(), errback, options);
+      });
+      promises.push(prom);
+    }
+
+    return Promise.all(promises)
+      .then(() => loaded);
+  }
+
+
+  /**
+   * getUserDetailsAsync
+   * Get the details of the logged-in user.
+   * GET /api/0.6/user/details
+   * @return  {Promise}  Promise resolved with the current logged in user's details
+   */
+  getUserDetailsAsync() {
+    if (!this.authenticated()) {
+      this._userDetails = null;
+      return Promise.reject(new Error('Not logged in'));
+    }
+
+    if (this._userDetails) {
+      return Promise.resolve(this._userDetails);
+    }
+
+    return new Promise((resolve, reject) => {
+      const errback = (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          this._userDetails = results.data[0];
+          resolve(this._userDetails);
+        }
+      };
+
+      const options = { skipSeen: false, filter: new Set(['user']) };
+      const json = (this.preferJSON ? '.json' : '');
+
+      this.loadFromAPI(`/api/0.6/user/details${json}`, errback, options);
+    });
+  }
+
+
+  /**
+   * getUserPreferencesAsync
+   * Get the stored preferences for the logged in user.
+   * GET /api/0.6/user/preferences
+   * @return  {Promise}  Promise resolved with the current logged in user's preferences
+   */
+  getUserPreferencesAsync() {
+    if (!this.authenticated()) {
+      this._userPreferences = null;
+      return Promise.reject(new Error('Not logged in'));
+    }
+    if (this._userPreferences) {
+      return Promise.resolve(this._userPreferences);
+    }
+
+    return new Promise((resolve, reject) => {
+      const errback = (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          this._userPreferences = results.data[0];
+          resolve(this._userPreferences);
+        }
+      };
+
+      const options = { skipSeen: false, filter: new Set(['preferences']) };
+      const json = (this.preferJSON ? '.json' : '');
+
+      this.loadFromAPI(
+        `/api/0.6/user/preferences${json}`,
+        errback,
+        options
+      );
+    });
+  }
+
+
+  /**
+   * getUserChangesetsAsync
+   * Get the previous changesets for the logged in user.
+   * GET /api/0.6/changesets?user=#id
+   * @return  {Promise}  Promise resolved with the current logged in user's previous changesets
+   */
+  getUserChangesetsAsync() {
+    if (!this.authenticated()) {
+      this._userChangesets = null;
+      return Promise.reject(new Error('Not logged in'));
+    }
+    if (this._userChangesets) {
+      return Promise.resolve(this._userChangesets);
+    }
+
+    return this.getUserDetailsAsync()
+      .then(user => {
+        return new Promise((resolve, reject) => {
+          const errback = (err, results) => {
+            if (err) {
+              reject(err);
+            } else {
+              this._userChangesets = results.data;
+              resolve(this._userChangesets);
+            }
+          };
+
+          const options = { skipSeen: false, filter: new Set(['changeset']) };
+          const json = (this.preferJSON ? '.json' : '');
+          this.loadFromAPI(`/api/0.6/changesets${json}?user=${user.id}`, errback, options);
+        });
+      });
+  }
+
+
+  /**
+   * getCapabilitiesAsync
+   * Fetch the API capabilities information.
+   * GET /api/capabilities
+   *
+   * The status will be one of:
+   *   'online'      - working normally
+   *   'readonly'    - reachable but readonly
+   *   'offline'     - reachable but offline
+   *   'error'       - unreachable / network issue
+   *   'ratelimit'   - rate limit detected
+   *
+   * see: https://wiki.openstreetmap.org/wiki/API_v0.6#Response
+   * @return  {Promise}  Promise resolved with the API status information
+   */
+  getCapabilitiesAsync() {
+    return new Promise((resolve, reject) => {
+      const errback = (err, results) => {
+        if (err?.message === 'Connection Switched') {  // If connection was just switched,
+          this._apiStatus = null;                      // reset cached status and try again
+          this._rateLimit = null;
+          this.getCapabilitiesAsync().then(resolve, reject);
+
+        } else if (err) {
+          this._apiStatus = 'error';
+          reject(err);
+
+        } else {
+          const api = results.data.find(d => d.type === 'api');
+          const policy = results.data.find(d => d.type === 'policy');
+
+          // Set status - 'online', 'readonly', or 'offline'
+          this._apiStatus = this._rateLimit ? 'ratelimit' : (api?.status?.api || 'online');
+
+          // Update max nodes per way
+          const maxWayNodes = api?.waynodes?.maximum || 2000;
+          if (maxWayNodes && isFinite(maxWayNodes)) {
+            this._maxWayNodes = maxWayNodes;
+          }
+
+          // Update imagery blocklists
+          const blocklist = policy?.imagery?.blacklist || [];
+          if (blocklist.length) {
+            this._imageryBlocklists = blocklist;
+          }
+
+          resolve({ osm: results.osm, api: api, policy: policy });
+        }
+      };
+
+      const options = { skipSeen: false, filter: new Set(['api', 'policy']) };
+      const json = (this.preferJSON ? '.json' : '');
+      this.loadFromAPI(
+        this._apiroot + `/api/capabilities${json}`,  // note, no '0.6'
+        errback,
+        options
+      );
+    });
+  }
+
+
+  /**
+   * reloadApiStatus
+   * Calls `getCapabilitiesAsync` and emits an `apistatuschange` event if the returned
+   * status differs from the cached status.
+   *
+   * The status will be one of:
+   *   'online'    - working normally
+   *   'readonly'  - reachable but readonly
+   *   'offline'   - reachable but offline
+   *   'error'     - unreachable / network issue
+   *   'ratelimit' - rate limit detected
+   */
+  reloadApiStatus() {
+    const startStatus = this._apiStatus;
+    this.getCapabilitiesAsync()
+      .then(() => {
+        const currStatus = this._apiStatus;
+        if (currStatus !== startStatus) {
+          this.emit('apistatuschange', currStatus);
+        }
+      });
   }
 
 
@@ -623,7 +992,7 @@ export class OsmService extends AbstractSystem {
 
         // Closing the changeset is optional, and we won't get a result.
         // Only try to close the changeset if we're still talking to the same server.
-        if (this.connectionID === cid) {
+        if (this._connectionID === cid) {
           this.closeChangeset(changeset, () => {});
         }
       });
@@ -631,220 +1000,21 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  // Load multiple users in chunks
-  // (note: callback may be called multiple times)
-  // GET /api/0.6/users?users=#id1,#id2,...,#idn
-  loadUsers(uids, callback) {
-    let toLoad = [];
-    let cached = [];
-
-    for (const uid of utilArrayUniq(uids)) {
-      if (this._userCache.user[uid]) {  // loaded already
-        this._userCache.toLoad.delete(uid);
-        cached.push(this._userCache.user[uid]);
-      } else {
-        toLoad.push(uid);
-      }
-    }
-
-    if (cached.length || !this.authenticated()) {
-      callback(null, cached);
-      if (!this.authenticated()) return;  // require auth
-    }
-
-    const gotUsers = (err, results) => {
-      if (err) return callback(err);
-      callback(null, results.data);
-    };
-
-    const options = { skipSeen: true };
-    for (const arr of utilArrayChunk(toLoad, 150)) {
-      this.loadFromAPI(
-        '/api/0.6/users.json?users=' + arr.join(),
-        gotUsers,
-        options
-      );
-    }
-  }
-
-
-  // Load a given user by id
-  // GET /api/0.6/user/#id
-  loadUser(uid, callback) {
-    if (this._userCache.user[uid] || !this.authenticated()) {   // require auth
-      this._userCache.toLoad.delete(uid);
-      return callback(null, this._userCache.user[uid]);
-    }
-
-    const gotUsers = (err, results) => {
-      if (err) return callback(err);
-      callback(null, results.data[0]);
-    };
-
-    const options = { skipSeen: true };
-    this.loadFromAPI(
-      `/api/0.6/user/${uid}.json`,
-      gotUsers,
-      options
-    );
-  }
-
-
-  /**
-   * _parseUserPreferencesXML
-   * @param xml
-   * @param callback
-   */
-  _parseUserPreferencesXML(xml, callback) {
-    const preferences = {};
-    const preferenceElems = xml.getElementsByTagName('preference');
-
-    for (let i = 0; i < preferenceElems.length; i++) {
-      const elem = preferenceElems[i];
-      const key = elem.getAttribute('k');
-      const value = elem.getAttribute('v');
-      if (key && value) {
-        preferences[key] = value;
-      }
-    }
-
-    callback(null, { data: preferences });
-  }
-
-
-  // Load maproulette api key from OSM preferences
-  // GET /api/0.6/user/preferences
-  loadMapRouletteKey(callback) {
-    if (!this.authenticated()) {   // require auth
-      return callback(null, {});
-    }
-
-    this._oauth.xhr({
-      method: 'GET',
-      path: '/api/0.6/user/preferences'
-    }, (err, data) => {
-      if (err) {
-        console.error('Error in loadUserPreferences:', err);  // eslint-disable-line no-console
-        return callback(err);
-      }
-
-      this._parseUserPreferencesXML(data, (err, result) => {
-        if (err) {
-          return callback(err);
-        } else {
-          return callback(null, result.data);
-        }
-      });
-    });
-  }
-
-
-  // Load the details of the logged-in user
-  // GET /api/0.6/user/details
-  userDetails(callback) {
-    if (this._userDetails) {    // retrieve cached
-      return callback(null, this._userDetails);
-    }
-
-    const gotUsers = (err, results) => {
-      if (err) return callback(err);
-      this._userDetails = results.data[0];
-      callback(null, this._userDetails);
-    };
-
-    const options = { skipSeen: false };
-    this.loadFromAPI(
-      `/api/0.6/user/details.json`,
-      gotUsers,
-      options
-    );
-  }
-
-
-  // Load previous changesets for the logged in user
-  // GET /api/0.6/changesets?user=#id
-  userChangesets(callback) {
-    if (this._userChangesets) {    // retrieve cached
-      return callback(null, this._userChangesets);
-    }
-
-    const gotChangesets = (err, results) => {
-      if (err) return callback(err);
-      this._userChangesets = results.data;
-      return callback(null, this._userChangesets);
-    };
-
-    const options = { skipSeen: false };
-    const gotUser = (err, user) => {
-      if (err) return callback(err);
-      this.loadFromAPI(
-        `/api/0.6/changesets.json?user=${user.id}`,
-        gotChangesets,
-        options
-      );
-    };
-
-    this.userDetails(gotUser);
-  }
-
-
-  // Fetch the status of the OSM API.
-  // GET /api/capabilities
-  // see: https://wiki.openstreetmap.org/wiki/API_v0.6#Response
-  //
-  // The status will be one of:
-  //   'online'      - working normally
-  //   'readonly'    - reachable but readonly
-  //   'offline'     - reachable but offline
-  //   'error'       - unreachable / network issue
-  //   'ratelimit'   - rate limit detected
-  //
-  status(callback) {
-    const gotResult = (err, result) => {
-      if (err?.message === 'Connection Switched') {  // If connection was just switched,
-        this._apiStatus = null;                      // reset cached status and try again
-        this.status(callback);
-        return;
-      } else if (err) {
-        return callback(err, 'error');   // a network issue
-      } else if (this._rateLimit) {
-        return callback(null, 'ratelimit');
-      } else {
-        const status = this._parseCapabilitiesJSON(result);
-        return callback(null, status);
-      }
-    };
-
-    const url = this._apiroot + '/api/capabilities.json';
-    const errback = this._wrapcb(gotResult);
-
-    fetch(url)
-      .then(utilFetchResponse)
-      .then(result => errback(null, result))
-      .catch(err => errback(err));
-  }
-
-
-  // Calls `status` and emits an `apistatuschange` event if the returned
-  // status differs from the cached status.
-  reloadApiStatus() {
-    this.status((err, result) => {
-      if (result !== this._apiStatus) {
-        this._apiStatus = result;
-        this.emit('apistatuschange', err, result);
-      }
-    });
-  }
-
-
   // Load data (entities) from the API in tiles
   // GET /api/0.6/map?bbox=
   loadTiles(callback) {
-    if (this._paused || this.getRateLimit()) return;
+    if (this._paused || this.getRateLimit()) {
+      if (callback) callback(null, []);
+      return;
+    }
 
     const cache = this._tileCache;
     const viewport = this.context.viewport;
-    if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
+    if (cache.lastv === viewport.v) {  // exit early if the view is unchanged
+      if (callback) callback(null, []);
+      return;
+    }
+
     cache.lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
@@ -935,9 +1105,10 @@ export class OsmService extends AbstractSystem {
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial;
     const locations = context.systems.locations;
+    const tileID = tile.id;
 
-    if (spatial.hasTile('osm-data', tile.id)) return;
-    if (cache.inflight[tile.id]) return;
+    if (spatial.hasTile('osm-data', tileID)) return;
+    if (cache.inflight[tileID]) return;
 
     if (locations) {
       // Exit if this tile covers a blocked region (all corners are blocked)
@@ -950,9 +1121,9 @@ export class OsmService extends AbstractSystem {
     }
 
     const gotTile = (err, results) => {
-      delete cache.inflight[tile.id];
+      delete cache.inflight[tileID];
       if (!err) {
-        cache.toLoad.delete(tile.id);
+        cache.toLoad.delete(tileID);
         spatial.addTiles('osm-data', [tile]);
       }
 
@@ -963,24 +1134,32 @@ export class OsmService extends AbstractSystem {
       }
     };
 
-    const path = '/api/0.6/map.json?bbox=';
     const options = { skipSeen: true };
+    const json = (this.preferJSON ? '.json' : '');
+    const path = `/api/0.6/map${json}?bbox=` + tile.wgs84Extent.toParam();
 
-    cache.inflight[tile.id] = this.loadFromAPI(
-      path + tile.wgs84Extent.toParam(),
-      gotTile,
-      options
-    );
+    cache.inflight[tileID] = this.loadFromAPI(path, gotTile, options);
   }
 
 
+  /**
+   * isDataLoaded
+   * Is OSM data exist at the given [lon,lat] coordinate?
+   * @param   {Array<number>}  loc      - the search location (WGS84 [lon,lat])
+   * @return  {boolean}  `true` if data exists there, `false` if not
+   */
   isDataLoaded(loc) {
     const spatial = this.context.systems.spatial;
     return spatial.hasTileAtLoc('osm-data', loc);
   }
 
 
-  // Load the tile that covers the given `loc`
+  /**
+   * loadTileAtLoc
+   * Queue loading the tile that covers the given `loc`
+   * @param   {Array<number>}  loc      - the search location (WGS84 [lon,lat])
+   * @param   {function}       callback - errback-style callback function to call with results
+   */
   loadTileAtLoc(loc, callback) {
     const spatial = this.context.systems.spatial;
 
@@ -1012,27 +1191,19 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  // Load notes from the API in tiles
-  // GET /api/0.6/notes?bbox=
+  /**
+   * loadNotes
+   * Schedule any data requests needed to cover the current map view
+   * @param  {Object}  noteOptions - note options
+   */
   loadNotes(noteOptions) {
     if (this._paused || this.getRateLimit()) return;
 
     const context = this.context;
     const cache = this._noteCache;
-    const gfx = context.systems.gfx;
     const locations = context.systems.locations;
     const spatial = context.systems.spatial;
     const viewport = context.viewport;
-
-    noteOptions = Object.assign({ limit: 10000, closed: 7 }, noteOptions);
-
-    const that = this;
-    const path = '/api/0.6/notes?limit=' + noteOptions.limit + '&closed=' + noteOptions.closed + '&bbox=';
-    const deferLoadUsers = _throttle(() => {
-      const uids = [...that._userCache.toLoad.values()];
-      if (!uids.length) return;
-      that.loadUsers(uids, function() {});  // eagerly load user details
-    }, 750);
 
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
     cache.lastv = viewport.v;
@@ -1058,40 +1229,84 @@ export class OsmService extends AbstractSystem {
           continue;
         }
       }
-
-      const options = { skipSeen: false };
-      cache.inflight[tileID] = this.loadFromAPI(
-        path + tile.wgs84Extent.toParam(),
-        function(err) {
-          delete that._noteCache.inflight[tileID];
-          if (!err) {
-            spatial.addTiles('osm-notes', [tile]);
-          }
-          // deferLoadUsers();
-          gfx?.deferredRedraw();
-        },
-        options
-      );
+      this.loadNotesTile(tile, noteOptions);
     }
   }
 
-  // Load a single note by id, XML format
-  // GET /api/0.6/notes/#id
-  loadNote(noteID, callback) {
-    const options = { skipSeen: false };
-    const gotNote = (err, results) => {
-      if (callback) {
-        callback(err, { data: results });
+
+  /**
+   * loadNotesTile
+   * Load a single tile of note data.
+   * GET /api/0.6/notes?bbox=
+   * @param  {Tile}    tile - Tile data
+   * @param  {Object}  noteOptions - note options
+   */
+  loadNotesTile(tile, noteOptions) {
+    noteOptions = Object.assign({ limit: 10000, closed: 7 }, noteOptions);
+
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial;
+    const cache = this._noteCache;
+    const tileID = tile.id;
+
+    const errback = (err, results) => {
+      delete cache.inflight[tileID];
+
+      if (results) {
+        spatial.addTiles('osm-notes', [tile]);   // mark as loaded
+        for (const props of (results.data ?? [])) {
+          this._cacheNote(props);
+        }
+        gfx?.deferredRedraw();
       }
-      const gfx = this.context.systems.gfx;
-      gfx?.deferredRedraw();
     };
 
-    this.loadFromAPI(
-      `/api/0.6/notes/${noteID}`,
-      gotNote,
-      options
-    );
+    const json = (this.preferJSON ? '.json' : '');
+    const options = { skipSeen: true, filter: new Set(['note']) };
+    const path = `/api/0.6/notes${json}?limit=` + noteOptions.limit + '&closed='
+      + noteOptions.closed + '&bbox=' + tile.wgs84Extent.toParam();
+
+    cache.inflight[tileID] = this.loadFromAPI(path, errback, options);
+  }
+
+
+  /**
+   * loadNoteAsync
+   * Load a single note by id.
+   * GET /api/0.6/notes/#id
+   * @param   {string|number}  id - noteID to get
+   * @return  {Promise}  Promise resolved with the note
+   */
+  loadNoteAsync(id) {
+    const context = this.context;
+    const spatial = context.systems.spatial;
+    const gfx = context.systems.gfx;
+
+    const noteID = id.toString();
+    let note = spatial.getData('osm-notes', noteID);
+    if (note) {
+      return Promise.resolve(note);
+    }
+
+    return new Promise((resolve, reject) => {
+      const errback = (err, results) => {
+        if (err) {
+          reject(err);
+        } else if (Array.isArray(results?.data)) {
+          note = this._cacheNote(results.data[0]);
+          gfx?.deferredRedraw();
+          resolve(note);
+        } else {
+          reject(new Error(`Note ${noteID} not found`));
+        }
+      };
+
+      const options = { skipSeen: false, filter: new Set(['note']) };
+      const json = (this.preferJSON ? '.json' : '');
+
+      this.loadFromAPI(`/api/0.6/notes/${noteID}${json}`, errback, options);
+    });
   }
 
 
@@ -1271,6 +1486,7 @@ export class OsmService extends AbstractSystem {
     this._rateLimit = null;
     this._userChangesets = null;
     this._userDetails = null;
+    this._userPreferences = null;
     this._oauth.logout();
     this.emit('authchange');
     return this;
@@ -1298,7 +1514,7 @@ export class OsmService extends AbstractSystem {
         return;
       }
       this.reloadApiStatus();
-      this.userChangesets(function() {});  // eagerly load user details/changesets
+//      this.userChangesets(function() {});  // eagerly load user details/changesets
       this.emit('authchange');
       if (callback) callback(err, result);
     };
@@ -1402,482 +1618,39 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  _getLoc(attrs) {
-    const lon = attrs.getNamedItem('lon')?.value;
-    const lat = attrs.getNamedItem('lat')?.value;
-    return [ parseFloat(lon), parseFloat(lat) ];
-  }
-
-
-  _getNodes(xml) {
-    const elems = Array.from(xml.getElementsByTagName('nd'));
-    return elems.map(elem => 'n' + elem.attributes.getNamedItem('ref').value);
-  }
-
-
-  _getNodesJSON(obj) {
-    return (obj.nodes ?? []).map(nodeID => 'n' + nodeID);
-  }
-
-
-  _getTags(xml) {
-    const elems = Array.from(xml.getElementsByTagName('tag'));
-    let tags = {};
-    for (const elem of elems) {
-      const attrs = elem.attributes;
-      const k = (attrs.getNamedItem('k')?.value ?? '').trim();
-      const v = (attrs.getNamedItem('v')?.value ?? '').trim();
-      if (k) {
-        tags[k] = v;
-      }
-    }
-    return tags;
-  }
-
-
-  _getMembers(xml) {
-    const elems = Array.from(xml.getElementsByTagName('member'));
-    return elems.map(elem => {
-      const attrs = elem.attributes;
-      return {
-        id: attrs.getNamedItem('type').value[0] + attrs.getNamedItem('ref').value,
-        type: attrs.getNamedItem('type').value,
-        role: attrs.getNamedItem('role').value
-      };
-    });
-  }
-
-
-  _getMembersJSON(obj) {
-    return (obj.members ?? []).map(member => {
-      return {
-        id: member.type[0] + member.ref,
-        type: member.type,
-        role: member.role
-      };
-    });
-  }
-
-
-  _parseComments(comments) {
-    let parsedComments = [];
-
-    for (const comment of Array.from(comments)) {
-      if (comment.nodeName === 'comment') {
-        let parsedComment = {};
-
-        for (const node of Array.from(comment.childNodes)) {
-          const nodeName = node.nodeName;
-          if (nodeName === '#text') continue;
-          parsedComment[nodeName] = node.textContent;
-
-          if (nodeName === 'uid') {
-            const uid = node.textContent;
-            if (uid && !this._userCache.user[uid]) {
-              this._userCache.toLoad.add(uid);
-            }
-          }
-        }
-
-        if (Object.keys(parsedComment).length) {
-          parsedComments.push(parsedComment);
-        }
-      }
-    }
-    return parsedComments;
-  }
-
-
   /**
-   * _parseJSON
-   * @param payload
-   * @param callback
-   * @param options
+   * _cacheNote
+   * Store the given note in the caches
+   * @param   {Object}  source - the note properties
+   * @return  {Marker}  The note
    */
-  _parseJSON(payload, callback, options) {
-    options = Object.assign({ skipSeen: true }, options);
-
-    if (!payload)  {
-      return callback({ message: 'No JSON', status: -1 });
-    }
-
-    let json = payload;
-    if (typeof json !== 'object') {
-      json = JSON.parse(payload);
-    }
-
-    // The payload may contain Elements, Users, or Changesets
-    const elements = json.elements ?? [];
-    const users = (json.user ? [json.user] : json.users) ?? [];
-    const changesets = json?.changesets || [];
-
-    if (!elements || !users || !changesets) {
-      return callback({ message: 'No JSON', status: -1 });
-    }
-    if (elements.some(el => el.type === 'error')) {
-      return callback({ message: 'Partial JSON', status: -1 });
-    }
-
-    // Defer parsing until later (todo: move all this to a worker)
-    const handle = globalThis.requestIdleCallback(() => {
-      this._deferred.delete(handle);
-
-      let results = { data: [], seenIDs: new Set() };
-
-      // Parse elements
-      for (const element of elements) {
-        let parser;
-        if (element.type === 'node') {
-          parser = this._parseNodeJSON;
-        } else if (element.type === 'way') {
-          parser = this._parseWayJSON;
-        } else if (element.type === 'relation') {
-          parser = this._parseRelationJSON;
-        }
-        if (!parser) continue;
-
-        const uid = OsmEntity.fromOSM(element.type, element.id);
-        results.seenIDs.add(uid);
-
-        if (options.skipSeen) {
-          if (this._tileCache.seen.has(uid)) continue;  // avoid reparsing a "seen" entity
-          this._tileCache.seen.add(uid);
-        }
-
-        const parsed = parser(element, uid);
-        if (parsed) {
-          results.data.push(parsed);
-        }
-      }
-
-      // Parse users
-      for (const user of users) {
-        const uid = user.id?.toString();
-        if (!uid) continue;
-
-        this._userCache.toLoad.delete(uid);
-        results.seenIDs.add(uid);
-
-        if (options.skipSeen && this._userCache.user[uid]) {  // avoid reparsing a "seen" entity
-          continue;
-        }
-
-        const parsed = {
-          id: uid,
-          display_name: user.display_name,
-          account_created: user.account_created,
-          image_url: user.img?.href,
-          changesets_count: user.changesets?.count?.toString() ?? '0',
-          active_blocks: user.blocks?.received?.active?.toString() ?? '0'
-        };
-
-        this._userCache.user[uid] = parsed;
-        results.data.push(parsed);
-      }
-
-      // Parse changesets
-      for (const changeset of changesets) {
-        if (!changeset?.tags?.comment) continue;   // only include changesets with comment
-        results.data.push(changeset);
-      }
-
-      callback(null, results);
-    });
-
-    this._deferred.add(handle);
-  }
-
-
-  /**
-   * _parseXML
-   * @param xml
-   * @param callback
-   * @param options
-   */
-  _parseXML(xml, callback, options) {
-    options = Object.assign({ skipSeen: true }, options);
-
-    if (!xml?.childNodes) {
-      return callback({ message: 'No XML', status: -1 });
-    }
-
-    const osmElement = Array.from(xml.childNodes).find(child => child.nodeName === 'osm');
-    if (!osmElement?.childNodes) {
-      return callback({ message: 'No OSM Element', status: -1 });
-    }
-
-    const children = Array.from(osmElement.childNodes);
-    if (children.some(child => child.nodename === 'error')) {
-      return callback({ message: 'Partial XML', status: -1 });
-    }
-
-    // Defer parsing until later (todo: move all this to a worker)
-    const handle = globalThis.requestIdleCallback(() => {
-      this._deferred.delete(handle);
-
-      let results = { data: [], seenIDs: new Set() };
-
-      for (const child of children) {
-        let parser;
-        if (child.nodeName === 'node') {
-          parser = this._parseNodeXML;
-        } else if (child.nodeName === 'way') {
-          parser = this._parseWayXML;
-        } else if (child.nodeName === 'relation') {
-          parser = this._parseRelationXML;
-        } else if (child.nodeName === 'note') {
-          parser = this._parseNoteXML;
-        } else if (child.nodeName === 'user') {
-          parser = this._parseUserXML;
-        }
-        if (!parser) continue;
-
-        let uid;
-        if (child.nodeName === 'user') {
-          uid = child.attributes.getNamedItem('id').value;
-          results.seenIDs.add(uid);
-
-          if (options.skipSeen && this._userCache.user[uid]) {  // avoid reparsing a "seen" entity
-            this._userCache.toLoad.delete(uid);
-            continue;
-          }
-
-        } else if (child.nodeName === 'note') {
-          uid = child.getElementsByTagName('id')[0].textContent;
-          results.seenIDs.add(uid);
-
-        } else {
-          uid = OsmEntity.fromOSM(child.nodeName, child.attributes.getNamedItem('id').value);
-          results.seenIDs.add(uid);
-
-          if (options.skipSeen) {
-            if (this._tileCache.seen.has(uid)) continue;  // avoid reparsing a "seen" entity
-            this._tileCache.seen.add(uid);
-          }
-        }
-
-        const parsed = parser(child, uid);
-        if (parsed) {
-          results.data.push(parsed);
-        }
-      }
-
-      callback(null, results);
-    });
-
-    this._deferred.add(handle);
-  }
-
-
-  _parseNodeJSON(obj, uid) {
-    return new OsmNode(this.context, {
-      id:  uid,
-      visible: typeof obj.visible === 'boolean' ? obj.visible : true,
-      version: obj.version?.toString(),
-      changeset: obj.changeset?.toString(),
-      timestamp: obj.timestamp,
-      user: obj.user,
-      uid: obj.uid?.toString(),
-      loc: [ parseFloat(obj.lon), parseFloat(obj.lat) ],
-      tags: obj.tags
-    });
-  }
-
-  _parseWayJSON(obj, uid) {
-    return new OsmWay(this.context, {
-      id:  uid,
-      visible: typeof obj.visible === 'boolean' ? obj.visible : true,
-      version: obj.version?.toString(),
-      changeset: obj.changeset?.toString(),
-      timestamp: obj.timestamp,
-      user: obj.user,
-      uid: obj.uid?.toString(),
-      tags: obj.tags,
-      nodes: this._getNodesJSON(obj)
-    });
-  }
-
-  _parseRelationJSON(obj, uid) {
-    return new OsmRelation(this.context, {
-      id:  uid,
-      visible: typeof obj.visible === 'boolean' ? obj.visible : true,
-      version: obj.version?.toString(),
-      changeset: obj.changeset?.toString(),
-      timestamp: obj.timestamp,
-      user: obj.user,
-      uid: obj.uid?.toString(),
-      tags: obj.tags,
-      members: this._getMembersJSON(obj)
-    });
-  }
-
-  _parseNodeXML(xml, uid) {
-    const attrs = xml.attributes;
-    return new OsmNode(this.context, {
-      id: uid,
-      visible: (!attrs.visible || attrs.visible.value !== 'false'),
-      version: attrs.version.value,
-      changeset: attrs.changeset?.value,
-      timestamp: attrs.timestamp?.value,
-      user: attrs.user?.value,
-      uid: attrs.uid?.value,
-      loc: this._getLoc(attrs),
-      tags: this._getTags(xml)
-    });
-  }
-
-  _parseWayXML(xml, uid) {
-    const attrs = xml.attributes;
-    return new OsmWay(this.context, {
-      id: uid,
-      visible: (!attrs.visible || attrs.visible.value !== 'false'),
-      version: attrs.version.value,
-      changeset: attrs.changeset?.value,
-      timestamp: attrs.timestamp?.value,
-      user: attrs.user?.value,
-      uid: attrs.uid?.value,
-      tags: this._getTags(xml),
-      nodes: this._getNodes(xml),
-    });
-  }
-
-  _parseRelationXML(xml, uid) {
-    const attrs = xml.attributes;
-    return new OsmRelation(this.context, {
-      id: uid,
-      visible: (!attrs.visible || attrs.visible.value !== 'false'),
-      version: attrs.version.value,
-      changeset: attrs.changeset?.value,
-      timestamp: attrs.timestamp?.value,
-      user: attrs.user?.value,
-      uid: attrs.uid?.value,
-      tags: this._getTags(xml),
-      members: this._getMembers(xml)
-    });
-  }
-
-  _parseNoteXML(xml, uid) {
+  _cacheNote(source) {
     const context = this.context;
     const spatial = context.systems.spatial;
+    const noteID = source.id;
 
-    const props = {
-      id: uid,
-      serviceID: this.id,
-      type: 'note'
-    };
-
-    // If notes are coincident, move them apart slightly..
-    const attrs = xml.attributes;
-    props.loc = spatial.preventCoincidentLoc('osm-notes', this._getLoc(attrs));
-
-    // parse note contents
-    for (const node of Array.from(xml.childNodes)) {
-      const nodeName = node.nodeName;
-      if (nodeName === '#text') continue;
-
-      // if the element is comments, parse the comments
-      if (nodeName === 'comments') {
-        props.comments = this._parseComments(node.childNodes);
-      } else {
-        props.comments = node.textContent;
-      }
+    let note = spatial.getData('osm-notes', noteID);
+    if (!note) {
+      const loc = spatial.preventCoincidentLoc('osm-notes', source.loc);
+      note = new Marker(this.context, {
+        type:       'note',
+        serviceID:  this.id,
+        id:         noteID,
+        loc:        loc
+      });
     }
 
-    const note = new Marker(this.context, props);
-    spatial.addData('osm-notes', note);
-    return note;
-  }
+    // Update whatever additional props we were passed..
+    const props = note.props;
+    if (source.url)           props.url          = source.url;
+    if (source.comment_url)   props.comment_url  = source.comment_url;
+    if (source.close_url)     props.close_url    = source.close_url;
+    if (source.date_created)  props.date_created = source.date_created;
+    if (source.status)        props.status       = source.status;
+    if (source.comments)      props.comments     = source.comments;
 
-
-  _parseUserXML(xml, uid) {
-    const attrs = xml.attributes;
-    let user = {
-      id: uid,
-      display_name: attrs.getNamedItem('display_name')?.value,
-      account_created: attrs.getNamedItem('account_created')?.value,
-      changesets_count: '0',
-      active_blocks: '0'
-    };
-
-    const img = xml.getElementsByTagName('img');
-    if (img && img[0] && img[0].getAttribute('href')) {
-      user.image_url = img[0].getAttribute('href');
-    }
-
-    const changesets = xml.getElementsByTagName('changesets');
-    if (changesets && changesets[0] && changesets[0].getAttribute('count')) {
-      user.changesets_count = changesets[0].getAttribute('count');
-    }
-
-    const blocks = xml.getElementsByTagName('blocks');
-    if (blocks && blocks[0]) {
-      const received = blocks[0].getElementsByTagName('received');
-      if (received && received[0] && received[0].getAttribute('active')) {
-        user.active_blocks = received[0].getAttribute('active');
-      }
-    }
-
-    this._userCache.user[uid] = user;
-    this._userCache.toLoad.delete(uid);
-    return user;
-  }
-
-  _parseCapabilitiesJSON(json) {
-    // Update blocklists
-    const regexes = [];
-    for (const item of json.policy.imagery.blacklist) {
-      const regexString = item.regex;  // needs unencode?
-      if (regexString) {
-        try {
-          regexes.push(new RegExp(regexString));
-        } catch (e) {
-          /* noop */
-        }
-      }
-    }
-    if (regexes.length) {
-      this._imageryBlocklists = regexes;
-    }
-
-    // Update max nodes per way
-    const maxWayNodes = json.api.waynodes.maximum;
-    if (maxWayNodes && isFinite(maxWayNodes)) {
-      this._maxWayNodes = maxWayNodes;
-    }
-
-    // Return status
-    const apiStatus = json.api.status.api;  // 'online', 'readonly', or 'offline'
-    return apiStatus;
-  }
-
-
-  _parseCapabilitiesXML(xml) {
-    // Update blocklists
-    const regexes = [];
-    for (const element of xml.getElementsByTagName('blacklist')) {
-      const regexString = element.getAttribute('regex');  // needs unencode?
-      if (regexString) {
-        try {
-          regexes.push(new RegExp(regexString));
-        } catch (e) {
-          /* noop */
-        }
-      }
-    }
-    if (regexes.length) {
-      this._imageryBlocklists = regexes;
-    }
-
-    // Update max nodes per way
-    const waynodes = xml.getElementsByTagName('waynodes');
-    const maxWayNodes = waynodes.length && parseInt(waynodes[0].getAttribute('maximum'), 10);
-    if (maxWayNodes && isFinite(maxWayNodes)) {
-      this._maxWayNodes = maxWayNodes;
-    }
-
-    // Return status
-    const apiStatus = xml.getElementsByTagName('status');
-    return apiStatus[0].getAttribute('api');   // 'online', 'readonly', or 'offline'
+    spatial.replaceData('osm-notes', note);
+    return note.touch();
   }
 
 

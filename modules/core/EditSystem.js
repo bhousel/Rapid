@@ -6,7 +6,7 @@ import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from './AbstractSystem.js';
 import { Edit } from './lib/index.js';
-import { Difference, Graph, Tree, createOsmFeature } from '../data/index.js';
+import { Difference, OsmEntity, Graph, Tree, createOsmEntity } from '../data/index.js';
 import { uiLoading } from '../ui/loading.js';
 
 
@@ -616,36 +616,51 @@ export class EditSystem extends AbstractSystem {
   /**
    *  merge
    *  Merge new entities into the Base Graph.
+   *  (Sorry, but this one is not like what `git merge` does.)
+   *
    *  This function is called when we have parsed a new tile of OSM data, we will
    *   receive the new entities and a list of all entity ids that the tile contains.
    *  Can also be called in other situations, like restoring history from
-   *  storage, or loading specific entities from the OSM API.
-   *  (Sorry, but this one is not like what `git merge` does.)
+   *    storage, or loading specific entities from the OSM API.
+   *  This function can accept an Array of Entities or an Array of props to construct.
    *
-   *  @param  {Array<Entity>}  entities - Entities to merge into the history (usually only the new ones)
-   *  @param  {Set<string>}    seenIDs? - Optional set of all entity IDs on the tile (including previously seen ones)
+   *  @param  {Array<*>}    toMerge - Entities (or props) to merge into base graph (usually only the new ones)
+   *  @param  {Set<string>} seenIDs? - Optional set of all entity IDs on the tile (including previously seen ones)
    */
-  merge(entities, seenIDs) {
+  merge(toMerge, seenIDs) {
+    const context = this.context;
     const baseGraph = this.base.graph;
     const stagingGraph = this.staging.graph;
+    const newIDs = new Set();
+
+    // Collect the Entities, create if necessary...
+    const entities = [];
+    for (const props of toMerge) {
+      let entity;
+      if (props instanceof OsmEntity) {
+        entity = props;
+      } else {
+        entity = createOsmEntity(context, props);
+      }
+      entities.push(entity);
+
+      // Which ones are really new (not in the Base Graph)?
+      if (!baseGraph.hasEntity(entity.id)) {
+        newIDs.add(entity.id);
+      }
+    }
+    if (!entities.length) return;  // nothing to do
+
 
     // Note: I'd like to try to find a way to avoid seenIDs, but we probably need it for now.
     // The emit('merge', seenIDs) below triggers a re-render of all features on a tile,
     // even the previously seen ones. The reason is because new information could cause
-    // features to render differently.  An example would be a ways that are a members of
+    // features to render differently.  An example would be: ways that are members of
     // a large multipolygon could be part of the outer or a hole, and those ways need to
     // redraw even if different ways appear.
     // see https://github.com/facebook/Rapid/commit/4223385
     if (!(seenIDs instanceof Set)) {
       seenIDs = new Set(entities.map(entity => entity.id));
-    }
-
-    // Which ones are really new (not in the Base Graph)?
-    const newIDs = new Set();
-    for (const entity of entities) {
-      if (!baseGraph.hasEntity(entity.id)) {  // not merged in yet.
-        newIDs.add(entity.id);
-      }
     }
 
     // If we are merging in new relation members, bump the relation's version.
@@ -1053,8 +1068,8 @@ export class EditSystem extends AbstractSystem {
     }
 
     // Reconstruct base entities..
-    for (const e of backup.baseEntities) {
-      const entity = createOsmFeature(context, e);
+    for (const props of backup.baseEntities) {
+      const entity = createOsmEntity(context, props);
       __baseEntities.set(entity.id, entity);
     }
 
@@ -1070,7 +1085,7 @@ export class EditSystem extends AbstractSystem {
 
     // Reconstruct modified entities..
     for (const e of backup.entities) {
-      const entity = createOsmFeature(context, e);
+      const entity = createOsmEntity(context, e);
       __modifiedEntities.set(entity.key, entity);
     }
 
@@ -1083,12 +1098,17 @@ export class EditSystem extends AbstractSystem {
     //  - The child nodes may have been deleted, so we may have to fetch older non-deleted copies
     //
     // A thought I'm having is - if we need to do all this anyway, it might make more sense to just store the
-    // base version numbers rather than base entities, then use `loadEntityVersion` to fetch exactly what we need.
+    // base version numbers rather than base entities, then use `loadEntityVersionAsync` to fetch exactly what we need.
+    // new: the OSM API now supports a "multi-fetch with version numbers" option.
     const _loadMissingEntitiesAsync = () => {
       return new Promise((resolve, reject) => {
 
         if (osm && __missingEntityIDs.size) {
-          // watch out: this callback may be called multiple times..
+          // Watch out: this callback may be called multiple times..
+          // Since switching the osm service methods to async we shouldn't get errors anymore
+          //  it will always resolve to whatever was fetched.
+          // But: another potential problem is that we'll never actually fetch "redacted" entities
+          //  so potential infinite recursion scenerio.
           const _missingEntitiesLoaded = (err, result) => {
             if (err) {
               reject(err);
@@ -1099,14 +1119,17 @@ export class EditSystem extends AbstractSystem {
               const invisibles = visibleGroups.false ?? [];   // deleted nodes
 
               // Visible (not deleted) are no longer missing and will be merged as base entities..
-              for (const entity of visibles) {
+              for (const props of visibles) {
+                const entity = createOsmEntity(context, props);
                 __missingEntityIDs.delete(entity.id);
                 __baseEntities.set(entity.id, entity);
               }
 
-              // Invisible (deleted) entities, need to go back a version to find them..
-              for (const entity of invisibles) {
-                osm.loadEntityVersion(entity.id, +entity.version - 1, _missingEntitiesLoaded);
+              // Recurse to load invisible (deleted) entities, need to go back a version to find them..
+              for (const props of invisibles) {
+                osm.loadEntityVersionAsync(props.id, +props.version - 1)
+                  .then(results => _missingEntitiesLoaded(null, results))
+                  .catch(err => reject(err));
               }
             }
 
@@ -1115,7 +1138,10 @@ export class EditSystem extends AbstractSystem {
             }
           };
 
-          osm.loadMultiple(__missingEntityIDs, _missingEntitiesLoaded);
+          // continue loading missing entities until we have them all
+          osm.loadMultipleAsync(__missingEntityIDs)
+            .then(results => _missingEntitiesLoaded(null, results))
+            .catch(err => reject(err));
 
         } else {  // nothing to do
           resolve();

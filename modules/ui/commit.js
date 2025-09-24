@@ -394,36 +394,36 @@ export function uiCommit(context) {
     prose = prose.enter()
       .append('p')
       .attr('class', 'commit-info')
-      .html(l10n.tHtml('commit.upload_explanation'))
+      .text(l10n.t('commit.upload_explanation'))
       .merge(prose);
 
     // Always check if this has changed, but only update prose.html()
     // if needed, because it can trigger a style recalculation
-    osm.userDetails(function(err, user) {
-      if (err) return;
+    osm.getUserDetailsAsync()
+      .then(user => {
+        if (_userDetails === user) return;  // no change
+        _userDetails = user;
 
-      if (_userDetails === user) return;  // no change
-      _userDetails = user;
+        let userLink = d3_select(document.createElement('div'));
 
-      let userLink = d3_select(document.createElement('div'));
+        const href = user?.img?.href;
+        if (href) {
+          userLink
+            .append('img')
+            .attr('src', href)
+            .attr('class', 'icon pre-text user-icon');
+        }
 
-      if (user.image_url) {
         userLink
-          .append('img')
-          .attr('src', user.image_url)
-          .attr('class', 'icon pre-text user-icon');
-      }
+          .append('a')
+          .attr('class', 'user-info')
+          .text(user.display_name)
+          .attr('href', osm.userURL(user.display_name))
+          .attr('target', '_blank');
 
-      userLink
-        .append('a')
-        .attr('class', 'user-info')
-        .html(user.display_name)
-        .attr('href', osm.userURL(user.display_name))
-        .attr('target', '_blank');
-
-      prose
-        .html(l10n.tHtml('commit.upload_explanation_with_user', { user: userLink.html() }));
-    });
+        prose
+          .html(l10n.tHtml('commit.upload_explanation_with_user', { user: userLink.html() }));
+      });
 
 
     // Request Review
@@ -694,8 +694,8 @@ export function uiCommit(context) {
     }
 
     // always update userdetails, just in case user reauthenticates as someone else
-    if (_userDetails && _userDetails.changesets_count !== undefined) {
-      let changesetsCount = parseInt(_userDetails.changesets_count, 10) + 1;  // iD#4283
+    if (_userDetails?.changesets_count !== undefined) {
+      const changesetsCount = _userDetails.changesets_count + 1;  // iD#4283
       tags.changesets_count = String(changesetsCount);
 
       // first 100 edits - new user

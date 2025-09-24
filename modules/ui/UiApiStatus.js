@@ -155,10 +155,9 @@ export class UiApiStatus {
   /**
    * _onApiStatusChange
    * Callback function called on any API status change by the OSM service.
-   * @param  {Error}   err? - optional Error object
    * @param  {string}  apiStatus - probably 'online', 'readonly', or 'offline'
    */
-  _onApiStatusChange(err, apiStatus) {
+  _onApiStatusChange(apiStatus) {
     this._apiStatus = apiStatus ?? 'error';
     this.render();
   }

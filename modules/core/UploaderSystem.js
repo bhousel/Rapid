@@ -4,6 +4,7 @@ import { AbstractSystem } from './AbstractSystem.js';
 import { actionDiscardTags } from '../actions/discard_tags.js';
 import { actionMergeRemoteChanges } from '../actions/merge_remote_changes.js';
 import { actionRevert } from '../actions/revert.js';
+import { createOsmEntity } from '../data/index.js';
 import { Graph } from '../data/lib/Graph.js';
 
 
@@ -197,7 +198,9 @@ export class UploaderSystem extends AbstractSystem {
 
     if (osm && this._toLoadIDs.size) {
       this.emit('progressChanged', this._loadedIDs.size, this._toCheckIDs.size);
-      osm.loadMultiple(Array.from(this._toLoadIDs), this._loadedSome);
+      osm.loadMultipleAsync(Array.from(this._toLoadIDs))
+        .then(results => this._loadedSome(null, results))
+        .catch(err => this._loadedSome(err));
     } else {
       this._tryUpload();
     }
@@ -207,7 +210,7 @@ export class UploaderSystem extends AbstractSystem {
   // `loadedSome` callback may be called multiple times.
   // Here we load a batch of remote entities into `remoteGraph`,
   // then expand the search set if needed and schedule more loading.
-  _loadedSome(err, result) {
+  _loadedSome(err, results) {
     if (this._errors.length) return;   // give up if there are errors
 
     const l10n = this.context.systems.l10n;
@@ -224,7 +227,8 @@ export class UploaderSystem extends AbstractSystem {
 
     let loadMoreIDs = new Set();
 
-    for (const entity of result.data) {
+    for (const props of (results.data || [])) {
+      const entity = createOsmEntity(props);
       this._remoteGraph.replace(entity);
       this._loadedIDs.add(entity.id);
       this._toLoadIDs.delete(entity.id);
@@ -255,7 +259,10 @@ export class UploaderSystem extends AbstractSystem {
     this.emit('progressChanged', this._loadedIDs.size, this._toCheckIDs.size);
 
     if (osm && loadMoreIDs.size) {
-      osm.loadMultiple(Array.from(loadMoreIDs), this._loadedSome);
+      osm.loadMultipleAsync(Array.from(loadMoreIDs))
+        .then(results => this._loadedSome(null, results))
+        .catch(err => this._loadedSome(err));
+
 
     } else if (!this._toLoadIDs.size) {  // we have loaded everything, continue to the next step
       this._detectConflicts();

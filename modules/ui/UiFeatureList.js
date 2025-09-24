@@ -2,7 +2,7 @@ import { selection, select } from 'd3-selection';
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import * as sexagesimal from '@mapbox/sexagesimal';
 
-import { Graph, createOsmFeature } from '../data/index.js';
+import { Graph, createOsmEntity } from '../data/index.js';
 import { uiIcon } from './icon.js';
 import { utilCmd, utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../util/index.js';
 
@@ -499,7 +499,7 @@ export class UiFeatureList {
         attrs.nodes = ['a','a'];    // so that geometry area is possible
       }
 
-      const tempEntity = createOsmFeature(context, attrs);
+      const tempEntity = createOsmEntity(context, attrs);
       const tempGraph = new Graph(this.context, [tempEntity]);
       const preset = presets.match(tempEntity, tempGraph);
       const type = (preset && preset.name()) || l10n.displayType(id);

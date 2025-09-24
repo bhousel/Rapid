@@ -11,6 +11,8 @@ import { utilNoAuto, utilRebind } from '../util/index.js';
 export function uiMapRouletteEditor(context) {
   const l10n = context.systems.l10n;
   const maproulette = context.services.maproulette;
+  const osm = context.services.osm;
+
   const dispatch = d3_dispatch('change');
   const mapRouletteDetails = uiMapRouletteDetails(context);
   const mapRouletteHeader = uiMapRouletteHeader(context);
@@ -18,10 +20,13 @@ export function uiMapRouletteEditor(context) {
 
   let _marker;
   let _actionTaken;
-  let _mapRouletteApiKey;
+  let _apikey;
+  let _user;
 
 
   function render($selection) {
+    if (!osm || !maproulette) return;
+
     const $header = $selection.selectAll('.header')
       .data([0]);
 
@@ -56,7 +61,7 @@ export function uiMapRouletteEditor(context) {
       .merge($editor)
       .call(mapRouletteHeader.task(_marker))
       .call(mapRouletteDetails.task(_marker))
-      .call(maprouletteSaveSection)
+      .call(mapRouletteSaveSection)
       .call(commentSaveSection);
 
 
@@ -73,21 +78,21 @@ export function uiMapRouletteEditor(context) {
       .call(ViewOn.render);
   }
 
-  function getMapRouletteApiKey(context, callback) {
-    const osm = context.services.osm;
-    osm.loadMapRouletteKey((err, preferences) => {
-      if (typeof callback === 'function') {
-        if (err) {
-          callback(err);
-        } else {
-          callback(null, preferences.maproulette_apikey_v2);
-        }
-      }
-    });
+
+  function getMapRouletteApiKeyAsync() {
+    return osm.getUserPreferencesAsync()
+      .then(prefs => {
+        _apikey = prefs.maproulette_apikey_v2;
+        return _apikey;
+      })
+      .catch(err => {
+        _apikey = null;
+        console.error(err);  // eslint-disable-line no-console
+      });
   }
 
 
-  function maprouletteSaveSection($selection) {
+  function mapRouletteSaveSection($selection) {
     const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
     const isShown = (_marker && isSelected);
@@ -203,51 +208,45 @@ export function uiMapRouletteEditor(context) {
       .attr('class', 'detail-section')
       .merge($detailSection);
 
-    const osm = context.services.osm;
-    if (!osm) return;
-
-    // Check if user is authenticated with OSM
-    const osmAuth = osm.authenticated();
-    let $authWarning = $detailSection.selectAll('.auth-warning')
+    const $authWarning = $detailSection.selectAll('.auth-warning')
       .data([0]);
 
-    showAuthWarning($authWarning, osmAuth, 'map_data.layers.maproulette.login');
+    updateAuthWarning($authWarning, 'map_data.layers.maproulette.login');
 
-    // Check if _mapRouletteApiKey is defined
-    getMapRouletteApiKey(context, (err, apiKey) => {
-      if (err) {
-        console.error(err); // eslint-disable-line no-console
-        return;
-      }
-      _mapRouletteApiKey = apiKey;
-      const mrAuth = _mapRouletteApiKey !== undefined;
-      $authWarning = $detailSection.selectAll('.auth-warning')
-        .data([0]);
-      showAuthWarning($authWarning, mrAuth, 'map_data.layers.maproulette.loginMaproulette');
-    });
+    getMapRouletteApiKeyAsync()
+      .then(() => {
+        updateAuthWarning($authWarning, 'map_data.layers.maproulette.loginMaproulette');
+      });
 
-    osm.userDetails(function(err, user) {
-      if (err) return;
+    osm.getUserDetailsAsync()
+      .then(user => {
+        _user = user;
+        let $userLink = d3_select(document.createElement('div'));
 
-      let $userLink = d3_select(document.createElement('div'));
+        const href = user?.img?.href;
+        if (href) {
+          $userLink
+            .append('img')
+            .attr('src', href)
+            .attr('class', 'icon pre-text user-icon');
+        }
 
-      if (user.image_url) {
         $userLink
-          .append('img')
-          .attr('src', user.image_url)
-          .attr('class', 'icon pre-text user-icon');
-      }
-
-      $userLink
-        .append('a')
-        .attr('class', 'user-info')
-        .text(user.display_name)
-        .attr('href', osm.userURL(user.display_name))
-        .attr('target', '_blank');
-    });
+          .append('a')
+          .attr('class', 'user-info')
+          .text(user.display_name)
+          .attr('href', osm.userURL(user.display_name))
+          .attr('target', '_blank');
+      })
+      .catch(err => {
+        _user = null;
+        console.error(err);  // eslint-disable-line no-console
+      });
 
 
-    function showAuthWarning($selection, isAuthenticated, messageKey) {
+    function updateAuthWarning($selection, messageKey) {
+      const isAuthenticated = (_user && _apikey);
+
       if (isAuthenticated) {
         $selection.exit()
           .transition()
@@ -305,108 +304,100 @@ export function uiMapRouletteEditor(context) {
    *  These buttons are available only after the user has completed authentication.
    */
   function mRSaveButtons($selection) {
-    getMapRouletteApiKey(context, (err, apiKey) => {
-      if (err) {
-        console.error(err); // eslint-disable-line no-console
-        return;
-      }
+    getMapRouletteApiKeyAsync()
+      .then(apiKey => {
+        const hasAuth = (_user && _apikey);
+        const errID = _marker?.id;
+        const isSelected = errID && context.selectedData().has(errID);
 
-      _mapRouletteApiKey = apiKey;
-      const osm = context.services.osm;
-      const hasOSMAuth = osm && osm.authenticated();
-      const hasMapRouletteAuth = _mapRouletteApiKey !== undefined;
-      const hasAuth = hasOSMAuth && hasMapRouletteAuth;
-      const errID = _marker?.id;
-      const isSelected = errID && context.selectedData().has(errID);
+        const uiSystem = context.systems.ui;
+        // Check if the MapRoulette menu is showing
+        if (uiSystem._showsMapRouletteMenu) {
+          $selection.selectAll('.mr-save .buttons').style('display', 'none');
+          return;
+        } else {
+          $selection.selectAll('.mr-save .buttons').style('display', ''); // Ensure buttons are shown if menu is not open
+        }
 
-      const uiSystem = context.systems.ui;
-      // Check if the MapRoulette menu is showing
-      if (uiSystem._showsMapRouletteMenu) {
-        $selection.selectAll('.mr-save .buttons').style('display', 'none');
-        return;
-      } else {
-        $selection.selectAll('.mr-save .buttons').style('display', ''); // Ensure buttons are shown if menu is not open
-      }
+        let $buttons = $selection.selectAll('.buttons')
+          .data(isSelected ? [_marker] : [], d => d.key);
 
-      let $buttons = $selection.selectAll('.buttons')
-        .data(isSelected ? [_marker] : [], d => d.key);
+        // exit
+        $buttons.exit()
+          .remove();
 
-      // exit
-      $buttons.exit()
-        .remove();
+        // enter
+        const $$buttons = $buttons.enter()
+          .append('div')
+          .attr('class', 'buttons');
 
-      // enter
-      const $$buttons = $buttons.enter()
-        .append('div')
-        .attr('class', 'buttons');
+        $$buttons
+          .append('button')
+          .attr('class', 'button fixedIt-button action');
 
-      $$buttons
-        .append('button')
-        .attr('class', 'button fixedIt-button action');
+        $$buttons
+          .append('button')
+          .attr('class', 'button cantComplete-button action');
 
-      $$buttons
-        .append('button')
-        .attr('class', 'button cantComplete-button action');
+        $$buttons
+          .append('button')
+          .attr('class', 'button alreadyFixed-button action');
 
-      $$buttons
-        .append('button')
-        .attr('class', 'button alreadyFixed-button action');
+        $$buttons
+          .append('button')
+          .attr('class', 'button notAnIssue-button action');
 
-      $$buttons
-        .append('button')
-        .attr('class', 'button notAnIssue-button action');
+        const $$checkboxNearby = $$buttons.append('div')
+          .attr('class', 'checkbox-section');
 
-      const $$checkboxNearby = $$buttons.append('div')
-        .attr('class', 'checkbox-section');
+        $$checkboxNearby
+          .append('input')
+          .attr('type', 'checkbox')
+          .attr('id', 'nearbyTaskCheckbox')
+          .property('checked', maproulette.nearbyTaskEnabled)
+          .on('change', nearbyTaskChanged);
 
-      $$checkboxNearby
-        .append('input')
-        .attr('type', 'checkbox')
-        .attr('id', 'nearbyTaskCheckbox')
-        .property('checked', maproulette.nearbyTaskEnabled)
-        .on('change', nearbyTaskChanged);
+        $$checkboxNearby
+          .append('label')
+          .attr('for', 'nearbyTaskCheckbox')
+          .text(l10n.t('map_data.layers.maproulette.nearbyTask.title'));
 
-      $$checkboxNearby
-        .append('label')
-        .attr('for', 'nearbyTaskCheckbox')
-        .text(l10n.t('map_data.layers.maproulette.nearbyTask.title'));
+        // update
+        $buttons = $buttons
+          .merge($$buttons);
 
-      // update
-      $buttons = $buttons
-        .merge($$buttons);
+        $buttons.select('.fixedIt-button')
+          .attr('disabled', isSaveDisabled(_marker))
+          .text(l10n.t('map_data.layers.maproulette.fixed'))
+          .on('click.fixedIt', function(d3_event, d) {
+            fixedIt(d3_event, d, $selection);
+          });
 
-      $buttons.select('.fixedIt-button')
-        .attr('disabled', isSaveDisabled(_marker))
-        .text(l10n.t('map_data.layers.maproulette.fixed'))
-        .on('click.fixedIt', function(d3_event, d) {
-          fixedIt(d3_event, d, $selection);
-        });
+        $buttons.select('.cantComplete-button')
+          .attr('disabled', isSaveDisabled(_marker))
+          .text(l10n.t('map_data.layers.maproulette.cantComplete'))
+          .on('click.cantComplete', function(d3_event, d) {
+            cantComplete(d3_event, d, $selection);
+          });
 
-      $buttons.select('.cantComplete-button')
-        .attr('disabled', isSaveDisabled(_marker))
-        .text(l10n.t('map_data.layers.maproulette.cantComplete'))
-        .on('click.cantComplete', function(d3_event, d) {
-          cantComplete(d3_event, d, $selection);
-        });
+        $buttons.select('.alreadyFixed-button')
+          .attr('disabled', isSaveDisabled(_marker))
+          .text(l10n.t('map_data.layers.maproulette.alreadyFixed'))
+          .on('click.alreadyFixed', function(d3_event, d) {
+            alreadyFixed(d3_event, d, $selection);
+          });
 
-      $buttons.select('.alreadyFixed-button')
-        .attr('disabled', isSaveDisabled(_marker))
-        .text(l10n.t('map_data.layers.maproulette.alreadyFixed'))
-        .on('click.alreadyFixed', function(d3_event, d) {
-          alreadyFixed(d3_event, d, $selection);
-        });
+        $buttons.select('.notAnIssue-button')
+          .attr('disabled', isSaveDisabled(_marker))
+          .text(l10n.t('map_data.layers.maproulette.notAnIssue'))
+          .on('click.notAnIssue', function(d3_event, d) {
+            notAnIssue(d3_event, d, $selection);
+          });
 
-      $buttons.select('.notAnIssue-button')
-        .attr('disabled', isSaveDisabled(_marker))
-        .text(l10n.t('map_data.layers.maproulette.notAnIssue'))
-        .on('click.notAnIssue', function(d3_event, d) {
-          notAnIssue(d3_event, d, $selection);
-        });
-
-      function isSaveDisabled(d) {
-        return (d && hasAuth) ? null : true;
-      }
-    });
+        function isSaveDisabled(d) {
+          return (d && hasAuth) ? null : true;
+        }
+      });
   }
 
 
@@ -436,15 +427,6 @@ export function uiMapRouletteEditor(context) {
    *  These buttons are available only after the user has clicked an action button
    */
   function submitButtons($selection) {
-    const osm = context.services.osm;
-    osm.loadMapRouletteKey((err, preferences) => {
-      if (err) {
-        console.error(err); // eslint-disable-line no-console
-        return;
-      }
-      _mapRouletteApiKey = preferences.maproulette_apikey_v2;
-    });
-
     const errID = _marker?.id;
     const isSelected = errID && context.selectedData().has(errID);
     let $buttons = $selection.selectAll('.buttons')
@@ -528,26 +510,24 @@ export function uiMapRouletteEditor(context) {
 
   function clickSubmit(d3_event, d) {
     this.blur();    // avoid keeping focus on the button - iD#4641
-    const osm = context.services.osm;
     const userID = osm._userDetails.id;
-    if (maproulette) {
-      d.props.taskStatus = d.props._status;
-      d.props.mapRouletteApiKey = _mapRouletteApiKey;
-      d.props.comment = d3_select('.new-comment-input').property('value').trim();
-      d.props.taskId = d.id;
-      d.props.userId = userID;
-      maproulette.postUpdate(d, (err, item) => {
-        if (err) {
-          console.error(err);  // eslint-disable-line no-console
-          return;
-        }
-        dispatch.call('change', item);
-        // Fly to a nearby task if the feature is enabled, after the update
-        if (maproulette.nearbyTaskEnabled) {
-          maproulette.flyToNearbyTask(d);
-        }
-      });
-    }
+
+    d.props.taskStatus = d.props._status;
+    d.props.mapRouletteApiKey = _apikey;
+    d.props.comment = d3_select('.new-comment-input').property('value').trim();
+    d.props.taskId = d.id;
+    d.props.userId = userID;
+    maproulette.postUpdate(d, (err, item) => {
+      if (err) {
+        console.error(err);  // eslint-disable-line no-console
+        return;
+      }
+      dispatch.call('change', item);
+      // Fly to a nearby task if the feature is enabled, after the update
+      if (maproulette.nearbyTaskEnabled) {
+        maproulette.flyToNearbyTask(d);
+      }
+    });
   }
 
   render.error = function(val) {

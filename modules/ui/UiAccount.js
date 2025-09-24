@@ -144,7 +144,6 @@ export class UiAccount {
           osm.authenticate();
         });
     }
-
   }
 
 
@@ -161,10 +160,15 @@ export class UiAccount {
       this.render();
 
     } else {
-      osm.userDetails((err, user) => {
-        this.user = user || null;
-        this.render();
-      });
+      osm.getUserDetailsAsync()
+        .then(user => {
+          this.user = user;
+          this.render();
+        })
+        .catch(() => {
+          this.user = null;
+          this.render();
+        });
     }
   }
 

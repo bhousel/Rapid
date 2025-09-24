@@ -239,28 +239,28 @@ export function uiNoteEditor(context) {
       .text(l10n.t('note.upload_explanation'))
       .merge($prose);
 
-    osm.userDetails((err, user) => {
-      if (err) return;
+    osm.getUserDetailsAsync()
+      .then(user => {
+        let $userLink = d3_select(document.createElement('div'));
 
-      let $userLink = d3_select(document.createElement('div'));
+        const href = user?.img?.href;
+        if (href) {
+          $userLink
+            .append('img')
+            .attr('src', href)
+            .attr('class', 'icon pre-text user-icon');
+        }
 
-      if (user.image_url) {
         $userLink
-          .append('img')
-          .attr('src', user.image_url)
-          .attr('class', 'icon pre-text user-icon');
-      }
+          .append('a')
+          .attr('class', 'user-info')
+          .text(user.display_name)
+          .attr('href', osm.userURL(user.display_name))
+          .attr('target', '_blank');
 
-      $userLink
-        .append('a')
-        .attr('class', 'user-info')
-        .text(user.display_name)
-        .attr('href', osm.userURL(user.display_name))
-        .attr('target', '_blank');
-
-      $prose
-        .html(l10n.tHtml('note.upload_explanation_with_user', { user: $userLink.html() }));
-    });
+        $prose
+          .html(l10n.tHtml('note.upload_explanation_with_user', { user: $userLink.html() }));
+      });
   }
 
 

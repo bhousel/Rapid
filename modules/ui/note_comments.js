@@ -85,16 +85,18 @@ export function uiNoteComments(context) {
     }
 
     for (const uid of uids) {
-      osm.loadUser(uid, (err, user) => {
-        if (!user || !user.image_url) return;
+      osm.loadUserAsync(uid)
+        .then(user => {
+          const href = user?.img?.href;
+          if (!href) return;
 
-        $selection.selectAll(`.comment-avatar.user-${uid}`)
-          .html('')
-          .append('img')
-          .attr('class', 'icon comment-avatar-icon')
-          .attr('src', user.image_url)
-          .attr('alt', user.display_name);
-      });
+          $selection.selectAll(`.comment-avatar.user-${uid}`)
+            .html('')
+            .append('img')
+            .attr('class', 'icon comment-avatar-icon')
+            .attr('src', href)
+            .attr('alt', user.display_name);
+        });
     }
   }
 

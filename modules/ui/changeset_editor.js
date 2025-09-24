@@ -68,21 +68,22 @@ export function uiChangesetEditor(context) {
             // and checked for hashtags, even if retrieved from localstorage
             utilTriggerEvent(commentField, 'blur');
 
-            var osm = context.services.osm;
+            // Populate dropdown with user's recent changeset comments, if possible
+            const osm = context.services.osm;
             if (osm) {
-                osm.userChangesets(function (err, changesets) {
-                    if (err) return;
+              osm.getUserChangesetsAsync()
+                .then(results => {
+                  // skip empty comments
+                  const comments = results.data.map(changeset => {
+                    const comment = changeset?.tags?.comment;
+                    return comment ? { title: comment, value: comment } : null;
+                  }).filter(Boolean);
 
-                    var comments = changesets.map(function(changeset) {
-                        var comment = changeset.tags.comment;
-                        return comment ? { title: comment, value: comment } : null;
-                    }).filter(Boolean);
-
-                    commentField
-                        .call(commentCombo
-                            .data(utilArrayUniqBy(comments, 'title'))
-                        );
-                });
+                  commentField
+                    .call(commentCombo
+                      .data(utilArrayUniqBy(comments, 'title'))
+                    );
+              });
             }
         }
 

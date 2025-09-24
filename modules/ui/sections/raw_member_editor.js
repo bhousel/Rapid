@@ -50,9 +50,8 @@ export function uiSectionRawMemberEditor(context) {
 
     // display the loading indicator
     d3_select(this.parentNode).classed('tag-reference-loading', true);
-    context.loadEntity(d.id, function() {
-      section.reRender();
-    });
+    context.loadEntityAsync(d.id)
+      .then(() => section.reRender());
   }
 
 

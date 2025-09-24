@@ -233,69 +233,55 @@ export class Context extends EventEmitter {
   set locale(val)  { this._prelocale = val; }    // remember for init time
 
 
-  _afterLoad(cid, callback) {
-    return (err, result) => {
-      const osm = this.services.osm;
-      if (err) {
-        // 400 Bad Request, 401 Unauthorized, 403 Forbidden..
-        if (err.status === 400 || err.status === 401 || err.status === 403) {
-          osm?.logout();
-        }
-        if (typeof callback === 'function') {
-          callback(err);
-        }
-        return;
-
-      } else if (osm?.connectionID !== cid) {
-        if (typeof callback === 'function') {
-          callback({ message: 'Connection Switched', status: -1 });
-        }
-        return;
-
-      } else {
-        this.systems.editor.merge(result.data, result.seenIDs);
-        if (typeof callback === 'function') {
-          callback(err, result);
-        }
-        return;
-      }
-    };
-  }
-
-
-  loadTiles(callback) {
+  loadTiles() {
+    const editor = this.systems.editor;
     const osm = this.services.osm;
-    if (!osm) return;
+    if (!osm || !this.editable()) return;
 
     const z = this.viewport.transform.zoom;
     if (z < MINZOOM) return;  // this would fire off too many API requests
 
-    if (this.editable()) {
-      const cid = osm.connectionID;
-      osm.loadTiles(this._afterLoad(cid, callback));
-    }
+    osm.loadTiles((err, results) => {
+      if (results) {
+        editor?.merge(results.data, results.seenIDs);
+      }
+    });
   }
 
 
-  loadTileAtLoc(loc, callback) {
+  loadTileAtLoc(loc) {
+    const editor = this.systems.editor;
     const osm = this.services.osm;
-    if (!osm) return;
+    if (!osm || !this.editable()) return;
 
-    if (this.editable()) {
-      const cid = osm.connectionID;
-      osm.loadTileAtLoc(loc, this._afterLoad(cid, callback));
-    }
+    osm.loadTileAtLoc(loc, (err, results) => {
+      if (results) {
+        editor?.merge(results.data, results.seenIDs);
+      }
+    });
   }
 
 
-  // Download the full entity and its parent relations. The callback may be called multiple times.
-  loadEntity(entityID, callback) {
+  // Download the full entity and its parent relations.
+  loadEntityAsync(entityID) {
+    const editor = this.systems.editor;
     const osm = this.services.osm;
-    if (!osm) return;
+    if (!osm) {
+      return Promise.resolve();
+    }
 
-    const cid = osm.connectionID;
-    osm.loadEntity(entityID, this._afterLoad(cid, callback));
-    osm.loadEntityRelations(entityID, this._afterLoad(cid, callback));
+    return osm.loadEntityAsync(entityID)
+      .then(results => {
+        if (results) {
+          editor?.merge(results.data, results.seenIDs);
+        }
+      })
+      .then(() => osm.loadEntityRelationsAsync(entityID))
+      .then(results => {
+        if (results) {
+          editor?.merge(results.data, results.seenIDs);
+        }
+      });
   }
 
 
