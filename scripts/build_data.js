@@ -1,9 +1,8 @@
 /* eslint-disable no-console */
-import chalk from 'chalk';
-import { globSync } from 'glob';
 import fs from 'node:fs';
 import stringify from 'json-stringify-pretty-compact';
 import shell from 'shelljs';
+import { styleText } from 'node:util';
 import JSON5 from 'json5';
 import YAML from 'js-yaml';
 
@@ -52,8 +51,8 @@ if (process.argv[1].indexOf('build_data.js') > -1) {
 function buildDataAsync() {
   if (_buildPromise) return _buildPromise;
 
-  const START = '🏗   ' + chalk.yellow('Building data...');
-  const END = '👍  ' + chalk.green('data built');
+  const START = '🏗   ' + styleText('yellow', 'Building data...');
+  const END = '👍  ' + styleText('green', 'data built');
 
   console.log('');
   console.log(START);
@@ -123,12 +122,12 @@ function buildDataAsync() {
       writeEnJson();
 
       // copy `data/` files to `dist/data/` and stamp with metadata
-      for (const sourceFile of globSync('data/**/*.json')) {
+      for (const sourceFile of fs.globSync('data/**/*.json')) {
         const destinationFile = sourceFile.replace(/\\/g, '/').replace('data/', 'dist/data/');
         copyToDistSync(sourceFile, destinationFile);
       }
 
-      for (const file of globSync('dist/data/**/*.json')) {
+      for (const file of fs.globSync('dist/data/**/*.json')) {
         minifySync(file);
       }
     })
@@ -302,7 +301,7 @@ function writeEnJson() {
     fs.writeFileSync('data/l10n/tagging.en.json', JSON.stringify(tagging, null, 2) + '\n');
 
   } catch (err) {
-    console.error(chalk.red(`Error - ${err.message}`));
+    console.error(styleText('red', `Error - ${err.message}`));
     process.exit(1);
   }
 }
@@ -315,8 +314,8 @@ function copyToDistSync(inFile, outFile) {
     const contents = fs.readFileSync(inFile, 'utf8');
     writeFileWithMeta(outFile, contents);
   } catch (err) {
-    console.error(chalk.red(`Error - ${err.message} copying:`));
-    console.error('  ' + chalk.yellow(inFile));
+    console.error(styleText('red', `Error - ${err.message} copying:`));
+    console.error(styleText('yellow', '  ' + inFile));
     process.exit(1);
   }
 }
@@ -330,8 +329,8 @@ function minifySync(inFile) {
     const outFile = inFile.replace('.json', '.min.json');
     fs.writeFileSync(outFile, JSON.stringify(JSON5.parse(contents)));
   } catch (err) {
-    console.error(chalk.red(`Error - ${err.message} minifying:`));
-    console.error('  ' + chalk.yellow(inFile));
+    console.error(styleText('red', `Error - ${err.message} minifying:`));
+    console.error(styleText('yellow', '  ' + inFile));
     process.exit(1);
   }
 }

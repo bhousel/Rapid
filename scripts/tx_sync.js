@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
 /* eslint-disable no-process-env */
-import chalk from 'chalk';
 import fs from 'node:fs';
 import JSON5 from 'json5';
+import { styleText } from 'node:util';
 import { transifexApi as api } from '@transifex/api';
 
 //
@@ -72,13 +72,13 @@ Promise.resolve()
   .then(findSameSourceStrings)
   .then(processLanguages)
   .then(() => {
-    console.log(chalk.yellow(`✅  Done!`));
+    console.log(styleText('yellow', `✅  Done!`));
   });
 
 
 //
 async function getProjectDetails() {
-  console.log(chalk.yellow(`📥  Fetching project details…`));
+  console.log(styleText('yellow', `📥  Fetching project details…`));
   return Promise.all([
     api.User.get(USER),
     api.Project.get(ID_PROJECT),
@@ -109,7 +109,7 @@ async function getProjectDetails() {
 
 //
 async function getLanguageDetails() {
-  console.log(chalk.yellow(`📥  Fetching language details…`));
+  console.log(styleText('yellow', `📥  Fetching language details…`));
   return getCollection(api.Language)
     .then(vals => {
       for (const val of vals) {
@@ -121,7 +121,7 @@ async function getLanguageDetails() {
 
 //
 async function getiDLanguageStats() {
-  console.log(chalk.yellow(`📥  Fetching iD language stats…`));
+  console.log(styleText('yellow', `📥  Fetching iD language stats…`));
   const iter = api.ResourceLanguageStats.filter({ project: ID_PROJECT, resource: ID_RESOURCE });
 
   return getCollection(iter)
@@ -136,7 +136,7 @@ async function getiDLanguageStats() {
 
 //
 async function getRapidLanguageStats() {
-  console.log(chalk.yellow(`📥  Fetching Rapid language stats…`));
+  console.log(styleText('yellow', `📥  Fetching Rapid language stats…`));
   const iter = api.ResourceLanguageStats.filter({ project: RAPID_PROJECT, resource: RAPID_RESOURCE });
 
   return getCollection(iter)
@@ -175,7 +175,7 @@ async function getRapidLanguageStats() {
 
 //
 async function getiDSourceStrings() {
-  console.log(chalk.yellow(`📥  Fetching iD source strings…`));
+  console.log(styleText('yellow', `📥  Fetching iD source strings…`));
   const iter = api.ResourceString.filter({ resource: ID_RESOURCE });
 
   return getCollection(iter)
@@ -189,7 +189,7 @@ async function getiDSourceStrings() {
 
 //
 async function getRapidSourceStrings() {
-  console.log(chalk.yellow(`📥  Fetching Rapid source strings…`));
+  console.log(styleText('yellow', `📥  Fetching Rapid source strings…`));
   const iter = api.ResourceString.filter({ resource: RAPID_RESOURCE });
 
   return getCollection(iter)
@@ -204,7 +204,7 @@ async function getRapidSourceStrings() {
 
 //
 function findSameSourceStrings() {
-  console.log(chalk.yellow(`🔦  Finding source strings that are the same…`));
+  console.log(styleText('yellow', `🔦  Finding source strings that are the same…`));
 
   // Note: 'keys' are our identifiers, like 'icons.download'
   // use `keys_id` and `keys_rapid` to get the Transifex identifiers, like 's:9e6b7e75e8405d21eb9c2458ab412b18'
@@ -234,7 +234,7 @@ function findSameSourceStrings() {
       // console.log(`${key} looks same in iD and Rapid: ${strings_id.other}`);
     }
   }
-  console.log(chalk.reset(same.size.toString()));
+  console.log(styleText('reset', same.size.toString()));
 }
 
 
@@ -276,7 +276,7 @@ async function getiDTranslationsForLanguage(languageID) {
   const translations = new Map();   //  Map<stringID, Object>
   translations_id.set(languageID, translations);
 
-  console.log(chalk.yellow(`📥  Fetching iD translations for ${languageID}`));
+  console.log(styleText('yellow', `📥  Fetching iD translations for ${languageID}`));
   const iter = api.ResourceTranslation.filter({ resource: ID_RESOURCE, language: languageID });
 
   return getCollection(iter)
@@ -298,12 +298,12 @@ async function getRapidTranslationsForLanguage(languageID) {
 
   // Rapid project doesn't have this language yet, create one
   if (!languages_rapid.has(languageID)) {
-    console.log(chalk.yellow(`📦  Creating language for Rapid for ${languageID}`));
+    console.log(styleText('yellow', `📦  Creating language for Rapid for ${languageID}`));
     await project_rapid.add('languages', [languages.get(languageID)]);
     // We expect that after adding the language, we should get a collection of empty ResourceTranslations below.
   }
 
-  console.log(chalk.yellow(`📥  Fetching Rapid translations for ${languageID}`));
+  console.log(styleText('yellow', `📥  Fetching Rapid translations for ${languageID}`));
   const iter = api.ResourceTranslation.filter({ resource: RAPID_RESOURCE, language: languageID });
 
   return getCollection(iter)
@@ -322,7 +322,7 @@ async function updateRapidTranslationsForLanguage(languageID, showCount = true) 
   const from_id = translations_id.get(languageID);        //  Map<stringID, Object>
   const to_rapid = translations_rapid.get(languageID);    //  Map<stringID, Object>
 
-  console.log(chalk.yellow(`✏️   Syncing translations iD -> Rapid for ${languageID}`));
+  console.log(styleText('yellow', `✏️   Syncing translations iD -> Rapid for ${languageID}`));
   let count = 0;
   if (!process.stdout.isTTY) showCount = false;
 

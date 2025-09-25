@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
-import chalk from 'chalk';
 import gaze from 'gaze/lib/gaze.js';
 import StaticServer from 'static-server/server.js';
+import { styleText } from 'node:util';
 
 import { buildCSSAsync } from './build_css.js';
 
@@ -12,5 +12,5 @@ gaze(['css/**/*.css'], (err, watcher) => {
 
 const server = new StaticServer({ rootPath: process.cwd(), port: 8080, followSymlink: true });
 server.start(() => {
-  console.log(chalk.yellow(`Listening on ${server.port}`));
+  console.log(styleText('yellow', `Listening on ${server.port}`));
 });

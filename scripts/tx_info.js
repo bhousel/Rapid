@@ -1,13 +1,11 @@
 /* eslint-disable no-console */
 /* eslint-disable no-process-env */
-import chalk from 'chalk';
 import fs from 'node:fs';
 import JSON5 from 'json5';
-import { parseArgs } from 'node:util';
+import { parseArgs, styleText } from 'node:util';
 import { transifexApi as api } from '@transifex/api';
 
 const localeCompare = new Intl.Collator('en').compare;
-
 
 
 //
@@ -29,13 +27,13 @@ if (process.env.transifex_token) {
 
 const { positionals } = parseArgs({ allowPositionals: true });
 if (!positionals.length) {
-  console.error(chalk.yellow('  missing lookup key, example:'));
-  console.error(chalk.yellow(`  tx_info.js modes.add_area.title`));
+  console.error(styleText('yellow', '  missing lookup key, example:'));
+  console.error(styleText('yellow', `  tx_info.js modes.add_area.title`));
   console.error('');
   process.exit(1);
 }
 const LOOKUP_KEY = positionals[0];
-console.log(chalk.yellow(`lookup key "${LOOKUP_KEY}"`));
+console.log(styleText('yellow', `lookup key "${LOOKUP_KEY}"`));
 
 const RAPID_PROJECT = 'o:rapid-editor:p:rapid-editor';
 const CORE_RESOURCE = 'o:rapid-editor:p:rapid-editor:r:core';
@@ -51,13 +49,13 @@ Promise.resolve()
   .then(getRapidLanguages)
   .then(getTranslationStrings)
   .then(() => {
-    console.log(chalk.yellow(`✅  Done!`));
+    console.log(styleText('yellow', `✅  Done!`));
   });
 
 
 //
 async function getProjectDetails() {
-  console.log(chalk.yellow(`📥  Fetching project details…`));
+  console.log(styleText('yellow', `📥  Fetching project details…`));
   project_rapid = await api.Project.get(RAPID_PROJECT);
   resource_core = await api.Resource.get(CORE_RESOURCE);
 }
@@ -95,18 +93,18 @@ async function getSourceString() {
   await query.fetch();
 
   if (query.data.length === 0) {
-    console.log(chalk.yellow(`❌  "${LOOKUP_KEY}" not found…`));
+    console.log(styleText('yellow', `❌  "${LOOKUP_KEY}" not found…`));
     process.exit(1);
   } else {
     source_string = query.data[0];
-    console.log(chalk.yellow(`✅  found "${LOOKUP_KEY}":`));
+    console.log(styleText('yellow', `✅  found "${LOOKUP_KEY}":`));
   }
 }
 
 
 // getRapidLanguages
 async function getRapidLanguages() {
-  console.log(chalk.yellow(`📥  Fetching Rapid languages…`));
+  console.log(styleText('yellow', `📥  Fetching Rapid languages…`));
   const opts = { project: RAPID_PROJECT, resource: CORE_RESOURCE };
   const iter = api.ResourceLanguageStats.filter(opts).all();
   return getCollection(iter)
@@ -141,7 +139,10 @@ async function getRapidLanguages() {
 async function getTranslationStrings() {
   // Print English first
   const sstrings = JSON.stringify(source_string.attributes.strings);
-  console.log(chalk.yellow.inverse('l:en:') + chalk.reset.yellow(`    \t` + sstrings));
+  console.log(
+    styleText(['yellow', 'inverse'], 'l:en:') +
+    styleText(['reset', 'yellow'], `    \t` + sstrings)
+  );
 
   for (const languageID of languageIDs) {
     if (languageID === 'l:en') continue;   // skip `l:en`, it's the source language
@@ -151,10 +152,16 @@ async function getTranslationStrings() {
     await query.fetch();
 
     if (query.data.length === 0) {
-      console.log(chalk.yellow.inverse(`${languageID}:`) + chalk.reset.yellow.dim(`    \t` + 'untranslated'));
+      console.log(
+        styleText(['yellow', 'inverse'], `${languageID}:`) +
+        styleText(['reset', 'yellow', 'dim'], `    \t` + 'untranslated')
+      );
     } else {
       const tstrings = JSON.stringify(query.data[0].attributes.strings);
-      console.log(chalk.yellow.inverse(`${languageID}:`) + chalk.reset.yellow(`    \t` + tstrings));
+      console.log(
+        styleText(['yellow', 'inverse'], `${languageID}:`) +
+        styleText(['reset', 'yellow'], `    \t` + tstrings)
+      );
     }
   }
 }

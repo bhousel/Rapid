@@ -1,11 +1,10 @@
 /* eslint-disable no-console */
 /* eslint-disable no-process-env */
-import chalk from 'chalk';
 import fs from 'node:fs';
-import { globSync } from 'glob';
 import JSON5 from 'json5';
 import shell from 'shelljs';
 import stringify from 'json-stringify-pretty-compact';
+import { styleText } from 'node:util';
 import { transifexApi as api } from '@transifex/api';
 
 import * as CLDR from './cldr.js';
@@ -67,20 +66,20 @@ Promise.resolve()
   .then(getImagery)
   .then(getTagging)
   .then(() => {
-    console.log(chalk.yellow(`✅  Done!`));
+    console.log(styleText('yellow', `✅  Done!`));
   });
 
 
 // startClean
 // Remove old files before starting
 function startClean() {
-  console.log(chalk.yellow(`🧼  Start clean…`));
+  console.log(styleText('yellow', `🧼  Start clean…`));
 
   // create target folders if necessary
   if (!fs.existsSync('data/l10n'))  fs.mkdirSync('data/l10n', { recursive: true });
 
   shell.rm('-f', 'data/locales.json');
-  for (const file of globSync('data/l10n/*', { ignore: 'data/l10n/*.en.json' })) {
+  for (const file of fs.globSync('data/l10n/*', { ignore: 'data/l10n/*.en.json' })) {
     shell.rm('-f', file);
   }
 }
@@ -88,7 +87,7 @@ function startClean() {
 
 //
 async function getProjectDetails() {
-  console.log(chalk.yellow(`📥  Fetching project details…`));
+  console.log(styleText('yellow', `📥  Fetching project details…`));
   return Promise.all([
     api.Project.get(ID_PROJECT),
     api.Project.get(RAPID_PROJECT),
@@ -127,7 +126,7 @@ async function getProjectDetails() {
 
 //
 async function getLanguageDetails() {
-  console.log(chalk.yellow(`📥  Fetching language details…`));
+  console.log(styleText('yellow', `📥  Fetching language details…`));
   return getCollection(api.Language)
     .then(vals => {
       for (const val of vals) {
@@ -139,7 +138,7 @@ async function getLanguageDetails() {
 
 //
 async function getRapidLanguageStats() {
-  console.log(chalk.yellow(`📥  Fetching Rapid language stats…`));
+  console.log(styleText('yellow', `📥  Fetching Rapid language stats…`));
   const iter = api.ResourceLanguageStats.filter({ project: RAPID_PROJECT, resource: CORE_RESOURCE });
 
   return getCollection(iter)
@@ -154,7 +153,7 @@ async function getRapidLanguageStats() {
 // writeLocalesFile
 // We'll include only the locales supported by the Rapid project.
 function writeLocalesFile() {
-  console.log(chalk.yellow(`✏️   Writing 'locales.json'…`));
+  console.log(styleText('yellow', `✏️   Writing 'locales.json'…`));
 
   const locales = {}
   for (const languageID of languages_rapid) {
@@ -244,7 +243,7 @@ async function getTagging() {
 
 //
 async function getSourceStrings(resourceName, resourceID, collection) {
-  console.log(chalk.yellow(`📥  Fetching '${resourceName}' source strings…`));
+  console.log(styleText('yellow', `📥  Fetching '${resourceName}' source strings…`));
   const iter = api.ResourceString.filter({ resource: resourceID });
 
   return getCollection(iter)
@@ -282,7 +281,7 @@ async function getTranslationStrings(resourceName, resourceID, languageID, colle
   const translations = new Map();   //  Map<stringID, ResourceTranslation>
   collection.set(languageID, translations);
 
-  console.log(chalk.yellow(`📥  Fetching '${resourceName}' translations for '${languageID}'`));
+  console.log(styleText('yellow', `📥  Fetching '${resourceName}' translations for '${languageID}'`));
   const iter = api.ResourceTranslation.filter({ resource: resourceID, language: languageID, translated: true });
 
   return getCollection(iter)
@@ -411,7 +410,7 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
 // fill in every string, and use this signal to try to get their language 100% complete.
 //    // Only remove the redundant translations from the Rapid 'core' resource, not the iD projects
 //    if (resourceName === 'core' && isRedundant) {
-//      console.log(chalk.yellow(`🔪   Removing redundant '${languageID}' translation…`));
+//      console.log(styleText('yellow', `🔪   Removing redundant '${languageID}' translation…`));
 //      await saveWithRetry(translation, { strings: null });
 //    }
   }
@@ -453,14 +452,14 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
   }
 
   if (count > 0) {
-    console.log(chalk.yellow(`✏️   Writing '${resourceName}.${code}.json'…`));
+    console.log(styleText('yellow', `✏️   Writing '${resourceName}.${code}.json'…`));
     const output = {};
     output[code] = data;
     fs.writeFileSync(`data/l10n/${resourceName}.${code}.json`, JSON.stringify(output, null, 2) + '\n');
   } else {
-    console.log(chalk.yellow(`🔦  No meaningful translations found…`));
+    console.log(styleText('yellow', `🔦  No meaningful translations found…`));
   }
-  console.log(chalk.reset(count.toString()));
+  console.log(styleText('reset', count.toString()));
 
   return true;
 }
