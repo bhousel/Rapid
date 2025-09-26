@@ -2,7 +2,8 @@ import { Tiler } from '@rapid-sdk/math';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { RapidDataset } from '../core/lib/index.js';
-import { Graph, OsmEntity, OsmNode, OsmWay, Tree } from '../data/index.js';
+import { Graph, OsmNode, OsmWay, Tree } from '../data/index.js';
+import { OsmXMLParser } from '../data/parsers/OsmXMLParser.js';
 import { utilFetchResponse } from '../util/index.js';
 
 
@@ -26,13 +27,10 @@ export class MapWithAIService extends AbstractSystem {
     this.requiredDependencies = new Set(['spatial']);
     this.optionalDependencies = new Set(['gfx', 'locations', 'rapid', 'urlhash']);
 
+    this._XMLParser = new OsmXMLParser();
     this._tiler = new Tiler().zoomRange(TILEZOOM);
-    this._datasets = {};
+    this._datasets = new Map();  // Map<datasetID, Object>
     this._deferred = new Set();
-
-    // Ensure methods used as callbacks always have `this` bound correctly.
-    this._parseNode = this._parseNode.bind(this);
-    this._parseWay = this._parseWay.bind(this);
   }
 
 
@@ -48,24 +46,7 @@ export class MapWithAIService extends AbstractSystem {
       .then(() => this.resetAsync())
       .then(() => {
         // allocate a special dataset for the rapid intro graph.
-        const datasetID = 'rapid_intro_graph';
-        const graph = new Graph(this.context);
-        const tree = new Tree(graph, datasetID);
-        const cache = {
-          inflight: {},
-          loaded: new Set(),           // Set<tileID>
-          seen: new Set(),             // Set<entityID>
-          seenFirstNodeID: new Set(),  // Set<entityID>
-          splitWays: new Map()         // Map<originalID, Set<Entity>>
-        };
-        const ds = {
-          id: datasetID,
-          graph: graph,
-          tree: tree,
-          cache: cache,
-          lastv: null
-        };
-        this._datasets[datasetID] = ds;
+        this.getDataset('rapid_intro_graph');
       });
   }
 
@@ -172,22 +153,53 @@ export class MapWithAIService extends AbstractSystem {
       this._deferred.delete(handle);
     }
 
-    for (const [datasetID, ds] of Object.entries(this._datasets)) {
-      if (ds.cache.inflight) {
-        Object.values(ds.cache.inflight).forEach(controller => this._abortRequest(controller));
+    for (const [datasetID, ds] of this._datasets) {
+      if (ds.inflight) {
+        Object.values(ds.inflight).forEach(controller => controller.abort());
       }
-      ds.lastv = null;
+
       ds.graph = new Graph(this.context);
       ds.tree = new Tree(ds.graph, datasetID);
-      ds.cache = {
-        inflight: {},
-        loaded: new Set(),           // Set(tileID)
-        seen: new Set(),             // Set(entityID)
-        seenFirstNodeID: new Set(),  // Set(entityID)
-        splitWays: new Map()         // Map(originalID -> Set(Entity))
-      };
+      ds.inflight = {};
+      ds.loaded.clear();
+      ds.seen.clear();
+      ds.seenFirstNodeID.clear();
+      ds.splitWays.clear();
+      ds.lastv = null;
     }
+
+    this._XMLParser.reset();
+
     return Promise.resolve();
+  }
+
+
+  /**
+   * getDataset
+   * Get a dataset cache identified by the given datasetID.
+   * Create it if it doesn't exist yet.
+   * @param   {string}  datasetID  - the cache to get (or create)
+   * @return  {Object}  dataset cache
+   */
+  getDataset(datasetID) {
+    let ds = this._datasets.get(datasetID);
+    if (!ds) {
+      const graph = new Graph(this.context);
+      const tree = new Tree(graph, datasetID);
+      ds = {
+        id: datasetID,
+        graph: graph,
+        tree: tree,
+        inflight: {},
+        loaded: new Set(),           // Set<tileID>
+        seen: new Set(),             // Set<entityID>
+        seenFirstNodeID: new Set(),  // Set<entityID>
+        splitWays: new Map(),        // Map<originalID, Set<Entity>>
+        lastv: null
+      };
+      this._datasets.set(datasetID, ds);
+    }
+    return ds;
   }
 
 
@@ -198,7 +210,7 @@ export class MapWithAIService extends AbstractSystem {
    * @return  {Array}   Array of data (OSM Entities)
    */
   getData(datasetID) {
-    const ds = this._datasets[datasetID];
+    const ds = this._datasets.get(datasetID);
     if (!ds || !ds.tree || !ds.graph) return [];
 
     const extent = this.context.viewport.visibleExtent();
@@ -214,111 +226,169 @@ export class MapWithAIService extends AbstractSystem {
   loadTiles(datasetID) {
     if (this._paused) return;
 
-    let ds = this._datasets[datasetID];
-    let graph, tree, cache;
-
-    if (ds) {
-      graph = ds.graph;
-      tree = ds.tree;
-      cache = ds.cache;
-
-    } else {
-      // as tile requests arrive, setup the resources needed to hold the results
-      graph = new Graph(this.context);
-      tree = new Tree(graph, datasetID);
-      cache = {
-        inflight: {},
-        loaded: new Set(),           // Set<tileID>
-        seen: new Set(),             // Set<entityID>
-        seenFirstNodeID: new Set(),  // Set<entityID>
-        splitWays: new Map()         // Map<originalID, Set<Entity>>
-      };
-      ds = {
-        id: datasetID,
-        graph: graph,
-        tree: tree,
-        cache: cache,
-        lastv: null
-      };
-      this._datasets[datasetID] = ds;
-    }
-
     const context = this.context;
-    const gfx = context.systems.gfx;
-    const locations = context.systems.locations;
     const viewport = context.viewport;
 
-    if (ds.lastv === viewport.v) return;  // exit early if the view is unchanged
+    const ds = this.getDataset(datasetID);  // create caches, if needed
+    if (ds.lastv === viewport.v) return;    // exit early if the view is unchanged
     ds.lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const k of Object.keys(cache.inflight)) {
+    for (const k of Object.keys(ds.inflight)) {
       const wanted = tiles.find(tile => tile.id === k);
       if (!wanted) {
-        this._abortRequest(cache.inflight[k]);
-        delete cache.inflight[k];
+        ds.inflight[k].abort();
+        delete ds.inflight[k];
       }
     }
 
     for (const tile of tiles) {
-      if (cache.loaded.has(tile.id) || cache.inflight[tile.id]) continue;
-
-      if (locations) {
-        // Exit if this tile covers a blocked region (all corners are blocked)
-        const corners = tile.wgs84Extent.polygon().slice(0, 4);
-        const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
-        if (tileBlocked) {
-          cache.loaded.add(tile.id);  // don't try again
-          continue;
-        }
-      }
-
-      const resource = this._tileURL(ds, tile.wgs84Extent);
-      const controller = new AbortController();
-      fetch(resource, { signal: controller.signal })
-        .then(utilFetchResponse)
-        .then(xml => {
-          delete cache.inflight[tile.id];
-          if (!xml) return;
-          this._parseXML(ds, xml, tile, (err, result) => {
-            if (err) return;
-            graph.rebase(result, [graph], true);   // true = force replace entities
-            tree.rebase(result, true);
-            cache.loaded.add(tile.id);
-
-            gfx?.deferredRedraw();
-          });
-        })
-        .catch(e => {
-          if (e.name === 'AbortError') return;
-          console.error(e);  // eslint-disable-line
-        });
-
-      cache.inflight[tile.id] = controller;
+      this.loadTile(ds, tile);
     }
   }
 
 
+  /**
+   * loadTile
+   * Load a single tile of data
+   * @param  {Object}  ds - the dataset info
+   * @param  {Tile}    tile - a tile object
+   */
+  loadTile(ds, tile) {
+    if (!ds || this._paused) return;
+
+    const context = this.context;
+    const locations = context.systems.locations;
+    const tileID = tile.id;
+
+    if (ds.loaded.has(tileID) || ds.inflight[tileID]) return;
+
+    if (locations) {
+      // Exit if this tile covers a blocked region (all corners are blocked)
+      const corners = tile.wgs84Extent.polygon().slice(0, 4);
+      const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
+      if (tileBlocked) {
+        ds.loaded.add(tile.id);  // don't try again
+        return;
+      }
+    }
+
+    const url = this._tileURL(ds, tile.wgs84Extent);
+    const controller = new AbortController();
+    fetch(url, { signal: controller.signal })
+      .then(utilFetchResponse)
+      .then(xml => this._gotTile(xml, ds, tile))
+      .catch(e => {
+        if (e.name === 'AbortError') return;
+        console.error(e);  // eslint-disable-line
+      })
+      .finally(() => {
+        delete ds.inflight[tileID];
+      });
+
+    ds.inflight[tileID] = controller;
+  }
+
+
+  /**
+   * _gotTile
+   * Process the response from the tile fetch.
+   * @param  {Document}  xml - the xml content to parse
+   * @param  {Object}    ds - the dataset info
+   * @param  {Tile}      tile - a tile object
+   */
+  _gotTile(xml, ds, tile) {
+    if (!xml) return;  // ignore empty responses
+
+    const context = this.context;
+    const gfx = context.systems.gfx;
+
+    const graph = ds.graph;
+    const tree = ds.tree;
+    const tileID = tile.id;
+
+    const results = this._XMLParser.parse(xml, {
+      skipSeen: false,                   // expect duplicate wayIDs that are split
+      filter: new Set(['node', 'way'])   // don't expect 'relation' from this service
+    });
+
+    const entities = [];
+    for (const props of results.data) {
+      const entityID = props.id;
+
+      // add some extra metadata properties
+      Object.assign(props, {
+        __fbid__: entityID,
+        __service__: 'mapwithai',
+        __datasetid__: ds.id
+      });
+
+      if (props.type === 'node') {
+        if (ds.seen.has(entityID)) continue;   // can skip seen nodes
+        ds.seen.add(entityID);
+        entities.push(new OsmNode(context, props));
+
+      } else if (props.type === 'way') {
+        // The MapWithAI service uses a non-deterministic method for splitting ways into segments.
+        // This means that each response may have split the way differently, see Rapid#1288
+        // This is extra challenging because the user may accept some roads, store their edits to
+        // localStorage, refresh Rapid and restore their edits, and we'd expect their restored
+        // edits should still work with whatever ways we receive from the server.
+        // We work around this issue in `_connectSplitWays`
+
+        // If `orig_id` is present, it means that the way was split
+        // by the server, and we will need to reassemble the pieces.
+        const origID = props.orig_id;
+        if (origID) {
+          let splitWays = ds.splitWays.get(origID);
+          if (!splitWays) {
+            splitWays = new Set();
+            ds.splitWays.set(origID, splitWays);
+          }
+          splitWays.add(props);
+          continue;  // bail out, `_connectSplitWays` will handle this instead
+
+        } else {  // a normal unsplit way
+          if (ds.seen.has(entityID)) continue;   // can skip seen ways
+          ds.seen.add(entityID);
+
+          // Ignore duplicate buildings in the MS Buildings dataset.
+          // They will appear with unique entity id, but with the same nodelist, see Rapid#873
+          if (/^msBuildings/.test(ds.id)) {
+            const firstNodeID = props.nodes[0];
+            if (!firstNodeID || ds.seenFirstNodeID.has(firstNodeID)) continue;
+            ds.seenFirstNodeID.add(firstNodeID);
+          }
+
+          entities.push(new OsmWay(context, props));
+        }
+      }
+    }
+
+    // Try to reconnect split ways.
+    entities.push.apply(entities, this._connectSplitWays(ds));
+
+    graph.rebase(entities, [graph], true);   // true = force replace entities
+    tree.rebase(entities, true);
+    ds.loaded.add(tileID);
+    gfx?.deferredRedraw();
+  }
+
+
   graph(datasetID) {
-    const ds = this._datasets[datasetID];
-    return ds?.graph;
+    const ds = this.getDataset(datasetID);  // create caches, if needed
+    return ds.graph;
   }
 
 
   /* this is called to merge in the rapid_intro_graph */
   merge(datasetID, entities) {
-    const ds = this._datasets[datasetID];
-    if (!ds || !ds.tree || !ds.graph) return;
+    const ds = this.getDataset(datasetID);  // create caches, if needed
     ds.graph.rebase(entities);
     ds.tree.rebase(entities);
-  }
-
-
-  _abortRequest(controller) {
-    controller.abort();
   }
 
 
@@ -363,12 +433,12 @@ export class MapWithAIService extends AbstractSystem {
 
     const customUrlRoot = urlhash?.getParam('fb_ml_road_url');
     const urlRoot = customUrlRoot || APIROOT;
-    const url = urlRoot + '?' + mapwithaiQsString(qs, true);  // true = noencode
+    const url = urlRoot + '?' + MWAIQsString(qs, true);  // true = noencode
     return url;
 
 
     // This utilQsString does not sort the keys, because the MapWithAI service needs them to be ordered a certain way.
-    function mapwithaiQsString(obj, noencode) {
+    function MWAIQsString(obj, noencode) {
       // encode everything except special characters used in certain hash parameters:
       // "/" in map states, ":", ",", {" and "}" in background
       function softEncode(s) {
@@ -383,183 +453,34 @@ export class MapWithAIService extends AbstractSystem {
   }
 
 
-  _getLoc(attrs) {
-    const lon = attrs.lon?.value;
-    const lat = attrs.lat?.value;
-    return [ parseFloat(lon), parseFloat(lat) ];
-  }
-
-
-  _getNodes(xml) {
-    const elems = Array.from(xml.getElementsByTagName('nd'));
-    return elems.map(elem => 'n' + elem.attributes.ref.value);
-  }
-
-
-  _getTags(xml) {
-    const elems = Array.from(xml.getElementsByTagName('tag'));
-    const tags = {};
-    for (const elem of elems) {
-      const attrs = elem.attributes;
-      const k = (attrs.k.value ?? '').trim();
-      const v = (attrs.v.value ?? '').trim();
-      if (k && v) {
-        tags[k] = v;
-      }
-    }
-    return tags;
-  }
-
-
-  _getVisible(attrs) {
-    return (!attrs.visible || attrs.visible.value !== 'false');
-  }
-
-
-  _parseNode(obj, uid) {
-    const attrs = obj.attributes;
-    return new OsmNode(this.context, {
-      id: uid,
-      visible: this._getVisible(attrs),
-      loc: this._getLoc(attrs),
-      tags: this._getTags(obj)
-    });
-  }
-
-  _parseWay(obj, uid) {
-    const attrs = obj.attributes;
-    return new OsmWay(this.context, {
-      id: uid,
-      visible: this._getVisible(attrs),
-      tags: this._getTags(obj),
-      nodes: this._getNodes(obj),
-    });
-  }
-
-
-  _parseXML(dataset, xml, tile, callback) {
-    if (!xml || !xml.childNodes) {
-      return callback({ message: 'No XML', status: -1 });
-    }
-
-    const root = xml.childNodes[0];
-    const children = root.childNodes;
-    const handle = window.requestIdleCallback(() => {
-      this._deferred.delete(handle);
-      let results = [];
-      for (const child of children) {
-        const result = this._parseEntity(dataset, tile, child);
-        if (result) results.push(result);
-      }
-
-      results = results.concat(this._connectSplitWays(dataset));
-      callback(null, results);
-    });
-
-    this._deferred.add(handle);
-  }
-
-
-  _parseEntity(dataset, tile, element) {
-    const cache = dataset.cache;
-
-    const type = element.nodeName;
-    if (!['node', 'way'].includes(type)) return null;
-
-    let entityID, entity;
-    entityID = OsmEntity.fromOSM(type, element.attributes.id.value);
-
-    if (type === 'node') {
-      if (cache.seen.has(entityID)) {   // ignore nodes we've seen already
-        return null;
-      } else {
-        entity = this._parseNode(element, entityID);
-        cache.seen.add(entityID);
-      }
-
-    } else if (type === 'way') {
-
-      //   The MapWithAI service uses a non-deterministic method for splitting ways into segments.
-      //   This means that each request we issue may split the way differently, see Rapid#1288
-      //   This is extra challenging because the user may accept some roads, store their edits to
-      //   localStorage, refresh Rapid and restore their edits, and we'd expect their restored
-      //   edits should still work with whatever ways we receive from the server.
-      //   We work around this issue in `_connectSplitWays`
-
-      // If `orig_id` is present, it means that the way was split
-      // by the server, and we will need to reassemble the pieces.
-      if (element.attributes.orig_id) {
-        const origEntityID = OsmEntity.fromOSM(type, element.attributes.orig_id.value);
-        entity = this._parseWay(element, entityID);
-        let ways = cache.splitWays.get(origEntityID);
-        if (!ways) {
-          ways = new Set();
-          cache.splitWays.set(origEntityID, ways);
-        }
-        ways.add(entity);
-        return null;   // bail out, `_connectSplitWays` will handle this instead
-
-      } else {  // a normal unsplit way
-        if (cache.seen.has(entityID)) {   // ignore ways we've seen already
-          return null;
-        } else {
-          entity = this._parseWay(element, entityID);
-          cache.seen.add(entityID);
-
-          // Ignore duplicate buildings in the MS Buildings dataset.
-          // They will appear with unique entity id, but with the same nodelist, see Rapid#873
-          if (/^msBuildings/.test(dataset.id)) {
-            const firstNodeID = entity.nodes[0];
-            if (cache.seenFirstNodeID.has(firstNodeID)) {
-              return null;
-            }
-            cache.seenFirstNodeID.add(firstNodeID);
-          }
-
-        }
-      }
-
-    } else {
-      return null;
-    }
-
-    const metadata = {
-      __fbid__: entityID,
-      __service__: 'mapwithai',
-      __datasetid__: dataset.id
-    };
-
-    // Adds metadata props directly
-    Object.assign(entity.props, metadata);
-    return entity;
-  }
-
-
   /**
    * _connectSplitWays
    * Call this sometimes to reassemble ways that were split by the server.
+   * @param  {Object}  ds - the dataset info
    */
-  _connectSplitWays(dataset) {
-    const graph = dataset.graph;
-    const cache = dataset.cache;
+  _connectSplitWays(ds) {
+    const context = this.context;
+    const graph = ds.graph;
     const results = [];
 
-    for (const [origEntityID, ways] of cache.splitWays) {
-      let survivor = graph.hasEntity(origEntityID);   // if we've done this before, the graph will have it
+    // Check each way that shares this `origID`.
+    // Pick one to be the "survivor" (it doesn't matter which one).
+    // Merge the nodes into the survivor (this will bump internal version `v`, so it gets redrawn)
+    //
+    // some implementation notes:
+    // 1. Note that the "ways" here haven't been constructed as Entities yet, they are just props.
+    // 2. `actionJoin` is similar to this, but does more than we need and uses `osmJoinWays`,
+    // 3. `osmJoinWays` could almost do this, but it only can join head-tail, it can't
+    //  deal with situations where ways partially overlap or reverse, which we get from this server.
+    //  see examples below
 
-      // Check each way that shares this `origEntityID`.
-      // Pick one to be the "survivor" (it doesn't matter which one).
-      // Merge the nodes into the survivor (this will bump internal version `v`, so it gets redrawn)
-      //
-      // some implementation notes:
-      // 1. `actionJoin` is similar to this, but does more than we need and uses `osmJoinWays`,
-      // 2. `osmJoinWays` could almost do this, but it only can join head-tail, it can't
-      //  deal with situations where ways partially overlap or reverse, which we get from this server.
-      //  see examples below
+    for (const [origID, ways] of ds.splitWays) {
+      let survivor = graph.hasEntity(origID);   // if we've done this before, the graph will have it
 
       for (const candidate of ways) {
         if (!survivor || !survivor.nodes.length) {   // first time, just pick first way we see.
-          survivor = candidate.update({ id: origEntityID });  // but use the original (stable) id
+          candidate.id = origID;                     // but use the original (stable) id
+          survivor = new OsmWay(context, candidate);
           ways.delete(candidate);
           continue;
         }
@@ -634,23 +555,14 @@ export class MapWithAIService extends AbstractSystem {
           s++;
         }
 
-        ways.delete(candidate);    // remove candidate
-        survivor = survivor.update({ nodes: nodeIDs });   // note, update bumps 'v' version automatically
+        ways.delete(candidate);            // remove candidate
+        survivor.props.nodes = nodeIDs;    // update nodelist in-place, hope this is ok.
+        survivor.updateGeometry(graph).touch();
       }
 
-
-      // Include the survivor entity in the result.
-      // (calling code will merge it into the graph).
       if (survivor) {
-        const metadata = {
-          __fbid__: survivor.id,
-          __service__: 'mapwithai',
-          __datasetid__: dataset.id
-        };
-        Object.assign(survivor.props, metadata);
         results.push(survivor);
       }
-
     }
 
     return results;

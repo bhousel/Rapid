@@ -291,7 +291,7 @@ export class EsriService extends AbstractSystem {
     ds.layer = null;   // the schema info will live here
 
     // Experiment: cleanup the `licenseInfo` field by removing styles. (not used currently)
-    // We had consider showing these to the user, but they could instead click "more info"
+    // We had considered showing these to the user, but they could instead click "more info"
     // and see all of this information and more on the ArcGIS page.
     //  const license = select(document.createElement('div'));
     //  license.html(ds.licenseInfo);       // set innerHtml

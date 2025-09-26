@@ -1,12 +1,11 @@
 import { Tiler, Viewport } from '@rapid-sdk/math';
-import { utilArrayChunk, utilArrayGroupBy, utilArrayUniq, utilObjectOmit, utilQsString } from '@rapid-sdk/util';
+import { utilArrayChunk, utilArrayUniq, utilObjectOmit, utilQsString } from '@rapid-sdk/util';
 import _throttle from 'lodash-es/throttle.js';
 import { osmAuth } from 'osm-auth';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { JXON } from '../util/jxon.js';
-import { createOsmEntity, OsmEntity, OsmNode, OsmRelation, OsmWay, Marker } from '../data/index.js';
-
+import { OsmEntity, Marker } from '../data/index.js';
 import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.js';
 import { utilFetchResponse } from '../util/index.js';
 
@@ -47,8 +46,8 @@ export class OsmService extends AbstractSystem {
     // Using JSON can be much more efficient because it avoids the overhead
     // of parsing and creating a Document and DOM objects.
     this.preferJSON = true;
-    this.JSONParser = new OsmJSONParser();
-    this.XMLParser = new OsmXMLParser();
+    this._JSONParser = new OsmJSONParser();
+    this._XMLParser = new OsmXMLParser();
 
     this._tileCache = {};
     this._noteCache = {};
@@ -211,8 +210,8 @@ export class OsmService extends AbstractSystem {
     spatial.clearCache('osm-data');
     spatial.clearCache('osm-notes');
 
-    this.JSONParser.reset();
-    this.XMLParser.reset();
+    this._JSONParser.reset();
+    this._XMLParser.reset();
 
     return Promise.resolve();
   }
@@ -370,9 +369,9 @@ export class OsmService extends AbstractSystem {
             try {
               let results;
               if (path.includes('.json')) {
-                results = this.JSONParser.parse(content, options);
+                results = this._JSONParser.parse(content, options);
               } else {
-                results = this.XMLParser.parse(content, options);
+                results = this._XMLParser.parse(content, options);
               }
               return callback(null, results);
             } catch (err2) {
@@ -624,7 +623,7 @@ export class OsmService extends AbstractSystem {
           resolve();
         };
 
-        this.loadFromAPI('/api/0.6/users${json}?users=' + chunk.join(), errback, options);
+        this.loadFromAPI(`/api/0.6/users${json}?users=` + chunk.join(), errback, options);
       });
       promises.push(prom);
     }
