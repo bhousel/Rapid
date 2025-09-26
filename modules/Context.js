@@ -242,7 +242,7 @@ export class Context extends EventEmitter {
     if (z < MINZOOM) return;  // this would fire off too many API requests
 
     osm.loadTiles((err, results) => {
-      if (results) {
+      if (Array.isArray(results?.data)) {
         editor?.merge(results.data, results.seenIDs);
       }
     });
@@ -255,7 +255,7 @@ export class Context extends EventEmitter {
     if (!osm || !this.editable()) return;
 
     osm.loadTileAtLoc(loc, (err, results) => {
-      if (results) {
+      if (Array.isArray(results?.data)) {
         editor?.merge(results.data, results.seenIDs);
       }
     });
@@ -272,13 +272,13 @@ export class Context extends EventEmitter {
 
     return osm.loadEntityAsync(entityID)
       .then(results => {
-        if (results) {
+      if (Array.isArray(results?.data)) {
           editor?.merge(results.data, results.seenIDs);
         }
       })
       .then(() => osm.loadEntityRelationsAsync(entityID))
       .then(results => {
-        if (results) {
+      if (Array.isArray(results?.data)) {
           editor?.merge(results.data, results.seenIDs);
         }
       });
