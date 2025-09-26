@@ -39,10 +39,11 @@ import { DOMParser } from '@xmldom/xmldom';
  *
  * The supported "types" include:
  *  'node', 'way', 'relation',    (sometimes called "elements")
+ *  'changeset',
  *  'note',
  *  'user',
+ *  'user_block',
  *  'preferences',
- *  'changeset',
  *  'api', 'policy'  (returned from the `/capabilities` API call)
  *  'bounds'         (returned with the `/map` API call)
  */
@@ -57,18 +58,19 @@ export class OsmXMLParser {
     this._parseNode = this._parseNode.bind(this);
     this._parseWay = this._parseWay.bind(this);
     this._parseRelation = this._parseRelation.bind(this);
+    this._parseChangeset = this._parseChangeset.bind(this);
     this._parseNote = this._parseNote.bind(this);
     this._parseComments = this._parseComments.bind(this);
     this._parseUser = this._parseUser.bind(this);
+    this._parseUserBlock = this._parseUserBlock.bind(this);
     this._parsePreferences = this._parsePreferences.bind(this);
-    this._parseChangeset = this._parseChangeset.bind(this);
     this._parseApi = this._parseApi.bind(this);
     this._parsePolicy = this._parsePolicy.bind(this);
     this._parseBounds = this._parseBounds.bind(this);
     this._getTags = this._getTags.bind(this);
 
     this.types = new Set([
-      'node', 'way', 'relation', 'note', 'user', 'preferences', 'changeset', 'api', 'policy', 'bounds'
+      'node', 'way', 'relation', 'changeset', 'note', 'user', 'user_block', 'preferences', 'api', 'policy', 'bounds'
     ]);
   }
 
@@ -164,6 +166,9 @@ export class OsmXMLParser {
       } else if (child.nodeName === 'user' && filter.has('user')) {
         id = 'user' + child.attributes.getNamedItem('id').value;
         parser = this._parseUser;
+
+      } else if (child.nodeName === 'user_block' && filter.has('user_block')) {
+        parser = this._parseUserBlock;
 
       } else if (child.nodeName === 'preferences' && filter.has('preferences')) {
         parser = this._parsePreferences;
@@ -407,9 +412,7 @@ export class OsmXMLParser {
    * @return  {Object}   Object of parsed properties
    */
   _parseUser(xml) {
-    const props = {
-      type: 'user'
-    };
+    const props = { type: 'user' };
 
     const attrs = getCleanAttributes(xml);
     for (const [k, v] of Object.entries(attrs)) {  // grab 'id', 'display_name', 'account_created'
@@ -482,6 +485,47 @@ export class OsmXMLParser {
       if (sent) {
         props.messages.sent = getCleanAttributes(sent);
       }
+    }
+
+    return props;
+  }
+
+
+  /**
+   * _parseUserBlock
+   * Parse the given `<user_block>` element.
+   * @param   {DOMNode}  xml - the DOM node
+   * @return  {Object}   Object of parsed properties
+   */
+  _parseUserBlock(xml) {
+    const props = { type: 'user_block' };
+
+    const attrs = getCleanAttributes(xml);
+    for (const [k, v] of Object.entries(attrs)) {  // grab 'id', 'created_at', 'updated_at', etc.
+      // if (props.hasOwnProperty(k)) continue;  // can't happen, no props to overwrite
+      props[k] = v;
+    }
+
+    const user = xml.getElementsByTagName('user')[0];
+    if (user) {
+      props.user = getCleanAttributes(user);
+    }
+
+    const creator = xml.getElementsByTagName('creator')[0];
+    if (creator) {
+      props.creator = getCleanAttributes(creator);
+    }
+
+    const revoker = xml.getElementsByTagName('revoker')[0];
+    if (revoker) {
+      props.revoker = getCleanAttributes(revoker);
+    }
+
+    const reason = xml.getElementsByTagName('reason')[0];
+    if (reason) {
+      props.reason = reason.textContent;
+    } else {
+      props.reason = '';
     }
 
     return props;

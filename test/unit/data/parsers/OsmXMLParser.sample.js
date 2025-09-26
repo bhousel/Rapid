@@ -345,6 +345,37 @@ export const usersXML = `
 
 
 // ----------------------------------------
+// User Blocks
+
+// User block, basic info, needs_view=true
+export const userBlock1 = `
+<user_block id="1" created_at="2025-09-01 00:00:00Z" updated_at="2025-09-01 00:00:01Z" ends_at="2025-09-01 00:00:02Z" needs_view="true">
+  <user uid="100" user="bhousel"/>
+  <creator uid="200" user="lgtm"/>
+  <revoker uid="200" user="lgtm"/>
+  <reason>blocked for spamming</reason>
+</user_block>`;
+
+// User block, no reason, needs_view=false
+export const userBlock2 = `
+<user_block id="2" created_at="2025-09-02 00:00:00Z" updated_at="2025-09-02 00:00:01Z" ends_at="2025-09-02 00:00:02Z" needs_view="false">
+  <user uid="100" user="bhousel"/>
+  <creator uid="200" user="lgtm"/>
+</user_block>`;
+
+// User Blocks are returned as direct descendant childNodes of the `osm` element.
+// This covers responses to calls like:
+// GET /api/0.6/user_blocks/#id
+// GET /user/blocks/active
+export const userBlocksXML = `
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="OpenStreetMap server" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+  ${userBlock1}
+  ${userBlock2}
+</osm>`;
+
+
+// ----------------------------------------
 // Preferences
 
 // Preferences of the logged-in user are returned in a `preferences` element.
@@ -844,6 +875,31 @@ export const user2Result = {
   changesets: { count: 999 },
   traces: { count: 999 },
   blocks: { received: { count: 0, active: 0 } }
+};
+
+export const userBlock1Result = {
+  type: 'user_block',
+  id: '1',
+  created_at: new Date('2025-09-01 00:00:00Z'),
+  updated_at: new Date('2025-09-01 00:00:01Z'),
+  ends_at: new Date('2025-09-01 00:00:02Z'),
+  needs_view: true,
+  user: { uid: '100', user: 'bhousel' },
+  creator: { uid: '200', user: 'lgtm' },
+  revoker: { uid: '200', user: 'lgtm' },
+  reason: 'blocked for spamming'
+};
+
+export const userBlock2Result = {
+  type: 'user_block',
+  id: '2',
+  created_at: new Date('2025-09-02 00:00:00Z'),
+  updated_at: new Date('2025-09-02 00:00:01Z'),
+  ends_at: new Date('2025-09-02 00:00:02Z'),
+  needs_view: false,
+  user: { uid: '100', user: 'bhousel' },
+  creator: { uid: '200', user: 'lgtm' },
+  reason: ''
 };
 
 export const preferencesResult = {

@@ -138,6 +138,23 @@ describe('OsmJSONParser', () => {
       assert.deepEqual(data[1], sample.user2Result);
     });
 
+    it('parses single user block', () => {
+      const results = parser.parse(sample.userBlockJSON);
+      const data = results.data;
+      assert.isArray(data);
+      assert.lengthOf(data, 1);
+      assert.deepEqual(data[0], sample.userBlock1Result);
+    });
+
+    it('parses multiple user blocks', () => {
+      const results = parser.parse(sample.userBlocksJSON);
+      const data = results.data;
+      assert.isArray(data);
+      assert.lengthOf(data, 2);
+      assert.deepEqual(data[0], sample.userBlock1Result);
+      assert.deepEqual(data[1], sample.userBlock2Result);
+    });
+
     it('parses preferences', () => {
       const results = parser.parse(sample.preferencesJSON);
       const data = results.data;

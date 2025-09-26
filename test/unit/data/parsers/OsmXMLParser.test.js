@@ -133,6 +133,15 @@ describe('OsmXMLParser', () => {
       assert.deepEqual(data[1], sample.user2Result);
     });
 
+    it('parses user blocks', () => {
+      const results = parser.parse(sample.userBlocksXML);
+      const data = results.data;
+      assert.isArray(data);
+      assert.lengthOf(data, 2);
+      assert.deepEqual(data[0], sample.userBlock1Result);
+      assert.deepEqual(data[1], sample.userBlock2Result);
+    });
+
     it('parses preferences', () => {
       const results = parser.parse(sample.preferencesXML);
       const data = results.data;

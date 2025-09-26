@@ -41,10 +41,11 @@
  *
  * The supported "types" include:
  *  'node', 'way', 'relation',    (sometimes called "elements")
+ *  'changeset',
  *  'note',
  *  'user',
+ *  'user_block',
  *  'preferences',
- *  'changeset',
  *  'api', 'policy'  (returned from the `/capabilities` API call)
  *  'bounds'         (returned with the `/map` API call)
  */
@@ -59,17 +60,18 @@ export class OsmJSONParser {
     this._parseNode = this._parseNode.bind(this);
     this._parseWay = this._parseWay.bind(this);
     this._parseRelation = this._parseRelation.bind(this);
+    this._parseChangeset = this._parseChangeset.bind(this);
     this._parseNote = this._parseNote.bind(this);
     this._parseComments = this._parseComments.bind(this);
     this._parseUser = this._parseUser.bind(this);
+    this._parseUserBlock = this._parseUserBlock.bind(this);
     this._parsePreferences = this._parsePreferences.bind(this);
-    this._parseChangeset = this._parseChangeset.bind(this);
     this._parseApi = this._parseApi.bind(this);
     this._parsePolicy = this._parsePolicy.bind(this);
     this._parseBounds = this._parseBounds.bind(this);
 
     this.types = new Set([
-      'node', 'way', 'relation', 'note', 'user', 'preferences', 'changeset', 'api', 'policy', 'bounds'
+      'node', 'way', 'relation', 'changeset', 'note', 'user', 'user_block', 'preferences', 'api', 'policy', 'bounds'
     ]);
   }
 
@@ -213,6 +215,24 @@ export class OsmJSONParser {
       }
     }
 
+    // 'changesets'
+    const changesets = (json.changeset ? [json.changeset] : json.changesets) || [];
+    if (changesets.length && filter.has('changeset')) {
+      for (const obj of changesets) {
+        const id = 'c' + obj.id;
+
+        if (skipSeen) {  // skip things we've seen before
+          if (this._seen.has(id)) continue;
+          this._seen.add(id);
+        }
+
+        const parsed = this._parseChangeset(obj, id);
+        if (parsed) {
+          results.data.push(parsed);
+        }
+      }
+    }
+
     // 'users'
     const users = (json.user ? [json.user] : json.users) || [];
     if (users.length && filter.has('user')) {
@@ -231,18 +251,11 @@ export class OsmJSONParser {
       }
     }
 
-    // 'changesets'
-    const changesets = (json.changeset ? [json.changeset] : json.changesets) || [];
-    if (changesets.length && filter.has('changeset')) {
-      for (const obj of changesets) {
-        const id = 'c' + obj.id;
-
-        if (skipSeen) {  // skip things we've seen before
-          if (this._seen.has(id)) continue;
-          this._seen.add(id);
-        }
-
-        const parsed = this._parseChangeset(obj, id);
+    // 'user_blocks'
+    const user_blocks = (json.user_block ? [json.user_block] : json.user_blocks) || [];
+    if (user_blocks.length && filter.has('user_block')) {
+      for (const obj of user_blocks) {
+        const parsed = this._parseUserBlock(obj);
         if (parsed) {
           results.data.push(parsed);
         }
@@ -408,6 +421,24 @@ export class OsmJSONParser {
 
     if (!props.roles) {  // make sure this property always exists
       props.roles = [];
+    }
+
+    return props;
+  }
+
+
+  /**
+   * _parseUserBlock
+   * Parse the given `user_block` object.
+   * @param   {Object}  obj - the source object
+   * @return  {Object}  Object of parsed properties
+   */
+  _parseUserBlock(obj) {
+    const props = { type: 'user_block' };
+    copyProps(props, obj);
+
+    if (!props.reason) {  // make sure this property always exists
+      props.reason = '';
     }
 
     return props;

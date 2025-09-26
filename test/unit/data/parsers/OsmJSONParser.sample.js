@@ -542,6 +542,55 @@ export const usersJSON = {
 
 
 // ----------------------------------------
+// User Blocks
+
+// User block, basic info, needs_view=true
+export const userBlock1 = {
+  "id": 1,
+  "created_at": "2025-09-01 00:00:00Z",
+  "updated_at": "2025-09-01 00:00:01Z",
+  "ends_at": "2025-09-01 00:00:02Z",
+  "needs_view": true,
+  "user": { "uid": 100, "user": "bhousel" },
+  "creator": { "uid": 200, "user": "lgtm" },
+  "revoker": { "uid": 200, "user": "lgtm" },
+  "reason": "blocked for spamming"
+};
+
+// User block, no reason, needs_view=false
+export const userBlock2 = {
+  "id": 2,
+  "created_at": "2025-09-02 00:00:00Z",
+  "updated_at": "2025-09-02 00:00:01Z",
+  "ends_at": "2025-09-02 00:00:02Z",
+  "needs_view": false,
+  "user": { "uid": 100, "user": "bhousel" },
+  "creator": { "uid": 200, "user": "lgtm" }
+};
+
+// A single user block will be returned in a `user_block` property.
+// GET /api/0.6/user_blocks/#id
+export const userBlockJSON = {
+  "version": "0.6",
+  "generator": "OpenStreetMap server",
+  "copyright": "OpenStreetMap and contributors",
+  "attribution": "http://www.openstreetmap.org/copyright",
+  "license": "http://opendatacommons.org/licenses/odbl/1-0/",
+  "user_block": userBlock1
+};
+
+// A user may have multiple active blocks returned in a `user_blocks` Array property.
+// GET /user/blocks/active
+export const userBlocksJSON = {
+  "version": "0.6",
+  "generator": "OpenStreetMap server",
+  "copyright": "OpenStreetMap and contributors",
+  "attribution": "http://www.openstreetmap.org/copyright",
+  "license": "http://opendatacommons.org/licenses/odbl/1-0/",
+  "user_blocks": [ userBlock1, userBlock2 ]
+};
+
+// ----------------------------------------
 // Preferences
 
 // Preferences of the logged-in user are returned in a `preferences` property.
@@ -717,6 +766,8 @@ export {
   note2Result,
   user1Result,
   user2Result,
+  userBlock1Result,
+  userBlock2Result,
   preferencesResult,
   apiResult,
   policyResult

@@ -1004,14 +1004,14 @@ export class OsmService extends AbstractSystem {
   // GET /api/0.6/map?bbox=
   loadTiles(callback) {
     if (this._paused || this.getRateLimit()) {
-      if (callback) callback(null, []);
+      if (callback) callback(null, { data: [] });
       return;
     }
 
     const cache = this._tileCache;
     const viewport = this.context.viewport;
     if (cache.lastv === viewport.v) {  // exit early if the view is unchanged
-      if (callback) callback(null, []);
+      if (callback) callback(null, { data: [] });
       return;
     }
 
