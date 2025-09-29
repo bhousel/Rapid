@@ -278,6 +278,7 @@ export class MapRouletteService extends AbstractSystem {
         .then(challenge => {
           cache.challengeRequest.set(challengeID, { status: 'loaded' });
 
+          challenge.id = challenge.id.toString();    // force to string
           challenge.isVisible = challenge.enabled && !challenge.deleted;
 
           // Update task statuses
@@ -483,7 +484,7 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * getClosed
-   * Get details about all taskks closed in this session
+   * Get details about all tasks closed in this session
    * @return  {Array<*>}  Array of objects
    */
   getClosed() {
@@ -587,7 +588,8 @@ export class MapRouletteService extends AbstractSystem {
    * @return  {string}  the url
    */
   itemURL(task) {
-    return `https://maproulette.org/challenge/${task.props.parentId}/task/${task.id}`;
+    const challengeID = task.props.parentId;
+    return `https://maproulette.org/challenge/${challengeID}/task/${task.id}`;
   }
 
 
