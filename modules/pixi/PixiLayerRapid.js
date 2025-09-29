@@ -207,7 +207,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const dsEnabled = (dataset.added && dataset.enabled);
     if (!dsEnabled) return;
 
-    const service = context.services[dataset.service];  // 'mapwithai' or 'esri'
+    const service = context.services[dataset.serviceID];  // 'mapwithai', 'esri', 'overture'
     if (!service?.started) return;
 
     let useConflation = dataset.conflated;
@@ -221,7 +221,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
     // Overture data isn't editable, nor conflatable... yet.
     let dsGraph = null;
-    if (dataset.service !== 'overture') {
+    if (dataset.serviceID !== 'overture') {
        dsGraph = service.graph(datasetID);
     }
 
@@ -234,7 +234,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const data = { points: [], vertices: new Set(), lines: [], polygons: [] };
 
     /* Facebook AI/ML */
-    if (dataset.service === 'mapwithai') {
+    if (dataset.serviceID === 'mapwithai') {
       if (zoom >= 15) {  // avoid firing off too many API requests
         service.loadTiles(datasetID);  // fetch more
       }
@@ -243,7 +243,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       const entities = service.getData(datasetID)
         .filter(entity => entity.type === 'way' && !isAcceptedOrIgnored(entity));
 
-      // fb_ai service gives us roads and buildings together,
+      // MapWithAIService gives us roads and buildings together,
       // so filter further according to which dataset we're drawing
       if (dataset.id === 'fbRoads'
         || dataset.id === 'omdFootways'
@@ -265,7 +265,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       }
 
     /* ESRI ArcGIS */
-    } else if (dataset.service === 'esri') {
+    } else if (dataset.serviceID === 'esri') {
       if (zoom >= 14) {  // avoid firing off too many API requests
         service.loadTiles(datasetID);  // fetch more
       }
@@ -283,7 +283,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         }
       }
 
-    } else if (dataset.service === 'overture') {
+    } else if (dataset.serviceID === 'overture') {
       if (zoom >= 16) {  // avoid firing off too many API requests
         service.loadTiles(datasetID);  // fetch more
       }

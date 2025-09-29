@@ -117,6 +117,30 @@ describe('EsriService', () => {
       return _esri.resetAsync();
     });
 
+    describe('getAvailableDatasets', () => {
+      it('returns datasets provided by this service', () => {
+        const results = _esri.getAvailableDatasets();
+        assert.isArray(results);
+        assert.lengthOf(results, 198);    // expect 198 datasets loaded in 2 pages
+
+        const ds0 = results[0];
+        assert.instanceOf(ds0, Rapid.RapidDataset);
+        assert.strictEqual(ds0.id, '660457fac76344b195c555e0dff386ff');
+        assert.strictEqual(ds0.label, 'Africa Buildings');
+      });
+    });
+
+    describe('getDataUsed', () => {
+      it('rewrites the data used string for the Google Buildings datasets', () => {
+        const result = _esri.getDataUsed('Google Buildings for Argentina');
+        assert.strictEqual(result, 'Google Open Buildings');
+      });
+      it('doesn\'t rewrite the data used string other datasets', () => {
+        const result = _esri.getDataUsed('United States Addresses');
+        assert.strictEqual(result, 'United States Addresses');
+      });
+    });
+
   });
 
 });

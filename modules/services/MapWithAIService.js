@@ -25,7 +25,7 @@ export class MapWithAIService extends AbstractSystem {
     super(context);
     this.id = 'mapwithai';
     this.requiredDependencies = new Set(['spatial']);
-    this.optionalDependencies = new Set(['gfx', 'locations', 'rapid', 'urlhash']);
+    this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash']);
 
     this._XMLParser = new OsmXMLParser();
     this._tiler = new Tiler().zoomRange(TILEZOOM);
@@ -73,7 +73,7 @@ export class MapWithAIService extends AbstractSystem {
       id: 'fbRoads',
 //      conflated: true,
       conflated: false,
-      service: 'mapwithai',
+      serviceID: 'mapwithai',
       categories: new Set(['meta', 'roads', 'featured']),
       dataUsed: ['mapwithai', 'Facebook Roads'],
       itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook',
@@ -86,7 +86,7 @@ export class MapWithAIService extends AbstractSystem {
       id: 'msBuildings',
 //      conflated: true,
       conflated: false,
-      service: 'mapwithai',
+      serviceID: 'mapwithai',
       categories: new Set(['microsoft', 'buildings', 'featured']),
       dataUsed: ['mapwithai', 'Microsoft Buildings'],
       itemUrl: 'https://github.com/microsoft/GlobalMLBuildingFootprints',
@@ -98,7 +98,7 @@ export class MapWithAIService extends AbstractSystem {
 //    const omdFootways = new RapidDataset(context, {
 //      id: 'omdFootways',
 //      conflated: true,
-//      service: 'mapwithai',
+//      serviceID: 'mapwithai',
 //      categories: new Set(['meta', 'footways', 'featured']),
 //      tags: new Set(['opendata']),
 //      overlay: {
@@ -117,7 +117,7 @@ export class MapWithAIService extends AbstractSystem {
 //    const metaSyntheticFootways = new RapidDataset(context, {
 //      id: 'metaSyntheticFootways',
 //      conflated: true,
-//      service: 'mapwithai',
+//      serviceID: 'mapwithai',
 //      categories: new Set(['meta', 'footways', 'featured', 'preview']),
 //      tags: new Set(['opendata']),
 //      dataUsed: ['mapwithai', 'Meta Synthetic Footways'],
@@ -131,7 +131,7 @@ export class MapWithAIService extends AbstractSystem {
       id: 'rapid_intro_graph',
       hidden: true,
       conflated: false,
-      service: 'mapwithai',
+      serviceID: 'mapwithai',
       categories: new Set(['meta', 'roads']),
       color: '#da26d3',
       dataUsed: [],

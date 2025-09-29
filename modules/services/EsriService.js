@@ -107,7 +107,7 @@ export class EsriService extends AbstractSystem {
       const dataset = new RapidDataset(this.context, {
         id: d.id,
         conflated: false,
-        service: 'esri',
+        serviceID: 'esri',
         categories: categories,
         dataUsed: ['esri', this.getDataUsed(d.title)],
         label: d.title,
@@ -124,7 +124,7 @@ export class EsriService extends AbstractSystem {
 //      // Test running building layers through MapWithAI conflation service
 //      if (categories.has('buildings')) {
 //        dataset.conflated = true;
-//        dataset.service = 'mapwithai';
+//        dataset.serviceID = 'mapwithai';
 //      }
 
       return dataset;

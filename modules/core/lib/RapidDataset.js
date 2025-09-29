@@ -12,7 +12,7 @@ export class RapidDataset {
     this.context = context;
 
     this.id = props.id;
-    this.service = props.service;                      // 'esri', 'mapwithai', 'overture'
+    this.serviceID = props.serviceID;                  // 'esri', 'mapwithai', 'overture'
     this.categories = props.categories ?? new Set();   // e.g. 'buildings' 'addresses'
     this.tags = props.tags ?? new Set();               // e.g. 'opendata' - (flags like categories but not visible)
     this.color = props.color ?? RAPID_MAGENTA;
@@ -53,19 +53,19 @@ export class RapidDataset {
     else type = 'points';
 
     const assets = this.context.systems.assets;
-    return assets.getFileURL(`img/data-${type}.png`);
+    return assets?.getFileURL(`img/data-${type}.png`) || '';
   }
 
   // Attempt to localize the dataset name, fallback to 'label' or 'id'
   getLabel() {
     const l10n = this.context.systems.l10n;
-    return this.labelStringID ? l10n.t(this.labelStringID) : (this._label || this.id);
+    return (l10n && this.labelStringID) ? l10n.t(this.labelStringID) : (this._label || this.id);
   }
 
   // Attempt to localize the dataset description, fallback to empty string
   getDescription() {
     const l10n = this.context.systems.l10n;
-    return this.descriptionStringID ? l10n.t(this.descriptionStringID) : (this._description || '');
+    return (l10n && this.descriptionStringID) ? l10n.t(this.descriptionStringID) : (this._description || '');
   }
 
 }
