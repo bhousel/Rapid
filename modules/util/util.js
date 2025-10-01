@@ -81,11 +81,10 @@ export function geojsonExtent(geojson) {
 export function utilHighlightEntities(context, entityIDs, highlighted) {
   const editor = context.systems.editor;
   const gfx = context.systems.gfx;
+  const scene = gfx?.scene;
+  const layer = scene?.layers.get('osm');
 
-  const scene = gfx.scene;
-  if (!scene) return;  // called too soon?
-
-  const layer = scene.layers.get('osm');
+  if (!gfx || !scene || !layer) return;  // called too soon?
 
   if (highlighted) {
     for (const entityID of entityIDs) {

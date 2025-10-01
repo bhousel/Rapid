@@ -259,38 +259,42 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * _imageryChanged
-   * Called whenever the imagery changes
-   * Also used to push changes in imagery state to the urlhash
+   * Called whenever the imagery changes.
+   * This will update the urlhash, trigger a redraw, and emit an 'imagerychange' event.
    */
   _imageryChanged() {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const urlhash = context.systems.urlhash;
+
     const baseLayer = this._baseLayer;
-    if (this.context.inIntro || !baseLayer) return;
+    if (urlhash && baseLayer && !context.inIntro) {
+      // Gather info about enabled base imagery
+      let baseLayerID = baseLayer.key;  // note: use `key` here - for Wayback it will include the date
+      if (baseLayerID === 'custom') {
+        baseLayerID = `custom:${baseLayer.template}`;
+      }
 
-    const urlhash = this.context.systems.urlhash;
-    if (!urlhash) return;
+      // Gather info about enabled overlay imagery (ignore locator)
+      let overlayIDs = [];
+      for (const overlay of this._overlayLayers.values()) {
+        if (overlay.isLocatorOverlay()) continue;
+        overlayIDs.push(overlay.id);
+      }
 
-    // Gather info about enabled base imagery
-    let baseLayerID = baseLayer.key;  // note: use `key` here - for Wayback it will include the date
-    if (baseLayerID === 'custom') {
-      baseLayerID = `custom:${baseLayer.template}`;
+      // Update hash params: 'background', 'overlays', 'offset'
+      urlhash.setParam('background', baseLayerID);
+      urlhash.setParam('overlays', overlayIDs.length ? overlayIDs.join(',') : null);
+
+      const meters = geoOffsetToMeters(baseLayer.offset);
+      const EPSILON = 0.01;
+      const x = +meters[0].toFixed(2);
+      const y = +meters[1].toFixed(2);
+      urlhash.setParam('offset', (Math.abs(x) > EPSILON || Math.abs(y) > EPSILON) ? `${x},${y}` : null);
     }
 
-    // Gather info about enabled overlay imagery (ignore locator)
-    let overlayIDs = [];
-    for (const overlay of this._overlayLayers.values()) {
-      if (overlay.isLocatorOverlay()) continue;
-      overlayIDs.push(overlay.id);
-    }
-
-    // Update hash params: 'background', 'overlays', 'offset'
-    urlhash.setParam('background', baseLayerID);
-    urlhash.setParam('overlays', overlayIDs.length ? overlayIDs.join(',') : null);
-
-    const meters = geoOffsetToMeters(baseLayer.offset);
-    const EPSILON = 0.01;
-    const x = +meters[0].toFixed(2);
-    const y = +meters[1].toFixed(2);
-    urlhash.setParam('offset', (Math.abs(x) > EPSILON || Math.abs(y) > EPSILON) ? `${x},${y}` : null);
+    gfx?.immediateRedraw();
+    this.emit('imagerychange');
   }
 
 
@@ -395,7 +399,6 @@ export class ImagerySystem extends AbstractSystem {
     this._baseLayer = (!fail ? source : this.getSourceByID('none'));
 
     this._imageryChanged();
-    this.emit('imagerychange');
     return this;
   }
 
@@ -496,7 +499,6 @@ export class ImagerySystem extends AbstractSystem {
       this._overlayLayers.set(source.id, source);
     }
     this._imageryChanged();
-    this.emit('imagerychange');
   }
 
 
@@ -520,7 +522,6 @@ export class ImagerySystem extends AbstractSystem {
     }
 
     this._imageryChanged();
-    this.emit('imagerychange');
   }
 
 
@@ -535,7 +536,6 @@ export class ImagerySystem extends AbstractSystem {
       const zoom = this.context.viewport.transform.zoom;
       this._baseLayer.nudge(delta, zoom);
       this._imageryChanged();
-      this.emit('imagerychange');
     }
   }
 
@@ -554,7 +554,6 @@ export class ImagerySystem extends AbstractSystem {
     if (this._baseLayer) {
       this._baseLayer.offset = [setX, setY];
       this._imageryChanged();
-      this.emit('imagerychange');
     }
   }
 
@@ -572,7 +571,7 @@ export class ImagerySystem extends AbstractSystem {
     const context = this.context;
     const layer = context.systems.gfx?.scene?.layers?.get('background');
     layer?.setBrightness(val);
-    this.emit('imagerychange');
+    this._imageryChanged();
   }
 
   /**
@@ -589,7 +588,7 @@ export class ImagerySystem extends AbstractSystem {
     const context = this.context;
     const layer = context.systems.gfx?.scene?.layers?.get('background');
     layer?.setContrast(val);
-    this.emit('imagerychange');
+    this._imageryChanged();
   }
 
   /**
@@ -606,7 +605,7 @@ export class ImagerySystem extends AbstractSystem {
     const context = this.context;
     const layer = context.systems.gfx?.scene?.layers?.get('background');
     layer?.setSaturation(val);
-    this.emit('imagerychange');
+    this._imageryChanged();
   }
 
   /**
@@ -623,7 +622,7 @@ export class ImagerySystem extends AbstractSystem {
     const context = this.context;
     const layer = context.systems.gfx?.scene?.layers?.get('background');
     layer?.setSharpness(val);
-    this.emit('imagerychange');
+    this._imageryChanged();
   }
 
   /**
@@ -636,7 +635,7 @@ export class ImagerySystem extends AbstractSystem {
   set numGridSplits(val = 0) {
     if (val === this._numGridSplits) return;  // no change
     this._numGridSplits = val;
-    this.emit('imagerychange');
+    this._imageryChanged();
   }
 
 }

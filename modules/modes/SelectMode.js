@@ -122,7 +122,7 @@ export class SelectMode extends AbstractMode {
       sidebarContent = uiNoteEditor(context).note(datum);
       sidebarContent
         .on('change', () => {
-          gfx.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+          gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const osm = context.services.osm;
           const note = osm?.getNote(datumID);
           if (!(note instanceof Marker)) return;  // or - go to browse mode
@@ -134,7 +134,7 @@ export class SelectMode extends AbstractMode {
       sidebarContent = uiKeepRightEditor(context).error(datum);
       sidebarContent
         .on('change', () => {
-          gfx.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+          gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const keepright = context.services.keepright;
           const error = keepright?.getError(datumID);
           if (!(error instanceof Marker)) return;  // or - go to browse mode?
@@ -146,7 +146,7 @@ export class SelectMode extends AbstractMode {
       sidebarContent = uiOsmoseEditor(context).error(datum);
       sidebarContent
         .on('change', () => {
-          gfx.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+          gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const osmose = context.services.osmose;
           const error = osmose?.getError(datumID);
           if (!(error instanceof Marker)) return;  // or - go to browse mode?
@@ -160,7 +160,7 @@ export class SelectMode extends AbstractMode {
       ui.MapRouletteMenu.error(datum);
       sidebarContent
         .on('change', () => {
-          gfx.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+          gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const maproulette = context.services.maproulette;
           const error = maproulette?.getError(datumID);
           if (!(error instanceof Marker)) return;  // or - go to browse mode?

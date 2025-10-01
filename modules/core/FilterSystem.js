@@ -65,7 +65,7 @@ export class FilterSystem extends AbstractSystem {
     super(context);
     this.id = 'filters';
     this.requiredDependencies = new Set(['editor']);
-    this.optionalDependencies = new Set(['storage', 'urlhash']);
+    this.optionalDependencies = new Set(['gfx', 'storage', 'urlhash']);
 
     this._filters = new Map();        // Map(filterID -> Filter)
     this._hidden = new Set();         // Set(filterID) to hide
@@ -75,6 +75,7 @@ export class FilterSystem extends AbstractSystem {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashchange = this._hashchange.bind(this);
+    this._filterChanged = this._filterChanged.bind(this);
 
     // hardcode the filters for now
     this._filters.set('points',          new Filter(this._isPoint.bind(this)));
@@ -157,7 +158,7 @@ export class FilterSystem extends AbstractSystem {
       const filter = this._filters.get(filterID);
       filter.enabled = false;
     }
-    this._update();
+    this._filterChanged();
     this._started = true;
 
     return this._startPromise = super.startAsync();
@@ -217,7 +218,7 @@ export class FilterSystem extends AbstractSystem {
     const filter = this._filters.get(filterID);
     if (filter && !filter.enabled) {
       filter.enabled = true;
-      this._update();
+      this._filterChanged();
     }
   }
 
@@ -235,7 +236,7 @@ export class FilterSystem extends AbstractSystem {
       }
     }
     if (didChange) {
-      this._update();
+      this._filterChanged();
     }
   }
 
@@ -249,7 +250,7 @@ export class FilterSystem extends AbstractSystem {
     const filter = this._filters.get(filterID);
     if (filter?.enabled) {
       filter.enabled = false;
-      this._update();
+      this._filterChanged();
     }
   }
 
@@ -267,7 +268,7 @@ export class FilterSystem extends AbstractSystem {
       }
     }
     if (didChange) {
-      this._update();
+      this._filterChanged();
     }
   }
 
@@ -282,7 +283,7 @@ export class FilterSystem extends AbstractSystem {
     if (!filter) return;
 
     filter.enabled = !filter.enabled;
-    this._update();
+    this._filterChanged();
   }
 
 
@@ -678,19 +679,21 @@ export class FilterSystem extends AbstractSystem {
       }
 
       if (didChange) {
-        this._update();
+        this._filterChanged();
       }
     }
   }
 
 
   /**
-   * _update
-   * Called whenever the enabled/disabled filters change
-   * Used to push changes in state to the urlhash and the localStorage
+   * _filterChanged
+   * Called whenever the enabled/disabled filters change.
+   * Used to push changes in state to the urlhash and the localStorage,
+   *   then trigger a redraw, and emit a 'filterchange' event.
    */
-  _update() {
+  _filterChanged() {
     const context = this.context;
+    const gfx = context.systems.gfx;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
 
@@ -709,6 +712,7 @@ export class FilterSystem extends AbstractSystem {
     // update localstorage
     storage?.setItem('disabled-features', filterIDs);
 
+    gfx?.immediateRedraw();
     this.emit('filterchange');
   }
 

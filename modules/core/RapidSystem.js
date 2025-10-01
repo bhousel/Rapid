@@ -37,7 +37,7 @@ export class RapidSystem extends AbstractSystem {
     super(context);
     this.id = 'rapid';
     this.requiredDependencies = new Set();
-    this.optionalDependencies = new Set(['editor', 'urlhash']);
+    this.optionalDependencies = new Set(['editor', 'gfx', 'urlhash']);
 
     this.catalog = new Map();             // Map<datasetID, RapidDataset> - all the datasets we know about
     this.categories = new Set();          // Set<string> - all the dataset 'categories' we know about
@@ -57,6 +57,7 @@ export class RapidSystem extends AbstractSystem {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashchange = this._hashchange.bind(this);
     this._stablechange = this._stablechange.bind(this);
+    this._datasetsChanged = this._datasetsChanged.bind(this);
   }
 
 
@@ -373,10 +374,12 @@ export class RapidSystem extends AbstractSystem {
 
   /**
    * _datasetsChanged
-   * Handle changes in dataset state, update the urlhash, emit 'datasetchange'
+   * Called whenever the datasets change.
+   * This will update the urlhash, trigger a redraw, and emit a 'datasetchange' event.
    */
   _datasetsChanged() {
     const context = this.context;
+    const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
 
     const enabledIDs = [];
@@ -409,6 +412,7 @@ export class RapidSystem extends AbstractSystem {
     // datasets
     urlhash?.setParam('datasets', enabledIDs.length ? enabledIDs.join(',') : null);
 
+    gfx?.immediateRedraw();
     this.emit('datasetchange');
   }
 

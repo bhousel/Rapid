@@ -275,7 +275,8 @@ export class GraphicsSystem extends AbstractSystem {
   /**
    * deferredRedraw
    * Schedules an APP pass but does not reset the timer.
-   * This is for situations where new data is available, but we can wait a bit to show it.
+   * This is intended for most situations where new data is streaming in, but we can
+   * allow the changes to batch up over several animation frames before rendering.
    */
   deferredRedraw() {
     this._appPending = true;
@@ -286,7 +287,8 @@ export class GraphicsSystem extends AbstractSystem {
    * immediateRedraw
    * Schedules an APP pass on the next available tick.
    * If there was a DRAW pending, cancel it.
-   * This is for situations where we want the user to see the update immediately.
+   * This is intended for interactive situations where the user did a thing and we want
+   * the map to update on the next available animation frame to show their change.
    */
   immediateRedraw() {
     this._timeToNextRender = 0;    // asap

@@ -223,6 +223,8 @@ export class OsmService extends AbstractSystem {
    * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   switchAsync(newOptions) {
+    const gfx = this.context.systems.gfx;
+
     this._wwwroot = newOptions.url;
     this._apiroot = newOptions.apiUrl;
 
@@ -233,6 +235,7 @@ export class OsmService extends AbstractSystem {
 
     return this.resetAsync()
       .then(() => {
+        gfx?.immediateRedraw();
         this.emit('authchange');
       });
   }
@@ -1312,6 +1315,7 @@ export class OsmService extends AbstractSystem {
   // Create a note
   // POST /api/0.6/notes?params
   postNoteCreate(note, callback) {
+    const gfx = this.context.systems.gfx;
     const noteID = note.id;
 
     if (this._noteCache.inflightPost[noteID]) {
@@ -1334,7 +1338,6 @@ export class OsmService extends AbstractSystem {
         if (err) {
           return callback(err);
         } else {
-          const gfx = this.context.systems.gfx;
           gfx?.deferredRedraw();
           return callback(null, results.data[0]);
         }
@@ -1368,6 +1371,7 @@ export class OsmService extends AbstractSystem {
   // POST /api/0.6/notes/#id/close?text=comment
   // POST /api/0.6/notes/#id/reopen?text=comment
   postNoteUpdate(note, newStatus, callback) {
+    const gfx = this.context.systems.gfx;
     const noteID = note.id;
 
     if (!this.authenticated()) {
@@ -1406,7 +1410,6 @@ export class OsmService extends AbstractSystem {
         if (err) {
           return callback(err);
         } else {
-          const gfx = this.context.systems.gfx;
           gfx?.deferredRedraw();
           return callback(null, results.data[0]);
         }
@@ -1482,11 +1485,15 @@ export class OsmService extends AbstractSystem {
 
 
   logout() {
+    const gfx = this.context.systems.gfx;
+
     this._rateLimit = null;
     this._userChangesets = null;
     this._userDetails = null;
     this._userPreferences = null;
     this._oauth.logout();
+
+    gfx?.immediateRedraw();
     this.emit('authchange');
     return this;
   }
@@ -1498,6 +1505,10 @@ export class OsmService extends AbstractSystem {
 
 
   authenticate(callback) {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const l10n = context.systems.l10n;
+
     const cid = this._connectionID;
     this._rateLimit = null;
     this._userChangesets = null;
@@ -1514,12 +1525,12 @@ export class OsmService extends AbstractSystem {
       }
       this.reloadApiStatus();
 //      this.userChangesets(function() {});  // eagerly load user details/changesets
+      gfx?.immediateRedraw();
       this.emit('authchange');
       if (callback) callback(err, result);
     };
 
     // Ensure the locale is correctly set before opening the popup
-    const l10n = this.context.systems.l10n;
     const localeCode = l10n?.localeCode() || 'en-US';
 
     this._oauth.options({

@@ -330,6 +330,7 @@ export class Context extends EventEmitter {
    * @return  The mode that got entered
    */
   enter(modeOrModeID, options) {
+    const gfx = this.systems.gfx;
     const currMode = this._currMode;
     let newMode;
 
@@ -357,6 +358,8 @@ export class Context extends EventEmitter {
       this._currMode.enter();
     }
     this.$container.classed(`mode-${this._currMode.id}`, true);
+
+    gfx?.immediateRedraw();
     this.emit('modechange', this._currMode);
     return this._currMode;
   }

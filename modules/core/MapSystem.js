@@ -36,7 +36,7 @@ export class MapSystem extends AbstractSystem {
     super(context);
     this.id = 'map';
     this.requiredDependencies = new Set(['editor', 'gfx']);
-    this.optionalDependencies = new Set(['filters', 'imagery', 'l10n', 'photos', 'rapid', 'storage', 'styles', 'urlhash']);
+    this.optionalDependencies = new Set(['filters', 'l10n', 'rapid', 'storage', 'urlhash']);
 
     // display options
     this.areaFillOptions = ['wireframe', 'partial', 'full'];
@@ -55,8 +55,6 @@ export class MapSystem extends AbstractSystem {
     this._updateHash = this._updateHash.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
     this.render = this.render.bind(this);
-    this.immediateRedraw = this.immediateRedraw.bind(this);
-    this.deferredRedraw = this.deferredRedraw.bind(this);
   }
 
 
@@ -72,12 +70,9 @@ export class MapSystem extends AbstractSystem {
     const editor = context.systems.editor;
     const filters = context.systems.filters;
     const gfx = context.systems.gfx;
-    const imagery = context.systems.imagery;
     const l10n = context.systems.l10n;
-    const photos = context.systems.photos;
     const rapid = context.systems.rapid;
     const storage = context.systems.storage;
-    const styles = context.systems.styles;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
@@ -115,6 +110,8 @@ export class MapSystem extends AbstractSystem {
             if (entityIDs) {
               scene.dirtyData('osm', entityIDs);
             }
+            // Do we need this here?  OsmService calls `deferredRedraw` as tiles are loaded.
+            // We would only need it if there can be delay between when tiles are loaded 'merge' is emitted.
             gfx.deferredRedraw();
           })
           .on('stagingchange', difference => {
@@ -168,28 +165,16 @@ export class MapSystem extends AbstractSystem {
 
         filters?.on('filterchange', () => {
           scene.dirtyLayers('osm');
-          gfx.immediateRedraw();
         });
 
         rapid?.on('datasetchange', () => {
           scene.dirtyLayers(['rapid', 'rapidoverlay']);
-          gfx.immediateRedraw();
         });
 
         l10n?.on('localechange', () => {
           this._setupKeybinding();
           scene.dirtyScene();    // labeled features can be on any layer
-          gfx.immediateRedraw();
         });
-
-        context.on('modechange', gfx.immediateRedraw);
-        scene.on('layerchange', gfx.immediateRedraw);
-        imagery?.on('imagerychange', gfx.immediateRedraw);
-        photos?.on('photochange', gfx.immediateRedraw);
-        styles?.on('stylechange', gfx.immediateRedraw);
-
-        const osm = context.services.osm;
-        osm?.on('authchange', gfx.immediateRedraw);
 
         this._setupKeybinding();
       });
@@ -209,7 +194,6 @@ export class MapSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * Note that calling `resetAsync` schedules an "immediate" redraw (on the next available tick).
    * @return  {Promise}  Promise resolved when this component has completed resetting
    */
   resetAsync() {
@@ -440,30 +424,6 @@ export class MapSystem extends AbstractSystem {
       urlhash.setParam('note', null);
     }
 
-  }
-
-
-  /**
-   * deferredRedraw
-   * Tell the renderer to redraw soon
-   * This is ideal for most situations where data is streaming in, and we can
-   * allow the changes to batch up over several animation frames.
-   */
-  deferredRedraw() {
-    const gfx = this.context.systems.gfx;
-    gfx.deferredRedraw();
-  }
-
-
-  /**
-   * immediateRedraw
-   * Tell the renderer to redraw as soon as possible.
-   * This is ideal for interactive situations where the user did a thing and we want
-   * the map to update on one of the next few animation frames to show their change.
-   */
-  immediateRedraw() {
-    const gfx = this.context.systems.gfx;
-    gfx.immediateRedraw();
   }
 
 

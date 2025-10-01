@@ -34,6 +34,14 @@ export class StyleSystem extends AbstractSystem {
     this.id = 'styles';
     this.context = context;
 
+    this.requiredDependencies = new Set();
+    this.optionalDependencies = new Set(['gfx']);
+
+    // Ensure methods used as callbacks always have `this` bound correctly.
+    this.styleMatch = this.styleMatch.bind(this);
+    this._styleChanged = this._styleChanged.bind(this);
+
+
     // Experiment, see Rapid#1230
     // matrix values from https://github.com/maputnik/editor
     this.protanopiaMatrix = [
@@ -549,9 +557,6 @@ export class StyleSystem extends AbstractSystem {
       },
     };
 
-
-    // Ensure methods used as callbacks always have `this` bound correctly.
-    this.styleMatch = this.styleMatch.bind(this);
   }
 
 
@@ -757,5 +762,19 @@ export class StyleSystem extends AbstractSystem {
     function getTag(tags, key) {
       return tags[key] === 'no' ? undefined : tags[key];
     }
+  }
+
+
+  /**
+   * _styleChanged
+   * (currently not used, see PhotoSystem, ImagerySystem for similar)
+   * Called whenever the style changes.
+   * This will trigger a redraw and emit a 'stylechange' event.
+   */
+  _styleChanged() {
+    const gfx = this.context.systems.gfx;
+
+    gfx?.immediateRedraw();
+    this.emit('stylechange');
   }
 }

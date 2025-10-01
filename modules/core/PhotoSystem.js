@@ -216,50 +216,54 @@ export class PhotoSystem extends AbstractSystem {
 
   /**
    * _photoChanged
-   * Push changes in photo viewer state to the urlhash
+   * Called whenever the photo changes.
+   * This will update the urlhash, trigger a redraw, and emit a 'photochange' event.
    */
   _photoChanged() {
     const context = this.context;
+    const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
-    const scene = context.systems.gfx?.scene;
+    const scene = gfx?.scene;
 
-
-    // photo_overlay
-    let enabledIDs = [];
-    if (scene) {
-      for (const layerID of this.layerIDs) {
-        const layer = scene.layers.get(layerID);
-        if (layer && layer.supported && layer.enabled) {
-          enabledIDs.push(layerID);
+    if (urlhash) {
+      // photo_overlay
+      let enabledIDs = [];
+      if (scene) {
+        for (const layerID of this.layerIDs) {
+          const layer = scene.layers.get(layerID);
+          if (layer && layer.supported && layer.enabled) {
+            enabledIDs.push(layerID);
+          }
         }
       }
+      urlhash.setParam('photo_overlay', enabledIDs.length ? enabledIDs.join(',') : null);
+
+      // photo_dates
+      let rangeString;
+      if (this._filterFromDate || this._filterToDate) {
+        rangeString = (this._filterFromDate || '') + '_' + (this._filterToDate || '');
+      }
+      urlhash.setParam('photo_dates', rangeString);
+
+      // photo_username
+      urlhash.setParam('photo_username', this._filterUsernames ? this._filterUsernames.join(',') : null);
+
+      // current photo
+      let photoString;
+      if (this._currPhotoLayerID && this._currPhotoID) {
+        photoString = `${this._currPhotoLayerID}/${this._currPhotoID}`;
+      }
+      urlhash.setParam('photo', photoString);
+
+      // current detection
+      let detectionString;
+      if (this._currDetectionLayerID && this._currDetectionID) {
+        detectionString = `${this._currDetectionLayerID}/${this._currDetectionID}`;
+      }
+      urlhash.setParam('detection', detectionString);
     }
-    urlhash?.setParam('photo_overlay', enabledIDs.length ? enabledIDs.join(',') : null);
 
-    // photo_dates
-    let rangeString;
-    if (this._filterFromDate || this._filterToDate) {
-      rangeString = (this._filterFromDate || '') + '_' + (this._filterToDate || '');
-    }
-    urlhash?.setParam('photo_dates', rangeString);
-
-    // photo_username
-    urlhash?.setParam('photo_username', this._filterUsernames ? this._filterUsernames.join(',') : null);
-
-    // current photo
-    let photoString;
-    if (this._currPhotoLayerID && this._currPhotoID) {
-      photoString = `${this._currPhotoLayerID}/${this._currPhotoID}`;
-    }
-    urlhash?.setParam('photo', photoString);
-
-    // current detection
-    let detectionString;
-    if (this._currDetectionLayerID && this._currDetectionID) {
-      detectionString = `${this._currDetectionLayerID}/${this._currDetectionID}`;
-    }
-    urlhash?.setParam('detection', detectionString);
-
+    gfx?.immediateRedraw();
     this.emit('photochange');
   }
 

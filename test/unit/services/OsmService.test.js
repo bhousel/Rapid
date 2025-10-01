@@ -129,7 +129,7 @@ describe('OsmService', () => {
           });
       });
 
-      it('emits an authchange event', () => {
+      it('emits an authchange event and requests a redraw', () => {
         const osm = new Rapid.OsmService(context);
         const spyAuthChange = mock.fn();
         osm.on('authchange', spyAuthChange);
@@ -142,7 +142,8 @@ describe('OsmService', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            assert.strictEqual(spyAuthChange.mock.callCount(), 1);
+            assert.strictEqual(spyAuthChange.mock.callCount(), 1);  // authchange emitted once
+            assert.lengthOf(spyRedraw.mock.calls, 1);               // redraw called once
           });
       });
     });
@@ -174,7 +175,8 @@ describe('OsmService', () => {
       // reset viewport
       context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       context.viewport.dimensions = [64, 64];
-      _osm.logout();
+      _osm.logout();                  // note: logout now triggers a redraw.
+      spyRedraw.mock.resetCalls();    // exclude that redraw from the call count
       return _osm.resetAsync();
     });
 

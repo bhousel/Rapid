@@ -61,6 +61,9 @@ export class PixiScene extends EventEmitter {
     this.layers = new Map();     // Map<layerID, Layer>
     this.features = new Map();   // Map<featureID, Feature>
 
+    // Ensure methods used as callbacks always have `this` bound correctly.
+    this._layerChanged = this._layerChanged.bind(this);
+
     // Create Layers
     [
       new PixiLayerBackgroundTiles(this),
@@ -136,7 +139,7 @@ export class PixiScene extends EventEmitter {
       layer.reset();
     }
 
-    this.emit('layerchange');
+    this._layerChanged();
   }
 
 
@@ -177,7 +180,7 @@ export class PixiScene extends EventEmitter {
         layer.enabled = true;
       }
     }
-    this.emit('layerchange');
+    this._layerChanged();
   }
 
 
@@ -193,7 +196,7 @@ export class PixiScene extends EventEmitter {
         layer.enabled = false;
       }
     }
-    this.emit('layerchange');
+    this._layerChanged();
   }
 
 
@@ -209,7 +212,7 @@ export class PixiScene extends EventEmitter {
         layer.enabled = !layer.enabled;
       }
     }
-    this.emit('layerchange');
+    this._layerChanged();
   }
 
 
@@ -223,7 +226,7 @@ export class PixiScene extends EventEmitter {
     for (const layer of this.layers.values()) {
       layer.enabled = toEnable.has(layer.id);
     }
-    this.emit('layerchange');
+    this._layerChanged();
   }
 
 
@@ -332,6 +335,17 @@ export class PixiScene extends EventEmitter {
    */
   dirtyData(layerID, dataIDs) {
     this.layers.get(layerID)?.dirtyData(dataIDs);
+  }
+
+
+  /**
+   * _layerChanged
+   * Called whenever the enabled layers change.
+   * This will trigger a redraw and emit a 'layerchange' event.
+   */
+  _layerChanged() {
+    this.gfx.immediateRedraw();
+    this.emit('layerchange');
   }
 
 }

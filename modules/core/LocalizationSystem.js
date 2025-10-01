@@ -20,7 +20,7 @@ export class LocalizationSystem extends AbstractSystem {
     super(context);
     this.id = 'l10n';
     this.requiredDependencies = new Set(['assets']);
-    this.optionalDependencies = new Set(['presets', 'urlhash']);
+    this.optionalDependencies = new Set(['gfx', 'presets', 'urlhash']);
 
     // These are the different language packs that can be loaded..
     this._scopes = new Set(['core', 'tagging', 'imagery', 'community']);
@@ -956,9 +956,11 @@ export class LocalizationSystem extends AbstractSystem {
    * _localeChanged
    * Called whenever something about the locale has changed.
    * This should happen after all locale files have been fetched.
+   * This will trigger a redraw, and emit a 'localechange' event.
    */
   _localeChanged() {
     const context = this.context;
+    const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
 
     if (!this._currLocaleCode) {       // no current locale?  shouldn't happen, reset to defaults
@@ -999,6 +1001,7 @@ export class LocalizationSystem extends AbstractSystem {
     const scriptNamesEn = this._cache?.en?.core?.scriptNames ?? {};
     this._currScriptNames = Object.assign({}, scriptNamesEn, scriptNamesLang, scriptNamesCurr);
 
+    gfx?.immediateRedraw();
     this.emit('localechange');
   }
 

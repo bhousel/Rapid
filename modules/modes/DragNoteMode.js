@@ -130,7 +130,7 @@ export class DragNoteMode extends AbstractMode {
 
     // Force a redraw - there is no event for notes that would tell the map to redraw.
     // (unlike with dragging osm features around, where editsystem emits `stagingchanged` events)
-    gfx.immediateRedraw();
+    gfx?.immediateRedraw();
   }
 
 
