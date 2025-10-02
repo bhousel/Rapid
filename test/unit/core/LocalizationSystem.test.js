@@ -13,7 +13,7 @@ describe('LocalizationSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an LocalizationSystem from a context', () => {
+      it('constructs a LocalizationSystem from a context', () => {
         const l10n = new Rapid.LocalizationSystem(context);
         assert.instanceOf(l10n, Rapid.LocalizationSystem);
         assert.strictEqual(l10n.id, 'l10n');

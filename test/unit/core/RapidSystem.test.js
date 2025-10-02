@@ -10,7 +10,7 @@ describe('RapidSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an RapidSystem from a context', () => {
+      it('constructs a RapidSystem from a context', () => {
         const rapid = new Rapid.RapidSystem(context);
         assert.instanceOf(rapid, Rapid.RapidSystem);
         assert.strictEqual(rapid.id, 'rapid');

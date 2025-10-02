@@ -10,7 +10,7 @@ describe('PhotoSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an PhotoSystem from a context', () => {
+      it('constructs a PhotoSystem from a context', () => {
         const photos = new Rapid.PhotoSystem(context);
         assert.instanceOf(photos, Rapid.PhotoSystem);
         assert.strictEqual(photos.id, 'photos');

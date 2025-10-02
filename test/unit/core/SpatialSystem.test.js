@@ -10,7 +10,7 @@ describe('SpatialSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an SpatialSystem from a context', () => {
+      it('constructs a SpatialSystem from a context', () => {
         const spatial = new Rapid.SpatialSystem(context);
         assert.instanceOf(spatial, Rapid.SpatialSystem);
         assert.strictEqual(spatial.id, 'spatial');

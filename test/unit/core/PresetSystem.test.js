@@ -15,7 +15,7 @@ describe('PresetSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an PresetSystem from a context', () => {
+      it('constructs a PresetSystem from a context', () => {
         const presets = new Rapid.PresetSystem(context);
         assert.instanceOf(presets, Rapid.PresetSystem);
         assert.strictEqual(presets.id, 'presets');

@@ -19,7 +19,7 @@ describe('ValidationSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an ValidationSystem from a context', () => {
+      it('constructs a ValidationSystem from a context', () => {
         const validator = new Rapid.ValidationSystem(context);
         assert.instanceOf(validator, Rapid.ValidationSystem);
         assert.strictEqual(validator.id, 'validator');

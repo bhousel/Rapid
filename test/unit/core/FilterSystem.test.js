@@ -21,7 +21,7 @@ describe('FilterSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an FilterSystem from a context', () => {
+      it('constructs a FilterSystem from a context', () => {
         const filters = new Rapid.FilterSystem(context);
         assert.instanceOf(filters, Rapid.FilterSystem);
         assert.strictEqual(filters.id, 'filters');

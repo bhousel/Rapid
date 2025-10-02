@@ -10,7 +10,7 @@ describe('StorageSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an StorageSystem from a context', () => {
+      it('constructs a StorageSystem from a context', () => {
         const storage = new Rapid.StorageSystem(context);
         assert.instanceOf(storage, Rapid.StorageSystem);
         assert.strictEqual(storage.id, 'storage');

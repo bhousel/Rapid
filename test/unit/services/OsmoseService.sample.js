@@ -1,6 +1,5 @@
 /* eslint-disable quotes */
 
-
 // data near [10°, 0°]
 export const data10 = {
   type: 'FeatureCollection',

@@ -15,7 +15,7 @@ describe('UrlHashSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an UrlHashSystem from a context', () => {
+      it('constructs a UrlHashSystem from a context', () => {
         const urlhash = new Rapid.UrlHashSystem(context);
         assert.instanceOf(urlhash, Rapid.UrlHashSystem);
         assert.strictEqual(urlhash.id, 'urlhash');

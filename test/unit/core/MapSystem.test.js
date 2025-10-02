@@ -33,7 +33,7 @@ describe('MapSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an MapSystem from a context', () => {
+      it('constructs a MapSystem from a context', () => {
         const map = new Rapid.MapSystem(context);
         assert.instanceOf(map, Rapid.MapSystem);
         assert.strictEqual(map.id, 'map');

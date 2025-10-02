@@ -10,7 +10,7 @@ describe('StyleSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs an StyleSystem from a context', () => {
+      it('constructs a StyleSystem from a context', () => {
         const styles = new Rapid.StyleSystem(context);
         assert.instanceOf(styles, Rapid.StyleSystem);
         assert.strictEqual(styles.id, 'styles');
