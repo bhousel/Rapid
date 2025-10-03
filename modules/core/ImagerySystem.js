@@ -82,8 +82,8 @@ export class ImagerySystem extends AbstractSystem {
         gfx?.scene?.on('layerchange', this._imageryChanged);
       })
       .then(() => assets.loadAssetAsync('imagery'))
-      .then(data => this._initImageryIndex(data))
-      .then(() => this._initWaybackAsync());
+      .then(data => this._initImageryIndex(data));
+      // .then(() => this._initWaybackAsync());
   }
 
 
@@ -176,16 +176,16 @@ export class ImagerySystem extends AbstractSystem {
   }
 
 
-  /**
-   * _initWaybackAsync
-   * Fetch all available Wayback imagery sources and load them into the special Wayback source.
-   * If there is no wayback imagery source, or the wayback data is not available, just resolve anyway.
-   * @return  {Promise}  Promise resolved when this data has been loaded
-   */
-  _initWaybackAsync() {
-    const wayback = this.getSourceByID('EsriWayback');
-    return wayback ? wayback.initWaybackAsync() : Promise.resolve();
-  }
+  // /**
+  //  * _initWaybackAsync
+  //  * Fetch all available Wayback imagery sources and load them into the special Wayback source.
+  //  * If there is no wayback imagery source, or the wayback data is not available, just resolve anyway.
+  //  * @return  {Promise}  Promise resolved when this data has been loaded
+  //  */
+  // _initWaybackAsync() {
+  //   const wayback = this.getSourceByID('EsriWayback');
+  //   return wayback ? wayback.initWaybackAsync() : Promise.resolve();
+  // }
 
 
   /**

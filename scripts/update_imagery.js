@@ -193,7 +193,10 @@ fs.writeFileSync('data/imagery.json', prettyStringify({ imagery: imagery }) + '\
 
 
 // We'll mirror the wayback config file, it's not available everywhere - see Rapid#1445
-fetch('https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json')
+const WAYBACK_CONFIG_FILE_PROD = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
+const WAYBACK_CONFIG_FILE_DEV = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/dev/waybackconfig.json';
+
+fetch(WAYBACK_CONFIG_FILE_PROD)
   .then(response => {
     if (!response.ok) throw new Error(response.status + ' ' + response.statusText);
     if (response.status === 204 || response.status === 205) return;

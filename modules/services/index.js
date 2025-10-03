@@ -14,6 +14,7 @@ import { OvertureService } from './OvertureService.js';
 import { StreetsideService } from './StreetsideService.js';
 import { TaginfoService } from './TaginfoService.js';
 import { VectorTileService } from './VectorTileService.js';
+import { WaybackService } from './WaybackService.js';
 import { WikidataService } from './WikidataService.js';
 import { WikipediaService } from './WikipediaService.js';
 
@@ -34,6 +35,7 @@ export {
   StreetsideService,
   TaginfoService,
   VectorTileService,
+  WaybackService,
   WikidataService,
   WikipediaService
 };
@@ -59,6 +61,7 @@ services.available.set('overture', OvertureService);
 services.available.set('streetside', StreetsideService);
 services.available.set('taginfo', TaginfoService);
 services.available.set('vectortile', VectorTileService);
+services.available.set('wayback', WaybackService);
 services.available.set('wikidata', WikidataService);
 services.available.set('wikipedia', WikipediaService);
 
