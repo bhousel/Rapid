@@ -83,7 +83,6 @@ export class ImagerySystem extends AbstractSystem {
       })
       .then(() => assets.loadAssetAsync('imagery'))
       .then(data => this._initImageryIndex(data));
-      // .then(() => this._initWaybackAsync());
   }
 
 
@@ -101,6 +100,7 @@ export class ImagerySystem extends AbstractSystem {
   _initImageryIndex(data) {
     const context = this.context;
     const storage = context.systems.storage;
+    const wayback = context.services.wayback;
 
     const arr = data.imagery || [];
 
@@ -114,7 +114,7 @@ export class ImagerySystem extends AbstractSystem {
     const features = arr.map(d => {
       if (!d.polygon) return null;
 
-      // workaround for editor-layer-index weirdness..
+      // Workaround for editor-layer-index weirdness..
       // Add an extra array nest to each element in `d.polygon`
       // so the rings are not treated as a bunch of holes:
       //   what we get:  [ [[outer],[hole],[hole]] ]
@@ -146,16 +146,16 @@ export class ImagerySystem extends AbstractSystem {
       }
       this._imageryIndex.sources.set(d.id.toLowerCase(), source);
 
-      // Add 'EsriWayback' as a special copy of 'EsriWorldImagery'
-      if (d.id === 'EsriWorldImagery') {
-        const props = Object.assign({}, d);
+      // When we add 'Esri World Imagery', add an additional source for 'Esri Wayback', if supported.
+      if (wayback && d.id === 'EsriWorldImagery') {
+        const props = Object.assign({}, d);  // copy
         props.id = 'EsriWayback';
         props.name = 'Esri Wayback';
         props.description = 'Esri Wayback contains archived snapshots of Esri World Imagery created over time.';
         props.startDate = null;  // user will choose
         props.endDate = null;    // user will choose
-        const wayback = new ImagerySourceEsriWayback(context, props);
-        this._imageryIndex.sources.set(props.id.toLowerCase(), wayback);
+        source = new ImagerySourceEsriWayback(context, props);
+        this._imageryIndex.sources.set(props.id.toLowerCase(), source);
       }
     }
 
@@ -174,18 +174,6 @@ export class ImagerySystem extends AbstractSystem {
       this.toggleOverlayLayer(locator);
     }
   }
-
-
-  // /**
-  //  * _initWaybackAsync
-  //  * Fetch all available Wayback imagery sources and load them into the special Wayback source.
-  //  * If there is no wayback imagery source, or the wayback data is not available, just resolve anyway.
-  //  * @return  {Promise}  Promise resolved when this data has been loaded
-  //  */
-  // _initWaybackAsync() {
-  //   const wayback = this.getSourceByID('EsriWayback');
-  //   return wayback ? wayback.initWaybackAsync() : Promise.resolve();
-  // }
 
 
   /**

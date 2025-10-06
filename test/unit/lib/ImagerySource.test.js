@@ -297,9 +297,12 @@ describe('ImagerySource', () => {
         startDate: '2020-01-01',
         endDate: '2020-12-31'
       });
-      source.getMetadata([0, 0], [0, 0, 0], (err, metadata) => {
+
+      // Tile parameter is unused for the default imagery source.
+      // It is only needed for sources where we need to fetch the metadata from a service.
+      source.getMetadata(null, (err, result) => {
         assert.isNotOk(err);
-        assert.deepEqual(metadata.vintage, {
+        assert.deepEqual(result.vintage, {
           start: '2020-01-01',
           end: '2020-12-31',
           range: '2020-01-01 - 2020-12-31'

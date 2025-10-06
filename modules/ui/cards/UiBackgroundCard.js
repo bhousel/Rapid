@@ -197,14 +197,14 @@ export class UiBackgroundCard extends AbstractUiCard {
     const centerExtent = new Extent(centerLoc);
     const layer = gfx.scene.layers.get('background');
     const tileMap = layer?._tileMaps.get(sourceID);
-    let tileCoord, tileZoom;
+    let tile, tileZoom;
 
     if (tileMap) {
-      for (const tile of tileMap.values()) {
-        if (!tile.loaded) continue;
-        if (tile.wgs84Extent.contains(centerExtent)) {
-          tileCoord = tile.xyz;
-          tileZoom = tile.xyz[2];
+      for (const t of tileMap.values()) {
+        if (!t.loaded) continue;
+        if (t.wgs84Extent.contains(centerExtent)) {
+          tile = t;
+          tileZoom = t.xyz[2];
           break;
         }
       }
@@ -218,10 +218,10 @@ export class UiBackgroundCard extends AbstractUiCard {
       .selectAll('.background-info-span-zoom')
       .text(this._metadata.zoom);
 
-    if (!tileCoord) return;
+    if (!tile) return;
 
     // attempt async update of the rest of the fields..
-    source.getMetadata(centerLoc, tileCoord, (err, result) => {
+    source.getMetadata(tile, (err, result) => {
       if (err || this._currSourceID !== sourceID) return;
 
       // update vintage

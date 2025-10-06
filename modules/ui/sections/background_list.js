@@ -1,6 +1,6 @@
 import { select } from 'd3-selection';
 import { easeCubicInOut } from 'd3-ease';
-import { numWrap } from '@rapid-sdk/math';
+import { geoSphericalDistance, numWrap } from '@rapid-sdk/math';
 import debounce from 'lodash-es/debounce.js';
 
 import { ImagerySource } from '../../core/lib/index.js';
@@ -34,6 +34,7 @@ export function uiSectionBackgroundList(context) {
   const l10n = context.systems.l10n;
   const map = context.systems.map;
   const storage = context.systems.storage;
+  const wayback = context.services.wayback;
   const ui = context.systems.ui;
 
   const section = uiSection(context, 'background-list')
@@ -42,6 +43,13 @@ export function uiSectionBackgroundList(context) {
 
   let _backgroundList = select(null);
   let _keys = null;
+  let _waybackDates = [];
+  let _waybackLoc = null;
+
+  if (wayback) {
+    _waybackDates = wayback.allDates.slice().reverse();  // copy and sort descending
+  }
+
 
   const settingsCustomBackground = uiSettingsCustomBackground(context)
     .on('change', customChanged);
@@ -362,7 +370,7 @@ export function uiSectionBackgroundList(context) {
           const currDate = d.date;
           const dropdown = li.selectAll('.wayback-date');
           const options = dropdown.selectAll('option')
-            .data(d.localReleaseDates, d => d);
+            .data(_waybackDates, d => d);
 
           options.exit()
             .remove();
@@ -549,14 +557,48 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
+   * refreshWaybackDates
+   * Redraw the list sometimes if the map has moved
+   */
+  function refreshWaybackDates() {
+    // is it even visible?
+    const $selection = section.selection();
+    if ($selection.classed('hide')) return;
+
+    const source = imagery.getSourceByID('EsriWayback');
+    if (!wayback || !source) return;
+
+    const lastLoc = _waybackLoc || [Infinity, Infinity];
+    const currLoc =  context.viewport.centerLoc();
+    const needsRefresh = (geoSphericalDistance(currLoc, lastLoc) > 5000);  // map moved > 5000 meters
+
+    if (needsRefresh) {
+      wayback.getLocalDatesAsync()
+        .then(result => {
+          const allDates = wayback.allDates;
+          const currDate = source.date;
+          const keepDates = new Set(result.releases.keys());
+
+          // Make sure to always include oldest, newest, and current selection.
+          keepDates.add(allDates.at(0));
+          keepDates.add(allDates.at(-1));
+          if (currDate) keepDates.add(currDate);
+
+          _waybackDates = [...keepDates].sort().reverse();   // sort as strings decending;
+          _waybackLoc = currLoc;
+          renderIfVisible();
+        });
+    }
+  }
+
+
+  /*
    * onMapDraw
    * Redraw the list sometimes if the map has moved
    */
   function onMapDraw() {
-    const wayback = imagery.getSourceByID('EsriWayback');
-    wayback.refreshLocalReleaseDatesAsync();
-
     window.requestIdleCallback(() => {
+      refreshWaybackDates();
       renderIfVisible();
     });
   }

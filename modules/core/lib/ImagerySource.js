@@ -1,8 +1,6 @@
 import { geoArea as d3_geoArea, geoMercatorRaw as d3_geoMercatorRaw } from 'd3-geo';
 import { utilAesDecrypt, utilQsString, utilStringQs } from '@rapid-sdk/util';
-import { geoSphericalDistance, Tiler, Viewport } from '@rapid-sdk/math';
-import * as Wayback from '@rapideditor/wayback-core';
-import RBush from 'rbush';
+import { geoSphericalDistance } from '@rapid-sdk/math';
 
 import { utilFetchResponse } from '../../util/index.js';
 
@@ -95,7 +93,7 @@ export class ImagerySource {
   }
 
 
-  getMetadata(loc, tileCoord, callback) {
+  getMetadata(tile, callback) {
     const vintage = {
       start: this._localeDateString(this.startDate),
       end: this._localeDateString(this.endDate)
@@ -228,7 +226,7 @@ export class ImagerySource {
 
   _localeDateString(s) {
     if (!s) return null;
-    const d = new Date(s + 'T00:00:00Z');  // Add 'T00:00:00Z' to create the date in UTC
+    const d = new Date(s + 'Z');  // Add 'Z' to create the date in UTC
     if (isNaN(d.getTime())) return null;
 
     return d.toISOString().split('T')[0];  // Return the date part of the ISO string
@@ -402,10 +400,14 @@ export class ImagerySourceEsri extends ImagerySource {
   }
 
 
-  getMetadata(loc, tileCoord, callback) {
-    const tileID = tileCoord.slice(0, 3).join('/');
-    const zoom = Math.min(tileCoord[2], this.zoomExtent[1]);
-    const unknown = this.context.systems.l10n.t('inspector.unknown');
+  getMetadata(tile, callback) {
+    const context = this.context;
+    const l10n = context.systems.l10n;
+
+    const loc = tile.wgs84Extent.center();
+    const tileID = tile.xyz.join('/');
+    const zoom = Math.min(tile.xyz[2], this.zoomExtent[1]);
+    const unknown = l10n?.t('inspector.unknown') || 'unknown';
 
     if (this._inflight[tileID]) return;
 
@@ -524,6 +526,7 @@ export class ImagerySourceEsri extends ImagerySource {
 /**
  * `ImagerySourceEsriWayback`
  * A special imagery source that allows users to choose available dates in the Esri Wayback Archive.
+ * Unlike other imagery sources, this source has a `date` setter and getter.
  * The actual date that the user wants to view is stored in `this.startDate` (and `this.endDate`)
  * Note that all "dates" in imagery sources are actually stored as ISO strings like `2024-01-01`
  */
@@ -531,14 +534,6 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
 
   constructor(context, src) {
     super(context, src);
-    this._initPromise = null;
-    this._refreshPromise = null;
-    this._tiler = new Tiler();
-
-    this._waybackData = new Map();        // Map<releaseDate, data>
-    this._releaseDateCache = new RBush();
-    this._oldestDate = null;
-    this._newestDate = null;
   }
 
   // Append the date to the `id` if there is one, e.g. `EsriWayback_2024-01-01`
@@ -559,9 +554,11 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
     return this.context.systems.l10n.t('background.wayback.description', { default: this._description });
   }
 
+  // Get the url template for the selected release
   get template() {
-    const current = this._waybackData.get(this.startDate);
-    return current?.template || this._template;
+    const wayback = this.context.services.wayback;
+    const release = wayback.byReleaseDate.get(this.date);
+    return release?.template || this._template;
   }
 
   // Append the date to `imageryUsed` if there is one, e.g. `Esri Wayback (2024-01-01)`
@@ -574,192 +571,51 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
     return s;
   }
 
-  get oldestDate() {
-    return this._oldestDate;
-  }
-
-  get newestDate() {
-    return this._newestDate;
-  }
-
-  // getter only, no setter
-  // `localReleaseDates` contains only the dates when the imagery has changed locally.
-  // While all dates are valid, these are the interesting ones where the map has changed.
-  // Copy to an Array for when we need to make the dropdown options list
-  get localReleaseDates() {
-    let results;
-
-    // Include any release dates we have fetched for this location
-    const [lon, lat] = this.context.viewport.centerLoc();
-    const hit = this._releaseDateCache.search({ minX: lon, minY: lat, maxX: lon, maxY: lat });
-    if (hit.length) {
-      results = new Set(hit[0].releaseDates);
-    } else {
-      results = new Set();
-    }
-
-    // always include oldest, newest, and current selection
-    if (this._oldestDate)  results.add(this._oldestDate);
-    if (this._newestDate)  results.add(this._newestDate);
-    if (this.startDate)    results.add(this.startDate);
-
-    return [...results].sort().reverse();   // sort as strings decending
-  }
-
-
-  // Pick the closest date available within range of valid dates
+  // Pick the closest supported date from the Wayback archive, without going over.
   set date(val) {
-    const requestDate = this._localeDateString(val);
-    if (!requestDate) return;
-
-    const allDates = [...this._waybackData.keys()].sort();  // sort as strings ascending
-
-    let chooseDate = allDates[0];
-    for (let i = 1; i < allDates.length; i++) {   // can skip oldest, it is already in chooseDate
-      const cmp = requestDate.localeCompare(chooseDate);
-      if (cmp <= 0) break;        // stop looking
-      chooseDate = allDates[i];   // try next date
-    }
+    const wayback = this.context.services.wayback;
+    const chooseDate = wayback.chooseClosestDate(val);
 
     this.startDate = chooseDate;
     this.endDate = chooseDate;
   }
 
-
   get date() {
     return this.startDate;
   }
 
-
-  /**
-   * initWaybackAsync
-   * Fetch all available Wayback imagery sources.
-   * If the wayback data is not available, just resolve anyway.
-   * We do this at init time so that if the url contains a wayback source, the user can use it.
-   * @return {Promise} Promise resolved when this data has been loaded
-   */
-  initWaybackAsync() {
-    if (this._initPromise) return this._initPromise;
-
-    return this._initPromise = new Promise(resolve => {
-      const context = this.context;
-      const assets = context.systems.assets;
-      assets.loadAssetAsync('wayback')
-        .then(data => Wayback.setWaybackConfigData(data.wayback))
-        .then(() => {
-          // `getWaybackItems` returns a `Promise` that resolves to a list of `WaybackItem` for all
-          // World Imagery Wayback releases from the Wayback archive. The output list is sorted by
-          // release date in descending order (newest release is the first item).
-          return Wayback.getWaybackItems()
-            .then(data => {
-              if (!Array.isArray(data) || !data.length) throw new Error('No Wayback data');
-
-              this._oldestDate = data.at(-1).releaseDateLabel;
-              this._newestDate = data.at(0).releaseDateLabel;
-              this.startDate = this.endDate = this._newestDate;  // default to showing the newest one
-
-              for (const d of data) {
-                // Convert placeholder tokens in the URL template from Esri's format to ours.
-                d.template = d.itemURL
-                  .replaceAll('{level}', '{zoom}')
-                  .replaceAll('{row}', '{y}')
-                  .replaceAll('{col}', '{x}');
-
-                // Use `releaseDateLabel` as the date, it's an ISO date string like `2024-01-01`
-                d.startDate = d.endDate = d.releaseDateLabel;
-
-                this._waybackData.set(d.releaseDateLabel, d);
-              }
-            });
-        })
-        .catch(e => console.error(e))  // eslint-disable-line no-console
-        .finally(() => resolve());
-    });
-  }
-
-
-  /**
-   * refreshLocalReleaseDatesAsync
-   * Refresh the list of localReleaseDates that appear changed in the current view.
-   * Because this is expensive, we cache the result for a given zoomed out tile.
-   * Do this sometimes but not too often.
-   * @return {Promise} Promise resolved when the localReleaseDates have been loaded
-   */
-  refreshLocalReleaseDatesAsync() {
-    // If we have already fetched the release dates for this box, resolve immediately
-    const [lon, lat] = this.context.viewport.centerLoc();
-    const hit = this._releaseDateCache.search({ minX: lon, minY: lat, maxX: lon, maxY: lat });
-    if (hit.length) {
-      return Promise.resolve(hit[0].releaseDates);
-    }
-
-    // If a refresh is in progress, return that instead
-    if (this._refreshPromise) {
-      return this._refreshPromise;
-    }
-
-    // Get a single tile at this location
-    const TILEZOOM = 14;
-//worldcoordinates
-    // const k = geoZoomToScale(TILEZOOM);
-    // const [x, y] = new Viewport({ k: k }).project([lon, lat]);
-    // const viewport = new Viewport({ k: k, x: -x, y: -y });
-    // const tile = this._tiler.zoomRange(TILEZOOM).getTiles(viewport).tiles[0];
-     const [x, y] = new Viewport({ z: TILEZOOM }).project([lon, lat]);
-     const viewport = new Viewport({ x: -x, y: -y, z: TILEZOOM  });
-     const tile = this._tiler.zoomRange(TILEZOOM).getTiles(viewport).tiles[0];
-
-    return this._refreshPromise = new Promise(resolve => {
-      Wayback.getWaybackItemsWithLocalChanges({ latitude: lat, longitude: lon }, TILEZOOM)
-        .then(data => {
-          if (!Array.isArray(data) || !data.length) throw new Error('No locally changed Wayback data');
-
-          const box = tile.wgs84Extent.bbox();
-          box.id = tile.id;
-          box.releaseDates = new Set(data.map(d => d.releaseDateLabel));
-          this._releaseDateCache.insert(box);
-          return box.releaseDates;
-        })
-        .catch(e => {
-          console.error(e);  // eslint-disable-line no-console
-          return new Set();
-        })
-        .then(val => {
-          this._refreshPromise = null;
-          resolve(val);
-        });
-    });
-  }
-
-
   /**
    * getMetadata
-   * The wayback-core library has a helpful function to get the metadata for us
+   * The Wayback service will get the metadata for the given tile.
+   * @param  {Tile}      tile - the tile to get metadata for
+   * @param  {function}  callback - errback-style callback function to call with results
    */
-  getMetadata(loc, tileCoord, callback) {
-    const point = { longitude: loc[0], latitude: loc[1] };
-    const zoom = Math.min(tileCoord[2], this.zoomExtent[1]);
-    const current = this._waybackData.get(this.startDate);
-    if (!current) {
-      callback(null, {});
+  getMetadata(tile, callback) {
+    const context = this.context;
+    const l10n = context.systems.l10n;
+    const wayback = context.services.wayback;
+    const unknown = l10n?.t('inspector.unknown') || 'unknown';
+
+    const release = wayback.byReleaseDate.get(this.date);
+    if (!release) {
+      if (typeof callback === 'function') {
+        callback(null, {});
+      }
       return;
     }
 
-    Wayback.getMetadata(point, zoom, current.releaseNum)
-      .then(data => {
-        const unknown = this.context.systems.l10n.t('inspector.unknown');
-        const captureDate = new Date(data.date).toISOString().split('T')[0];
-        const vintage = {
-          start: captureDate,
-          end: captureDate,
-          range: captureDate
-        };
+    wayback.getMetadataAsync(tile, this.date)
+      .then(result => {
         const metadata = {
-          vintage: vintage,
-          source: clean(data.source),
-          description: clean(data.provider),
-          resolution: clean(+parseFloat(data.resolution).toFixed(4)),
-          accuracy: clean(+parseFloat(data.accuracy).toFixed(4))
+          vintage: {
+            start: result.captureDate,
+            end:   result.captureDate,
+            range: result.captureDate
+          },
+          source: clean(result.source),
+          description: clean(result.provider),
+          resolution: clean(+parseFloat(result.resolution).toFixed(4)),
+          accuracy: clean(+parseFloat(result.accuracy).toFixed(4))
         };
 
         // append units - meters
@@ -770,15 +626,19 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
           metadata.accuracy += ' m';
         }
 
-        callback(null, metadata);
+        if (typeof callback === 'function') {
+          callback(null, metadata);
+        }
 
         function clean(val) {
           return String(val).trim() || unknown;
         }
       })
-      .catch(e => {
-        console.error(e);  // eslint-disable-line no-console
-        callback(e);
+      .catch(err => {
+        console.error(err);  // eslint-disable-line no-console
+        if (typeof callback === 'function') {
+          callback(err, {});
+        }
       });
   }
 
