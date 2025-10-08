@@ -619,11 +619,13 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
         };
 
         // append units - meters
-        if (isFinite(metadata.resolution)) {
-          metadata.resolution += ' m';
-        }
-        if (isFinite(metadata.accuracy)) {
-          metadata.accuracy += ' m';
+        if (l10n) {
+          if (isFinite(metadata.resolution)) {
+            metadata.resolution = l10n.t('units.meters', { quantity: metadata.resolution });
+          }
+          if (isFinite(metadata.accuracy)) {
+            metadata.accuracy = l10n.t('units.meters', { quantity: metadata.accuracy });
+          }
         }
 
         if (typeof callback === 'function') {

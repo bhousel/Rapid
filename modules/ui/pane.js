@@ -7,7 +7,7 @@ import { uiTooltip } from './tooltip.js';
 export function uiPane(context, id) {
   const l10n = context.systems.l10n;
   const ui = context.systems.ui;
-  const validator = context.systems.validator;
+  // const validator = context.systems.validator;
 
   let _key;
   let _label = '';
@@ -64,12 +64,12 @@ export function uiPane(context, id) {
     if (show) {
       _paneSelection.selectAll('.pane-content')
         .call(pane.renderContent);
-
-      // Rapid#655: Since firing the validator is so expensive,
-      // only do it when we're right about to open the validation pane.
-      if (pane.id === 'issues') {
-        validator.validateAsync();
-      }
+//
+//      // Rapid#655: Since firing the validator is so expensive,
+//      // only do it when we're right about to open the validation pane.
+//      if (pane.id === 'issues') {
+//        validator.validateAsync();
+//      }
     }
   };
 

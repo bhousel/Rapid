@@ -1,6 +1,14 @@
 /* eslint-disable quotes */
 
 export const waybackConfig = {
+  "13534": {
+    "itemID": "2de04974bcf148838142e57d74aaf379",
+    "itemTitle": "World Imagery (Wayback 2021-06-30)",
+    "itemURL": "https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/13534/{level}/{row}/{col}",
+    "metadataLayerUrl": "https://metadata.maptiles.arcgis.com/arcgis/rest/services/World_Imagery_Metadata_2021_r09/MapServer",
+    "metadataLayerItemID": "3d89a062923546ecbaa91909a089a840",
+    "layerIdentifier": "WB_2021_R09"
+  },
   "13161": {
     "itemID": "d722c8eca54d4adb8087870f5ca0ef78",
     "itemTitle": "World Imagery (Wayback 2018-01-08)",
@@ -27,26 +35,49 @@ export const waybackConfig = {
   }
 };
 
+
+export const tilemap13534 = {
+  "valid": true,
+  "location": { "left": 8647, "top": 8192, "width": 1, "height": 1 },
+  "data":[1]
+};
+
 export const tilemap13161 = {
   "valid": true,
-  "location": { "left": 19237, "top": 24688, "width": 1, "height": 1 },
+  "location": { "left": 8647, "top": 8192, "width": 1, "height": 1 },
   "data":[1]
 };
 
 export const tilemap9203 = {
   "valid": true,
-  "location": { "left": 19237, "top": 24688, "width": 1, "height": 1 },
+  "location": { "left": 8647, "top": 8192, "width": 1, "height": 1 },
   "data":[1],
   "select":[10]
 };
 
 export const tilemap10 = {
   "valid": true,
-  "location": { "left": 19237, "top": 24688, "width": 1, "height": 1 },
+  "location": { "left": 8647, "top": 8192, "width": 1, "height": 1 },
   "data":[1]
 };
 
-export const metadata = {
+export const response13534 = {
+  status: 200,
+  headers: { 'Content-Type': 'image/jpeg', 'Content-Length': 45071 }
+};
+
+export const response13161 = {
+  status: 200,
+  headers: { 'Content-Type': 'image/jpeg', 'Content-Length': 45071 }
+};
+
+export const response10 = {
+  status: 200,
+  headers: { 'Content-Type': 'image/jpeg', 'Content-Length': 22885 }
+};
+
+
+export const metadata13161 = {
   "displayFieldName": "NICE_NAME",
   "fieldAliases": {
     "SRC_DATE2": "SRC_DATE2",
@@ -88,12 +119,20 @@ export const metadata = {
   "features": [
     {
       "attributes": {
-        "SRC_DATE2": 1568851200000,
-        "NICE_DESC": "Maxar",
-        "SRC_DESC": "WV02",
-        "SAMP_RES": 0.29999999999999999,
-        "SRC_ACC": 4.0599999999999996
+        "SRC_DATE2": 1442361600000,   // '2015-09-16T00:00:00.000Z'
+        "NICE_DESC": "DigitalGlobe",
+        "SRC_DESC": "WV03_VNIR",
+        "SAMP_RES": 0.3,
+        "SRC_ACC": 4
       }
     }
   ]
+};
+
+export const metadata13161Result = {
+  captureDate:  '2015-09-16',
+  provider:     'DigitalGlobe',
+  source:       'WV03_VNIR',
+  resolution:   0.3,
+  accuracy:     4
 };

@@ -6,7 +6,6 @@ import { FetchError, utilFetchResponse } from '../util/index.js';
 
 const WAYBACK_SERVICE_BASE_PROD = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';
 //const WAYBACK_SERVICE_BASE_DEV = 'https://waybackdev.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';
-const TILEZOOM = 14;
 
 /**
  * `WaybackService`
@@ -31,16 +30,17 @@ export class WaybackService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'wayback';
-    this.requiredDependencies = new Set(['assets', 'spatial']);
-    this.optionalDependencies = new Set(['gfx', 'l10n']);
+    this.requiredDependencies = new Set(['assets' /*,'spatial'*/]);
+    this.optionalDependencies = new Set([]);
 
     this.allDates = [];                 // Array<releaseDate> ascending
     this.byReleaseNumber = new Map();   // Map<releaseNumber, Object>
     this.byReleaseDate = new Map();     // Map<releaseDate, Object>
 
-    this._tiler = new Tiler();//.zoomRange(TILEZOOM);
+    this._tiler = new Tiler();
     this._cache = {};
-    this._metadata = new Map();   // Map<key, Object>  where `key` like 'tileID_YYYY-MM-DD'
+    this._metadata = new Map();     // Map<key, Object>  where `key` like 'tileID_YYYY-MM-DD'
+    this._localDates = new Map();   // Map<tileID, Array<releaseDate>>
   }
 
 
@@ -54,7 +54,6 @@ export class WaybackService extends AbstractSystem {
 
     const context = this.context;
     const assets = context.systems.assets;
-    const gfx = context.systems.gfx;
 
     return this._initPromise = super.initAsync()
       .then(() => this.resetAsync())
@@ -105,7 +104,6 @@ export class WaybackService extends AbstractSystem {
           }
           previous = curr;
         }
-
       });
   }
 
@@ -132,11 +130,11 @@ export class WaybackService extends AbstractSystem {
       }
     }
     this._cache = {
-      inflight:   new Map()  // Map<tileID, {Promise, AbortController}>
+      inflight: new Map()  // Map<tileID, {Promise, AbortController}>
     };
 
-    const spatial = this.context.systems.spatial;
-    spatial.clearCache('wayback');
+//    const spatial = this.context.systems.spatial;
+//    spatial.clearCache('wayback');
 
     return Promise.resolve();
   }
@@ -155,10 +153,11 @@ export class WaybackService extends AbstractSystem {
     const requestDate = this._localeDateString(val);
     if (!requestDate) return chooseDate;
 
-    for (let i = 1; i < this.allDates.length; i++) {   // can skip oldest, it is already in chooseDate
-      const cmp = requestDate.localeCompare(chooseDate);
-      if (cmp <= 0) break;             // stop looking
-      chooseDate = this.allDates[i];   // try next date
+    for (let i = 1; i < this.allDates.length; i++) {   // can skip earliest, it is already in chooseDate
+      const date = this.allDates[i];
+      const cmp = date.localeCompare(requestDate);
+      if (cmp > 0) break;   // went over, stop looking
+      chooseDate = date;    // this date works
     }
     return chooseDate;
   }
@@ -167,11 +166,11 @@ export class WaybackService extends AbstractSystem {
   /**
    * getLocalDatesAsync
    * Return a Promise to get the list of wayback imagery dates that appear changed in the current view.
-   * @return  {Promise}  Promise resolved with a `Map<releaseDate, release>` candidate releases for current tile
+   * @return  {Promise}  Promise resolved with an `Array<releaseDate>` for the current view
    */
   getLocalDatesAsync() {
     const context = this.context;
-    const spatial = context.systems.spatial;
+    // const spatial = context.systems.spatial;
     const viewport = context.viewport;
     const cache = this._cache;
 
@@ -185,6 +184,10 @@ export class WaybackService extends AbstractSystem {
 
     // Done already..
     const tileID = tile.id;
+    const localDates = this._localDates.get(tileID);
+    if (localDates) {
+      return Promise.resolve(localDates);
+    }
     //if (spatial.hasTile('wayback', tileID))
     // const dates = cache.localDates.get(tileID);
     // if (dates) {
@@ -203,15 +206,13 @@ export class WaybackService extends AbstractSystem {
 
     const controller = new AbortController();
     const opts = { signal: controller.signal };
-
-    return Promise.resolve()
+    const prom = Promise.resolve()
       .then(() => this.checkTilemapsAsync(tile, opts))
       .then(releases => this.checkImagesAsync(releases, tile, opts))
       .then(releases => {
-        return {
-          tile: tile,
-          releases: releases
-        };
+        const localDates = [...releases.keys()];
+        this._localDates.set(tileID, localDates);
+        return localDates;
       })
       .catch(err => {
         if (err.name === 'AbortError') return;          // ok
@@ -220,6 +221,9 @@ export class WaybackService extends AbstractSystem {
       .finally(() => {
         cache.inflight.delete(tileID);
       });
+
+    cache.inflight.set(tileID, { promise: prom, controller: controller });
+    return prom;
   }
 
 
@@ -347,7 +351,6 @@ export class WaybackService extends AbstractSystem {
         for (const result of results) {
           if (result.size > 0 && result.size !== lastSize) {
             keepReleases.set(result.releaseDate, result.release);
-            console.log(`keeping ${result.releaseDate} ${result.releaseNumber} size=${result.size}`);
           }
           lastSize = result.size;
         }
@@ -409,13 +412,13 @@ export class WaybackService extends AbstractSystem {
           throw new Error(`Metadata not found for ${tile.id} release ${releaseDate}`);
         }
 
-        const captureDate = this._localeDateString(attr.SRC_DATE2);
+        const captureDate = new Date(attr.SRC_DATE2).toISOString().split('T')[0];  // convert timestamp to string
         const metadata = {
-          capture_date:  captureDate,     // '2024-02-14'
-          provider:      attr.NICE_DESC,  // 'Maxar'
-          source_name:   attr.SRC_DESC,   // 'WV03'
-          resolution:    attr.SAMP_RES,   // 0.3  (meters / px)
-          accuracy:      attr.SRC_ACC     // 5    (meters within true location)
+          captureDate:  captureDate,     // '2024-02-14'
+          provider:     attr.NICE_DESC,  // 'Maxar'
+          source:       attr.SRC_DESC,   // 'WV03'
+          resolution:   attr.SAMP_RES,   // 0.3  (meters / px)
+          accuracy:     attr.SRC_ACC     // 5    (meters within true location)
         };
         this._metadata.set(key, metadata);
         return metadata;

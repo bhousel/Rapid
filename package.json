@@ -66,7 +66,6 @@
     "@rapid-sdk/util": "~1.0.0-pre.3",
     "@rapideditor/country-coder": "~5.4.0",
     "@rapideditor/location-conflation": "~1.5.0",
-    "@rapideditor/wayback-core": "^1.0.7",
     "@tmcw/togeojson": "^7.1.2",
     "@types/chai": "^5.2.2",
     "@xmldom/xmldom": "^0.8.11",

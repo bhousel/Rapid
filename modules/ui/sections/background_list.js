@@ -43,12 +43,9 @@ export function uiSectionBackgroundList(context) {
 
   let _backgroundList = select(null);
   let _keys = null;
+  let _waybackPromise = null;  // only allow one at a time
   let _waybackDates = [];
   let _waybackLoc = null;
-
-  if (wayback) {
-    _waybackDates = wayback.allDates.slice().reverse();  // copy and sort descending
-  }
 
 
   const settingsCustomBackground = uiSettingsCustomBackground(context)
@@ -74,7 +71,20 @@ export function uiSectionBackgroundList(context) {
    * It skips actual rendering if the disclosure is closed
    */
   function renderIfVisible() {
-    section.reRender();
+    if (isVisible()) {
+      section.reRender();
+    }
+  }
+
+
+  /* renderIfVisible
+   * Checks if the pane and disclosure section are both visible.
+   */
+  function isVisible() {
+    const $container = context.container();
+    if ($container.selectAll('.map-pane.background-pane.hide').size()) return false;
+    if (section.selection().selectAll('.disclosure-wrap.hide').size()) return false;
+    return true;
   }
 
 
@@ -368,6 +378,13 @@ export function uiSectionBackgroundList(context) {
         // Update the Wayback release date options
         if (d.id === 'EsriWayback') {
           const currDate = d.date;
+
+          // If we don't know the locally changed dates yet, just show all dates in the dropdown
+          if (wayback && !_waybackDates.length) {
+            _waybackDates = wayback.allDates.slice().reverse();  // copy and sort descending
+            refreshWaybackDates();
+          }
+
           const dropdown = li.selectAll('.wayback-date');
           const options = dropdown.selectAll('option')
             .data(_waybackDates, d => d);
@@ -558,13 +575,10 @@ export function uiSectionBackgroundList(context) {
 
   /*
    * refreshWaybackDates
-   * Redraw the list sometimes if the map has moved
+   * Refresh the list locally-changed Wayback dates.
+   * This is used as the source data for the dropdown.
    */
   function refreshWaybackDates() {
-    // is it even visible?
-    const $selection = section.selection();
-    if ($selection.classed('hide')) return;
-
     const source = imagery.getSourceByID('EsriWayback');
     if (!wayback || !source) return;
 
@@ -572,21 +586,26 @@ export function uiSectionBackgroundList(context) {
     const currLoc =  context.viewport.centerLoc();
     const needsRefresh = (geoSphericalDistance(currLoc, lastLoc) > 5000);  // map moved > 5000 meters
 
-    if (needsRefresh) {
-      wayback.getLocalDatesAsync()
+    if (needsRefresh && !_waybackPromise) {
+      _waybackPromise = wayback.getLocalDatesAsync()
         .then(result => {
+          if (!Array.isArray(result)) return;
+
           const allDates = wayback.allDates;
           const currDate = source.date;
-          const keepDates = new Set(result.releases.keys());
+          const keepDates = new Set(result);
 
-          // Make sure to always include oldest, newest, and current selection.
+          // Make sure to always include oldest, newest, and currently selected date.
           keepDates.add(allDates.at(0));
           keepDates.add(allDates.at(-1));
           if (currDate) keepDates.add(currDate);
 
-          _waybackDates = [...keepDates].sort().reverse();   // sort as strings decending;
+          _waybackDates = [...keepDates].sort().reverse();   // sort as strings decending
           _waybackLoc = currLoc;
           renderIfVisible();
+        })
+        .finally(() => {
+          _waybackPromise = null;  // can try again
         });
     }
   }
@@ -594,12 +613,14 @@ export function uiSectionBackgroundList(context) {
 
   /*
    * onMapDraw
-   * Redraw the list sometimes if the map has moved
+   * Redraw the content sometimes after the map has moved.
    */
   function onMapDraw() {
     window.requestIdleCallback(() => {
-      refreshWaybackDates();
-      renderIfVisible();
+      if (isVisible()) {
+        refreshWaybackDates();
+        renderIfVisible();
+      }
     });
   }
 
