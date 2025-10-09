@@ -460,7 +460,7 @@ export class StreetsideService extends AbstractSystem {
       $attribution
         .append('span')
         .attr('class', 'captured_at')
-        .text(_localeDateString(props.captured_at));
+        .text(l10n.displayShortDate(props.captured_at));
 
       $attribution
         .append('span')
@@ -473,17 +473,6 @@ export class StreetsideService extends AbstractSystem {
       .attr('target', '_blank')
       .attr('href', `https://www.bing.com/maps?cp=${props.loc[1]}~${props.loc[0]}&lvl=17&dir=${props.ca}&style=x&v=2&sV=1`)
       .text('bing.com');
-
-
-    function _localeDateString(s) {
-      if (!s) return null;
-      const options = { day: 'numeric', month: 'short', year: 'numeric' };
-      const d = new Date(s);
-      if (isNaN(d.getTime())) return null;
-
-      const localeCode = l10n.localeCode();
-      return d.toLocaleDateString(localeCode, options);
-    }
   }
 
 
@@ -680,22 +669,6 @@ export class StreetsideService extends AbstractSystem {
 
     photos.selectPhoto('streetside', nextBubble.id);
     this.emit('imageChanged');
-  }
-
-
-  /**
-   * _localeDateString
-   * @param  {string}  s - the date to format, as a string
-   * @return {string}  the localized date string
-   */
-  _localeDateString(s) {
-    if (!s) return null;
-    const options = { day: 'numeric', month: 'short', year: 'numeric' };
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return null;
-
-    const localeCode = this.context.systems.l10n.localeCode();
-    return d.toLocaleString(localeCode, options);
   }
 
 

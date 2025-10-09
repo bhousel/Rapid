@@ -1,6 +1,7 @@
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
+import { utilDate, utilDateString } from '../util/date.js';
 
 
 /**
@@ -347,7 +348,7 @@ export class PhotoSystem extends AbstractSystem {
 
   /**
    * fromDate
-   * @return  The from date filter value, or null if unset
+   * @return  The from date filter value, as YYYY-MM-DD, or null if unset
    * @readonly
    */
   get fromDate() {
@@ -356,7 +357,7 @@ export class PhotoSystem extends AbstractSystem {
 
   /**
    * toDate
-   * @return  The to date filter value, or null if unset
+   * @return  The to date filter value, as YYYY-MM-DD, or null if unset
    * @readonly
    */
   get toDate() {
@@ -574,31 +575,31 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * setDateFilter
    * Sets a date filter value
-   * @param   type   'fromDate' or 'toDate'
-   * @param   val    the value to set it to
+   * @param  {string}  type - 'fromDate' or 'toDate'
+   * @param  {string}  val  - the value to set it to, should be in YYYY-MM-DD format
    */
   setDateFilter(type, val) {
-    // validate the date
-    let date = val && new Date(val);
-    if (date && !isNaN(date)) {
-      val = date.toISOString().slice(0, 10);
-    } else {
-      val = null;
-    }
-
+    const newValue = utilDateString(val) || null;
+    const newDate = utilDate(val);
     let didChange = false;
-    if (type === 'fromDate') {
-      this._filterFromDate = val;
+
+    if (type === 'fromDate') {   // set the fromDate..
+      this._filterFromDate = newValue;
       didChange = true;
-      if (this._filterFromDate && this._filterToDate && new Date(this._filterToDate) < new Date(this._filterFromDate)) {
-        this._filterToDate = this._filterFromDate;
+
+      const toDate = utilDate(this._filterToDate);
+      if (newDate && toDate && newDate > toDate) {  // if new fromDate is after toDate..
+        this._filterToDate = newValue;
       }
     }
-    if (type === 'toDate') {
-      this._filterToDate = val;
+
+    if (type === 'toDate') {    // set the toDate..
+      this._filterToDate = newValue;
       didChange = true;
-      if (this._filterFromDate && this._filterToDate && new Date(this._filterToDate) < new Date(this._filterFromDate)) {
-        this._filterFromDate = this._filterToDate;
+
+      const fromDate = utilDate(this._filterFromDate);
+      if (newDate && fromDate && newDate < fromDate) {  // if new toDate is before fromDate..
+        this._filterFromDate = newValue;
       }
     }
 

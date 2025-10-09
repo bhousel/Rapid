@@ -2,7 +2,8 @@ import { Tiler, Viewport } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { FetchError, utilFetchResponse } from '../util/index.js';
+import { utilDateString } from '../util/date.js';
+import { FetchError, utilFetchResponse } from '../util/fetch_response.js';
 
 const WAYBACK_SERVICE_BASE_PROD = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';
 //const WAYBACK_SERVICE_BASE_DEV = 'https://waybackdev.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';
@@ -150,7 +151,7 @@ export class WaybackService extends AbstractSystem {
   chooseClosestDate(val) {
     let chooseDate = this.allDates[0];  // start with earliest date
 
-    const requestDate = this._localeDateString(val);
+    const requestDate = utilDateString(val);
     if (!requestDate) return chooseDate;
 
     for (let i = 1; i < this.allDates.length; i++) {   // can skip earliest, it is already in chooseDate
@@ -412,9 +413,8 @@ export class WaybackService extends AbstractSystem {
           throw new Error(`Metadata not found for ${tile.id} release ${releaseDate}`);
         }
 
-        const captureDate = new Date(attr.SRC_DATE2).toISOString().split('T')[0];  // convert timestamp to string
         const metadata = {
-          captureDate:  captureDate,     // '2024-02-14'
+          captureDate:  utilDateString(attr.SRC_DATE2),   // '2024-02-14'
           provider:     attr.NICE_DESC,  // 'Maxar'
           source:       attr.SRC_DESC,   // 'WV03'
           resolution:   attr.SAMP_RES,   // 0.3  (meters / px)
@@ -443,15 +443,6 @@ export class WaybackService extends AbstractSystem {
         return layerID;
       }
     }
-  }
-
-
-  _localeDateString(s) {
-    if (!s) return null;
-    const d = new Date(s + 'Z');  // Add 'Z' to create the date in UTC
-    if (isNaN(d.getTime())) return null;
-
-    return d.toISOString().split('T')[0];  // Return the date part of the ISO string
   }
 
 }

@@ -4,17 +4,6 @@ export function uiDetectionDetails(context) {
   let _marker;
 
 
-  function _localeDateString(s) {
-    if (!s) return null;
-    const options = { day: 'numeric', month: 'short', year: 'numeric' };
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return null;
-
-    const localeCode = l10n.localeCode();
-    return d.toLocaleDateString(localeCode, options);
-  }
-
-
   function render(selection) {
     const $details = selection.selectAll('.sidebar-details')
       .data(_marker ? [_marker] : [], d => d.key);
@@ -57,7 +46,7 @@ export function uiDetectionDetails(context) {
 
     $$firstseen
       .append('span')
-      .text(d => d.props.first_seen_at ? _localeDateString(d.props.first_seen_at) : l10n.t('inspector.unknown'));
+      .text(d => d.props.first_seen_at ? l10n.displayShortDate(d.props.first_seen_at) : l10n.t('inspector.unknown'));
 
     const $$lastseen = $$description
       .attr('class', 'qa-details-item')
@@ -69,7 +58,7 @@ export function uiDetectionDetails(context) {
 
     $$lastseen
       .append('span')
-      .text(d => d.props.last_seen_at ? _localeDateString(d.props.last_seen_at) : l10n.t('inspector.unknown'));
+      .text(d => d.props.last_seen_at ? l10n.displayShortDate(d.props.last_seen_at) : l10n.t('inspector.unknown'));
 
   }
 

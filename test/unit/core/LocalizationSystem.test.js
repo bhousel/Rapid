@@ -72,6 +72,8 @@ describe('LocalizationSystem', () => {
 
     before(() => {
       _l10n = new Rapid.LocalizationSystem(context);
+      _l10n._currLocaleCode = 'en-US';  // Force 'en-US' for the testing
+
       // init?
 
       _l10n._cache = {
@@ -193,6 +195,23 @@ describe('LocalizationSystem', () => {
         assert.strictEqual(_l10n.displayName(tags5), 'BART Yellow from Antioch to Millbrae via Pittsburg/Bay Point;San Francisco International Airport');
       });
     });
+
+
+    describe('displayShortDate', () => {
+      it('returns a short date using current locale', () => {
+        const s = _l10n.displayShortDate('2025-01-01T02:00:00Z');
+        assert.strictEqual(s, 'Jan 1, 2025');
+      });
+
+      it('returns empty string for invalid inputs', () => {
+        assert.strictEqual('', _l10n.displayShortDate());
+        assert.strictEqual('', _l10n.displayShortDate({}));
+        assert.strictEqual('', _l10n.displayShortDate([]));
+        assert.strictEqual('', _l10n.displayShortDate(null));
+        assert.strictEqual('', _l10n.displayShortDate(Infinity));
+      });
+    });
+
 
     describe('dmsMatcher', () => {
       it('parses D M SS format', () => {

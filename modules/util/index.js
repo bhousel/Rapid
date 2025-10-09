@@ -1,4 +1,6 @@
 export { utilCmd } from './cmd.js';
+export { utilDate } from './date.js';
+export { utilDateString } from './date.js';
 export { utilDetect } from './detect.js';
 export { utilFetchResponse, FetchError } from './fetch_response.js';
 export { utilFunctor } from './util.js';

@@ -391,7 +391,7 @@ export class KartaviewService extends AbstractSystem {
       $attribution
         .append('span')
         .attr('class', 'captured_at')
-        .text(_localeDateString(image.props.captured_at));
+        .text(l10n.displayShortDate(image.props.captured_at));
 
       $attribution
         .append('span')
@@ -404,17 +404,6 @@ export class KartaviewService extends AbstractSystem {
       .attr('target', '_blank')
       .attr('href', `https://kartaview.org/details/${image.sequenceID}/${image.sequenceIndex}/track-info`)
       .text('kartaview.org');
-
-
-    function _localeDateString(s) {
-      if (!s) return null;
-      const options = { day: 'numeric', month: 'short', year: 'numeric' };
-      const d = new Date(s);
-      if (isNaN(d.getTime())) return null;
-
-      const localeCode = l10n.localeCode();
-      return d.toLocaleDateString(localeCode, options);
-    }
   }
 
 

@@ -1,6 +1,7 @@
 import { numClamp, numWrap } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
+import { utilDate } from '../util/date.js';
 import { utilDetect } from '../util/detect.js';
 
 
@@ -798,6 +799,23 @@ export class LocalizationSystem extends AbstractSystem {
     } else {
       return area;
     }
+  }
+
+
+  /**
+   * displayShortDate
+   * Displays a date in its localized short format, for example in US would be 'Jan 01, 2025'.
+   * It treats dates as UTC, to avoid timezone surprises.
+   * Accepts a date, a numeric timestamp, or a string that looks like a Date.
+   * @param  {string|number|Date}  val - the Date-like value to display.
+   * @return {string}  Text to display
+   */
+  displayShortDate(val) {
+    const d = utilDate(val);
+    if (!d) return '';
+
+    const options = { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' };
+    return d.toLocaleDateString(this._currLocaleCode, options);
   }
 
 

@@ -258,7 +258,7 @@ export function uiSectionPhotoOverlays(context) {
       })
       .on('change', function(d3_event, d) {
         let value = utilGetSetValue(d3_select(this)).trim();
-        photos.setDateFilter(d, value, true);
+        photos.setDateFilter(d, value);
         // reload the displayed dates
         li.selectAll('input')
           .each(function(d) {

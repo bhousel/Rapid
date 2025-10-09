@@ -2,7 +2,8 @@ import { geoArea as d3_geoArea, geoMercatorRaw as d3_geoMercatorRaw } from 'd3-g
 import { utilAesDecrypt, utilQsString, utilStringQs } from '@rapid-sdk/util';
 import { geoSphericalDistance } from '@rapid-sdk/math';
 
-import { utilFetchResponse } from '../../util/index.js';
+import { utilDateString } from '../../util/date.js';
+import { utilFetchResponse } from '../../util/fetch_response.js';
 
 
 /**
@@ -60,11 +61,13 @@ export class ImagerySource {
   }
 
   get name() {
-    return this.context.systems.l10n.t(`_imagery.imagery.${this._idtx}.name`, { default: this._name });
+    const l10n = this.context.systems.l10n;
+    return l10n?.t(`_imagery.imagery.${this._idtx}.name`, { default: this._name }) || this._name;
   }
 
   get description() {
-    return this.context.systems.l10n.t(`_imagery.imagery.${this._idtx}.description`, { default: this._description });
+    const l10n = this.context.systems.l10n;
+    return l10n?.t(`_imagery.imagery.${this._idtx}.description`, { default: this._description }) || this._description;
   }
 
   get imageryUsed() {
@@ -95,8 +98,8 @@ export class ImagerySource {
 
   getMetadata(tile, callback) {
     const vintage = {
-      start: this._localeDateString(this.startDate),
-      end: this._localeDateString(this.endDate)
+      start: utilDateString(this.startDate),
+      end: utilDateString(this.endDate)
     };
     vintage.range = this._vintageRange(vintage);
 
@@ -224,15 +227,6 @@ export class ImagerySource {
   }
 
 
-  _localeDateString(s) {
-    if (!s) return null;
-    const d = new Date(s + 'Z');  // Add 'Z' to create the date in UTC
-    if (isNaN(d.getTime())) return null;
-
-    return d.toISOString().split('T')[0];  // Return the date part of the ISO string
-  }
-
-
   _vintageRange(vintage) {
     let s;
     if (vintage.start || vintage.end) {
@@ -256,7 +250,8 @@ export class ImagerySourceNone extends ImagerySource {
     super(context, { id: 'none', template: '' });
   }
   get name() {
-    return this.context.systems.l10n.t('background.none');
+    const l10n = this.context.systems.l10n;
+    return l10n?.t('background.none') || 'None';
   }
   get area() {
     return -1;  // sources in background pane are sorted by area
@@ -277,7 +272,8 @@ export class ImagerySourceCustom extends ImagerySource {
     super(context, { id: 'custom', template: template });
   }
   get name() {
-    return this.context.systems.l10n.t('background.custom');
+    const l10n = this.context.systems.l10n;
+    return l10n?.t('background.custom') || 'Custom';
   }
   get area() {
     return -2;  // sources in background pane are sorted by area
@@ -483,7 +479,7 @@ export class ImagerySourceEsri extends ImagerySource {
           }
 
           // pass through the discrete capture date from metadata
-          const captureDate = this._localeDateString(result.features[0].attributes.SRC_DATE2);
+          const captureDate = utilDateString(result.features[0].attributes.SRC_DATE2);
           vintage = {
             start: captureDate,
             end: captureDate,
@@ -498,11 +494,13 @@ export class ImagerySourceEsri extends ImagerySource {
           };
 
           // append units - meters
-          if (isFinite(metadata.resolution)) {
-            metadata.resolution += ' m';
-          }
-          if (isFinite(metadata.accuracy)) {
-            metadata.accuracy += ' m';
+          if (l10n) {
+            if (isFinite(metadata.resolution)) {
+              metadata.resolution = l10n.t('units.meters', { quantity: metadata.resolution });
+            }
+            if (isFinite(metadata.accuracy)) {
+              metadata.accuracy = l10n.t('units.meters', { quantity: metadata.accuracy });
+            }
           }
 
           this._cache[tileID].metadata = metadata;
@@ -548,10 +546,12 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
 
   // `wayback` will not be in the imagery index, so we localize these strings differently
   get name() {
-    return this.context.systems.l10n.t('background.wayback.name', { default: this._name });
+    const l10n = this.context.systems.l10n;
+    return l10n?.t('background.wayback.name', { default: this._name }) || this._name;
   }
   get description() {
-    return this.context.systems.l10n.t('background.wayback.description', { default: this._description });
+    const l10n = this.context.systems.l10n;
+    return l10n?.t('background.wayback.description', { default: this._description }) || this._description;
   }
 
   // Get the url template for the selected release

@@ -143,24 +143,6 @@ describe('ImagerySource', () => {
   });
 
 
-  describe('_localeDateString', () => {
-    it('returns null if the input is not provided', () => {
-      const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.isNull(source._localeDateString());
-    });
-
-    it('returns null if the input is not a valid date', () => {
-      const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.isNull(source._localeDateString('not a date'));
-    });
-
-    it('returns a formatted date string if the input is a valid date', () => {
-      const source = new Rapid.ImagerySource(context, { id: 'test' });
-      assert.strictEqual(source._localeDateString('2020-01-01'), '2020-01-01');
-    });
-  });
-
-
   describe('_vintageRange', () => {
     it('returns undefined if the input does not have a start or end', () => {
       const source = new Rapid.ImagerySource(context, { id: 'test' });

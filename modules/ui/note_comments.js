@@ -58,7 +58,7 @@ export function uiNoteComments(context) {
     $$metadata
       .append('div')
       .attr('class', 'comment-date')
-      .html(d => l10n.t(`note.status.${d.action}`, { when: localeDateString(d.date) }));
+      .html(d => l10n.t(`note.status.${d.action}`, { when: l10n.displayShortDate(d.date) }));
 
     $$main
       .append('div')
@@ -98,18 +98,6 @@ export function uiNoteComments(context) {
             .attr('alt', user.display_name);
         });
     }
-  }
-
-
-  function localeDateString(s) {
-    if (!s) return null;
-    const options = { day: 'numeric', month: 'short', year: 'numeric' };
-    s = s.replace(/-/g, '/'); // fix browser-specific Date() issues
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return null;
-
-    const localeCode = context.systems.l10n.localeCode();
-    return d.toLocaleDateString(localeCode, options);
   }
 
 
