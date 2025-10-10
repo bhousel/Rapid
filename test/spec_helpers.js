@@ -1,6 +1,6 @@
 /* eslint no-extend-native:off */
 
-import { expect } from '../node_modules/chai/chai.js';
+import { expect } from '../node_modules/chai/index.js';
 window.expect = expect;
 
 // Try not to load imagery

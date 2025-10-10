@@ -184,6 +184,10 @@ if (presetID === 'highway/turning_loop')            p.icon = 'maki-circle';
 if (p.icon === 'roentgen-needleleaved_tree')        p.icon = 'temaki-tree_needleleaved';
 if (p.icon === 'roentgen-tree')                     p.icon = 'temaki-tree_broadleaved';
 
+// fix: FontAwesome v7 no longer has 'fas-vector-square'
+// see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
+if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_framed';
+
           const preset = new Preset(context, presetID, p, this._fields, this._presets);
           if (preset.locationSet) newLocationSets.push(preset);
           this._presets[presetID] = preset;

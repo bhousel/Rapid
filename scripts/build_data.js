@@ -10,13 +10,6 @@ import { writeFileWithMeta } from './write_file_with_meta.js';
 import * as CLDR from './cldr.js';
 const localeCompare = new Intl.Collator('en').compare;
 
-// FontAwesome icons
-import * as fontawesome from '@fortawesome/fontawesome-svg-core';
-import { fas } from '@fortawesome/free-solid-svg-icons';
-import { far } from '@fortawesome/free-regular-svg-icons';
-import { fab } from '@fortawesome/free-brands-svg-icons';
-fontawesome.library.add(fas, far, fab);
-
 // Load source data
 const categoriesFile = 'node_modules/@openstreetmap/id-tagging-schema/dist/preset_categories.min.json';
 const fieldsFile = 'node_modules/@openstreetmap/id-tagging-schema/dist/fields.min.json';
@@ -161,6 +154,11 @@ function gatherPresetIcons(icons) {
   for (const source of [presetsJSON, categoriesJSON, fieldsJSON]) {
     for (const item of Object.values(source)) {
       if (item.icon) {
+        // fix: FontAwesome v7 no longer has 'fas-vector-square'
+        // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
+        if (item.icon === 'fas-vector-square') {
+          item.icon = 'temaki-portrait_framed';
+        }
         icons.add(item.icon);
       }
     }
@@ -176,13 +174,19 @@ function writeIcons(icons) {
     if (['iD', 'rapid', 'maki', 'temaki', 'roentgen'].includes(prefix)) {
       continue;  // These are expected to live in an existing spritesheet..
 
-    } else if (['fas', 'far', 'fab'].includes(prefix)) {   // FontAwesome, must be extracted
-      const def = fontawesome.findIconDefinition({ prefix: prefix, iconName: name });
+    } else if (['fas', 'far', 'fab'].includes(prefix)) {   // FontAwesome..
+      const folder = {
+        fas: 'node_modules/@fortawesome/fontawesome-free/svgs/solid',
+        far: 'node_modules/@fortawesome/fontawesome-free/svgs/regular',
+        fab: 'node_modules/@fortawesome/fontawesome-free/svgs/brands'
+      }[prefix];
+
       try {
-        fs.writeFileSync(`svg/fontawesome/${icon}.svg`, fontawesome.icon(def).html.toString());
-      } catch (error) {
-        console.error(`Error: No FontAwesome icon for ${icon}`);
-        throw (error);
+        // copy and remove the comments
+        const src = fs.readFileSync(`${folder}/${name}.svg`, 'utf8');
+        fs.writeFileSync(`svg/fontawesome/${icon}.svg`, src.replace(/<!--[\s\S\n]*?-->/g, ''));
+      } catch {
+        console.error(styleText('yellow', `Error: No FontAwesome icon for ${icon}`));
       }
 
     } else {
