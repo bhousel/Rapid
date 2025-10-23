@@ -6,7 +6,7 @@ import * as Rapid from '../../../modules/headless.js';
 describe('actionAddEntity', () => {
   const context = new Rapid.MockContext();
 
-  it('adds an entity to the graph', t => {
+  it('adds an entity to the graph', () => {
     const base = new Rapid.Graph(context);
     const graph = new Rapid.Graph(base);
     const entity = new Rapid.OsmNode(context);
