@@ -75,7 +75,7 @@ export class UiDefs {
       .attr('class', d => `spritesheet spritesheet-${d}`)
       .each((d, i, nodes) => {
         const $group = select(nodes[i]);
-        const url = assets.getFileURL(`img/${d}-sprite.svg`);
+        const url = assets.getFileURL(`svg/${d}-sprite.svg`);
         fetch(url)
           // We need the browser's DOMParser here, so we can insert this spritesheet into the document.
           .then(response => utilFetchResponse(response, new window.DOMParser()))

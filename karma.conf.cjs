@@ -19,8 +19,8 @@ module.exports = function (config) {
     files: [
       'node_modules/sinon/pkg/sinon.js',
       'node_modules/happen/happen.js',
-      { pattern: 'dist/rapid.js', included: true },
-      { pattern: 'dist/rapid.css', included: true },
+      { pattern: 'dist/js/rapid.js', included: true },
+      { pattern: 'dist/css/rapid.css', included: true },
       { pattern: 'dist/**/*', included: false },
       { pattern: 'node_modules/chai/*', included: false },
       { pattern: 'test/browser/renderer/*.json', included: false },
@@ -45,7 +45,7 @@ module.exports = function (config) {
     // preprocess matching files before serving them to the browser
     // available preprocessors: https://www.npmjs.com/search?q=keywords:karma-preprocessor
     preprocessors: {
-      'dist/rapid.js': ['coverage'],
+      'dist/js/rapid.js': ['coverage'],
       'test/browser/renderer/*.json': ['json_fixtures']
     },
 

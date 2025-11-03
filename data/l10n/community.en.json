@@ -50,7 +50,6 @@
       "openstreetmapchina": "OpenStreetMap China",
       "openstreetmapcologne": "OpenStreetMap Cologne",
       "openstreetmapcomunitatvalenciana": "OpenStreetMap Comunitat Valenciana",
-      "openstreetmapcostarica": "OpenStreetMap Costa Rica",
       "openstreetmapcotedivoire": "OpenStreetMap Cote d'Ivoire",
       "openstreetmapcroatia": "OpenStreetMap Croatia",
       "openstreetmapcuba": "OpenStreetMap Cuba",
@@ -89,7 +88,6 @@
       "openstreetmapguinea": "OpenStreetMap Guinea",
       "openstreetmaphaiti": "OpenStreetMap Haiti",
       "openstreetmaphamburg": "OpenStreetMap Hamburg",
-      "openstreetmaphonduras": "OpenStreetMap Honduras",
       "openstreetmaphongkong": "OpenStreetMap Hong Kong",
       "openstreetmaphungary": "OpenStreetMap Hungary",
       "openstreetmapiceland": "OpenStreetMap Iceland",
@@ -103,7 +101,6 @@
       "openstreetmapitalylazio": "OpenStreetMap Italy-Lazio",
       "openstreetmapitalylombardia": "OpenStreetMap Italy-Lombardia",
       "openstreetmapitalypiemonte": "OpenStreetMap Italy-Piemonte",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Italy-South Tyrol",
       "openstreetmapitalytrentino": "OpenStreetMap Italy-Trentino",
       "openstreetmapjapan": "OpenStreetMap Japan",
       "openstreetmapkarlsruhe": "OpenStreetMap Karlsruhe",
@@ -112,10 +109,8 @@
       "openstreetmapkerala": "OpenStreetMap Kerala",
       "openstreetmapkorea": "OpenStreetMap Korea",
       "openstreetmapkosovo": "OpenStreetMap Kosovo",
-      "openstreetmapkyrgyzstan": "OpenStreetMap Kyrgyzstan",
       "openstreetmaplatinamerica": "OpenStreetMap Latin America",
       "openstreetmaplatvia": "OpenStreetMap Latvia",
-      "openstreetmaplebanon": "OpenStreetMap Lebanon",
       "openstreetmaplesotho": "OpenStreetMap Lesotho",
       "openstreetmapliberia": "OpenStreetMap Liberia",
       "openstreetmaplibya": "OpenStreetMap Libya",
@@ -160,6 +155,7 @@
       "openstreetmappiemonte": "OpenStreetMap Piemonte",
       "openstreetmappoland": "OpenStreetMap Poland",
       "openstreetmapportugal": "OpenStreetMap Portugal",
+      "openstreetmappuglia": "OpenStreetMap Puglia",
       "openstreetmappunjab": "OpenStreetMap Punjab",
       "openstreetmaprdc": "OpenStreetMap RDC",
       "openstreetmaprennes": "OpenStreetMap Rennes",
@@ -203,6 +199,7 @@
       "openstreetmapzambia": "OpenStreetMap Zambia",
       "openstreetmapzimbabwe": "OpenStreetMap Zimbabwe",
       "osmcolombia": "OSM Colombia",
+      "osmewikiemiliaromagna": "OSM e Wiki Emilia-Romagna",
       "osmmainz": "OSM Mainz",
       "osmnelson": "OSM Nelson",
       "swissopenstreetmap": "Swiss OpenStreetMap",
@@ -754,7 +751,10 @@
       "description": "We help grow and improve OpenStreetMap in Italy."
     },
     "it-discourse": {
-      "description": "Il forum dove poter discutere di OpenStreetMap"
+      "description": "A Forum to discuss OpenStreetMap in Italy"
+    },
+    "it-emilia-romagna-telegram": {
+      "description": "Everybody is welcome! You can enter the chat with this link: {signupUrl}"
     },
     "ivides_website": {
       "description": "We are focused on sustainable development, mapping, and support of the OpenStreetMap community."
@@ -994,10 +994,6 @@
     "OSM-AR-wiki": {
       "description": "Everything you need to know about mapping in Argentina."
     },
-    "osm-asia-facebook": {
-      "description": "OpenStreetMap Asia Facebook Group",
-      "extendedDescription": "A group for integrated mapping support for Asia. We especially want to be a place for mappers without a local community to share information and collaborate on solving problems in their areas that they otherwise wouldn't be able to address because of the lack of a local community."
-    },
     "osm-at": {
       "description": "The platform for information on OpenStreetMap in Austria"
     },
@@ -1012,11 +1008,6 @@
     },
     "osm-benin-facebook": {
       "description": "Improve OpenStreetMap in Benin"
-    },
-    "OSM-Central-Salish-Sea": {
-      "name": "OpenStreetMap Central Salish Sea",
-      "description": "Mappers and OpenStreetMap users around Mount Vernon, WA",
-      "extendedDescription": "OpenStreetMap is an map of the world made by people like you. It's a map that you build, that's given away for free like wikipedia. Check out osm.org for more. We meet all the time to talk maps, make maps and have fun!"
     },
     "osm-ch": {
       "name": "{community}",
@@ -1322,10 +1313,6 @@
     "talk-mg": {
       "description": "Place for OpenStreetMap contributors, communities and users in Madagascar to share and discuss."
     },
-    "talk-pacific": {
-      "description": "The regional OSM mailing list for and by the peoples of the Moana/Oceania/Pacific",
-      "extendedDescription": "We would like this mailing list to support all peoples of the Pacific, in all of our diversity and aspirations, to share thoughts, questions, projects, and everything related to OpenStreetMap in our sea of islands."
-    },
     "tn-facebook-group": {
       "name": "{community} Facebook Group"
     },
@@ -1368,10 +1355,6 @@
     "us-massachusetts-mailinglist": {
       "name": "Talk-us-massachusetts Mailing List",
       "description": "Email mailing list for the Massachusetts OSM community"
-    },
-    "us-newyork-mailinglist": {
-      "name": "Talk-us-newyork Mailing List",
-      "description": "Email mailing list for the New York State OSM community"
     },
     "uy-irc": {
       "description": "Join #{account} on irc.freenode.org (port 6667)",
@@ -1444,11 +1427,6 @@
       "name": "Clemson Mappers",
       "description": "YouthMappers chapter at Clemson University",
       "extendedDescription": "Students in Clemson are supported by the Center for Geospatial Technologies, a community of interdisciplinary geospatial science practitioners supporting research, teaching, and outreach activities using technologies that enable the collection, analysis, and application of geospatial data. Students integrate geospatial technologies within their scholarly activities across all disciplines and build connections throughout the world."
-    },
-    "ym-College-of-William-and-Mary": {
-      "name": "All over the map!",
-      "description": "YouthMappers chapter at College of William and Mary",
-      "extendedDescription": "The students who are all over the map are supported by the Center for Geospatial Analysis, a group integrating GIS across the curriculum and providing student and faculty with hardware, software, and expertise.  Students of all backgrounds utilize GIS across campus, including environmental science and policy, geology, history, business, sociology, biology, anthropology, public policy, and marine sciences."
     },
     "ym-Cornell-University": {
       "name": "Mapping Society",
@@ -2008,11 +1986,6 @@
       "name": "UZMappers",
       "description": "YouthMappers chapter at University of Zimbabwe",
       "extendedDescription": "UzMappersTeam Zimbabwe is a team of Volunteers using OpenStreetMap for Open Data Mapping and Humanitarian Disaster response mapping .The team empowers its members with open source geospatial technology skills."
-    },
-    "ym-UW-Madison": {
-      "name": "BadgerMaps",
-      "description": "YouthMappers chapter at UW-Madison",
-      "extendedDescription": "BadgerMaps is the UW campus chapter of Youthmappers, an organization dedicated to humanitarian and community mapping services. We connect our volunteer network with opportunities to create GIS data for projects that need it."
     },
     "ym-Vassar-College": {
       "name": "Hudson Valley Mappers",
