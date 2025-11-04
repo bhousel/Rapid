@@ -1,6 +1,6 @@
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
-import { promisify } from 'node:util';
+import { promisify } from 'bun:util';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -15,7 +15,7 @@ describe('NominatimService', () => {
   const context = new Rapid.MockContext();
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock
       .mockGlobal()
       .sticky(/reverse\?.*lat=48&lon=16/, { address: { country_code: 'at' }})
@@ -23,7 +23,7 @@ describe('NominatimService', () => {
       .sticky(/reverse\?.*lat=1000&lon=1000/, { error: 'Unable to geocode' });
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
   });
 
@@ -94,7 +94,7 @@ describe('NominatimService', () => {
   describe('methods', () => {
     let _nominatim;
 
-    before(() => {
+    beforeAll(() => {
       _nominatim = new Rapid.NominatimService(context);
       return _nominatim.initAsync().then(() => _nominatim.startAsync());
     });

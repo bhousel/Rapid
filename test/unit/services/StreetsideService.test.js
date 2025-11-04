@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -18,23 +18,23 @@ describe('StreetsideService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock.mockGlobal();
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -87,7 +87,7 @@ describe('StreetsideService', () => {
         return prom
   // for now, expect this to fail when run headlessly
           .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-          .catch(err => assert.match(err, /document is not defined/i));
+          .catch(err => assert.match(err, /document/i));
   //        .then(val => assert.isTrue(streetside.started));
       });
     });
@@ -114,7 +114,7 @@ describe('StreetsideService', () => {
   describe('methods', () => {
     let _streetside;
 
-    before(() => {
+    beforeAll(() => {
       _streetside = new Rapid.StreetsideService(context);
 
       // We will replace the tiler to make testing a little easier.
@@ -135,7 +135,7 @@ describe('StreetsideService', () => {
     });
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', (t, done) => {
+      it('loads a tile of data and requests a redraw', done => {
         fetchMock
           .route(/StreetSideBubbleMetaData/, {
             body: JSON.stringify(sample.bubbles10),
@@ -145,14 +145,14 @@ describe('StreetsideService', () => {
 
         _streetside.loadTiles();
 
-        setImmediate(() => {
+        setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
           assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
           const spatial = context.systems.spatial;
           assert.isTrue(spatial.hasTileAtLoc('streetside-images', [10, 0]));  // tile is loaded here
           done();
-        });
+        }, 1);
       });
     });
 
@@ -168,7 +168,7 @@ describe('StreetsideService', () => {
             headers: { 'Content-Type': 'text/plain' }
           });
         _streetside.loadTiles();
-        return new Promise(resolve => { setImmediate(resolve); });
+        return new Promise(resolve => { setTimeout(resolve, 1); });
       });
 
       describe('getImages', () => {

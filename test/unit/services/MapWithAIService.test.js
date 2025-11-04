@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -15,23 +15,23 @@ describe('MapWithAIService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock.mockGlobal();
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -106,7 +106,7 @@ describe('MapWithAIService', () => {
   describe('methods', () => {
     let _mapwithai;
 
-    before(() => {
+    beforeAll(() => {
       _mapwithai = new Rapid.MapWithAIService(context);
 
       // We will replace the tiler to make testing a little easier.
@@ -167,7 +167,7 @@ describe('MapWithAIService', () => {
     });
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', (t, done) => {
+      it('loads a tile of data and requests a redraw', done => {
         fetchMock.route(/ml_roads/, {
           body: sample.data10,
           status: 200,
@@ -175,7 +175,7 @@ describe('MapWithAIService', () => {
         });
         _mapwithai.loadTiles('msBuildings');
 
-        setImmediate(() => {
+        setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
           assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
@@ -185,7 +185,7 @@ describe('MapWithAIService', () => {
 //          const spatial = context.systems.spatial;
 //          assert.isTrue(spatial.hasTileAtLoc('mapwithai', [10, 0]));  // tile is loaded here
           done();
-        });
+        }, 1);
       });
     });
 
@@ -200,7 +200,7 @@ describe('MapWithAIService', () => {
           headers: { 'Content-Type': 'text/xml' }
         });
         _mapwithai.loadTiles('msBuildings');
-        return new Promise(resolve => { setImmediate(resolve); });
+        return new Promise(resolve => { setTimeout(resolve, 1); });
       });
 
       describe('getData', () => {

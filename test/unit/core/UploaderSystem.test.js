@@ -1,4 +1,4 @@
-import { before, describe, it } from 'node:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -72,7 +72,7 @@ describe('UploaderSystem', () => {
   describe('methods', () => {
     let _uploader;
 
-    before(() => {
+    beforeAll(() => {
       _uploader = new Rapid.UploaderSystem(context);
       return _uploader.initAsync().then(() => _uploader.startAsync());
     });

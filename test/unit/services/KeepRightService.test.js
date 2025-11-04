@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -23,23 +23,23 @@ describe('KeepRightService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock.mockGlobal();
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -122,7 +122,7 @@ describe('KeepRightService', () => {
   describe('methods', () => {
     let _keepright;
 
-    before(() => {
+    beforeAll(() => {
       _keepright = new Rapid.KeepRightService(context);
       return _keepright.initAsync().then(() => _keepright.startAsync());
     });
@@ -136,17 +136,17 @@ describe('KeepRightService', () => {
 
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', (t, done) => {
+      it('loads a tile of data and requests a redraw', done => {
         fetchMock.route(/export\.php/, sample.data10);
         _keepright.loadTiles();
-        setImmediate(() => {
+        setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
           assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
           const spatial = context.systems.spatial;
           assert.isTrue(spatial.hasTileAtLoc('keepright', [10, 0]));  // tile is loaded here
           done();
-        });
+        }, 1);
       });
     });
 
@@ -157,7 +157,7 @@ describe('KeepRightService', () => {
         // (this needs to be beforeEach because the parent beforeEach resets)
         fetchMock.route(/export\.php/, sample.data10);
         _keepright.loadTiles();
-        return new Promise(resolve => { setImmediate(resolve); });
+        return new Promise(resolve => { setTimeout(resolve, 1); });
       });
 
       describe('getData', () => {

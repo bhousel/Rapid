@@ -69,11 +69,23 @@ export class UrlHashSystem extends AbstractSystem {
     this.doUpdateTitle = true;
     this.titleBase = 'Rapid';
 
-    // Note that `window` or `document` may not exist in a
+    // Note that `window`, `document`, or `location` may not exist in a
     // non-browser environment so fallback to a mock.
     try {
-      _window = window;
-      _document = window.document;
+      if (!('window' in globalThis)) {
+        throw new Error('No window');
+      }
+      _window = globalThis.window;
+
+      if (!('document' in _window)) {
+        throw new Error('No document');
+      }
+      _document = globalThis.document;
+
+      if (typeof _window.location?.hash !== 'string') {
+        throw new Error('No hash');
+      }
+
     } catch (e) {
       _document = {
         isMocked: true,

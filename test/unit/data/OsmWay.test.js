@@ -1,4 +1,4 @@
-import { after, before, describe, it } from 'node:test';
+import { afterAll, beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -7,12 +7,12 @@ describe('OsmWay', () => {
   const context = new Rapid.MockContext();
   let _savedAreaKeys;
 
-  before(() => {
+  beforeAll(() => {
     _savedAreaKeys = Rapid.osmAreaKeys;
     Rapid.osmSetAreaKeys({ building: {} });
   });
 
-  after(() => {
+  afterAll(() => {
     Rapid.osmSetAreaKeys(_savedAreaKeys);
   });
 

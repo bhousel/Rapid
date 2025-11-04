@@ -1,4 +1,4 @@
-import { after, before, describe, it } from 'node:test';
+import { afterAll, beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -114,7 +114,7 @@ describe('AssetSystem', () => {
   describe('methods', () => {
     let _assets;
 
-    before(() => {
+    beforeAll(() => {
       _assets = new Rapid.AssetSystem(context);
       return _assets.initAsync().then(() => _assets.startAsync());
     });
@@ -122,12 +122,12 @@ describe('AssetSystem', () => {
     describe('getFileURL', () => {
       const TESTMAP = { 'test/img/loader.gif': '/assets/test/img/loader-b66184b5c4afbccc25f.gif' };
 
-      before(() => {
+      beforeAll(() => {
         _assets.filePath = 'test/';
         _assets.fileReplacements = TESTMAP;
       });
 
-      after(() => {
+      afterAll(() => {
         _assets.filePath = '';
         _assets.fileReplacements = {};
       });

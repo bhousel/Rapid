@@ -1,4 +1,4 @@
-import { before, describe, it } from 'node:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -67,7 +67,7 @@ describe('StyleSystem', () => {
   describe('methods', () => {
     let _styles;
 
-    before(() => {
+    beforeAll(() => {
       _styles = new Rapid.StyleSystem(context);
       return _styles.initAsync().then(() => _styles.startAsync());
     });

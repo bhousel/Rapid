@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -20,12 +20,12 @@ describe('OsmoseService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock
       .mockGlobal()
       // service will `_loadStringsAsync()` to fetch supported issue types when it starts.
@@ -34,14 +34,14 @@ describe('OsmoseService', () => {
       .sticky(/items\/8300\/class\/52\?langs/, sample.lang_8300_52);
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -124,7 +124,7 @@ describe('OsmoseService', () => {
   describe('methods', () => {
     let _osmose;
 
-    before(() => {
+    beforeAll(() => {
       _osmose = new Rapid.OsmoseService(context);
       return _osmose.initAsync().then(() => _osmose.startAsync());
     });
@@ -138,17 +138,17 @@ describe('OsmoseService', () => {
 
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', (t, done) => {
+      it('loads a tile of data and requests a redraw', done => {
         fetchMock.route(/issues/, sample.data10);
         _osmose.loadTiles();
-        setImmediate(() => {
+        setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
           assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
           const spatial = context.systems.spatial;
           assert.isTrue(spatial.hasTileAtLoc('osmose', [10, 0]));  // tile is loaded here
           done();
-        });
+        }, 1);
       });
     });
 
@@ -159,7 +159,7 @@ describe('OsmoseService', () => {
         // (this needs to be beforeEach because the parent beforeEach resets)
         fetchMock.route(/issues/, sample.data10);
         _osmose.loadTiles();
-        return new Promise(resolve => { setImmediate(resolve); });
+        return new Promise(resolve => { setTimeout(resolve, 1); });
       });
 
       describe('getData', () => {

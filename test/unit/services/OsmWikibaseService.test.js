@@ -1,6 +1,6 @@
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
-import { promisify } from 'node:util';
+import { promisify } from 'bun:util';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './OsmWikibaseService.sample.js';
@@ -16,11 +16,11 @@ describe('OsmWikibaseService', () => {
   const context = new Rapid.MockContext();
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock.mockGlobal();
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
   });
 
@@ -91,7 +91,7 @@ describe('OsmWikibaseService', () => {
   describe('methods', () => {
     let _wikibase;
 
-    before(() => {
+    beforeAll(() => {
       _wikibase = new Rapid.OsmWikibaseService(context);
       return _wikibase.initAsync().then(() => _wikibase.startAsync());
     });

@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import gaze from 'gaze/lib/gaze.js';
 import StaticServer from 'static-server/server.js';
-import { styleText } from 'node:util';
+import { styleText } from 'bun:util';
 
 import { buildCSSAsync } from './build_css.js';
 

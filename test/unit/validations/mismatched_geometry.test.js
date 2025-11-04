@@ -1,14 +1,13 @@
-import { afterEach, before, beforeEach, describe, it } from 'node:test';
+import { beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
 describe('validationMismatchedGeometry', () => {
-  let graph;
-  let _savedAreaKeys;
+  let _graph;
 
   class MockEditSystem extends Rapid.MockSystem {
-    get staging() { return { graph: graph }; }
+    get staging() { return { graph: _graph }; }
   }
 
   const context = new Rapid.MockContext();
@@ -27,16 +26,8 @@ describe('validationMismatchedGeometry', () => {
   const validator = Rapid.validationMismatchedGeometry(context);
 
 
-  before(() => {
-    return Promise.all([
-      context.systems.locations.initAsync()
-    ]);
-  });
-
-  beforeEach(() => {
-    graph = new Rapid.Graph(context);   // reset
-    _savedAreaKeys = Rapid.osmAreaKeys;
-
+  beforeAll(() => {
+    // cache test presets to avoid `preset.initAsync` from fetching them
     const testPresets = {
       building: {
         tags: { building: '*' },
@@ -49,21 +40,23 @@ describe('validationMismatchedGeometry', () => {
       }
     };
     context.systems.assets._cache.tagging_preset_presets = testPresets;
+
+    return Promise.all([
+      context.systems.presets.initAsync()
+    ]);
   });
 
-  afterEach(() => {
-    Rapid.osmSetAreaKeys(_savedAreaKeys);
-    context.systems.assets._cache.tagging_preset_presets = {};
+  beforeEach(() => {
+    _graph = new Rapid.Graph(context);   // reset
   });
-
 
 
   function validate() {
-    const entities = [ ...graph.base.entities.values() ];
+    const entities = [ ..._graph.base.entities.values() ];
 
     let issues = [];
     for (const entity of entities) {
-      issues = issues.concat(validator(entity, graph));
+      issues = issues.concat(validator(entity, _graph));
     }
     return issues;
   }
@@ -75,7 +68,7 @@ describe('validationMismatchedGeometry', () => {
   function createPoint(n1tags = {}) {
     const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0], tags: n1tags });
     const entities = [n1];
-    graph = new Rapid.Graph(context, entities);
+    _graph = new Rapid.Graph(context, entities);
   }
 
   //    n2      w1: [n1, n2, n3]
@@ -88,7 +81,7 @@ describe('validationMismatchedGeometry', () => {
     const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [2, 0] });
     const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3'], tags: w1tags });
     const entities = [n1, n2, n3, w1];
-    graph = new Rapid.Graph(context, entities);
+    _graph = new Rapid.Graph(context, entities);
   }
 
   //    n2      w1: [n1, n2, n3, n1]
@@ -101,7 +94,7 @@ describe('validationMismatchedGeometry', () => {
     const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [2, 0] });
     const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1'], tags: w1tags });
     const entities = [n1, n2, n3, w1];
-    graph = new Rapid.Graph(context, entities);
+    _graph = new Rapid.Graph(context, entities);
   }
 
 
@@ -138,7 +131,7 @@ describe('validationMismatchedGeometry', () => {
     // In this test case, `building=yes` suggests area, and we should match the 'building' preset.
     Rapid.osmSetAreaKeys({ building: {} });
     const presets = context.systems.presets;
-    return presets.initAsync().then(() => {
+    // return presets.initAsync().then(() => {
       createOpenWay({ building: 'yes' });
 
       const issues = validate();
@@ -152,7 +145,7 @@ describe('validationMismatchedGeometry', () => {
         entityIds: ['w1']
       };
       assert.deepInclude(issues[0], expected);
-    });
+    // });
   });
 
   it('does not flag cases whether the entity matches the generic preset, regardless of geometry', () => {
@@ -160,21 +153,21 @@ describe('validationMismatchedGeometry', () => {
     // There is no preset for `waterway=security_lock`, so it matches fallback presets for both line and area.
     Rapid.osmSetAreaKeys({ waterway: { dam: true } });
     const presets = context.systems.presets;
-    return presets.initAsync().then(() => {
+    // return presets.initAsync().then(() => {
       createOpenWay({ 'disused:waterway': 'security_lock' });
       const issues = validate();
       assert.deepEqual(issues, []);
-    });
+    // });
   });
 
   it(`does not flag open way if the preset location doesn't match the entity location` , () => {
     // In this test case, there is an area preset for `amenity=library` but we won't match it because of the location
     const presets = context.systems.presets;
-    return presets.initAsync().then(() => {
+    // return presets.initAsync().then(() => {
       createOpenWay({ amenity: 'library' });
       const issues = validate();
       assert.deepEqual(issues, []);
-    });
+    // });
   });
 
   it('flags open way with both area and line tags', () => {

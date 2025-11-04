@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -17,23 +17,23 @@ describe('KartaviewService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock.mockGlobal();
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -114,7 +114,7 @@ describe('KartaviewService', () => {
   describe('methods', () => {
     let _kartaview;
 
-    before(() => {
+    beforeAll(() => {
       _kartaview = new Rapid.KartaviewService(context);
       return _kartaview.initAsync().then(() => _kartaview.startAsync());
     });
@@ -128,17 +128,17 @@ describe('KartaviewService', () => {
 
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', (t, done) => {
+      it('loads a tile of data and requests a redraw', done => {
         fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
         _kartaview.loadTiles();
-        setImmediate(() => {
+        setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
           assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
           const spatial = context.systems.spatial;
           assert.isTrue(spatial.hasTileAtLoc('kartaview-images', [10, 0]));  // tile is loaded here
           done();
-        });
+        }, 1);
       });
     });
 
@@ -149,7 +149,7 @@ describe('KartaviewService', () => {
         // (this needs to be beforeEach because the parent beforeEach resets)
         fetchMock.route(/nearby-photos/, sample.nearbyPhotos10);
         _kartaview.loadTiles();
-        return new Promise(resolve => { setImmediate(resolve); });
+        return new Promise(resolve => { setTimeout(resolve, 1); });
       });
 
       describe('getImages', () => {

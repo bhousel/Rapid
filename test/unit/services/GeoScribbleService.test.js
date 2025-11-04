@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -15,23 +15,23 @@ describe('GeoScribbleService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock.mockGlobal();
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -108,7 +108,7 @@ describe('GeoScribbleService', () => {
   describe('methods', () => {
     let _geoscribble;
 
-    before(() => {
+    beforeAll(() => {
       _geoscribble = new Rapid.GeoScribbleService(context);
       return _geoscribble.initAsync().then(() => _geoscribble.startAsync());
     });
@@ -122,17 +122,17 @@ describe('GeoScribbleService', () => {
 
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', (t, done) => {
+      it('loads a tile of data and requests a redraw', (done) => {
         fetchMock.route(/geojson/, sample.data10);
         _geoscribble.loadTiles();
-        setImmediate(() => {
+        setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
           assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
           const spatial = context.systems.spatial;
           assert.isTrue(spatial.hasTileAtLoc('geoscribble', [10, 0]));  // tile is loaded here
           done();
-        });
+        }, 1);
       });
     });
 
@@ -143,7 +143,7 @@ describe('GeoScribbleService', () => {
         // (this needs to be beforeEach because the parent beforeEach resets)
         fetchMock.route(/geojson/, sample.data10);
         _geoscribble.loadTiles();
-        return new Promise(resolve => { setImmediate(resolve); });
+        return new Promise(resolve => { setTimeout(resolve, 1); });
       });
 
       describe('getData', () => {

@@ -1,4 +1,4 @@
-import { before, describe, it } from 'node:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -70,7 +70,7 @@ describe('LocalizationSystem', () => {
   describe('methods', () => {
     let _l10n;
 
-    before(() => {
+    beforeAll(() => {
       _l10n = new Rapid.LocalizationSystem(context);
       _l10n._currLocaleCode = 'en-US';  // Force 'en-US' for the testing
 

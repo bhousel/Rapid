@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -15,23 +15,23 @@ describe('MapRouletteService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock.mockGlobal();
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -114,7 +114,7 @@ describe('MapRouletteService', () => {
   describe('methods', () => {
     let _maproulette;
 
-    before(() => {
+    beforeAll(() => {
       _maproulette = new Rapid.MapRouletteService(context);
       return _maproulette.initAsync().then(() => _maproulette.startAsync());
     });
@@ -128,18 +128,18 @@ describe('MapRouletteService', () => {
 
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', (t, done) => {
+      it('loads a tile of data and requests a redraw', done => {
         fetchMock.route(/tasks/, sample.data10);
         fetchMock.route(/challenge/, sample.challenge100);
         _maproulette.loadTiles();
-        setImmediate(() => {
+        setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 2);  // 1 for tasks, 1 for the challenge
           assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
           const spatial = context.systems.spatial;
           assert.isTrue(spatial.hasTileAtLoc('maproulette', [10, 0]));  // tile is loaded here
           done();
-        });
+        }, 1);
       });
     });
 
@@ -151,7 +151,7 @@ describe('MapRouletteService', () => {
         fetchMock.route(/tasks/, sample.data10);
         fetchMock.route(/challenge/, sample.challenge100);
         _maproulette.loadTiles();
-        return new Promise(resolve => { setImmediate(resolve); });
+        return new Promise(resolve => { setTimeout(resolve, 1); });
       });
 
       describe('getData', () => {

@@ -1,4 +1,4 @@
-import { before, describe, it } from 'node:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -17,7 +17,7 @@ describe('validationOutdatedTags', () => {
   const validator = Rapid.validationOutdatedTags(context);
 
 
-  before(() => {
+  beforeAll(() => {
     const deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
     Rapid.osmSetDeprecatedTags(deprecated);
 

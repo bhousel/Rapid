@@ -1,5 +1,5 @@
-import { describe, it } from 'node:test';
-import { strict as assert } from 'node:assert';
+import { describe, it } from 'bun:test';
+import { strict as assert } from 'bun:assert';
 import * as Rapid from '../../../modules/headless.js';
 import sinon from 'sinon';
 

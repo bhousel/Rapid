@@ -1,4 +1,4 @@
-import { before, beforeEach, describe, it } from 'node:test';
+import { beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -22,7 +22,7 @@ describe('validationAmbiguousCrossingTags', () => {
   const validator = Rapid.validationAmbiguousCrossingTags(context);
 
 
-  before(() => {
+  beforeAll(() => {
     const l10n = context.systems.l10n;
     l10n.preferredLocaleCodes = 'en';
     l10n._cache = {

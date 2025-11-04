@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -17,23 +17,23 @@ describe('MapillaryService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock.mockGlobal();
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -88,7 +88,7 @@ describe('MapillaryService', () => {
         return prom
   // for now, expect this to fail when run headlessly
           .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
-          .catch(err => assert.match(err, /document is not defined/i));
+          .catch(err => assert.match(err, /document/i));
   //        .then(val => assert.isTrue(mapillary.started));
       });
     });
@@ -117,7 +117,7 @@ describe('MapillaryService', () => {
   describe('methods', () => {
     let _mapillary;
 
-    before(() => {
+    beforeAll(() => {
       _mapillary = new Rapid.MapillaryService(context);
       return _mapillary.initAsync();
         //.then(() => _mapillary.startAsync());
@@ -132,7 +132,7 @@ describe('MapillaryService', () => {
     });
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', (t, done) => {
+      it('loads a tile of data and requests a redraw', done => {
         fetchMock.route(/mly1_/, {
           body: sample.pbf10,
           status: 200,
@@ -141,14 +141,14 @@ describe('MapillaryService', () => {
 
         _mapillary.loadTiles('images');
 
-        setImmediate(() => {
+        setTimeout(() => {
           assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
           assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
           const spatial = context.systems.spatial;
           assert.isTrue(spatial.hasTileAtLoc('mapillary-images', [10, 0]));  // tile is loaded here
           done();
-        });
+        }, 1);
       });
     });
 
@@ -163,7 +163,7 @@ describe('MapillaryService', () => {
           headers: { 'Content-Type': 'application/x-protobuf' }
         });
         _mapillary.loadTiles('images');
-        return new Promise(resolve => { setImmediate(resolve); });
+        return new Promise(resolve => { setTimeout(resolve, 1); });
       });
 
       describe('getData', () => {

@@ -1,4 +1,4 @@
-import { before, describe, it } from 'node:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -67,7 +67,7 @@ describe('SpatialSystem', () => {
   describe('methods', () => {
     let _spatial;
 
-    before(() => {
+    beforeAll(() => {
       _spatial = new Rapid.SpatialSystem(context);
       return _spatial.initAsync().then(() => _spatial.startAsync());
     });

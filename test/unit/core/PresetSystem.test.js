@@ -1,4 +1,4 @@
-import { afterEach, before, beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -72,7 +72,7 @@ describe('PresetSystem', () => {
   describe('methods', () => {
     let _presets, _savedAreaKeys;
 
-    before(() => {
+    beforeAll(() => {
       _presets = new Rapid.PresetSystem(context);
       return _presets.initAsync().then(() => _presets.startAsync());
     });

@@ -40,7 +40,6 @@ export class AssetSystem extends AbstractSystem {
         'phone_formats':             'data/phone_formats.min.json',
         'qa_data':                   'data/qa_data.min.json',
         'shortcuts':                 'data/shortcuts.min.json',
-        'tagging_preset_overrides':  'data/preset_overrides.min.json',
         'territory_languages':       'data/territory_languages.min.json',
         'wayback':                   'data/wayback.min.json',
 
@@ -71,6 +70,7 @@ export class AssetSystem extends AbstractSystem {
         'tagging_preset_defaults':    'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist/preset_defaults.min.json',
         'tagging_preset_fields':      'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist/fields.min.json',
         'tagging_preset_presets':     'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist/presets.min.json',
+        'tagging_preset_overrides':   'data/preset_overrides.min.json',
 
         'wmf_sitematrix':  'https://cdn.jsdelivr.net/npm/wmf-sitematrix@0.2/data/wikipedia.min.json'
       },
@@ -85,7 +85,6 @@ export class AssetSystem extends AbstractSystem {
         'phone_formats':             'data/phone_formats.min.json',
         'qa_data':                   'data/qa_data.min.json',
         'shortcuts':                 'data/shortcuts.min.json',
-        'tagging_preset_overrides':  'data/preset_overrides.min.json',
         'territory_languages':       'data/territory_languages.min.json',
         'wayback':                   'data/wayback.min.json',
 
@@ -116,6 +115,7 @@ export class AssetSystem extends AbstractSystem {
         'tagging_preset_defaults':    'data/modules/id-tagging-schema/preset_defaults.min.json',
         'tagging_preset_fields':      'data/modules/id-tagging-schema/fields.min.json',
         'tagging_preset_presets':     'data/modules/id-tagging-schema/presets.min.json',
+        'tagging_preset_overrides':   'data/preset_overrides.min.json',
 
         'wmf_sitematrix':  'data/modules/wmf-sitematrix/wikipedia.min.json'
       }
@@ -148,7 +148,7 @@ export class AssetSystem extends AbstractSystem {
     // Mock data for testing, prevents the data from being fetched.
     // Not sure how I feel about this :-/
     /* c8 ignore start */
-    const isTestEnvironment = (typeof window === 'undefined' || globalThis.mocha);
+    const isTestEnvironment = (!('window' in globalThis) || ('mocha' in globalThis));
     if (isTestEnvironment) {
       const c = this._cache;
       c.address_formats = { addressFormats: [{ format: [['housenumber', 'street'], ['city', 'postcode'] ] }] };

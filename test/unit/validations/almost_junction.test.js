@@ -1,10 +1,10 @@
-import { before, beforeEach, describe, it } from 'node:test';
+import { beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
 // TODO FIX Tree.waySegments
-describe.skip('validationAlmostJunction', () => {
+describe.todo('validationAlmostJunction', () => {
   let graph, tree;
 
   class MockEditSystem extends Rapid.MockSystem {
@@ -19,10 +19,10 @@ describe.skip('validationAlmostJunction', () => {
     spatial:  new Rapid.SpatialSystem(context)
   };
 
-  const validator = Rapid.validationAlmostJunction(context);
+  const validator = null;//Rapid.validationAlmostJunction(context);
 
 
-  before(() => {
+  beforeAll(() => {
     return context.systems.spatial.initAsync();
   });
 

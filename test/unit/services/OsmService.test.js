@@ -1,5 +1,5 @@
-import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
-import { promisify } from 'node:util';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
+import { promisify } from 'bun:util';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -16,12 +16,12 @@ describe('OsmService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock
       .mockGlobal()
       .sticky(/api\/capabilities\.json/, sample.capabilitiesJSON)
@@ -30,14 +30,14 @@ describe('OsmService', () => {
       .sticky(/changesets\.json\?user=/, sample.changesetsJSON);
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -131,7 +131,7 @@ describe('OsmService', () => {
 
       it('emits an authchange event and requests a redraw', () => {
         const osm = new Rapid.OsmService(context);
-        const spyAuthChange = mock.fn();
+        const spyAuthChange = mock();
         osm.on('authchange', spyAuthChange);
         const opts = {
           url: 'https://www.example.com',
@@ -142,8 +142,8 @@ describe('OsmService', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            assert.strictEqual(spyAuthChange.mock.callCount(), 1);  // authchange emitted once
-            assert.lengthOf(spyRedraw.mock.calls, 1);               // redraw called once
+            assert.lengthOf(spyAuthChange.mock.calls, 1);   // authchange emitted once
+            assert.lengthOf(spyRedraw.mock.calls, 1);       // redraw called once
           });
       });
     });
@@ -166,7 +166,7 @@ describe('OsmService', () => {
       });
     }
 
-    before(() => {
+    beforeAll(() => {
       _osm = new Rapid.OsmService(context);
       return _osm.initAsync().then(() => _osm.startAsync());
     });
@@ -176,7 +176,7 @@ describe('OsmService', () => {
       context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       context.viewport.dimensions = [64, 64];
       _osm.logout();                  // note: logout now triggers a redraw.
-      spyRedraw.mock.resetCalls();    // exclude that redraw from the call count
+      spyRedraw.mockClear();    // exclude that redraw from the call count
       return _osm.resetAsync();
     });
 
@@ -595,7 +595,7 @@ describe('OsmService', () => {
 
 
     describe('loadNotes', () => {
-      it('loads a tile of notes and requests a redraw', (t, done) => {
+      it('loads a tile of notes and requests a redraw', done => {
         fetchMock.route(/notes/, sample.notesJSON);
         _osm.loadNotes({ /*no options*/ });
         // no errback to promisify :-(

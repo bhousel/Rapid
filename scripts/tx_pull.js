@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import JSON5 from 'json5';
 import shell from 'shelljs';
 import stringify from 'json-stringify-pretty-compact';
-import { styleText } from 'node:util';
+import { styleText } from 'bun:util';
 import { transifexApi as api } from '@transifex/api';
 
 import * as CLDR from './cldr.js';

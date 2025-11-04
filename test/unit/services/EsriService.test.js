@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -15,26 +15,26 @@ describe('EsriService', () => {
 
   // Spy on redraws..
   const gfx = context.systems.gfx;
-  const spyRedraw = mock.fn();
+  const spyRedraw = mock();
   gfx.immediateRedraw = spyRedraw;
   gfx.deferredRedraw = spyRedraw;
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock
       .mockGlobal()
       .sticky(/search\?.*&start=1$/, sample.datasetsPage1)
       .sticky(/search\?.*&start=101$/, sample.datasetsPage2);
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
-    mock.reset();
+    spyRedraw.mockReset();
   });
 
   beforeEach(() => {
     fetchMock.removeRoutes().clearHistory();
-    spyRedraw.mock.resetCalls();
+    spyRedraw.mockClear();
   });
 
 
@@ -108,7 +108,7 @@ describe('EsriService', () => {
   describe('methods', () => {
     let _esri;
 
-    before(() => {
+    beforeAll(() => {
       _esri = new Rapid.EsriService(context);
       return _esri.initAsync().then(() => _esri.startAsync());
     });

@@ -2,7 +2,7 @@
 /* eslint-disable no-process-env */
 import fs from 'node:fs';
 import JSON5 from 'json5';
-import { styleText } from 'node:util';
+import { styleText } from 'bun:util';
 import { transifexApi as api } from '@transifex/api';
 
 //

@@ -1,4 +1,4 @@
-import { before, beforeEach, describe, it } from 'node:test';
+import { beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../../modules/headless.js';
 
@@ -48,7 +48,7 @@ describe('getDeprecatedTags', () => {
     { old: { amenity: 'gambling', gambling: 'casino' }, replace: { amenity: 'casino' } }
   ];
 
-  before(() => {
+  beforeAll(() => {
     Rapid.osmSetDeprecatedTags(deprecated);
   });
 

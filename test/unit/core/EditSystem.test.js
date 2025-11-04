@@ -1,4 +1,4 @@
-import { beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import sinon from 'sinon';
 import * as Rapid from '../../../modules/headless.js';

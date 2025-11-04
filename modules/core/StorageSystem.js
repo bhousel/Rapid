@@ -26,7 +26,11 @@ export class StorageSystem extends AbstractSystem {
     // Note that accessing localStorage may throw a `SecurityError`,
     // or just not exist in a non-browser environment, so fallback to a mock.
     try {
-      this._storage = window.localStorage;
+      if (!('localStorage' in globalThis)) {
+        throw new Error('No localStorage');
+      }
+      this._storage = globalThis.localStorage;
+
     } catch (e) {
       this._mock = new Map();
       this._storage = {

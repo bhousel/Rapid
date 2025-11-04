@@ -1,7 +1,7 @@
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { afterAll, beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
-import { promisify } from 'node:util';
+import { promisify } from 'bun:util';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -15,7 +15,7 @@ describe('TaginfoService', () => {
   const context = new Rapid.MockContext();
 
   // Setup fetchMock..
-  before(() => {
+  beforeAll(() => {
     fetchMock
       .mockGlobal()
       // This matches the query run in `startAsync()` to get the list of popular keys.
@@ -26,7 +26,7 @@ describe('TaginfoService', () => {
       });
   });
 
-  after(() => {
+  afterAll(() => {
     fetchMock.hardReset({ includeSticky: true });
   });
 
@@ -97,7 +97,7 @@ describe('TaginfoService', () => {
   describe('methods', () => {
     let _taginfo;
 
-    before(() => {
+    beforeAll(() => {
       _taginfo = new Rapid.TaginfoService(context);
       return _taginfo.initAsync().then(() => _taginfo.startAsync());
     });

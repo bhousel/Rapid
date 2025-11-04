@@ -1,4 +1,4 @@
-import { beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -111,24 +111,24 @@ describe('MapSystem', () => {
 
 
     describe('zoomIn', () => {
-      it('increments zoom', (t, done) => {
+      it('increments zoom', done => {
         assert.strictEqual(_map.zoom(4), _map);  // set
         _map.zoomIn();
-        setImmediate(() => {
+        setTimeout(() => {
           assert.closeTo(_map.zoom(), 5, 1e-6);  // get
           done();
-        });
+        }, 1);
       });
     });
 
     describe('zoomOut', () => {
-      it('decrements zoom', (t, done) => {
+      it('decrements zoom', done => {
         assert.strictEqual(_map.zoom(4), _map);  // set
         _map.zoomOut();
-        setImmediate(() => {
+        setTimeout(() => {
           assert.closeTo(_map.zoom(), 3, 1e-6);  // get
           done();
-        });
+        }, 1);
       });
     });
 
@@ -145,25 +145,25 @@ describe('MapSystem', () => {
     });
 
     describe('centerEase', () => {
-      it('sets center', (t, done) => {
+      it('sets center', done => {
         assert.strictEqual(_map.centerEase([20, 20], 0), _map);  // set
-        setImmediate(() => {
+        setTimeout(() => {
           assert.closeTo(_map.center()[0], 20, 1e-6);  // get
           assert.closeTo(_map.center()[1], 20, 1e-6);  // get
           done();
-        });
+        }, 1);
       });
     });
 
     describe('centerZoom', () => {
-      it('gets and sets center and zoom', (t, done) => {
+      it('gets and sets center and zoom', done => {
         assert.strictEqual(_map.centerZoom([20, 25], 4), _map);  // set
-        setImmediate(() => {
+        setTimeout(() => {
           assert.closeTo(_map.center()[0], 20, 1e-6);  // get
           assert.closeTo(_map.center()[1], 25, 1e-6);  // get
           assert.strictEqual(_map.zoom(), 4);          // get
           done();
-        });
+        }, 1);
       });
     });
 
