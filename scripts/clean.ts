@@ -32,9 +32,10 @@ for (const f of folders) {
   await $`rm -rf ${f}`;
 }
 
-// Legacy: what `run clean` did before:
-await $`rm -f ./dist/esbuild.json`;
-await $`rm -f ./dist/*.js`;
-await $`rm -f ./dist/*.map`;
-await $`rm -f ./dist/*.css`;
-await $`rm -f ./dist/img/*-sprite.svg`;
+// Legacy: Remove some older things from the project
+await $`rm -f ./dist/esbuild.json`.quiet();
+await $`rm -f ./dist/*.js`.quiet();
+await $`rm -f ./dist/*.map`.quiet();
+await $`rm -f ./dist/*.css`.quiet();
+await $`rm -f ./dist/img/*-sprite.svg`.quiet();
+await $`rm -f ./img`.quiet();

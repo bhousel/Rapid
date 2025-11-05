@@ -128,7 +128,7 @@ export class RapidSystem extends AbstractSystem {
 
         // Set some defaults if urlhash doesn't have them
         if (!urlhash?.initialHashParams.has('datasets')) {
-          this._addedDatasetIDs = new Set(['fbRoads', 'msBuildings', 'overture-places', 'omdFootways']);  // on menu
+          this._addedDatasetIDs = new Set(['fbRoads', 'msBuildings', 'overture-places' /*, 'omdFootways'*/]);  // on menu
           this._enabledDatasetIDs = new Set(['fbRoads', 'msBuildings']);  // checked
           this._datasetsChanged();
         }
