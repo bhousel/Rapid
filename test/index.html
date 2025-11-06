@@ -1,86 +1,98 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-  <meta charset='utf-8'>
-  <title>Mocha Tests</title>
-  <link rel='stylesheet' href='../node_modules/mocha/mocha.css'>
-  <link rel='stylesheet' href='../dist/css/rapid.css'>
-  <style type='text/css'>
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-    }
-  </style>
+<meta charset='utf-8'>
+<title>Mocha Tests</title>
+<link rel='stylesheet' href='../node_modules/mocha/mocha.css'>
 </head>
 
 <body style="overflow:scroll">
-  <div id='mocha'></div>
+<div id='mocha'></div>
 
-  <script src='../node_modules/mocha/mocha.js'></script>
-  <script src='../node_modules/sinon/pkg/sinon.js'></script>
-  <script src='../node_modules/happen/happen.js'></script>
-  <script src='../dist/js/rapid.js'></script>
+<script src='../node_modules/mocha/mocha.js'></script>
+<script src='../node_modules/sinon/pkg/sinon.js'></script>
+<script src='../dist/js/rapid-dev.js'></script>
 
-  <script type='module' src='./spec_helpers.js'></script>
+<script type='module'>
 
-  <script>
-    var scripts = [
-      'browser/Context.test.js',
+// Setup chai
+import { assert } from '../node_modules/chai/index.js';
+window.assert = assert;
 
-      'browser/operations/extract.js',
-      'browser/operations/straighten.js',
+// Setup mocha
+mocha.setup({
+  timeout: 5000,  // 5 sec
+  ui: 'bdd',
+  globals: [
+    '__onmousemove.zoom',
+    '__onmouseup.zoom',
+    '__onkeydown.select',
+    '__onkeyup.select',
+    '__onclick.draw',
+    '__onclick.draw-block'
+  ]
+});
 
-      // 'browser/svg/tag_classes.js',
+// Try not to load imagery
+window.location.hash = '#background=none';
 
-      'browser/ui/combobox.js',
-      'browser/ui/confirm.js',
-      'browser/ui/flash.js',
-      'browser/ui/icon.js',
-      'browser/ui/modal.js',
-      'browser/ui/sections/raw_tag_editor.js',
-      'browser/ui/fields/access.js',
-      'browser/ui/fields/localized.js',
-      'browser/ui/fields/wikipedia.js',
+// Force the browser to use mouse events
+delete window.PointerEvent;
 
-      'browser/util/cmd.js'
-    ];
 
-    window.executionErrors = [];
+var scripts = [
+  'browser/Context.test.js',
 
-    window.onerror = function (message, source, line, col) {
-      window.executionErrors.push(message + " source: " + source + " line: " + line + " col: " + col);
-    };
+  'browser/operations/extract.js',
+  'browser/operations/straighten.js',
 
-    // Create and execute all test scripts in specified order..
-    function nextScript() {
-      if (!scripts.length) {
-        window.mocha.run();
+  // 'browser/svg/tag_classes.js',
 
-        if (window.executionErrors.length > 0){
-          console.log('\n[Execution errors exist] Please resolve the following:');
-          for (var i = 0; i < window.executionErrors.length; i++){
-            console.log('[Execution error] ' + window.executionErrors[i]);
-          }
-          console.log('Disposing mocha.');
-          window.mocha.dispose();
-        }
-        return;
+  'browser/ui/combobox.js',
+  'browser/ui/confirm.js',
+  'browser/ui/flash.js',
+  'browser/ui/icon.js',
+  'browser/ui/modal.js',
+  'browser/ui/sections/raw_tag_editor.js',
+  'browser/ui/fields/access.js',
+  'browser/ui/fields/localized.js',
+  'browser/ui/fields/wikipedia.js',
+
+  'browser/util/cmd.js'
+];
+
+window.executionErrors = [];
+
+window.onerror = function (message, source, line, col) {
+  window.executionErrors.push(message + " source: " + source + " line: " + line + " col: " + col);
+};
+
+// Create and execute all test scripts in specified order..
+function nextScript() {
+  if (!scripts.length) {
+    window.mocha.run();
+
+    if (window.executionErrors.length > 0){
+      console.log('\n[Execution errors exist] Please resolve the following:');
+      for (var i = 0; i < window.executionErrors.length; i++){
+        console.log('[Execution error] ' + window.executionErrors[i]);
       }
-      var src = scripts.shift();
-      var newScript;
-      newScript = document.createElement('script');
-      newScript.type = 'text/javascript';
-      newScript.src = src;
-      newScript.onload = nextScript;
-      document.getElementsByTagName('body')[0].appendChild(newScript);
+      console.log('Disposing mocha.');
+      window.mocha.dispose();
     }
+    return;
+  }
+  var src = scripts.shift();
+  var newScript;
+  newScript = document.createElement('script');
+  newScript.type = 'text/javascript';
+  newScript.src = src;
+  newScript.onload = nextScript;
+  document.getElementsByTagName('body')[0].appendChild(newScript);
+}
 
-    // Defer start, this allows `spec_helpers.js` to be run as a module
-    document.addEventListener('DOMContentLoaded', () => nextScript());
-  </script>
+nextScript();
 
+</script>
 </body>
 </html>

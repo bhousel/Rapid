@@ -22,25 +22,29 @@ describe('uiFlash', () => {
     container.remove();
   });
 
+  function delay(msec) {
+    return new Promise(resolve => { setTimeout(resolve, msec); });
+  }
+
 
   it('flash is shown', () => {
     Rapid.uiFlash(context).duration(10)();
     const flashWrap = d3.selectAll('.flash-wrap');
     const footerWrap = d3.selectAll('.map-footer-wrap');
-    expect(flashWrap.classed('map-footer-show')).to.be.ok;
-    expect(footerWrap.classed('map-footer-hide')).to.be.ok;
+    assert.isTrue(flashWrap.classed('map-footer-show'));
+    assert.isTrue(footerWrap.classed('map-footer-hide'));
   });
 
-  it('flash goes away', done => {
+  it('flash goes away', () => {
     Rapid.uiFlash(context).duration(10)();
-    window.setTimeout(() => {
-      d3.timerFlush();
-      const flashWrap = d3.selectAll('.flash-wrap');
-      const footerWrap = d3.selectAll('.map-footer-wrap');
-      expect(flashWrap.classed('map-footer-hide')).to.be.ok;
-      expect(footerWrap.classed('map-footer-show')).to.be.ok;
-      done();
-    }, 20);
+    return delay(20)
+      .then(() => {
+        d3.timerFlush();
+        const flashWrap = d3.selectAll('.flash-wrap');
+        const footerWrap = d3.selectAll('.map-footer-wrap');
+        assert.isTrue(flashWrap.classed('map-footer-hide'));
+        assert.isTrue(footerWrap.classed('map-footer-show'));
+      });
   });
 
 });

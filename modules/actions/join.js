@@ -192,7 +192,7 @@ export function actionJoin(ids, options = {}) {
           conflicting = true;
 
           // Rapid tagnosticRoadCombine - allow combining highways with conflicting tags
-          if (k === 'highway' && options.tagnosticRoadCombine && !window.mocha) {
+          if (k === 'highway' && options.tagnosticRoadCombine) {
             conflicting = false;
           }
         }

@@ -56,52 +56,52 @@ describe('operationExtract', () => {
 
     it('is not available for no selected ids', () => {
       const result = Rapid.operationExtract(context, []).available();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('is not available for unknown selected id', () => {
       const result = Rapid.operationExtract(context, ['z']).available();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('is not available for selected way', () => {
       const result = Rapid.operationExtract(context, ['x']).available();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('is not available for selected node with tags, no parent way', () => {
       const result = Rapid.operationExtract(context, ['e']).available();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('is not available for selected node with no tags, no parent way', () => {
       const result = Rapid.operationExtract(context, ['f']).available();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('is not available for selected node with no tags, parent way', () => {
       const result = Rapid.operationExtract(context, ['c']).available();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('is not available for selected node with no tags, two parent ways', () => {
       const result = Rapid.operationExtract(context, ['d']).available();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('is available for selected node with tags, parent way', () => {
       const result = Rapid.operationExtract(context, ['a']).available();
-      expect(result).to.be.ok;
+      assert.isOk(result);
     });
 
     it('is available for selected node with tags, two parent ways', () => {
       const result = Rapid.operationExtract(context, ['b']).available();
-      expect(result).to.be.ok;
+      assert.isOk(result);
     });
 
     it('is available for two selected nodes with tags and parent ways', () => {
       const result = Rapid.operationExtract(context, ['a', 'b']).available();
-      expect(result).to.be.ok;
+      assert.isOk(result);
     });
   });
 
@@ -116,7 +116,7 @@ describe('operationExtract', () => {
       ]);
 
       const result = Rapid.operationExtract(context, ['b']).disabled();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('returns enabled for non-restriction related node', () => {
@@ -128,7 +128,7 @@ describe('operationExtract', () => {
         new Rapid.OsmRelation(context, { id: 'r', members: [{ id: 'b', role: 'label' }] })
       ]);
       const result = Rapid.operationExtract(context, ['b']).disabled();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('returns enabled for via node in restriction', () => {
@@ -153,7 +153,7 @@ describe('operationExtract', () => {
         })
       ]);
       const result = Rapid.operationExtract(context, ['d']).disabled();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
 
     it('returns enabled for location_hint node in restriction', () => {
@@ -179,7 +179,7 @@ describe('operationExtract', () => {
         })
       ]);
       const result = Rapid.operationExtract(context, ['d']).disabled();
-      expect(result).to.be.not.ok;
+      assert.isNotOk(result);
     });
   });
 

@@ -11,30 +11,30 @@ describe('Context', () => {
         downloaded: false
       };
 
-      expect(context.debugFlags()).to.eql(TESTFLAGS);
+      assert.deepInclude(context.debugFlags(), TESTFLAGS);
 
       context.setDebug('tile', true);
-      expect(context.getDebug('tile')).to.be.true;
+      assert.isTrue(context.getDebug('tile'));
 
       context.setDebug('label');
-      expect(context.getDebug('label')).to.be.true;
+      assert.isTrue(context.getDebug('label'));
 
       context.setDebug('tile', false);
-      expect(context.getDebug('tile')).to.be.false;
+      assert.isFalse(context.getDebug('tile'));
     });
   });
 
   describe('next', () => {
     it('gets the next number in the given sequence', () => {
       const context = new Rapid.Context();
-      expect(context.next('node')).to.equal(1);
-      expect(context.next('node')).to.equal(2);
+      assert.strictEqual(context.next('node'), 1);
+      assert.strictEqual(context.next('node'), 2);
     });
 
     it('handles sequence replacement', () => {
       const context = new Rapid.Context();
       context.sequences = { node: 100 };
-      expect(context.next('node')).to.equal(101);
+      assert.strictEqual(context.next('node'), 101);
     });
   });
 

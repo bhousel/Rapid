@@ -1,8 +1,8 @@
 // Polyfill idle callback functions (for Safari)
-window.requestIdleCallback = window.requestIdleCallback ||
+globalThis.requestIdleCallback = globalThis.requestIdleCallback ||
   function(cb) {
     var start = Date.now();
-    return window.requestAnimationFrame(function() {
+    return globalThis.requestAnimationFrame(function() {
       cb({
         didTimeout: false,
         timeRemaining: function() {
@@ -11,11 +11,11 @@ window.requestIdleCallback = window.requestIdleCallback ||
       });
     });
   };
-window.cancelIdleCallback = window.cancelIdleCallback ||
+globalThis.cancelIdleCallback = globalThis.cancelIdleCallback ||
   function(handle) {
-    window.cancelAnimationFrame(handle);
+    globalThis.cancelAnimationFrame(handle);
   };
 
-import * as Rapid from './index.js';
-window.Rapid = Rapid;
-window.Rapid.isDebug = false;
+import * as RAPID from './index.js';
+globalThis.Rapid = { ...RAPID };
+globalThis.Rapid.isDebug = false;

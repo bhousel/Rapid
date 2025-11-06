@@ -17,7 +17,8 @@ export class KeyOperationBehavior extends AbstractBehavior {
     this.id = `key-${operation.id}`;
 
     this._operation = operation;
-    if (!window.mocha) {
+    const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
+    if (!isTestEnvironment) {
       this._keybinding = this.context.keybinding(); // "global" keybinding (on document)
     }
 

@@ -86,7 +86,7 @@ export function utilDetect(refresh) {
   /* Locale */
   _cached.locales = globalThis.navigator?.languages?.slice() || ['en-US'];  // shallow copy
 
-  _cached.isTestEnvironment = (!('window' in globalThis) || ('mocha' in globalThis));
+  _cached.isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
 
   // test environment will not have `window`
   if (!_cached.isTestEnvironment) {

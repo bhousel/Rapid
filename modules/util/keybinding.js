@@ -1,131 +1,132 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 
 import { utilIterable } from './iterable.js';
 
 
 export function utilKeybinding(namespace) {
-    var _keybindings = {};
+    let _keybindings = {};
 
 
-    function testBindings(d3_event, isCapturing) {
-        var didMatch = false;
-        var bindings = Object.keys(_keybindings).map(function(id) { return _keybindings[id]; });
-        var i, binding;
+    /**
+     * testBindings
+     * Test whether the given event matches any known keybinding.
+     * IF so, it calls the bound callback function.
+     * @param  {Event}    evt          - the Event to test
+     * @param  {boolean}  isCapturing  - `true` if capturing phase, `false` if bubbling phase
+     * @return {boolean}  `true` if something matched, `false` if not
+     */
+    function testBindings(evt, isCapturing = false) {
+      const bindings = [...Object.values(_keybindings)];
 
-        // Most key shortcuts will accept either lower or uppercase ('h' or 'H'),
-        // so we don't strictly match on the shift key, but we prioritize
-        // shifted keybindings first, and fallback to unshifted only if no match.
-        // (This lets us differentiate between '←'/'⇧←' or '⌘Z'/'⌘⇧Z')
+      // Most key shortcuts will accept either lower or uppercase ('h' or 'H'),
+      // so we don't strictly match on the shift key, but we prioritize
+      // shifted keybindings first, and fallback to unshifted only if no match.
+      // (This lets us differentiate between '←'/'⇧←' or '⌘Z'/'⌘⇧Z')
 
-        // priority match shifted keybindings first
-        for (i = 0; i < bindings.length; i++) {
-            binding = bindings[i];
-            if (!binding.event.modifiers.shiftKey) continue;  // no shift
-            if (!!binding.capture !== isCapturing) continue;
-            if (matches(d3_event, binding, true)) {
-                binding.callback(d3_event);
-                didMatch = true;
-
-                // match a max of one binding per event
-                break;
-            }
+      // Match shifted keybindings first...
+      for (const binding of bindings) {
+        if (!binding.event.modifiers.shiftKey) continue;  // no shift
+        if (!!binding.capture !== isCapturing) continue;
+        if (testBinding(evt, binding.event, true)) {
+          binding.callback(evt);
+          return true;  // match a max of one binding per event
         }
+      }
 
-        if (didMatch) return;
-
-        // then unshifted keybindings
-        for (i = 0; i < bindings.length; i++) {
-            binding = bindings[i];
-            if (binding.event.modifiers.shiftKey) continue;   // shift
-            if (!!binding.capture !== isCapturing) continue;
-            if (matches(d3_event, binding, false)) {
-                binding.callback(d3_event);
-                break;
-            }
+      // Then unshifted keybindings...
+      for (const binding of bindings) {
+        if (binding.event.modifiers.shiftKey) continue;   // shift
+        if (!!binding.capture !== isCapturing) continue;
+        if (testBinding(evt, binding.event, false)) {
+          binding.callback(evt);
+          return true;
         }
+      }
 
-
-        function matches(d3_event, binding, testShift) {
-            var event = d3_event;
-            var isMatch = false;
-            var tryKeyCode = true;
-
-            // Prefer a match on `KeyboardEvent.key`
-            if (event.key !== undefined) {
-                tryKeyCode = (event.key.charCodeAt(0) > 255);  // outside ISO-Latin-1
-                isMatch = true;
-
-                if (binding.event.key === undefined) {
-                    isMatch = false;
-                } else if (Array.isArray(binding.event.key)) {
-                    if (binding.event.key.map(function(s) {
-                        return s.toLowerCase();
-                    }).indexOf(event.key.toLowerCase()) === -1) {
-                        isMatch = false;
-                    }
-                } else {
-                    if (event.key.toLowerCase() !== binding.event.key.toLowerCase()) {
-                        isMatch = false;
-                    }
-                }
-            }
-
-            // Fallback match on `KeyboardEvent.keyCode`, can happen if:
-            // - browser doesn't support `KeyboardEvent.key`
-            // - `KeyboardEvent.key` is outside ISO-Latin-1 range (cyrillic?)
-            if (!isMatch && tryKeyCode) {
-                isMatch = (event.keyCode === binding.event.keyCode);
-            }
-
-            if (!isMatch) return false;
-
-            // test modifier keys
-            if (!(event.ctrlKey && event.altKey)) {  // if both are set, assume AltGr and skip it - #4096
-                if (event.ctrlKey !== binding.event.modifiers.ctrlKey) return false;
-                if (event.altKey !== binding.event.modifiers.altKey) return false;
-            }
-            if (event.metaKey !== binding.event.modifiers.metaKey) return false;
-            if (testShift && event.shiftKey !== binding.event.modifiers.shiftKey) return false;
-
-            return true;
-        }
+      return false;
     }
 
 
-    function capture(d3_event) {
-        testBindings(d3_event, true);
+    /**
+     * testBinding
+     * Test whether the given event matches the given binding.
+     * @param  {Event}    evt        - the Event to test
+     * @param  {Object}   check      - the keybinding to check
+     * @param  {boolean}  testShift  - whether to require the Shift key to match
+     * @return {boolean}  `true` if a match, `false` if not
+     */
+    function testBinding(evt, check, testShift) {
+      let isMatch = false;
+      let tryKey, tryKeyCode;
+
+      // Prefer a match on `KeyboardEvent.key`, if it is a string within ISO-Latin-1
+      // Note that `key` might be a string like 'Tab' or 'Esc' or a key like 'A'
+      if (typeof evt.key === 'string' && evt.key.length > 0 && evt.key.charCodeAt(0) <= 255) {
+        tryKey = evt.key.toLowerCase();
+      }
+      // Fallback to a match on `KeyboardEvent.keyCode` (older browsers, non-Latin key, Cyrillic?)
+      if (typeof evt.keyCode === 'number' && evt.keyCode !== 0) {
+        tryKeyCode = evt.keyCode;
+      }
+
+      // First, test `key` if possible
+      if (tryKey !== undefined && check.key) {
+        const arr = Array.isArray(check.key) ? check.key : [check.key];
+        isMatch = arr.some(s => s.toLowerCase() === tryKey);
+      }
+      // Fallback, test `keyCode`, if possible
+      if (!isMatch && tryKeyCode !== undefined && check.keyCode) {
+        isMatch = (tryKeyCode === check.keyCode);
+      }
+
+      if (!isMatch) return false;
+
+      // Test modifier keys
+      if (!(evt.ctrlKey && evt.altKey)) {  // if both are set, assume AltGr and skip it - iD#4096
+        if (evt.ctrlKey !== check.modifiers.ctrlKey) return false;
+        if (evt.altKey !== check.modifiers.altKey) return false;
+      }
+      if (evt.metaKey !== check.modifiers.metaKey) return false;
+      if (testShift && evt.shiftKey !== check.modifiers.shiftKey) return false;
+
+      return true;
     }
 
 
-    function bubble(d3_event) {
-        var tagName = d3_select(d3_event.target).node().tagName;
-        if (tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA') {
-            return;
-        }
-        testBindings(d3_event, false);
+    function capture(evt) {
+      testBindings(evt, true);
+    }
+
+
+    function bubble(evt) {
+      var tagName = select(evt.target).node().tagName;
+      if (tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA') {
+        return;
+      }
+      testBindings(evt, false);
     }
 
 
     function keybinding(selection) {
-        selection = selection || d3_select(document);
-        selection.on('keydown.capture.' + namespace, capture, true);
-        selection.on('keydown.bubble.' + namespace, bubble, false);
-        return keybinding;
+      selection = selection || select(document);
+      selection.on('keydown.capture.' + namespace, capture, true);
+      selection.on('keydown.bubble.' + namespace, bubble, false);
+      return keybinding;
     }
 
     // was: keybinding.off()
     keybinding.unbind = function(selection) {
-        _keybindings = [];
-        selection = selection || d3_select(document);
-        selection.on('keydown.capture.' + namespace, null);
-        selection.on('keydown.bubble.' + namespace, null);
-        return keybinding;
+      _keybindings = {};
+      selection = selection || select(document);
+      selection.on('keydown.capture.' + namespace, null);
+      selection.on('keydown.bubble.' + namespace, null);
+      return keybinding;
     };
 
 
     keybinding.clear = function() {
-        _keybindings = {};
-        return keybinding;
+      _keybindings = {};
+      return keybinding;
     };
 
 

@@ -131,7 +131,7 @@ export class EditSystem extends AbstractSystem {
       .then(() => {
         this._reset();
 
-        const isTestEnvironment = (!('window' in globalThis) || ('mocha' in globalThis));
+        const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
         if (isTestEnvironment) return;
 
         // Setup event handlers..
@@ -1048,7 +1048,7 @@ export class EditSystem extends AbstractSystem {
     gfx?.pause();  // block rendering
 
     let loading;
-    const isTestEnvironment = (!('window' in globalThis) || ('mocha' in globalThis));
+    const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
     if (!isTestEnvironment) {
       loading = uiLoading(context).blocking(true);
       context.container().call(loading);   // block ui

@@ -42,11 +42,12 @@ describe('uiFieldWikipedia', () => {
   }
 
   const context = new MockContext();
-  let graph, entity, selection, field;
+  let entity, base, graph, selection, field;
 
   beforeEach(() => {
     entity = new Rapid.OsmNode(context, { id: 'n-1', tags: {} });
-    graph = new Rapid.Graph(context, [entity]);
+    base = new Rapid.Graph(context, [entity]);
+    graph = new Rapid.Graph(base);
 
     selection = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, 'wikipedia', {
@@ -55,6 +56,10 @@ describe('uiFieldWikipedia', () => {
       type: 'wikipedia'
     });
   });
+
+  function delay(msec) {
+    return new Promise(resolve => { setTimeout(resolve, msec); });
+  }
 
 
   function changeTags(changed) {
@@ -67,73 +72,79 @@ describe('uiFieldWikipedia', () => {
   }
 
 
-  it('recognizes lang:title format', done => {
+  it('recognizes lang:title format', () => {
     const wikipedia = Rapid.uiFieldWikipedia(context, field);
-    window.setTimeout(() => {   // async, so data will be available
-      selection.call(wikipedia);
-      wikipedia.tags({ wikipedia: 'en:Title' });
+    return delay(1)  // async, so data will be available
+      .then(() => {
+        selection.call(wikipedia);
+        wikipedia.tags({ wikipedia: 'en:Title' });
 
-      expect(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'))).to.equal('English');
-      expect(Rapid.utilGetSetValue(selection.selectAll('.wiki-title'))).to.equal('Title');
-      done();
-    }, 20);
+        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang')), 'English');
+        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-title')), 'Title');
+      });
   });
 
 
-  it('sets language, value', done => {
+  it('sets language, value', () => {
     const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
-    window.setTimeout(() => {   // async, so data will be available
-      wikipedia.on('change', changeTags);
-      selection.call(wikipedia);
+    return delay(1)  // async, so data will be available
+      .then(() => {
+        wikipedia.on('change', changeTags);
+        selection.call(wikipedia);
 
-      const spy = sinon.spy();
-      wikipedia.on('change.spy', spy);
+        const spy = sinon.spy();
+        wikipedia.on('change.spy', spy);
 
-      Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
-      happen.once(selection.selectAll('.wiki-lang').node(), { type: 'change' });
-      happen.once(selection.selectAll('.wiki-lang').node(), { type: 'blur' });
+        Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
 
-      Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'Title');
-      happen.once(selection.selectAll('.wiki-title').node(), { type: 'change' });
-      happen.once(selection.selectAll('.wiki-title').node(), { type: 'blur' });
+        const langInput = selection.selectAll('.wiki-lang').node();
+        langInput.dispatchEvent(new Event('change'));
+        langInput.dispatchEvent(new FocusEvent('blur'));
 
-      expect(spy.callCount).to.equal(4);
-      expect(spy.getCall(0).args[0]).to.deep.equal({ wikipedia: undefined});  // lang on change
-      expect(spy.getCall(1).args[0]).to.deep.equal({ wikipedia: undefined});  // lang on blur
-      expect(spy.getCall(2).args[0]).to.deep.equal({ wikipedia: 'de:Title' });   // title on change
-      expect(spy.getCall(3).args[0]).to.deep.equal({ wikipedia: 'de:Title' });   // title on blur
-      done();
-    }, 20);
+        Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'Title');
+
+        const titleInput = selection.selectAll('.wiki-title').node();
+        titleInput.dispatchEvent(new Event('change'));
+        titleInput.dispatchEvent(new FocusEvent('blur'));
+
+        assert.strictEqual(spy.callCount, 4);
+        assert.deepEqual(spy.getCall(0).args[0], { wikipedia: undefined });   // lang on change
+        assert.deepEqual(spy.getCall(1).args[0], { wikipedia: undefined });   // lang on blur
+        assert.deepEqual(spy.getCall(2).args[0], { wikipedia: 'de:Title' });  // title on change
+        assert.deepEqual(spy.getCall(3).args[0], { wikipedia: 'de:Title' });  // title on blur
+      });
   });
 
 
-  it('recognizes pasted URLs', done => {
+  it('recognizes pasted URLs', () => {
     const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
-    window.setTimeout(() => {   // async, so data will be available
-      wikipedia.on('change', changeTags);
-      selection.call(wikipedia);
+    return delay(1)  // async, so data will be available
+      .then(() => {
+        wikipedia.on('change', changeTags);
+        selection.call(wikipedia);
 
-      Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'http://de.wikipedia.org/wiki/Title');
-      happen.once(selection.selectAll('.wiki-title').node(), { type: 'change' });
+        Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'http://de.wikipedia.org/wiki/Title');
 
-      expect(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'))).to.equal('Deutsch');
-      expect(Rapid.utilGetSetValue(selection.selectAll('.wiki-title'))).to.equal('Title');
-      done();
-    }, 20);
+        const titleInput = selection.selectAll('.wiki-title').node();
+        titleInput.dispatchEvent(new Event('change'));
+
+        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang')), 'Deutsch');
+        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-title')), 'Title');
+      });
   });
 
 
   describe('encodePath', () => {
     it('returns an encoded URI component that contains the title with spaces replaced by underscores', done => {
       const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
-      expect(wikipedia.encodePath('? (film)', undefined)).to.equal('%3F_(film)');
+      assert.strictEqual(wikipedia.encodePath('? (film)', undefined), '%3F_(film)');
       done();
     });
 
     it('returns an encoded URI component that includes an anchor fragment', done => {
       const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
       // this can be tested manually by entering '? (film)#Themes and style in the search box before focusing out'
-      expect(wikipedia.encodePath('? (film)', 'Themes and style')).to.equal('%3F_(film)#Themes_and_style');
+      assert.strictEqual(wikipedia.encodePath('? (film)', 'Themes and style'), '%3F_(film)#Themes_and_style');
       done();
     });
   });
@@ -143,44 +154,44 @@ describe('uiFieldWikipedia', () => {
     it('returns an encoded URI anchor fragment', done => {
       const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
       // this can be similarly tested by entering 'Section#Arts, entertainment and media' in the search box before focusing out'
-      expect(wikipedia.encodeURIAnchorFragment('Theme?')).to.equal('#Theme%3F');
+      assert.strictEqual(wikipedia.encodeURIAnchorFragment('Theme?'), '#Theme%3F');
       done();
     });
 
     it('replaces all whitespace characters with underscore', done => {
       const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
-      expect(wikipedia.encodeURIAnchorFragment('Themes And Styles')).to.equal('#Themes_And_Styles');
+      assert.strictEqual(wikipedia.encodeURIAnchorFragment('Themes And Styles'), '#Themes_And_Styles');
       done();
     });
 
     it('encodes % characters, does not replace them with a dot', done => {
       const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
-      expect(wikipedia.encodeURIAnchorFragment('Is%this_100% correct')).to.equal('#Is%25this_100%25_correct');
+      assert.strictEqual(wikipedia.encodeURIAnchorFragment('Is%this_100% correct'), '#Is%25this_100%25_correct');
       done();
     });
 
     it('encodes characters that are URI encoded characters', done => {
       const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
-      expect(wikipedia.encodeURIAnchorFragment('Section %20%25')).to.equal('#Section_%2520%2525');
+      assert.strictEqual(wikipedia.encodeURIAnchorFragment('Section %20%25'), '#Section_%2520%2525');
       done();
     });
   });
 
 
-  it('preserves existing language', done => {
+  it('defaults to previously-used language', () => {
     const wikipedia1 = Rapid.uiFieldWikipedia(context, field);
-    window.setTimeout(() => {   // async, so data will be available
-      selection.call(wikipedia1);
-      Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
+    const wikipedia2 = Rapid.uiFieldWikipedia(context, field);
 
-      const wikipedia2 = Rapid.uiFieldWikipedia(context, field);
-      window.setTimeout(() => {   // async, so data will be available
+    return delay(1)  // async, so data will be available
+      .then(() => {
+        selection.call(wikipedia1);
+        Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
+      })
+      .then(() => {
         selection.call(wikipedia2);
         wikipedia2.tags({});
-        expect(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'))).to.equal('Deutsch');
-        done();
-      }, 20);
-    }, 20);
+        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang')), 'Deutsch');
+      });
   });
 
 
@@ -196,40 +207,44 @@ describe('uiFieldWikipedia', () => {
     // Set title to "Skip"
     Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
     Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'Skip');
-    happen.once(selection.selectAll('.wiki-title').node(), { type: 'change' });
-    happen.once(selection.selectAll('.wiki-title').node(), { type: 'blur' });
+
+    const titleInput = selection.selectAll('.wiki-title').node();
+    titleInput.dispatchEvent(new Event('change'));
+    titleInput.dispatchEvent(new FocusEvent('blur'));
 
     // t0
     const graph = editor.staging.graph;
-    expect(graph.entity(entity.id).tags.wikidata).to.be.undefined;
+    assert.isUndefined(graph.entity(entity.id).tags.wikidata);
 
     // t30:  graph change - Set title to "Title"
-    window.setTimeout(() => {
+    setTimeout(() => {
       Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'Title');
-      happen.once(selection.selectAll('.wiki-title').node(), { type: 'change' });
-      happen.once(selection.selectAll('.wiki-title').node(), { type: 'blur' });
+
+      const titleInput = selection.selectAll('.wiki-title').node();
+      titleInput.dispatchEvent(new Event('change'));
+      titleInput.dispatchEvent(new FocusEvent('blur'));
     }, 30);
 
     // t60:  at t0 + 60ms (delay), wikidata SHOULD NOT be set because graph has changed.
 
     // t70:  check that wikidata unchanged
-    window.setTimeout(() => {
+    setTimeout(() => {
       const graph = editor.staging.graph;
-      expect(graph.entity(entity.id).tags.wikidata).to.be.undefined;
+      assert.isUndefined(graph.entity(entity.id).tags.wikidata);
     }, 70);
 
     // t90:  at t30 + 60ms (delay), wikidata SHOULD be set because graph is unchanged.
 
     // t100:  check that wikidata has changed
-    window.setTimeout(() => {
+    setTimeout(() => {
       const graph = editor.staging.graph;
-      expect(graph.entity(entity.id).tags.wikidata).to.equal('Q216353');
+      assert.strictEqual(graph.entity(entity.id).tags.wikidata, 'Q216353');
 
-      expect(spy.callCount).to.equal(4);
-      expect(spy.getCall(0)).to.have.been.calledWith({ wikipedia: 'de:Skip' });   // 'Skip' on change
-      expect(spy.getCall(1)).to.have.been.calledWith({ wikipedia: 'de:Skip' });   // 'Skip' on blur
-      expect(spy.getCall(2)).to.have.been.calledWith({ wikipedia: 'de:Title' });  // 'Title' on change +10ms
-      expect(spy.getCall(3)).to.have.been.calledWith({ wikipedia: 'de:Title' });  // 'Title' on blur   +10ms
+      assert.strictEqual(spy.callCount, 4);
+      assert.deepEqual(spy.getCall(0).args[0], { wikipedia: 'de:Skip' });    // 'Skip' on change
+      assert.deepEqual(spy.getCall(1).args[0], { wikipedia: 'de:Skip' });    // 'Skip' on blur
+      assert.deepEqual(spy.getCall(2).args[0], { wikipedia: 'de:Title' });   // 'Title' on change +10ms
+      assert.deepEqual(spy.getCall(3).args[0], { wikipedia: 'de:Title' });   // 'Title' on blur   +10ms
       done();
     }, 100);
 

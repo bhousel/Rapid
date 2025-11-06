@@ -18,6 +18,9 @@ describe('uiConfirm', () => {
   const context = new MockContext();
   let elem;
 
+  function delay(msec) {
+    return new Promise(resolve => { setTimeout(resolve, msec); });
+  }
 
   beforeEach(() => {
     elem = d3.select('body')
@@ -32,78 +35,80 @@ describe('uiConfirm', () => {
 
   it('can be instantiated', () => {
     const selection = Rapid.uiConfirm(context, elem);
-    expect(selection).to.be.ok;
+    assert.isOk(selection);
   });
 
   it('has a header section', () => {
     const selection = Rapid.uiConfirm(context, elem);
-    expect(selection.selectAll('div.content div.header').size()).to.equal(1);
+    assert.strictEqual(selection.selectAll('div.content div.header').size(), 1);
   });
 
   it('has a message section', () => {
     const selection = Rapid.uiConfirm(context, elem);
-    expect(selection.selectAll('div.content div.message-text').size()).to.equal(1);
+    assert.strictEqual(selection.selectAll('div.content div.message-text').size(), 1);
   });
 
   it('has a buttons section', () => {
     const selection = Rapid.uiConfirm(context, elem);
-    expect(selection.selectAll('div.content div.buttons').size()).to.equal(1);
+    assert.strictEqual(selection.selectAll('div.content div.buttons').size(), 1);
   });
 
   it('can have an ok button added to it', () => {
     const selection = Rapid.uiConfirm(context, elem).okButton();
-    expect(selection.selectAll('div.content div.buttons button.action').size()).to.equal(1);
+    assert.strictEqual(selection.selectAll('div.content div.buttons button.action').size(), 1);
   });
 
-  it('can be dismissed by calling close function', done => {
+  it('can be dismissed by calling close function', () => {
     const selection = Rapid.uiConfirm(context, elem);
     selection.close();
-    window.setTimeout(() => {
-      d3.timerFlush();
-      expect(selection.node().parentNode).to.be.null;
-      done();
-    }, 275);
+    return delay(275)
+      .then(() => {
+        d3.timerFlush();
+        assert.isNull(selection.node().parentNode);
+      });
   });
 
-  it('can be dismissed by clicking the close button', done => {
+  it('can be dismissed by clicking the close button', () => {
     const selection = Rapid.uiConfirm(context, elem);
-    happen.click(selection.select('button.close').node());
-    window.setTimeout(() => {
-      d3.timerFlush();
-      expect(selection.node().parentNode).to.be.null;
-      done();
-    }, 275);
+    const target = selection.select('button.close').node();
+    target.dispatchEvent(new MouseEvent('click'));
+    return delay(275)
+      .then(() => {
+        d3.timerFlush();
+        assert.isNull(selection.node().parentNode);
+      });
   });
 
-  it('can be dismissed by pressing escape', done => {
+  it('can be dismissed by pressing escape', () => {
     const selection = Rapid.uiConfirm(context, elem);
-    happen.keydown(document, {keyCode: 27});
-    happen.keyup(document, {keyCode: 27});
-    window.setTimeout(() => {
-      d3.timerFlush();
-      expect(selection.node().parentNode).to.be.null;
-      done();
-    }, 275);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', keyCode: 27 }));
+    return delay(275)
+      .then(() => {
+        d3.timerFlush();
+        assert.isNull(selection.node().parentNode);
+      });
   });
 
-  it('can be dismissed by pressing backspace', done => {
+  it('can be dismissed by pressing backspace', () => {
     const selection = Rapid.uiConfirm(context, elem);
-    happen.keydown(document, {keyCode: 8});
-    happen.keyup(document, {keyCode: 8});
-    window.setTimeout(() => {
-      d3.timerFlush();
-      expect(selection.node().parentNode).to.be.null;
-      done();
-    }, 275);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', keyCode: 8 }));
+    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Backspace', keyCode: 8 }));
+    return delay(275)
+      .then(() => {
+        d3.timerFlush();
+        assert.isNull(selection.node().parentNode);
+      });
   });
 
-  it('can be dismissed by clicking the ok button', done => {
+  it('can be dismissed by clicking the ok button', () => {
     const selection = Rapid.uiConfirm(context, elem).okButton();
-    happen.click(selection.select('div.content div.buttons button.action').node());
-    window.setTimeout(() => {
-      d3.timerFlush();
-      expect(selection.node().parentNode).to.be.null;
-      done();
-    }, 275);
+    const target = selection.select('div.content div.buttons button.action').node();
+    target.dispatchEvent(new MouseEvent('click'));
+    return delay(275)
+      .then(() => {
+        d3.timerFlush();
+        assert.isNull(selection.node().parentNode);
+      });
   });
 });

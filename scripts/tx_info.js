@@ -1,7 +1,6 @@
 /* eslint-disable no-console */
 /* eslint-disable no-process-env */
 import fs from 'node:fs';
-import JSON5 from 'json5';
 import { parseArgs, styleText } from 'bun:util';
 import { transifexApi as api } from '@transifex/api';
 
@@ -21,7 +20,7 @@ const localeCompare = new Intl.Collator('en').compare;
 if (process.env.transifex_token) {
   api.setup({ auth: process.env.transifex_token });
 } else {
-  const auth = JSON5.parse(fs.readFileSync('./transifex.auth', 'utf8'));
+  const auth = JSON.parse(fs.readFileSync('./transifex.auth', 'utf8'));
   api.setup({ auth: auth.token });
 }
 

@@ -47,162 +47,186 @@ describe('uiFieldLocalized', () => {
   const context = new MockContext();
   let selection, field;
 
-
   beforeEach(() => {
     selection = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, 'name', { key: 'name', type: 'localized' });
     field.locked = () => { return false; };
   });
 
+  function delay(msec) {
+    return new Promise(resolve => { setTimeout(resolve, msec); });
+  }
 
-  it('adds a blank set of fields when the + button is clicked', done => {
+
+  it('adds a blank set of fields when the + button is clicked', () => {
     const localized = Rapid.uiFieldLocalized(context, field);
-    window.setTimeout(() => {
-      selection.call(localized);
-      happen.click(selection.selectAll('.localized-add').node());
-      expect(selection.selectAll('.localized-lang').nodes().length).to.equal(1);
-      expect(selection.selectAll('.localized-value').nodes().length).to.equal(1);
-      done();
-    }, 1);  // async, so AssetSystem promise will have settled
-  });
+    return delay(1)  // async, so AssetSystem promise will have settled
+      .then(() => {
+        selection.call(localized);
 
+        const addButton = selection.selectAll('.localized-add').node();
+        addButton.dispatchEvent(new MouseEvent('click'));
 
-  it('doesn\'t create a tag when the value is empty', done => {
-    const localized = Rapid.uiFieldLocalized(context, field);
-    window.setTimeout(() => {
-      selection.call(localized);
-      happen.click(selection.selectAll('.localized-add').node());
-
-      localized.on('change', tags => {
-        expect(tags).to.eql({});
+        assert.lengthOf(selection.selectAll('.localized-lang').nodes(), 1);
+        assert.lengthOf(selection.selectAll('.localized-value').nodes(), 1);
       });
-
-      Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'Deutsch');
-      happen.once(selection.selectAll('.localized-lang').node(), { type: 'change' });
-      happen.once(selection.selectAll('.localized-lang').node(), { type: 'blur' });
-      done();
-    }, 1);  // async, so AssetSystem promise will have settled
   });
 
-
-  it('doesn\'t create a tag when the name is empty', done => {
+  it('doesn\'t create a tag when the value is empty', () => {
     const localized = Rapid.uiFieldLocalized(context, field);
-    window.setTimeout(() => {
-      selection.call(localized);
-      happen.click(selection.selectAll('.localized-add').node());
+    return delay(1)  // async, so AssetSystem promise will have settled
+      .then(() => {
+        selection.call(localized);
 
-      localized.on('change', tags => {
-        expect(tags).to.eql({});
+        const addButton = selection.selectAll('.localized-add').node();
+        addButton.dispatchEvent(new MouseEvent('click'));
+
+        localized.on('change', tags => {
+          assert.deepEqual(tags, {});
+        });
+
+        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'Deutsch');
+
+        const langInput = selection.selectAll('.localized-lang').node();
+        langInput.dispatchEvent(new Event('change'));
+        langInput.dispatchEvent(new FocusEvent('blur'));
       });
-
-      Rapid.utilGetSetValue(selection.selectAll('.localized-value'), 'Value');
-      happen.once(selection.selectAll('.localized-value').node(), { type: 'change' });
-      happen.once(selection.selectAll('.localized-value').node(), { type: 'blur' });
-      done();
-    }, 1);  // async, so AssetSystem promise will have settled
   });
 
-
-  it('creates a tag after setting language then value', done => {
+  it('doesn\'t create a tag when the name is empty', () => {
     const localized = Rapid.uiFieldLocalized(context, field);
-    window.setTimeout(() => {
-      selection.call(localized);
-      happen.click(selection.selectAll('.localized-add').node());
+    return delay(1)  // async, so AssetSystem promise will have settled
+      .then(() => {
+        selection.call(localized);
 
-      Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'Deutsch');
-      happen.once(selection.selectAll('.localized-lang').node(), { type: 'change' });
+        const addButton = selection.selectAll('.localized-add').node();
+        addButton.dispatchEvent(new MouseEvent('click'));
 
-      localized.on('change', tags => {
-        expect(tags).to.eql({ 'name:de': 'Value' });
+        localized.on('change', tags => {
+          assert.deepEqual(tags, {});
+        });
+
+        Rapid.utilGetSetValue(selection.selectAll('.localized-value'), 'Value');
+
+        const valueInput = selection.selectAll('.localized-value').node();
+        valueInput.dispatchEvent(new Event('change'));
+        valueInput.dispatchEvent(new FocusEvent('blur'));
       });
-
-      Rapid.utilGetSetValue(selection.selectAll('.localized-value'), 'Value');
-      happen.once(selection.selectAll('.localized-value').node(), { type: 'change' });
-      done();
-    }, 1);  // async, so AssetSystem promise will have settled
   });
 
-
-  it('creates a tag after setting value then language', done => {
+  it('creates a tag after setting language then value', () => {
     const localized = Rapid.uiFieldLocalized(context, field);
-    window.setTimeout(() => {
-      selection.call(localized);
-      happen.click(selection.selectAll('.localized-add').node());
+    return delay(1)  // async, so AssetSystem promise will have settled
+      .then(() => {
+        selection.call(localized);
 
-      Rapid.utilGetSetValue(selection.selectAll('.localized-value'), 'Value');
-      happen.once(selection.selectAll('.localized-value').node(), { type: 'change' });
+        const addButton = selection.selectAll('.localized-add').node();
+        addButton.dispatchEvent(new MouseEvent('click'));
 
-      localized.on('change', tags => {
-        expect(tags).to.eql({ 'name:de': 'Value' });
+        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'Deutsch');
+
+        const langInput = selection.selectAll('.localized-lang').node();
+        langInput.dispatchEvent(new Event('change'));
+
+        localized.on('change', tags => {
+          assert.deepEqual(tags, { 'name:de': 'Value' });
+        });
+
+        Rapid.utilGetSetValue(selection.selectAll('.localized-value'), 'Value');
+
+        const valueInput = selection.selectAll('.localized-value').node();
+        valueInput.dispatchEvent(new Event('change'));
       });
-
-      Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'Deutsch');
-      happen.once(selection.selectAll('.localized-lang').node(), { type: 'change' });
-      done();
-    }, 1);  // async, so AssetSystem promise will have settled
   });
 
-
-  it('changes an existing language', done => {
+  it('creates a tag after setting value then language', () => {
     const localized = Rapid.uiFieldLocalized(context, field);
-    window.setTimeout(() => {
-      selection.call(localized);
-      localized.tags({ 'name:de': 'Value' });
+    return delay(1)  // async, so AssetSystem promise will have settled
+      .then(() => {
+        selection.call(localized);
 
-      localized.on('change', tags => {
-        expect(tags).to.eql({ 'name:de': undefined, 'name:en': 'Value' });
+        const addButton = selection.selectAll('.localized-add').node();
+        addButton.dispatchEvent(new MouseEvent('click'));
+
+        Rapid.utilGetSetValue(selection.selectAll('.localized-value'), 'Value');
+
+        const valueInput = selection.selectAll('.localized-value').node();
+        valueInput.dispatchEvent(new Event('change'));
+
+        localized.on('change', tags => {
+          assert.deepEqual(tags, { 'name:de': 'Value' });
+        });
+
+        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'Deutsch');
+
+        const langInput = selection.selectAll('.localized-lang').node();
+        langInput.dispatchEvent(new Event('change'));
       });
-
-      Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'English');
-      happen.once(selection.selectAll('.localized-lang').node(), { type: 'change' });
-      done();
-    }, 1);  // async, so AssetSystem promise will have settled
   });
 
-
-  it('ignores similar keys like `old_name`', done => {
+  it('changes an existing language', () => {
     const localized = Rapid.uiFieldLocalized(context, field);
-    window.setTimeout(() => {
-      selection.call(localized);
-      localized.tags({ 'old_name:de': 'Value' });
+    return delay(1)  // async, so AssetSystem promise will have settled
+      .then(() => {
+        selection.call(localized);
+        localized.tags({ 'name:de': 'Value' });
 
-      expect(selection.selectAll('.localized-lang').empty()).to.be.ok;
-      expect(selection.selectAll('.localized-value').empty()).to.be.ok;
-      done();
-    }, 1);  // async, so AssetSystem promise will have settled
+        localized.on('change', tags => {
+          assert.deepEqual(tags, { 'name:de': undefined, 'name:en': 'Value' });
+        });
+
+        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'English');
+
+        const langInput = selection.selectAll('.localized-lang').node();
+        langInput.dispatchEvent(new Event('change'));
+    });
   });
 
-
-  it('removes the tag when the language is emptied', done => {
+  it('ignores similar keys like `old_name`', () => {
     const localized = Rapid.uiFieldLocalized(context, field);
-    window.setTimeout(() => {
-      selection.call(localized);
-      localized.tags({ 'name:de': 'Value' });
+    return delay(1)  // async, so AssetSystem promise will have settled
+      .then(() => {
+        selection.call(localized);
+        localized.tags({ 'old_name:de': 'Value' });
 
-      localized.on('change', tags => {
-        expect(tags).to.eql({ 'name:de': undefined });
+        assert.isTrue(selection.selectAll('.localized-lang').empty());
+        assert.isTrue(selection.selectAll('.localized-value').empty());
       });
-
-      Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), '');
-      happen.once(selection.selectAll('.localized-lang').node(), { type: 'change' });
-      done();
-    }, 1);  // async, so AssetSystem promise will have settled
   });
 
-
-  it('removes the tag when the value is emptied', done => {
+  it('removes the tag when the language is emptied', () => {
     const localized = Rapid.uiFieldLocalized(context, field);
-    window.setTimeout(() => {
-      selection.call(localized);
-      localized.tags({ 'name:de': 'Value' });
+    return delay(1)  // async, so AssetSystem promise will have settled
+      .then(() => {
+        selection.call(localized);
+        localized.tags({ 'name:de': 'Value' });
 
-      localized.on('change', tags => {
-          expect(tags).to.eql({'name:de': undefined });
+        localized.on('change', tags => {
+          assert.deepEqual(tags, { 'name:de': undefined });
+        });
+
+        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), '');
+
+        const langInput = selection.selectAll('.localized-lang').node();
+        langInput.dispatchEvent(new Event('change'));
       });
+  });
 
-      Rapid.utilGetSetValue(selection.selectAll('.localized-value'), '');
-      happen.once(selection.selectAll('.localized-value').node(), { type: 'change' });
-      done();
-    }, 1);  // async, so AssetSystem promise will have settled
+  it('removes the tag when the value is emptied', () => {
+    const localized = Rapid.uiFieldLocalized(context, field);
+    return delay(1)  // async, so AssetSystem promise will have settled
+      .then(() => {
+        selection.call(localized);
+        localized.tags({ 'name:de': 'Value' });
+
+        localized.on('change', tags => {
+          assert.deepEqual(tags, { 'name:de': undefined });
+        });
+
+        Rapid.utilGetSetValue(selection.selectAll('.localized-value'), '');
+
+        const valueInput = selection.selectAll('.localized-value').node();
+        valueInput.dispatchEvent(new Event('change'));
+      });
   });
 });

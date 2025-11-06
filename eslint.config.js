@@ -119,18 +119,17 @@ export default [
   },
 
   {
-    files: ['test/spec_helpers.js', 'test/browser/**'],
+    files: ['test/test_setup.js', 'test/browser/**'],
     languageOptions: {
       globals: {
         ...globals.browser,
         ...globals.mocha,
         Rapid: false,
         d3: false,
-        expect: false,   // used by chai
+        assert: false,   // used by chai
         fetchMock: false,
-        happen: false,
         sdk: false,
-        sinon: false,
+        sinon: false
       }
     },
     rules: {

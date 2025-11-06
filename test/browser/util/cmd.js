@@ -30,37 +30,37 @@ describe('utilCmd', () => {
   it('does not overwrite mac keybindings', () => {
     _userAgent = 'Mac';
     Rapid.utilDetect(true);  // force redetection
-    expect(Rapid.utilCmd('⌘A')).to.eql('⌘A');
+    assert.strictEqual(Rapid.utilCmd('⌘A'), '⌘A');
   });
 
 
   it('changes keys to linux versions', () => {
     _userAgent = 'Linux';
     Rapid.utilDetect(true);  // force redetection
-    expect(Rapid.utilCmd('⌘⌫')).to.eql('⌃⌫');
-    expect(Rapid.utilCmd('⌘A')).to.eql('⌃A');
-    expect(Rapid.utilCmd('⇧A')).to.eql('⇧A');
-    expect(Rapid.utilCmd('⌘⇧A')).to.eql('⌃⇧A');
-    expect(Rapid.utilCmd('⌘⇧Z')).to.eql('⌃⇧Z');
+    assert.strictEqual(Rapid.utilCmd('⌘⌫'), '⌃⌫');
+    assert.strictEqual(Rapid.utilCmd('⌘A'), '⌃A');
+    assert.strictEqual(Rapid.utilCmd('⇧A'), '⇧A');
+    assert.strictEqual(Rapid.utilCmd('⌘⇧A'), '⌃⇧A');
+    assert.strictEqual(Rapid.utilCmd('⌘⇧Z'), '⌃⇧Z');
   });
 
 
   it('changes keys to win versions', () => {
     _userAgent = 'Win';
     Rapid.utilDetect(true);  // force redetection
-    expect(Rapid.utilCmd('⌘⌫')).to.eql('⌃⌫');
-    expect(Rapid.utilCmd('⌘A')).to.eql('⌃A');
-    expect(Rapid.utilCmd('⇧A')).to.eql('⇧A');
-    expect(Rapid.utilCmd('⌘⇧A')).to.eql('⌃⇧A');
-    expect(Rapid.utilCmd('⌘⇧Z')).to.eql('⌃Y');  // special case
+    assert.strictEqual(Rapid.utilCmd('⌘⌫'), '⌃⌫');
+    assert.strictEqual(Rapid.utilCmd('⌘A'), '⌃A');
+    assert.strictEqual(Rapid.utilCmd('⇧A'), '⇧A');
+    assert.strictEqual(Rapid.utilCmd('⌘⇧A'), '⌃⇧A');
+    assert.strictEqual(Rapid.utilCmd('⌘⇧Z'), '⌃Y');  // special case
   });
 
 
   it('handles multi-character keys', () => {
     _userAgent = 'Win';
     Rapid.utilDetect(true);  // force redetection
-    expect(Rapid.utilCmd('f11')).to.eql('f11');
-    expect(Rapid.utilCmd('⌘plus')).to.eql('⌃plus');
+    assert.strictEqual(Rapid.utilCmd('f11'), 'f11');
+    assert.strictEqual(Rapid.utilCmd('⌘plus'), '⌃plus');
   });
 
 });

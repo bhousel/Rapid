@@ -1,8 +1,8 @@
 // Polyfill idle callback functions (for Safari)
-window.requestIdleCallback = window.requestIdleCallback ||
+globalThis.requestIdleCallback = globalThis.requestIdleCallback ||
   function(cb) {
     var start = Date.now();
-    return window.requestAnimationFrame(function() {
+    return globalThis.requestAnimationFrame(function() {
       cb({
         didTimeout: false,
         timeRemaining: function() {
@@ -11,31 +11,26 @@ window.requestIdleCallback = window.requestIdleCallback ||
       });
     });
   };
-window.cancelIdleCallback = window.cancelIdleCallback ||
+globalThis.cancelIdleCallback = globalThis.cancelIdleCallback ||
   function(handle) {
-    window.cancelAnimationFrame(handle);
+    globalThis.cancelAnimationFrame(handle);
   };
 
-import * as Rapid from './index.js';
-window.Rapid = Rapid;
-window.Rapid.isDebug = true;
-
-// For dev build, we'll bundle additional things
-// that are useful for testing or debugging.
-import fetchMock from 'fetch-mock';
-window.fetchMock = fetchMock;
+import * as RAPID from './index.js';
+globalThis.Rapid = { ...RAPID };
+globalThis.Rapid.isDebug = true;
 
 // Include rapid-sdk as a single `sdk` namespace.
 // (This works because we know there are no name conflicts)
 import * as SDKMATH from '@rapid-sdk/math';
 import * as SDKUTIL from '@rapid-sdk/util';
-window.Rapid.sdk = { ...SDKMATH, ...SDKUTIL };
+globalThis.Rapid.sdk = { ...SDKMATH, ...SDKUTIL };
 
 import * as d3 from 'd3';
-window.d3 = d3;
+globalThis.d3 = d3;
 
 import * as PIXI from 'pixi.js';
-window.PIXI = PIXI;
+globalThis.PIXI = PIXI;
 
-import * as SPECTOR from 'spectorjs';
-window.SPECTOR = SPECTOR;
+// import * as SPECTOR from 'spectorjs';
+// globalThis.SPECTOR = SPECTOR;

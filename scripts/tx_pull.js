@@ -1,7 +1,6 @@
 /* eslint-disable no-console */
 /* eslint-disable no-process-env */
 import fs from 'node:fs';
-import JSON5 from 'json5';
 import shell from 'shelljs';
 import stringify from 'json-stringify-pretty-compact';
 import { styleText } from 'bun:util';
@@ -25,7 +24,7 @@ const localeCompare = new Intl.Collator('en').compare;
 if (process.env.transifex_token) {
   api.setup({ auth: process.env.transifex_token });
 } else {
-  const auth = JSON5.parse(fs.readFileSync('./transifex.auth', 'utf8'));
+  const auth = JSON.parse(fs.readFileSync('./transifex.auth', 'utf8'));
   api.setup({ auth: auth.token });
 }
 

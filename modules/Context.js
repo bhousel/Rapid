@@ -165,7 +165,8 @@ export class Context extends EventEmitter {
       this.behaviors[id] = new Behavior(this);
     }
 
-    if (!window.mocha) {
+    const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
+    if (!isTestEnvironment) {
       for (const [id, Service] of services.available) {
         this.services[id] = new Service(this);
       }
