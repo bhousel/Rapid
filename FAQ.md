@@ -1,1 +1,0 @@
-For FAQs about Rapid usage and Facebook Map With AI service, please go to [Map With AI FAQ page](https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/FAQ).
