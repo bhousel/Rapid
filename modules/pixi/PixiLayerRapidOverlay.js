@@ -94,18 +94,16 @@ return; // not yet
    * @param  {number}    frame    -  Integer frame being rendered
    * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
    * @param  {number}    zoom     -  Effective zoom level to use for rendering
-   * @param  {*}         lines    -  Array of point data
+   * @param  {*}         points   -  Array of feature data
    * @param  {*}         color    -  The color to use
    */
   renderPoints(frame, viewport, zoom, points, color) {
     const parentContainer = this.overlaysContainer;
     for (const d of points) {
-      const parts = (d.geometry.type === 'Point') ? [d.geometry.coordinates]
+      const coords = (d.geometry.type === 'Point') ? [d.geometry.coordinates]
         : (d.geometry.type === 'MultiPoint') ? d.geometry.coordinates : [];
 
-      for (let i = 0; i < parts.length; ++i) {
-        const loc = parts[i];
-
+      for (const loc of coords) {
         const point = viewport.project(loc);
         const feature = new PIXI.Graphics()
           .circle(0, 0, 40)

@@ -311,13 +311,10 @@ export function validationAlmostJunction(context) {
 
       // then, check if the extension part [tipNode.loc -> extTipLoc] intersects any other ways
       const segmentInfos = tree.waySegments(queryExtent, graph);
-      for (let i = 0; i < segmentInfos.length; i++) {
-        let segmentInfo = segmentInfos[i];
-
+      for (const segmentInfo of segmentInfos) {
         let way2 = graph.entity(segmentInfo.wayId);
 
         if (!isHighway(way2)) continue;
-
         if (!canConnectWays(way, way2)) continue;
 
         let nAid = segmentInfo.nodes[0],
@@ -325,8 +322,8 @@ export function validationAlmostJunction(context) {
 
         if (nAid === tipNid || nBid === tipNid) continue;
 
-        let nA = graph.entity(nAid),
-          nB = graph.entity(nBid);
+        let nA = graph.entity(nAid);
+        let nB = graph.entity(nBid);
         let crossLoc = geomLineIntersection([tipNode.loc, extTipLoc], [nA.loc, nB.loc]);
         if (crossLoc) {
           return {

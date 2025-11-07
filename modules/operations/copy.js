@@ -78,10 +78,10 @@ export function operationCopy(context, selectedIDs) {
       children = [];
     }
 
-    for (let i = 0; i < children.length; i++) {
-      if (!descendants[children[i]]) {
-        descendants[children[i]] = true;
-        descendants = getDescendants(children[i], graph, descendants);
+    for (const child of children) {
+      if (!descendants[child]) {
+        descendants[child] = true;
+        descendants = getDescendants(child, graph, descendants);
       }
     }
 

@@ -187,7 +187,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       // # of viewfields has changed, or if the texture name has changed, recreate them
       if (this._viewfieldCount !== vfAngles.length || this._viewfieldName !== style.viewfieldName) {
         this.viewfields.removeChildren();
-        for (let i = 0; i < vfAngles.length; i++) {
+        for (const _a of vfAngles) {
           const vfSprite = new PIXI.Sprite(vfTexture);
           vfSprite.eventMode = 'none';
           vfSprite.anchor.set(0.5, 0.5);  // middle, middle

@@ -282,8 +282,7 @@ export function actionMove(moveIDs, tryDelta, viewport, cache) {
 
 
   function cleanupIntersections(graph) {
-    for (let i = 0; i < cache.intersections.length; i++) {
-      const obj = cache.intersections[i];
+    for (const obj of cache.intersections) {
       graph = replaceMovedVertex(obj.nodeID, obj.movedId, graph, _delta);
       graph = replaceMovedVertex(obj.nodeID, obj.unmovedId, graph, null);
       graph = unZorroIntersection(obj, graph);
@@ -301,9 +300,7 @@ export function actionMove(moveIDs, tryDelta, viewport, cache) {
       return vecAdd(viewport.project(loc), _delta);
     }
 
-    for (var i = 0; i < cache.intersections.length; i++) {
-      var obj = cache.intersections[i];
-
+    for (const obj of cache.intersections) {
       // Don't limit movement if this is vertex joins 2 endpoints..
       if (obj.movedIsEP && obj.unmovedIsEP) continue;
       // Don't limit movement if this vertex is not an endpoint anyway..
@@ -318,8 +315,8 @@ export function actionMove(moveIDs, tryDelta, viewport, cache) {
       var unmovedPath = unmovedNodes.map(function(n) { return viewport.project(n.loc); });
       var hits = geomPathIntersections(movedPath, unmovedPath);
 
-      for (var j = 0; i < hits.length; i++) {
-        if (vecEqual(hits[j], end)) continue;
+      for (const hit of hits) {
+        if (vecEqual(hit, end)) continue;
         var edge = geoChooseEdge(unmovedNodes, end, viewport);
         _delta = vecSubtract(viewport.project(edge.loc), start);
       }
@@ -336,8 +333,8 @@ export function actionMove(moveIDs, tryDelta, viewport, cache) {
       limitDelta(graph);
     }
 
-    for (var i = 0; i < cache.nodes.length; i++) {
-      var node = graph.entity(cache.nodes[i]);
+    for (const nodeID of cache.nodes) {
+      var node = graph.entity(nodeID);
       var start = viewport.project(node.loc);
       var end = vecAdd(start, _delta);
       graph = graph.replace(node.move(viewport.unproject(end)));

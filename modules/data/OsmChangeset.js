@@ -84,17 +84,17 @@ export class OsmChangeset extends OsmEntity {
   osmChangeJXON(changes) {
     const changesetID = this.props.id;
 
-    function nest(x, order) {
+    function nest(arr, order) {
       const groups = {};
-      for (let i = 0; i < x.length; i++) {
-        const tagName = Object.keys(x[i])[0];
+      for (const item of arr) {
+        const tagName = Object.keys(item)[0];
         if (!groups[tagName]) groups[tagName] = [];
-        groups[tagName].push(x[i][tagName]);
+        groups[tagName].push(item[tagName]);
       }
       const ordered = {};
-      order.forEach(o => {
-        if (groups[o]) ordered[o] = groups[o];
-      });
+      for (const k of order) {
+        if (groups[k]) ordered[k] = groups[k];
+      }
       return ordered;
     }
 

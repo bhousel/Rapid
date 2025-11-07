@@ -383,9 +383,9 @@ export class ImagerySourceEsri extends ImagerySource {
           throw new Error('Unknown Error');
         }
         let hasTiles = true;
-        for (let i = 0; i < tilemap.data.length; i++) {
+        for (const d of tilemap.data) {
           // 0 means an individual tile in the grid doesn't exist
-          if (!tilemap.data[i]) {
+          if (!d) {
             hasTiles = false;
           }
         }

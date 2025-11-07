@@ -31,8 +31,7 @@ export function actionMerge(ids) {
       const nodes = utilArrayUniq(graph.childNodes(target));
       let removeNode = point;
 
-      for (var i = 0; i < nodes.length; i++) {
-        var node = nodes[i];
+      for (const node of nodes) {
         if (graph.parentWays(node).length > 1 ||
           graph.parentRelations(node).length ||
           node.hasInterestingTags()) {

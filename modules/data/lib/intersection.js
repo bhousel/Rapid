@@ -492,30 +492,30 @@ export function osmIntersection(context, graph, startvertexID, maxDistance) {
               nextNodes.forEach(function(nextNode) {
                   // gather restrictions FROM this way
                   var fromRestrictions = vgraph.parentRelations(entity).filter(function(r) {
-                      if (!r.isRestriction()) return false;
+                    if (!r.isRestriction()) return false;
 
-                      var f = r.memberByRole('from');
-                      if (!f || f.id !== entity.id) return false;
+                    const f = r.memberByRole('from');
+                    if (!f || f.id !== entity.id) return false;
 
-                      var isOnly = /^only_/.test(r.tags.restriction);
-                      if (!isOnly) return true;
+                    const isOnly = /^only_/.test(r.tags.restriction);
+                    if (!isOnly) return true;
 
-                      // `only_` restrictions only matter along the direction of the VIA - #4849
-                      var isOnlyVia = false;
-                      var v = r.membersByRole('via');
-                      if (v.length === 1 && v[0].type === 'node') {   // via node
-                          isOnlyVia = (v[0].id === nextNode.id);
-                      } else {                                        // via way(s)
-                          for (var i = 0; i < v.length; i++) {
-                              if (v[i].type !== 'way') continue;
-                              var viaWay = vgraph.entity(v[i].id);
-                              if (viaWay.first() === nextNode.id || viaWay.last() === nextNode.id) {
-                                  isOnlyVia = true;
-                                  break;
-                              }
-                          }
+                    // `only_` restrictions only matter along the direction of the VIA - #4849
+                    let isOnlyVia = false;
+                    const vias = r.membersByRole('via');
+                    if (vias.length === 1 && vias[0].type === 'node') {   // via node
+                      isOnlyVia = (vias[0].id === nextNode.id);
+                    } else {                                        // via way(s)
+                      for (const v of vias) {
+                        if (v.type !== 'way') continue;
+                        const viaWay = vgraph.entity(v.id);
+                        if (viaWay.first() === nextNode.id || viaWay.last() === nextNode.id) {
+                          isOnlyVia = true;
+                          break;
+                        }
                       }
-                      return isOnlyVia;
+                    }
+                    return isOnlyVia;
                   });
 
                   step(nextNode, currPath, currRestrictions.concat(fromRestrictions), false);

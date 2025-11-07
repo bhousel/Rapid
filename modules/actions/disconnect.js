@@ -42,9 +42,8 @@ export function actionDisconnect(nodeID, newNodeID) {
     let candidates = [];
     let keeping = false;
     let parentWays = graph.parentWays(graph.entity(nodeID));
-    let way, waynode;
-    for (let i = 0; i < parentWays.length; i++) {
-      way = parentWays[i];
+
+    for (const way of parentWays) {
       if (_wayIDs && _wayIDs.indexOf(way.id) === -1) {
         keeping = true;
         continue;
@@ -53,7 +52,7 @@ export function actionDisconnect(nodeID, newNodeID) {
         candidates.push({ wayID: way.id, index: 0 });
       } else {
         for (let j = 0; j < way.nodes.length; j++) {
-          waynode = way.nodes[j];
+          const waynode = way.nodes[j];
           if (waynode === nodeID) {
             if (way.isClosed() &&
               parentWays.length > 1 &&

@@ -169,12 +169,12 @@ describe('actionOrthogonalize', () => {
         ]
       ];
 
-      for (var i = 0; i < tests.length; i++) {
+      for (const test of tests) {
         const base = new Rapid.Graph(context, [
-          new Rapid.OsmNode(context, { id: 'a', loc: tests[i][0] }),
-          new Rapid.OsmNode(context, { id: 'b', loc: tests[i][1] }),
-          new Rapid.OsmNode(context, { id: 'c', loc: tests[i][2] }),
-          new Rapid.OsmNode(context, { id: 'd', loc: tests[i][3] }),
+          new Rapid.OsmNode(context, { id: 'a', loc: test[0] }),
+          new Rapid.OsmNode(context, { id: 'b', loc: test[1] }),
+          new Rapid.OsmNode(context, { id: 'c', loc: test[2] }),
+          new Rapid.OsmNode(context, { id: 'd', loc: test[3] }),
           new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
         ]);
         const graph = new Rapid.Graph(base);

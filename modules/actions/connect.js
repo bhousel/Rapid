@@ -14,41 +14,36 @@ import { actionDeleteWay } from './delete_way.js';
 export function actionConnect(nodeIDs) {
   const action = (graph) => {
     let survivor;
-    let node;
-    let parents;
 
     // Choose a survivor node, prefer an existing (not new) node - iD#4974
-    for (let i = 0; i < nodeIDs.length; i++) {
-      survivor = graph.entity(nodeIDs[i]);
+    for (const nodeID of nodeIDs) {
+      survivor = graph.entity(nodeID);
       if (survivor.version) break;  // found one
     }
 
     // Replace all non-surviving nodes with the survivor and merge tags.
-    for (let i = 0; i < nodeIDs.length; i++) {
-      node = graph.entity(nodeIDs[i]);
-      if (node.id === survivor.id) continue;
+    for (const nodeID of nodeIDs) {
+      if (nodeID === survivor.id) continue;
+      const node = graph.entity(nodeID);
 
-      parents = graph.parentWays(node);
-      for (let j = 0; j < parents.length; j++) {
-        graph.replace(parents[j].replaceNode(node.id, survivor.id));
+      for (const parentWay of graph.parentWays(node)) {
+        graph.replace(parentWay.replaceNode(nodeID, survivor.id));
       }
 
-      parents = graph.parentRelations(node);
-      for (let j = 0; j < parents.length; j++) {
-        graph.replace(parents[j].replaceMember(node, survivor));
+      for (const parentRel of graph.parentRelations(node)) {
+        graph.replace(parentRel.replaceMember(node, survivor));
       }
 
       survivor = survivor.mergeTags(node.tags);
-      graph = actionDeleteNode(node.id)(graph);
+      graph = actionDeleteNode(nodeID)(graph);
     }
 
     graph.replace(survivor);
 
     // find and delete any degenerate ways created by connecting adjacent vertices
-    parents = graph.parentWays(survivor);
-    for (let i = 0; i < parents.length; i++) {
-      if (parents[i].isDegenerate()) {
-        graph = actionDeleteWay(parents[i].id)(graph);
+    for (const parentWay of graph.parentWays(survivor)) {
+      if (parentWay.isDegenerate()) {
+        graph = actionDeleteWay(parentWay.id)(graph);
       }
     }
 
@@ -58,84 +53,74 @@ export function actionConnect(nodeIDs) {
 
   action.disabled = (graph) => {
     let seen = {};
-    let restrictionIDs = [];
+    const restrictionIDs = new Set();
     let survivor;
-    let node, way;
-    let relations, relation, role;
 
     // Choose a survivor node, prefer an existing (not new) node - iD#4974
-    for (let i = 0; i < nodeIDs.length; i++) {
-      survivor = graph.entity(nodeIDs[i]);
+    for (const nodeID of nodeIDs) {
+      survivor = graph.entity(nodeID);
       if (survivor.version) break;  // found one
     }
 
     // 1. disable if the nodes being connected have conflicting relation roles
-    for (let i = 0; i < nodeIDs.length; i++) {
-      node = graph.entity(nodeIDs[i]);
-      relations = graph.parentRelations(node);
+    for (const nodeID of nodeIDs) {
+      const node = graph.entity(nodeID);
 
-      for (let j = 0; j < relations.length; j++) {
-        relation = relations[j];
-        role = relation.memberById(node.id).role || '';
+      for (const relation of graph.parentRelations(node)) {
+        const relationID = relation.id;
+        const role = relation.memberById(nodeID).role || '';
 
         // if this node is a via node in a restriction, remember for later
         if (relation.hasFromViaTo()) {
-          restrictionIDs.push(relation.id);
+          restrictionIDs.add(relationID);
         }
 
-        if (seen[relation.id] !== undefined && seen[relation.id] !== role) {
+        if (seen[relationID] !== undefined && seen[relationID] !== role) {
           return 'relation';
         } else {
-          seen[relation.id] = role;
+          seen[relationID] = role;
         }
       }
     }
 
     // gather restrictions for parent ways
-    for (let i = 0; i < nodeIDs.length; i++) {
-      node = graph.entity(nodeIDs[i]);
+    for (const nodeID of nodeIDs) {
+      const node = graph.entity(nodeID);
 
-      let parents = graph.parentWays(node);
-      for (let j = 0; j < parents.length; j++) {
-        let parent = parents[j];
-        relations = graph.parentRelations(parent);
-
-        for (let k = 0; k < relations.length; k++) {
-          relation = relations[k];
-          if (relation.hasFromViaTo()) {
-            restrictionIDs.push(relation.id);
+      for (const parentWay of graph.parentWays(node)) {
+        for (const parentRelation of graph.parentRelations(parentWay)) {
+          if (parentRelation.hasFromViaTo()) {
+            restrictionIDs.add(parentRelation.id);
           }
         }
       }
     }
 
-
     // test restrictions
-    restrictionIDs = utilArrayUniq(restrictionIDs);
-    for (let i = 0; i < restrictionIDs.length; i++) {
-      relation = graph.entity(restrictionIDs[i]);
+    for (const restrictionID of restrictionIDs) {
+      const relation = graph.entity(restrictionID);
       if (!relation.isComplete(graph)) continue;
 
       let memberWays = relation.members
-        .filter(function(m) { return m.type === 'way'; })
-        .map(function(m) { return graph.entity(m.id); });
+        .filter(m => m.type === 'way')
+        .map(m => graph.entity(m.id));
 
       memberWays = utilArrayUniq(memberWays);
-      let f = relation.memberByRole('from');
-      let t = relation.memberByRole('to');
-      let isUturn = (f.id === t.id);
+      const f = relation.memberByRole('from');
+      const t = relation.memberByRole('to');
+      const isUturn = (f.id === t.id);
 
       // 2a. disable if connection would damage a restriction
       // (a key node is a node at the junction of ways)
-      let nodes = { from: [], via: [], to: [], keyfrom: [], keyto: [] };
-      for (let j = 0; j < relation.members.length; j++) {
-        collectNodes(relation.members[j], nodes);
+      const nodes = { from: [], via: [], to: [], keyfrom: [], keyto: [] };
+      for (const member of relation.members) {
+        collectNodes(member, nodes);
       }
 
       nodes.keyfrom = utilArrayUniq(nodes.keyfrom.filter(hasDuplicates));
       nodes.keyto = utilArrayUniq(nodes.keyto.filter(hasDuplicates));
 
-      let filter = keyNodeFilter(nodes.keyfrom, nodes.keyto);
+      const filter = keyNodeFilter(nodes.keyfrom, nodes.keyto);
       nodes.from = nodes.from.filter(filter);
       nodes.via = nodes.via.filter(filter);
       nodes.to = nodes.to.filter(filter);
@@ -146,8 +131,7 @@ export function actionConnect(nodeIDs) {
       let connectKeyFrom = false;
       let connectKeyTo = false;
 
-      for (let j = 0; j < nodeIDs.length; j++) {
-        let n = nodeIDs[j];
+      for (const n of nodeIDs) {
         if (nodes.from.indexOf(n) !== -1)    { connectFrom = true; }
         if (nodes.via.indexOf(n) !== -1)     { connectVia = true; }
         if (nodes.to.indexOf(n) !== -1)      { connectTo = true; }
@@ -166,16 +150,14 @@ export function actionConnect(nodeIDs) {
 
         let n0 = null;
         let n1 = null;
-        for (let j = 0; j < memberWays.length; j++) {
-          way = memberWays[j];
+        for (const way of memberWays) {
           if (way.contains(nodeIDs[0])) { n0 = nodeIDs[0]; }
           if (way.contains(nodeIDs[1])) { n1 = nodeIDs[1]; }
         }
 
         if (n0 && n1) {    // both nodes are part of the restriction
           let ok = false;
-          for (let j = 0; j < memberWays.length; j++) {
-            way = memberWays[j];
+          for (const way of memberWays) {
             if (way.isAdjacent(n0, n1)) {
               ok = true;
               break;
@@ -189,15 +171,15 @@ export function actionConnect(nodeIDs) {
 
       // 2b. disable if nodes being connected will destroy a member way in a restriction
       // (to test, make a copy and try actually connecting the nodes)
-      for (let j = 0; j < memberWays.length; j++) {
-        way = memberWays[j].update({});   // make copy
-        for (let k = 0; k < nodeIDs.length; k++) {
-          if (nodeIDs[k] === survivor.id) continue;
+      for (const w of memberWays) {
+        let way = w.update({});   // make copy
+        for (const nodeID of nodeIDs) {
+          if (nodeID === survivor.id) continue;
 
-          if (way.isAdjacent(nodeIDs[k], survivor.id)) {
-            way = way.removeNode(nodeIDs[k]);
+          if (way.isAdjacent(nodeID, survivor.id)) {
+            way = way.removeNode(nodeID);
           } else {
-            way = way.replaceNode(nodeIDs[k], survivor.id);
+            way = way.replaceNode(nodeID, survivor.id);
           }
         }
         if (way.isDegenerate()) {
@@ -221,10 +203,10 @@ export function actionConnect(nodeIDs) {
     }
 
     function collectNodes(member, collection) {
-      let entity = graph.hasEntity(member.id);
+      const entity = graph.hasEntity(member.id);
       if (!entity) return;
 
-      let role = member.role || '';
+      const role = member.role || '';
       if (!collection[role]) {
         collection[role] = [];
       }

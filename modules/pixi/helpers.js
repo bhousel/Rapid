@@ -293,9 +293,7 @@ export function getLineSegments(points, spacing, isSided = false, isLimited = fa
   let a;
 
   let segments = [];
-  for (let i = 0; i < points.length; i++) {
-    const b = points[i];
-
+  for (const b of points) {
     if (a) {
       let span = vecLength(a, b) - offset;
 

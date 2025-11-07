@@ -19,8 +19,8 @@ export function actionStraightenWay(selectedIDs, viewport) {
     let selectedWays = selectedIDs.filter(id => graph.entity(id).type === 'way');
     let selectedNodes = selectedIDs.filter(id => graph.entity(id).type === 'node');
 
-    for (let i = 0; i < selectedWays.length; i++) {
-      const way = graph.entity(selectedWays[i]);
+    for (const wayID of selectedWays) {
+      const way = graph.entity(wayID);
       nodes = way.nodes.slice(0);
       remainingWays.push(nodes);
       startNodes.push(nodes[0]);

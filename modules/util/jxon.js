@@ -109,9 +109,9 @@ export var JXON = new (function () {
       } else if (sName.charAt(0) === sAttrPref) {
         oParentEl.setAttribute(sName.slice(1), vValue);
       } else if (vValue.constructor === Array) {
-        for (var nItem = 0; nItem < vValue.length; nItem++) {
+        for (const d of vValue) {
           oChild = oXMLDoc.createElement(sName);
-          loadObjTree(oXMLDoc, oChild, vValue[nItem]);
+          loadObjTree(oXMLDoc, oChild, d);
           oParentEl.appendChild(oChild);
         }
       } else {

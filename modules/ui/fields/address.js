@@ -122,9 +122,8 @@ export function uiFieldAddress(context, uifield) {
     if (!_countryCode) return;
 
     let addressFormat;
-    for (let i = 0; i < _addressFormats.length; i++) {
-      let format = _addressFormats[i];
-      if (!format.countryCodes) {
+    for (const format of _addressFormats) {
+      if (!addressFormat && !format.countryCodes) {
         addressFormat = format;   // choose the default format, keep going
       } else if (format.countryCodes.includes(_countryCode)) {
         addressFormat = format;   // choose the country format, stop here

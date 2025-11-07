@@ -496,9 +496,7 @@ export class OsmRelation extends OsmEntity {
       }
     }
 
-    for (let i = 0; i < inners.length; i++) {
-      let inner = inners[i];
-
+    for (let inner of inners) {
       if (d3_geoArea({ type: 'Polygon', coordinates: [inner] }) < 2 * Math.PI) {
         inner = inner.reverse();
       }

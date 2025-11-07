@@ -173,9 +173,7 @@ export function actionMergeRemoteChanges(id, options = {}) {
     let tags = Object.assign({}, a);   // shallow copy
     let changed = false;
 
-    for (var i = 0; i < keys.length; i++) {
-      var k = keys[i];
-
+    for (const k of keys) {
       if (o[k] !== b[k] && a[k] !== b[k]) {    // changed remotely..
         if (o[k] !== a[k]) {      // changed locally..
           _conflicts.push(

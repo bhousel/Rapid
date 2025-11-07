@@ -20,7 +20,11 @@ export function uiSectionColorblindModeOptions(context) {
   const protanopiaFilter = new PIXI.ColorMatrixFilter();
   const deuteranopiaFilter = new PIXI.ColorMatrixFilter();
   const tritanopiaFilter = new PIXI.ColorMatrixFilter();
-  const filtersObject = { 'Protanopia': protanopiaFilter, 'Deuteranopia': deuteranopiaFilter, 'Tritanopia': tritanopiaFilter };
+  const filtersObject = {
+    'Protanopia': protanopiaFilter,
+    'Deuteranopia': deuteranopiaFilter,
+    'Tritanopia': tritanopiaFilter
+  };
 
   // color matrices
   const protanopiaMatrix = colors.protanopiaMatrix;
@@ -33,14 +37,13 @@ export function uiSectionColorblindModeOptions(context) {
   tritanopiaFilter.matrix = tritanopiaMatrix;
 
   function loadComboBoxData(){
-    let colorblindModes = Object.keys(filtersObject);
-
-    for (let i = 0; i < colorblindModes.length; i++) {
-      let colorObject = {};
-      let colorblindModeTitle = colorblindModes[i].toLowerCase();
-      colorObject.title = colorblindModeTitle;
-      colorObject.value = l10n.t(`preferences.colorblind_options.${colorblindModeTitle}`);
-      comboData.push(colorObject);
+    const colorblindModes = Object.keys(filtersObject);
+    for (const title of colorblindModes) {
+      const k = title.toLowerCase();
+      comboData.push({
+        title: k,
+        value: l10n.t(`preferences.colorblind_options.${k}`),
+      });
     }
     return comboData;
   }

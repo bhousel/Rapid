@@ -552,16 +552,16 @@ export function uiSectionRawMembershipEditor(context) {
             var origValue = role.property('value');
 
             function sort(value, data) {
-                var sameletter = [];
-                var other = [];
-                for (var i = 0; i < data.length; i++) {
-                    if (data[i].value.substring(0, value.length) === value) {
-                        sameletter.push(data[i]);
-                    } else {
-                        other.push(data[i]);
-                    }
+              const sameletter = [];
+              const other = [];
+              for (const d of data) {
+                if (d.value.substring(0, value.length) === value) {
+                  sameletter.push(d);
+                } else {
+                  other.push(d);
                 }
-                return sameletter.concat(other);
+              }
+              return sameletter.concat(other);
             }
 
             role.call(uiCombobox(context, 'member-role')

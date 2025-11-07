@@ -20,12 +20,11 @@ export function uiSectionColorSelection(context) {
   function loadComboBoxData(){
     let colorSchemeKeys = Object.keys(colors.getAllColorSchemes());
 
-    for (let i = 0; i < colorSchemeKeys.length; i++) {
-      let colorObject = {};
-      let colorSchemeTitle = colorSchemeKeys[i];
-      colorObject.title = colorSchemeTitle;
-      colorObject.value = l10n.t(`preferences.color_selection.${colorSchemeTitle}`);
-      comboData.push(colorObject);
+    for (const k of colorSchemeKeys) {
+      comboData.push({
+        title: k,
+        value: l10n.t(`preferences.color_selection.${k}`)
+      });
     }
     return comboData;
   }
@@ -90,10 +89,9 @@ export function uiSectionColorSelection(context) {
     }
 
     function getColorSchemeName(val) {
-      for (let i = 0; i < comboData.length; i++) {
-        let colorSchemeObj = comboData[i];
-        if (colorSchemeObj.value === val) {
-          return colorSchemeObj.title;
+      for (const d of comboData) {
+        if (d.value === val) {
+          return d.title;
         }
       }
     }
