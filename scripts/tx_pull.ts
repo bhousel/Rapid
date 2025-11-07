@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import fs from 'node:fs';
-import shell from 'shelljs';
+import { $, Glob } from 'bun';
 import stringify from 'json-stringify-pretty-compact';
 import { styleText } from 'bun:util';
 import { transifexApi as api } from '@transifex/api';
@@ -23,7 +22,7 @@ const localeCompare = new Intl.Collator('en').compare;
 if (process.env.transifex_token) {
   api.setup({ auth: process.env.transifex_token });
 } else {
-  const auth = JSON.parse(fs.readFileSync('./transifex.auth', 'utf8'));
+  const auth = await Bun.file('./transifex.auth').json();
   api.setup({ auth: auth.token });
 }
 
@@ -70,15 +69,17 @@ Promise.resolve()
 
 // startClean
 // Remove old files before starting
-function startClean() {
+async function startClean() {
   console.log(styleText('yellow', `🧼  Start clean…`));
 
-  // create target folders if necessary
-  if (!fs.existsSync('data/l10n'))  fs.mkdirSync('data/l10n', { recursive: true });
+  $.nothrow();  // If a shell command returns nonzero, keep going.
 
-  shell.rm('-f', 'data/locales.json');
-  for (const file of fs.globSync('data/l10n/*', { ignore: 'data/l10n/*.en.json' })) {
-    shell.rm('-f', file);
+  await $`rm -f ./data/locales.json`.quiet();
+
+  const glob = new Glob('data/l10n/*');
+  for await (const file of glob.scan()) {
+    if (/\.en\.json$/.test(file)) continue;  // don't delete *.en.json
+    await $`rm -f ${file}`;
   }
 }
 
@@ -150,7 +151,7 @@ async function getRapidLanguageStats() {
 
 // writeLocalesFile
 // We'll include only the locales supported by the Rapid project.
-function writeLocalesFile() {
+async function writeLocalesFile() {
   console.log(styleText('yellow', `✏️   Writing 'locales.json'…`));
 
   const locales = {};
@@ -168,7 +169,7 @@ function writeLocalesFile() {
     locales[code] = { rtl: rtl };
   }
 
-  fs.writeFileSync('data/locales.json', stringify({ locales: sortObject(locales) }) + '\n');
+  await Bun.write('./data/locales.json', stringify({ locales: sortObject(locales) }) + '\n');
 }
 
 
@@ -453,7 +454,7 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
     console.log(styleText('yellow', `✏️   Writing '${resourceName}.${code}.json'…`));
     const output = {};
     output[code] = data;
-    fs.writeFileSync(`data/l10n/${resourceName}.${code}.json`, JSON.stringify(output, null, 2) + '\n');
+    await Bun.write(`./data/l10n/${resourceName}.${code}.json`, JSON.stringify(output, null, 2) + '\n');
   } else {
     console.log(styleText('yellow', `🔦  No meaningful translations found…`));
   }

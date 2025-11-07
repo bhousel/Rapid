@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import fs from 'node:fs';
 import { parseArgs, styleText } from 'bun:util';
 import { transifexApi as api } from '@transifex/api';
 
@@ -19,14 +18,15 @@ const localeCompare = new Intl.Collator('en').compare;
 if (process.env.transifex_token) {
   api.setup({ auth: process.env.transifex_token });
 } else {
-  const auth = JSON.parse(fs.readFileSync('./transifex.auth', 'utf8'));
+  const auth = await Bun.file('./transifex.auth').json();
   api.setup({ auth: auth.token });
 }
 
 const { positionals } = parseArgs({ allowPositionals: true });
 if (!positionals.length) {
-  console.error(styleText('yellow', '  missing lookup key, example:'));
-  console.error(styleText('yellow', `  tx_info.js modes.add_area.title`));
+  console.error('');
+  console.error(styleText('gray', 'missing lookup key, example:'));
+  console.error(styleText('white', `$ bun  tx_info.ts  modes.add_area.title`));
   console.error('');
   process.exit(1);
 }
@@ -152,7 +152,7 @@ async function getTranslationStrings() {
     if (query.data.length === 0) {
       console.log(
         styleText(['yellow', 'inverse'], `${languageID}:`) +
-        styleText(['reset', 'yellow', 'dim'], `    \tuntranslated`)
+        styleText(['reset', 'yellowBright'], `    \tuntranslated`)
       );
     } else {
       const tstrings = JSON.stringify(query.data[0].attributes.strings);

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import fs from 'node:fs';
 import { styleText } from 'bun:util';
 import { transifexApi as api } from '@transifex/api';
 
@@ -30,7 +29,7 @@ import { transifexApi as api } from '@transifex/api';
 if (process.env.transifex_token) {
   api.setup({ auth: process.env.transifex_token });
 } else {
-  const auth = JSON.parse(fs.readFileSync('./transifex.auth', 'utf8'));
+  const auth = await Bun.file('./transifex.auth').json();
   api.setup({ auth: auth.token });
 }
 
