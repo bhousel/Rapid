@@ -1,12 +1,10 @@
-/* eslint-disable no-console */
-
 import { $, Glob } from 'bun';
 $.nothrow();  // If a shell command returns nonzero, keep going.
 
 import stringify from 'json-stringify-pretty-compact';
 import { styleText } from 'bun:util';
 
-import * as CLDR from './cldr.js';
+import * as CLDR from './cldr.ts';
 const localeCompare = new Intl.Collator('en').compare;
 
 // Load source data
@@ -23,7 +21,7 @@ const qaDataJSON = await Bun.file(qaDataFile).json();
 const territoriesJSON = await Bun.file(territoriesFile).json();
 
 
-buildData();
+await buildData();
 
 // This script builds all the data files
 // Files under `/data/*` are part of the project and checked in.
@@ -89,7 +87,8 @@ async function buildData() {
   const territoryLanguages = { territoryLanguages: sortObject(gatherTerritoryLanguages()) };
   await Bun.write('./data/territory_languages.json', stringify(territoryLanguages, { maxLength: 9999 }) + '\n');
 
-  const languages = { languages: sortObject(CLDR.langNamesInNativeLang()) };
+  const langInfo = Object.fromEntries(await CLDR.langNamesInNativeLang());
+  const languages = { languages: sortObject(langInfo) };
   await Bun.write('./data/languages.json', stringify(languages, { maxLength: 200 }) + '\n');
 
   await writeEnJson();
@@ -191,8 +190,8 @@ function gatherTerritoryLanguages() {
 async function writeEnJson() {
   // core.yaml
   const core = Bun.YAML.parse(await Bun.file('./data/core.yaml').text());
-  core.en.languageNames = CLDR.languageNamesInLanguageOf('en');
-  core.en.scriptNames = CLDR.scriptNamesInLanguageOf('en');
+  core.en.languageNames = Object.fromEntries(await CLDR.languageNamesInLanguageOf('en'));
+  core.en.scriptNames = Object.fromEntries(await CLDR.scriptNamesInLanguageOf('en'));
   await Bun.write('./data/l10n/core.en.json', JSON.stringify(core, null, 2) + '\n');
 
   // community index

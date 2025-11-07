@@ -1,12 +1,11 @@
-/* eslint-disable no-console */
-/* eslint-disable no-process-env */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import fs from 'node:fs';
 import shell from 'shelljs';
 import stringify from 'json-stringify-pretty-compact';
 import { styleText } from 'bun:util';
 import { transifexApi as api } from '@transifex/api';
 
-import * as CLDR from './cldr.js';
+import * as CLDR from './cldr.ts';
 const localeCompare = new Intl.Collator('en').compare;
 
 
@@ -154,7 +153,7 @@ async function getRapidLanguageStats() {
 function writeLocalesFile() {
   console.log(styleText('yellow', `✏️   Writing 'locales.json'…`));
 
-  const locales = {}
+  const locales = {};
   for (const languageID of languages_rapid) {
     const language = languages.get(languageID);
     if (!language)  throw new Error(`Missing language '${languageID}'`);
@@ -422,13 +421,13 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
     const langNames = CLDR.languageNamesInLanguageOf(code);
     const langNamesEn = CLDR.languageNamesInLanguageOf('en');
     // If this code includes a territory like `zh-CN`, we will allow a fallback to `zh`.
-    let langNamesFallback = {};
+    let langNamesFallback = new Map();
     if (territoryCode) {
       langNamesFallback = CLDR.languageNamesInLanguageOf(langCode);
     }
 
-    for (const [key, name] of Object.entries(langNames)) {
-      if (name === langNamesFallback[key] || name === langNamesEn[key]) continue;  // redundant
+    for (const [key, name] of langNames) {
+      if (name === langNamesFallback.get(key) || name === langNamesEn.get(key)) continue;  // redundant
       if (!data.languageNames)  data.languageNames = {};
       data.languageNames[key] = name;
       count++;
@@ -437,13 +436,13 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
     const scriptNames = CLDR.scriptNamesInLanguageOf(code);
     const scriptNamesEn = CLDR.scriptNamesInLanguageOf('en');
     // If this code includes a territory like `zh-CN`, we will allow a fallback to `zh`.
-    let scriptNamesFallback = {};
+    let scriptNamesFallback = new Map();
     if (territoryCode) {
       scriptNamesFallback = CLDR.scriptNamesInLanguageOf(langCode);
     }
 
-    for (const [key, name] of Object.entries(scriptNames)) {
-      if (name === scriptNamesFallback[key] || name === scriptNamesEn[key]) continue;  // redundant
+    for (const [key, name] of scriptNames) {
+      if (name === scriptNamesFallback.get(key) || name === scriptNamesEn.get(key)) continue;  // redundant
       if (!data.scriptNames)  data.scriptNames = {};
       data.scriptNames[key] = name;
       count++;
@@ -504,8 +503,8 @@ function saveWithRetry(resource, arg1, arg2) {
     .catch(err => {
       console.error(err);
       if (err.statusCode === 500 || err.statusCode === 429 || err.code === 'ETIMEDOUT') {  // server error or rate limit
-        return new Promise(r => setTimeout(r, 10000))          // wait 10 sec
-          .then(() => saveWithRetry(resource, arg1, arg2));    // try again
+        return new Promise(resolve => { setTimeout(resolve, 10000); })  // wait 10 sec
+          .then(() => saveWithRetry(resource, arg1, arg2));  // try again
       } else {
         throw err;
       }

@@ -1,5 +1,4 @@
-/* eslint-disable no-console */
-/* eslint-disable no-process-env */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import fs from 'node:fs';
 import { parseArgs, styleText } from 'bun:util';
 import { transifexApi as api } from '@transifex/api';
@@ -37,10 +36,10 @@ console.log(styleText('yellow', `lookup key "${LOOKUP_KEY}"`));
 const RAPID_PROJECT = 'o:rapid-editor:p:rapid-editor';
 const CORE_RESOURCE = 'o:rapid-editor:p:rapid-editor:r:core';
 
-let project_rapid;         // Project
-let resource_core;         // Resource
-let source_string;         // ResrouceString
-let languageIDs;           // Array<languageID>
+let project_rapid;     // Project
+let resource_core;     // Resource
+let source_string;     // ResrouceString
+let languageIDs;       // Array<languageID>
 
 Promise.resolve()
   .then(getProjectDetails)
@@ -140,7 +139,7 @@ async function getTranslationStrings() {
   const sstrings = JSON.stringify(source_string.attributes.strings);
   console.log(
     styleText(['yellow', 'inverse'], 'l:en:') +
-    styleText(['reset', 'yellow'], `    \t` + sstrings)
+    styleText(['reset', 'yellow'], `    \t${sstrings}`)
   );
 
   for (const languageID of languageIDs) {
@@ -153,13 +152,13 @@ async function getTranslationStrings() {
     if (query.data.length === 0) {
       console.log(
         styleText(['yellow', 'inverse'], `${languageID}:`) +
-        styleText(['reset', 'yellow', 'dim'], `    \t` + 'untranslated')
+        styleText(['reset', 'yellow', 'dim'], `    \tuntranslated`)
       );
     } else {
       const tstrings = JSON.stringify(query.data[0].attributes.strings);
       console.log(
         styleText(['yellow', 'inverse'], `${languageID}:`) +
-        styleText(['reset', 'yellow'], `    \t` + tstrings)
+        styleText(['reset', 'yellow'], `    \t${tstrings}`)
       );
     }
   }

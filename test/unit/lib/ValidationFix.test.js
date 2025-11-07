@@ -7,7 +7,6 @@ describe('ValidationFix', () => {
   it('constructs a ValidationFix object', () => {
     const props = {
       title: 'Test Title',
-      // eslint-disable-next-line no-console
       onClick: () => console.log('Clicked'),
       disabledReason: 'Test Reason',
       icon: 'Test Icon',

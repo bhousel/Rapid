@@ -1,9 +1,8 @@
-/* eslint-disable no-console */
 import stringify from 'json-stringify-pretty-compact';
 import { styleText } from 'bun:util';
 
 
-buildImagery();
+await buildImagery();
 
 // This script processes files used to know what background imagery is available
 //  ./data/manual_imagery.json   - our customizations
@@ -145,7 +144,7 @@ async function buildImagery() {
       }
     }
 
-    let extent = source.extent || {};
+    const extent = source.extent || {};
     if (extent.min_zoom || extent.max_zoom) {
       item.zoomExtent = [
         extent.min_zoom || 0,
@@ -196,7 +195,7 @@ async function buildImagery() {
 
   // We'll mirror the wayback config file, it's not available everywhere - see Rapid#1445
   const WAYBACK_CONFIG_FILE_PROD = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
-  const WAYBACK_CONFIG_FILE_DEV = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/dev/waybackconfig.json';
+  // const WAYBACK_CONFIG_FILE_DEV = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/dev/waybackconfig.json';
 
   await fetch(WAYBACK_CONFIG_FILE_PROD)
     .then(response => {

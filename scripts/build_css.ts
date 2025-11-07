@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import { Glob } from 'bun';
 import autoprefixer from 'autoprefixer';
 import postcss from 'postcss';
@@ -6,7 +5,7 @@ import prepend from 'postcss-selector-prepend';
 import { styleText } from 'bun:util';
 
 
-buildCSS();
+await buildCSS();
 
 // This script concats all of the `/css/*` files into a single `dist/rapid.css` file.
 async function buildCSS() {
@@ -36,5 +35,5 @@ async function buildCSS() {
       }
       return Bun.write('./dist/css/rapid.css', concat);
     })
-    .then(() => console.timeEnd(END))
+    .then(() => console.timeEnd(END));
 }

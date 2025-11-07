@@ -21,10 +21,9 @@ const rules = {
     "indent": ["off", 2],
     "keyword-spacing": "error",
     "linebreak-style": ["error", "unix"],
-    "no-await-in-loop": "error",
+    "no-await-in-loop": "off",
     "no-caller": "error",
     "no-catch-shadow": "error",
-    "no-console": "warn",
     "no-constructor-return": "error",
     "no-div-regex": "error",
     "no-duplicate-imports": "warn",
@@ -49,7 +48,6 @@ const rules = {
     "no-new-wrappers": "error",
     "no-octal": "error",
     "no-octal-escape": "error",
-    "no-process-env": "error",
     "no-promise-executor-return": "error",
     "no-proto": "error",
     "no-prototype-builtins": "off",
@@ -88,7 +86,7 @@ const rules = {
     "quotes": ["error", "single", { "allowTemplateLiterals": true }],
     "radix": ["error", "always"],
     "require-atomic-updates": "error",
-    "require-await": "error",
+    "require-await": "off",
     "semi": ["error", "always"],
     "semi-spacing": "error",
     "space-unary-ops": "error",
@@ -116,6 +114,10 @@ export default [
       globals: {
         ...globals.browser
       }
+    },
+    rules: {
+      "no-console": "warn",
+      "no-process-env": "error"
     }
   },
   {

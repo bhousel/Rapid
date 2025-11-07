@@ -24,7 +24,7 @@
     "build:svg": "run-p 'svg:*'",
     "clean": "bun ./scripts/clean.ts",
     "imagery": "bun ./scripts/imagery.js",
-    "lint": "eslint ./modules ./test",
+    "lint": "eslint ./modules ./test ./scripts",
     "start": "run-s build start:server",
     "start:server": "bun ./scripts/server.ts",
     "stats": "run-s 'stats:**'",

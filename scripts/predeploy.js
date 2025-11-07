@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import shell from 'shelljs';
 
 // This script should normally only be run from a GitHub deploy action.

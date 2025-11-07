@@ -1,5 +1,4 @@
-/* eslint-disable no-console */
-/* eslint-disable no-process-env */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import fs from 'node:fs';
 import { styleText } from 'bun:util';
 import { transifexApi as api } from '@transifex/api';
@@ -22,7 +21,6 @@ import { transifexApi as api } from '@transifex/api';
 // If this script stops because of a server issue, you can restart it.
 // It will again iterate through each language, but will run quickly through the ones already done.
 //
-
 
 // Create a file `transifex.auth` in the root folder of the Rapid project.
 // This file should contain your API bearer token, for example:
@@ -428,8 +426,8 @@ function saveWithRetry(resource, arg1, arg2) {
     .catch(err => {
       console.error(err);
       if (err.statusCode === 500 || err.statusCode === 429 || err.code === 'ETIMEDOUT') {  // server error or rate limit
-        return new Promise(r => setTimeout(r, 10000))          // wait 10 sec
-          .then(() => saveWithRetry(resource, arg1, arg2));    // try again
+        return new Promise(resolve => { setTimeout(resolve, 10000); })  // wait 10 sec
+          .then(() => saveWithRetry(resource, arg1, arg2));   // try again
       } else {
         throw err;
       }
