@@ -72,7 +72,7 @@ Promise.resolve()
 async function startClean() {
   console.log(styleText('yellow', `🧼  Start clean…`));
 
-  $.nothrow();  // If a shell command returns nonzero, keep going.
+  // $.nothrow();  // If a shell command returns nonzero, keep going.
 
   await $`rm -f ./data/locales.json`.quiet();
 
@@ -419,12 +419,12 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
   // As above, we'll include some logic to check for redundancy between these strings
   // and whatever strings are present in the fallback language (if any) and in English.
   if (resourceName === 'core') {
-    const langNames = CLDR.languageNamesInLanguageOf(code);
-    const langNamesEn = CLDR.languageNamesInLanguageOf('en');
+    const langNames = await CLDR.languageNamesInLanguageOf(code);
+    const langNamesEn = await CLDR.languageNamesInLanguageOf('en');
     // If this code includes a territory like `zh-CN`, we will allow a fallback to `zh`.
     let langNamesFallback = new Map();
     if (territoryCode) {
-      langNamesFallback = CLDR.languageNamesInLanguageOf(langCode);
+      langNamesFallback = await CLDR.languageNamesInLanguageOf(langCode);
     }
 
     for (const [key, name] of langNames) {
@@ -434,12 +434,12 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
       count++;
     }
 
-    const scriptNames = CLDR.scriptNamesInLanguageOf(code);
-    const scriptNamesEn = CLDR.scriptNamesInLanguageOf('en');
+    const scriptNames = await CLDR.scriptNamesInLanguageOf(code);
+    const scriptNamesEn = await CLDR.scriptNamesInLanguageOf('en');
     // If this code includes a territory like `zh-CN`, we will allow a fallback to `zh`.
     let scriptNamesFallback = new Map();
     if (territoryCode) {
-      scriptNamesFallback = CLDR.scriptNamesInLanguageOf(langCode);
+      scriptNamesFallback = await CLDR.scriptNamesInLanguageOf(langCode);
     }
 
     for (const [key, name] of scriptNames) {
@@ -481,14 +481,18 @@ async function getCollection(iterable, showCount = true) {
 
   for await (const val of iterable.all()) {
     results.push(val);
-    if (showCount) {
+    if (showCount && results.length % 50 === 0) {
       process.stdout.clearLine(0);
       process.stdout.cursorTo(0);
       process.stdout.write(results.length.toString());
+      Bun.sleepSync(1000); // slow down!
     }
   }
 
   if (showCount) {
+    process.stdout.clearLine(0);
+    process.stdout.cursorTo(0);
+    process.stdout.write(results.length.toString());
     process.stdout.write('\n');
   }
 
