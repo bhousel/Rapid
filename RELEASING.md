@@ -21,7 +21,8 @@ The `main` branch includes all the code, but we don't check in the built assets 
 # Make sure your main branch is up to date and all tests pass
 git checkout main
 git pull origin
-npm run test
+bun install
+bun run test
 
 # Pick a version, see https://semver.org/ - for example: 'A.B.C' or 'A.B.C-pre.D'
 #  - We do this step first because the files in `/dist` will include this version in their metadata
@@ -35,15 +36,15 @@ git add . && git commit -m  "$VERSION"
 
 # Update imagery
 rm -rf package-lock.json node_modules/editor-layer-index/
-npm install
-npm run imagery
-npm run build
-git add . && git commit -m 'npm run imagery'
+bun install
+bun run imagery
+bun run build
+git add . && git commit -m 'bun run imagery'
 
 # Update translations
-npm run translations
-npm run build
-git add . && git commit -m 'npm run translations'
+bun run translations
+bun run build
+git add . && git commit -m 'bun run translations'
 
 # Update main branch
 git push origin main
@@ -61,7 +62,7 @@ This will also be the commit that we tag and publish.
 ```bash
 git checkout release
 git reset --hard main
-npm run all
+bun run all
 git add -f dist
 git commit -m 'Check in build'
 git push origin -f release
@@ -83,7 +84,7 @@ Confirm that publish will work, and that it won't be >150 MB.
 If it is too large, the JSDelivr CDN will not serve it.  See Rapid#1561
 
 ```bash
-npm publish --dry-run
+bun publish --dry-run
 ```
 
 Typically you should see something like this:
@@ -100,7 +101,7 @@ The point of no return, tag and publish:
 ```bash
 git tag "$VERSION"
 git push origin "$VERSION"
-npm publish
+bun publish
 ```
 
 Set as latest release on GitHub:
