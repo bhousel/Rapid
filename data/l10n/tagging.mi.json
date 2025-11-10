@@ -177,6 +177,12 @@
             "tunnel": "Anaroa"
           }
         },
+        "structure_canal": {
+          "options": {
+            "bridge": "Arawhiti",
+            "tunnel": "Anaroa"
+          }
+        },
         "structure_waterway": {
           "options": {
             "tunnel": "Anaroa"
@@ -225,6 +231,11 @@
             "industrial": "Ahumahi"
           }
         },
+        "waste": {
+          "options": {
+            "trash": "rāpihi"
+          }
+        },
         "water_source": {
           "options": {
             "river": "Awa"
@@ -259,9 +270,6 @@
         "amenity/ice_cream": {
           "name": "Aihikirīmi toa"
         },
-        "amenity/kindergarten": {
-          "name": "Kura Pūhou"
-        },
         "amenity/library": {
           "name": "Whare pukapuka"
         },
@@ -280,8 +288,11 @@
         "amenity/recycling": {
           "name": "Hangarua"
         },
-        "amenity/school": {
-          "name": "Kura"
+        "amenity/recycling_centre": {
+          "name": "Taupuni Hangarua"
+        },
+        "amenity/recycling_container": {
+          "name": "Ipu Hangarua"
         },
         "amenity/theatre": {
           "name": "Whare Tapere"
@@ -292,11 +303,9 @@
         "amenity/townhall": {
           "name": "Hōro ā-Tāone"
         },
-        "amenity/university": {
-          "name": "Whare Wānanga"
-        },
         "amenity/waste_basket": {
-          "name": "Rapihi"
+          "name": "rāpihi",
+          "terms": "ipu para"
         },
         "area": {
           "name": "Pae"
@@ -372,6 +381,9 @@
         },
         "landuse/industrial": {
           "name": "Papa ahumahi"
+        },
+        "landuse/landfill": {
+          "name": "maunga para"
         },
         "landuse/retail": {
           "name": "Ngā Toa"

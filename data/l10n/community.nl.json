@@ -56,14 +56,11 @@
       "openstreetmapitalylazio": "OpenStreetMap Italië-Lazio",
       "openstreetmapitalylombardia": "OpenStreetMap Italië-Lombardije",
       "openstreetmapitalypiemonte": "OpenStreetMap Italië-Piëmont",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Italië-Zuid-Tirol",
       "openstreetmapitalytrentino": "OpenStreetMap Italië-Trentino",
       "openstreetmapkazakhstan": "OpenStreetMap Kazachstan",
       "openstreetmapkenya": "OpenStreetMap Kenia",
-      "openstreetmapkyrgyzstan": "OpenStreetMap Kirgizië",
       "openstreetmaplatinamerica": "OpenStreetMap Latijns-Amerika",
       "openstreetmaplatvia": "OpenStreetMap Letland",
-      "openstreetmaplebanon": "OpenStreetMap Libanon",
       "openstreetmaplibya": "OpenStreetMap Libië",
       "openstreetmaplithuania": "OpenStreetMap Litouwen",
       "openstreetmaplombardia": "OpenStreetMap Lombardije",
@@ -88,7 +85,6 @@
       "openstreetmaprussia": "OpenStreetMap Rusland",
       "openstreetmapsaudiarabia": "OpenStreetMap Saudi-Arabië",
       "openstreetmapserbia": "OpenStreetMap Servië",
-      "openstreetmapseychelles": "OpenStreetMap Seychellen",
       "openstreetmapslovenia": "OpenStreetMap Slovenië",
       "openstreetmapsomalia": "OpenStreetMap Somalië",
       "openstreetmapsouthafrica": "OpenStreetMap Zuid-Afrika",
@@ -96,7 +92,6 @@
       "openstreetmapsudan": "OpenStreetMap Soedan",
       "openstreetmapsweden": "OpenStreetMap Zweden",
       "openstreetmapswitzerland": "OpenStreetMap Zwitserland",
-      "openstreetmapsyria": "OpenStreetMap Syrië",
       "openstreetmaptunisia": "OpenStreetMap Tunesië",
       "openstreetmapturin": "OpenStreetMap Turijn",
       "openstreetmapturkey": "OpenStreetMap Turkije",
@@ -150,12 +145,6 @@
       "telegram": {
         "description": "Kom erbij op de Telegram chat van onze community"
       },
-      "twitter": {
-        "name": "{community} op 𝕏"
-      },
-      "x": {
-        "name": "{community} op 𝕏"
-      },
       "youtube": {
         "name": "{community} op YouTube",
         "description": "Abonneer op ons YouTube-kanaal"
@@ -190,9 +179,6 @@
     "be-chapter": {
       "description": "Wij helpen OpenStreetMap groeien en verbeteren in België. ",
       "extendedDescription": "Als u de OpenStreetMap gemeenschap in België mee wil verbeteren en doen groeien, om steeds meer mensen gek van mapping te maken, dan is OpenStreetMap België de juiste plaats voor u!"
-    },
-    "be-irc": {
-      "extendedDescription": "Kom erbij op #{account}  op irc.oftc.net (poort 6667), het kanaal is gekoppeld aan de Matrix-chatruimte"
     },
     "be-matrix": {
       "description": "Alle mappers zijn welkom!"
@@ -372,14 +358,8 @@
     "hu-matrix": {
       "extendedDescription": "OpenStreetMap chat over kaart onderwerpen. Een van de hulpfora van de OSM gemeenschap."
     },
-    "hu-meetup": {
-      "description": "Het platform om meetups te organiseren in Hongarije"
-    },
     "hu-mobilizon": {
       "name": "{community} op Mobilizon"
-    },
-    "hu-website": {
-      "description": "Wij helpen OpenStreetMap groeien en verbeteren in Hongarije."
     },
     "hu-wiki": {
       "description": "{community} Wikipagina"
@@ -454,6 +434,9 @@
     "MappingWR": {
       "description": "Uitstootarme routes rond Waterloo Region vindbaar maken."
     },
+    "maptime-bogota-youtube": {
+      "extendedDescription": "Leer gegevens in het veld te verzamelen en te digitaliseren inOpenStreetMap. Voorkennis is niet nodig! Je hebt alleen de wil om deel te nemen, te leren en plezier te hebben."
+    },
     "Maptime-ME-meetup": {
       "description": "Mappers en OpenStreetMap-gebruikers in de omgeving van Portland, ME",
       "extendedDescription": "Maptime is, letterlijk, tijd voor het kaartmaken. Onze missie in om de deuren van cartografische mogelijkheden te openen voor iedereen, door het creëren van een tijdstip en plek voor collaboratief leren, exploratie en map creatie gebruikmakende van mapping tools en technologieën."
@@ -525,10 +508,6 @@
     },
     "osm-benin-facebook": {
       "description": "Verbeter OpenStreetMap in Benin"
-    },
-    "OSM-Central-Salish-Sea": {
-      "description": "Mappers en OpenStreetMap-gebruikers in de omgeving van Mount Vernon, WA",
-      "extendedDescription": "OpenStreetMap is een map van de wereld gemaakt door mensen zoals jou. Het is een map die jij bouwt, die gratis wordt wegegeven zoals Wikipedia. Bekijk osm.org voor meer. We komen de hele tijd samen om over kaarten te praten, mappen te maken en plezier te hebben!"
     },
     "osm-ch": {
       "description": "Het platform voor informatie over OpenStreetMap in Zwitserland"
@@ -749,9 +728,6 @@
       "description": "Kom erbij op #{account} op irc.freenode.org (poort 6667)",
       "extendedDescription": "Kom erbij op #{account} op irc.freenode.org"
     },
-    "vn-mailinglist": {
-      "description": "Mailinglijst aangaande OpenStreetMap in Vietnam of het Vietnamees"
-    },
     "vn-wiki": {
       "description": "{community} Wikipagina"
     },
@@ -788,9 +764,6 @@
     },
     "ym-Clemson-University": {
       "description": "YouthMappers-afdeling aan de Clemson University"
-    },
-    "ym-College-of-William-and-Mary": {
-      "description": "YouthMappers-afdeling aan de College of William and Mary"
     },
     "ym-Cornell-University": {
       "description": "YouthMappers-afdeling aan de Cornell University"
@@ -1136,9 +1109,6 @@
     },
     "ym-University-of-Zimbabwe": {
       "description": "YouthMappers-afdeling aan de University of Zimbabwe"
-    },
-    "ym-UW-Madison": {
-      "description": "YouthMappers-afdeling aan de UW-Madison"
     },
     "ym-Vassar-College": {
       "description": "YouthMappers-afdeling aan het Vassar College"

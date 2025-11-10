@@ -206,10 +206,6 @@
     "OSM-AR-twitter": {
       "extendedDescription": "Nyheter fra det lokale fellesskapet og OpenStreetMap generelt."
     },
-    "OSM-Central-Salish-Sea": {
-      "description": "Kartleggere og OpenStreetMap-brukere, rundt Mount Vernon, WA",
-      "extendedDescription": "OpenStreetMap er et kart over verden laget av folk som deg. Det er et kart som du bygger, som gis bort gratis, litt som Wikipedia. Sjekk ut osm.org for mer info. Vi møtes hele tiden for å snakke kart, lage kart og ha det gøy!"
-    },
     "OSM-Chattanooga": {
       "description": "OpenStreetMap-brukergruppen for Chattanooga"
     },
@@ -342,9 +338,6 @@
     "talk-bo": {
       "extendedDescription": "Kartlegger du i Bolivia? Har du spørsmål, og har lyst til å sosialisere med fellesskapet her? Bli med på {url}. Alle er velkomne!"
     },
-    "talk-nz": {
-      "description": "New Zealands OSM-samfunnsprat"
-    },
     "tw-slack": {
       "description": "Alle er velkomne! Registrer deg på {signupUrl}"
     },
@@ -363,9 +356,6 @@
     },
     "uk-london-wiki": {
       "description": "{community} Wiki-side"
-    },
-    "uk-loomio": {
-      "name": "OpenStreetMap UK på Loomio"
     },
     "vn-wiki": {
       "description": "{community} Wiki-side"

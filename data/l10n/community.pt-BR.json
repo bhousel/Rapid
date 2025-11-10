@@ -24,6 +24,9 @@
       "aparat": {
         "description": "Inscreva-se no nosso canal Aparat"
       },
+      "bluesky": {
+        "description": "Siga-nos no Bluesky"
+      },
       "discord": {
         "description": "Entre em contato com outros mapeadores no Discord"
       },
@@ -35,6 +38,9 @@
       },
       "forum": {
         "description": "O fórum oficial para {community}"
+      },
+      "instagram": {
+        "description": "Siga-nos no Instagram"
       },
       "linkedin": {
         "description": "Entre para a nossa community no LinkedIn"
@@ -56,10 +62,18 @@
       "telegram": {
         "description": "Junte-se à nossa comunidade de bate-papo do Telegram"
       },
+      "threads": {
+        "description": "Siga-nos no Threads"
+      },
+      "tiktok": {
+        "description": "Siga-nos no TikTok"
+      },
       "twitter": {
+        "name": "{community} no  𝕏",
         "description": "Siga-nos no 𝕏"
       },
       "x": {
+        "name": "{community} no 𝕏",
         "description": "Siga-nos no 𝕏"
       },
       "youtube": {
@@ -180,6 +194,9 @@
     "MappingWR": {
       "description": "Fazendo rotas de menos emissões de carbono em torno de Waterloo. Região fácil de encontrar."
     },
+    "MapRVA": {
+      "description": "MapRVA é um grupo de entusiastas de mapeamento em Richmond, Virgínia, que trabalha para criar e compartilhar dados geoespaciais da nossa cidade usando o OpenStreetMap."
+    },
     "Maptime-ME-meetup": {
       "description": "Mapeadores e usuários do OpenStreetMap, em torno de Portland, ME",
       "extendedDescription": "Tempo de mapeamento é, literalmente, tempo para criação de mapas. Nossa missão é abrir as portas de possibilidades cartográficas para qualquer um interessado por criar tempo e espaço para o aprendizado colaborativo, exploração e criação de mapas usando ferramentas de mapeamento e tecnologias."
@@ -189,6 +206,9 @@
     },
     "me-telegram": {
       "description": "Todos são bem-vindos! Inscreva-se em {signupUrl}"
+    },
+    "minas_gerais-discord": {
+      "extendedDescription": "Bem-vindo ao Discord do OSM Minas Gerais! Somos uma comunidade de mapeadores apaixonados por criar mapas detalhados e de código aberto para Minas Gerais, Brasil. Junte-se a nós para colaborar, compartilhar dicas e ajudar a tornar os mapas de Minas Gerais os melhores do OpenStreetMap. Seja você iniciante ou profissional, vamos mapear juntos!"
     },
     "Nottingham-OSM-pub-meetup": {
       "name": "Encontro mensal no bar em Midlands Orientais (Nottingham)",
@@ -204,9 +224,6 @@
     },
     "OSM-AR-twitter": {
       "extendedDescription": "Notícias da comunidade local e do OpenStreetMap em geral."
-    },
-    "OSM-Central-Salish-Sea": {
-      "description": "Mapeadores e usuários do OpenStreetMap em Mount Vernon, WA"
     },
     "OSM-Chattanooga": {
       "description": "O grupo de usuários do OpenStreetMap para o Chattanooga"
@@ -259,6 +276,12 @@
     "OSM-Puducherry-Mailing-List": {
       "name": "Movimento de Hardware e Software Livres - Lista de discussão",
       "extendedDescription": "O FSHM organiza eventos relacionados a software/hardware livres, tecnologia, ativismo e OpenStreetMap."
+    },
+    "osm-punjab-matrix": {
+      "description": "Mapeamos Punjab juntos. Junte-se ao nosso grupo Matrix"
+    },
+    "osm-punjab-telegram": {
+      "description": "Mapeamos Punjab juntos. Junte-se ao nosso grupo de Telegram. {url}"
     },
     "OSM-Rome-meetup": {
       "description": "Melhore o OpenStreetMap na área de Roma",

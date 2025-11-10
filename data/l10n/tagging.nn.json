@@ -845,6 +845,9 @@
         "structure": {
           "placeholder": "Ukjend"
         },
+        "structure_canal": {
+          "placeholder": "Ukjend"
+        },
         "structure_waterway": {
           "placeholder": "Ukjend"
         },
@@ -957,12 +960,6 @@
         "amenity/dentist": {
           "name": "Tannlege"
         },
-        "amenity/driving_school": {
-          "name": "Køyreskule"
-        },
-        "amenity/language_school": {
-          "name": "Språkskule"
-        },
         "amenity/telephone": {
           "name": "Telefon"
         },
@@ -998,9 +995,6 @@
         },
         "entrance/emergency": {
           "name": "Naudutgang"
-        },
-        "leisure/dancing_school": {
-          "name": "Danseskule"
         },
         "line": {
           "name": "Linje"

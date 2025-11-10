@@ -143,6 +143,11 @@
         "air_conditioning": {
           "terms": "[traduza com sinônimos ou termos relacionados para 'Ar Condicionado', separados por vírgulas]"
         },
+        "aircraft/type": {
+          "options": {
+            "airliner": "Grande avião de passageiros"
+          }
+        },
         "animal_boarding": {
           "label": "Para animais"
         },
@@ -399,7 +404,6 @@
             "roof": "Telhado ou cobertura",
             "ruins": "Ruinas decorativas/cênicas",
             "school": "Edifício escolar",
-            "semidetached_house": "Casa geminada",
             "service": "Edifício de máquinas",
             "stadium": "Edificação de estádio",
             "static_caravan": "Casa móvel",
@@ -491,6 +495,13 @@
         "circumference": {
           "label": "Circunferência (na altura do peito)"
         },
+        "climbing/grade/french": {
+          "terms": "grade,nível,grau,níveis,classificação,nível,dificuldade"
+        },
+        "climbing/length": {
+          "label": "Comprimento (em metros)",
+          "terms": "comprimento,metros,extensão,"
+        },
         "clothes": {
           "options": {
             "babies": "Roupas para bebês",
@@ -539,7 +550,7 @@
         },
         "consulate": {
           "options": {
-            "consular_office": "Escritório Consular",
+            "consular_office": "Escritório consular",
             "residence": "Residência oficial de um embaixador"
           }
         },
@@ -813,8 +824,7 @@
             "pescetarian": "Pescetariana",
             "vegan": "Vegano",
             "vegetarian": "Vegetariano"
-          },
-          "terms": "Tipos de dietas"
+          }
         },
         "direction": {
           "label": "Direção (graus em sentido horário)"
@@ -879,6 +889,14 @@
         "duration": {
           "label": "Tempo de duração",
           "terms": "[traduza com sinônimos ou termos relacionados para 'Duração', separados por vírgulas]"
+        },
+        "education": {
+          "options": {
+            "college": "Faculdade",
+            "driving_school": "Autoescola",
+            "language_school": "Escola de idiomas",
+            "prep_school": "Escola de preparação para exames"
+          }
         },
         "electrified": {
           "options": {
@@ -1181,6 +1199,13 @@
             "difficult": "Difícil: Maneira estreita e exposta. Pode conter obstáculos para passar por cima e estreitar passagens."
           },
           "placeholder": "Difícil, Perigoso..."
+        },
+        "house": {
+          "options": {
+            "bungalow": {
+              "title": "Bangalô"
+            }
+          }
         },
         "iata": {
           "label": "Código do aeroporto IATA"
@@ -1609,7 +1634,6 @@
           }
         },
         "phone": {
-          "placeholder": "+55 11 0982 1098",
           "terms": "número de telefone,celular,phone,fone,contato telefônico"
         },
         "picnic_table": {
@@ -1699,6 +1723,14 @@
             "sled": "Trenó",
             "sleigh": "Trenó",
             "snow_park": "Estação de esqui"
+          }
+        },
+        "playground": {
+          "options": {
+            "ladder": "Escada",
+            "map": "Mapa",
+            "maze": "Labirinto",
+            "platform": "Plataforma"
           }
         },
         "plots": {
@@ -1911,7 +1943,7 @@
           }
         },
         "service_times": {
-          "label": "Horários de Serviço"
+          "label": "Horários de missa/culto"
         },
         "shelter": {
           "label": "Abrigo contra intempéries"
@@ -2044,6 +2076,9 @@
             "cutting": "Escavação",
             "embankment": "Aterro elevado"
           }
+        },
+        "structure_canal": {
+          "placeholder": "Desconhecido"
         },
         "subject/wikidata": {
           "label": "Wikidata do assunto"
@@ -2705,10 +2740,6 @@
         "amenity/clock/sundial": {
           "terms": "Relógio de sol"
         },
-        "amenity/college": {
-          "name": "Escola técnica",
-          "terms": "Colégio técnico, Ensino profissionalizante, Educação profissional"
-        },
         "amenity/community_centre": {
           "terms": "Centro comunitário, Salão de festas e eventos, centro social, associação de moradores"
         },
@@ -2779,10 +2810,6 @@
         },
         "amenity/driver_training": {
           "name": "Área de treinamento de megulho"
-        },
-        "amenity/driving_school": {
-          "name": "Auto escola",
-          "terms": "Escola de direção, escola de motoristas, auto-escola, autoescola"
         },
         "amenity/events_venue": {
           "name": "Local de eventos",
@@ -2889,14 +2916,6 @@
           "name": "Caixa de Karaokê",
           "terms": "Caixa de Karaokê"
         },
-        "amenity/kindergarten": {
-          "name": "Escola de educação infantil",
-          "terms": "escola de educação infantil,educação infantil,pré-escola"
-        },
-        "amenity/language_school": {
-          "name": "Escola de idiomas",
-          "terms": "Escola de idiomas"
-        },
         "amenity/lavoir": {
           "name": "Lavanderia pública",
           "terms": "lavadeiro, lavadero, local de lavagem de roupas público"
@@ -2940,10 +2959,6 @@
         "amenity/motorcycle_rental": {
           "name": "Aluguel de motocicleta",
           "terms": "Aluguel de motocicleta"
-        },
-        "amenity/music_school": {
-          "name": "Escola de Música",
-          "terms": "escola musical, ensino de música, aulas de música, escola de instrumentos musicais, escola de canto"
         },
         "amenity/nightclub": {
           "name": "Boate",
@@ -3067,10 +3082,6 @@
         "amenity/post_office": {
           "name": "Agência de correios",
           "terms": "Correios, Encomendas, Transporte, Log, Cargas"
-        },
-        "amenity/prep_school": {
-          "name": "Escola de preparação para exames",
-          "terms": "teste prep, tutoring school, escola, escola de preparação"
         },
         "amenity/prison": {
           "name": "Presídio",
@@ -3198,9 +3209,6 @@
           "name": "Ponto de descarga de dejetos (para trailers)",
           "terms": "Depósito de Toaletes de Trailers, depósito de banheiro de trailers, depósito sanitário, trailer, despejo de banheiro, despejo sanitário"
         },
-        "amenity/school": {
-          "terms": "área escolar, terreno escolar, pátio escolar, colégio, ensino fundamental, ensino médio, educação, instituição de ensino"
-        },
         "amenity/shelter": {
           "name": "Abrigo contra intempéries",
           "terms": "abrigo contra intempéries, abrigo, proteção da chuva"
@@ -3210,7 +3218,7 @@
           "terms": "Mirante"
         },
         "amenity/shelter/lean_to": {
-          "name": "Quiosque",
+          "name": "Abrigo aberto",
           "terms": "Puxadinho, abrigo, montanha, teto, cobertura"
         },
         "amenity/shelter/picnic_shelter": {
@@ -3315,10 +3323,6 @@
         },
         "amenity/trolley_bay": {
           "name": "Baia de carrinhos de supermercado"
-        },
-        "amenity/university": {
-          "name": "Universidade ou faculdade",
-          "terms": "Área de Universidade, Faculdade, Área de Faculdade, Centro Universitário"
         },
         "amenity/vacuum_cleaner": {
           "name": "Estação de aspiração",
@@ -3748,6 +3752,9 @@
         "building/house": {
           "terms": "Casa, Residência"
         },
+        "building/house/terraced": {
+          "name": "Casa geminada"
+        },
         "building/houseboat": {
           "terms": "Casa flutuante"
         },
@@ -3799,7 +3806,6 @@
           "terms": "Edifício Escolar, escola, prédio escolar, colégio"
         },
         "building/semidetached_house": {
-          "name": "Casa geminada",
           "terms": "Casa irmanada"
         },
         "building/service": {
@@ -3828,6 +3834,9 @@
         },
         "building/temple": {
           "terms": "Templo, igreja, lugar de adoração, capela, local sagrado"
+        },
+        "building/terrace": {
+          "name": "Fileira de casas geminadas"
         },
         "building/train_station": {
           "name": "Edifício de estação de trem"
@@ -4053,6 +4062,39 @@
         "disused/shop": {
           "name": "Loja em desuso"
         },
+        "education": {
+          "name": "Instituição de ensino"
+        },
+        "education/dancing_school": {
+          "terms": "Escola de dança,swing,tango,jazz,dança,baile,forró,samba,balé,ballet,bachata,salsa"
+        },
+        "education/driving_school": {
+          "name": "Autoescola",
+          "terms": "Escola de direção, escola de motoristas, auto-escola, autoescola"
+        },
+        "education/kindergarten": {
+          "name": "Creche/Centro de educação infantil",
+          "terms": "escola de educação infantil,educação infantil,pré-escola,jardim de infância"
+        },
+        "education/language_school": {
+          "name": "Escola de idiomas"
+        },
+        "education/music_school": {
+          "terms": "escola musical, ensino de música, aulas de música, escola de instrumentos musicais, escola de canto"
+        },
+        "education/prep_school": {
+          "name": "Escola de preparação para exames",
+          "terms": "teste prep, tutoring school, escola, escola de preparação,kumon,cursinho"
+        },
+        "education/school": {
+          "terms": "área escolar, terreno escolar, pátio escolar, colégio, ensino fundamental, ensino médio, educação, instituição de ensino"
+        },
+        "education/university": {
+          "terms": "Área de Universidade, Faculdade, Área de Faculdade, Centro Universitário"
+        },
+        "education/yes": {
+          "name": "Instituição de ensino (tipo não especificado)"
+        },
         "embankment": {
           "name": "Aterro Elevado"
         },
@@ -4069,12 +4111,6 @@
         "emergency/defibrillator": {
           "name": "Desfibrilador",
           "terms": "desfibrilador automático externo, dea"
-        },
-        "emergency/designated": {
-          "name": "Acesso de Emergência Designado"
-        },
-        "emergency/destination": {
-          "name": "Acesso de emergência como destino"
         },
         "emergency/fire_alarm": {
           "name": "Caixa de chamada de alarme de incêndio",
@@ -4114,17 +4150,8 @@
           "name": "Resgate na montanha",
           "terms": "Resgate na montanha"
         },
-        "emergency/no": {
-          "name": "Acesso de Emergência Não Permitido"
-        },
-        "emergency/official": {
-          "name": "Acesso de emergência oficial"
-        },
         "emergency/phone": {
           "terms": "Telefone de Emergência"
-        },
-        "emergency/private": {
-          "name": "Acesso de Emergência Privado"
         },
         "emergency/siren": {
           "terms": "Sirene"
@@ -4134,9 +4161,6 @@
         },
         "emergency/water_tank": {
           "terms": "Tanque de água de emergência"
-        },
-        "emergency/yes": {
-          "name": "Acesso de Emergência"
         },
         "entrance": {
           "terms": "Entrada / Saída"
@@ -4527,10 +4551,10 @@
           "terms": "estacionamento, via de estacionamento, corredor de estacionamento"
         },
         "highway/service_area": {
-          "name": "Área de Serviço Pavimentada"
+          "name": "Área de serviço pavimentada"
         },
         "highway/services": {
-          "name": "Posto de Serviços",
+          "name": "Posto de serviços",
           "terms": "Área de Serviço, Posto de combustíveis, posto de gasolina, combustíveis, borracharia, lava jato, serviços, loja de conveniências"
         },
         "highway/speed_camera": {
@@ -4907,10 +4931,6 @@
         "leisure/dance": {
           "name": "Danceteria",
           "terms": "salão de dança, balada, boate, clube de dança, salsa, tango"
-        },
-        "leisure/dancing_school": {
-          "name": "Escola de Dança",
-          "terms": "Escola de dança, swing, tango, jazz, dança, baile, forró, samba"
         },
         "leisure/disc_golf_course": {
           "name": "Percurso de golfe de disco",
@@ -5436,7 +5456,8 @@
           "terms": "Oleoduto subterrâneo"
         },
         "man_made/planter": {
-          "name": "Vaso"
+          "name": "Vaso",
+          "terms": "jardim,plantas,vegetação,caixa,flores,bloco,"
         },
         "man_made/pumping_station": {
           "name": "Estação de bombeamento\nEstação de captação de água\nEstação elevatória\nEstação elevatória de água\nEstação elevatória de esgoto\nEEE",
@@ -5480,9 +5501,6 @@
         },
         "man_made/tailings_pond": {
           "name": "Lagoa de rejeitos"
-        },
-        "man_made/torii": {
-          "terms": "Torii,Tori"
         },
         "man_made/tower": {
           "terms": "Torre"
@@ -5669,8 +5687,7 @@
           "terms": "Moita, Arbusto, Matagal, vegetação"
         },
         "natural/shingle": {
-          "name": "Telha",
-          "terms": "Telha"
+          "name": "Seixos"
         },
         "natural/shrub": {
           "terms": "Arbusto"
@@ -6995,7 +7012,6 @@
           "terms": "Loja de Joias, Ouro, Prata, Bijuterias, Biju, Loja de Bijuterias, Joias, diamantes, colares"
         },
         "shop/kiosk": {
-          "name": "Quiosque (comercial)",
           "terms": "kiosk, kioske, banca, loja, comércio, conveniência"
         },
         "shop/kitchen": {
@@ -7381,8 +7397,8 @@
           "terms": "Arte, Galeria, Exposição, Artes Plásticas, Cultura, museu"
         },
         "tourism/guest_house": {
-          "name": "Guesthouse",
-          "terms": "Guesthouse"
+          "name": "Pousada",
+          "terms": "Pousada,bed and breakfast,cama,café da manhã,pensão"
         },
         "tourism/hostel": {
           "terms": "Albergue"

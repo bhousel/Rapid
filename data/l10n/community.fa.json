@@ -1,7 +1,7 @@
 {
   "fa": {
     "_communities": {
-      "freelibreopensourcesoftwarekosovaflossk": "نرم افزار رایگان Libre Open Source Kosova (FLOSSK)",
+      "freelibreopensourcesoftwarekosovaflossk": "نرم افزار منبع باز آزاد کوزوا (فلاسک)",
       "kiribatiwomeninmapping": "زنان کیریباتی در نقشه برداری",
       "mappingbotswana": "نقشه برداری از بوتسوانا",
       "maptimebogota": "maptime بوگوتا",
@@ -31,25 +31,26 @@
       "openstreetmapbrasilia": "اوپن‌استریت‌مپ برازیلیا",
       "openstreetmapbremen": "اوپن‌استریت‌مپ برمن",
       "openstreetmapbulgaria": "اوپن‌استریت‌مپ بلغارستان",
-      "openstreetmapburkinafaso": "اوپن‌استریت‌مپ بورکینافاسو",
       "openstreetmapburundi": "اوپن‌استریت‌مپ بوروندی",
       "openstreetmapcambodia": "اوپن‌استریت‌مپ کامبوج",
       "openstreetmapcameroon": "اوپن‌استریت‌مپ کامرون",
       "openstreetmapcanada": "اوپن‌استریت‌مپ کانادا",
       "openstreetmapcastillayleon": "اوپن‌استریت‌مپ کاستیا و لئون",
       "openstreetmapcatalancountries": "اوپن‌استریت‌مپ سرزمین‌های کاتالان",
+      "openstreetmapceara": "اوپن‌استریت‌مپ سئارا",
       "openstreetmapchad": "اوپن‌استریت‌مپ چاد",
       "openstreetmapchile": "اوپن‌استریت‌مپ شیلی",
       "openstreetmapchina": "اوپن‌استریت‌مپ چین",
       "openstreetmapcologne": "اوپن‌استریت‌مپ کلن",
       "openstreetmapcomunitatvalenciana": "اوپن‌استریت‌مپ والنسیا",
-      "openstreetmapcostarica": "اوپن‌استریت‌مپ کاستاریکا",
       "openstreetmapcotedivoire": "اوپن‌استریت‌مپ ساحل عاج",
       "openstreetmapcroatia": "اوپن‌استریت‌مپ کرواسی",
       "openstreetmapcuba": "اوپن‌استریت‌مپ کوبا",
       "openstreetmapcuneo": "اوپن‌استریت‌مپ کونیو",
+      "openstreetmapcyprus": "اوپن‌استریت‌مپ قبرس",
       "openstreetmapde": "اوپن‌استریت‌مپ آلمان",
       "openstreetmapdeepsouth": "اوپن‌استریت‌مپ جنوب عمیق",
+      "openstreetmapdelhi": "اوپن‌استریت‌مپ دهلی",
       "openstreetmapdenmark": "اوپن‌استریت‌مپ دانمارک",
       "openstreetmapdjibouti": "اوپن‌استریت‌مپ جیبوتی",
       "openstreetmapdominicanrepublic": "اوپن‌استریت‌مپ جمهوری دومینیکن",
@@ -79,7 +80,6 @@
       "openstreetmapguinea": "اوپن‌استریت‌مپ گینه",
       "openstreetmaphaiti": "اوپن‌استریت‌مپ هائیتی",
       "openstreetmaphamburg": "اوپن‌استریت‌مپ هامبورگ",
-      "openstreetmaphonduras": "اوپن‌استریت‌مپ هندوراس",
       "openstreetmaphongkong": "اوپن‌استریت‌مپ هنگ کنگ",
       "openstreetmaphungary": "اوپن‌استریت‌مپ مجارستان",
       "openstreetmapiceland": "اوپن‌استریت‌مپ ایسلند",
@@ -93,7 +93,6 @@
       "openstreetmapitalylazio": "اوپن‌استریت‌مپ لاتزیو ایتالیا",
       "openstreetmapitalylombardia": "اوپن‌استریت‌مپ لمباردی ایتالیا",
       "openstreetmapitalypiemonte": "اوپن‌استریت‌مپ پیمونت ایتالیا",
-      "openstreetmapitalysouthtyrol": "اوپن‌استریت‌مپ تیرول جنوبی ایتالیا",
       "openstreetmapitalytrentino": "اوپن‌استریت‌مپ ترنتینو ایتالیا",
       "openstreetmapjapan": "اوپن‌استریت‌مپ ژاپن",
       "openstreetmapkarlsruhe": "اوپن‌استریت‌مپ کارلسروهه",
@@ -102,10 +101,8 @@
       "openstreetmapkerala": "اوپن‌استریت‌مپ کرالا",
       "openstreetmapkorea": "اوپن‌استریت‌مپ کره",
       "openstreetmapkosovo": "اوپن‌استریت‌مپ کوزوو",
-      "openstreetmapkyrgyzstan": "اوپن‌استریت‌مپ قرقیزستان",
       "openstreetmaplatinamerica": "اوپن‌استریت‌مپ آمریکای لاتین",
       "openstreetmaplatvia": "اوپن‌استریت‌مپ لتونی",
-      "openstreetmaplebanon": "اوپن‌استریت‌مپ لبنان",
       "openstreetmaplesotho": "اوپن‌استریت‌مپ لسوتو",
       "openstreetmapliberia": "اوپن‌استریت‌مپ لیبریا",
       "openstreetmaplibya": "اوپن‌استریت‌مپ لیبی",
@@ -128,6 +125,7 @@
       "openstreetmapmoldova": "اوپن‌استریت‌مپ مولداوی",
       "openstreetmapmongolia": "اوپن‌استریت‌مپ مغولستان",
       "openstreetmapmontenegro": "اوپن‌استریت‌مپ مونته‌نگرو",
+      "openstreetmapmontrouge": "اوپن‌استریت‌مپ مونتروژ",
       "openstreetmapmorocco": "اوپن‌استریت‌مپ مراکش",
       "openstreetmapmyanmar": "اوپن‌استریت‌مپ میانمار",
       "openstreetmapnepal": "اوپن‌استریت‌مپ نپال",
@@ -135,6 +133,7 @@
       "openstreetmapnicaragua": "اوپن‌استریت‌مپ نیکاراگوئه",
       "openstreetmapniger": "اوپن‌استریت‌مپ نیجر",
       "openstreetmapnigeria": "اوپن‌استریت‌مپ نیجریه",
+      "openstreetmapnorthkorea": "اوپن‌استریت‌مپ کره شمالی",
       "openstreetmapnorway": "اوپن‌استریت‌مپ نروژ",
       "openstreetmapottawa": "اوپن‌استریت‌مپ اتاوا",
       "openstreetmappakistan": "اوپن‌استریت‌مپ پاکستان",
@@ -154,7 +153,6 @@
       "openstreetmapsaudiarabia": "اوپن‌استریت‌مپ عربستان سعودی",
       "openstreetmapsenegal": "اوپن‌استریت‌مپ سنگال",
       "openstreetmapserbia": "اوپن‌استریت‌مپ صربستان",
-      "openstreetmapseychelles": "اوپن‌استریت‌مپ سیشل",
       "openstreetmapsierraleone": "اوپن‌استریت‌مپ سیرالئون",
       "openstreetmapslovenia": "اوپن‌استریت‌مپ اسلوونی",
       "openstreetmapsomalia": "اوپن‌استریت‌مپ سومالی",
@@ -164,7 +162,6 @@
       "openstreetmapsudan": "اوپن‌استریت‌مپ سودان",
       "openstreetmapsweden": "اوپن‌استریت‌مپ سوئد",
       "openstreetmapswitzerland": "اوپن‌استریت‌مپ سوئیس",
-      "openstreetmapsyria": "اوپن‌استریت‌مپ سوریه",
       "openstreetmaptaiwan": "اوپن‌استریت‌مپ تایوان",
       "openstreetmaptanzania": "اوپن‌استریت‌مپ تانزانیا",
       "openstreetmapthailand": "اوپن‌استریت‌مپ تایلند",
@@ -287,9 +284,6 @@
     "be-chapter": {
       "description": "ما به رشد و بهبود اوپن‌استریت‌مپ در بلژیک کمک می کنیم.",
       "extendedDescription": "اگر می خواهید به بهبود و رشد جامعه نقشه برداری در بلژیک کمک کنید ، و افراد بیشتری را از نقشه برداری دیوانه کنید، اوپن‌استریت‌مپ بلژیک مکان مناسبی برای شما است!"
-    },
-    "be-irc": {
-      "extendedDescription": "به #{account} در irc.oftc.net (پورت 6667) بپیوندید، بین این کانال و کانال چت ماتریکس پل زده شده است."
     },
     "be-matrix": {
       "description": "نقشه‌کشان، همگی خوش آمدید!"
@@ -415,9 +409,6 @@
     },
     "hu-matrix": {
       "extendedDescription": "چت اوپن‌استریت‌مپ برای موضوعات نقشه. یکی از انجمن های پشتیبانی انجمن OSM."
-    },
-    "hu-meetup": {
-      "description": "پلتفرم سازماندهی نشست ها در مجارستان"
     },
     "hu-mobilizon": {
       "name": "{community} در Mobilizon",
@@ -567,11 +558,6 @@
     },
     "osm-benin-facebook": {
       "description": "اوپن‌استریت‌مپ را در بنین بهبود بخشید"
-    },
-    "OSM-Central-Salish-Sea": {
-      "name": "اوپن‌استریت‌مپ دریای سالیش مرکزی",
-      "description": "نقشه برداران و کاربران اوپن‌استریت‌مپ در اطراف Mount Vernon ، WA",
-      "extendedDescription": "اوپن‌استریت‌مپ نقشه ای از جهان است که توسط افرادی مانند شما ساخته شده است. این نقشه ای است که شما می سازید ، مانند ویکی پدیا به صورت رایگان در اختیار شما قرار می گیرد. برای اطلاعات بیشتر به osm.org مراجعه کنید. ما همیشه برای مباحثه نقشه ها ، تهیه نقشه ها و تفریح ملاقات می کنیم!"
     },
     "osm-ch": {
       "description": "بستری برای اطلاعات در مورد اوپن‌استریت‌مپ در سوئیس"
@@ -779,12 +765,6 @@
     "talk-mg": {
       "description": "مکانی برای مشارکت کنندگان اوپن‌استریت‌مپ، اجتماعات و کاربران مشارکت کنندگان اوپن‌استریت‌مپ در ماداگاسکار برای اشتراک گذاری و بحث."
     },
-    "talk-nz": {
-      "description": "بحث انجمن OSM نیوزلند"
-    },
-    "talk-pacific": {
-      "extendedDescription": "ما می‌خواهیم این لیست پستی از همه مردم اقیانوس آرام، برای همه تنوع‌ها و آرزوهایمان، برای به اشتراک گذاشتن افکار، سؤالات، پروژه‌ها و هر چیزی که به اوپن‌استریت‌مپ در دریای جزایر ما مربوط می‌شود، پشتیبانی کند."
-    },
     "tw-slack": {
       "description": "همگی خوش آمدید! ثبت نام کنید در {signupUrl}"
     },
@@ -812,9 +792,6 @@
     "uy-irc": {
       "description": "به #{account} در irc.freenode.org (پورت 6667) بپیوندید",
       "extendedDescription": "به #{account} در irc.freenode.org بپیوندید"
-    },
-    "vn-mailinglist": {
-      "description": "لیست پستی درباره اوپن‌استریت‌مپ در ویتنام یا ویتنامی"
     },
     "ym-Ardhi-University": {
       "description": "بخش نقشه برداران جوان در دانشگاه اردی",
@@ -847,11 +824,6 @@
       "name": "نقشه‌بردارهای کلمسون",
       "description": "بخش نقشه برداران جوان در دانشگاه کلمسون",
       "extendedDescription": "دانش‌آموزان در کلمسون توسط مرکز فناوری‌های زمین‌فضایی، جامعه‌ای متشکل از متخصصان علوم زمین‌فضایی بین‌رشته‌ای که از فعالیت‌های تحقیقاتی، آموزشی و توسعه‌ای با استفاده از فناوری‌هایی که امکان جمع‌آوری، تجزیه و تحلیل و کاربرد داده‌های مکانی را فراهم می‌کنند، حمایت می‌کنند. دانش‌آموزان فناوری‌های زمین فضایی را در فعالیت‌های علمی خود در تمام رشته‌ها ادغام می‌کنند و ارتباطات را در سراسر جهان ایجاد می‌کنند."
-    },
-    "ym-College-of-William-and-Mary": {
-      "name": "سراسر نقشه!",
-      "description": "بخش نقشه برداران جوان در کالج ویلیام و مری",
-      "extendedDescription": "دانشجویانی که در سراسر نقشه هستند توسط مرکز تجزیه و تحلیل جغرافیایی پشتیبانی می‌شوند، گروهی که GIS را در سراسر برنامه درسی یکپارچه می‌کند و سخت‌افزار، نرم‌افزار و تخصص را برای دانشجویان و اساتید فراهم می‌کند. دانش‌آموزان با هر زمینه‌ای از GIS در سراسر محوطه دانشگاه، از جمله علم و سیاست محیطی، زمین‌شناسی، تاریخ، تجارت، جامعه‌شناسی، زیست‌شناسی، مردم‌شناسی، سیاست عمومی و علوم دریایی استفاده می‌کنند."
     },
     "ym-Cornell-University": {
       "name": "جامعه نقشه برداری",

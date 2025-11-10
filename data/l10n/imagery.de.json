@@ -78,6 +78,13 @@
         "description": "Hochauflösende Luftbilder von Dourados (2018) und mehreren Bezirken (2020).",
         "name": "Dourados Orthofotos"
       },
+      "EOXAT2017CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 wolkenlos - https://s2maps.eu von EOX IT Services GmbH (Enthält bearbeitete Copernicus Sentinel Daten 2017)"
+        },
+        "description": "Nachbearbeitete Sentinel Satellitenbilder.",
+        "name": "eox.at 2017 wolkenlos"
+      },
       "EOXAT2018CLOUDLESS": {
         "attribution": {
           "text": "Sentinel-2 wolkenfrei - https://s2maps.eu by EOX IT Services GmbH (enthält modofizierte Copernicus Sentinel Daten 2017 & 2018)"
@@ -112,6 +119,20 @@
         },
         "description": "Nachbearbeitete Sentinel Satellitenbilder.",
         "name": "eox.at 2022 wolkenlos"
+      },
+      "EOXAT2023CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 wolkenlos - https://s2maps.eu von EOX IT Services GmbH (Enthält bearbeitete Copernicus Sentinel Daten 2023)"
+        },
+        "description": "Nachbearbeitete Sentinel Satellitenbilder.",
+        "name": "eox.at 2023 wolkenlos"
+      },
+      "EOXAT2024CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 wolkenlos - https://s2maps.eu von EOX IT Services GmbH (Enthält bearbeitete Copernicus Sentinel Daten 2024)"
+        },
+        "description": "Nachbearbeitete Sentinel Satellitenbilder.",
+        "name": "eox.at 2024 wolkenlos"
       },
       "EsriWorldImagery": {
         "attribution": {
@@ -350,10 +371,7 @@
         "name": "Orthofotos des nördlichen Teils des portugiesischen Festlands – 25 cm – 2021 (DGT)"
       },
       "OSIP": {
-        "description": "Ohio Statewide Imagery Program III aktuellste Orthobilder für jedes County mit einer Auflösung von 1 Fuß bis 3 Zoll von 2017 bis 2020."
-      },
-      "OSIP_1ft": {
-        "name": "Ohio Statewide Imagery Program 1-Fuß"
+        "description": "Ohio Statewide Imagery Program III – die aktuellsten Orthobilder von jedem County in Auflösungen von 6 Zoll bis 1 Zoll von 2017 bis 2024."
       },
       "OSMUK-Cadastral-Parcels": {
         "attribution": {
@@ -566,6 +584,9 @@
         "description": "Anmerkungsüberlagerung von basemap.at",
         "name": "basemap.at Überlagerung"
       },
+      "bg-maf-orthophoto-latest": {
+        "description": "Aktuelle orthorektifizierte Luftbilder, bereitgestellt vom Ministerium für Landwirtschaft und Ernährung Bulgariens."
+      },
       "cyclosm": {
         "attribution": {
           "text": "Rendering: CyclOSM ( bereitgestellt von OpenStreetMap France) © Kartendaten von OpenStreetMap-Mitwirkenden."
@@ -591,44 +612,51 @@
       },
       "gothenburg-citymap": {
         "attribution": {
-          "text": "© Gemeinde Gothenburg, CC0"
+          "text": "© Gemeinde Göteborg, CC0"
         },
-        "description": "Die Karte der Gemeinde ist eine Überblickskarte die Gothenburg zeigt. Sie enthält Informationen über Flächennutzung, Kommunikation, Hydrgraphie, Gebäude, Adressen und Straßennamen. administrative Gliederung und Orientierungstexte.",
-        "name": "Karte der Gemeinde Gothenburg"
+        "description": "Die Karte der Gemeinde ist eine Überblickskarte die Göteborg zeigt. Sie enthält Informationen über Flächennutzung, Kommunikation, Hydrgraphie, Gebäude, Adressen und Straßennamen. administrative Gliederung und Orientierungstexte.",
+        "name": "Karte der Gemeinde Göteborg"
       },
       "gothenburg-dtm-2017": {
         "attribution": {
           "text": "© Gemeinde Göteborg, CC0"
-        }
+        },
+        "description": "Webkartendienst mit Schummerung und Neigungsangaben auf Grundlage des Höhenmodells 2017 für die Stadt Göteborg. Auflösung 0,5 Meter pro Pixel.",
+        "name": "Göteborg mit Schummerung"
       },
       "gothenburg-ortho": {
         "attribution": {
-          "text": "© Gemeinde Gothenburg, CC0"
+          "text": "© Gemeinde Göteborg, CC0"
         },
-        "description": "Orthofoto für Gemeinde Gothenburg"
+        "description": "Orthofoto der Gemeinde Göteborg",
+        "name": "Göteborg Orthofoto 2015"
       },
       "gothenburg-ortho_2017": {
         "attribution": {
           "text": "© Gemeinde Göteborg, CC0"
-        }
+        },
+        "description": "Orthofoto der Gemeinde Göteborg",
+        "name": "Göteborg Orthofoto 2017"
       },
       "gothenburg-ortho_2019": {
         "attribution": {
-          "text": "© Gemeinde Göteborg, CC0"
-        }
+          "text": "© Stadtverwaltung Göteborg, CC0"
+        },
+        "description": "Orthofoto der Gemeinde Göteborg",
+        "name": "Göteborg Orthofoto 2019"
       },
       "gothenburg-ortho_2021": {
         "attribution": {
           "text": "© Stadtverwaltung Göteborg, CC0"
         },
-        "description": "Orthofoto der Stadt Göteborg",
-        "name": "Göteburg Orthofoto 2021"
+        "description": "Orthofoto der Gemeinde Göteborg",
+        "name": "Göteborg Orthofoto 2021"
       },
       "gothenburg-ortho_latest": {
         "attribution": {
           "text": "© Stadtverwaltung Göteborg, CC0"
         },
-        "description": "Orthofoto der Stadt Göteborg",
+        "description": "Orthofoto der Gemeinde Göteborg",
         "name": "Aktuellstes Orthofoto der Stadt Göteborg"
       },
       "gsi<TX_DOT>go<TX_DOT>jp_airphoto": {

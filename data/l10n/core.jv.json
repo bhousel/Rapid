@@ -8,7 +8,6 @@
     },
     "languageNames": {
       "ace": "Achinese",
-      "af": "Afrika",
       "alt": "Altai Sisih Kidul",
       "am": "Amharik",
       "ar": "Arab",
@@ -95,6 +94,7 @@
       "kru": "Kuruk",
       "ksh": "Colonia",
       "ku": "Kurdis",
+      "ku-menu-core": "Kurdi",
       "kum": "Kumik",
       "kw": "Kernowek",
       "ky": "Kirgis",

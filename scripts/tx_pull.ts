@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { $, Glob } from 'bun';
+//import { $, Glob } from 'bun';
+import child_process from 'node:child_process';
+import fs from 'node:fs/promises';
+import { promisify } from 'node:util';
 import stringify from 'json-stringify-pretty-compact';
-import { styleText } from 'bun:util';
+import { styleText } from 'node:util';
 import { transifexApi as api } from '@transifex/api';
 
 import * as CLDR from './cldr.ts';
@@ -22,7 +25,9 @@ const localeCompare = new Intl.Collator('en').compare;
 if (process.env.transifex_token) {
   api.setup({ auth: process.env.transifex_token });
 } else {
-  const auth = await Bun.file('./transifex.auth').json();
+  // const auth = await Bun.file('./transifex.auth').json();
+  const contents = await fs.readFile('./transifex.auth', 'utf8');
+  const auth = JSON.parse(contents);
   api.setup({ auth: auth.token });
 }
 
@@ -72,14 +77,21 @@ Promise.resolve()
 async function startClean() {
   console.log(styleText('yellow', `🧼  Start clean…`));
 
-  // $.nothrow();  // If a shell command returns nonzero, keep going.
+//  // $.nothrow();  // If a shell command returns nonzero, keep going.
+//
+//  await $`rm -f ./data/locales.json`.quiet();
+  const exec = promisify(child_process.exec);
+  await exec('rm -f ./data/locales.json');
 
-  await $`rm -f ./data/locales.json`.quiet();
 
-  const glob = new Glob('data/l10n/*');
-  for await (const file of glob.scan()) {
+//  const glob = new Glob('data/l10n/*');
+//  for await (const file of glob.scan()) {
+//    if (/\.en\.json$/.test(file)) continue;  // don't delete *.en.json
+//    await $`rm -f ${file}`;
+//  }
+  for await (const file of fs.glob('data/l10n/*')) {
     if (/\.en\.json$/.test(file)) continue;  // don't delete *.en.json
-    await $`rm -f ${file}`;
+    await exec(`rm -f ${file}`);
   }
 }
 
@@ -169,7 +181,8 @@ async function writeLocalesFile() {
     locales[code] = { rtl: rtl };
   }
 
-  await Bun.write('./data/locales.json', stringify({ locales: sortObject(locales) }) + '\n');
+  await fs.writeFile('./data/locales.json', stringify({ locales: sortObject(locales) }) + '\n');
+  // await Bun.write('./data/locales.json', stringify({ locales: sortObject(locales) }) + '\n');
 }
 
 
@@ -188,8 +201,12 @@ async function getCommunity() {
   await getSourceStrings('community', COMMUNITY_RESOURCE, sources_community);
   for (const languageID of languages_rapid) {
     if (languageID === 'l:en') continue;   // skip `l:en`, it's the source language
-    await getTranslationStrings('community', COMMUNITY_RESOURCE, languageID, translations_community);
-    await processTranslations('community', languageID, sources_community, translations_community);
+    try {
+      await getTranslationStrings('community', COMMUNITY_RESOURCE, languageID, translations_community);
+      await processTranslations('community', languageID, sources_community, translations_community);
+    } catch (err) {
+      console.warn(err?.message);
+    }
   }
 }
 
@@ -198,8 +215,12 @@ async function getImagery() {
   await getSourceStrings('imagery', IMAGERY_RESOURCE, sources_imagery);
   for (const languageID of languages_rapid) {
     if (languageID === 'l:en') continue;   // skip `l:en`, it's the source language
-    await getTranslationStrings('imagery', IMAGERY_RESOURCE, languageID, translations_imagery);
-    await processTranslations('imagery', languageID, sources_imagery, translations_imagery);
+    try {
+      await getTranslationStrings('imagery', IMAGERY_RESOURCE, languageID, translations_imagery);
+      await processTranslations('imagery', languageID, sources_imagery, translations_imagery);
+    } catch (err) {
+      console.warn(err?.message);
+    }
   }
 }
 
@@ -208,8 +229,12 @@ async function getTagging() {
   await getSourceStrings('tagging', TAGGING_RESOURCE, sources_tagging);
   for (const languageID of languages_rapid) {
     if (languageID === 'l:en') continue;   // skip `l:en`, it's the source language
-    await getTranslationStrings('tagging', TAGGING_RESOURCE, languageID, translations_tagging);
-    await processTranslations('tagging', languageID, sources_tagging, translations_tagging);
+    try {
+      await getTranslationStrings('tagging', TAGGING_RESOURCE, languageID, translations_tagging);
+      await processTranslations('tagging', languageID, sources_tagging, translations_tagging);
+    } catch (err) {
+      console.warn(err?.message);
+    }
   }
 }
 
@@ -454,7 +479,8 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
     console.log(styleText('yellow', `✏️   Writing '${resourceName}.${code}.json'…`));
     const output = {};
     output[code] = data;
-    await Bun.write(`./data/l10n/${resourceName}.${code}.json`, JSON.stringify(output, null, 2) + '\n');
+    await fs.writeFile(`./data/l10n/${resourceName}.${code}.json`, JSON.stringify(output, null, 2) + '\n');
+    // await Bun.write(`./data/l10n/${resourceName}.${code}.json`, JSON.stringify(output, null, 2) + '\n');
   } else {
     console.log(styleText('yellow', `🔦  No meaningful translations found…`));
   }
@@ -479,20 +505,16 @@ async function getCollection(iterable, showCount = true) {
     process.stdout.write('0');
   }
 
-  for await (const val of iterable.all()) {
-    results.push(val);
-    if (showCount && results.length % 50 === 0) {
+  for await (const page of iterable.allPages()) {
+    results.push(...page.data);
+    if (showCount) {
       process.stdout.clearLine(0);
       process.stdout.cursorTo(0);
       process.stdout.write(results.length.toString());
-      Bun.sleepSync(1000); // slow down!
     }
   }
 
   if (showCount) {
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
-    process.stdout.write(results.length.toString());
     process.stdout.write('\n');
   }
 

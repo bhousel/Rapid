@@ -42,12 +42,10 @@
       "openstreetmapitalylazio": "OpenStreetMap Ý–Lazio",
       "openstreetmapitalylombardia": "OpenStreetMap Ý–Lombardia",
       "openstreetmapitalypiemonte": "OpenStreetMap Ý–Piemonte",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Ý–Nam Tirol",
       "openstreetmapitalytrentino": "OpenStreetMap Ý–Trentino",
       "openstreetmapjapan": "OpenStreetMap Nhật Bản",
       "openstreetmapkorea": "OpenStreetMap Triều Tiên",
       "openstreetmaplatinamerica": "OpenStreetMap Mỹ Latinh",
-      "openstreetmaplebanon": "OpenStreetMap Liban",
       "openstreetmaplithuania": "OpenStreetMap Litva",
       "openstreetmaplondon": "OpenStreetMap Luân Đôn",
       "openstreetmapmexico": "OpenStreetMap México",
@@ -151,17 +149,19 @@
         "name": "{community} trên Threads",
         "description": "Theo dõi chúng tôi trên Threads"
       },
+      "tiktok": {
+        "description": "Theo dõi chúng tôi trên TikTok"
+      },
       "twitter": {
-        "name": "{community} trên 𝕏",
-        "description": "Theo dõi chúng tôi trên 𝕏"
+        "name": "{community} trên X",
+        "description": "Theo dõi chúng tôi trên X"
       },
       "wiki": {
         "name": "Dự án Wiki {community}",
         "url": "https://wiki.openstreetmap.org/wiki/{account}?uselang=vi"
       },
       "x": {
-        "name": "{community} trên 𝕏",
-        "description": "Theo dõi chúng tôi trên 𝕏"
+        "name": "{community} trên X"
       },
       "xmpp": {
         "name": "{community} trên XMPP"
@@ -206,9 +206,6 @@
     },
     "be-chapter": {
       "description": "Chúng ta giúp phát triển và cải thiện OpenStreetMap tại Bỉ."
-    },
-    "be-irc": {
-      "extendedDescription": "Hãy tham gia #{account} tại irc.oftc.net (cổng 6667), kênh này có cầu nối với kênh trò chuyện Matrix"
     },
     "be-matrix": {
       "description": "Mời mọi người tham gia!",
@@ -272,6 +269,9 @@
     },
     "cl-telegram": {
       "extendedDescription": "Mời mọi người tham gia cộng đồng để tìm hiểu thêm về OpenStreetMap, hỏi đáp, và tham dự các cuộc họp mặt của chúng ta."
+    },
+    "co-talk": {
+      "name": "Danh sách thư {community}"
     },
     "comunitat-valenciana-wiki": {
       "description": "Mọi điều cần biết để lập bản đồ tại Cộng đồng Valencia: {url}"
@@ -437,14 +437,8 @@
     "hu-facebook-group": {
       "name": "Nhóm Facebook {community}"
     },
-    "hu-meetup": {
-      "description": "Trang tổ chức cuộc họp mặt tại Hungary"
-    },
     "hu-mobilizon": {
       "name": "{community} tại Mobilizon"
-    },
-    "hu-website": {
-      "description": "Chúng ta giúp phát triển và cải thiện OpenStreetMap tại Hungary."
     },
     "hu-wiki": {
       "description": "Trang Wiki {community}"
@@ -475,6 +469,9 @@
     "it-chapter": {
       "description": "Chúng ta giúp phát triển và cải thiện OpenStreetMap tại Ý."
     },
+    "ivides_website": {
+      "description": "Chúng tôi tập trung vào phát triển bền vững, lập bản đồ và hỗ trợ cộng đồng OpenStreetMap."
+    },
     "ko-facebook": {
       "description": "Những người lập bản đồ và người dùng OpenStreetMap ở Triều Tiên"
     },
@@ -482,7 +479,8 @@
       "description": "GitHub {community}"
     },
     "ko-osm": {
-      "description": "Chúng tôi giúp mở rộng và cải thiện OpenStreetMap tại Hàn Quốc."
+      "description": "Chúng tôi giúp mở rộng và cải thiện OpenStreetMap tại Hàn Quốc.",
+      "extendedDescription": "Nếu bạn đang tham gia đóng góp hoặc quan tâm đến việc đóng góp cho OpenStreetMap, đừng ngần ngại tham gia cùng chúng tôi. Chúng tôi luôn sẵn sàng chào đón người mới!"
     },
     "kosovo-flossk": {
       "name": "Phần mềm Tự do Nguồn mở Kosovo (FLOSSK)",
@@ -660,11 +658,6 @@
     },
     "osm-benin-facebook": {
       "description": "Cải thiện OpenStreetMap tại Bénin"
-    },
-    "OSM-Central-Salish-Sea": {
-      "name": "OpenStreetMap Biển Salish Trung",
-      "description": "Những người lập bản đồ và người dùng OpenStreetMap ở vùng Mount Vernon, Washington",
-      "extendedDescription": "OpenStreetMap (OSM) là bản đồ thế giới do những người như bạn xây dựng và cho phép mọi người sử dụng miễn phí và vô hạn chế giống như Wikipedia. Chúng tôi gặp mặt thường xuyên để nói chuyện vui vẻ về bản đồ và lập bản đồ!"
     },
     "osm-ch": {
       "description": "Trang thông tin về OpenStreetMap tại Thụy Sĩ"
@@ -900,9 +893,6 @@
     "talk-mg": {
       "description": "Nơi để những người đóng góp, cộng đồng, và người dùng OpenStreetMap chia sẻ và thảo luận."
     },
-    "talk-nz": {
-      "description": "Thảo luận cộng đồng OSM tại New Zealand"
-    },
     "tn-facebook-group": {
       "name": "Nhóm Facebook {community}"
     },
@@ -935,23 +925,13 @@
     "uk-london-wiki": {
       "description": "Trang Wiki {community}"
     },
-    "uk-loomio": {
-      "name": "OpenStreetMap Vương quốc Anh tại Loomio"
-    },
     "us-massachusetts-mailinglist": {
       "name": "Danh sách thư talk-us-massachusetts",
       "description": "Danh sách thư của cộng đồng OSM tại Massachusetts"
     },
-    "us-newyork-mailinglist": {
-      "name": "Danh sách thư talk-us-newyork",
-      "description": "Danh sách thư của cộng đồng OSM tại Tiểu bang New York"
-    },
     "uy-irc": {
       "description": "Hãy tham gia #{account} tại irc.oftc.net (cổng 6667)",
       "extendedDescription": "Hãy tham gia #{account} tại irc.oftc.net"
-    },
-    "vn-mailinglist": {
-      "description": "Danh sách thư về OpenStreetMap tại Việt Nam hoặc trong tiếng Việt"
     },
     "vn-wiki": {
       "description": "Trang Wiki {community}"
@@ -997,9 +977,6 @@
     },
     "ym-Clemson-University": {
       "description": "Nhánh YouthMappers tại Đại học Clemson"
-    },
-    "ym-College-of-William-and-Mary": {
-      "description": "Nhánh YouthMappers tại Trường cao đẳng William & Mary"
     },
     "ym-Cornell-University": {
       "description": "Nhánh YouthMappers tại Đại học Cornell"
@@ -1369,9 +1346,6 @@
     },
     "ym-University-of-Zimbabwe": {
       "description": "Nhánh YouthMappers tại Đại học Zimbabwe"
-    },
-    "ym-UW-Madison": {
-      "description": "Nhánh YouthMappers tại Đại học Wisconsin tại Madison"
     },
     "ym-Vassar-College": {
       "description": "Nhánh YouthMappers tại Trường cao đẳng Vassar"

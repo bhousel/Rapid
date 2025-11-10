@@ -2,104 +2,168 @@
   "cy": {
     "imagery": {
       "Bedzin-PL-aerial_image": {
-        "name": "Będzin: Orthophotomap 2013 (delwedd o'r awyr)"
+        "name": "Będzin: Orthophotomap 2013 (delweddau o'r awyr)"
       },
       "Bedzin-PL-buildings": {
         "name": "Będzin: Adeiladau"
       },
       "Bing": {
-        "description": "Lloeren ac delweddau o'r awyr."
+        "description": "Delweddau o'r awyr a lloeren.",
+        "name": "Delweddau Bing o'r awyr"
       },
       "Bytom-2012": {
-        "name": "Bytom: Orthophotomap 2012 (delwedd o'r awyr)"
+        "name": "Bytom: Orthophotomap 2012 (delweddau o'r awyr)"
       },
       "Bytom-2014": {
-        "name": "Bytom: Fotoplan 2014 (delwedd o'r awyr)"
+        "name": "Bytom: Fotoplan 2014 (delweddau o'r awyr)"
       },
       "Bytom-2016": {
-        "name": "Bytom: Orthophotomap 2016 (delwedd o'r awyr)"
+        "name": "Bytom: Orthophotomap 2016 (delweddau o'r awyr)"
       },
       "Bytom-2018": {
-        "name": "Bytom: Orthophotomap 2018 (delwedd o'r awyr)"
+        "name": "Bytom: Orthophotomap 2018 (delweddau o'r awyr)"
       },
       "Bytom-2021": {
-        "name": "Bytom: Orthophotomap 2021 (delwedd o'r awyr)"
+        "name": "Bytom: Orthophotomap 2021 (delweddau o'r awyr)"
       },
       "Bytom-buildings": {
         "name": "Bytom: Adeiladau"
       },
       "Czestochowa-2011": {
-        "name": "Częstochowa: Orthophotomap 2011 (delwedd o'r awyr)"
+        "name": "Częstochowa: Orthophotomap 2011 (delweddau o'r awyr)"
       },
       "Czestochowa-2013": {
-        "name": "Częstochowa: Orthophotomap 2013 (delwedd o'r awyr)"
+        "name": "Częstochowa: Orthophotomap 2013 (delweddau o'r awyr)"
       },
       "Czestochowa-2014": {
-        "name": "Częstochowa: Orthophotomap 2014 (delwedd o'r awyr)"
+        "name": "Częstochowa: Orthophotomap 2014 (delweddau o'r awyr)"
       },
       "Czestochowa-2015": {
-        "name": "Częstochowa: Orthophotomap 2015 (delwedd o'r awyr)"
+        "name": "Częstochowa: Orthophotomap 2015 (delweddau o'r awyr)"
       },
       "Czestochowa-2016": {
-        "name": "Częstochowa: Orthophotomap 2016 (delwedd o'r awyr)"
+        "name": "Częstochowa: Orthophotomap 2016 (delweddau o'r awyr)"
       },
       "Czestochowa-2017": {
-        "name": "Częstochowa: Orthophotomap 2017 (delwedd o'r awyr)"
+        "name": "Częstochowa: Orthophotomap 2017 (delweddau o'r awyr)"
       },
       "Czestochowa-buildings": {
         "name": "Częstochowa: Adeiladau"
       },
       "DV_DHMV_II_HILL_25cm": {
-        "name": "Digitaal Vlaanderen DHV II, cysgod bryniau amlgyfeiriadol 0,25 m"
+        "name": "Digitaal Vlaanderen DHV II, graddliwio'r dirwedd amlgyfeiriadol 0,25 m"
       },
       "DV_DHMV_II_SVF_25cm": {
-        "name": "Digitaal Vlaanderen DHV II, ffactor Skyview 0,25 m"
+        "name": "Digitaal Vlaanderen DHV II, ffactor Skyview 0.25 m"
       },
       "DV_OrthoPhoto": {
-        "name": "Digitaal Vlaanderen delweddau o'r awyr mwyaf diweddar"
+        "name": "Digitaal Vlaanderen delweddau o'r awyr diweddaraf"
       },
       "DV_OrthoPhoto_20132015_10cm": {
-        "name": "Digitaal Vlaanderen 2013-2015 delweddau o'r awyr 10cm"
+        "name": "Digitaal Vlaanderen 2013-2015 delweddau 10cm o'r awyr"
       },
       "DV_OrthoPhoto_Preliminary": {
         "name": "Digitaal Vlaanderen delweddau rhagarweiniol o'r awyr "
       },
+      "Dourados_Ortofotos": {
+        "description": "Dourados (2018) a chyffuniau (2020) delweddau eglurder uchel o'r awyr."
+      },
+      "EOXAT2017CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 cloudless - https://s2maps.eu gan EOX IT Services GmbH (Yn cynnwys data Copernicus Sentinel 2017 wedi'u haddasu)"
+        },
+        "description": "Delweddau lloeren Sentinel wedi'u hôl-brosesu.",
+        "name": "eox.at 2017 heb gymylau"
+      },
       "EOXAT2018CLOUDLESS": {
         "attribution": {
-          "text": "Sentinel-2 cloudless - https://s2maps.eu gan EOX IT Services GmbH (Yn cynnwys data addas Copernicus Sentinel 2017 & 2018)"
+          "text": "Sentinel-2 heb gymylau - https://s2maps.eu gan EOX IT Services GmbH (Yn cynnwys data Copernicus Sentinel 2017 a 2018 wedi'u haddasu)"
         },
         "description": "Delweddau lloeren Sentinel wedi'u hôl-brosesu.",
         "name": "eox.at 2018 heb gymylau"
       },
       "EOXAT2019CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 heb gymylau - https://s2maps.eu by EOX IT Services GmbH (Yn cynnwys data Copernicus Sentinel 2019 wedi'u haddasu)"
+        },
         "description": "Delweddau lloeren Sentinel wedi'u hôl-brosesu",
         "name": "eox.at 2019 heb gymylau"
       },
       "EOXAT2020CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 heb gymylau - https://s2maps.eu by EOX IT Services GmbH (Yn cynnwys data Copernicus Sentinel 2020 wedi'u haddasu)"
+        },
         "description": "Delweddau lloeren Sentinel wedi'u hôl-brosesu",
         "name": "eox.at 2020 heb gymylau"
       },
       "EOXAT2021CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 heb gymylau - https://s2maps.eu by EOX IT Services GmbH (Yn cynnwys data Copernicus Sentinel 2021 wedi'u haddasu)"
+        },
         "description": "Delweddau lloeren Sentinel wedi'u hôl-brosesu",
         "name": "eox.at 2021 heb gymylau"
       },
       "EOXAT2022CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 heb gymylau - https://s2maps.eu by EOX IT Services GmbH (Yn cynnwys data Copernicus Sentinel 2022 wedi'u haddasu)"
+        },
         "description": "Delweddau lloeren Sentinel wedi'u hôl-brosesu",
         "name": "eox.at 2022 heb gymylau"
+      },
+      "EOXAT2023CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 heb gymylau - https://s2maps.eu by EOX IT Services GmbH (Yn cynnwys data Copernicus Sentinel 2023 wedi'u haddasu)"
+        },
+        "description": "Delweddau lloeren Sentinel wedi'u hôl-brosesu.",
+        "name": "eox.at 2023 heb gymylau"
+      },
+      "EOXAT2024CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 heb gymylau - https://s2maps.eu by EOX IT Services GmbH (Yn cynnwys data Copernicus Sentinel 2024 wedi'u haddasu)"
+        },
+        "description": "Delweddau lloeren Sentinel wedi'u hôl-brosesu.",
+        "name": "eox.at 2024 heb gymylau"
       },
       "EsriWorldImagery": {
         "attribution": {
           "text": "Telerau ac Adborth"
-        }
+        },
+        "description": "Delweddau Esri o'r byd",
+        "name": "Delweddau Esri o'r byd"
       },
       "EsriWorldImageryClarity": {
         "attribution": {
           "text": "Telerau ac Adborth"
         },
-        "description": "Delweddau o archif Esri a allai fod yn fwy clir a chywir na'r haen ragosodedig."
+        "description": "Delweddau o archif Esri a all fod yn gliriach ac yn fwy cywir na'r haen ragosodedig.",
+        "name": "Delweddau Esri o'r byd (Clir) Beta"
+      },
+      "FOMI_2011_2014": {
+        "description": "Orthoffotograffau gyda dail gan y Llywodraeth gydag eglurdeb 40 cm/picsel ar gyfer y wlad gyfan. Dylid defnyddio'r haen hon fel sail alinio os nad oes ffynhonell mwy cywir. Maent yn ddelweddau fformat WEBP, ac mae angen ychwanegyn WEBP ar JOSM i'w defnyddio.",
+        "name": "Orthoffotograff FÖMI 2011–2014 (WEBP)"
+      },
+      "FOMI_2015": {
+        "description": "Orthoffotograffau gyda dail gan y Llywodraeth gydag eglurdeb 40 cm/picsel ar gyfer y wlad gyfan. Dylid defnyddio'r haen hon fel sail alinio os nad oes ffynhonell mwy cywir. Maent yn ddelweddau fformat WEBP, ac mae angen ychwanegyn WEBP ar JOSM i'w defnyddio.",
+        "name": "Orthoffotograff FÖMI 2015 (WEBP)"
+      },
+      "FOMI_2015_leafoff_20cm": {
+        "description": "Orthoffotograffau heb ddail gan y Llywodraeth gydag eglurdeb 20 cm/picsel ar gyfer y wlad gyfan. Dylid defnyddio'r haen hon fel sail alinio os nad oes ffynhonell mwy cywir. Maent yn ddelweddau fformat WEBP, ac mae angen ychwanegyn WEBP ar JOSM i'w defnyddio.",
+        "name": "Orthoffotograff FÖMI heb ddail 2015 20cm (webp)"
+      },
+      "Frankfurt-am-Main-2019": {
+        "description": "Delweddau Frankfurt am Main o'r awyr, a dynnwyd ar 16 Ebrill 2019"
+      },
+      "Geodatastyrelsen_Cadastral_Parcels_INSPIRE_View": {
+        "name": "Parseli Cadastrol SDFI Golwg INSPIRE"
       },
       "Geodatastyrelsen_Denmark": {
-        "name": "Delweddaeth SDFI"
+        "name": "Delweddau SDFI o'r awyr"
+      },
+      "Geodatastyrelsen_Skaermkort": {
+        "name": "Screenmap SDFI"
+      },
+      "Geoportal2-PL-City-boundaries_WMS": {
+        "name": "Geoportal 2: Ffiniau dinas WMS"
       },
       "Geoportal2-PL-HighResolution-aerial_archival_image_WMS": {
         "name": "Geoportal 2: High Resolution Orthophotomap (delweddau archif) (WMS)"
@@ -182,12 +246,17 @@
           "text": "Adran Drafnidiaeth Ohio"
         }
       },
+      "OSIP": {
+        "attribution": {
+          "text": "Rhaglen Delweddau Talaith Ohio Gyfan"
+        }
+      },
       "OSMUK-Cadastral-Parcels": {
         "attribution": {
           "text": "Yn cynnwys gwybodaeth sector cyhoeddus sydd wedi'i drwyddedu o dan Drwydded Llywodraeth Agored v3.0."
         },
         "description": "Parseli cadastrol (cofrestr tir) ag aliniwyd yn berffaith ym Mhrydain Fawr",
-        "name": "OSMUK - Parseli Cadastrol"
+        "name": "Parseli Cadastrol OSMUK"
       },
       "OSM_Inspector-Addresses": {
         "attribution": {
@@ -237,6 +306,9 @@
       "Riksantikvariambetet-heritage": {
         "name": "Riksantikvarieämbetet - Adeiladau treftadaeth"
       },
+      "Riksantikvariambetet-protected": {
+        "name": "Riksantikvarieämbetet - Ardaloedd Treftadaeth Gwarchodedig"
+      },
       "Riksantikvariambetet-ruins": {
         "name": "Riksantikvarieämbetet - Adfeilion"
       },
@@ -247,21 +319,27 @@
         "name": "Siemianowice Śląskie: Adeiladau"
       },
       "US-TIGER-Roads-2018": {
+        "description": "Melyn = Map data parth cyhoeddus o Gyfrifiad UDA. Coch = Ni chanfuwyd y data ar OpenStreetMap",
         "name": "Ffyrdd TIGER 2018"
       },
       "US-TIGER-Roads-2019": {
+        "description": "Melyn = Map data parth cyhoeddus o Gyfrifiad UDA. Coch = Ni chanfuwyd y data ar OpenStreetMap",
         "name": "Ffyrdd TIGER 2019"
       },
       "US-TIGER-Roads-2020": {
+        "description": "Melyn = Map data parth cyhoeddus o Gyfrifiad UDA. Coch = Ni chanfuwyd y data ar OpenStreetMap",
         "name": "Ffyrdd TIGER 2020"
       },
       "US-TIGER-Roads-2021": {
+        "description": "Melyn = Map data parth cyhoeddus o Gyfrifiad UDA. Coch = Ni chanfuwyd y data ar OpenStreetMap",
         "name": "Ffyrdd TIGER 2021"
       },
       "US-TIGER-Roads-2022": {
+        "description": "Melyn = Map data parth cyhoeddus o Gyfrifiad UDA. Coch = Ni chanfuwyd y data ar OpenStreetMap",
         "name": "Ffyrdd TIGER 2022"
       },
       "US-TIGER-Roads-2023": {
+        "description": "Melyn = Map data parth cyhoeddus o Gyfrifiad UDA. Coch = Ni chanfuwyd y data ar OpenStreetMap",
         "name": "Ffyrdd TIGER 2023"
       },
       "USDA-NAIP": {
@@ -303,6 +381,11 @@
       "basemap<TX_DOT>at-overlay": {
         "name": "Troshaen basemap.at"
       },
+      "cyclosm": {
+        "attribution": {
+          "text": "Rendro: CyclOSM (a gynhelir gan OpenStreetMap Ffrainc), © Data map gan gyfranwyr OpenStreetMap"
+        }
+      },
       "debicki-buildings": {
         "name": "Powiat dębicki: Adeiladau"
       },
@@ -310,7 +393,7 @@
         "attribution": {
           "text": "Cyfranwyr GeoScribble"
         },
-        "name": "Nodiadau diweddaraf GeoScribble"
+        "name": "GeoScribble - Nodiadau diweddaraf"
       },
       "gothenburg-citymap": {
         "attribution": {
@@ -375,7 +458,8 @@
         }
       },
       "kartverket-bygninger": {
-        "description": "Adeiladau INSPIRE ar gyfer Norwy."
+        "description": "Adeiladau INSPIRE ar gyfer Norwy.",
+        "name": "Troshaen adeiladau Kartverket"
       },
       "lancucki-buildings": {
         "name": "Powiat łańcucki: Adeiladau"
@@ -387,6 +471,9 @@
       },
       "lubaczowski-buildings": {
         "name": "Powiat lubaczowski: Adeiladau"
+      },
+      "maaamet<TX_DOT>ee-pohi_vr2": {
+        "name": "Map Sylfaenol Maa-amet"
       },
       "mapbox_locator_overlay": {
         "attribution": {
@@ -401,14 +488,29 @@
         },
         "name": "OpenPT Map (troshaen)"
       },
+      "openrailwaymap": {
+        "attribution": {
+          "text": "Rendro: OpenRailwayMap, © Data map gan gyfranwyr OpenStreetMap"
+        }
+      },
+      "openrailwaymap-maxspeeds": {
+        "attribution": {
+          "text": "Rendro: OpenRailwayMap, © Data map gan gyfranwyr OpenStreetMap"
+        },
+        "name": "OpenRailwayMap - Terfynau Cyflymder"
+      },
       "openrailwaymap-signalling": {
-        "name": "OpenRailwayMap Signalau"
+        "attribution": {
+          "text": "Rendro: OpenRailwayMap, © Data map gan gyfranwyr OpenStreetMap"
+        },
+        "name": "OpenRailwayMap - Signalau"
       },
       "osm-gps": {
         "attribution": {
           "text": "© Cyfranwyr OpenStreetMap"
         },
-        "name": "Arllwybrau GPS OpenStreetMap"
+        "description": "Olion GPS cyhoeddus wedi'u huwchlwytho i OpenStreetMap.",
+        "name": "OpenStreetMap - Olion GPS"
       },
       "osm-mapnik-german_style": {
         "attribution": {
@@ -436,7 +538,7 @@
       },
       "qa_no_address": {
         "attribution": {
-          "text": "Simon Poole, Data cyfranwyr ©OpenStreetMap"
+          "text": "Simon Poole, Data © Cyfranwyr OpenStreetMap"
         },
         "name": "QA Dim Cyfeiriad"
       },
@@ -454,11 +556,14 @@
       "scb-industrial": {
         "name": "SCB - Ardaloedd Diwydiannol"
       },
+      "scb-settlements": {
+        "name": "SCB - Setliadau Bach"
+      },
       "scb-urban": {
         "name": "SCB - Ardaloedd Dinesig"
       },
       "scb-vacation": {
-        "name": "SCB - Ardaloedd Tai Haf"
+        "name": "SCB - Ardaloedd Tai Gwyliau"
       },
       "skobbler": {
         "attribution": {
@@ -475,6 +580,11 @@
       "stalowowolski-buildings": {
         "name": "Powiat stalowowolski: Adeiladau"
       },
+      "stamen-terrain-background": {
+        "attribution": {
+          "text": "Teiliau map gan Stamen Design, dan CC BY 3.0. Data gan OpenStreetMap, dan ODbL"
+        }
+      },
       "stockholm-orto": {
         "attribution": {
           "text": "© Bwrdeistref Stockholm, CC0"
@@ -486,21 +596,32 @@
       "tf-cycle": {
         "attribution": {
           "text": "Mapiau © Thunderforest, Data © Cyfranwyr OpenStreetMap"
-        }
+        },
+        "name": "OpenCycleMap Thunderforest"
       },
       "tf-landscape": {
         "attribution": {
           "text": "Mapiau © Thunderforest, Data © Cyfranwyr OpenStreetMap"
-        }
+        },
+        "name": "Tirwedd Thunderforest"
       },
       "tf-outdoors": {
         "attribution": {
           "text": "Mapiau © Thunderforest, Data © Cyfranwyr OpenStreetMap"
         },
-        "name": "Thunderforest Awyr Agored"
+        "name": "Awyr Agored Thunderforest"
       },
       "trafikverket-baninfo": {
         "name": "Trafikverket Rhwydwaith Rheilffordd"
+      },
+      "trafikverket-vagnat": {
+        "name": "Trafikverket Rhwydwaith Ffyrdd"
+      },
+      "trafikverket-vagnat-extra": {
+        "name": "Trafikverket Rhwydwaith Ffyrdd ychwanegol"
+      },
+      "trafikverket-vagnat-option": {
+        "name": "Trafikverket Rhwydwaith Ffyrdd opsiynau"
       },
       "wroclaw-orto2015": {
         "name": "Wrocław: Orthophotomap 2015 (delwedd o'r awyr)"

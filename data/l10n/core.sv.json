@@ -17,7 +17,8 @@
       "undo_redo": "Ångra / Gör om",
       "recent": "Senaste",
       "favorites": "Favoriter",
-      "add_feature": "Lägg till objekt"
+      "add_feature": "Lägg till objekt",
+      "rapid_features": "Hjälpa"
     },
     "title": {
       "labeled_and_more": {
@@ -27,13 +28,16 @@
     },
     "modes": {
       "add_area": {
-        "title": "Område"
+        "title": "Område",
+        "description": "Lägg till byggnader, parker, sjöar eller andra områden på kartan."
       },
       "add_line": {
-        "title": "Linje"
+        "title": "Linje",
+        "description": "Lägg till vägar, gångvägar, bäckar eller andra linjer på kartan."
       },
       "add_point": {
-        "title": "Punkt"
+        "title": "Punkt",
+        "description": "Lägg till företag, papperskorgar, brevlådor eller andra punkter på kartan."
       },
       "add_note": {
         "title": "Anteckning",
@@ -105,7 +109,7 @@
       "paste": {
         "title": "Klistra in",
         "description": {
-          "one": "Lägg till en/ett dubblerat {feature} här.",
+          "one": "Lägg till ett dubblerat {feature} här.",
           "other": "Lägg till {n} dubblerade objekt här."
         },
         "annotation": {
@@ -116,15 +120,53 @@
       },
       "circularize": {
         "title": "Gör till cirkel",
+        "description": {
+          "one": "Gör den här funktionen cirkulär.",
+          "other": "Gör dessa funktioner cirkulära."
+        },
         "annotation": {
           "feature": {
             "one": "Gjorde ett objekt runt.",
             "other": "Gjorde {n} objekt runda."
           }
+        },
+        "multiple_blockers": {
+          "one": "Detta kan inte göras cirkulärt av flera anledningar.",
+          "other": "Dessa kan inte göras cirkulära av flera anledningar."
+        },
+        "not_closed": {
+          "one": "Detta kan inte göras cirkulärt eftersom det inte är en slinga.",
+          "other": "Dessa kan inte göras cirkulära eftersom de inte är loopar."
+        },
+        "too_large": {
+          "one": "Detta kan inte göras cirkulärt eftersom inte tillräckligt av det är synligt för närvarande.",
+          "other": "Detta kan inte göras cirkulärt eftersom det inte är en slinga."
+        },
+        "connected_to_hidden": {
+          "one": "Detta kan inte göras cirkulärt eftersom det är kopplat till en dold funktion.",
+          "other": "Detta kan inte göras cirkulärt eftersom inte är synligt för närvarande."
+        },
+        "not_downloaded": {
+          "one": "Dessa kan inte göras cirkulära eftersom delar av dem ännu inte laddats ner.",
+          "other": "Dessa kan inte göras cirkulära eftersom delar av dem ännu inte har laddats ner."
+        },
+        "already_circular": {
+          "one": "Detta kan inte göras mer cirkulärt än det redan är.",
+          "other": "Dessa kan inte göras mer cirkulära än de redan är."
         }
       },
       "orthogonalize": {
         "title": "Räta upp",
+        "description": {
+          "corner": {
+            "one": "Räta upp dessa hörn.",
+            "other": "Räta upp dessa hörn."
+          },
+          "feature": {
+            "one": "Räta ut hörnen på dessa funktioner.",
+            "other": "Räta ut hörnen på dessa funktioner."
+          }
+        },
         "annotation": {
           "corner": {
             "one": "Rätat upp ett hörn.",
@@ -134,6 +176,34 @@
             "one": "Rätat upp hörnen på ett objekt.",
             "other": "Rätat upp hörnen på {n} objekt."
           }
+        },
+        "multiple_blockers": {
+          "one": "Dessa kan inte kvadreras av flera anledningar.",
+          "other": "Dessa kan inte kvadreras av flera anledningar."
+        },
+        "end_vertex": {
+          "one": "Dessa kan inte kvadreras eftersom de är ändpunkter.",
+          "other": "Dessa kan inte kvadreras eftersom de är ändpunkter."
+        },
+        "square_enough": {
+          "one": "Dessa kan inte kvadreras eftersom de är ändpunkter.",
+          "other": "Dessa kan inte rätas upp mer än de redan är."
+        },
+        "not_squarish": {
+          "one": "Detta kan inte göras fyrkantigt eftersom det inte är fyrkantigt.",
+          "other": "Dessa kan inte rätas upp då de inte är fyrkantiga."
+        },
+        "too_large": {
+          "one": "Denna kan inte rätas upp då inte tillräckligt av den är synligt för tillfället.",
+          "other": "Dessa kan inte rätas upp då inte tillräckligt av dem är synligt för tillfället."
+        },
+        "connected_to_hidden": {
+          "one": "Detta kan inte rätas upp då det är kopplat till ett dolt objekt.",
+          "other": "Dessa kan inte rätas upp då vissa av dem är kopplade till dolda objekt."
+        },
+        "not_downloaded": {
+          "one": "Detta kan inte göras kvadratisk då delar av det ännu inte har laddats ned.",
+          "other": "Dessa kan inte göras kvadratisk då delar av dem ännu inte har laddats ned."
         }
       },
       "straighten": {
@@ -152,10 +222,34 @@
             "one": "Rätade ut en linje.",
             "other": "Rätade ut {n} linjer."
           }
+        },
+        "too_bendy": {
+          "one": "Den kan inte rätas ut då den är för böjd.",
+          "other": "Dessa kan inte rätas ut då de är för böjda."
+        },
+        "connected_to_hidden": {
+          "one": "Denna linje kan inte rätas ut då den är kopplad till ett dolt objekt.",
+          "other": "Dessa kan inte rätas ut då vissa av dem är kopplade till dolda objekt."
+        },
+        "not_downloaded": {
+          "one": "Detta kan inte rätas ut då delar av det ännu inte har laddats ned.",
+          "other": "Dessa kan inte rätas ut då delar av dem ännu inte har laddats ned."
+        },
+        "straight_enough": {
+          "one": "Denna kan inte rätas ut mer än den redan är.",
+          "other": "Dessa kan inte rätas ut mer än de redan är."
+        },
+        "too_large": {
+          "one": "Denna kan inte rätas ut då inte tillräckligt av den är synligt för tillfället.",
+          "other": "Dessa kan inte rätas ut då inte tillräckligt av dem är synligt för tillfället."
         }
       },
       "delete": {
         "title": "Radera",
+        "description": {
+          "one": "Radera detta objekt permanent.",
+          "other": "Radera dessa objekt permanent."
+        },
         "annotation": {
           "point": "Tog bort en punkt.",
           "vertex": "Tog bort en nod från en väg.",
@@ -166,6 +260,30 @@
             "one": "Tog bort ett objekt.",
             "other": "Tog bort {n} objekt."
           }
+        },
+        "too_large": {
+          "one": "Detta objekt kan inte raderas då inte tillräckligt av det är synligt för tillfället.",
+          "other": "Dessa objekt kan inte raderas då inte tillräckligt av dem är synliga för tillfället."
+        },
+        "incomplete_relation": {
+          "one": "Detta objekt kan inte raderas då det inte är fullständigt nedladdat.",
+          "other": "Dessa objekt kan inte raderas då de inte är fullständigt nedladdade."
+        },
+        "part_of_relation": {
+          "one": "Detta objekt kan inte raderas då det är del i en relation. Du måste ta bort det från relationen först. ",
+          "other": "Dessa objekt kan inte raderas då de är delar i en relation. Du måste ta bort dem från relationen först."
+        },
+        "connected_to_hidden": {
+          "one": "Detta objekt kan inte raderas då det är kopplat till ett dolt objekt.",
+          "other": "Dessa objekt kan inte raderas då några av dem är kopplade till dolda objekt."
+        },
+        "not_downloaded": {
+          "one": "Detta objekt kan inte raderas då delar av det ännu inte har laddats ned.",
+          "other": "Dessa objekt kan inte raderas då delar av dem ännu inte har laddats ned."
+        },
+        "has_wikidata_tag": {
+          "one": "Detta objekt kan inte raderas då det har en Wikidata-tagg.",
+          "other": "Dessa objekt kan inte raderas då de har Wikidata-taggar."
         }
       },
       "downgrade": {
@@ -189,6 +307,10 @@
             "one": "Nedgradera ett objekt.",
             "other": "Nedgradera {n} objekt."
           }
+        },
+        "has_wikidata_tag": {
+          "one": "Detta objekt kan inte nedgraderas då det har en Wikidata-tagg.",
+          "other": "Dessa objekt kan inte nedgraderas då vissa ha Wikidata-taggar."
         }
       },
       "add_member": {
@@ -288,6 +410,10 @@
       },
       "move": {
         "title": "Flytta",
+        "description": {
+          "one": "Flytta detta objekt till annan plats.",
+          "other": "Flytta dessa objekt till annan plats."
+        },
         "annotation": {
           "point": "Flyttade en punkt.",
           "vertex": "Flyttade en nod i en väg.",
@@ -298,12 +424,38 @@
             "one": "Flyttade ett objekt.",
             "other": "Flyttade {n} objekt."
           }
+        },
+        "incomplete_relation": {
+          "one": "Detta objekt kan inte flyttas då det inte är fullständigt nedladdat.",
+          "other": "Dessa objekt kan inte flyttas då de inte är fullständigt nedladdade."
+        },
+        "too_large": {
+          "one": "Detta objekt kan inte flyttas, då inte tillräckligt mycket av det är synligt för tillfället.",
+          "other": "Dessa objekt kan inte flyttas då de inte är tillräckligt synliga för tillfället."
+        },
+        "connected_to_hidden": {
+          "one": "Detta objekt kan inte flyttas då det är kopplat till dolt objekt.",
+          "other": "Dessa objekt kan inte flyttas då de är kopplade till dolda objekt."
+        },
+        "not_downloaded": {
+          "one": "Detta objekt kan inte flyttas då delar av det ännu inte har laddats ned.",
+          "other": "Dessa objekt kan inte flyttas då delar av dem ännu inte har laddats ned."
         }
       },
       "reflect": {
         "title": {
           "long": "Spegla lång",
           "short": "Spegla kort"
+        },
+        "description": {
+          "long": {
+            "one": "Spegla detta objekt längs dess långa axel.",
+            "other": "Spegla dessa objekt längs deras gemensamma långa axel."
+          },
+          "short": {
+            "one": "Spegla detta objekt längs dess korta axel.",
+            "other": "Spegla dessa objekt längs deras gemensamma korta axel."
+          }
         },
         "annotation": {
           "long": {
@@ -318,10 +470,30 @@
               "other": "Speglade {n} objekt längs deras korta axel."
             }
           }
+        },
+        "incomplete_relation": {
+          "one": "Detta objekt kan inte speglas då det inte har laddats ned fullständigt.",
+          "other": "Dessa objekt kan inte speglas då de inte har laddats ned fullständigt."
+        },
+        "too_large": {
+          "one": "Detta objekt kan inte speglas då inte tillräckligt av det är synligt för tillfället.",
+          "other": "Dessa objekt kan inte speglas då inte tillräckligt av dem är synligt för tillfället."
+        },
+        "connected_to_hidden": {
+          "one": "Detta objekt kan inte speglas då det är kopplat till ett dolt objekt.",
+          "other": "Dessa objekt kan inte speglas då några av dem är kopplade till dolda objekt."
+        },
+        "not_downloaded": {
+          "one": "Detta objekt kan inte speglas då delar av det ännu inte har laddats ned.",
+          "other": "Dessa objekt kan inte speglas då delar av det ännu inte har laddats ned."
         }
       },
       "rotate": {
         "title": "Rotera",
+        "description": {
+          "one": "Rotera den här funktionen runt dess mittpunkt.",
+          "other": "Rotera dessa funktioner runt deras mittpunkt."
+        },
         "annotation": {
           "line": "Roterade en linje.",
           "area": "Roterade ett område.",
@@ -330,6 +502,22 @@
             "one": "Roterade ett objekt.",
             "other": "Roterade {n} objekt."
           }
+        },
+        "incomplete_relation": {
+          "one": "Den här funktionen kan inte roteras eftersom den inte har laddats ner helt.",
+          "other": "Dessa funktioner kan inte roteras eftersom de inte har laddats ner helt."
+        },
+        "too_large": {
+          "one": "Detta objekt kan inte roteras då det inte är tillräckligt av det är synligt för tillfället.",
+          "other": "Dessa objekt kan inte roteras då de inte är tillräckligt synliga för tillfället."
+        },
+        "connected_to_hidden": {
+          "one": "Detta objekt kan inte roteras då det är kopplat till dolt objekt.",
+          "other": "Dessa objekt kan inte roteras då de är kopplade till dolda objekt."
+        },
+        "not_downloaded": {
+          "one": "Detta objekt kan inte roteras då delar av det ännu inte har laddats ned.",
+          "other": "Dessa objekt kan inte roteras då delar av dem ännu inte har laddats ned."
         }
       },
       "reverse": {
@@ -370,6 +558,22 @@
               "other": "Skalade upp {n} objekt."
             }
           }
+        },
+        "too_small": {
+          "one": "Detta objekt kan inte skalas ned då det skulle bli för litet.",
+          "other": "Dessa objekt kan inte skalas ned då de skulle bli för små."
+        },
+        "too_large": {
+          "one": "Detta objekt kan inte skalas då inte tillräckligt av det är synligt för tillfället.",
+          "other": "Dessa objekt kan inte skalas då inte tillräckligt av dem är synliga för tillfället."
+        },
+        "connected_to_hidden": {
+          "one": "Detta objekt kan inte skalas då det är kopplat till ett dolt objekt.",
+          "other": "Dessa objekt kan inte skalas då några av dem är kopplade till dolda objekt."
+        },
+        "not_downloaded": {
+          "one": "Detta objekt kan inte skalas då delar av det ännu inte har laddats ned.",
+          "other": "Dessa objekt kan inte skalas då delar av dem ännu inte har laddats ned."
         }
       },
       "split": {
@@ -379,6 +583,10 @@
             "single": {
               "single_node": "Dela denna linje i två vid denna punkt.",
               "multiple_node": "Dela denna linje vid dessa punkter."
+            },
+            "multiple": {
+              "single_node": "Dela dessa linjer vid denna punkt.",
+              "multiple_node": "Dela dessa linjer vid dessa punkter."
             }
           },
           "area": {
@@ -424,6 +632,18 @@
       "extract": {
         "title": "Extrahera",
         "description": {
+          "vertex": {
+            "one": "Extrahera denna punkt från dess föräldraobjekt.",
+            "other": "Extrahera dessa punkter från dess föräldraobjekt."
+          },
+          "line": {
+            "one": "Extrahera en punkt från denna linje.",
+            "other": "Extrahera punkter från dessa linjer."
+          },
+          "area": {
+            "one": "Extrahera en punkt från detta område.",
+            "other": "Extrahera punkter från dessa områden."
+          },
           "feature": {
             "other": "Extrahera punkter från dessa objekt."
           }
@@ -431,7 +651,21 @@
         "annotation": {
           "one": "Extraherade en punkt.",
           "other": "Extraherade {n} punkter."
+        },
+        "too_large": {
+          "one": "En punkt kan inte extraheras då inte tillräckligt av det här objektet är synligt för tillfället.",
+          "other": "Punkter kan inte extraheras då inte tillräckligt av de här objekten är synliga för tillfället."
+        },
+        "connected_to_hidden": {
+          "one": "Denna punkt kan inte extraheras då den är kopplad till ett dolt objekt.",
+          "other": "Punkter kan inte extraheras från dessa objekt då vissa av dem är kopplade till dolda objekt."
         }
+      },
+      "cycle_highway_tag": {
+        "title": "Tagg för cykelväg",
+        "description": "Genväg för att cykla på vald motorväg eller övergångsställe genom flera olika taggar.",
+        "highway_annotation": "Ändrad vägtagg för vald väg.",
+        "crosswalk_annotation": "Ändrade övergångsställets tagg för vald väg."
       }
     },
     "restriction": {
@@ -475,6 +709,7 @@
       "tooltip": "Gör om: {action}",
       "nothing": "Inget att upprepa."
     },
+    "tooltip_keyhint": "Nyckel:",
     "translate": {
       "translate": "Lägg till flerspråkiga namn",
       "localized_translation_label": "Flerspråkigt namn",
@@ -487,6 +722,7 @@
     "loading_auth": "Ansluter till OpenStreetMap...",
     "report_a_bug": "Rapportera ett fel",
     "help_translate": "Hjälp till och översätta",
+    "example": "Exempel:",
     "feature_info": {
       "hidden_warning": {
         "one": "{count} dolt objekt",
@@ -498,8 +734,11 @@
         "error": "Det går inte att nå OpenStreetMap API. Dina redigeringar är säkra lokalt. Kontrollera din nätverksanslutning.",
         "offline": "OpenStreetMap API är offline. Dina redigeringar är säkra lokalt. Kom tillbaka senare.",
         "readonly": "OpenStreetMap API är för närvarande skrivskyddat. Du kan fortsätta redigera, men måste vänta med att spara dina ändringar.",
-        "local_storage_full": "Du har gjort för många redigeringar för att säkerhetskopiera. Överväg att spara dina ändringar nu."
+        "ratelimit": "Du har laddat ner för mycket data från OpenStreetMap. Försök igen om  1{seconds} sekunder eller byt konto.",
+        "local_storage_full": "Du har gjort för många redigeringar för att säkerhetskopiera. Överväg att spara dina ändringar nu.",
+        "contextlost": "Grafiksystemet har stött på ett problem. Rapid kommer att försöka fortsätta med reducerad kvalitet."
       },
+      "dismiss": "Avfärda",
       "retry": "Försök igen"
     },
     "commit": {
@@ -551,6 +790,7 @@
         "last_edit": "Senast redigering",
         "edited_by": "Redigerad av",
         "changeset": "Ändringsuppsättning",
+        "link_text": "Historik på openstreetmap.org",
         "note_no_history": "Ingen historik (ny anteckning)",
         "note_comments": "Kommentarer",
         "note_created_date": "Skapad den",
@@ -595,6 +835,7 @@
       "location_unavailable": "Din plats är inte tillgänglig."
     },
     "inspector": {
+      "tooltip": "Aktivera funktionsinspektören.",
       "zoom_to": {
         "title": "Zooma till markering",
         "no_selection": "Inget att zooma till."
@@ -603,6 +844,7 @@
       "view_on_osm": "Visa på openstreetmap.org",
       "view_on_osmose": "Visa på osmose.openstreetmap.fr",
       "view_on_keepRight": "Visa på keepright.at",
+      "view_on_maproulette": "Visa på maproulette.org",
       "feature_type": "Objekttyp",
       "fields": "Egenskaper",
       "tags": "Taggar",
@@ -620,6 +862,7 @@
         "other": "{n} sökresult för {search}"
       },
       "no_documentation_key": "Det finns inget dokumentation tillgänglig.",
+      "edit_reference": "redigera/översätta",
       "wiki_reference": "Visa dokumentation",
       "wiki_en_reference": "Visa dokumentation på engelska",
       "key_value": "nyckel=värde",
@@ -634,6 +877,7 @@
       "unknown": "Okänd",
       "incomplete": "<inte hämtad>",
       "feature_list": "Sök efter objekt",
+      "multiselect": "Flera val",
       "check": {
         "yes": "Ja",
         "no": "Nej",
@@ -663,7 +907,9 @@
         "ref_from_to_via": "{ref} från {from} till {to} via {via}",
         "network_ref_from_to": "{network} {ref} från {from} till {to}",
         "network_ref_from_to_via": "{network} {ref} från {from} till {to} via {via}"
-      }
+      },
+      "first_seen": "Först sedd",
+      "last_seen": "Senast sedd"
     },
     "background": {
       "title": "Bakgrund",
@@ -674,14 +920,28 @@
       "switch": "Växla tillbaka till denna bakgrund",
       "custom": "Anpassad",
       "overlays": "Bildlager",
+      "grid": {
+        "grids": "Rutnät",
+        "no_grid": "Inget rutnät",
+        "n_by_n": "{num} x {num} Rutnät"
+      },
+      "imagery_source_faq": "Bildinformation / Rapportera ett problem",
       "imagery_problem_faq": "Rapportera ett problem med flygfoto",
       "reset": "återställ",
       "reset_all": "Återställ allt",
       "display_options": "Visningsinställningar",
+      "wayback": {
+        "description": "Esri Wayback innehåller arkiverade ögonblicksbilder av Esri World Imagery som skapats över tid.",
+        "date": "Datum"
+      },
       "brightness": "Ljusstyrka",
       "contrast": "Kontrast",
       "saturation": "Mättnad",
       "sharpness": "Skärpa",
+      "3dmap": {
+        "description": "Visa 3D-karta",
+        "tooltip": "Visa en infälld 3D-karta."
+      },
       "minimap": {
         "description": "Visa minikarta",
         "tooltip": "Visar en utzoomad karta för att hjälpa dig att hitta i området som visas för tillfället."
@@ -704,15 +964,43 @@
       "layers": {
         "osm": {
           "tooltip": "Kartdata från OpenStreetMap",
-          "title": "OpenStreetMap-data"
+          "title": "OpenStreetMap-data",
+          "feature": "OpenStreetMap-funktionen"
         },
         "notes": {
           "tooltip": "Anteckning från OpenStreetMap",
           "title": "OpenStreetMap-anteckningar"
         },
+        "rapid": {
+          "tooltip": "Föreslagna funktioner identifierade från maskininlärning och öppna data som kan användas för att förbättra OpenStreetMap",
+          "title": "Snabba funktioner",
+          "license": "Facebooks karta med AI-licens"
+        },
         "maproulette": {
+          "tooltip": "Uppgifter från maproulette.org. Du kan också ange en kommaseparerad lista med utmanings-ID:n för att filtrera.",
+          "title": {
+            "one": "MapRoulette-uppgift",
+            "other": "MapRoulette-uppgifter"
+          },
+          "loading_task_details": "Laddar uppgiftsinformation...",
+          "error_loading_task_details": "Fel vid laddning av uppgiftsinformationen. Försök att vänta och välja den igen.",
           "detail_title": "Detaljer",
-          "cancel": "Avbryt"
+          "id_title": "Utmanings-ID / Uppgifts-ID",
+          "id_placeholder": "Utmanings-ID:n",
+          "instruction_title": "Instruktioner",
+          "fixed": "Jag fixade det!",
+          "cantComplete": "Kan inte slutföras",
+          "alreadyFixed": "Redan åtgärdat",
+          "notAnIssue": "Inte ett problem",
+          "login": "Du måste logga in för att ändra MapRoulette-utmaningen.",
+          "loginMaproulette": "Du måste logga in på MapRoulette för att redigera den här uppgiften.",
+          "inputPlaceholder": "Ändra kommentar (valfritt)",
+          "comment": "Vänligen bekräfta",
+          "cancel": "Avbryt",
+          "submit": "Skicka in",
+          "nearbyTask": {
+            "title": "Hoppa till närliggande uppgift"
+          }
         },
         "keepRight": {
           "tooltip": "Dataproblem hittad av keepright.at",
@@ -722,12 +1010,17 @@
           "tooltip": "Dataproblem hittade av osmose.openstreetmap.fr",
           "title": "Osmose-problem"
         },
+        "geoScribble": {
+          "tooltip": "Frihandsanteckningar gjorda av EveryDoor-användare",
+          "title": "GeoScribble-annoteringar"
+        },
         "custom": {
           "tooltip": "Drag och släpp en datafil på sidan, eller klicka på knappen för att ställa in",
           "title": "Anpassad kartdata",
           "zoom": "Zooma till data"
         }
       },
+      "fill_area": "Fyll områden",
       "history_panel": {
         "title": "Visa panel för historik",
         "tooltip": "Visa versionsdetaljer för markering."
@@ -774,6 +1067,11 @@
       }
     },
     "filters": {
+      "title": "Filter",
+      "active": "Vissa funktioner är filtrerade:",
+      "hidden_preset": {
+        "manual": "{features} filtreras. Aktivera dem i kartdatapanelen."
+      },
       "points": {
         "description": "Punkter",
         "tooltip": "Intressanta platser"
@@ -886,11 +1184,19 @@
       "custom_data": {
         "tooltip": "Redigera anpassat kartlager",
         "header": "Inställningar för anpassad kartdata",
+        "instructions": "Anpassade kartdata kan läggas till kartan som ett referenslager på två sätt:",
         "file": {
+          "heading": "Lokal datafil",
+          "instructions": "Välj en lokal datafil. Filtyper som stöds är:",
+          "tip": "Tips: Du kan också dra och släppa vilken som helst av dessa filtyper till huvudkartan.",
           "label": "Bläddra efter fil"
         },
         "or": "Eller",
         "url": {
+          "heading": "Fjärrdata-URL",
+          "instructions": "Ange en URL till någon av ovanstående filtyper, en vektorbricktjänst i MVT-stil eller ett .pmtiles-arkiv.",
+          "tokens": "Stödda ersättningstokens:",
+          "xyz": "`{zoom}` eller `{z}`, `{x}`, `{y}` för Z/X/Y brick-schema",
           "placeholder": "Ange en url"
         }
       }
@@ -900,9 +1206,28 @@
       "description": "Inställningar",
       "privacy": {
         "title": "Integritet",
+        "privacy_link": "Visa Rapids integritetspolicy",
         "third_party_icons": {
           "description": "Visa tredjepartsikoner",
           "tooltip": "Avmarkera denna ruta för att undvika att ladda ikoner från tredje parts webbplatser så som Wikimedia Commons, Facebook eller Twitter."
+        }
+      },
+      "map_interaction": {
+        "title": "Kartinteraktion",
+        "mouse_wheel": {
+          "title": "Mushjulets beteende",
+          "auto": {
+            "title": "Automatisk",
+            "tooltip": "Bäst för användare av styrplattan. Med 2 fingrar panorerar svepgester kartan och nypgester zoomar och zoomar ut kartan. Håll ned Shift för att zooma och zooma ut kartan."
+          },
+          "zoom": {
+            "title": "Zooma kartan",
+            "tooltip": "Att skrolla med hjulet zoomar och zoomar alltid ut kartan."
+          },
+          "pan": {
+            "title": "Panorera kartan",
+            "tooltip": "Om du skrollar med hjulet panoreras kartan. Om du håller nere Shift zoomas och zoomas kartan ut."
+          }
         }
       },
       "color_selection": {
@@ -944,7 +1269,8 @@
         "deleted": "Detta objekt har raderats av {user}.",
         "location": "Detta objekt har flyttas av både dig och {user}.",
         "nodelist": "Noder har ändrats av både dig och {user}.",
-        "memberlist": "Relationsmedlemmar har ändrats av både dig och {user}."
+        "memberlist": "Relationsmedlemmar har ändrats av både dig och {user}.",
+        "tags": "Du ändrade taggen 1{tag}1 till \"{local}\" och {user} ändrade den till \"{remote}\"."
       }
     },
     "success": {
@@ -968,19 +1294,36 @@
       "cancel": "Avbryt"
     },
     "splash": {
+      "welcome": "Välkommen till {rapidicon} {version}!",
       "start": "Redigera nu"
     },
     "source_switch": {
       "lose_changes": "Du har osparade ändringar som kommer gå förlorade vid byte av kartserver. Är du säker att du vill byta server?"
     },
+    "rapid_splash": {
+      "text": "Välj alternativet {rapidicon} för att starta snabbgenomgången. Om du är nybörjare på OSM och inte har kartlagt tidigare, välj det första alternativet {walkthrough}. Klicka slutligen på det sista alternativet {edit} om du vill gå direkt till kartläggningen. Du kan alltid komma åt genomgången senare från hjälpmenyn."
+    },
+    "rapid_first_edit": {
+      "nice": "Du har precis lagt till din första {rapidicon} AI-assisterade funktion, vad bra."
+    },
     "rapid_inspector": {
-      "tags": "Taggar"
+      "notice": {
+        "open_data": "Denna datauppsättning består av öppna data. Se vår [licens]({url}) för mer information."
+      },
+      "tags": "Taggar",
+      "option_accept": {
+        "disabled_flash": "För att förbättra OSM-datakvaliteten tillåter vi endast att {n} AI-funktioner läggs till i varje kartläggningssession."
+      }
     },
     "rapid_menu": {
+      "toggle_all": "Visa/visa alla {rapidicon}-data",
       "remove": "Ta bort",
       "category": {
         "roads": "vägar"
       }
+    },
+    "version": {
+      "whats_new": "Nyheter i Rapid {version}"
     },
     "tag_reference": {
       "description": "Beskrivning",
@@ -1368,13 +1711,19 @@
       "title": "Hjälp",
       "help": {
         "title": "Hjälp",
+        "welcome": "Välkommen till {rapidicon}-redigeraren för [OpenStreetMap](https://www.openstreetmap.org/). Med den här redigeraren kan du uppdatera OpenStreetMap direkt från din webbläsare.",
         "open_data_h": "Öppen data",
         "open_data": "Ändringar du gör på kartan kommer att vara synliga för alla som använder OpenStreetMap. Dina ändringar kan vara baserade på egen kunskap, undersökningar på plats eller bilder  som samlats in från flyg eller på gatunivå. Kopiering från kommersiella källor, till exempel Google Maps, är [strängt förbjudet](https://www.openstreetmap.org/copyright).",
         "before_start_h": "Innan du börjar",
-        "open_source_h": "Öppen källkod"
+        "before_start": "Du bör vara bekant med OpenStreetMap och den här redigeraren innan du börjar redigera. Rapid innehåller en genomgång som lär dig grunderna i att redigera OpenStreetMap. Tryck på knappen \"{start_the_walkthrough}\" på den här skärmen för att starta handledningen – den tar bara cirka 15 minuter.",
+        "open_source_h": "Öppen källkod",
+        "open_source": "Rapid-redigeraren är ett samarbetsprojekt med öppen källkod, och du använder version {version} nu. Källkoden finns tillgänglig [på GitHub](https://github.com/facebook/Rapid)."
       },
       "overview": {
         "title": "Översikt",
+        "navigation_pan": "Du kan panorera kartan genom att hålla ner vänster musknapp {mouse_left_icon} och flytta musen runt, eller genom att {onefinger_tap_and_drag_icon} dra på en pekskärm. Du kan också använda piltangenterna {keyboard_arrows_all} på ett tangentbord.",
+        "navigation_zoom": "Du kan zooma in eller ut genom att skrolla med ett {mouse_wheel_icon} mushjul eller styrplatta, eller genom att {twofinger_zoom_icon} zooma med två fingrar på en pekskärm. Du kan också trycka på {plus} / {minus}-knapparna längs sidan av kartan eller `+`, `-`-tangenterna på ett tangentbord.",
+        "navigation_rotate": "Du kan rotera kartan genom att hålla ner `{option}` och {mouse_left_icon} och dra kartan, eller genom att hålla ner `{shift}` och använda vänster-/högerpiltangenterna på {keyboard_arrows_left_right}.",
         "features_h": "Kartobjekt",
         "features": "Vi använder ordet *objekt* för att beskriva saker som förekommer på kartan, så som vägar, byggnader eller intressanta platser. Allt i den verkliga världen kan kartläggas som ett objekt på OpenStreetMap. Kartobjekt representeras på kartan av *punkter*, *linjer* och *områden*.",
         "nodes_ways": "I OpenStreetMap kallas ibland punkter för *noder*, och linjer och områden kallas ibland för *vägar*."
@@ -1382,9 +1731,12 @@
       "editing": {
         "title": "Redigera & spara",
         "select_h": "Markera",
+        "select_left_click": "{mouse_left_icon} Vänsterklicka eller {onefinger_tap_icon} tryck på en funktion för att välja den. Detta markerar den med ett pulserande sken och visar ytterligare information om den i funktionsinspektören.",
+        "select_right_click": "{mouse_right_icon} Högerklicka eller {onefinger_tap_and_hold_icon} tryck länge på en funktion för att visa redigeringsmenyn, som erbjuder funktioner som kopiera, rotera och radera.",
         "select_space": "Knappen `{space}` kan också användas istället för vänsterklick vid markering och när du ritar.",
         "multiselect_h": "Markera flera",
         "multiselect": "Markering av flera objekt tillsammans låter dig snabbt redigera dem alla på en gång.",
+        "multiselect_lasso": "Ett annat sätt att markera flera funktioner är att hålla ner `{shift}`-tangenten, sedan trycka och hålla ner vänster musknapp {mouse_left_icon} och dra musen för att rita en markeringslasso. Alla punkter inom lassoområdet kommer att markeras.",
         "undo_redo_h": "Ångra & gör om",
         "undo_redo": "Dina ändringar lagras lokalt i din webbläsare tills dess att du väljer att spara dem på OpenStreetMaps server. Du kan ångra ändringar genom att trycka på knappen {undo_icon} **{undo}**, och göra om dem genom att trycka på knappen {redo_icon} **{redo}**.",
         "save_h": "Spara",
@@ -1414,7 +1766,10 @@
         "title": "Punkter",
         "intro": "*Punkter* kan användas för att representera objekt så som affärer, restauranger och monument. De markerar en specifik plats och beskriver vad det är.",
         "add_point_h": "Lägg till punkter",
+        "add_point": "För att lägga till en punkt, tryck på knappen {point_icon} **{point}** i verktygsfältet ovanför kartan, eller tryck på kortkommandot `{add_point_key}`.",
+        "add_point_finish": "Sedan, placera sedan den nya punkten på kartan. Placera markören med en mus där punkten ska vara och {mouse_left_icon} vänsterklicka. På en pekskärm, {onefinger_tap_icon} tryck på platsen.",
         "move_point_h": "Flytta punkter",
+        "move_point": "För att flytta en punkt, {mouse_left_icon} vänsterklicka och dra den med musen eller {onefinger_tap_and_drag_icon} tryck och dra den på en pekskärm.",
         "delete_point_h": "Radera punkter",
         "delete_point": "Det är ok att radera objekt som inte existerar i den verkliga världen. Genom att radera ett objekt från OpenStreetMap raderas det från kartan som alla användare ser, så du bör försäkra dig om att objektet verkligen inte finns i verkligheten innan du raderar det."
       },
@@ -1422,17 +1777,25 @@
         "title": "Linjer",
         "intro": "*Linjer* används för att representera objekt så som vägar, järnvägar och floder. Linjer bör ritas längst mitten av objektet de representerar.",
         "add_line_h": "Lägg till linjer",
+        "add_line": "För att lägga till en linje, tryck på knappen {line_icon} **{line}** i verktygsfältet ovanför kartan, eller tryck på kortkommandot `{add_line_key}`.",
+        "add_line_draw": "Sedan, markera sedan linjens startplats. Placera markören med en mus där linjen ska börja och {mouse_left_icon} vänsterklicka för att placera en nod. På en pekskärm, {onefinger_tap_icon} tryck på platsen.",
+        "add_line_continue": "Fortsätt placera noder genom att {mouse_left_icon} klicka eller {onefinger_tap_icon} trycka längs linjens form. Medan du ritar kan du zooma in eller dra kartan för att lägga till fler detaljer.",
         "add_line_finish": "För att slutföra linjen, klick eller tryck på senaste noden igen eller tryck `{return}`.",
         "modify_line_h": "Modifiera linjer",
         "modify_line_dragnode": "Ofta ser du linjer som inte har korrekt form, t.ex. vägar som inte helt matchar med bakgrundsbilden. För att justera formen på en linje, markera den först. Alla noder längst linjen kommer att visas som små cirklar. Du kan dra och flytta noderna till bättre platser.",
+        "modify_line_addnode": "Du kan också skapa nya noder längs en linje genom att dubbelklicka {mouse_left_icon}x2 eller dubbelknacka {onefinger_tap_icon}x2 på linjen, eller genom att dra de små trianglarna vid mittpunkterna mellan noderna.",
         "connect_line_h": "Koppla ihop linjer",
         "connect_line": "Att ha vägar sammankopplade korrekt är viktigt för kartan, och en förutsättning för att kunna ge navigeringsanvisningar.",
         "connect_line_display": "Sammankopplade vägar visas med gråa cirklar. Ändpunkten av en linje ritas med en stor vit cirkel om den inte är ansluten till något.",
+        "connect_line_drag": "För att ansluta en linje till en annan funktion, dra en av linjens noder till den andra funktionen tills båda funktionerna snäpper ihop. Tips: Du kan hålla ner `{option}`-tangenten för att förhindra att noder ansluter till andra funktioner.",
         "connect_line_tag": "Om du vet att anslutningen har trafikljus eller övergångsställe kan du lägga till det genom att markera den anslutna noden och använda objektredigeraren för att välja objekttyp.",
         "disconnect_line_h": "Koppla isär linjer",
+        "disconnect_line_command": "För att koppla bort en väg från en annan funktion, {mouse_right_icon} högerklicka eller {onefinger_tap_and_hold_icon} tryck länge på den anslutande noden och välj åtgärden {disconnect_icon} **{disconnect}** från redigeringsmenyn.",
         "move_line_h": "Flytta linjer",
+        "move_line_command": "För att flytta en hel rad, högerklicka {mouse_right_icon} på raden och välj åtgärden {move_icon} **{move}** från redigeringsmenyn. Flytta sedan musen och vänsterklicka {mouse_left_icon} för att placera raden på en ny plats.",
         "delete_line_h": "Radera linjer",
-        "delete_line": "Om en linje är helt fel, t.ex. om en väg inte existerar i verkligheten, är det ok att radera den. Var försiktig när du radera objekt: bakgrundsbilden du använder kan vara föråldrad, och en väg som ser fel ut kan helt enkelt vara nybyggd."
+        "delete_line": "Om en linje är helt fel, t.ex. om en väg inte existerar i verkligheten, är det ok att radera den. Var försiktig när du radera objekt: bakgrundsbilden du använder kan vara föråldrad, och en väg som ser fel ut kan helt enkelt vara nybyggd.",
+        "delete_line_command": "För att radera en rad, högerklicka {mouse_right_icon} eller {onefinger_tap_and_hold_icon} tryck länge på raden för att visa redigeringsmenyn och använd sedan åtgärden {delete_icon} **{delete}**."
       },
       "areas": {
         "title": "Områden",
@@ -1440,12 +1803,18 @@
         "point_or_area_h": "Punkter eller områden?",
         "point_or_area": "Många objekt kan representeras både som punkter och som områden. Du bör rita konturen av byggnader och fastigheter som områden när det är möjligt. Placera punkter inuti en byggnads område för att representera företag, faciliteter och andra objekt lokaliserade inuti byggnaden.",
         "add_area_h": "Lägg till områden",
+        "add_area_command": "För att lägga till ett område, tryck på knappen {area_icon} **{area}** i verktygsfältet ovanför kartan, eller tryck på kortkommandot `{add_area_key}`.",
+        "add_area_draw": "Placera sedan områdets första hörn. Placera markören över valfritt hörn med en mus och vänsterklicka med {mouse_left_icon} för att placera en nod. På en pekskärm, {onefinger_tap_icon} tryck på platsen.",
+        "add_area_continue": "Placera sedan områdets första hörn. Placera markören över valfritt hörn med en mus och vänsterklicka med {mouse_left_icon} för att placera en nod. På en pekskärm, {onefinger_tap_icon} tryck på platsen.",
         "add_area_finish": "För att slutföra ett område, klicka eller tryck på första eller sista noden igen, eller tryck `{return}`.",
         "square_area_h": "Räta upp hörn",
+        "square_area_command": "Många områdesfunktioner, som byggnader, har fyrkantiga hörn. För att fyrkanta hörnen i ett område, högerklicka {mouse_right_icon} eller {onefinger_tap_and_hold_icon} tryck länge på kanten av området och välj åtgärden {orthogonalize_icon} **{orthogonalize}** från redigeringsmenyn.",
         "modify_area_h": "Modifiera områden",
         "modify_area_dragnode": "Ofta ser du områden som inte har korrekt form, t.ex. en byggnad som inte helt matchar med bakgrundsbilden. För att justera formen på ett område, markera det först. Alla noder längst området kommer att visas som små cirklar. Du kan dra och flytta noderna till bättre platser.",
+        "modify_area_addnode": "Du kan också skapa nya noder längs ett område genom att {mouse_left_icon}x2 dubbelklicka eller {onefinger_tap_icon}x2 dubbelknacka på en kant, eller genom att dra de små trianglarna vid mittpunkterna mellan noderna.",
         "delete_area_h": "Radera områden",
-        "delete_area": "Om ett område är helt fel, t.ex. om en byggnad inte existerar i verkligheten, är det ok att radera den. Var försiktig när du radera objekt – bakgrundsbilden du använder kan vara föråldrad, och en byggnad som ser fel ut kan helt enkelt vara nybyggd."
+        "delete_area": "Om ett område är helt fel, t.ex. om en byggnad inte existerar i verkligheten, är det ok att radera den. Var försiktig när du radera objekt – bakgrundsbilden du använder kan vara föråldrad, och en byggnad som ser fel ut kan helt enkelt vara nybyggd.",
+        "delete_area_command": "För att radera ett område, högerklicka {mouse_right_icon} eller tryck {onefinger_tap_and_hold_icon} länge på området för att visa redigeringsmenyn och använd sedan åtgärden {delete_icon} **{delete}**."
       },
       "relations": {
         "title": "Relationer",
@@ -1458,9 +1827,11 @@
         "relation_types_h": "Typer av relationer",
         "multipolygon_h": "Multipolygoner",
         "multipolygon": "En *multipolygon-relation* är en grupp av en eller flera *yttre* objekt och en eller flera *inre* objekt. De yttre objekten definierar den yttre kanten av av multipolygonen, och de inre objekten definierar delområden eller hål utklippta inuti multipolygonen.",
+        "multipolygon_create": "För att skapa en multipolygon, till exempel en byggnad med ett hål i, rita den yttre kanten som en area och den inre kanten som en linje eller en annan typ av area. Vänsterklicka sedan med `{shift}`+{mouse_left_icon} för att välja båda funktionerna, högerklicka med {mouse_right_icon} för att visa redigeringsmenyn och välj åtgärden {merge_icon} **{merge}**.",
         "turn_restriction_h": "Svängrestriktioner",
         "turn_restriction": "En *svängrestriktion-relation* är en grupp av flera vägsegment i en korsning. Svängrestriktioner består av en *från*-väg, en *via*-nod eller -vägar, och en *till*-väg.",
         "turn_restriction_field": "För att redigera svängrestriktioner, markera en korsningsnod där två eller fler vägar möts. Objektredigeraren kommer att visa en speciell egenskap för \"{turn_restrictions}\" med en visualisering av korsningen.",
+        "turn_restriction_editing": "I fältet \"{turn_restrictions}\" väljer du en \"från\"-väg och ser om svängar är tillåtna eller begränsade till någon av \"till\"-vägarna. Du kan trycka på svängikonerna för att växla mellan tillåtna och begränsade. Rapid skapar relationer automatiskt och ställer in rollerna från, via och till baserat på dina val.",
         "route_h": "Rutter",
         "route": "En *rutt*-relation är en grupp av en eller flera linjer som tillsammans formar ett ruttnätverk, så som buss-rutter, tåg-rutter eller väg-rutt.",
         "route_add": "För att lägga till ett objekt till en rutt-relation, välj objektet och bläddra ned till sektionen \"{relations}\" i objektredigeraren. Tryck sedan på knappen {plus} Lägg till för att lägga till detta objekt till en närliggande existerande relation eller en ny relation.",
@@ -1470,6 +1841,7 @@
       },
       "operations": {
         "title": "Operationer",
+        "intro": "*Operationer* är specialkommandon som du kan använda för att redigera funktioner. {mouse_right_icon} Högerklicka eller {onefinger_tap_and_hold_icon} tryck länge på valfri funktion för att visa tillgängliga åtgärder.",
         "intro_2": "Varje operation har dess egna kortokmmandon. De flesta operationer kan tillämpas på flera objekt samtidigt.",
         "straighten": "{straighten_icon} **{straighten}** ta bort börjar på linjen. Den lägger grupper av punkter på en rak linje.",
         "orthogonalize": "{orthogonalize_icon} **{orthogonalize}** gör hörn i ett område och på linjer till 90°. Du kan räta ut individuella hörn eller hela områden.",
@@ -1489,8 +1861,11 @@
       },
       "notes": {
         "title": "Anteckningar",
+        "show_notes": "För att aktivera anteckningslagret, öppna panelen {data_icon} **{map_data}** och klicka i kryssrutan för {osm_notes}, eller tryck på `{shift}`+`{toggle_notes_key}`.",
         "add_note_h": "Lägga till anteckningar",
         "add_note": "För att lägga till en ny anteckning, tryck på knappen {note_icon} **{note}** i verktygsraden ovanför kartan, eller trycka kortkommandot `{add_note_key}`.",
+        "place_note": "Sedan, placera sedan den nya anteckningen på kartan. Placera markören med musen där anteckningen ska vara och {mouse_left_icon} vänsterklicka. På en pekskärm, {onefinger_tap_icon} tryck på platsen.",
+        "move_note": "För att flytta en anteckning, {mouse_left_icon} vänsterklicka och dra den med musen eller {onefinger_tap_and_drag_icon} tryck och dra den på en pekskärm. Endast nya anteckningar kan flyttas.",
         "update_note_h": "Stänga, återöppna och kommentera",
         "update_note": "En existerande anteckning kan uppdateras genom att stänga den, återöppna den, eller genom att lägga till en kommentar till den. Genom att stänga en anteckning indikerar du att problemet har lösts. Genom att återöppna en anteckning indikerar du att det ursprungliga problemet inte är löst. ",
         "save_note_h": "Spara anteckningar",
@@ -1503,7 +1878,8 @@
         "choosing": "För att se vilka bildkällor som finns tillgängliga vid redigering, öppna panelen {layers_icon} **{background_settings}** vid sidan av kartan.",
         "sources": "Satellitelagret [Bing Maps](https://www.bing.com/maps/) eller det bästa lokala flygbilderna är satt som standardbakgrund. Beroende på var du redigerar, finns flera bildkällor tillgängliga. Vissa kan vara nyare eller har bättre upplösning, så det är alltid klokt att kontrollera vilket lager som är bäst som referens vid kartläggning.",
         "offsets_h": "Justera bildplacering",
-        "offset": "Bilder är ibland förskjutna lite i förhållande till korrekt kartdata. Om du ser att många vägar eller byggnader är förskjutna i förhållande till bakgrundsbilden kan det vara bakgrundsbilden som är felaktig, så flytta dem inte bara för att matcha bakgrunden. Istället kan du justera bakgrunden så att den matchar med existerande data genom att expandera sektionen \"{imagery_offset}\" längst ned i panelen Bakgrundsinställningar."
+        "offset": "Bilder är ibland förskjutna lite i förhållande till korrekt kartdata. Om du ser att många vägar eller byggnader är förskjutna i förhållande till bakgrundsbilden kan det vara bakgrundsbilden som är felaktig, så flytta dem inte bara för att matcha bakgrunden. Istället kan du justera bakgrunden så att den matchar med existerande data genom att expandera sektionen \"{imagery_offset}\" längst ned i panelen Bakgrundsinställningar.",
+        "offset_change": "Tryck på de små triangelknapparna för att justera bildförskjutningen i små steg, eller håll ner vänster musknapp {mouse_left_icon} och dra inom den grå rutan för att justera bilden."
       },
       "streetlevel": {
         "title": "Gatubilder",
@@ -1624,6 +2000,12 @@
           "reference": "Korsande vägar bör ha en gemensam korsningspunkt."
         }
       },
+      "ambiguous_crossing": {
+        "fix": {
+          "choose_type": "Tagga denna övergångsplats som '{type}'",
+          "update_type": "Tagga denna övergångsplats som '{type}'"
+        }
+      },
       "area_as_point": {
         "message": "{feature} bör vara ett område, inte en punkt"
       },
@@ -1635,6 +2017,12 @@
         "detached": {
           "message": "{feature} är för nära {feature2}",
           "reference": "Separata punkter för inte dela en plats."
+        }
+      },
+      "curb_nodes": {
+        "message": "{feature} kan sakna kantstensnoder.",
+        "fix": {
+          "add_curb_nodes": "Lägg till {type} kantnoder"
         }
       },
       "crossing_ways": {
@@ -1702,6 +2090,9 @@
       "fixme_tag": {
         "message": "{feature} har en \"Fix Me\"-begäran",
         "reference": "En \"fixme\"-tagg indikerar att en kartläggare har begärt hjälp med ett objekt. "
+      },
+      "short_road": {
+        "message": "{highway} är kortare än 20 meter."
       },
       "generic_name": {
         "message": "{feature} har det misstänkta namnet \"{name}\"",
@@ -2229,6 +2620,9 @@
         "retry_circle": "Du tryckte inte på knappen {circularize_icon} {circularize}. Försök igen.",
         "play": "Bra jobbat! Öva dig genom att rita av några fler byggnader och prova några fler av operationerna i redigeringsmenyn. **När du är redo att fortsätta till nästa kapitel, tryck '{next}'.**"
       },
+      "rapid": {
+        "title": "Snabba funktioner"
+      },
       "startediting": {
         "title": "Börja redigera",
         "help": "Du är nu redo att redigera OpenStreetMap!{br}Du kan repetera denna genomgång när du vill, eller läsa mer i dokumentationen genom att klicka på knappen {help_icon} {help} eller trycka på tangenten `{help_key}`.",
@@ -2740,6 +3134,8 @@
       "ksf": "bafia",
       "ksh": "kölniska",
       "ku": "kurdiska",
+      "ku-menu-core": "kurdiska",
+      "ku-menu-extension": "kurmandji",
       "kum": "kumykiska",
       "kut": "kutenaj",
       "kv": "kome",

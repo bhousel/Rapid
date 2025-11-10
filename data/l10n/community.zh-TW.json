@@ -33,7 +33,6 @@
       "openstreetmapbrasilia": "開放街圖巴西利亞",
       "openstreetmapbremen": "開放街圖不萊梅",
       "openstreetmapbulgaria": "開放街圖保加利亞",
-      "openstreetmapburkinafaso": "開放街圖布吉納法索",
       "openstreetmapburundi": "開放街圖蒲隆地",
       "openstreetmapbzh": "開放街圖布列塔尼",
       "openstreetmapcambodia": "開放街圖柬埔寨",
@@ -47,7 +46,6 @@
       "openstreetmapchina": "開放街圖中國",
       "openstreetmapcologne": "開放街圖科隆",
       "openstreetmapcomunitatvalenciana": "開放街圖瓦倫西亞社群",
-      "openstreetmapcostarica": "開放街圖哥斯大黎加",
       "openstreetmapcotedivoire": "開放街圖象牙海岸",
       "openstreetmapcroatia": "開放街圖克羅埃西亞",
       "openstreetmapcuba": "開放街圖古巴",
@@ -86,7 +84,6 @@
       "openstreetmapguinea": "開放街圖幾內亞",
       "openstreetmaphaiti": "開放街圖海地",
       "openstreetmaphamburg": "開放街圖漢堡",
-      "openstreetmaphonduras": "開放街圖宏都拉斯",
       "openstreetmaphongkong": "開放街圖香港",
       "openstreetmaphungary": "開放街圖匈牙利",
       "openstreetmapiceland": "開放街圖冰島",
@@ -100,7 +97,6 @@
       "openstreetmapitalylazio": "開放街圖義大利拉吉歐",
       "openstreetmapitalylombardia": "開放街圖義大利倫巴底",
       "openstreetmapitalypiemonte": "開放街圖義大利皮埃蒙特",
-      "openstreetmapitalysouthtyrol": "開放街圖義大利波爾察諾-上阿迪傑",
       "openstreetmapitalytrentino": "開放街圖義大利特倫蒂諾",
       "openstreetmapjapan": "開放街圖日本",
       "openstreetmapkarlsruhe": "開放街圖卡爾斯魯爾",
@@ -109,10 +105,8 @@
       "openstreetmapkerala": "開放街圖喀拉拉邦",
       "openstreetmapkorea": "開放街圖韓國",
       "openstreetmapkosovo": "開放街圖科索渥",
-      "openstreetmapkyrgyzstan": "開放街圖吉爾吉斯",
       "openstreetmaplatinamerica": "開放街圖拉丁美洲",
       "openstreetmaplatvia": "開放街圖拉脫維亞",
-      "openstreetmaplebanon": "開放街圖黎巴嫩",
       "openstreetmaplesotho": "開放街圖賴索托",
       "openstreetmapliberia": "開放街圖賴比瑞亞",
       "openstreetmaplibya": "開放街圖利比亞",
@@ -156,6 +150,7 @@
       "openstreetmapphilippines": "開放街圖菲律賓",
       "openstreetmappoland": "開放街圖波蘭",
       "openstreetmapportugal": "開放街圖葡萄牙",
+      "openstreetmappuglia": "開放街圖普利亞",
       "openstreetmaprdc": "開放街圖剛果民主共和國",
       "openstreetmaprennes": "開放街圖雷恩",
       "openstreetmapreunion": "開放街圖留尼旺",
@@ -166,7 +161,6 @@
       "openstreetmapsaudiarabia": "開放街圖沙烏地阿拉伯",
       "openstreetmapsenegal": "開放街圖塞內加爾",
       "openstreetmapserbia": "開放街圖塞爾維亞",
-      "openstreetmapseychelles": "開放街圖塞席爾",
       "openstreetmapsierraleone": "開放街圖獅子山",
       "openstreetmapsingapore": "開放街圖新加坡",
       "openstreetmapslovenia": "開放街圖斯洛維尼亞",
@@ -177,7 +171,6 @@
       "openstreetmapsudan": "開放街圖蘇丹",
       "openstreetmapsweden": "開放街圖瑞典",
       "openstreetmapswitzerland": "開放街圖瑞士",
-      "openstreetmapsyria": "開放街圖敘利亞",
       "openstreetmaptaiwan": "開放街圖台灣",
       "openstreetmaptanzania": "開放街圖坦尚尼亞",
       "openstreetmapthailand": "開放街圖泰國",
@@ -199,6 +192,7 @@
       "openstreetmapwesternsahara": "開放街圖西撒哈拉",
       "openstreetmapzambia": "開放街圖桑比亞",
       "openstreetmapzimbabwe": "開放街圖辛巴威",
+      "osmewikiemiliaromagna": "OSM 與 Wiki 艾米利亞‧羅馬涅",
       "tadeomappers": "塔德奧圖客",
       "youthmappersasu": "年輕圖客ASU"
     },
@@ -221,12 +215,6 @@
       },
       "newsletter": {
         "name": "{community} 電子報"
-      },
-      "twitter": {
-        "name": "X 上的 {community}"
-      },
-      "x": {
-        "name": "X 上的 {community}"
       }
     },
     "af-matrix": {
@@ -260,9 +248,6 @@
     },
     "be-discourse": {
       "description": "討論開放街圖在比利時事物的 Discourse"
-    },
-    "be-irc": {
-      "extendedDescription": "在 irc.oftc.net (port 6667) 上面加入 #{account} ，與 Matrix 聊天頻道互連同步"
     },
     "be-matrix": {
       "description": "歡迎所有圖客！",
@@ -404,12 +389,6 @@
     "hr-tm": {
       "description": "探索克羅埃西亞的啟動畫地圖任務"
     },
-    "hu-meetup": {
-      "description": "匈牙利舉行聚會的平台"
-    },
-    "hu-website": {
-      "description": "我們協助匈牙利的開放街圖成長茁壯並改善它。"
-    },
     "hu-wiki": {
       "description": "{community} 的維基頁面"
     },
@@ -424,6 +403,12 @@
     },
     "it-chapter": {
       "description": "我們協助義大利的開放街圖成長茁壯並改善它。"
+    },
+    "it-discourse": {
+      "description": "討論開放街圖在義大利事物的論壇"
+    },
+    "it-emilia-romagna-telegram": {
+      "description": "歡迎大家參與！你可以透過這個連結加入交流：{signupUrl}"
     },
     "ko-osm": {
       "description": "我們協助韓國的開放街圖成長茁壯並改善它。"
@@ -489,9 +474,6 @@
     },
     "osm-at": {
       "description": "開放街圖在奧地利交流資訊的平台"
-    },
-    "OSM-Central-Salish-Sea": {
-      "name": "開放街圖中薩利希海"
     },
     "OSM-Colorado": {
       "name": "開放街圖科羅拉多",

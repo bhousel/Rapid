@@ -58,7 +58,7 @@
             },
             "designated": {
               "description": "Toegang toegestaan volgens bebording of specifieke, plaatselijke verordeningen",
-              "title": "Zoals aangegeven"
+              "title": "Voor ontworpen en gemaakt"
             },
             "destination": {
               "description": "Toegang enkel toegestaan met een aanwijsbare bestemming",
@@ -211,6 +211,16 @@
           "label": "Airconditioning",
           "terms": "koelsysteem,koeling"
         },
+        "aircraft/type": {
+          "options": {
+            "airliner": "Passagiersvliegtuig",
+            "cargo": "Vrachtvliegtuig",
+            "fixed_wing": "Luchtvaartuig met vaste vleugels",
+            "glider": "Zweefvliegtuig",
+            "jet": "Straalvliegtuig",
+            "military": "Militair"
+          }
+        },
         "alt_name": {
           "label": "Alternatieve naam",
           "terms": "andere benaming"
@@ -262,7 +272,9 @@
             "painting": "Schilderij",
             "relief": "Reliëf",
             "sculpture": "Sculptuur",
-            "statue": "Standbeeld"
+            "statue": "Standbeeld",
+            "stone": "Artistiek bewerkte steen",
+            "tilework": "Tegelwerk"
           }
         },
         "ascent": {
@@ -389,8 +401,8 @@
         "bath/open_air": {
           "label": "Openlucht"
         },
-        "bath/sand_bath": {
-          "label": "Japans zandbad"
+        "bath/sand_bath-JP": {
+          "label": "Zandbad"
         },
         "bath/type": {
           "label": "Type",
@@ -611,6 +623,10 @@
         "button_operated": {
           "label": "Oproepknop"
         },
+        "cabins": {
+          "label": "Blokhutten",
+          "terms": "huisjes,hutten"
+        },
         "cables": {
           "label": "Electrokabels",
           "placeholder": "1, 2, 3 …"
@@ -723,6 +739,13 @@
         "circumference": {
           "label": "Omtrek (op borsthoogte)",
           "terms": "omtrek,borsthoogte"
+        },
+        "climbing/length": {
+          "label": "Lengte (meter)",
+          "terms": "lengte,meter"
+        },
+        "climbing/trad": {
+          "label": "Traditioneel klimmen"
         },
         "clothes": {
           "label": "Kleding",
@@ -1224,15 +1247,14 @@
           "terms": "kroondiameter,kruindiameter,kroondoorsnede,kruindoorsnede"
         },
         "diet_multi": {
-          "label": "Soorten diëten",
+          "label": "Dieetopties",
           "options": {
             "gluten_free": "Glutenvrij",
             "lactose_free": "Lactosevrij",
             "pescetarian": "Pescotarisch",
             "vegan": "Veganistisch",
             "vegetarian": "Vegetarisch"
-          },
-          "terms": "dieet types"
+          }
         },
         "diplomatic": {
           "label": "Diplomatietype",
@@ -1319,6 +1341,9 @@
           },
           "terms": "huisdier, hond"
         },
+        "dog_check": {
+          "label": "Geschikt voor honden"
+        },
         "door": {
           "label": "Deur"
         },
@@ -1350,6 +1375,18 @@
         "duration": {
           "label": "Tijdsduur",
           "terms": "duur"
+        },
+        "education": {
+          "options": {
+            "college": "Middelbaar beroepsonderwijs",
+            "dancing_school": "Dansschool",
+            "driving_school": "Rijschool",
+            "kindergarten": "Kleuterschool",
+            "language_school": "Taalschool",
+            "music_school": "Muziekschool",
+            "prep_school": "Bijlesinstituut",
+            "university": "Universiteit of hogeschool"
+          }
         },
         "ele": {
           "label": "Hoogte (meter)",
@@ -1857,6 +1894,7 @@
             "millstone": "Kilometerpaal",
             "mine": "Mijn",
             "mine_shaft": "Mijnschacht",
+            "monument": "Monumentaal groot gedenkteken",
             "pillory": "Historische schandpaal",
             "railway": "Spoorweg",
             "ruins": "Ruïne",
@@ -1913,7 +1951,35 @@
           "label": "Heet water"
         },
         "house": {
-          "label": "Soort huis"
+          "label": "Soort huis",
+          "options": {
+            "bungalow": {
+              "description": "Een klein huis met een enkele verdieping"
+            },
+            "detached": {
+              "description": "Een vrijstaand huis",
+              "title": "Vrijstaande woning"
+            },
+            "link-detached": {
+              "description": "Een huis dat verbonden aan een ander huis via een garage of ander niet-woongedeelte",
+              "title": "Geschakelde woning"
+            },
+            "maisonette": {
+              "description": "Een woonhuis van twee verdiepingen met een eigen externe ingang in plaats van een gemeenschappelijke ingang"
+            },
+            "semi-detached": {
+              "description": "Een huis dat aan één zijde is verbonden met een ander huis",
+              "title": "Twee-onder-een-kapwoning "
+            },
+            "terrace": {
+              "description": "Een rij huizen die in lijnverband aan elkaar verbonden zijn (bij voorkeur elk huis als een apart gebied in kaart brengen)",
+              "title": "Blok van rijtjeshuizen"
+            },
+            "terraced": {
+              "description": "Individueel huis in een blok rijtjeshuizen",
+              "title": "Rijtjeshuis"
+            }
+          }
         },
         "iata": {
           "label": "IATA-luchthavencode"
@@ -2164,6 +2230,9 @@
           "label": "Fabrikant",
           "terms": "fabrikant,maker,producent"
         },
+        "manufacturer/wikidata": {
+          "label": "Fabrikant Wikidata"
+        },
         "map_size": {
           "label": "Dekkingsgebied"
         },
@@ -2176,7 +2245,7 @@
           }
         },
         "mapillary": {
-          "label": "Mapillary-afbeeldingsID",
+          "label": "Mapillary-afbeeldings-ID",
           "terms": "mapillary foto id,mapillary nummer,mapillary foto nummer,mapillary afbeelding id,mapillary afbeelding nummer"
         },
         "marker": {
@@ -2592,7 +2661,7 @@
           "label": "Overlappingsbreedte"
         },
         "panoramax": {
-          "label": "Panoramax-afbeeldingsID",
+          "label": "Panoramax-afbeeldings-ID",
           "terms": "identificatie,nummer"
         },
         "par": {
@@ -2849,7 +2918,89 @@
           "label": "Energiebron"
         },
         "playground": {
-          "label": "Speelplaatstype"
+          "label": "Speelplaatstype",
+          "options": {
+            "activitypanel": "Activiteitenpaneel",
+            "aerialrotator": "Draaiplateau",
+            "archimedes_screw": "Schroef van Archimedes",
+            "baby_swing": "Babyschommel",
+            "balance": "Balanceertoestel (ongespecificeerd)",
+            "balancebeam": "Evenwichtsbalk",
+            "ball_pool": "Ballenbak",
+            "bannister_bars": "Glijstangen",
+            "basketrotator": "Manddraaimolentje",
+            "basketswing": "Mandschommel",
+            "belt_bridge": "Rubberen hangbrug",
+            "blackboard": "Schoolbord",
+            "bridge": "Brug",
+            "chute": "Tunnelglijbaan",
+            "climbing": "Klimtoestel (ongespecificeerd)",
+            "climbing_pole": "Klimpaal",
+            "climbing_slope": "Klimhelling",
+            "climbingframe": "Klimrek",
+            "climbingwall": "Klimmuur",
+            "cushion": "Springkussen",
+            "dome": "Koepelvormig klimrek",
+            "excavator": "Graafarm",
+            "exercise": "Fitnesstoestel",
+            "hammock": "Hangmat",
+            "hamster_wheel": "Hamsterrad",
+            "hopscotch": "Hinkelbaan",
+            "horizontal_bar": "Rekstok",
+            "map": "Kaart",
+            "marble_run": "Knikkerbaan",
+            "maze": "Doolhof",
+            "monkey_bars": "Apenrek",
+            "mound": "Kunstmatige heuvel",
+            "musical_instrument": "Muziekinstrument",
+            "parallel_bars": "Parallel bars (brug)",
+            "playhouse": "Speelhuisje",
+            "pump": "Pomp",
+            "ride_on": "Vast rijtoestel",
+            "rope_swing": "Touwschommel",
+            "rope_traverse": "Touwparcours",
+            "rotator": "Draaielement (ongespecificeerd)",
+            "roundabout": "Draaimolen",
+            "sand": "Zandtoestel (ongespecificeerd)",
+            "sand_pulley": "Zandtakel",
+            "sand_seesaw": "Zandwip",
+            "sand_wheel": "Zandrad",
+            "sandpit": "Zandbak",
+            "seat": "Zitje",
+            "seesaw": "Wip",
+            "sieve": "Zeef",
+            "sledding": "Sleeheuvel",
+            "slide": "Glijbaan",
+            "speaking_tube": "Fluisterbuis",
+            "spinner_bowl": "Draaikom",
+            "spinning_circle": "Draaicirkel",
+            "spinning_disc": "Draaischijf",
+            "splash_pad": "Waterspelplaats",
+            "spring_board": "Springplank",
+            "springy": "Veertoestel",
+            "stepping_post": "Stappaal",
+            "stepping_stone": "Stapstenen",
+            "steps": "Trap",
+            "structure": "Speeltuig",
+            "swing": "Schommel",
+            "table": "Tafel",
+            "teenshelter": "Hangplek voor jongeren",
+            "tire_swing": "Bandschommel",
+            "track": "Speelbaan",
+            "tunnel_tube": "Tunnelbuis",
+            "water": "Watertoestel (ongespecificeerd)",
+            "water_barrier": "Waterdam",
+            "water_basin": "Waterbassin",
+            "water_cannon": "Waterkanon",
+            "water_channel": "Waterkanaal",
+            "water_seesaw": "Waterwip",
+            "water_sprayer": "Watervernevelaar",
+            "water_stream": "Waterstroom",
+            "water_wheel": "Waterrad",
+            "wobble_bridge": "Wiebelbrug",
+            "youth_bench": "Jongerenbank",
+            "zipwire": "Tokkelbaan / Kabelbaan"
+          }
         },
         "playground/theme": {
           "label": "Thema",
@@ -2962,6 +3113,7 @@
             "clothes": "Kleding",
             "cooking_oil": "Bakolie",
             "engine_oil": "Motorolie",
+            "food_waste": "Voedselresten",
             "glass": "Glas (gehard glas, ruiten, spiegels, enz.)",
             "glass_bottles": "Glazen flessen en potten",
             "green_waste": "Groenafval",
@@ -3138,6 +3290,33 @@
           "label": "Kleur dak",
           "terms": "dak,kleur,leien,dakpannen,pannen,plat dak"
         },
+        "roof/height": {
+          "label": "Dakhoogte (meters)"
+        },
+        "roof/shape": {
+          "label": "Dakvorm",
+          "options": {
+            "butterfly": "Vlinderdak",
+            "cone": "Kegeldak",
+            "crosspitched": "Kruisdak",
+            "dome": "Koepel",
+            "flat": "Plat dak",
+            "gabled": "Zadeldak",
+            "gabled_height_moved": "Zadeldak met verhoogde nok",
+            "gambrel": "Mansardedak",
+            "half-hipped": "Half schilddak",
+            "hipped": " Schilddak",
+            "hipped-and-gabled": "Schilddak met puntgevels",
+            "mansard": "Mansardedak",
+            "onion": "Uidak",
+            "pyramidal": "Tentdak",
+            "round": "Rond dak",
+            "sawtooth": "Sheddak",
+            "side_half-hipped": "Zadeldak met halve zijheupen",
+            "side_hipped": "zadeldak met zijheupen",
+            "skillion": "Lessenaarsdak"
+          }
+        },
         "rooms": {
           "label": "Aantal kamers"
         },
@@ -3312,6 +3491,13 @@
           "label": "Fietser-voetganger scheiding",
           "terms": "scheiding,afgescheiden"
         },
+        "self_checkout": {
+          "options": {
+            "no": "Geen",
+            "only": "Enkel",
+            "yes": "Aanwezig"
+          }
+        },
         "self_service": {
           "label": "Zelfbediening"
         },
@@ -3450,8 +3636,7 @@
             "osm notes": "Kaartopmerkingen van OpenStreetMap",
             "streetlevel imagery": "Foto's op straatniveau",
             "survey": "Ter plaatse bekeken"
-          },
-          "terms": "bronnen,referentie,opzoeking"
+          }
         },
         "source/population": {
           "label": "Bron van bevolkingsaantal"
@@ -3572,6 +3757,13 @@
           },
           "placeholder": "Onbekend",
           "terms": "structuur,vorm"
+        },
+        "structure_canal": {
+          "label": "Constructie",
+          "options": {
+            "bridge": "Brug"
+          },
+          "placeholder": "Onbekend"
         },
         "structure_power": {
           "label": "Constructie",
@@ -4065,7 +4257,7 @@
             "eggs": "Eieren",
             "electronics": "Elektronica",
             "elongated_coin": "Sourvenirmunten",
-            "excrement_bags": "Strontzakjes",
+            "excrement_bags": "Poepzakjes",
             "feminine_hygiene": "Menstruatieproducten",
             "food": "Voedsel",
             "fuel": "Brandstof",
@@ -4145,6 +4337,7 @@
         "water_source": {
           "label": "Waterbron",
           "options": {
+            "groundwater": "Grondwater",
             "main": "Waterdistributieleiding",
             "pond": "Vijver",
             "river": "Rivier",
@@ -4469,6 +4662,9 @@
           "name": "Koffiehuis",
           "terms": "koffie,bistro"
         },
+        "amenity/cafe/teahouse": {
+          "name": "Theehuisje"
+        },
         "amenity/car_pooling": {
           "name": "Carpoolparking",
           "terms": "autodelen,carpoolen,"
@@ -4523,10 +4719,6 @@
         "amenity/clock/sundial": {
           "name": "Zonnewijzer",
           "terms": "zonnewijzer,zonnetijd"
-        },
-        "amenity/college": {
-          "name": "Campus van beroepsschool",
-          "terms": "bso,buo,buso,vmbo,speciaal onderwijs,bijzonder onderwijs,onderwijs,middelbaar,secundair onderwijs"
         },
         "amenity/community_centre": {
           "name": "Buurthuis",
@@ -4585,6 +4777,9 @@
         "amenity/dentist": {
           "name": "Tandarts",
           "terms": "tandheelkundige,mond,tanden"
+        },
+        "amenity/device_charging_station": {
+          "name": "Apparaatoplader"
         },
         "amenity/dive_centre": {
           "name": "Duikcentrum",
@@ -4724,10 +4919,6 @@
         "amenity/driver_training": {
           "name": "Rijvaardigheidscentrum",
           "terms": "slipcursus,rijles,trainingscentrum,rijtraining"
-        },
-        "amenity/driving_school": {
-          "name": "Rijschool",
-          "terms": "autorijschool,autoschool,rijlessen,rijinstructeur"
         },
         "amenity/embassy": {
           "name": "Ambassade"
@@ -4870,16 +5061,9 @@
           "name": "Karaokehokje",
           "terms": "karaoke"
         },
-        "amenity/kindergarten": {
-          "name": "Gebied van Crèche/Kleuterschool"
-        },
         "amenity/kneipp_water_cure": {
           "name": "Kneipp-faciliteit",
           "terms": "Kneipp,voetbad,hydrotherapie"
-        },
-        "amenity/language_school": {
-          "name": "Taalschool",
-          "terms": "taal,vertalen,school"
         },
         "amenity/lavoir": {
           "name": "Openbare wasplaats",
@@ -4935,10 +5119,6 @@
         "amenity/motorcycle_rental": {
           "name": "Motorfietsverhuur",
           "terms": "motorfiets,moto,verhuur,verhuurder"
-        },
-        "amenity/music_school": {
-          "name": "Muziekschool",
-          "terms": "muziekacademie,conservatorium"
         },
         "amenity/nightclub": {
           "name": "Nachtclub",
@@ -5071,10 +5251,6 @@
         "amenity/post_office": {
           "name": "Postkantoor",
           "terms": "postbus,brievenbus,bpost,posterijen,postnl"
-        },
-        "amenity/prep_school": {
-          "name": "Studiebegeleiding",
-          "terms": "voorbereidingsschool,huiswerk,begeleiding"
         },
         "amenity/prison": {
           "name": "Gevangenisgebied",
@@ -5234,10 +5410,6 @@
           "name": "Kampeerauto-toilet-afvoer",
           "terms": "kampeerauto,beerput,camper,kampeerwagen,mobilhome,zwerfwagen,motorhome,uitwerpselen,urine,toilet"
         },
-        "amenity/school": {
-          "name": "Schoolgebied",
-          "terms": "school,onderwijs,secundair onderwijs,lager onderwijs,basisschool,middelbaar,voortgezet onderwijs"
-        },
         "amenity/shelter": {
           "name": "Beschutting",
           "terms": "afdak,schuilplaats,bescherming,beschutting,wachthuisje,wachthokje,bushokje,buskotje"
@@ -5392,10 +5564,6 @@
           "name": "Winkelwagenstalling",
           "terms": "opstelplaats,winkelwagen,karretjes,winkelkar,overkapping,terugbrengen"
         },
-        "amenity/university": {
-          "name": "Campus van universiteit of hogeschool",
-          "terms": "universiteit,hogeschool,onderwijs,hoger onderwijs"
-        },
         "amenity/vacuum_cleaner": {
           "name": "Stofzuiger",
           "terms": "stofzuiger,zuiging,autoschoonmaak"
@@ -5449,7 +5617,7 @@
           "terms": "muntautomaat,iconische munt,muntvervormer"
         },
         "amenity/vending_machine/excrement_bags": {
-          "name": "Strontzakjesautomaat",
+          "name": "Poepzakjesautomaat",
           "terms": "hondenstrontzakjesautomaat"
         },
         "amenity/vending_machine/feminine_hygiene": {
@@ -5503,6 +5671,9 @@
         "amenity/veterinary": {
           "name": "Dierenarts",
           "terms": "veearts,dierendokter"
+        },
+        "amenity/veterinary_pharmacy": {
+          "name": "Dierenapotheek"
         },
         "amenity/waste/dog_excrement": {
           "name": "Afvalbak voor hondenpoep",
@@ -5607,7 +5778,8 @@
           "terms": "roetsjbaan,rollercoaster"
         },
         "attraction/summer_toboggan": {
-          "name": "Zomerrodelbaan"
+          "name": "Zomerrodelbaan",
+          "terms": "rodelbaan"
         },
         "attraction/swing_carousel": {
           "name": "Zweefmolen",
@@ -6303,6 +6475,33 @@
         "disused/shop": {
           "name": "Ongebruikte winkel"
         },
+        "education/dancing_school": {
+          "name": "Dansschool"
+        },
+        "education/driving_school": {
+          "name": "Rijschool"
+        },
+        "education/kindergarten": {
+          "name": "Kleuterschool"
+        },
+        "education/language_school": {
+          "name": "Taalschool"
+        },
+        "education/music_school": {
+          "name": "Muziekschool"
+        },
+        "education/prep_school": {
+          "name": "Bijlesinstituut"
+        },
+        "education/school": {
+          "name": "Schoolgebied"
+        },
+        "education/university": {
+          "name": "Gebied van universiteit of hogeschool"
+        },
+        "education/yes": {
+          "name": "Educatieve instelling (ongespecificeerd)"
+        },
         "embankment": {
           "name": "Dijk"
         },
@@ -6319,12 +6518,6 @@
         },
         "emergency/defibrillator": {
           "terms": "AED,hartritme,groene doos,externe defibrillator,schok,elektrische schok,reanimeren"
-        },
-        "emergency/designated": {
-          "name": "Toegang voor hulpdiensten: geadviseerd"
-        },
-        "emergency/destination": {
-          "name": "Toegang voor hulpdiensten: bestemmingsverkeer"
         },
         "emergency/disaster_response": {
           "name": "Kazerne van noodhulpeenheden",
@@ -6379,18 +6572,9 @@
           "name": "Bergredding",
           "terms": "reddingsdienst,redding,bergredders"
         },
-        "emergency/no": {
-          "name": "Toegang voor hulpdiensten: nee"
-        },
-        "emergency/official": {
-          "name": "Toegang voor hulpdiensten: officiële voorkeursweg"
-        },
         "emergency/phone": {
           "name": "Praatpaal",
           "terms": "noodtelefoon"
-        },
-        "emergency/private": {
-          "name": "Toegang voor hulpdiensten: privé"
         },
         "emergency/siren": {
           "name": "Sirene",
@@ -6407,9 +6591,6 @@
         "emergency/water_tank": {
           "name": "Noodwatertank",
           "terms": "watertank,wateropslag,noodwateropslag,reservoir,noodreservoir,brandweerreservoir,brandweertank"
-        },
-        "emergency/yes": {
-          "name": "Toegang voor hulpdiensten: ja"
         },
         "entrance": {
           "name": "Ingang/Uitgang",
@@ -6601,6 +6782,9 @@
         "highway/crossing": {
           "name": "Oversteekplaats",
           "terms": "kruispunt,oversteken"
+        },
+        "highway/crossing/informal": {
+          "name": "Informele oversteekplaats"
         },
         "highway/crossing/traffic_signals": {
           "name": "Oversteekplaats met voetgangersverkeerslichten",
@@ -6922,6 +7106,9 @@
           "name": "Geschiedskundige plaats",
           "terms": "historische site,geschiedkundige site,historische plaats"
         },
+        "historic/aircraft": {
+          "name": "Historisch luchtvaartuig"
+        },
         "historic/archaeological_site": {
           "name": "Archeologische opgraving",
           "terms": "archeologische site,archeologische plaats"
@@ -6966,18 +7153,23 @@
           "terms": "herenhuis,deftig,royaal,statig,woonhuis,villa,woning,havezate"
         },
         "historic/memorial": {
-          "name": "Herdenkingsmonument",
-          "terms": "gedenkteken"
+          "name": "Gedenkteken",
+          "terms": "gedenkteken, herdenkingsmonument, gedenkplaats"
+        },
+        "historic/memorial/blue_plaque-GB-IE": {
+          "name": "Blue plaque"
         },
         "historic/memorial/plaque": {
           "name": "Gedenkplaat",
           "terms": "herinnering,herdenking,plakkaat,bord,nagedachtenis"
         },
         "historic/memorial/stolperstein-EU": {
-          "name": "Stolpersteine"
+          "name": "Stolpersteine",
+          "terms": "struikelsteen"
         },
         "historic/monument": {
-          "terms": "gedenkplaats"
+          "name": "Monumentaal groot gedenkteken",
+          "terms": "gedenkteken, herdenkingsmonument, gedenkplaats"
         },
         "historic/pillory": {
           "name": "Historische schandpaal",
@@ -7269,10 +7461,6 @@
         "leisure/dance": {
           "name": "Danszaal",
           "terms": "ballroom,jive,swing,tango,wals"
-        },
-        "leisure/dancing_school": {
-          "name": "Dansschool",
-          "terms": "dansonderwijs,dansconservatorium,conservatorium"
         },
         "leisure/disc_golf_course": {
           "name": "Discgolfparcours",
@@ -7947,9 +8135,6 @@
         },
         "man_made/telescope/radio": {
           "name": "Radiotelescoop"
-        },
-        "man_made/torii": {
-          "terms": "Japanse poort,vogelzitstok,Shintō schrijn"
         },
         "man_made/tower": {
           "name": "Toren"
@@ -9184,6 +9369,9 @@
           "name": "Badkamermeubelwinkel",
           "terms": "sanitairwinkel"
         },
+        "shop/bbq": {
+          "name": "BBQ Winkel"
+        },
         "shop/beauty": {
           "name": "Schoonheidssalon",
           "terms": "schoonheidswinkel,schoonheidsspeciaalzaak"
@@ -10247,6 +10435,9 @@
         },
         "type/site": {
           "terms": "terrein"
+        },
+        "type/site/climbing/area": {
+          "name": "Klimgebied"
         },
         "type/waterway": {
           "name": "Waterloop",

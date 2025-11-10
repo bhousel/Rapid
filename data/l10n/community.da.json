@@ -4,6 +4,10 @@
       "openstreetmapdenmark": "OpenStreetMap Danmark"
     },
     "_defaults": {
+      "bluesky": {
+        "name": "{community} på Bluesky",
+        "description": "Følg os på Bluesky"
+      },
       "discord": {
         "description": "Kom i kontakt med andre kortlæggere på Discord"
       },
@@ -15,16 +19,18 @@
         "description": "Den officielle mailingliste for {community}"
       },
       "mastodon": {
+        "name": "{community} på Mastodon",
         "description": "Den officielle Mastodon-konto for {community}"
       },
       "threads": {
         "description": "Følg os på Threads"
       },
       "twitter": {
-        "description": "Følg os på 𝕏"
+        "description": "Følg os på X"
       },
       "x": {
-        "description": "Følg os på 𝕏"
+        "name": "{community} på X",
+        "description": "Følg os på X"
       }
     },
     "Bay-Area-OpenStreetMappers": {
@@ -41,6 +47,12 @@
     },
     "cape-coast-youthmappers": {
       "description": "Følg os på Twitter på {url}"
+    },
+    "co-mastodon": {
+      "name": "Indlæg fra {community} på Mastodon"
+    },
+    "co-talk": {
+      "name": "{community} mailing-liste"
     },
     "de-berlin-mailinglist": {
       "name": "Berlin maillingliste"
@@ -110,7 +122,8 @@
       "description": "Alle er velkomne! Tilmeld dig på {signupUrl}"
     },
     "uk-london-mastodon": {
-      "name": "OpenStreetMap London på Mastodon"
+      "name": "OpenStreetMap London på Mastodon",
+      "description": "OpenStreetMap London på Mastodon: {url}"
     }
   }
 }

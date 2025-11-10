@@ -1,8 +1,24 @@
 {
   "no": {
     "imagery": {
+      "Bedzin-PL-buildings": {
+        "name": "Będzin: Bygninger"
+      },
       "Bing": {
-        "description": "Flyfoto og satellitt-ortofoto."
+        "description": "Flyfoto og satellitt-ortofoto.",
+        "name": "Bing Luftfoto "
+      },
+      "Bytom-buildings": {
+        "name": "Bytom: Bygninger"
+      },
+      "DV_OrthoPhoto": {
+        "name": "Digitaal Vlaanderen nyeste luftbilder"
+      },
+      "DV_OrthoPhoto_20132015_10cm": {
+        "name": "Digitaal Vlaanderen 2013-2015 luftbilder 10cm"
+      },
+      "EOXAT2017CLOUDLESS": {
+        "description": "Etterbehandlet Sentinel Satellite ortofoto."
       },
       "EOXAT2018CLOUDLESS": {
         "attribution": {
@@ -21,6 +37,12 @@
         "description": "Etterbehandlet Sentinel Satellite ortofoto."
       },
       "EOXAT2022CLOUDLESS": {
+        "description": "Etterbehandlet Sentinel Satellite ortofoto."
+      },
+      "EOXAT2023CLOUDLESS": {
+        "description": "Etterbehandlet Sentinel Satellite ortofoto."
+      },
+      "EOXAT2024CLOUDLESS": {
         "description": "Etterbehandlet Sentinel Satellite ortofoto."
       },
       "EsriWorldImagery": {
@@ -355,6 +377,17 @@
         },
         "name": "OpenStreetMap (Tysk Stil)"
       },
+      "przemysl-aerial": {
+        "attribution": {
+          "text": "Przemyśl by"
+        }
+      },
+      "przemysl-buildings": {
+        "attribution": {
+          "text": "Przemyśl by"
+        },
+        "name": "Przemyśl: Bygninger"
+      },
       "qa_no_address": {
         "attribution": {
           "text": "Simon Poole, Data ©OpenStreetMap bidragsytere"
@@ -366,9 +399,16 @@
           "text": "© Fliser: skobbler Kart data: OpenStreetMap bidragsytere"
         }
       },
+      "skolverket-schools": {
+        "description": "Svenske skoler.",
+        "name": "Skolverket - Skoler"
+      },
       "skoterleder": {
         "description": "Snøscooterløyper",
         "name": "Snøscooterkart Sverige"
+      },
+      "stalowowolski-buildings": {
+        "name": "Powiat stalowowolski: Bygninger"
       },
       "stamen-terrain-background": {
         "attribution": {
@@ -379,7 +419,15 @@
       "stockholm-orto": {
         "attribution": {
           "text": "© Stockholm kommune, CC0"
-        }
+        },
+        "description": "Ortofotoer fra Stockholm kommune 2018, CC0-lisens"
+      },
+      "susono_shizuoka_jp_orthophoto": {
+        "attribution": {
+          "text": "Susono by orthofoto"
+        },
+        "description": "Flyfoto utgitt av Susono by som åpne data.",
+        "name": "Susono by orthofoto"
       },
       "tf-cycle": {
         "attribution": {

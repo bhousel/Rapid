@@ -18,20 +18,22 @@
       "undo_redo": "撤销 / 重做",
       "recent": "最近",
       "favorites": "收藏",
-      "add_feature": "添加要素"
+      "add_feature": "添加要素",
+      "rapid_features": "辅助"
     },
     "title": {
       "labeled_and_more": "{labeled}及另外{count}个"
     },
     "modes": {
       "add_area": {
-        "title": "区域"
+        "title": "区域",
+        "description": "新增建筑、公园、湖泊、或其他区域到地图上。"
       },
       "add_line": {
-        "title": "綫"
+        "description": "新增道路、人行通道、溪流，或其他线条到地图上。"
       },
       "add_point": {
-        "title": "點"
+        "description": "新增商家、垃圾桶、邮箱，或是其他节点到地图上。"
       },
       "add_note": {
         "title": "注记",
@@ -41,7 +43,6 @@
         "title": "添加 {feature}"
       },
       "browse": {
-        "title": "周圍睇",
         "description": "移动和缩放地图。"
       },
       "drag_node": {
@@ -96,9 +97,15 @@
       },
       "circularize": {
         "title": "环形化",
+        "description": "让这些特征环状化。",
         "annotation": {
           "feature": "环状化 {n} 个要素。"
-        }
+        },
+        "multiple_blockers": "因为多种原因这些特征无法环形化。",
+        "not_closed": "这些特征无法环形化，因为它们不是封闭的。",
+        "too_large": "无法将它们排列成环状，因为当前可见的部分不足。",
+        "connected_to_hidden": "无法将它们排列成环状，因为该特征连接到了其他隐藏的特征。",
+        "not_downloaded": "无法将它们排列成环状，因为这些要素有一部分未被下载"
       },
       "orthogonalize": {
         "title": "直角化",

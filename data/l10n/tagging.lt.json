@@ -180,6 +180,12 @@
         "agrarian": {
           "label": "Produktai"
         },
+        "aircraft/type": {
+          "label": "Tipas",
+          "options": {
+            "military": "Karinis"
+          }
+        },
         "amenity": {
           "label": "Tipas"
         },
@@ -272,9 +278,6 @@
         },
         "bath/open_air": {
           "label": "Atvira Erdvė"
-        },
-        "bath/sand_bath": {
-          "label": "Smėlio vonia"
         },
         "bath/type": {
           "label": "Ypatybė",
@@ -421,6 +424,9 @@
         },
         "castle_type": {
           "label": "Tipas"
+        },
+        "climbing/length": {
+          "label": "Ilgis (metrais)"
         },
         "clothes": {
           "label": "Drabužiai"
@@ -1522,6 +1528,11 @@
         "roller_coaster/track": {
           "label": "Tipas"
         },
+        "roof/shape": {
+          "options": {
+            "dome": "Kupolas"
+          }
+        },
         "room": {
           "label": "Tipas"
         },
@@ -1771,6 +1782,14 @@
             "bridge": "Tiltas",
             "embankment": "Pylimas",
             "ford": "Brasta",
+            "tunnel": "Tunelis"
+          },
+          "placeholder": "Nežinoma"
+        },
+        "structure_canal": {
+          "label": "Struktūra",
+          "options": {
+            "bridge": "Tiltas",
             "tunnel": "Tunelis"
           },
           "placeholder": "Nežinoma"
@@ -2198,9 +2217,6 @@
           "name": "Laikrodis",
           "terms": "Laikrodis"
         },
-        "amenity/college": {
-          "name": "Kolegijos kiemas"
-        },
         "amenity/community_centre": {
           "name": "Bendruomenės centras",
           "terms": "Bendruomenės centras"
@@ -2227,9 +2243,6 @@
         "amenity/drinking_water": {
           "name": "Geriamas vanduo",
           "terms": "Vanduo,Geriamas vanduo"
-        },
-        "amenity/driving_school": {
-          "name": "Vairavimo mokykla"
         },
         "amenity/embassy": {
           "name": "Ambasada"
@@ -2270,9 +2283,6 @@
         "amenity/internet_cafe": {
           "name": "Interneto kavinė"
         },
-        "amenity/language_school": {
-          "name": "Kalbų mokykla"
-        },
         "amenity/library": {
           "name": "Biblioteka",
           "terms": "biblioteka,skaitykla"
@@ -2284,9 +2294,6 @@
         "amenity/motorcycle_parking": {
           "name": "Motociklų stovėjimo aikštelė",
           "terms": "Motociklų stovėjimo aikštelė"
-        },
-        "amenity/music_school": {
-          "name": "Muzikos mokykla"
         },
         "amenity/nightclub": {
           "name": "Naktinis klubas",
@@ -2346,9 +2353,6 @@
           "name": "Restoranas",
           "terms": "rastoranas"
         },
-        "amenity/school": {
-          "name": "Mokyklos kiemas"
-        },
         "amenity/shelter": {
           "name": "Pastogė",
           "terms": "pastogė"
@@ -2386,10 +2390,6 @@
         "amenity/townhall": {
           "name": "Rotušė",
           "terms": "rotušė"
-        },
-        "amenity/university": {
-          "name": "Universiteto kiemas",
-          "terms": "universiteto teritorija"
         },
         "amenity/vending_machine": {
           "name": "Prekybos automatas"
@@ -3066,9 +3066,6 @@
         },
         "leisure/dance": {
           "name": "Šokių salė"
-        },
-        "leisure/dancing_school": {
-          "name": "Šokių mokykla"
         },
         "leisure/dog_park": {
           "name": "Šunų parkas",

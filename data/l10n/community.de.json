@@ -16,6 +16,7 @@
       "openstreetmapbolivia": "OpenStreetMap Bolivien",
       "openstreetmapbosniaandherzegovina": "OpenStreetMap Bosnien und Herzegowina",
       "openstreetmapbrasil": "OpenStreetMap Brasilien",
+      "openstreetmapbrasilminasgerais": "OpenStreetMap Brasilien Minas Gerais",
       "openstreetmapbulgaria": "OpenStreetMap Bulgarien",
       "openstreetmapcambodia": "OpenStreetMap Kambodscha",
       "openstreetmapcameroon": "OpenStreetMap Kamerun",
@@ -54,14 +55,11 @@
       "openstreetmapitalylazio": "OpenStreetMap Italien-Lazio",
       "openstreetmapitalylombardia": "OpenStreetMap Italien-Lombardei",
       "openstreetmapitalypiemonte": "OpenStreetMap Italien-Piemont",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Italien-Südtirol",
       "openstreetmapitalytrentino": "OpenStreetMap Italien-Trentino",
       "openstreetmapkazakhstan": "OpenStreetMap Kasachstan",
       "openstreetmapkenya": "OpenStreetMap Kenia",
-      "openstreetmapkyrgyzstan": "OpenStreetMap Kirgisistan",
       "openstreetmaplatinamerica": "OpenStreetMap Lateinamerika",
       "openstreetmaplatvia": "OpenStreetMap Litauen",
-      "openstreetmaplebanon": "OpenStreetMap Libanon",
       "openstreetmaplibya": "OpenStreetMap Libyen",
       "openstreetmaplithuania": "OpenStreetMap Litauen",
       "openstreetmapljubljana": "OpenStreetMap Laibach",
@@ -84,14 +82,12 @@
       "openstreetmaprwanda": "OpenStreetMap Ruanda",
       "openstreetmapsaudiarabia": "OpenStreetMap Saudi Arabien",
       "openstreetmapserbia": "OpenStreetMap Serbien",
-      "openstreetmapseychelles": "OpenStreetMap Seychellen",
       "openstreetmapsingapore": "OpenStreetMap Singapur",
       "openstreetmapslovenia": "OpenStreetMap Slowenien",
       "openstreetmapsouthafrica": "OpenStreetMap Südafrika",
       "openstreetmapsouthsudan": "OpenStreetMap Südsudan",
       "openstreetmapsweden": "OpenStreetMap Schweden",
       "openstreetmapswitzerland": "OpenStreetMap Schweiz",
-      "openstreetmapsyria": "OpenStreetMap Syrien",
       "openstreetmaptunisia": "OpenStreetMap Tunesien",
       "openstreetmapturkey": "OpenStreetMap Türkei",
       "openstreetmapus": "OpenStreetMap USA",
@@ -101,6 +97,7 @@
       "openstreetmapwesternsahara": "OpenStreetMap Westsahara",
       "openstreetmapzambia": "OpenStreetMap Sambia",
       "osmcolombia": "OSM Kolumbien",
+      "osmewikiemiliaromagna": "OSM und Wiki Emilia-Romagna",
       "swissopenstreetmap": "OpenStreetMap Schweiz"
     },
     "_defaults": {
@@ -169,15 +166,15 @@
         "description": "Folge uns auf TikTok"
       },
       "twitter": {
-        "name": "{community} auf 𝕏",
-        "description": "Folge uns auf 𝕏"
+        "name": "{community} auf X",
+        "description": "Folge uns auf X"
       },
       "x": {
-        "name": "{community} auf 𝕏",
-        "description": "Folge uns auf 𝕏"
+        "name": "{community} auf X",
+        "description": "Folge uns auf X"
       },
       "xmpp": {
-        "description": "{url}Nimm an unserem XMPP-Community-Chat teil:"
+        "description": "Nimm an unserem XMPP-Community-Chat teil: {url}"
       },
       "youtube": {
         "name": "{community} auf YouTube",
@@ -219,9 +216,6 @@
     },
     "be-discourse": {
       "description": "Ein Forum um OpenStreetMap in Belgien zu diskutieren"
-    },
-    "be-irc": {
-      "extendedDescription": "Tritt #{account} auf irc.oftc.net (port 6667) bei, er ist mit dem Matrix-Chat-Kanal gespiegelt"
     },
     "be-matrix": {
       "description": "Alle Mapper sind willkommen!",
@@ -515,9 +509,6 @@
     "hu-matrix": {
       "extendedDescription": "OpenStreetMap chat über Kartenthemen. Eines der Foren zur Unterstützung der OSM Gemeinschaft."
     },
-    "hu-meetup": {
-      "description": "Die Plattform um Treffen in Ungarn zu organisieren"
-    },
     "hu-mobilizon": {
       "name": "{community} auf Mobilizon",
       "description": "Kommende Veranstaltungen für die OpenStreetMap Gemeinschaft in Ungarn"
@@ -526,10 +517,13 @@
       "description": "Erkunde aktive Kartierungsaufgaben in Ungarn"
     },
     "hu-website": {
-      "description": "Wir helfen OpenStreetMap in Ungarn beim Wachsen und Verbessern."
+      "description": "Die Webseite der ungarischen OpenStreetMap-Gemeinschaft"
     },
     "hu-wiki": {
       "description": "{community} Wiki Seite"
+    },
+    "hu-youtube": {
+      "description": "OpenStreetMap Ungarn meetup Live Streams und Aufzeichnungen"
     },
     "humanitarian-osm-tr-slack": {
       "name": "Humanitarian OpenStreetMap Türkei Slack",
@@ -559,7 +553,10 @@
       "description": "Wir helfen OpenStreetMap in Italien beim besser und größer werden."
     },
     "it-discourse": {
-      "description": "Das italienische Forum, in dem Sie über OpenStreetMap diskutieren können"
+      "description": "Ein Forum zur Diskussion über OpenStreetMap in Italien"
+    },
+    "it-emilia-romagna-telegram": {
+      "description": "Jeder ist willkommen! Über diesen Link kannst du dem Chat beitreten: {signupUrl}"
     },
     "ivides_website": {
       "description": "Wir konzentrieren uns auf nachhaltige Entwicklung, Kartierung und Unterstützung der OpenStreetMap-Community."
@@ -644,7 +641,7 @@
       "description": "Hilf dabei niedrigenergierouten in der Waterloo Region leicht auffindbar zu machen."
     },
     "MapRVA": {
-      "description": "MapRVA Treffen"
+      "description": "MapRVA ist eine Gruppe von Mapping-Enthusiasten in Richmond, Virginia, die daran arbeiten, mit OpenStreetMap Geodaten unserer Stadt zu erstellen und zu teilen."
     },
     "maptime-bogota-facebook": {
       "description": "Wir sind eine Gruppe interessierter Menschen, die Bogotá und seine Umgebung in OpenStreetMap kartieren wollen.",
@@ -696,6 +693,9 @@
     },
     "me-telegram": {
       "description": "Alle sind willkommen! Anmeldung unter {signupUrl}"
+    },
+    "minas_gerais-discord": {
+      "extendedDescription": "Willkommen im OSM Minas Gerais Discord! Wir sind eine Gemeinschaft von Mappern, die leidenschaftlich gerne detaillierte Open-Source-Karten für Minas Gerais, Brasilien, erstellen. Tritt uns bei, um zusammenzuarbeiten, Tipps auszutauschen und zu helfen, die Karten von MG zu den besten auf OpenStreetMap zu machen. Egal ob du ein Neuling oder ein Profi bist, lass uns gemeinsam kartieren!"
     },
     "mm-facebook": {
       "extendedDescription": "Mappen in Maynmar? Hast du Fragen, willst du dich mit der Community hier verbinden? Tritt bei {url} bei. Alle sind willkommen!"
@@ -770,10 +770,6 @@
     "OSM-AR-wiki": {
       "description": "Alles was du über Mappen in Argentinien wissen musst."
     },
-    "osm-asia-facebook": {
-      "description": "OpenStreetMap Asien Facebook-Gruppe",
-      "extendedDescription": "Eine Gruppe für integrierte Mapping-Unterstützung für Asien. Wir wollen vor allem ein Ort sein, an dem Kartographen ohne lokale Gemeinschaft Informationen austauschen und gemeinsam an der Lösung von Problemen in ihren Gebieten arbeiten können, die sie sonst aufgrund des Fehlens einer lokalen Gemeinschaft nicht angehen könnten."
-    },
     "osm-at": {
       "description": "Die Plattform für Information über OpenStreetMap in Österreich"
     },
@@ -785,10 +781,6 @@
     },
     "osm-benin-facebook": {
       "description": "Verbesere OpenStreetMap in Benin"
-    },
-    "OSM-Central-Salish-Sea": {
-      "description": "Mapper und OpenStreetMap Benutzer und um Mount Vernon, USA",
-      "extendedDescription": "OpenStreetMap ist eine Weltkarte gemacht von Menschen wie dir. Es ist eine Karte, zu der du beiträgst und die frei zugänglich ist wie Wikipedia. Besuche osm.org für mehr Information. Wir treffen uns immer wieder, um über Karten zu reden, zu mappen und Spaß zu haben!"
     },
     "osm-ch": {
       "description": "Die Plattform für Informationen über OpenStreetMap in der Schweiz"
@@ -951,6 +943,13 @@
       "description": "FSHM Puducherry Mailing Liste um Mappen in Puducherry und anderes zu diskutieren.",
       "extendedDescription": "FSHM organisiert Treffen über Freie Software/Hardware, Technologie und Aktivismus für OpenStreetMap."
     },
+    "osm-punjab-matrix": {
+      "description": "Wir kartieren Punjab gemeinsam. Treten Sie unserer Matrix-Gruppe bei",
+      "extendedDescription": "Inoffizieller Chat-Raum für OSM Punjab, auch mit der OSMPunjab Telegram-Gruppe verbunden"
+    },
+    "osm-punjab-telegram": {
+      "description": "Wir kartieren Punjab gemeinsam. Treten Sie unserer Telegram-Gruppe bei. {url}"
+    },
     "OSM-Rome-meetup": {
       "name": "Einführung für Mapper in Rom",
       "description": "Verbessere in Rom und Umgebung",
@@ -1069,13 +1068,6 @@
     "talk-mg": {
       "description": "Ort für OpenStreetMap-Mitwirkende, Communitys und Benutzer in Madagaskar um sich auszutauschen und zu diskutieren."
     },
-    "talk-nz": {
-      "description": "Neuseeland OSM Gemeinschafts-atalk"
-    },
-    "talk-pacific": {
-      "description": "Die regionale OSM-Mailingliste für und von den Menschen in Moana/Ozeanien/Pazifik",
-      "extendedDescription": "Wir möchten, dass diese Mailingliste alle Menschen des Pazifiks in all ihrer Vielfalt und ihren Bestrebungen unterstützt, um Gedanken, Fragen, Projekte und alles, was mit OpenStreetMap in unserem Meer von Inseln zu tun hat, auszutauschen."
-    },
     "tn-facebook-group": {
       "name": "{community} Facebook Gruppe"
     },
@@ -1109,9 +1101,6 @@
     "uk-london-wiki": {
       "description": "{community} Wiki Seite"
     },
-    "uk-loomio": {
-      "name": "OpenStreetMap UK auf Loomio"
-    },
     "us-discourse": {
       "description": "Ein Diskussionsforum über OpenStreetMap in den Vereinigten Staaten"
     },
@@ -1119,16 +1108,9 @@
       "name": "Talk-us-massachusetts Mailing Liste",
       "description": "Email Liste für die OSM Gemeinschaft in Massachusetts"
     },
-    "us-newyork-mailinglist": {
-      "name": "Talk-us-newyork Mailing Liste",
-      "description": "Email Liste für die OSM Gemeinschaft im Staat New York"
-    },
     "uy-irc": {
       "description": "Tritt #{account} auf irc.frreenode.org (port 6667) bei",
       "extendedDescription": "Tritt #{account} auf irc.frreenode.org bei"
-    },
-    "vn-mailinglist": {
-      "description": "Mailing Liste über OpenStreetMap in Vietnam oder in Vietnamesisch"
     },
     "vn-wiki": {
       "description": "{community} Wiki Seite"
@@ -1187,10 +1169,6 @@
     "ym-Clemson-University": {
       "description": "YouthMappers Ortsgruppe der Clemson University",
       "extendedDescription": "Die Studenten in Clemson werden vom Center for Geospatial Technologies unterstützt, einer Gemeinschaft von interdisziplinären Geowissenschaftlern, die Forschung, Lehre und Outreach-Aktivitäten mit Technologien unterstützen, die die Sammlung, Analyse und Anwendung von Geodaten ermöglichen. Die Studenten integrieren Geospatial-Technologien in ihre wissenschaftlichen Aktivitäten über alle Disziplinen hinweg und bauen Verbindungen in der ganzen Welt auf."
-    },
-    "ym-College-of-William-and-Mary": {
-      "description": "YouthMappers Ortsgruppe des College of William and Mary",
-      "extendedDescription": "Die Studenten, die überall auf der Karte sind, werden vom Center for Geospatial Analysis unterstützt, einer Gruppe, die GIS in den Lehrplan integriert und Studenten und Dozenten mit Hardware, Software und Know-how versorgt. Studenten aller Fachrichtungen nutzen GIS auf dem gesamten Campus, einschließlich Umweltwissenschaft und -politik, Geologie, Geschichte, Wirtschaft, Soziologie, Biologie, Anthropologie, öffentliche Ordnung und Meereswissenschaften."
     },
     "ym-Cornell-University": {
       "description": "YouthMappers Ortsgruppe der Cornell University",
@@ -1664,10 +1642,6 @@
     "ym-University-of-Zimbabwe": {
       "description": "YouthMappers Ortsgruppe der University of Zimbabwe",
       "extendedDescription": "Das UzMappersTeam Zimbabwe ist ein Team von Freiwilligen, die OpenStreetMap für die Kartierung offener Daten und humanitärer Katastropheneinsätze nutzen und ihre Mitglieder mit Open-Source-Geodaten-Technologie ausstatten."
-    },
-    "ym-UW-Madison": {
-      "description": "YouthMappers Ortsgruppe der UW-Madison",
-      "extendedDescription": "BadgerMaps ist die UW-Campusgruppe von Youthmappers, einer Organisation, die sich für humanitäre und kommunale Kartierungsdienste einsetzt. Wir verbinden unser Freiwilligen-Netzwerk mit Möglichkeiten zur Erstellung von GIS-Daten für Projekte, die sie benötigen."
     },
     "ym-Vassar-College": {
       "description": "YouthMappers Ortsgruppe der Vassar College",

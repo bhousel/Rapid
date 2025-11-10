@@ -12,6 +12,7 @@
       "openstreetmapbelgium": "OpenStreetMap Belgien",
       "openstreetmapbosniaandherzegovina": "OpenStreetMap Bosnien och Hercegovina",
       "openstreetmapbrasil": "OpenStreetMap Brasilien",
+      "openstreetmapbrasilminasgerais": "OpenStreetMap Brasilien – Minas Gerais",
       "openstreetmapbulgaria": "OpenStreetMap Bulgarien",
       "openstreetmapcambodia": "OpenStreetMap Kambodja",
       "openstreetmapcameroon": "OpenStreetMap Kamerun",
@@ -51,12 +52,9 @@
       "openstreetmapitalylazio": "OpenStreetMap Italien-Lazio",
       "openstreetmapitalylombardia": "OpenStreetMap Italien-Lombardiet",
       "openstreetmapitalypiemonte": "OpenStreetMap Italien-Piemonte",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Italien-Sydtyrolen",
       "openstreetmapitalytrentino": "OpenStreetMap Italien-Trentino",
-      "openstreetmapkyrgyzstan": "OpenStreetMap Kirgizistan",
       "openstreetmaplatinamerica": "OpenStreetMap Latinamerika",
       "openstreetmaplatvia": "OpenStreetMap Lettland",
-      "openstreetmaplebanon": "OpenStreetMap Libanon",
       "openstreetmaplibya": "OpenStreetMap Libyen",
       "openstreetmaplithuania": "OpenStreetMap Litauen",
       "openstreetmaplombardia": "OpenStreetMap Lombardiet",
@@ -73,24 +71,24 @@
       "openstreetmapoceania": "OpenStreetMap Oceanien",
       "openstreetmapphilippines": "OpenStreetMap Filippinerna",
       "openstreetmappoland": "OpenStreetMap Polen",
+      "openstreetmappuglia": "OpenStreetMap Apulien",
       "openstreetmaprdc": "OpenStreetMap Kongo-Kinshasa",
       "openstreetmapromania": "OpenStreetMap Rumänien",
       "openstreetmaprussia": "OpenStreetMap Ryssland",
       "openstreetmapsaudiarabia": "OpenStreetMap Saudiarabien",
       "openstreetmapserbia": "OpenStreetMap Serbien",
-      "openstreetmapseychelles": "OpenStreetMap Seychellerna",
       "openstreetmapslovenia": "OpenStreetMap Slovenien",
       "openstreetmapsouthafrica": "OpenStreetMap Sydafrika",
       "openstreetmapsouthsudan": "OpenStreetMap Sydsudan",
       "openstreetmapsweden": "OpenStreetMap Sverige",
       "openstreetmapswitzerland": "OpenStreetMap Schweiz",
-      "openstreetmapsyria": "OpenStreetMap Syrien",
       "openstreetmaptunisia": "OpenStreetMap Tunisien",
       "openstreetmapturkey": "OpenStreetMap Turkiet",
       "openstreetmapuk": "OpenStreetMap Storbritannien",
       "openstreetmapukraine": "OpenStreetMap Ukraina",
       "openstreetmapwestbengal": "OpenStreetMap Västbengalen",
-      "openstreetmapwesternsahara": "OpenStreetMap Västsahara"
+      "openstreetmapwesternsahara": "OpenStreetMap Västsahara",
+      "osmewikiemiliaromagna": "OSM och Wiki Emilia-Romagna"
     },
     "_defaults": {
       "aparat": {
@@ -176,15 +174,15 @@
         "description": "Följ oss på TikTok"
       },
       "twitter": {
-        "name": "{community} på 𝕏",
-        "description": "Följ oss på 𝕏"
+        "name": "{community} på X",
+        "description": "Följ oss på X"
       },
       "wiki": {
         "name": "WikiProject för {community}"
       },
       "x": {
-        "name": "{community} på 𝕏",
-        "description": "Följ oss på 𝕏"
+        "name": "{community} på X",
+        "description": "Följ oss på X"
       },
       "xmpp": {
         "name": "XMPP för {community",
@@ -231,9 +229,6 @@
     },
     "be-discourse": {
       "description": "Ett forum för att diskutera OpenStreetMap i Belgien"
-    },
-    "be-irc": {
-      "extendedDescription": "Anslut #{account} på irc.oftc.net (port 6667), den är bryggad med chatt-kanalen Matrix"
     },
     "be-matrix": {
       "description": "Alla kartläggare är välkomna!",
@@ -428,9 +423,6 @@
     "de-mainz-signal": {
       "description": "OpenStreetMap i Mainz, Wiesbaden och omgivning"
     },
-    "de-mainz-telegram": {
-      "description": "OpenStreetMap i Mainz med omgivning"
-    },
     "de-mainz-wiki": {
       "description": "OpenStreetMap i Mainz med omgivning"
     },
@@ -550,9 +542,6 @@
     "hu-matrix": {
       "extendedDescription": "OpenStreetMap-chat om kartor. En av OSM-gemenskapens support-forum."
     },
-    "hu-meetup": {
-      "description": "Plattformen för att organisera träffar i Ungen"
-    },
     "hu-mobilizon": {
       "name": "{community} på Mobilizon",
       "description": "Kommande evenemang för OpenStreetMap Ungern-gemenskapen"
@@ -562,10 +551,13 @@
       "description": "Utforska aktiva karteringsuppgifter i Ungern"
     },
     "hu-website": {
-      "description": "Vi hjälper till att utöka och förbättra OpenStreetMap i Ungern."
+      "description": "Webbplats för den ungerska OpenStreetMap-gemenskapen"
     },
     "hu-wiki": {
       "description": "Wiki-sida för {community}"
+    },
+    "hu-youtube": {
+      "description": "OpenStreetMap Ungern – direktsändningar och inspelningar från träffar"
     },
     "humanitarian-osm-tr-slack": {
       "name": "Slack för Humanitarian OpenStreetMap Turkiet",
@@ -595,7 +587,10 @@
       "description": "Vi hjälper till att utöka och förbättra OpenStreetMap i Italien."
     },
     "it-discourse": {
-      "description": "Forumet där du kan diskutera OpenStreetMap"
+      "description": "Ett forum för att diskutera OpenStreetMap i Italien"
+    },
+    "it-emilia-romagna-telegram": {
+      "description": "Alla är välkomna! Du kan gå in i chatten via den här länken: {signupUrl}"
     },
     "ivides_website": {
       "description": "Vi fokuserar på hållbar utveckling, kartläggning och stöd för OpenStreetMap-gemenskapen."
@@ -685,7 +680,7 @@
       "description": "Det är lätt att hitta vägar med låg koldioxidutsläpp runt Waterloo-regionen."
     },
     "MapRVA": {
-      "description": "Meetup för MapRV"
+      "description": "MapRVA är en grupp kartentusiaster i Richmond, Virginia som arbetar med att skapa och dela geospatial data om vår stad med hjälp av OpenStreetMap."
     },
     "maptime-bogota-facebook": {
       "description": "Vi är en grupp människor som är intresserade av att kartlägga Bogotá och dess omgivningar i OpenStreetMap.",
@@ -737,6 +732,9 @@
     },
     "me-telegram": {
       "description": "Alla är välkomna! Registrera dig på {signupUrl}"
+    },
+    "minas_gerais-discord": {
+      "extendedDescription": "Välkommen till OSM Minas Gerais Discord! Vi är en gemenskap av kartläggare som brinner för att bygga detaljerade kartor med öppen källkod för Minas Gerais, Brasilien. Gå med oss ​​för att samarbeta, dela tips och hjälpa till att göra MG:s kartor till de bästa på OpenStreetMap. Oavsett om du är nybörjare eller proffs, låt oss kartlägga tillsammans!"
     },
     "mm-facebook": {
       "extendedDescription": "Kartlägger i Myanmar? Har du frågor, vill du ansluta till gemenskapen här? Anslut dig på {url}. Alla är välkomna!"
@@ -811,10 +809,6 @@
     "OSM-AR-wiki": {
       "description": "Allt du behöver veta om kartläggning i Argentina."
     },
-    "osm-asia-facebook": {
-      "description": "OpenStreetMap Asiens Facebook-grupp",
-      "extendedDescription": "En grupp för integrerat kartläggningsstöd för Asien. Vi vill särskilt vara en plats för kartläggare utan en lokal gemenskap att dela information och samarbeta för att lösa problem i sina områden som de annars inte skulle kunna hantera på grund av bristen på en lokal gemenskap."
-    },
     "osm-at": {
       "description": "Plattformen för information om OpenStreetMap i Österrike"
     },
@@ -829,11 +823,6 @@
     },
     "osm-benin-facebook": {
       "description": "Förbättra OpenStreetMap i Benin"
-    },
-    "OSM-Central-Salish-Sea": {
-      "name": "OpenStreetMap Centrala Salishhavet",
-      "description": "Kartläggare och OpenStreetMap-användare runt Mount Vernon, Washington",
-      "extendedDescription": "OpenStreetMap är en världskarta skapad av människor precis som du. Det är en karta du bygger och ger bort gratis, precis som Wikipedia. Ta en titt på osm.org för mer information. Vi träffas hela tiden för att prata om kartor, skapar kartor och har kul!"
     },
     "osm-ch": {
       "description": "Plattformen för information om OpenStreetMap i Schweiz"
@@ -997,6 +986,13 @@
       "description": "E-postlistan FSHM Puducherry för att diskutera kartläggning i Puducherry  och andra saker.",
       "extendedDescription": "FSHM organiserar evenemang relaterade till fri mjukvara/hårdvara, teknologi, aktivism och OpenStreetMap."
     },
+    "osm-punjab-matrix": {
+      "description": "Vi kartlägger Punjab tillsammans. Gå med i vår Matrix-grupp",
+      "extendedDescription": "Inofficiellt chattrum för OSM Punjab, även kopplat till OSMPunjab Telegram-gruppen"
+    },
+    "osm-punjab-telegram": {
+      "description": "Vi kartlägger Punjab tillsammans. Gå med i vår telegramgrupp. {url}"
+    },
     "OSM-Rome-meetup": {
       "name": "Möte för romerska kartläggare",
       "description": "Förbättra OpenStreetMap kring Rom",
@@ -1119,13 +1115,6 @@
     "talk-mg": {
       "description": "Plats för bidragsgivare till OpenStreetMap, sammanslutningar och användare i Madagaskar för att dela och diskutera."
     },
-    "talk-nz": {
-      "description": "Femenskapsdiskussion för Nya Zeelands OSM"
-    },
-    "talk-pacific": {
-      "description": "Den regionala OSM-epostlistan för och av folken i Moana/Oceanien/Stillahavsområdet",
-      "extendedDescription": "Vi vill att den här e-postlistan ska stödja allt folk i Stilla havet, i all vår mångfald och ambitioner, för att dela tankar, frågor, projekt och allt relaterat till OpenStreetMap i vårt hav av öar."
-    },
     "tn-facebook-group": {
       "name": "Facebook-grupp för {community}"
     },
@@ -1162,9 +1151,6 @@
     "uk-london-wiki": {
       "description": "Wiki-sida för {community}"
     },
-    "uk-loomio": {
-      "name": "OpenStreetMap UK på Loomio"
-    },
     "us-discourse": {
       "description": "Ett diskussionsforum om OpenStreetMap i USA"
     },
@@ -1172,16 +1158,9 @@
       "name": "E-postlistan Talk-us-massachusetts",
       "description": "E-postlista for OSM-gemenskapen i Massachusetts"
     },
-    "us-newyork-mailinglist": {
-      "name": "E-postlistan Talk-us-newyork",
-      "description": "E-postlista för OSM-gemenskapen i staten New York"
-    },
     "uy-irc": {
       "description": "Anslut #{account} på irc.freenode.org (port 6667)",
       "extendedDescription": "Anslut #{account} på irc.freenode.org"
-    },
-    "vn-mailinglist": {
-      "description": "E-postlista om OpenStreetMap i Vietnam eller på vietnamesiska"
     },
     "vn-wiki": {
       "description": "Wiki-sida för {community}"
@@ -1241,10 +1220,6 @@
     "ym-Clemson-University": {
       "description": "YouthMappers-filial vid Clemson University",
       "extendedDescription": "Studenter i Clemson stöds av Center for Geospatial Technologies, en gemenskap av tvärvetenskapliga geospatiala vetenskapliga utövare som stöder forsknings-, undervisnings- och uppsökande aktiviteter med hjälp av teknik som möjliggör insamling, analys och tillämpning av geospatial data. Studenter integrerar geospatial teknik inom sina vetenskapliga aktiviteter i alla discipliner och bygger upp förbindelser över hela världen."
-    },
-    "ym-College-of-William-and-Mary": {
-      "description": "YouthMappers-filial vid College of William and Mary",
-      "extendedDescription": "De studenter som finns över hela kartan stöds av Center for Geospatial Analysis, en grupp som integrerar GIS i läroplanen och ger studenter och lärare hårdvara, programvara och expertis. Studenter från alla bakgrunder använder GIS över hela campus, inklusive miljövetenskap och politik, geologi, historia, företag, sociologi, biologi, antropologi, allmän politik och marinvetenskap."
     },
     "ym-Cornell-University": {
       "description": "YouthMappers-filial vid Cornell University",
@@ -1358,6 +1333,7 @@
       "description": "YouthMappers-filial vid Jahangirnagar University"
     },
     "ym-Jomo-Kenyatta-University-of-Agriculture-and-Technology": {
+      "name": "Föreningen för geomatikingenjörsstudenter",
       "description": "YouthMappers-filial vid Jomo Kenyatta University of Agriculture and Technology",
       "extendedDescription": "The Association of Geomatics Engineering Students (AGES) syftar till att marknadsföra GIS-produkter och -tjänster samt utbilda studenter om användning av det samma. Det främjar inte bara socialisering mellan studenterna och yrkesutövare, utan ger också en plattform för att utbyta nya idéer för att hålla nya GIS- och kartläggningsevenemang och utbildning vid universitetet."
     },
@@ -1435,6 +1411,10 @@
       "name": "Youth Mappers vid Open University of Tanzania",
       "description": "YouthMappers-filial vid Open University of Tanzania",
       "extendedDescription": "Youth Mappers vid Open University of Tanzania\n\nHar grundats av medlemmar och studenter vid Open University of Tanzania på Institutionen för geografi som huvudsakligen behöver förbättra sin karriär och hjälpa unga genom gemensamma och partnerskapsprojekt med lokala samhällsgrupper så som Mikoko Scout Group (www.msg.or.tz ) och starta samarbete med internationella högskolor och universitet för utbytesprogram relaterde till geografistudier då några program som utarbetats av Mikoko Scout Group som kommer att länka lokala universitet och andra universitet av samma intresse genom International Nature & Environmental Youth Camp 2019 (www.campsite.msg.or.tz/nature.html)\n\nVår filial kommer snart att erkännas som ett ungdomsnätverksprogram som ger studenter möjlighet att studera och genomföra forskningsstudier på lokal nivå."
+    },
+    "ym-Oregon-State-University": {
+      "name": "YouthMappers vid Oregon State University",
+      "description": "YouthMappers chapter vid Oregon State University"
     },
     "ym-Politecnico-di-Milano": {
       "description": "YouthMappers-filial vid Politecnico di Milano",
@@ -1546,6 +1526,18 @@
       "description": "YouthMappers-filial vid Universidad Distrital Francisco Jose de Caldas",
       "extendedDescription": "Universidad Distrital Francisco José de Caldas är ett offentligt forskningsuniversitet med forskarutbildning baserat i Bogotá, Colombia med en befolkning på 26 140 studenter."
     },
+    "ym-Universidad-Jorge-Tadeo-Lozano": {
+      "name": "TadeoMappers vid Universidad Jorge Tadeo Lozano",
+      "description": "YouthMappers chapter vid Universidad Jorge Tadeo Lozano",
+      "extendedDescription": "Studenter från Bogotá som brinner för kartläggning för biologisk mångfald. De fokuserar på att kartlägga träd och ta aktiviteterna till skolor för att engagera hela samhället i miljöarbete."
+    },
+    "ym-Universidad-Jorge-Tadeo-Lozano-github": {
+      "extendedDescription": "TadeoMappers, i samarbetar med GNUTADEO:s fri programvarukollektiv, erbjuder arkiv för sitt arbete. Båda grupperna är knutna till Universidad Jorge Tadeo Lozano och främjar användningen av kartläggningsverktyg och programvara för samhällsdrivna projekt."
+    },
+    "ym-Universidad-Jorge-Tadeo-Lozano-instagram": {
+      "description": "Instagram för YouthMappers chapter TadeoMappers",
+      "extendedDescription": "TadeoMappers är en del av fri programvarugruppen GNUTADEO, ett kollektiv vid Universidad Jorge Tadeo Lozano."
+    },
     "ym-Universidad-Nacional-Autnoma-de-Honduras": {
       "description": "YouthMappers-filial vid Universidad Nacional Autónoma de Honduras"
     },
@@ -1560,6 +1552,13 @@
     "ym-Universidade-Eduardo-Mondlane": {
       "description": "YouthMappers-filial vid Universidade Eduardo Mondlane",
       "extendedDescription": "Vi är en studentgrupp som avser att gå med i det mozambikanska samhället för att skapa en motståndskraftig gemenskap av humanitär kartläggning. Gemenskapen har för avsikt att kartlägga landets fysiska ockupation och skapa öppna geografiska data, tillgängliga för allmänheten och som kan användas i flera områden utan tillhörande kostnader."
+    },
+    "ym-Universit-de-NZrkor": {
+      "description": "YouthMappers chapter vid University of N'Zérékoré",
+      "extendedDescription": "YouthMappers engagerar studenter i kartläggning vid katastrofer eller epidemier. De möjliggör också produktion och användning av fritt tillgängliga kartdata."
+    },
+    "ym-Universit-des-Sciences-Sociale-et-de-Gestion-de-Bamako": {
+      "description": "YouthMappers-filial vid University of Social Sciences and Management i Bamako"
     },
     "ym-Universit-Gaston-Berger": {
       "name": "YouthMappers vid UGB",
@@ -1695,10 +1694,6 @@
     "ym-University-of-Zimbabwe": {
       "description": "YouthMappers-filial vidUniversity of Zimbabwe",
       "extendedDescription": "UzMappersTeam Zimbabwe är ett team av volontärer som använder OpenStreetMap för Open Data- och Humanitarian Disaster response-kartläggning. Teamet ger sina medlemmar färdigheter i geospatial teknik med öppen källkod."
-    },
-    "ym-UW-Madison": {
-      "description": "YouthMappers-filial vid UW-Madison",
-      "extendedDescription": "BadgerMaps är UW-campusfilial för Youthmappers, en organisation som är dedikerad till humanitära tjänster och kartläggningstjänster. Vi kopplar vårt volontärnätverk med möjligheter att skapa GIS-data för projekt som behöver det."
     },
     "ym-Vassar-College": {
       "description": "YouthMappers-filial vid Vassar College",

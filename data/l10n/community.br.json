@@ -16,6 +16,7 @@
       "openstreetmapbivccvl": "OpenStreetMap Biella, Vercelli, Canavese ha Traoñiennoù Lanzo",
       "openstreetmapbosniaandherzegovina": "OpenStreetMap Bosnia-ha-Herzegovina",
       "openstreetmapbrasil": "OpenStreetMap Brazil",
+      "openstreetmapbrasilminasgerais": "OpenStreetMap Brazil Minas Gerais",
       "openstreetmapcambodia": "OpenStreetMap Kambodja",
       "openstreetmapcameroon": "OpenStreetMap Kameroun",
       "openstreetmapcanada": "OpenStreetMap Kanada",
@@ -55,11 +56,9 @@
       "openstreetmapitalylazio": "OpenStreetMap Italia-Lazio",
       "openstreetmapitalylombardia": "OpenStreetMap Italia-Lombardia",
       "openstreetmapitalypiemonte": "OpenStreetMap Italia-Piemonte",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Italia-Su Tirol",
       "openstreetmapitalytrentino": "OpenStreetMap Italia-Trentino",
       "openstreetmapkazakhstan": "OpenStreetMap Kazakstan",
       "openstreetmaplatinamerica": "OpenStreetMap Amerika Latin",
-      "openstreetmaplebanon": "OpenStreetMap Liban",
       "openstreetmaplibya": "OpenStreetMap Libia",
       "openstreetmaplithuania": "OpenStreetMap Lituania",
       "openstreetmaplondon": "OpenStreetMap Londrez",
@@ -78,20 +77,19 @@
       "openstreetmapperu": "OpenStreetMap Perou",
       "openstreetmapphilippines": "OpenStreetMap Filipinez",
       "openstreetmappoland": "OpenStreetMap Polonia",
+      "openstreetmappunjab": "OpenStreetMap Panjab",
       "openstreetmaprdc": "OpenStreetMap RDK",
       "openstreetmaprennes": "OpenStreetMap Roazhon",
-      "openstreetmapreunion": "OpenStreetMap Reunion",
+      "openstreetmapreunion": "OpenStreetMap Ar Reünion",
       "openstreetmapromania": "OpenStreetMap Roumania",
       "openstreetmaprussia": "OpenStreetMap Rusia",
       "openstreetmapsaudiarabia": "OpenStreetMap Arabia Saoudat",
-      "openstreetmapseychelles": "OpenStreetMap Sechelez",
       "openstreetmapsingapore": "OpenStreetMap Singapour",
       "openstreetmapsouthafrica": "OpenStreetMap Suafrika",
       "openstreetmapsouthsudan": "OpenStreetMap Susoudan",
       "openstreetmapsudan": "OpenStreetMap Soudan",
       "openstreetmapsweden": "OpenStreetMap Sveden",
       "openstreetmapswitzerland": "OpenStreetMap Suis",
-      "openstreetmapsyria": "OpenStreetMap Siria",
       "openstreetmaptunisia": "OpenStreetMap Tunizia",
       "openstreetmapturin": "OpenStreetMap Torino",
       "openstreetmapturkey": "OpenStreetMap Turkia",
@@ -101,6 +99,7 @@
       "openstreetmapus": "OpenStreetMap Stadoù-Unanet",
       "openstreetmapuzbekistan": "OpenStreetMap Ouzbekistan",
       "openstreetmapvietnam": "OpenStreetMap Viêt Nam",
+      "openstreetmapwarszawa": "OpenStreetMap Varsovia",
       "openstreetmapwestbengal": "OpenStreetMap Kornôg Bengal",
       "openstreetmapwesternsahara": "OpenStreetMap Sahara ar C'hornôg",
       "swissopenstreetmap": "OpenStreetMap Bro-Suis"
@@ -189,18 +188,19 @@
         "description": "Heuilhit ac'hanomp war dTikTok"
       },
       "twitter": {
-        "name": "{community} war 𝕏",
-        "description": "Heuilhit ac'hanomp war 𝕏"
+        "name": "{community} war X",
+        "description": "Heuilhit ac'hanomp war X"
       },
       "wiki": {
         "name": "WikiProject {community}"
       },
       "x": {
-        "name": "{community} war 𝕏",
-        "description": "Heuilhit ac'hanomp war 𝕏"
+        "name": "{community} war X",
+        "description": "Heuilhit ac'hanomp war X"
       },
       "xmpp": {
-        "name": "XMPP {community}"
+        "name": "XMPP {community}",
+        "description": "Adkavit flap XMPP hor gumuniezh: {url}"
       },
       "youtube": {
         "name": "{community} war YouTube",
@@ -274,6 +274,9 @@
     "castilla-y-leon-wiki": {
       "description": "Ar pep retañ evit kartennaouiñ Kastilha-ha-Leon: {url}"
     },
+    "cat-matrix": {
+      "description": "Strollad Matrix evit kumuniezh OpenStreetMap ar Broioù Katalan"
+    },
     "cat-twitch": {
       "name": "Chadenn Twitch {community}",
       "description": "OSM live editing, HOTosm, OpenData ha GIS"
@@ -303,31 +306,58 @@
       "name": "Raktresoù {community} war GitHub"
     },
     "co-instagram": {
-      "name": "Embannadennoù gant {community} war Instagram"
+      "name": "Embannadennoù gant {community} war Instagram",
+      "description": "Embannadennoù diwar-benn oberiantiz ar gumuniezh pe keleier"
     },
     "co-linkedin": {
-      "name": "Embannadennoù gant {community} war LinkedIn"
+      "name": "Embannadennoù gant {community} war LinkedIn",
+      "description": "Embannadennoù diwar-benn oberiantiz ar gumuniezh pe keleier"
     },
     "co-mastodon": {
-      "name": "Embannadennoù gant {community} war Mastodon"
+      "name": "Embannadennoù gant {community} war Mastodon",
+      "description": "Embannadennoù diwar-benn oberiantiz ar gumuniezh pe keleier"
+    },
+    "co-talk": {
+      "name": "Lizher-kelaouiñ {community}"
     },
     "co-telegram": {
       "name": "Strollad kaozeal diwar-benn {community} war Telegram"
     },
     "co-thread": {
-      "name": "Embannadennoù gant {community} war Threads"
+      "name": "Embannadennoù gant {community} war Threads",
+      "description": "Embannadennoù diwar-benn oberiantiz ar gumuniezh pe keleier"
     },
     "co-tiktok": {
-      "name": "Videoioù berr eus {community} war TikTok"
+      "name": "Videoioù berr eus {community} war TikTok",
+      "description": "Embannadennoù diwar-benn oberiantiz ar gumuniezh"
     },
     "co-twitter": {
-      "name": "Kumuniezh {community} war x-Twitter"
+      "name": "Kumuniezh {community} war x-Twitter",
+      "description": "Embannadennoù diwar-benn oberiantiz ar gumuniezh pe keleier"
+    },
+    "co-whatsapp": {
+      "name": "Keleier eus kumuniezh {community} war WhatsApp"
     },
     "co-youtube": {
       "name": "Videoioù eus {community} war YouTube"
     },
     "comunitat-valenciana-wiki": {
       "description": "Ar pep retañ evit kartennaouiñ Kumuniezh València: {url}"
+    },
+    "czech-discord": {
+      "description": "Saloñs OpenStreetMap CZ, liammet ouzh IRC, Jabber, Matrix ha Telegram"
+    },
+    "czech-irc": {
+      "description": "Saloñs OpenStreetMap CZ, liammet ouzh Discord, Jabber, Matrix ha Telegram"
+    },
+    "czech-matrix": {
+      "description": "Saloñs OpenStreetMap CZ, liammet ouzh Discord, IRC, Jabber ha Telegram"
+    },
+    "czech-telegram": {
+      "description": "Saloñs OpenStreetMap CZ, liammet ouzh Discord, IRC, Jabber ha Matrix"
+    },
+    "czech-xmpp": {
+      "description": "Saloñs OpenStreetMap CZ, liammet ouzh Discord, IRC, Matrix ha Telegram"
     },
     "de-aachen-wiki": {
       "description": "Pajenn Wiki {community}"
@@ -359,6 +389,9 @@
     "de-dusseldorf-wiki": {
       "description": "Pajenn Wiki {community}"
     },
+    "de-hamburg-xmpp": {
+      "name": "XMPP eus OpenStreetMap Hamburg"
+    },
     "de-karlsruhe-mailinglist": {
       "name": "Lizher-kelaouiñ Karlsruhe"
     },
@@ -369,9 +402,6 @@
       "description": "Pajenn Wiki {community}"
     },
     "de-mainz-mailinglist": {
-      "description": "OpenStreetMap e Mainz hag Umgebung"
-    },
-    "de-mainz-telegram": {
       "description": "OpenStreetMap e Mainz hag Umgebung"
     },
     "de-mainz-wiki": {
@@ -409,6 +439,9 @@
     "de-viersen-meetup": {
       "name": "Emvod OpenStreetMap Viersen",
       "description": "Emvod kumuniezh OSM hag implijerien distrig Viersen ha Mönchengladbach"
+    },
+    "de-xmpp": {
+      "name": "XMPP eus OpenStreetMap DE"
     },
     "DF-telegram": {
       "extendedDescription": "Emezelit er gumuniezh evit deskiñ muioc'h diwar-benn OpenStreetMap, sevel goulennoù pe kemer perzh en emvodoù. An holl 'zo deuet mat!"
@@ -476,7 +509,7 @@
       "name": "Merer trevelloù {community}"
     },
     "hu-website": {
-      "description": "Ni a sikour diorren ha gwellaat OpenStreetMap e Hungaria."
+      "description": "Al lec'hienn evit kumuniezh OpenStreetMap Hungaria"
     },
     "hu-wiki": {
       "description": "Pajenn Wiki {community}"
@@ -486,7 +519,7 @@
     },
     "id-facebook-group": {
       "name": "Strollad Facebook {community}",
-      "extendedDescription": "O kartennaouiñ en Indonezia? Goulennoù ho peus pe c'hoant ho peus da gejañ gant ar gumuniezh amañ? Deuit ganeomp war {url}. Pep hini 'zo deuet mat!"
+      "extendedDescription": "O kartennaouiñ en Indonezia? Goulennoù ho peus pe c'hoant ho peus da gejañ gant ar gumuniezh amañ? Adkavit ac'hanomp war {url}. Pep hini 'zo deuet mat!"
     },
     "ireland-chapter": {
       "description": "Ni a sikour diorren ha gwellaat OpenStreetMap en Iwerzhon."
@@ -497,8 +530,8 @@
     "it-chapter": {
       "description": "Ni a sikour diorren ha gwellaat OpenStreetMap en Italia."
     },
-    "it-discourse": {
-      "description": "Forom kartennourien OpenStreetMap Italia"
+    "ivides_website": {
+      "description": "Plediñ a reomp gant an diorren, ar c'hartennaouiñ ha skoazell kumuniezh OpenStreetMap war hir dermen."
     },
     "ko-facebook": {
       "description": "Kartennour·ien/ezed hag implijer·ien/ezed OpenStreetMap e Korea"
@@ -546,9 +579,6 @@
     },
     "MapLYH": {
       "description": "Strollad MapLYH"
-    },
-    "MapRVA": {
-      "description": "Emvod MapRVA"
     },
     "maptime-bogota-facebook": {
       "description": "Ni 'zo ur strollad a dud dedennet da gartennaouiñ Bogotá hag he c'horn-bro e OpenStreetMap."
@@ -607,7 +637,7 @@
     },
     "Open-Source-San-Jose-Discord": {
       "name": "Discord Open Source San José",
-      "description": "Kejit gant kartennour·ien/ezed all war zDiscord! Goude bezañ bet lakaet hoc'h anv, adkavit ar chadenn #🗺openstreetmap."
+      "description": "Kejit gant kartennourien ha kartennourezed all war zDiscord! Goude bezañ bet lakaet hoc'h anv, adkavit ar chadenn #🗺openstreetmap."
     },
     "Open-Source-San-Jose-Slack": {
       "name": "Slack Open Source San José",
@@ -639,9 +669,6 @@
     "OSM-AR-wiki": {
       "description": "Ar pep retañ evit kartennaouiñ Arc'hantina: {url}"
     },
-    "osm-asia-facebook": {
-      "description": "Strollad Facebook OpenStreetMap Azia"
-    },
     "osm-at": {
       "description": "Savenn titouroù diwar-benn OpenStreetMap en Aostria"
     },
@@ -650,9 +677,6 @@
     },
     "osm-benin-facebook": {
       "description": "Gwellaat OpenStreetMap e Benin"
-    },
-    "OSM-Central-Salish-Sea": {
-      "description": "Kartennour·ien/ezed hag implijer·ien/ezed OpenStreetMap e korn-bro Mount Vernon (Washington)"
     },
     "osm-ch": {
       "description": "Savenn titouroù diwar-benn OpenStreetMap e Suis"
@@ -674,7 +698,8 @@
       "name": "XMPP OpenStreetMap Delhi"
     },
     "OSM-Discord": {
-      "name": "Discord OpenStreetMap Bed"
+      "name": "Discord OpenStreetMap Bed",
+      "description": "Ur servijer Discord diofisiel meret gant ar gumuniezh evit kumuniezh OpenStreetMap a-bezh. Chadennoù lec'hel zo ivez."
     },
     "OSM-Discourse": {
       "name": "Forom ar gumuniezh OpenStreetMap",
@@ -683,8 +708,14 @@
     "OSM-Facebook": {
       "description": "Heuilhit ac'hanomp war Facebook evit resevout keleier OpenStreetMap."
     },
+    "osm-gh-website": {
+      "description": "Pourchas a ra servijoù ha keleier OSM evit ar gumuniezh e Ghana"
+    },
     "osm-hr": {
       "description": "Savenn titouroù diwar-benn OpenStreetMap e Kroatia"
+    },
+    "osm-id": {
+      "description": "Pourchas a ra servijoù ha keleier OSM evit ar gumuniezh en Indonezia"
     },
     "OSM-India-facebook": {
       "description": "Gwellaat OpenStreetMap en India",
@@ -759,6 +790,12 @@
     "OSM-PL-chapter": {
       "description": "Kêr kumuniezh OpenStreetMap Polonia"
     },
+    "osm-punjab-matrix": {
+      "description": "Kartennaouiñ a reomp Panjab asambles. Heuilhit hor strollad Matrix"
+    },
+    "osm-punjab-telegram": {
+      "description": "Kartennaouiñ a reomp Panjab asambles. Adkavit ac'hanomp en hor strollad Telegram: {url}"
+    },
     "OSM-Rome-meetup": {
       "description": "Gwellaat OpenStreetMap tro-dro da Roma"
     },
@@ -800,6 +837,9 @@
     },
     "OSM-US-Slack": {
       "description": "Pep hini 'zo deuet mat! Lakait hoc'h anv war {signupUrl}"
+    },
+    "OSM-Utah": {
+      "description": "Ho kumuniezh kartennaouiñ OSM evit rannvro Salt Lake City"
     },
     "OSM-Wyoming": {
       "description": "Kartennour·ien/ezed hag implijer·ien/ezed OpenStreetMap e Wyoming"
@@ -848,14 +888,14 @@
     "si-wiki": {
       "description": "Pajenn Wiki {community}"
     },
+    "sosm": {
+      "name": "Kevredigezh OpenStreetMap Suis"
+    },
     "talk-au": {
       "description": "Al lec'h ma c'hall flapañ kartennourezed ha kartennourien aostralianat"
     },
     "talk-bo": {
       "extendedDescription": "O kartennaouiñ e Bolivia? Goulennoù ho peus pe c'hoant ho peus da gejañ gant ar gumuniezh amañ? Deuit ganeomp war {url}. Pep hini 'zo deuet mat!"
-    },
-    "talk-nz": {
-      "description": "Flap kumuniezh OSM Nevez Zeland"
     },
     "tn-facebook-group": {
       "name": "Strollad Facebook {community}"
@@ -865,6 +905,9 @@
     },
     "tw-wiki": {
       "description": "Ar pep retañ evit kartennaouiñ Taiwan: {url}"
+    },
+    "tz-website": {
+      "description": "Pourchas a ra servijoù ha keleier OSM evit ar gumuniezh e Tanzania"
     },
     "ua-github": {
       "description": "GitHub OpenStreetMap Ukraina"
@@ -889,9 +932,6 @@
     "uk-london-wiki": {
       "description": "Pajenn Wiki {community}"
     },
-    "uk-loomio": {
-      "name": "OpenStreetMap UK war Loomio"
-    },
     "us-discourse": {
       "description": "Ur forom flapañ diwar-benn OpenStreetMap er Stadoù-Unanet"
     },
@@ -899,16 +939,9 @@
       "name": "Lizher-kelaouiñ Talk-us-massachusetts",
       "description": "Lizher-kelaouiñ kumuniezh OSM Massachusetts"
     },
-    "us-newyork-mailinglist": {
-      "name": "Lizher-kelaouiñ Talk-us-newyork",
-      "description": "Lizher-kelaouiñ kumuniezh OSM stad Evrog Nevez"
-    },
     "uy-irc": {
       "description": "Emezelit ouzh #{account} war irc.freenode.org (porzh 6667)",
       "extendedDescription": "Emezelit ouzh #{account} war irc.freenode.org"
-    },
-    "vn-mailinglist": {
-      "description": "Lizher-kelaouiñ OpenStreetMap vietnamat"
     },
     "vn-wiki": {
       "description": "Pajenn Wiki {community}"
@@ -940,9 +973,6 @@
     "ym-Clemson-University": {
       "name": "Kartennour·ien/ezed Clemson",
       "description": "Kevrenn YouthMappers skol-veur Clemson"
-    },
-    "ym-College-of-William-and-Mary": {
-      "name": "War ar gartenn a-bezh!"
     },
     "ym-Cornell-University": {
       "description": "Kevrenn YouthMappers e skol-veur Cornell"
@@ -1047,6 +1077,9 @@
     },
     "ym-Queen-Mary-University-of-London": {
       "description": "Kevrenn YouthMappers skol-veur Queen Mary Londez"
+    },
+    "ym-Sherubtse-College": {
+      "name": "Kevredigezh c'heografek"
     },
     "ym-Sokoine-University-of-Agriculture": {
       "description": "Kevrenn YouthMappers skol-veur labour-douar Sokoine"

@@ -28,7 +28,6 @@
       "openstreetmapbrasilia": "OpenStreetMap Μπραζίλια",
       "openstreetmapbremen": "OpenStreetMap Βρέμη",
       "openstreetmapbulgaria": "OpenStreetMap Βουλγαρία",
-      "openstreetmapburkinafaso": "OpenStreetMap Μπουρκίνα Φάσο",
       "openstreetmapburundi": "OpenStreetMap Μπουρούντι",
       "openstreetmapbzh": "OpenStreetMap BZH (Βρετάνη)",
       "openstreetmapcambodia": "OpenStreetMap Καμπότζη",
@@ -42,7 +41,6 @@
       "openstreetmapchina": "OpenStreetMap Κίνα",
       "openstreetmapcologne": "OpenStreetMap Κολωνία",
       "openstreetmapcomunitatvalenciana": "OpenStreetMap Βαλενθιανική Κοινότητα",
-      "openstreetmapcostarica": "OpenStreetMap Κόστα Ρίκα",
       "openstreetmapcotedivoire": "OpenStreetMap Ακτή Ελεφαντοστού",
       "openstreetmapcroatia": "OpenStreetMap Κροατία",
       "openstreetmapcuba": "OpenStreetMap Κούβα",
@@ -81,7 +79,6 @@
       "openstreetmapguinea": "OpenStreetMap Γουινέα",
       "openstreetmaphaiti": "OpenStreetMap Αϊτή",
       "openstreetmaphamburg": "OpenStreetMap Αμβούργο",
-      "openstreetmaphonduras": "OpenStreetMap Ονδούρα",
       "openstreetmaphongkong": "OpenStreetMap Χονγκ Κονγκ",
       "openstreetmaphungary": "OpenStreetMap Ουγγαρία",
       "openstreetmapiceland": "OpenStreetMap Ισλανδία",
@@ -95,7 +92,6 @@
       "openstreetmapitalylazio": "OpenStreetMap Ιταλία-Λάτσιο",
       "openstreetmapitalylombardia": "OpenStreetMap Ιταλία-Λομβαρδία",
       "openstreetmapitalypiemonte": "OpenStreetMap Ιταλία-Πιεμόντε",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Ιταλία-Νότιο Τιρόλο",
       "openstreetmapitalytrentino": "OpenStreetMap Ιταλία-Τρεντίνο",
       "openstreetmapjapan": "OpenStreetMap Ιαπωνία",
       "openstreetmapkarlsruhe": "OpenStreetMap Καρλσρούη",
@@ -104,10 +100,8 @@
       "openstreetmapkerala": "OpenStreetMap Κεράλα",
       "openstreetmapkorea": "OpenStreetMap Κορέα",
       "openstreetmapkosovo": "OpenStreetMap Κοσσυφοπέδιο",
-      "openstreetmapkyrgyzstan": "OpenStreetMap Κιργιζιστάν",
       "openstreetmaplatinamerica": "OpenStreetMap Λατινική Αμερική",
       "openstreetmaplatvia": "OpenStreetMap Λετονία",
-      "openstreetmaplebanon": "OpenStreetMap Λίβανος",
       "openstreetmaplesotho": "OpenStreetMap Λεσότο",
       "openstreetmapliberia": "OpenStreetMap Λιβερία",
       "openstreetmaplibya": "OpenStreetMap Λιβύη",
@@ -152,6 +146,7 @@
       "openstreetmappiemonte": "OpenStreetMap Πεδεμόντιο",
       "openstreetmappoland": "OpenStreetMap Πολωνία",
       "openstreetmapportugal": "OpenStreetMap Πορτογαλία",
+      "openstreetmappuglia": "OpenStreetMap Απουλία",
       "openstreetmaprdc": "OpenStreetMap RDC (Κονγκό)",
       "openstreetmaprennes": "OpenStreetMap Ρεν",
       "openstreetmapreunion": "OpenStreetMap Ρεϋνιόν",
@@ -162,7 +157,6 @@
       "openstreetmapsaudiarabia": "OpenStreetMap Σαουδική Αραβία",
       "openstreetmapsenegal": "OpenStreetMap Σενεγάλη",
       "openstreetmapserbia": "OpenStreetMap Σερβία",
-      "openstreetmapseychelles": "OpenStreetMap Σεϋχέλλες",
       "openstreetmapsierraleone": "OpenStreetMap Σιέρρα Λεόνε",
       "openstreetmapsingapore": "OpenStreetMap Σιγκαπούρη",
       "openstreetmapslovenia": "OpenStreetMap Σλοβενία",
@@ -173,7 +167,6 @@
       "openstreetmapsudan": "OpenStreetMap Σουδάν",
       "openstreetmapsweden": "OpenStreetMap Σουηδία",
       "openstreetmapswitzerland": "OpenStreetMap Ελβετία",
-      "openstreetmapsyria": "OpenStreetMap Συρία",
       "openstreetmaptaiwan": "OpenStreetMap Ταϊβάν",
       "openstreetmaptanzania": "OpenStreetMap Τανζανία",
       "openstreetmapthailand": "OpenStreetMap Ταϊλάνδη",
@@ -196,6 +189,7 @@
       "openstreetmapzambia": "OpenStreetMap Ζάμπια",
       "openstreetmapzimbabwe": "OpenStreetMap Ζιμπάμπουε",
       "osmcolombia": "OSM Κολομβία",
+      "osmewikiemiliaromagna": "OSM και Wiki Εμίλια-Ρομάνια",
       "osmmainz": "OSM Μάιντς",
       "osmnelson": "OSM Νέλσον"
     },
@@ -222,6 +216,9 @@
       "forum": {
         "name": "{community} Φόρουμ",
         "description": "Το επίσημο forum του {community}"
+      },
+      "github": {
+        "name": "{community} στο GitHub"
       },
       "instagram": {
         "name": "{community} στο Instagram",
@@ -265,15 +262,15 @@
         "description": "Ακολουθήστε μας στο TikTok"
       },
       "twitter": {
-        "name": "{community} στο 𝕏",
-        "description": "Ακολουθήστε μας στο 𝕏"
+        "name": "{community} στο X",
+        "description": "Ακολουθήστε μας στο X"
       },
       "wiki": {
         "name": "{community} ΒικιΈργο"
       },
       "x": {
-        "name": "{community} στο 𝕏",
-        "description": "Ακολουθήστε μας στο 𝕏"
+        "name": "{community} στο X",
+        "description": "Ακολουθήστε μας στο X"
       },
       "xmpp": {
         "description": "Γίνετε μέλος της κοινότητάς μας στο XMPP: {url}"
@@ -430,17 +427,20 @@
       "name": "Xeoinquedos στο Twitter",
       "description": "Ακολουθήστε μας στο Twitter στο {url}"
     },
+    "hr-github": {
+      "description": "{community} στο GitHub"
+    },
     "hr-wiki": {
       "description": "Σελίδα Wikiproject για Κροατία"
     },
     "hu-facebook-group": {
       "name": "{community} Ομάδα Facebook"
     },
-    "hu-meetup": {
-      "description": "Η πλατφόρμα για τη διοργάνωση συναντήσεων στην Ουγγαρία"
-    },
     "hu-mobilizon": {
       "name": "{community} στο Mobilizon"
+    },
+    "hu-website": {
+      "description": "Ο ιστότοπος της Ουγγρικής κοινότητας του OpenStreetMap"
     },
     "hu-wiki": {
       "description": "{community} Wiki σελίδα"
@@ -451,8 +451,17 @@
     "is-chapter": {
       "description": "Βοηθάμε την ανάπτυξη και τη βελτίωση του OpenStreetMap στην Ισλανδία"
     },
+    "it-discourse": {
+      "description": "Ένα Forum για συζήτηση του OpenStreetMap στην Ιταλία"
+    },
+    "it-emilia-romagna-telegram": {
+      "description": "Όλοι είναι ευπρόσδεκτοι! Μπορείτε να μπείτε στη συνομιλία με αυτόν τον σύνδεσμο: {signupUrl}"
+    },
     "ivides_website": {
       "description": "Εστιάζουμε στην βιώσιμη ανάπτυξη, χαρτογράφηση, και υποστήριξη της κοινότητας του OpenStreetMap."
+    },
+    "ko-github": {
+      "description": "{community} στο GitHub"
     },
     "kp-wiki": {
       "description": "{community} Οδηγός Χαρτογράφησης"
@@ -522,9 +531,6 @@
     },
     "osm-africa-slack": {
       "description": "Όλοι είναι ευπρόσδεκτοι! Εγγραφείτε στο {signupUrl}"
-    },
-    "osm-asia-facebook": {
-      "description": "Ομάδα Facebook OpenStreetMap Ασίας"
     },
     "osm-at": {
       "description": "Η πλατφόρμα για πληροφορίες σχετικά με το OpenStreetMap στην Αυστρία"
@@ -664,6 +670,9 @@
     },
     "sg-wiki": {
       "description": "{community} Wiki σελίδα"
+    },
+    "si-github": {
+      "description": "{community} στο GitHub"
     },
     "si-ljubljana-wiki": {
       "description": "{community} Wiki σελίδα"

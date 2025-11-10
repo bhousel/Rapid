@@ -48,15 +48,6 @@
       "Geoportal2-PL-water-pipe_WMS": {
         "description": "Ang Krajowa Integracja Uzbrojenia Terenu ay isang pinagsama-samang serbisyo para sa pagpapakita ng datos tungkol sa mga imprastrukturang pang-utility ng lupa, na direktang nagmumula sa mga yunit sa antas ng powiat (county). Ang serbisyong ito ay naglalaman lamang ng datos mula sa mga yunit na may WMS service na may angkop na mga parameter at kusang-loob na isinama ang kanilang WMS service sa pinagsama-samang serbisyo ng Krajowa Integracja Uzbrojenia Terenu."
       },
-      "OSIP": {
-        "description": "Ang Ohio Statewide Imagery Program III ay naglalaman ng pinakabagong orto-imaheng saklaw ang bawat county sa Ohio, na may resolusyon mula 1 foot hanggang 3 inches, mula taong 2017 hanggang 2020."
-      },
-      "OSIP_1ft": {
-        "description": " Ang Ohio Statewide Imagery Program II ay naglalaman ng orto-imaheng sumasaklaw sa lahat ng 88 county sa Ohio, na may resolusyon na 1 foot, mula taong 2011 hanggang 2014."
-      },
-      "OSIP_6in": {
-        "description": "Ang Ohio Statewide Imagery Program III ay naglalaman ng orto-imaheng ng 40 county na kinunan sa 6-inch na resolusyon noong 2017 at 2018, kasama ang mga imahe mula sa OSIP I at OSIP II sa 16 pang county mula 2010 hanggang 2014."
-      },
       "gothenburg-ortho_latest": {
         "name": "Pinakabagong Gothenburg Orthophoto"
       },

@@ -18,7 +18,7 @@
           "terms": "AC, A/C"
         },
         "backcountry": {
-          "terms": "Boonies"
+          "terms": "Wilderness"
         },
         "barrier": {
           "options": {
@@ -35,7 +35,7 @@
         },
         "building": {
           "options": {
-            "kindergarten": "Preschool / Nursery Building",
+            "kindergarten": "Preschool Building",
             "riding_hall": "Horse Riding Arena",
             "static_caravan": "Static Caravan",
             "terrace": "Terrace Houses"
@@ -65,10 +65,13 @@
           "label": "Nappy Changing Table"
         },
         "charge_fee": {
-          "placeholder": "1 EUR, 5 USD, 10 CAD…"
+          "placeholder": "10 AUD…"
         },
         "charge_toll": {
-          "placeholder": "1 EUR, 5 USD, 10 CAD…"
+          "placeholder": "10 AUD…"
+        },
+        "climbing/length": {
+          "label": "Length (Metres)"
         },
         "colour": {
           "label": "Colour"
@@ -166,7 +169,6 @@
         },
         "fuel/fuel_multi": {
           "options": {
-            "HGV_diesel": "Lorry Diesel",
             "e10": "E10 Petrol",
             "e85": "E85 Petrol",
             "octane_100": "Petrol (100 Octane)",
@@ -294,7 +296,7 @@
         },
         "office": {
           "options": {
-            "estate_agent": "Estate Agent",
+            "estate_agent": "Real Estate Agent",
             "union": "Union Office"
           }
         },
@@ -304,7 +306,7 @@
         "parking": {
           "options": {
             "layby": {
-              "title": "Lay-By"
+              "title": "Breakdown Bay"
             }
           }
         },
@@ -322,7 +324,6 @@
           "terms": "Payment Methods"
         },
         "phone": {
-          "placeholder": "+61 1 2345 6789",
           "terms": "Phone, Phone Number"
         },
         "recycling_type": {
@@ -471,7 +472,7 @@
         },
         "amenity/fuel": {
           "name": "Service Station\nPetrol Station",
-          "terms": "Gas Station,Service Station"
+          "terms": "Service Station,Petrol Station"
         },
         "amenity/ice_cream/frozen_yogurt": {
           "name": "Frozen Yoghurt Shop"
@@ -479,9 +480,6 @@
         "amenity/internet_cafe": {
           "name": "Internet Café",
           "terms": "cybercafe,taxiphone,teleboutique,coffee,cafe,net,lanhouse,internet cafe"
-        },
-        "amenity/kindergarten": {
-          "name": "Preschool / Nursery Grounds"
         },
         "amenity/parking": {
           "name": "Car Park\nParking Lot",
@@ -507,11 +505,11 @@
         "amenity/post_box": {
           "name": "Post Box"
         },
-        "amenity/prep_school": {
-          "name": "Exam Preparation"
+        "amenity/public_bookcase": {
+          "terms": "Street Library"
         },
         "amenity/ranger_station": {
-          "name": "Warden Station"
+          "name": "Park Ranger Office"
         },
         "amenity/recycling_centre": {
           "name": "Recycling Centre"
@@ -549,7 +547,7 @@
           "name": "Trolley Bay"
         },
         "amenity/vacuum_cleaner": {
-          "name": "Car Hoover Service"
+          "name": "Vehicle Vacuum Cleaning Station"
         },
         "amenity/vehicle_inspection": {
           "terms": "car inspection, mot test, mot centre"
@@ -558,7 +556,7 @@
           "name": "Elongated Coin Vending Machine"
         },
         "amenity/vending_machine/excrement_bags": {
-          "name": "Poo Bag Dispenser",
+          "name": "Dog Poo Bag Dispenser",
           "terms": "poo,excrement bags,poop,waste,dog,animal,pet"
         },
         "amenity/vending_machine/feminine_hygiene": {
@@ -571,7 +569,8 @@
           "name": "Public Transport Ticket Vending Machine"
         },
         "amenity/vending_machine/sweets": {
-          "name": "Sweets Vending Machine"
+          "name": "Sweets Vending Machine",
+          "terms": "sweets,candy,lollies"
         },
         "amenity/waste_basket": {
           "name": "Rubbish Bin"
@@ -622,7 +621,7 @@
           "name": "Terraced house"
         },
         "building/kindergarten": {
-          "name": "Preschool / Nursery Building"
+          "name": "Preschool Building"
         },
         "building/pavilion": {
           "terms": "sports,pavilion"
@@ -639,6 +638,9 @@
         "club/sport": {
           "terms": "athletics club,sporting club,sports association,sports society,sport club"
         },
+        "craft/confectionery": {
+          "terms": "sweets,candy,lollies"
+        },
         "emergency/fire_hose": {
           "terms": "fire hose reel,fhr,riser,dry riser,standpipe,stand pipe"
         },
@@ -646,7 +648,7 @@
           "name": "Fire Brigade Connection"
         },
         "entrance/emergency_ward_entrance": {
-          "name": "Accident and Emergency Entrance"
+          "name": "Emergency Department Entrance"
         },
         "golf/bunker": {
           "name": "Golf Bunker"
@@ -704,7 +706,7 @@
           "terms": "Yield,Sign"
         },
         "highway/living_street": {
-          "name": "Shared Zone Road"
+          "name": "Living Street\nShared Zone"
         },
         "highway/milestone": {
           "name": "Road Milestone"
@@ -720,7 +722,7 @@
           "terms": "streetlamp,street lamp,lamp,light,gaslight"
         },
         "highway/track": {
-          "name": "Track / Land-Access Road\nFire Trail",
+          "name": "Track / Land-Access Road\nFire Trail\nManagement Trail",
           "terms": "fire trail"
         },
         "highway/traffic_signals": {
@@ -738,9 +740,6 @@
         },
         "landuse/military/range": {
           "terms": "shooting range,shooting,range,gun,army,military,defence force"
-        },
-        "landuse/residential/apartments": {
-          "name": "Flat Complex"
         },
         "leisure/adult_gaming_centre": {
           "name": "Adult Gaming Centre"
@@ -774,9 +773,6 @@
         },
         "leisure/pitch/rugby_union": {
           "name": "Rugby Union Pitch"
-        },
-        "leisure/pitch/soccer": {
-          "name": "Football Pitch"
         },
         "leisure/pitch/table_soccer": {
           "name": "Table Football Table"
@@ -814,7 +810,7 @@
           "terms": "job,career,careers,vocational,vocation,occupation"
         },
         "office/estate_agent": {
-          "name": "Estate Agent"
+          "name": "Real Estate Agent"
         },
         "office/it": {
           "terms": "computer,information,software,technology,tech,it,ict,information technology"
@@ -876,7 +872,7 @@
         },
         "shop/alcohol": {
           "name": "Bottle Shop (Alcohol Shop)",
-          "terms": "alcohol,beer,booze,wine,off licence,off license"
+          "terms": "alcohol,beer,booze,wine,bottle shop,bottle o"
         },
         "shop/appliance": {
           "name": "Appliance Shop"
@@ -963,10 +959,10 @@
           "name": "Computer Shop"
         },
         "shop/confectionery": {
-          "name": "Sweet Shop"
+          "name": "Sweet Shop",
+          "terms": "sweets,candy,lollies"
         },
         "shop/convenience": {
-          "name": "Convenience Store / Dairy",
           "terms": "dairy,superette,convenience store,convenience shop,corner store,corner shop"
         },
         "shop/copyshop": {
@@ -1163,7 +1159,7 @@
           "name": "Tyre Shop"
         },
         "shop/vacuum_cleaner": {
-          "name": "Hoover Shop"
+          "name": "Vacuum Cleaner Shop"
         },
         "shop/variety_store": {
           "name": "Discount shop"

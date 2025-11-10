@@ -1,6 +1,9 @@
 {
   "pt-BR": {
     "imagery": {
+      "EOXAT2017CLOUDLESS": {
+        "description": "Imagens de satélite Sentinel pós-processadas."
+      },
       "EOXAT2018CLOUDLESS": {
         "attribution": {
           "text": "Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH (Contém dados Copernicus Sentinel modificados 2017 e 2018)"
@@ -19,6 +22,12 @@
       "EOXAT2022CLOUDLESS": {
         "description": "Imagens de satélite Sentinel pós-processadas."
       },
+      "EOXAT2023CLOUDLESS": {
+        "description": "Imagens de satélite Sentinel pós-processadas."
+      },
+      "EOXAT2024CLOUDLESS": {
+        "description": "Imagens de satélite Sentinel pós-processadas."
+      },
       "EsriWorldImagery": {
         "attribution": {
           "text": "Termos e Comentários"
@@ -32,6 +41,10 @@
         },
         "description": "Arquivo de imagens da Esri que podem ser mais claras e precisas do que a camada padrão.",
         "name": "Imagens globais da Esri (Clareadas) Beta"
+      },
+      "FOMI_2015_leafoff_20cm": {
+        "description": "Ortofotos do governo sem folhagem e resolução de 20 cm/pixel para 6 distritos. Esta camada deve ser usada como uma base de alinhamento na falta de uma referência mais precisa. Imagens no formato WEBP, o JOSM precisa de um plugin webp para elas.",
+        "name": "Ortofotos FÖMI 2015 20cm sem folhagem (webp)"
       },
       "Geoportal2-PL-City-boundaries_WMS": {
         "attribution": {

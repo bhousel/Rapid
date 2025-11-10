@@ -1,6 +1,9 @@
 {
   "hr": {
     "imagery": {
+      "Bedzin-PL-buildings": {
+        "name": "Będzin: Zgrade"
+      },
       "Bing": {
         "description": "Satelitske i zračne snimke."
       },

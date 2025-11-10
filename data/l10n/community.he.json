@@ -32,7 +32,6 @@
       "openstreetmapbrasilia": "OpenStreetMap ברזיליה",
       "openstreetmapbremen": "OpenStreetMap ברמן",
       "openstreetmapbulgaria": "OpenStreetMap בולגריה",
-      "openstreetmapburkinafaso": "OpenStreetMap בורקיה פאסו",
       "openstreetmapburundi": "OpenStreetMap בורונדי",
       "openstreetmapbzh": "OpenStreetMap לאזורים הברטוניים",
       "openstreetmapcambodia": "OpenStreetMap קמבודיה",
@@ -46,7 +45,6 @@
       "openstreetmapchina": "OpenStreetMap סין",
       "openstreetmapcologne": "OpenStreetMap קלן",
       "openstreetmapcomunitatvalenciana": "OpenStreetMap הקהילה האוטונומית ולנסיה",
-      "openstreetmapcostarica": "OpenStreetMap קוסטה ריקה",
       "openstreetmapcotedivoire": "OpenStreetMap קוט דיוואר (חוף השנהב)",
       "openstreetmapcroatia": "OpenStreetMap קרואטיה",
       "openstreetmapcuba": "OpenStreetMap קובה",
@@ -85,7 +83,6 @@
       "openstreetmapguinea": "OpenStreetMap גינאה",
       "openstreetmaphaiti": "OpenStreetMap האיטי",
       "openstreetmaphamburg": "OpenStreetMap המבורג",
-      "openstreetmaphonduras": "OpenStreetMap הונדורס",
       "openstreetmaphongkong": "OpenStreetMap הונג קונג",
       "openstreetmaphungary": "OpenStreetMap הונגריה",
       "openstreetmapiceland": "OpenStreetMap איסלנד",
@@ -99,7 +96,6 @@
       "openstreetmapitalylazio": "OpenStreetMap איטליה-לאציו",
       "openstreetmapitalylombardia": "OpenStreetMap איטליה-לומברדיה",
       "openstreetmapitalypiemonte": "OpenStreetMap איטליה-פיימונטה",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap איטליה-דרום טירול",
       "openstreetmapitalytrentino": "OpenStreetMap איטליה-טרנטינו",
       "openstreetmapjapan": "OpenStreetMap יפן",
       "openstreetmapkarlsruhe": "OpenStreetMap קרלסרוהה",
@@ -108,10 +104,8 @@
       "openstreetmapkerala": "OpenStreetMap קרלה",
       "openstreetmapkorea": "OpenStreetMap קוריאה",
       "openstreetmapkosovo": "OpenStreetMap קוסובו",
-      "openstreetmapkyrgyzstan": "OpenStreetMap קירגיסטן",
       "openstreetmaplatinamerica": "OpenStreetMap אמריקה הלטינית",
       "openstreetmaplatvia": "OpenStreetMap לטביה",
-      "openstreetmaplebanon": "OpenStreetMap לבנון",
       "openstreetmaplesotho": "OpenStreetMap לסוטו",
       "openstreetmapliberia": "OpenStreetMap ליבריה",
       "openstreetmaplibya": "OpenStreetMap לוב",
@@ -166,7 +160,6 @@
       "openstreetmapsaudiarabia": "OpenStreetMap ערב הסעודית",
       "openstreetmapsenegal": "OpenStreetMap סנגל",
       "openstreetmapserbia": "OpenStreetMap סרביה",
-      "openstreetmapseychelles": "OpenStreetMap איי סיישל",
       "openstreetmapsierraleone": "OpenStreetMap סיירה לאון",
       "openstreetmapsingapore": "OpenStreetMap סינגפור",
       "openstreetmapslovenia": "OpenStreetMap סלובניה",
@@ -177,7 +170,6 @@
       "openstreetmapsudan": "OpenStreetMap סודאן",
       "openstreetmapsweden": "OpenStreetMap שוודיה",
       "openstreetmapswitzerland": "OpenStreetMap שווייץ",
-      "openstreetmapsyria": "OpenStreetMap סוריה",
       "openstreetmaptaiwan": "OpenStreetMap טאיוואן",
       "openstreetmaptanzania": "OpenStreetMap טנזניה",
       "openstreetmapthailand": "OpenStreetMap תאילנד",
@@ -195,6 +187,7 @@
       "openstreetmapvenezuela": "OpenStreetMap ונצואלה",
       "openstreetmapvietnam": "OpenStreetMap וייטנאם",
       "openstreetmapwarszawa": "OpenStreetMap ורשה",
+      "openstreetmapwestbengal": "OpenStreetMap מערב בנגל",
       "openstreetmapwesternsahara": "OpenStreetMap סהרה המערבית",
       "openstreetmapzambia": "OpenStreetMap זמביה",
       "openstreetmapzimbabwe": "OpenStreetMap זימבבואה",
@@ -283,16 +276,8 @@
         "name": "{community} בטיקטוק",
         "description": "ניתן לעקוב אחרינו בטיקטוק"
       },
-      "twitter": {
-        "name": "{community} ב־𝕏",
-        "description": "ניתן לעקוב אחרינו ב־𝕏"
-      },
       "wiki": {
         "name": "ויקי־מיזם של {community}"
-      },
-      "x": {
-        "name": "{community} ב־𝕏",
-        "description": "ניתן לעקוב אחרינו ב־𝕏"
       },
       "xmpp": {
         "name": "ה־XMPP של {community} ",
@@ -344,9 +329,6 @@
     },
     "be-discourse": {
       "description": "פורום לדיונים על OpenStreetMap בבלגיה"
-    },
-    "be-irc": {
-      "extendedDescription": "ניתן להצטרף ל־‎#{account} תחת irc.oftc.net (פתחה 6667), הוא מקושר לערוץ הצ׳אט ב־Matrix"
     },
     "be-matrix": {
       "description": "כל הממפים מוזמנים!",
@@ -461,9 +443,6 @@
     "de-mainz-signal": {
       "description": "OpenStreetMap במיינץ, ויסבאדן וסביבתן"
     },
-    "de-mainz-telegram": {
-      "description": "OpenStreetMap במיינץ ובסביבתה"
-    },
     "de-mainz-wiki": {
       "description": "OpenStreetMap במיינץ ובסביבתה"
     },
@@ -555,9 +534,6 @@
     },
     "hu-matrix": {
       "extendedDescription": "שיחה בנושאי מפות סביב OpenStreetMap. אחד מפורומי התמיכה של קהילת OSM."
-    },
-    "hu-meetup": {
-      "description": "הפלטפורמה לכינוס מפגשים בהונגריה"
     },
     "hu-wiki": {
       "description": "עמוד הוויקי של {community}"
@@ -681,11 +657,6 @@
     },
     "osm-benin-facebook": {
       "description": "שיפור OpenStreetMap בבנין"
-    },
-    "OSM-Central-Salish-Sea": {
-      "name": "OpenStreetMap מרכז ים סאליש",
-      "description": "ממפים ומשתמשי OpenStreetMap סביב מאונט ורנון, וירג׳יניה",
-      "extendedDescription": "OpenStreetMap היא מפת העולם שנוצרת על ידי אנשים כמוך. זו מפה בהרכבתך, שמוגשת לציבור בחינם כמו ויקיפדיה. כדאי לבקר ב־osm.org למידע נוסף. אנו נפגשים כל הזמן ומדברים על מפות, ממפים ונהנים!"
     },
     "osm-ch": {
       "description": "הפלטפורמה למידע על OpenStreetMap בשווייץ"
@@ -943,9 +914,6 @@
     "talk-mg": {
       "description": "מקום לתורמים, קהילות ומשתמשי OpenStreetMap במדגסקר לשתף ולדון זה עם זה."
     },
-    "talk-nz": {
-      "description": "השיח הקהילתי של OSM ניו־זילנד"
-    },
     "tn-facebook-group": {
       "name": "קבוצת הפייסבוק של {community}"
     },
@@ -1023,10 +991,6 @@
     "ym-Clemson-University": {
       "name": "ממפי קלמסון",
       "description": "ממפים צעירים באוניברסיטת קלמסון"
-    },
-    "ym-College-of-William-and-Mary": {
-      "name": "בכל רחבי המפה!",
-      "description": "ממפים צעירים ב College of William and Mary"
     },
     "ym-Cornell-University": {
       "name": "ארגון מיפוי",
@@ -1412,10 +1376,6 @@
     },
     "ym-University-of-Wyoming": {
       "description": "ממפים צעירים ב University of Wyoming"
-    },
-    "ym-UW-Madison": {
-      "name": "מפות בדג'ר",
-      "description": "ממפים צעירים בUW-Madison"
     },
     "ym-Vassar-College": {
       "name": "ממפי עמק הדסון",

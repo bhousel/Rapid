@@ -27,7 +27,6 @@
       "openstreetmapchile": "OpenStreetMap Ĉilio",
       "openstreetmapchina": "OpenStreetMap Ĉinio",
       "openstreetmapcologne": "OpenStreetMap Kolonjo",
-      "openstreetmapcostarica": "OpenStreetMap Kostariko",
       "openstreetmapcotedivoire": "OpenStreetMap Ebur-Bordo",
       "openstreetmapcroatia": "OpenStreetMap Kroatio",
       "openstreetmapcuba": "OpenStreetMap Kubo",
@@ -50,7 +49,6 @@
       "openstreetmapguinea": "OpenStreetMap Gvineo",
       "openstreetmaphaiti": "OpenStreetMap Haitio",
       "openstreetmaphamburg": "OpenStreetMap Hamburgo",
-      "openstreetmaphonduras": "OpenStreetMap Honduro",
       "openstreetmaphongkong": "OpenStreetMap Honkongo",
       "openstreetmaphungary": "OpenStreetMap Hungario",
       "openstreetmapiceland": "OpenStreetMap Islando",
@@ -63,16 +61,13 @@
       "openstreetmapitaly": "OpenStreetMap Italujo",
       "openstreetmapitalylazio": "OpenStreetMap Italio-Lazio",
       "openstreetmapitalylombardia": "OpenStreetMap Italio-Lombardio",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Italio-Suda Tirolo",
       "openstreetmapitalytrentino": "OpenStreetMap Italio-Trentino",
       "openstreetmapjapan": "OpenStreetMap Japanio",
       "openstreetmapkazakhstan": "OpenStreetMap Kazastanio",
       "openstreetmapkenya": "OpenStreetMap Kenjo",
       "openstreetmapkorea": "OpenStreetMap Koreio",
-      "openstreetmapkyrgyzstan": "OpenStreetMap Kirgizio",
       "openstreetmaplatinamerica": "OpenStreetMap Latin-Ameriko",
       "openstreetmaplatvia": "OpenStreetMap Latvio",
-      "openstreetmaplebanon": "OpenStreetMap Libano",
       "openstreetmaplesotho": "OpenStreetMap Lesoto",
       "openstreetmapliberia": "OpenStreetMap Liberio",
       "openstreetmaplibya": "OpenStreetMap Libio",
@@ -115,7 +110,6 @@
       "openstreetmapsaudiarabia": "OpenStreetMap Saŭdiarabio",
       "openstreetmapsenegal": "OpenStreetMap Senegalo",
       "openstreetmapserbia": "OpenStreetMap Serbio",
-      "openstreetmapseychelles": "OpenStreetMap Sejŝeloj",
       "openstreetmapsierraleone": "OpenStreetMap Sieraleono",
       "openstreetmapsingapore": "OpenStreetMap Singapuro",
       "openstreetmapslovenia": "OpenStreetMap Slovenio",
@@ -126,7 +120,6 @@
       "openstreetmapsudan": "OpenStreetMap Sudano",
       "openstreetmapsweden": "OpenStreetMap Svedio",
       "openstreetmapswitzerland": "OpenStreetMap Svislando",
-      "openstreetmapsyria": "OpenStreetMap Sirio",
       "openstreetmaptaiwan": "OpenStreetMap Tajvano",
       "openstreetmaptanzania": "OpenStreetMap Tanzanio",
       "openstreetmapthailand": "OpenStreetMap Tajlando",
@@ -212,14 +205,8 @@
       "tiktok": {
         "description": "Sekvu nin ĉe TikTok"
       },
-      "twitter": {
-        "description": "Sekvu nin ĉe 𝕏"
-      },
       "wiki": {
         "name": "VikiProjekto {community}"
-      },
-      "x": {
-        "description": "Sekvu nin ĉe 𝕏"
       },
       "xmpp": {
         "name": "{community} ĉe XMPP"
@@ -299,9 +286,6 @@
     "hr-github": {
       "description": "{community} ĉe GitHub"
     },
-    "hu-meetup": {
-      "description": "Platformo por organizi kunvenojn en Hungarujo"
-    },
     "ko-github": {
       "description": "{community} ĉe GitHub"
     },
@@ -340,10 +324,6 @@
     },
     "osm-at": {
       "description": "Platformo de informoj pri OpenStreetMap en Aŭstrujo"
-    },
-    "OSM-Central-Salish-Sea": {
-      "description": "Mapigistoj kaj uzantoj de OpenStreetMap proksime de Mount Vernon (Vaŝingtonio)",
-      "extendedDescription": "OpenStreetMap estas mapo de la mondo farata de homoj kiel vi. Ĝi estas mapo, kiun vi kreas kaj kiu estas donata senpage kiel Vikipedio. Rigardu osm.org por pli da informo. Ni renkontas por pridiskuti mapojn, fari mapojn kaj ĝui!"
     },
     "OSM-Chattanooga": {
       "description": "Grupo de uzantoj de OpenStreetMap en Chattanooga"

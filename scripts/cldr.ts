@@ -1,4 +1,6 @@
-import { Glob } from 'bun';
+//import { Glob } from 'bun';
+import fs from 'node:fs/promises';
+
 
 //
 // This script gets all the supported language names from CLDR
@@ -24,7 +26,6 @@ const skipLanguages = new Set([
   'und',   // "undefined"
   'zxx'    // "no linguistic content / not applicable"
 ]);
-
 
 
 export type LangCode = string;       // e.g. 'en', 'en-GB', 'zh-CN'
@@ -59,14 +60,17 @@ export async function langNamesInNativeLang(): Map<LangCode, LangInfo> {
   results.set('zh_pinyin', { base: 'zh', script: 'Latn' });
 
   // The directory names are the codes
-  const glob = new Glob(`${CLDR_ROOT}/**/languages.json`);
-  for (const filepath of glob.scanSync()) {
+  //  const glob = new Glob(`${CLDR_ROOT}/**/languages.json`);
+  //  for (const filepath of glob.scanSync())
+  for await (const filepath of fs.glob(`${CLDR_ROOT}/**/languages.json`)) {
     const match = filepath.match(/\/([\w-]+)\/languages\.json$/);  // capture the code
     if (!match) continue;
     const code = match[1];
     if (!code) continue;
 
-    const json = await Bun.file(filepath).json();
+    //const json = await Bun.file(filepath).json();
+    const contents = await fs.readFile(filepath, 'utf8');
+    const json = JSON.parse(contents);
     const languageData = json.main[code];
     const identity = languageData.identity;
 
@@ -91,7 +95,10 @@ export async function langNamesInNativeLang(): Map<LangCode, LangInfo> {
   // CLDR locales don't cover all the languages people might want to use for OSM tags,
   // so also add the language names that we have English translations for
   const languagesFile = `${CLDR_ROOT}/en/languages.json`;
-  const languagesJSON = await Bun.file(languagesFile).json();
+  //const languagesJSON = await Bun.file(languagesFile).json();
+  const languagesContents = await fs.readFile(languagesFile, 'utf8');
+  const languagesJSON = JSON.parse(languagesContents);
+
   const englishNamesByCode = languagesJSON.main.en.localeDisplayNames.languages;
   for (const code of Object.keys(englishNamesByCode)) {
     if (results.has(code)) continue;
@@ -122,10 +129,18 @@ export async function languageNamesInLanguageOf(code: LangCode): Map<LangCode, s
   if (substitutions[code])  code = substitutions[code];
 
   const results = new Map<LangCode, string>();
-  const file = Bun.file(`${CLDR_ROOT}/${code}/languages.json`);
-  if (!await file.exists()) return results;
+  //const file = Bun.file(`${CLDR_ROOT}/${code}/languages.json`);
+  //if (!await file.exists()) return results;
+  //const languagesJSON = await file.json();
 
-  const languagesJSON = await file.json();
+  let contents, languagesJSON;
+  try {
+    contents = await fs.readFile(`${CLDR_ROOT}/${code}/languages.json`, 'utf8');
+    languagesJSON = JSON.parse(contents);
+  } catch (err) {
+    return results;  // no languages file?
+  }
+
   const languages = languagesJSON.main[code].localeDisplayNames.languages;
 
   for (const [code, name] of Object.entries(languages)) {
@@ -165,10 +180,18 @@ export async function scriptNamesInLanguageOf(code: LangCode): Map<ScriptCode, s
   if (substitutions[code])  code = substitutions[code];
 
   const results = new Map<ScriptCode, string>();
-  const file = Bun.file(`${CLDR_ROOT}/${code}/scripts.json`);
-  if (!await file.exists()) return results;
+  //const file = Bun.file(`${CLDR_ROOT}/${code}/scripts.json`);
+  //if (!await file.exists()) return results;
+  //const scriptsJSON = await file.json();
 
-  const scriptsJSON = await file.json();
+  let contents, scriptsJSON;
+  try {
+    contents = await fs.readFile(`${CLDR_ROOT}/${code}/scripts.json`, 'utf8');
+    scriptsJSON = JSON.parse(contents);
+  } catch (err) {
+    return results;  // no scripts file?
+  }
+
   const scripts = scriptsJSON.main[code].localeDisplayNames.scripts;
 
   for (const [code, name] of Object.entries(scripts)) {

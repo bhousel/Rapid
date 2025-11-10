@@ -110,6 +110,13 @@
       "Dourados_Ortofotos": {
         "description": "Dourados (2018) a několik okresů (2020) ve vysokém rozlišení."
       },
+      "EOXAT2017CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 bez mraků - https://s2maps.eu od EOX IT Services GmbH (Obsahuje upravená data z Copernicus Sentinel 2017)"
+        },
+        "description": "Následně zpracované snímky ze satelitu Sentinel.",
+        "name": "eox.at 2017 bez mraků"
+      },
       "EOXAT2018CLOUDLESS": {
         "attribution": {
           "text": "Sentinel-2 bez mraků – https://s2maps.eu – od společnosti EOX IT Services GmbH (obsahuje upravená data Copernicus Sentinel 2017 a 2018)"
@@ -144,6 +151,20 @@
         },
         "description": "Následně zpracované snímky ze satelitu Sentinel.",
         "name": "eox.at 2022 bez mraků"
+      },
+      "EOXAT2023CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 bez mraků - https://s2maps.eu od EOX IT Services GmbH (Obsahuje upravená data z Copernicus Sentinel 2023)"
+        },
+        "description": "Následně zpracované snímky ze satelitu Sentinel.",
+        "name": "eox.at 2023 bez mraků"
+      },
+      "EOXAT2024CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 bez mraků - https://s2maps.eu od EOX IT Services GmbH (Obsahuje upravená data z Copernicus Sentinel 2024)"
+        },
+        "description": "Následně zpracované snímky ze satelitu Sentinel.",
+        "name": "eox.at 2024 bez mraků"
       },
       "EsriWorldImagery": {
         "attribution": {
@@ -517,22 +538,8 @@
         "attribution": {
           "text": "Celostátní snímkovací program v Ohiu"
         },
-        "description": "Celostátní snímkovací program III v Ohiu - nejaktuálnější ortosnímky každého kraje při rozlišeních od 1 stopy do 3 palců od roku 2017 do roku 2020.",
+        "description": "Nejaktuálnější letecké snímky Celostátního snímkovacího programu v Ohiu III všech okresů v rozlišeních od 6 palců do 1 palce od roku 2017 do roku 2024.",
         "name": "Celostátní snímkovací program v Ohiu"
-      },
-      "OSIP_1ft": {
-        "attribution": {
-          "text": "Celostátní snímkovací program v Ohiu"
-        },
-        "description": "Ortosnímky Celostátního snímkovacího programu v Ohiu II všech 88 okresů v rozlišení jedné stopy v letech 2011 až 2014.",
-        "name": "Celostátní snímkovací program v Ohiu jednostopý"
-      },
-      "OSIP_6in": {
-        "attribution": {
-          "text": "Celostátní snímkovací program v Ohiu"
-        },
-        "description": "Ortosnímky Celostátního snímkovacího programu v Ohiu III 40 okresů pořízené v 6palcovém rozlišení v letech 2017 a 2018 plus snímky OSIP I a OSIP II v 16 dalších okresech od roku 2010 do roku 2014.",
-        "name": "Celostátní snímkovací program v Ohiu 6palcový"
       },
       "OSMUK-Cadastral-Parcels": {
         "attribution": {
@@ -761,6 +768,10 @@
         "description": "Překrytí anotací poskytuje basemap.at.",
         "name": "Překryv basemap.at"
       },
+      "bg-maf-orthophoto-latest": {
+        "description": "Nejnovější letecké snímky poskytnuté Ministerstvem zemědělství a potravin Bulharska",
+        "name": "Letecké snímky Ministerstva zemědělství a potravin Bulharska"
+      },
       "cyclosm": {
         "attribution": {
           "text": "Zobrazení: CyclOSM (hostováno OpenStreetMap Francie) © Mapová data přispěvatelé OpenStreetMap"
@@ -778,7 +789,7 @@
           "text": "Ortofoto EUFAR Balaton 2010"
         },
         "description": "Fotografie se zeměpisnými souřadnicemi od Balaton Limnological Institute z roku 1940.",
-        "name": "Ortofoto EUFAR Balaton"
+        "name": "Letecké snímky EUFAR Balaton"
       },
       "geoscribble-latest": {
         "attribution": {
@@ -847,7 +858,7 @@
         "attribution": {
           "text": "Bezešvé fotosnímky Japonska (GSI)"
         },
-        "description": "Bezešvé snímky japonska od GSI. Kolekce nejnovějších snímků GSI, po neštěstí a další.",
+        "description": "Bezešvé snímky Japonska od GSI. Kolekce nejnovějších snímků GSI, po neštěstí a další.",
         "name": "Bezešvé snímky Japonska (GSI)"
       },
       "gsi<TX_DOT>go<TX_DOT>jp_std_map": {
@@ -1097,7 +1108,7 @@
           "text": "© oblast Stockholm, licence CC0"
         },
         "description": "Letecké snímky oblasti Stockholmu z roku 2018, licence CC0",
-        "name": "Ortofotomapy Stockholmu"
+        "name": "Letecké snímky Stockholm"
       },
       "susono_shizuoka_jp_orthophoto": {
         "attribution": {

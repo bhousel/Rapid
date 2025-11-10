@@ -3,6 +3,29 @@
     "_communities": {
       "openstreetmappoland": "OpenStreetMap بولندا"
     },
+    "_defaults": {
+      "fediverse": {
+        "name": "{مجتمع}"
+      },
+      "gitlab": {
+        "name": "{مجتمع} جيت لاب"
+      },
+      "group": {
+        "name": "{مجتمع}"
+      },
+      "irc": {
+        "name": "{مجتمع} على بروتوكول الدردشة عبر الإنترنت"
+      },
+      "osm": {
+        "name": "{مجتمع}"
+      },
+      "osm-lc": {
+        "name": "{مجتمع}"
+      },
+      "url": {
+        "name": "{مجتمع}"
+      }
+    },
     "be-matrix": {
       "description": "نرحب بجميع مصممي الخرائط!"
     },
@@ -20,6 +43,9 @@
     },
     "Galicia-Xeoinquedos-Twitter": {
       "description": "تابعنا على تويتر على {url}"
+    },
+    "osm-ch": {
+      "name": "{مجتمع}"
     },
     "osm-india-github": {
       "description": "برمج معنا: {url}"

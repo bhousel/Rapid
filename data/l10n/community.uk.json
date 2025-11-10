@@ -27,9 +27,9 @@
       "openstreetmapbosniaandherzegovina": "OpenStreetMap Боснія і Герцеговина",
       "openstreetmapbrasil": "OpenStreetMap Бразилія",
       "openstreetmapbrasilia": "OpenStreetMap Бразилія (місто)",
+      "openstreetmapbrasilminasgerais": " OpenStreetMap Бразилія Мінас-Жерайс",
       "openstreetmapbremen": "OpenStreetMap Бремен",
       "openstreetmapbulgaria": "OpenStreetMap Болгарія",
-      "openstreetmapburkinafaso": "OpenStreetMap Буркіна-Фасо",
       "openstreetmapburundi": "OpenStreetMap Бурунді",
       "openstreetmapcambodia": "OpenStreetMap Камбоджа",
       "openstreetmapcameroon": "OpenStreetMap Камерун",
@@ -42,7 +42,6 @@
       "openstreetmapchina": "OpenStreetMap Китай",
       "openstreetmapcologne": "OpenStreetMap Кельн",
       "openstreetmapcomunitatvalenciana": "OpenStreetMap Спільнота Валенсії",
-      "openstreetmapcostarica": "OpenStreetMap Коста-Ріка",
       "openstreetmapcotedivoire": "OpenStreetMap Кот-д'Івуар",
       "openstreetmapcroatia": "OpenStreetMap Хорватія",
       "openstreetmapcuba": "OpenStreetMap Куба",
@@ -78,7 +77,6 @@
       "openstreetmapguinea": "OpenStreetMap Гвінея",
       "openstreetmaphaiti": "OpenStreetMap Гаїті",
       "openstreetmaphamburg": "OpenStreetMap Гамбург",
-      "openstreetmaphonduras": "OpenStreetMap Гондурас",
       "openstreetmaphongkong": "OpenStreetMap Гонконг",
       "openstreetmaphungary": "OpenStreetMap Угорщина",
       "openstreetmapiceland": "OpenStreetMap Ісландія",
@@ -92,7 +90,6 @@
       "openstreetmapitalylazio": "OpenStreetMap Італія-Лаціо",
       "openstreetmapitalylombardia": "OpenStreetMap Італія-Ломбардія",
       "openstreetmapitalypiemonte": "OpenStreetMap Італія-П'ємонт",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Італія-Південний Тіроль",
       "openstreetmapitalytrentino": "OpenStreetMap Італія-Трентіно",
       "openstreetmapjapan": "OpenStreetMap Японія",
       "openstreetmapkarlsruhe": "OpenStreetMap Карлсруе",
@@ -101,10 +98,8 @@
       "openstreetmapkerala": "OpenStreetMap Керала",
       "openstreetmapkorea": "OpenStreetMap Корея",
       "openstreetmapkosovo": "OpenStreetMap Косово",
-      "openstreetmapkyrgyzstan": "OpenStreetMap Киргизстан",
       "openstreetmaplatinamerica": "OpenStreetMap Латинська Америка",
       "openstreetmaplatvia": "OpenStreetMap Латвія",
-      "openstreetmaplebanon": "OpenStreetMap Ліван",
       "openstreetmaplesotho": "OpenStreetMap Лесото",
       "openstreetmapliberia": "OpenStreetMap Ліберія",
       "openstreetmaplibya": "OpenStreetMap Лівія",
@@ -149,6 +144,8 @@
       "openstreetmappiemonte": "OpenStreetMap П'ємонт",
       "openstreetmappoland": "OpenStreetMap Польща",
       "openstreetmapportugal": "OpenStreetMap Португалія",
+      "openstreetmappuglia": "OpenStreetMap  Апулія",
+      "openstreetmappunjab": "OpenStreetMap Пенджаб",
       "openstreetmaprennes": "OpenStreetMap Ренн",
       "openstreetmapreunion": "OpenStreetMap Реюньйон",
       "openstreetmapriograndedosul": "OpenStreetMap Ріо-Гранді-ду-Сул",
@@ -158,7 +155,6 @@
       "openstreetmapsaudiarabia": "OpenStreetMap Саудівська Аравія",
       "openstreetmapsenegal": "OpenStreetMap Сенегал",
       "openstreetmapserbia": "OpenStreetMap Сербія",
-      "openstreetmapseychelles": "OpenStreetMap Сейшельські острови",
       "openstreetmapsierraleone": "OpenStreetMap Сьєрра-Леоне",
       "openstreetmapsingapore": "OpenStreetMap Сінгапур",
       "openstreetmapslovenia": "OpenStreetMap Словенія",
@@ -169,7 +165,6 @@
       "openstreetmapsudan": "OpenStreetMap Судан",
       "openstreetmapsweden": "OpenStreetMap Швеція",
       "openstreetmapswitzerland": "OpenStreetMap Швейцарія",
-      "openstreetmapsyria": "OpenStreetMap Сирія",
       "openstreetmaptaiwan": "OpenStreetMap Тайвань",
       "openstreetmaptanzania": "OpenStreetMap Танзанія",
       "openstreetmapthailand": "OpenStreetMap Таїланд",
@@ -192,6 +187,7 @@
       "openstreetmapzambia": "OpenStreetMap Замбія",
       "openstreetmapzimbabwe": "OpenStreetMap Зімбабве",
       "osmcolombia": "OSM  Колумбія",
+      "osmewikiemiliaromagna": "OSM та Вікі Емілія-Романья",
       "osmmainz": "OSM Майнц"
     },
     "_defaults": {
@@ -263,12 +259,12 @@
         "description": "Слідкуйте за нами у TikTok"
       },
       "twitter": {
-        "name": "{community} в 𝕏",
-        "description": "Слідкуйте за нами в 𝕏"
+        "name": "{community} в X",
+        "description": "Слідкуйте за нами в X"
       },
       "x": {
-        "name": "{community} в 𝕏",
-        "description": "Слідкуйте за нами в 𝕏"
+        "name": "{community} в X",
+        "description": "Слідкуйте за нами в X"
       },
       "xmpp": {
         "description": "Приєднуйтесь до нашого чату XMPP: {url}"
@@ -314,9 +310,6 @@
     },
     "be-discourse": {
       "description": "Форум обговорення питань OpenStreetMap в Бельгії"
-    },
-    "be-irc": {
-      "extendedDescription": "Приєднуйтесь до # {account} на irc.oftc.net (порт 6667), він пов’язаний з каналом чату Matrix"
     },
     "be-matrix": {
       "description": "Ласкаво просимо всіх маперів!",
@@ -514,9 +507,6 @@
     "de-mainz-signal": {
       "description": "OpenStreetMap в Майнці, Вісбадені та Умгебунзі"
     },
-    "de-mainz-telegram": {
-      "description": "OpenStreetMap в Майнці та околицях"
-    },
     "de-mainz-wiki": {
       "description": "OpenStreetMap в Майнці та околицях"
     },
@@ -628,9 +618,6 @@
     "hu-matrix": {
       "extendedDescription": "OpenStreetMap чат про мапи. Один з форумів підтримки спільноти OSM."
     },
-    "hu-meetup": {
-      "description": "Платформа для організації зустрічей маперів з Угорщині"
-    },
     "hu-mobilizon": {
       "name": "{community} на Mobilizon",
       "description": "Найближчі події спільноти OpenStreetMap в Угорщині"
@@ -639,10 +626,13 @@
       "description": "Дізнайтесь про поточні завдання для мапінгу в Угорщині"
     },
     "hu-website": {
-      "description": "Ми допомагаємо розвивати та вдосконалювати OpenStreetMap в Угорщині."
+      "description": "Вебсайт угорської спільноти OpenStreetMap"
     },
     "hu-wiki": {
       "description": "{community} - сторінка у Вікі"
+    },
+    "hu-youtube": {
+      "description": "Прямі трансляції та записи зустрічей OpenStreetMap Угорщина"
     },
     "humanitarian-osm-tr-slack": {
       "name": "Humanitarian OpenStreetMap Турція Slack",
@@ -672,7 +662,10 @@
       "description": "Ми допомагаємо розвивати та вдосконалювати OpenStreetMap в Італії."
     },
     "it-discourse": {
-      "description": "Місце де ви можете обговорити питання пов'язані з OpenStreetMap"
+      "description": "Форум обговорення питань OpenStreetMap в Італії"
+    },
+    "it-emilia-romagna-telegram": {
+      "description": "Всі бажаючі можуть приєднатися! Ви можете увійти в чат за цим посиланням: {signupUrl}"
     },
     "ivides_website": {
       "description": "Ми зосереджені на сталому розвитку, картографії та підтримці спільноти OpenStreetMap."
@@ -755,6 +748,9 @@
     "MappingWR": {
       "description": "Робимо простим пошук маршрутів з обмеженнями рівня викидів вуглецю у регіоні Ватерлоо."
     },
+    "MapRVA": {
+      "description": "MapRVA — це група ентузіастів картографії з Річмонда, штат Вірджинія, які працюють над створенням та поширенням геопросторових даних нашого міста за допомогою OpenStreetMap."
+    },
     "maptime-bogota-facebook": {
       "description": "Ми група осіб зацікавлених в мапігу в OpenStreetMap в Боготі та навколо. ",
       "extendedDescription": "Навчіться збирати дані у полі та додавати їх в OpenStreetMap. Не обовʼязково мати попередні знання! Вам просто потрібно бажання брати участь, вчитися та отримувати задоволення."
@@ -805,6 +801,9 @@
     },
     "me-telegram": {
       "description": "Запрошуємо всіх! Зареєструйтеся на {signupUrl}"
+    },
+    "minas_gerais-discord": {
+      "extendedDescription": "Ласкаво просимо в Дискорд OSM Мінас-Жерайс! Ми — спільнота маперів, які захоплюються створенням детальних, відкритих мап Мінас-Жерайс, Бразилія. Приєднуйтесь до нас, щоб співпрацювати, ділитися порадами та допомагати робити мапи Мінас-Жерайс найкращими на OpenStreetMap. Незалежно від того, чи ви новачок, чи професіонал, нумо створювати мапи разом!"
     },
     "mm-facebook": {
       "extendedDescription": "Мапите в М'янмі? Маєте питання, бажаєте зв'язатись зі спільнотою? Приєднуйтесь до нас за адресою {url}. Ласкаво просимо!"
@@ -878,10 +877,6 @@
     "OSM-AR-wiki": {
       "description": "Все, що вам потрібно знати про мапінг в Аргентині."
     },
-    "osm-asia-facebook": {
-      "description": "OpenStreetMap Азія група у Facebook",
-      "extendedDescription": "Група для комплексної підтримки мапінгу в Азії. Ми прагнемо бути тим місцем, де мапери, які не мають місцевої спільноти, можуть обмінюватися інформацією та співпрацювати вирішуючи проблеми у своїх регіонах, які інакше вони не змогли б розвʼязати."
-    },
     "osm-at": {
       "description": "Інформація про OpenStreetMap в Австрії"
     },
@@ -896,11 +891,6 @@
     },
     "osm-benin-facebook": {
       "description": "Покращуйте OpenStreetMap у Беніні"
-    },
-    "OSM-Central-Salish-Sea": {
-      "name": "OpenStreetMap море Селіш",
-      "description": "Мапери та користувачі OpenStreetMap навколо гори Вернон, Вашингтон",
-      "extendedDescription": "OpenStreetMap – це мапа світу, створена такими людьми, як ви. Це мапа, подібна до Вікіпедії, яка розповсюджується вільно. Перегляньте osm.org, щоб дізнатися більше. Ми постійно зустрічаємось, щоб поговорити про мапи, помапити та отримати задоволення!"
     },
     "osm-ch": {
       "description": "Інформація про OpenStreetMap у Швейцарії"
@@ -1065,6 +1055,13 @@
       "description": "Список розсилки FSHM Puducherry для обговорення мапінгу та інших речей в Пудучеррі.",
       "extendedDescription": "FSHM організовує події пов'язані з вільним програмним та апаратним забезпеченням, технологіями, розповсюдженням інформації про них та OpenStreetMap."
     },
+    "osm-punjab-matrix": {
+      "description": "Мапимо Пенджаб разом. Приєднуйтесь до нашої групи Matrix",
+      "extendedDescription": "Неофіційний чат для OSM Пенджабу, також повʼязаний з групою OSMPunjab у Telegram"
+    },
+    "osm-punjab-telegram": {
+      "description": "Ми мапимо Пенджаб разом. Приєднуйтесь до нашої групи телеграм. {url}"
+    },
     "OSM-Rome-meetup": {
       "name": "Зустріч маперів Риму",
       "description": "Покращуйте OpenStreetMap в Римі",
@@ -1187,13 +1184,6 @@
     "talk-mg": {
       "description": "Місце, де учасники OpenStreetMap, спільнота та користувачі з Мадагаскару поширюють інформацію та обмінюються думками"
     },
-    "talk-nz": {
-      "description": "Місце спілкування спільноти OSM Нової Зеландії"
-    },
-    "talk-pacific": {
-      "description": "Регіональний список розсилки OSM маперів Моана/Океанії/Тихого океану",
-      "extendedDescription": "Ми хотіли б, щоб цей список розсилки був підтримкою для усіх маперів Тихого океану, у всьому нашому розмаїтті та прагненнях, місцем де можна ставити запитання, ділитися думками, проєктами та всім, що стосується OpenStreetMap у нашому морі островів."
-    },
     "tn-facebook-group": {
       "name": "{community} - група у Facebook"
     },
@@ -1230,9 +1220,6 @@
     "uk-london-wiki": {
       "description": "{community} - сторінка у Вікі"
     },
-    "uk-loomio": {
-      "name": "OpenStreetMap UK у Loomio"
-    },
     "us-discourse": {
       "description": "Форум для обговорення OpenStreetMap в Сполучених Штатах"
     },
@@ -1240,16 +1227,9 @@
       "name": "Talk-us-massachusetts Список розсилки",
       "description": "Список розсилки OSM спільноти штату Массачусетс"
     },
-    "us-newyork-mailinglist": {
-      "name": "Talk-us-newyork Список розсилки",
-      "description": "Список розсилки OSM спільноти штату Нью-Йорк"
-    },
     "uy-irc": {
       "description": "Приєднуйтесь до # {account} на irc.oftc.net (порт 6667)",
       "extendedDescription": "Приєднуйтесь до # {account} на irc.freenode.org"
-    },
-    "vn-mailinglist": {
-      "description": "Список розсилки OpenStreetMap у В'єтнамі"
     },
     "vn-wiki": {
       "description": "{community} - сторінка у Вікі"
@@ -1309,10 +1289,6 @@
     "ym-Clemson-University": {
       "description": "Осередок YouthMappers в Університеті Клемсона",
       "extendedDescription": "Студенти в Клемсоні отримують підтримку від Центру геопросторових технологій, спільноти міждисциплінарних практиків геопросторових наук, які підтримують дослідницьку, навчальну та інформаційно-просвітницьку діяльність з використанням технологій, які дозволяють збирати, аналізувати та застосовувати геопросторові дані. Студенти інтегрують геопросторові технології у свою наукову діяльність з усіх дисциплін і налагоджують зв’язки по всьому світу."
-    },
-    "ym-College-of-William-and-Mary": {
-      "description": "Осередок YouthMappers в Коледжі Вільяма і Мері",
-      "extendedDescription": "Студенти, які працюють по всій мапі, отримують підтримку від Центру геопросторового аналізу, групи, яка допомагає інтегрувати вивчення ГІС в навчальний план та надає студентам і викладачам апаратне, програмне забезпечення, а також ділиться своїм досвідом. Студенти будь-якого факультету використовують ГІС у своєму навчанні, включаючи науку про навколишнє середовище та політику, геологію, історію, бізнес, соціологію, біологію, антропологію, державну політику та вивчення океанів та морів."
     },
     "ym-Cornell-University": {
       "name": "Картографічне товариство",
@@ -1824,10 +1800,6 @@
     "ym-University-of-Zimbabwe": {
       "description": "Осередок YouthMappers в Університеті Зімбабве",
       "extendedDescription": "UzMappersTeam Zimbabwe — це команда волонтерів, які використовують OpenStreetMap для мапінгу, створення відкритих даних і мапінгу для реагування на гуманітарні катастрофи. Команда надає своїм членам навички геопросторових технологій з відкритим кодом."
-    },
-    "ym-UW-Madison": {
-      "description": "Осередок YouthMappers в UW-Медісон",
-      "extendedDescription": "BadgerMaps — це відділення молодіжної організації Youthmappers, яка займається наданням гуманітарних послуг і картографічних послуг для громади. Ми об’єднуємо нашу волонтерську мережу з можливостями для створення даних ГІС для проєктів, які цього потребують."
     },
     "ym-Vassar-College": {
       "name": "Мапери долини Гудзон",

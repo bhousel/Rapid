@@ -27,7 +27,6 @@
       "openstreetmapchina": "OpenStreetMap Chiny",
       "openstreetmapcologne": "OpenStreetMap Kolonia",
       "openstreetmapcomunitatvalenciana": "OpenStreetMap Walencja",
-      "openstreetmapcostarica": "OpenStreetMap Kostaryka",
       "openstreetmapcotedivoire": "OpenStreetMap Wybrzeże Kości Słoniowej",
       "openstreetmapcroatia": "OpenStreetMap Chorwacja",
       "openstreetmapcuba": "OpenStreetMap Kuba",
@@ -69,16 +68,13 @@
       "openstreetmapitalylazio": "OpenStreetMap Lacjum, Włochy",
       "openstreetmapitalylombardia": "OpenStreetMap Lombardia, Włochy",
       "openstreetmapitalypiemonte": "OpenStreetMap Piemont, Włochy",
-      "openstreetmapitalysouthtyrol": "OpenStreetMap Tyrol Południowy, Włochy",
       "openstreetmapitalytrentino": "OpenStreetMap Trydent, Włochy",
       "openstreetmapjapan": "OpenStreetMap Japonia",
       "openstreetmapkazakhstan": "OpenStreetMap Kazachstan",
       "openstreetmapkenya": "OpenStreetMap Kenia",
       "openstreetmapkosovo": "OpenStreetMap Kosowo",
-      "openstreetmapkyrgyzstan": "OpenStreetMap Kirgistan",
       "openstreetmaplatinamerica": "OpenStreetMap Ameryka Łacińska",
       "openstreetmaplatvia": "OpenStreetMap Łotwa",
-      "openstreetmaplebanon": "OpenStreetMap Liban",
       "openstreetmaplibya": "OpenStreetMap Libia",
       "openstreetmaplithuania": "OpenStreetMap Litwa",
       "openstreetmapljubljana": "OpenStreetMap Lublana",
@@ -109,7 +105,6 @@
       "openstreetmaprussia": "OpenStreetMap Rosja",
       "openstreetmaprwanda": "OpenStreetMap Ruanda",
       "openstreetmapsaudiarabia": "OpenStreetMap Arabia Saudyjska",
-      "openstreetmapseychelles": "OpenStreetMap Seszele",
       "openstreetmapsingapore": "OpenStreetMap Singapur",
       "openstreetmapslovenia": "OpenStreetMap Słowenia",
       "openstreetmapsouthafrica": "OpenStreetMap RPA",
@@ -216,14 +211,6 @@
         "name": "{community} na TikToku",
         "description": "Obserwuj nas na TikToku"
       },
-      "twitter": {
-        "name": "{community} na 𝕏",
-        "description": "Obserwuj nas na 𝕏"
-      },
-      "x": {
-        "name": "{community} na 𝕏",
-        "description": "Obserwuj nas na 𝕏"
-      },
       "xmpp": {
         "name": "XMPP {community}",
         "description": "Dołącz do naszego czatu społeczności na XMPP: {url}"
@@ -273,9 +260,6 @@
     },
     "be-discourse": {
       "description": "Forum dyskusyjne OpenStreetMab w Belgii"
-    },
-    "be-irc": {
-      "extendedDescription": "Wejdź na kanał #{account} na irc.oftc.net (port 6667), który jest połączony z kanałem Matrixa"
     },
     "be-matrix": {
       "description": "Wszyscy mapujący są mile widziani!",
@@ -491,9 +475,6 @@
     "hu-matrix": {
       "extendedDescription": "Czat OpenStreetMap na tematy mapowania. Jedno z forów wsparcia społeczności OSM."
     },
-    "hu-meetup": {
-      "description": "Platforma do organizowania spotkań na Węgrzech"
-    },
     "hu-mobilizon": {
       "name": "{community} na Mobilizon",
       "description": "Nadchodzące wydarzenia dla społeczności Węgierskiej OpenStreetMap "
@@ -501,9 +482,6 @@
     "hu-tm": {
       "name": "Menedżer zadań {community}",
       "description": "Przeglądaj aktywne zadania mapowe na Węgrzech"
-    },
-    "hu-website": {
-      "description": "Pomagamy rozwijać i ulepszać OpenStreetMap na Węgrzech."
     },
     "hu-wiki": {
       "description": "Strona Wiki {community}"
@@ -731,10 +709,6 @@
     },
     "osm-benin-facebook": {
       "description": "Ulepsz OpenStreetMap w Beninie"
-    },
-    "OSM-Central-Salish-Sea": {
-      "description": "Mapujący i użytkownicy OpenStreetMap z okolic Mount Vernon",
-      "extendedDescription": "OpenStreetMap to mapa świata robiona przez ludzi takich, jak ty. To mapa, którą ty tworzysz, która jest rozdawana za darmo, jak Wikipedia. Wejdź na osm.org, aby dowiedzieć się więcej. Spotykamy się ciągle, żeby porozmawiać o mapach, tworzyć je i dobrze się bawić!"
     },
     "osm-ch": {
       "description": "Platforma z informacjami o OpenStreetMap w Szwajcarii"
@@ -974,12 +948,6 @@
     "talk-mg": {
       "description": "Miejsce rozmów twórców, społeczności i użytkowników OpenStreetMap na Madagaskarze."
     },
-    "talk-nz": {
-      "description": "Lista dyskusyjna nowozelandzkiej społeczności OSM"
-    },
-    "talk-pacific": {
-      "extendedDescription": "Chcielibyśmy, aby ta lista mailingowa wspierała wszystkie narody Pacyfiku, w całej naszej różnorodności i aspiracjach, aby dzielić się przemyśleniami, pytaniami, projektami i wszystkim, co dotyczy OpenStreetMap na naszym morzu wysp."
-    },
     "tn-facebook-group": {
       "name": "Grupa {community} na Facebooku"
     },
@@ -1060,9 +1028,6 @@
     "ym-Clemson-University": {
       "name": "Mapujący z Clemson",
       "description": "Oddział YouthMappers na Uniwersytecie w Clemson"
-    },
-    "ym-College-of-William-and-Mary": {
-      "description": "Oddział YouthMappers na College of William & Mary"
     },
     "ym-Cornell-University": {
       "name": "YouthMappers na Cornell University",
@@ -1457,9 +1422,6 @@
     },
     "ym-University-of-Zimbabwe": {
       "description": "Oddział YouthMappers na Uniwersytecie w Zimbabwe"
-    },
-    "ym-UW-Madison": {
-      "description": "Oddział YouthMappers na Uniwersytecie Wisconsin w Madison"
     },
     "ym-Vassar-College": {
       "description": "Oddział YouthMappers na Vassar College"

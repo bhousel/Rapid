@@ -44,7 +44,6 @@
       "openstreetmapgermany": "OpenStreetMap Alemanya",
       "openstreetmapgreece": "OpenStreetMap Grècia",
       "openstreetmaphaiti": "OpenStreetMap Haití",
-      "openstreetmaphonduras": "OpenStreetMap Hondures",
       "openstreetmaphungary": "OpenStreetMap Hongria",
       "openstreetmapiceland": "OpenStreetMap Islàndia",
       "openstreetmapindia": "OpenStreetMap Índia",
@@ -54,10 +53,8 @@
       "openstreetmapitalytrentino": "OpenStreetMap Italia-Trentino",
       "openstreetmapjapan": "OpenStreetMap Japó",
       "openstreetmapkorea": "OpenStreetMap Corea",
-      "openstreetmapkyrgyzstan": "OpenStreetMap Kirguizstan",
       "openstreetmaplatinamerica": "OpenStreetMap Amèrica Llatina",
       "openstreetmaplatvia": "OpenStreetMap Letònia",
-      "openstreetmaplebanon": "OpenStreetMap Líban",
       "openstreetmapliberia": "OpenStreetMap Libèria",
       "openstreetmaplibya": "OpenStreetMap Líbia",
       "openstreetmaplithuania": "OpenStreetMap Lituània",
@@ -92,7 +89,6 @@
       "openstreetmapsouthsudan": "OpenStreetMap Sudan del Sud",
       "openstreetmapsweden": "OpenStreetMap Suècia",
       "openstreetmapswitzerland": "OpenStreetMap Suïssa",
-      "openstreetmapsyria": "OpenStreetMap Síria",
       "openstreetmaptanzania": "OpenStreetMap Tanzània",
       "openstreetmapthailand": "OpenStreetMap Tailàndia",
       "openstreetmaptunisia": "OpenStreetMap Tunísia",
@@ -180,16 +176,8 @@
         "name": "{community} a Threads",
         "description": "Segueix-nos a Threads"
       },
-      "twitter": {
-        "name": "{community} a 𝕏",
-        "description": "Segueix-nos a 𝕏"
-      },
       "wiki": {
         "name": "WikiProject d'{community}"
-      },
-      "x": {
-        "name": "{community} a 𝕏",
-        "description": "Segueix-nos a 𝕏"
       },
       "xmpp": {
         "name": "XMPP d'{community}"
@@ -254,11 +242,17 @@
       "description": "Segueix-nos a Twitter: {url}",
       "extendedDescription": "Aquest és l'identificacdor oficial dels Joves Cartografistes de la Universitat de Cape Coast, Ghana. Ens encanten els mapes, les dades obertes i ajudar a les persones vulnerables."
     },
+    "castilla-y-leon-wiki": {
+      "description": "Tot el que has de saber sobre mapejar en Castella i Lleó: {url}"
+    },
     "cat-github": {
       "description": "Projectes de la comunitat dels Països Catalans d'OpenStreetMap a GitHub"
     },
     "cat-matrix": {
       "description": "Grup de Matrix per la comunitat d'OpenStreetMap dels Països Catalans"
+    },
+    "cat-twitch": {
+      "name": "Canal de Twitch de {community}"
     },
     "cat-wiki": {
       "description": "Espai de coordinació per la comunitat d'OpenStreetMap als Països Catalans: {url}"
@@ -272,8 +266,24 @@
     "cl-telegram": {
       "extendedDescription": "Uniu-vos a la comunitat per aprendre més sobre OpenStreetMap, fer preguntes o participar en les nostres reunions. Tothom és benvingut!"
     },
+    "co-discourse": {
+      "name": "Tòpic de debats de la comunitat d'OSM sobre Colòmbia",
+      "description": "Aquests són els tòpics relacionats amb canvis del mapa a Colòmbia"
+    },
+    "co-facebook": {
+      "name": "Grup de {community} a Facebook",
+      "description": "Grup de conversació de problemes amb OSM a Colòmbia"
+    },
+    "co-talk": {
+      "name": "Llista de correus electrònics de {community}",
+      "description": "Correus electrònics que requereixen comunicar informació amb la comunitat"
+    },
+    "co-telegram": {
+      "name": "Grup de conversació de {community} a Telegram",
+      "description": "Debats oberts sobre tòpics d'interés general de la comunitat sencera. És el canal més actiu"
+    },
     "comunitat-valenciana-wiki": {
-      "description": "Tot el que necessites conèixer sobre mapejar a la Comunitat Valenciana"
+      "description": "Tot el que necessites conèixer sobre mapejar a la Comunitat Valenciana: {url}"
     },
     "de-aachen-wiki": {
       "description": "Pàgina wiki {community}"
@@ -317,32 +327,82 @@
     "DF-telegram": {
       "extendedDescription": "Uniu-vos a la comunitat per aprendre més sobre OpenStreetMap, fer preguntes o participar en les nostres reunions. Tots són benvinguts!"
     },
+    "dk-discourse": {
+      "description": "Un fòrum de debat sobre OpenStreetMap a Dinamarca"
+    },
+    "ee-wiki": {
+      "description": "Informació relacionada amb mapejat específicament a Estònia."
+    },
     "fr-35-wiki": {
       "description": "Pàgina wiki {community}"
     },
     "fr-38-wiki": {
       "description": "Pàgina wiki {community}"
     },
+    "fr-bzh-website": {
+      "description": "El mapa que parla Bretó"
+    },
+    "fr-chapter": {
+      "description": "Ajudem a OpenStreetMap a créixer i millorar a França."
+    },
+    "fr-discord": {
+      "name": "Comunitat de Discord d'OpenStreetMap de França"
+    },
     "fr-montrouge-wiki": {
       "description": "Pàgina wiki {community}"
     },
+    "fr-telegram": {
+      "description": "Grup de Telegram per a la comunitat d'OSM de França: {url}"
+    },
+    "galicia-wiki": {
+      "description": "Tot el que has de saber sobre mapejar a Galícia: {url}"
+    },
     "Galicia-Xeoinquedos-Twitter": {
+      "name": "Xeoinquedos a Twitter",
       "description": "Segueix-nos a Twitter: {url}"
     },
     "hr-github": {
       "description": "GitHub d'{community}"
     },
+    "hr-wiki": {
+      "description": "Pàgina wikiproject per a Croàcia"
+    },
     "hu-facebook-group": {
       "name": "Grup de Facebook {community}"
+    },
+    "hu-mobilizon": {
+      "description": "Esdeveniments pròxims per a la comunitat d'OpenStreetMap a Hongria"
+    },
+    "hu-tm": {
+      "description": "Explorar tasques actives de mapejat a Hongria"
+    },
+    "hu-website": {
+      "description": "El lloc web de la comunitat hongaresa d'OpenStreetMap"
     },
     "hu-wiki": {
       "description": "Pàgina wiki {community}"
     },
+    "id-facebook": {
+      "extendedDescription": "Mapejant a Indonèsia? Tens preguntes, vols connectar amb la comunitat d'ací? Uniu-vos a {url}. Tots són benvinguts!"
+    },
     "id-facebook-group": {
-      "name": "Grup de Facebook {community}"
+      "name": "Grup de Facebook {community}",
+      "extendedDescription": "Mapejant a Indonèsia? Tens preguntes, vols connectar amb la comunitat d'ací? Uniu-vos a {url}. Tots són benvinguts!"
+    },
+    "ireland-chapter": {
+      "description": "Ajudem a OpenStreetMap a créixer i millorar a Irlanda."
+    },
+    "is-chapter": {
+      "description": "Ajudem OpenStreetMap a créixer i millorar a Islàndia."
+    },
+    "it-chapter": {
+      "description": "Ajudem OpenStreetMap a créixer i millorar a Itàlia."
     },
     "ko-github": {
       "description": "GitHub d'{community}"
+    },
+    "ko-osm": {
+      "description": "Ajudem OpenStreetMap a créixer i millorar a Corea."
     },
     "madrid-uam-ym": {
       "name": "YouthMappers a la UAM",
@@ -350,6 +410,9 @@
     },
     "madrid-upm-ym": {
       "name": "Mapeig Humanitari"
+    },
+    "mn-facebook": {
+      "extendedDescription": "Mapejant a Mongòlia? Tens preguntes o vols connectar amb la comunitat d'ací? Unix-te'ns a {url}. Tothom és benvingut!"
     },
     "nl-matrix": {
       "description": "Tots els mapejadors són benvinguts!"
@@ -360,11 +423,34 @@
     "osm-africa-matrix": {
       "description": "Tots els mapejadors són benvinguts!"
     },
+    "osm-africa-slack": {
+      "description": "Tothom és benvingut! Registra't a {signupUrl}"
+    },
     "osm-deep-south-wiki": {
       "description": "Pàgina wiki {community}"
     },
+    "OSM-Discord": {
+      "description": "Servidor de Discord no oficial i gestionat per la comunitat per a la comunitat global d'OpenStreetMap. S'hi disposa de canals regionals."
+    },
+    "OSM-Discourse": {
+      "name": "Fòrum de comunitat d'OpenStreetMap",
+      "description": "Un lloc compartit per a converses sobre OpenStreetMap"
+    },
+    "osm-hr": {
+      "description": "La plataforma per a informació a OpenStreetMap a Croàcia"
+    },
     "OSM-India-facebook": {
-      "description": "Millora OpenStreetMap a l'Índia"
+      "description": "Millora OpenStreetMap a l'Índia",
+      "extendedDescription": "Mapejant a l'Índia? Tens preguntes, vols connectar amb la comunitat d'ací? Unix-te'ns a {url}. Tothom és benvingut!"
+    },
+    "OSM-india-twitter": {
+      "description": "Estem només a un tuit: {url}"
+    },
+    "osm-india-website": {
+      "description": "Mapejadors i usuaris d'OpenStreetMap a l'Índia"
+    },
+    "osm-india-wiki": {
+      "description": "Tot el que has de saber en mapejar a l'Índia: {url}"
     },
     "OSM-japan-facebook": {
       "description": "Mapadors i usuaris d'OpenStreetMap a Japó"
@@ -381,6 +467,12 @@
     "OSM-SoCal": {
       "name": "OpenStreetMap Califòrnia del Sud",
       "extendedDescription": "OpenStreetMap (OSM) Califòrnia del Sud és per a tothom interessat en el mapatge que s'uneixi a treballar amb OpenStreetMap. OpenStreetMap, la Viquipèdia dels mapes, és un mapa de codi obert gratuït del món sent creat per més de 1000000 de voluntaris al voltant del món. Tothom és benvingut. Si no coneixes OpenStreetMap, t'ensenyarem. Si tens una idea d'un projecte de mapatge o fins i tot una excursió de camp que el grup pot fer, genial!"
+    },
+    "osm-tw": {
+      "description": "Ajudem OpenStreetMap a créixer i millorar a Taiwan."
+    },
+    "OSM-US": {
+      "description": "Ajudem OpenStreetMap a créixer i millorar als Estats Units."
     },
     "OSMF": {
       "name": "Fundació OpenStreetMap",

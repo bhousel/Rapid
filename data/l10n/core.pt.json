@@ -197,6 +197,36 @@
             "many": "Os cantos de {n} elementos foram esquadrados.",
             "other": "Os cantos de {n} elementos foram esquadrados."
           }
+        },
+        "multiple_blockers": {
+          "one": "Este objeto não pode ser enquadrado por múltiplas razões.",
+          "many": "Estes objetos não podem ser enquadrados por múltiplas razões.",
+          "other": "Aquele objeto não pode ser enquadrado por múltiplas razões."
+        },
+        "end_vertex": {
+          "one": "Isto não pode ser enquadrado porque é um ponto final.",
+          "many": "Estes não podem ser enquadrados porque são pontos finais.",
+          "other": "Estes não podem ser enquadrados porque são pontos finais."
+        },
+        "square_enough": {
+          "one": "Este objeto não pode ser mais enquadrado do que já está.",
+          "many": "Estes objetos não podem ser mais quadrados do que já estão.",
+          "other": "Estes objetos não podem ser mais quadrados do que já estão."
+        },
+        "not_squarish": {
+          "one": "Este objeto não pode ser enquadrado porque não é quadrado.",
+          "many": "Esses objetos não podem ser enquadrados porque não são quadrados.",
+          "other": "Esses objetos não podem ser enquadrados porque não são quadrados."
+        },
+        "too_large": {
+          "one": "Isto não pode ser enquadrado porque uma parte dele não está visível.",
+          "many": "Estes não podem ser enquadrados porque uma parte deles não estão visíveis.",
+          "other": "Estes não podem ser enquadrados porque uma parte deles não estão visíveis."
+        },
+        "connected_to_hidden": {
+          "one": "Este objeto não pode ser enquadrado porque está conectado à um recurso oculto.",
+          "many": "Estes objetos não podem ser enquadrados porque alguns estão conectados à recursos ocultos.",
+          "other": "Estes objetos não podem ser enquadrados porque alguns estão conectados à recursos ocultos."
         }
       },
       "straighten": {
@@ -2893,6 +2923,7 @@
       "hax": "haida do sul",
       "he": "hebraico",
       "hi": "hindi",
+      "hi-Latn": "hindi (latim)",
       "hil": "hiligaynon",
       "hit": "hitita",
       "hmn": "hmong",
@@ -2969,6 +3000,8 @@
       "ksf": "bafia",
       "ksh": "kölsch",
       "ku": "curdo",
+      "ku-menu-core": "curdo",
+      "ku-menu-extension": "curmânji",
       "kum": "kumyk",
       "kut": "kutenai",
       "kv": "komi",

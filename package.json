@@ -41,7 +41,8 @@
     "test": "run-s lint test:unit test:browser",
     "test:browser": "bun test --dots --preload ./test/test_setup.js ./test/browser/**/*.js",
     "test:unit": "bun test --dots --coverage ./test/unit",
-    "translations": "bun ./scripts/tx_pull.js"
+    "translations": "node --experimental-strip-types ./scripts/tx_pull.ts",
+    "translations_BUN": "bun ./scripts/tx_pull.js"
   },
   "dependencies": {
     "@mapbox/geojson-area": "^0.2.2",

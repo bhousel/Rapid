@@ -55,6 +55,12 @@
         },
         "name": "Częstochowa：建筑"
       },
+      "EOXAT2017CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 无云 - https://s2maps.eu 由EOX IT Services GmbH提供（包含修改后的 Copernicus Sentinel 数据 2019）"
+        },
+        "name": "eox.at 2019 无云"
+      },
       "EOXAT2018CLOUDLESS": {
         "description": "经后期处理的 Sentinel 卫星影像。"
       },
@@ -67,9 +73,28 @@
       "EOXAT2021CLOUDLESS": {
         "description": "经过后期处理的 Sentinel Satellite 图像。"
       },
+      "EOXAT2023CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 无云 - https://s2maps.eu 由EOX IT Services GmbH提供（包含修改后的 Copernicus Sentinel 数据 2023）"
+        },
+        "name": "eox.at 2023 无云"
+      },
+      "EOXAT2024CLOUDLESS": {
+        "attribution": {
+          "text": "Sentinel-2 无云 - https://s2maps.eu 由EOX IT Services GmbH提供（包含修改后的 Copernicus Sentinel 数据 2024）"
+        },
+        "name": "eox.at 2024 无云"
+      },
       "EsriWorldImageryClarity": {
         "description": "比默认图层或许更为清晰准确的 Esri 归档影像。",
         "name": "Esri 清晰世界影像 (测试版)"
+      },
+      "FOMI_2015": {
+        "name": "FÖMI 2015年正射影像图（WebP）"
+      },
+      "FOMI_2015_leafoff_20cm": {
+        "description": "基于政府的正射影像，分辨率为 20 厘米/像素，涵盖 6 个区。由于缺乏更准确的参照，该图层应用作对齐基础。WEBP 格式的影像，JOSM 需要 WEBP 插件程序。",
+        "name": "FÖMI 2015年叶落期正射影像图，分辨率20厘米（WebP）"
       },
       "Geoportal2-PL-City-boundaries_WMS": {
         "attribution": {
@@ -113,14 +138,14 @@
         "attribution": {
           "text": "波兰大地测量与制图总局"
         },
-        "description": "基于WMS的地图浏览服务允许您查看波兰地区的正射影像。 通过该服务提供的数据是由航空照片组成的正射影像图。 该服务提供对WMS Interface 1.3.0的支持。",
+        "description": "基于 WMS 的地图浏览服务允许你查看波兰地区的正射影像。 通过该服务提供的数据是由航空照片组成的正射影像图。 该服务提供对 WMS Interface 1.3.0 的支持。",
         "name": "Geoportal 2: 最新正射航空影像 （WMS）"
       },
       "Geoportal2-PL-aerial_image_WMTS": {
         "attribution": {
           "text": "波兰大地测量与制图总局"
         },
-        "description": "基于WMTS的地图浏览服务允许您查看波兰地区的正射影像。 通过该服务提供的数据是由航空照片组成的正射影像图。",
+        "description": "基于 WMTS 的地图浏览服务允许你查看波兰地区的正射影像。 通过该服务提供的数据是由航空照片组成的正射影像图。",
         "name": "Geoportal 2: 最新正射航空影像 （WMTS）"
       },
       "Geoportal2-PL-boundaries-of-communes_WMS": {
@@ -202,11 +227,21 @@
       "Gliwice-buildings": {
         "name": "Gliwice：建筑"
       },
+      "LSA-ALKIS-CP": {
+        "description": "根据官方房地产地籍记录进行地块的矢量记录。",
+        "name": "© GeoBasis-DE/LVermGeo LSA，ALKIS 土地登记地块"
+      },
       "LSA-ALKIS_BU": {
-        "description": "Saxony-anhalt 建筑形状"
+        "description": "Saxony-anhalt 建筑形状",
+        "name": "© GeoBasis-DE/LVermGeo 土地利用分类系统，ALKIS 建筑轮廓"
+      },
+      "LSA-ATKIS-HYN": {
+        "description": "水网记录（可能与实际情况存在精度差异，使用时需结合正射影像图进行综合判断）",
+        "name": "© GeoBasis-DE/LVermGeo 土地利用分类系统，ATKIS 水文网络"
       },
       "LSA-DVG": {
-        "description": "行政边界的向量纪录。包含了邦、郡、市镇或郡的一部分。"
+        "description": "行政边界的向量纪录。包含了邦、郡、市镇或郡的一部分。",
+        "name": "© GeoBasis-DE/LVermGeo 土地利用分类系统，数字行政边界"
       },
       "Lodz-2015": {
         "attribution": {
@@ -237,6 +272,30 @@
       "Mapbox": {
         "name": "Mapbox 卫星"
       },
+      "ORTOS_DGRF_2004_06": {
+        "attribution": {
+          "text": "地理信息由国土总局提供"
+        },
+        "name": "葡萄牙本土正射影像图 - 50厘米分辨率 - 2004-2006年（DGT）"
+      },
+      "ORTOS_DGT_2014_15": {
+        "attribution": {
+          "text": "地理信息由国土总局提供"
+        },
+        "name": "葡萄牙本土沿海地区正射影像图 - 10厘米分辨率 - 2014-2015年（DGT）"
+      },
+      "ORTOS_DGT_2018_WMS": {
+        "attribution": {
+          "text": "地理信息由国土总局提供"
+        },
+        "name": "葡萄牙本土正射影像图 - 25厘米分辨率 - 2018年（DGT）"
+      },
+      "ORTOS_DGT_2021_RGB": {
+        "attribution": {
+          "text": "地理信息由国土总局提供"
+        },
+        "name": "葡萄牙本土北部地区正射影像图 - 25厘米分辨率 - 2021年（DGT）"
+      },
       "OSMUK-Cadastral-Parcels": {
         "description": "在英国完全对齐的地籍（土地注册）的地图",
         "name": "OSMUK 地籍包"
@@ -245,6 +304,9 @@
         "attribution": {
           "text": "© Geofabrik 有限公司，OpenStreetMap 贡献者，CC-BY-SA"
         }
+      },
+      "OpenAerialMapMosaic": {
+        "description": "由 Kontur.io 提供的 OpenAerialMap 全部影像的融合图层"
       },
       "US-TIGER-Roads-2019": {
         "name": "TIGER 道路 2019"
@@ -337,6 +399,10 @@
           "text": "Zabrza 市政府"
         },
         "name": "Zabrze: Orthophotomap 2011 (航空影像)"
+      },
+      "bg-maf-orthophoto-latest": {
+        "description": "保加利亚农业与食品部提供的最新正射校正航拍影像。",
+        "name": "保加利亚 MAF 正射影像"
       },
       "cyclosm": {
         "attribution": {

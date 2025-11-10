@@ -11,6 +11,7 @@
     "bs": {"rtl": false},
     "ca": {"rtl": false},
     "ckb": {"rtl": true},
+    "cmn": {"rtl": false},
     "cs": {"rtl": false},
     "cy": {"rtl": false},
     "da": {"rtl": false},
