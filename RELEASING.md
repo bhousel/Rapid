@@ -42,7 +42,14 @@ bun run build
 git add . && git commit -m 'bun run imagery'
 
 # Update translations
-bun run translations
+# Note!! We need `node` for this currently, as of bun v1.3.
+# This script should be able to run under `bun`, but there is a bug which causes
+# `bun` to exit early.  I have not been able determine the cause or reproduce.
+# My best guess is that the Transifex code relies on `axios` to do the data fetching,
+# and there a handful of open `bun` issues with `axios`.
+# We could work around this by using the command line `tx` tool to get the files instead.
+# bun run translations
+node --experimental-strip-types ./scripts/tx_pull.ts
 bun run build
 git add . && git commit -m 'bun run translations'
 
