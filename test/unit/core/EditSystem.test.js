@@ -1,6 +1,5 @@
-import { beforeEach, describe, it } from 'bun:test';
+import { beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
-import sinon from 'sinon';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -95,10 +94,10 @@ describe('EditSystem', () => {
 
       it('emits events', () => {
         const editor = new Rapid.EditSystem(context);
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
-        const onHistoryJump = sinon.spy();
-        const onBackupStatusChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
+        const onHistoryJump = mock();
+        const onBackupStatusChange = mock();
         editor.on('stagingchange', onStagingChange);
         editor.on('stablechange', onStableChange);
         editor.on('historyjump', onHistoryJump);
@@ -108,10 +107,16 @@ describe('EditSystem', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            assert.isOk(onStagingChange.calledOnceWith(editor._fullDifference));
-            assert.isOk(onStableChange.calledOnceWith(editor._fullDifference));
-            assert.isOk(onHistoryJump.calledOnceWith(0, 0));
-            assert.isOk(onBackupStatusChange.calledOnceWith(true));
+            assert.lengthOf(onStagingChange.mock.calls, 1);
+            assert.lengthOf(onStableChange.mock.calls, 1);
+            assert.lengthOf(onHistoryJump.mock.calls, 1);
+            assert.lengthOf(onBackupStatusChange.mock.calls, 1);
+
+            assert.deepEqual(onStagingChange.mock.lastCall[0], editor._fullDifference);
+            assert.deepEqual(onStableChange.mock.lastCall[0], editor._fullDifference);
+            assert.strictEqual(onHistoryJump.mock.lastCall[0], 0);
+            assert.strictEqual(onHistoryJump.mock.lastCall[1], 0);
+            assert.strictEqual(onBackupStatusChange.mock.lastCall[0], true);
           });
       });
     });
@@ -210,10 +215,11 @@ describe('EditSystem', () => {
 
       it('emits a merge event with the new entities', () => {
         const n = new Rapid.OsmNode(context, { id: 'n1' });
-        const onMerge = sinon.spy();
+        const onMerge = mock();
         _editor.on('merge', onMerge);
         _editor.merge([n]);
-        assert.isTrue(onMerge.calledOnceWith(new Set([n.id])));
+        assert.lengthOf(onMerge.mock.calls, 1);
+        assert.deepEqual(onMerge.mock.lastCall[0], new Set([n.id]));  // first argument
       });
     });
 
@@ -248,28 +254,30 @@ describe('EditSystem', () => {
       });
 
       it('emits an stagingchange event only', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         const action = Rapid.actionNoop();
         const difference = _editor.perform(action);
-        assert.isTrue(onStagingChange.calledOnceWith(difference));
-        assert.isTrue(onStableChange.notCalled);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.deepEqual(onStagingChange.mock.lastCall[0], difference);  // first argument
+        assert.lengthOf(onStableChange.mock.calls, 0);
       });
 
       it('performs multiple actions, emits a single stagingchange event', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         const action1 = actionAddNode('n-1');
         const action2 = actionAddNode('n-2');
         const difference = _editor.perform(action1, action2);
-        assert.isTrue(onStagingChange.calledOnceWith(difference));
-        assert.isTrue(onStableChange.notCalled);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.deepEqual(onStagingChange.mock.lastCall[0], difference);  // first argument
+        assert.lengthOf(onStableChange.mock.calls, 0);
       });
     });
 
@@ -294,8 +302,8 @@ describe('EditSystem', () => {
       });
 
       it('returns a Promise to perform transitionable action, emits stagingchange events only', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
@@ -304,8 +312,8 @@ describe('EditSystem', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            assert.isAbove(onStagingChange.callCount, 2);
-            assert.isTrue(onStableChange.notCalled);
+            assert.isAbove(onStagingChange.mock.calls.length, 2);
+            assert.lengthOf(onStableChange.mock.calls, 0);
           });
       });
     });
@@ -330,19 +338,19 @@ describe('EditSystem', () => {
       it('emits stagingchange and stablechange events', () => {
         _editor.perform(actionAddNode('n-1'));
 
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         _editor.revert();
-        assert.strictEqual(onStagingChange.callCount, 1);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.lengthOf(onStableChange.mock.calls, 0);
       });
 
       it('does nothing if no work in progress', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
@@ -350,8 +358,8 @@ describe('EditSystem', () => {
         const stable = _editor.stable;
 
         _editor.revert();
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
         assert.strictEqual(_editor.staging, staging);   // same staging
         assert.strictEqual(_editor.stable, stable);     // same stable
       });
@@ -384,26 +392,26 @@ describe('EditSystem', () => {
       });
 
       it('emits stagingchange and stablechange events', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         _editor.perform(actionAddNode('n-1'));
-        assert.strictEqual(onStagingChange.callCount, 1);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
-        assert.strictEqual(onStagingChange.callCount, 2);
-        assert.strictEqual(onStableChange.callCount, 1);
+        assert.lengthOf(onStagingChange.mock.calls, 2);
+        assert.lengthOf(onStableChange.mock.calls, 1);
 
         _editor.perform(actionAddNode('n-2'));
-        assert.strictEqual(onStagingChange.callCount, 3);
-        assert.strictEqual(onStableChange.callCount, 1);
+        assert.lengthOf(onStagingChange.mock.calls, 3);
+        assert.lengthOf(onStableChange.mock.calls, 1);
 
         _editor.commit({ annotation: 'added a node', selectedIDs: ['n-2'] });
-        assert.strictEqual(onStagingChange.callCount, 4);
-        assert.strictEqual(onStableChange.callCount, 2);
+        assert.lengthOf(onStagingChange.mock.calls, 4);
+        assert.lengthOf(onStableChange.mock.calls, 2);
       });
     });
 
@@ -440,26 +448,26 @@ describe('EditSystem', () => {
       });
 
       it('emits stagingchange and stablechange events', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         _editor.perform(actionAddNode('n-1'));
-        assert.strictEqual(onStagingChange.callCount, 1);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
-        assert.strictEqual(onStagingChange.callCount, 2);
-        assert.strictEqual(onStableChange.callCount, 1);
+        assert.lengthOf(onStagingChange.mock.calls, 2);
+        assert.lengthOf(onStableChange.mock.calls, 1);
 
         _editor.perform(actionAddNode('n-2'));
-        assert.strictEqual(onStagingChange.callCount, 3);
-        assert.strictEqual(onStableChange.callCount, 1);
+        assert.lengthOf(onStagingChange.mock.calls, 3);
+        assert.lengthOf(onStableChange.mock.calls, 1);
 
         _editor.commitAppend({ annotation: 'added a node', selectedIDs: ['n-2'] });  // commitAppend
-        assert.strictEqual(onStagingChange.callCount, 4);
-        assert.strictEqual(onStableChange.callCount, 2);
+        assert.lengthOf(onStagingChange.mock.calls, 4);
+        assert.lengthOf(onStableChange.mock.calls, 2);
       });
     });
 
@@ -491,80 +499,80 @@ describe('EditSystem', () => {
       });
 
       it('emits stagingchange, stablechange, and historyjump events', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
-        const onHistoryJump = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
+        const onHistoryJump = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
         _editor.on('historyjump', onHistoryJump);
 
         _editor.perform(actionAddNode('n-1'));
-        assert.strictEqual(onStagingChange.callCount, 1);
-        assert.strictEqual(onStableChange.callCount, 0);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.lengthOf(onStableChange.mock.calls, 0);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
-        assert.strictEqual(onStagingChange.callCount, 2);
-        assert.strictEqual(onStableChange.callCount, 1);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 2);
+        assert.lengthOf(onStableChange.mock.calls, 1);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.perform(actionAddNode('n-2'));
-        assert.strictEqual(onStagingChange.callCount, 3);
-        assert.strictEqual(onStableChange.callCount, 1);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 3);
+        assert.lengthOf(onStableChange.mock.calls, 1);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
-        assert.strictEqual(onStagingChange.callCount, 4);
-        assert.strictEqual(onStableChange.callCount, 2);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 4);
+        assert.lengthOf(onStableChange.mock.calls, 2);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.perform(actionAddNode('n-3'));
-        assert.strictEqual(onStagingChange.callCount, 5);
-        assert.strictEqual(onStableChange.callCount, 2);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 5);
+        assert.lengthOf(onStableChange.mock.calls, 2);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-3', selectedIDs: ['n-3'] });
-        assert.strictEqual(onStagingChange.callCount, 6);
-        assert.strictEqual(onStableChange.callCount, 3);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 6);
+        assert.lengthOf(onStableChange.mock.calls, 3);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.undo();
-        assert.strictEqual(onStagingChange.callCount, 7);
-        assert.strictEqual(onStableChange.callCount, 4);
-        assert.strictEqual(onHistoryJump.callCount, 1);
+        assert.lengthOf(onStagingChange.mock.calls, 7);
+        assert.lengthOf(onStableChange.mock.calls, 4);
+        assert.lengthOf(onHistoryJump.mock.calls, 1);
 
         _editor.redo();
-        assert.strictEqual(onStagingChange.callCount, 8);
-        assert.strictEqual(onStableChange.callCount, 5);
-        assert.strictEqual(onHistoryJump.callCount, 2);
+        assert.lengthOf(onStagingChange.mock.calls, 8);
+        assert.lengthOf(onStableChange.mock.calls, 5);
+        assert.lengthOf(onHistoryJump.mock.calls, 2);
       });
 
       it('does nothing if nothing to undo', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
-        const onHistoryJump = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
+        const onHistoryJump = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
         _editor.on('historyjump', onHistoryJump);
 
         _editor.undo();
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
       });
 
       it('does nothing if nothing to redo', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
-        const onHistoryJump = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
+        const onHistoryJump = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
         _editor.on('historyjump', onHistoryJump);
 
         _editor.redo();
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
       });
     });
 
@@ -591,153 +599,153 @@ describe('EditSystem', () => {
       });
 
       it('emits stagingchange, stablechange, and historyjump events', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
-        const onHistoryJump = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
+        const onHistoryJump = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
         _editor.on('historyjump', onHistoryJump);
 
         _editor.perform(actionAddNode('n-1'));
-        assert.strictEqual(onStagingChange.callCount, 1);
-        assert.strictEqual(onStableChange.callCount, 0);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.lengthOf(onStableChange.mock.calls, 0);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
         _editor.setCheckpoint('checkpoint');
-        assert.strictEqual(onStagingChange.callCount, 2);
-        assert.strictEqual(onStableChange.callCount, 1);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 2);
+        assert.lengthOf(onStableChange.mock.calls, 1);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.perform(actionAddNode('n-2'));
-        assert.strictEqual(onStagingChange.callCount, 3);
-        assert.strictEqual(onStableChange.callCount, 1);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 3);
+        assert.lengthOf(onStableChange.mock.calls, 1);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
-        assert.strictEqual(onStagingChange.callCount, 4);
-        assert.strictEqual(onStableChange.callCount, 2);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 4);
+        assert.lengthOf(onStableChange.mock.calls, 2);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.perform(actionAddNode('n-3'));
-        assert.strictEqual(onStagingChange.callCount, 5);
-        assert.strictEqual(onStableChange.callCount, 2);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 5);
+        assert.lengthOf(onStableChange.mock.calls, 2);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-3', selectedIDs: ['n-3'] });
-        assert.strictEqual(onStagingChange.callCount, 6);
-        assert.strictEqual(onStableChange.callCount, 3);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 6);
+        assert.lengthOf(onStableChange.mock.calls, 3);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
 
         _editor.restoreCheckpoint('checkpoint');
-        assert.strictEqual(onStagingChange.callCount, 7);
-        assert.strictEqual(onStableChange.callCount, 4);
-        assert.strictEqual(onHistoryJump.callCount, 1);
+        assert.lengthOf(onStagingChange.mock.calls, 7);
+        assert.lengthOf(onStableChange.mock.calls, 4);
+        assert.lengthOf(onHistoryJump.mock.calls, 1);
       });
 
       it('does nothing if checkpointID is missing or invalid', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
-        const onHistoryJump = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
+        const onHistoryJump = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
         _editor.on('historyjump', onHistoryJump);
 
         _editor.restoreCheckpoint();
         _editor.restoreCheckpoint('fake');
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
-        assert.strictEqual(onHistoryJump.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
       });
     });
 
 
     describe('beginTransaction / #endTransaction', () => {
       it('prevents change events from getting dispatched in a transaction', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         _editor.beginTransaction();
 
         _editor.perform(actionAddNode('n-1'));
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.perform(actionAddNode('n-2'));
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.endTransaction();   // events emit here
-        assert.strictEqual(onStagingChange.callCount, 1);
-        assert.strictEqual(onStableChange.callCount, 1);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.lengthOf(onStableChange.mock.calls, 1);
 
         // diff should contain all things changed during the transaction
-        const diff = onStagingChange.lastCall.firstArg;
+        const diff = onStagingChange.mock.lastCall[0];  // first argument
         assert.instanceOf(diff, Rapid.Difference);
         assert.instanceOf(diff.changes, Map);
         assert.hasAllKeys(diff.changes, ['n-1', 'n-2']);
       });
 
       it('does nothing if endTransaction called without beginTransaction', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         _editor.endTransaction();
 
         _editor.perform(actionAddNode('n-1'));
-        assert.strictEqual(onStagingChange.callCount, 1);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
-        assert.strictEqual(onStagingChange.callCount, 2);
-        assert.strictEqual(onStableChange.callCount, 1);
+        assert.lengthOf(onStagingChange.mock.calls, 2);
+        assert.lengthOf(onStableChange.mock.calls, 1);
       });
 
       it('uses earliest difference if beginTransaction called multiple times', () => {
-        const onStagingChange = sinon.spy();
-        const onStableChange = sinon.spy();
+        const onStagingChange = mock();
+        const onStableChange = mock();
         _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         _editor.beginTransaction();
 
         _editor.perform(actionAddNode('n-1'));
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         // This beginTransaction has no effect - we are already in a transaction
         _editor.beginTransaction();
 
         _editor.perform(actionAddNode('n-2'));
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
-        assert.strictEqual(onStagingChange.callCount, 0);
-        assert.strictEqual(onStableChange.callCount, 0);
+        assert.lengthOf(onStagingChange.mock.calls, 0);
+        assert.lengthOf(onStableChange.mock.calls, 0);
 
         _editor.endTransaction();   // events emit here
-        assert.strictEqual(onStagingChange.callCount, 1);
-        assert.strictEqual(onStableChange.callCount, 1);
+        assert.lengthOf(onStagingChange.mock.calls, 1);
+        assert.lengthOf(onStableChange.mock.calls, 1);
 
         // diff should contain all things changed during the transaction
-        const diff = onStagingChange.lastCall.firstArg;
+        const diff = onStagingChange.mock.lastCall[0];  // first argument
         assert.instanceOf(diff, Rapid.Difference);
         assert.instanceOf(diff.changes, Map);
         assert.hasAllKeys(diff.changes, ['n-1', 'n-2']);

@@ -1,7 +1,7 @@
-import { describe, it } from 'bun:test';
-import { strict as assert } from 'bun:assert';
+import { describe, it, mock } from 'bun:test';
+import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
-import sinon from 'sinon';
+
 
 describe('utilKeybinding', () => {
   it('should return a function', () => {
@@ -11,58 +11,67 @@ describe('utilKeybinding', () => {
 
   it('should add and remove keybindings', () => {
     const keybinding = Rapid.utilKeybinding('test');
-    keybinding.on('a', () => {});
+    keybinding.on('A', () => {});
     keybinding.off('a');
   });
 
   it('should trigger the correct callback when a key is pressed', () => {
-    const callback = sinon.spy();
+    const callback = mock();
     const keybinding = Rapid.utilKeybinding('test');
-    keybinding.on('a', callback);
-    keybinding.trigger('a');
-    assert.ok(!callback.calledOnce);
+    keybinding.on('A', callback);
+    keybinding.trigger({ type: 'keydown', key: 'a' });
+    assert.lengthOf(callback.mock.calls, 1);
   });
 
   it('should not trigger the callback when a different key is pressed', () => {
-    const callback = sinon.spy();
+    const callback = mock();
     const keybinding = Rapid.utilKeybinding('test');
-    keybinding.on('a', callback);
-    keybinding.trigger('b');
-    assert.ok(!callback.called);
+    keybinding.on('B', callback);
+    keybinding.trigger({ type: 'keydown', key: 'a' });
+    assert.lengthOf(callback.mock.calls, 0);
   });
 
-  it('should support multiple keybindings for the same key', () => {
-    const callback1 = sinon.spy();
-    const callback2 = sinon.spy();
-    const keybinding = Rapid.utilKeybinding('test');
-    keybinding.on('a', callback1);
-    keybinding.on('a', callback2);
-    keybinding.trigger('a');
-    assert.ok(!callback1.calledOnce);
-    assert.ok(!callback2.calledOnce);
+  it('if multiple keybindings for the same key, the last one overrides earlier ones', () => {
+    const orig = console.warn;
+    console.warn = () => {};   // temporarily silence the warning
+
+    return Promise.resolve()
+      .then(() => {
+        const callback1 = mock();
+        const callback2 = mock();
+        const keybinding = Rapid.utilKeybinding('test');
+        keybinding.on('A', callback1);
+        keybinding.on('A', callback2);
+        keybinding.trigger({ type: 'keydown', key: 'a' });
+        assert.lengthOf(callback1.mock.calls, 0);
+        assert.lengthOf(callback2.mock.calls, 1);
+      })
+      .finally(() => {
+        console.warn = orig;  // restore console.warn
+      })
   });
 
-  it('should support key combinations', () => {
-    const callback = sinon.spy();
+  it('should support control modifier key', () => {
+    const callback = mock();
     const keybinding = Rapid.utilKeybinding('test');
-    keybinding.on('ctrl+a', callback);
-    keybinding.trigger('ctrl+a');
-    assert.ok(!callback.calledOnce);
+    keybinding.on('⌃A', callback);
+    keybinding.trigger({ type: 'keydown', key: 'a', ctrlKey: true });
+    assert.lengthOf(callback.mock.calls, 1);
   });
 
-  it('should support modifier keys', () => {
-    const callback = sinon.spy();
+  it('should support shift modifier key', () => {
+    const callback = mock();
     const keybinding = Rapid.utilKeybinding('test');
-    keybinding.on('shift+a', callback);
-    keybinding.trigger('shift+a');
-    assert.ok(!callback.calledOnce);
+    keybinding.on('⇧A', callback);
+    keybinding.trigger({ type: 'keydown', key: 'a', shiftKey: true });
+    assert.lengthOf(callback.mock.calls, 1);
   });
 
   it('should support multiple modifier keys', () => {
-    const callback = sinon.spy();
+    const callback = mock();
     const keybinding = Rapid.utilKeybinding('test');
-    keybinding.on('ctrl+shift+a', callback);
-    keybinding.trigger('ctrl+shift+a');
-    assert.ok(!callback.calledOnce);
+    keybinding.on('⌃⇧A', callback);
+    keybinding.trigger({ type: 'keydown', key: 'a', ctrlKey: true, shiftKey: true });
+    assert.lengthOf(callback.mock.calls, 1);
   });
 });

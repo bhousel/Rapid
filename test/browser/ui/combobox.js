@@ -264,14 +264,16 @@ describe('uiCombobox', () => {
   });
 
   it('emits cancel event on ⎋', () => {
-    const spy = sinon.spy();
+    const spy = (...args) => spy.mock.calls.push(args);
+    spy.mock = { calls: [] };
+
     combobox.on('cancel', spy);
 
     input.call(combobox.data(data));
     focusTypeahead(input);
     simulateKeypress('b');
     simulateKeypress('⎋');
-    assert.isOk(spy.calledOnce);
+    assert.lengthOf(spy.mock.calls, 1);
   });
 
   it('hides on ↩', () => {

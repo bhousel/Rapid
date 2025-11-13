@@ -5,9 +5,6 @@ GlobalRegistrator.register();
 // import * as Rapid from '../dist/js/rapid-dev.js';
 import '../modules/main_dev.js';
 
-import sinon from 'sinon';
-window.sinon = sinon;
-
 import fetchMock from 'fetch-mock';
 window.fetchMock = fetchMock;
 window.fetchMock.mockGlobal();

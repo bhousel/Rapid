@@ -92,7 +92,9 @@ describe('uiFieldWikipedia', () => {
         wikipedia.on('change', changeTags);
         selection.call(wikipedia);
 
-        const spy = sinon.spy();
+        const spy = (...args) => spy.mock.calls.push(args);
+        spy.mock = { calls: [] };
+
         wikipedia.on('change.spy', spy);
 
         Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
@@ -107,11 +109,11 @@ describe('uiFieldWikipedia', () => {
         titleInput.dispatchEvent(new Event('change'));
         titleInput.dispatchEvent(new FocusEvent('blur'));
 
-        assert.strictEqual(spy.callCount, 4);
-        assert.deepEqual(spy.getCall(0).args[0], { wikipedia: undefined });   // lang on change
-        assert.deepEqual(spy.getCall(1).args[0], { wikipedia: undefined });   // lang on blur
-        assert.deepEqual(spy.getCall(2).args[0], { wikipedia: 'de:Title' });  // title on change
-        assert.deepEqual(spy.getCall(3).args[0], { wikipedia: 'de:Title' });  // title on blur
+        assert.lengthOf(spy.mock.calls, 4);
+        assert.deepEqual(spy.mock.calls[0][0], { wikipedia: undefined });   // lang on change
+        assert.deepEqual(spy.mock.calls[1][0], { wikipedia: undefined });   // lang on blur
+        assert.deepEqual(spy.mock.calls[2][0], { wikipedia: 'de:Title' });  // title on change
+        assert.deepEqual(spy.mock.calls[3][0], { wikipedia: 'de:Title' });  // title on blur
       });
   });
 
@@ -201,7 +203,9 @@ describe('uiFieldWikipedia', () => {
     wikipedia.on('change', changeTags);
     selection.call(wikipedia);
 
-    const spy = sinon.spy();
+    const spy = (...args) => spy.mock.calls.push(args);
+    spy.mock = { calls: [] };
+
     wikipedia.on('change.spy', spy);
 
     // Set title to "Skip"
@@ -240,11 +244,11 @@ describe('uiFieldWikipedia', () => {
       const graph = editor.staging.graph;
       assert.strictEqual(graph.entity(entity.id).tags.wikidata, 'Q216353');
 
-      assert.strictEqual(spy.callCount, 4);
-      assert.deepEqual(spy.getCall(0).args[0], { wikipedia: 'de:Skip' });    // 'Skip' on change
-      assert.deepEqual(spy.getCall(1).args[0], { wikipedia: 'de:Skip' });    // 'Skip' on blur
-      assert.deepEqual(spy.getCall(2).args[0], { wikipedia: 'de:Title' });   // 'Title' on change +10ms
-      assert.deepEqual(spy.getCall(3).args[0], { wikipedia: 'de:Title' });   // 'Title' on blur   +10ms
+      assert.lengthOf(spy.mock.calls, 4);
+      assert.deepEqual(spy.mock.calls[0][0], { wikipedia: 'de:Skip' });    // 'Skip' on change
+      assert.deepEqual(spy.mock.calls[1][0], { wikipedia: 'de:Skip' });    // 'Skip' on blur
+      assert.deepEqual(spy.mock.calls[2][0], { wikipedia: 'de:Title' });   // 'Title' on change +10ms
+      assert.deepEqual(spy.mock.calls[3][0], { wikipedia: 'de:Title' });   // 'Title' on blur   +10ms
       done();
     }, 100);
 

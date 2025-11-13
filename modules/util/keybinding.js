@@ -130,20 +130,18 @@ export function utilKeybinding(namespace) {
     };
 
 
-    // Add the trigger method to the returned object
+    // Manually trigger a keypress, useful for testing
     keybinding.trigger = function(event) {
-      const d3_event = {
-        type: event.type,
+      const evt = {
+        type: event.type || 'keydown',
         key: event.key,
         keyCode: event.keyCode,
-        shiftKey: event.shiftKey,
-        ctrlKey: event.ctrlKey,
-        altKey: event.altKey,
-        metaKey: event.metaKey
+        shiftKey: event.shiftKey || false,
+        ctrlKey: event.ctrlKey || false,
+        altKey: event.altKey || false,
+        metaKey: event.metaKey || false
       };
-      testBindings(d3_event, false);
-
-      return keybinding;
+      testBindings(evt, false);
     };
 
 
