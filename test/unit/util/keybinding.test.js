@@ -48,7 +48,7 @@ describe('utilKeybinding', () => {
       })
       .finally(() => {
         console.warn = orig;  // restore console.warn
-      })
+      });
   });
 
   it('should support control modifier key', () => {

@@ -107,8 +107,8 @@ export function uiSectionSelectionList(context) {
 
     items.selectAll('.entity-geom-icon use')
       .attr('href', (d, i, nodes) => {
-        const thiz = d3_select(nodes[i]);
-        const entity = thiz._groups[0][0].parentNode.parentNode.__data__;
+        const el = d3_select(nodes[i]);
+        const entity = el._groups[0][0].parentNode.parentNode.__data__;
         return '#rapid-icon-' + entity.geometry(graph);
       });
 

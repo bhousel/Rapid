@@ -323,8 +323,21 @@ export class Preset {
   // Replace {presetID} placeholders with the fields of the specified presets.
   _resolveFields(prop) {
     const fieldIDs = this.orig[prop] ?? [];    // always lookup original properties, don't use the functions
-    const thiz = this;
     let resolved = [];
+
+    // Returns an Array of fields to inherit from the given presetID, if found
+    const inheritFields = (presetID, prop) => {
+      const parent = this.allPresets[presetID];
+      if (!parent) return [];
+
+      if (prop === 'fields') {
+        return parent.fields();
+      } else if (prop === 'moreFields') {
+        return parent.moreFields();
+      } else {
+        return [];
+      }
+    };
 
     for (const fieldID of fieldIDs) {
       const match = fieldID.match(/^\{(.*)\}$/);
@@ -352,22 +365,6 @@ export class Preset {
     }
 
     return utilArrayUniq(resolved);
-
-
-    // Returns an Array of fields to inherit from the given presetID, if found
-    function inheritFields(presetID, prop) {
-      const parent = thiz.allPresets[presetID];
-      if (!parent) return [];
-
-      if (prop === 'fields') {
-        return parent.fields();
-      } else if (prop === 'moreFields') {
-        return parent.moreFields();
-      } else {
-        return [];
-      }
-    }
-
   }
 
 }

@@ -417,7 +417,7 @@ export function uiCombobox(context, klass) {
         // Then hides the combobox.
         function accept(d3_event, d) {
             _cancelFetch = true;
-            var thiz = input.node();
+            var el = input.node();
 
             if (d) {   // user clicked on a suggestion
                 utilGetSetValue(input, d.value);    // replace field contents
@@ -426,10 +426,10 @@ export function uiCombobox(context, klass) {
 
             // clear (and keep) selection
             var val = utilGetSetValue(input);
-            thiz.setSelectionRange(val.length, val.length);
+            el.setSelectionRange(val.length, val.length);
 
             d = _fetched[val];
-            dispatch.call('accept', thiz, d, val);
+            dispatch.call('accept', el, d, val);
             hide();
         }
 
@@ -438,7 +438,7 @@ export function uiCombobox(context, klass) {
         // Then hides the combobox.
         function cancel() {
             _cancelFetch = true;
-            var thiz = input.node();
+            var el = input.node();
 
             // clear (and remove) selection, and replace field contents
             var val = utilGetSetValue(input);
@@ -446,9 +446,9 @@ export function uiCombobox(context, klass) {
             var end = input.property('selectionEnd');
             val = val.slice(0, start) + val.slice(end);
             utilGetSetValue(input, val);
-            thiz.setSelectionRange(val.length, val.length);
+            el.setSelectionRange(val.length, val.length);
 
-            dispatch.call('cancel', thiz);
+            dispatch.call('cancel', el);
             hide();
         }
 

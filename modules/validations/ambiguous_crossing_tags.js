@@ -220,10 +220,9 @@ export function validationAmbiguousCrossingTags(context) {
 
 
     function makeFixes() {
-      const issue = this;
-      const wayID = issue.entityIds[0];
-      const choices = issue.data.choices;
-      const stringID = issue.data.isTagUpgrade ? 'update_type' : 'choose_type';
+      const wayID = this.entityIds[0];
+      const choices = this.data.choices;
+      const stringID = this.data.isTagUpgrade ? 'update_type' : 'choose_type';
       const fixes = [];
 
       for (const [type, choice] of choices) {

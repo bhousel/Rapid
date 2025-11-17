@@ -1,4 +1,5 @@
 import { Extent } from '@rapid-sdk/math';
+import { select as d3_select } from 'd3-selection';
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { interpolateNumber as d3_interpolateNumber } from 'd3-interpolate';
 
@@ -272,11 +273,11 @@ export function uiIntroArea(context, curtain) {
           pane
             .transition()
             .duration(250)
-            .tween('scroll.inspector', () => {
-              const node = this;
+            .tween('scroll.inspector', (d, i, nodes) => {
               const lerp = d3_interpolateNumber(start, end);
               return function(t) {
-                node.scrollTop = lerp(t);
+                const el = d3_select(nodes[i]);
+                el.scrollTop = lerp(t);
               };
             });
         }

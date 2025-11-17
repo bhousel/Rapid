@@ -2,9 +2,8 @@
 //import { $, Glob } from 'bun';
 import child_process from 'node:child_process';
 import fs from 'node:fs/promises';
-import { promisify } from 'node:util';
 import stringify from 'json-stringify-pretty-compact';
-import { styleText } from 'node:util';
+import { promisify, styleText } from 'node:util';
 import { transifexApi as api } from '@transifex/api';
 
 import * as CLDR from './cldr.ts';

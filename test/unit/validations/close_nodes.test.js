@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';

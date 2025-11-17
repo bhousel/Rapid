@@ -130,44 +130,35 @@ describe('validationMismatchedGeometry', () => {
   it('flags open way with area tag', () => {
     // In this test case, `building=yes` suggests area, and we should match the 'building' preset.
     Rapid.osmSetAreaKeys({ building: {} });
-    const presets = context.systems.presets;
-    // return presets.initAsync().then(() => {
-      createOpenWay({ building: 'yes' });
+    createOpenWay({ building: 'yes' });
 
-      const issues = validate();
-      assert.isArray(issues);
-      assert.lengthOf(issues, 1);
+    const issues = validate();
+    assert.isArray(issues);
+    assert.lengthOf(issues, 1);
 
-      const expected = {
-        type:      'mismatched_geometry',
-        subtype:   'area_as_line',
-        severity:  'warning',
-        entityIds: ['w1']
-      };
-      assert.deepInclude(issues[0], expected);
-    // });
+    const expected = {
+      type:      'mismatched_geometry',
+      subtype:   'area_as_line',
+      severity:  'warning',
+      entityIds: ['w1']
+    };
+    assert.deepInclude(issues[0], expected);
   });
 
   it('does not flag cases whether the entity matches the generic preset, regardless of geometry', () => {
     // In this test case, `waterway=yes` suggests area, but we won't match any presets.
     // There is no preset for `waterway=security_lock`, so it matches fallback presets for both line and area.
     Rapid.osmSetAreaKeys({ waterway: { dam: true } });
-    const presets = context.systems.presets;
-    // return presets.initAsync().then(() => {
-      createOpenWay({ 'disused:waterway': 'security_lock' });
-      const issues = validate();
-      assert.deepEqual(issues, []);
-    // });
+    createOpenWay({ 'disused:waterway': 'security_lock' });
+    const issues = validate();
+    assert.deepEqual(issues, []);
   });
 
   it(`does not flag open way if the preset location doesn't match the entity location` , () => {
     // In this test case, there is an area preset for `amenity=library` but we won't match it because of the location
-    const presets = context.systems.presets;
-    // return presets.initAsync().then(() => {
-      createOpenWay({ amenity: 'library' });
-      const issues = validate();
-      assert.deepEqual(issues, []);
-    // });
+    createOpenWay({ amenity: 'library' });
+    const issues = validate();
+    assert.deepEqual(issues, []);
   });
 
   it('flags open way with both area and line tags', () => {
