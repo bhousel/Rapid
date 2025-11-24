@@ -32,9 +32,10 @@ export function uiFieldCheck(context, uifield) {
   // Prepare the values and texts that this checkbox works with
   const options = uifield.presetField.options;
   if (Array.isArray(options)) {
+    const stringBase = `_tagging.presets.fields.${uifield.id}.options`;
     for (const v of options) {
       values.push(v === 'undefined' ? undefined : v);
-      texts.push(uifield.tHtml(`options.${v}`, { 'default': v }));
+      texts.push(l10n.tHtml(`${stringBase}.${v}`, { 'default': v }));
     }
   } else {
     values = [undefined, 'yes'];

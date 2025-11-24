@@ -143,7 +143,7 @@ export class PresetSystem extends AbstractSystem {
    * @param  {Object}  src - preset data to merge into the caches
    */
   merge(src) {
-    let newLocationSets = [];
+    const newLocationSets = [];
     const context = this.context;
     const locations = context.systems.locations;
 

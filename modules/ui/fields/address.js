@@ -252,16 +252,22 @@ export function uiFieldAddress(context, uifield) {
 
 
   function updatePlaceholder(inputSelection) {
-    return inputSelection.attr('placeholder', function(subfield) {
-      const key = uifield.key + ':' + subfield.id;
+    return inputSelection.attr('placeholder', subfield => {
+      const key = `${uifield.key}:${subfield.id}`;
       if (_tags && Array.isArray(_tags[key])) {
         return l10n.t('inspector.multiple_values');
       }
+
+      let placeholderID = `_tagging.presets.fields.${uifield.id}.placeholders.${subfield.id}`;
       if (_countryCode) {
-        const localkey = subfield.id + '!' + _countryCode;
-        const tkey = uifield.hasTextForStringID('placeholders.' + localkey) ? localkey : subfield.id;
-        return uifield.presetField.t(`placeholders.${tkey}`);
+        // Address field placeholders have a special overriding behavior where they sometimes look like
+        // `tag!code`, for example `city!vn`, meaning to show this placeholder string only in Vietnam.
+        const suffix = `!${_countryCode}`;
+        if (l10n.hasTextForStringID(placeholderID + suffix)) {
+          placeholderID += suffix;
+        }
       }
+      return l10n.t(placeholderID);
     });
   }
 

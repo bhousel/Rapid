@@ -12,13 +12,13 @@ export class Collection {
 
   /**
    * @constructor
-   * @param  context   Global shared application context
-   * @param  arr       An Array
+   * @param  {Context}  context - Global shared application context
+   * @param  {Array}    arr     - An Array
    */
   constructor(context, arr) {
     this.context = context;
     this.array = arr;
-    this._memo = new Map();  // Map(id -> item)
+    this._memo = new Map();  // Map<id, item>
   }
 
 

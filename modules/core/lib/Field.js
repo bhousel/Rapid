@@ -9,12 +9,12 @@ export class Field {
 
   /**
    * @constructor
-   * @param  context    Global shared application context
-   * @param  fieldID    String unique ID for this field
-   * @param  fieldData  Object containing the original properties for this field
-   * @param  allFields  Object reference to the index of all the fields
+   * @param  {Context}  context   - Global shared application context
+   * @param  {string}   fieldID   - String unique ID for this field
+   * @param  {Object}   props     - Object containing the original properties for this field
+   * @param  {Object}   allFields - Object reference to the index of all the fields
    */
-  constructor(context, fieldID, fieldData, allFields = {}) {
+  constructor(context, fieldID, props, allFields = {}) {
     this.context = context;
 
     this.id = fieldID;
@@ -23,33 +23,33 @@ export class Field {
 
     // Preserve and cleanup all original properties..
     this.orig = {};
-    this.orig.autoSuggestions = fieldData.autoSuggestions ?? true;
-    this.orig.caseSensitive = fieldData.caseSensitive ?? false;
-    this.orig.customValues = fieldData.customValues ?? true;
-    this.orig.default = fieldData.default;
-    this.orig.geometry = fieldData.geometry;
-    this.orig.icon = fieldData.icon;
-    this.orig.increment = fieldData.increment ?? 1;
-    this.orig.key = fieldData.key;
-    this.orig.keys = fieldData.keys ?? [fieldData.key];
-    this.orig.label = fieldData.label ?? '';
-    this.orig.locationSet = fieldData.locationSet;
-    this.orig.maxValue = fieldData.maxValue;
-    this.orig.minValue = fieldData.minValue;
-    this.orig.options = fieldData.options;
-    this.orig.pattern = fieldData.pattern;
-    this.orig.placeholder = fieldData.placeholder ?? '';
-    this.orig.prerequisiteTag = fieldData.prerequisiteTag;
-    this.orig.reference = fieldData.reference;
-    this.orig.snake_case = fieldData.snake_case ?? true;
-    this.orig.strings = fieldData.strings;
-    this.orig.terms = (fieldData.terms ?? []).join();
-    this.orig.type = fieldData.type;
-    this.orig.universal = fieldData.universal ?? false;
-    this.orig.urlFormat = fieldData.urlFormat;
-    this.orig.usage = fieldData.usage;
+    this.orig.autoSuggestions = props.autoSuggestions ?? true;
+    this.orig.caseSensitive = props.caseSensitive ?? false;
+    this.orig.customValues = props.customValues ?? true;
+    this.orig.default = props.default;
+    this.orig.geometry = props.geometry;
+    this.orig.icon = props.icon;
+    this.orig.increment = props.increment ?? 1;
+    this.orig.key = props.key;
+    this.orig.keys = props.keys ?? [props.key];
+    this.orig.label = props.label ?? '';
+    this.orig.locationSet = props.locationSet;
+    this.orig.maxValue = props.maxValue;
+    this.orig.minValue = props.minValue;
+    this.orig.options = props.options;
+    this.orig.pattern = props.pattern;
+    this.orig.placeholder = props.placeholder ?? '';
+    this.orig.prerequisiteTag = props.prerequisiteTag;
+    this.orig.reference = props.reference;
+    this.orig.snake_case = props.snake_case ?? true;
+    this.orig.strings = props.strings;
+    this.orig.terms = (props.terms ?? []).join();
+    this.orig.type = props.type;
+    this.orig.universal = props.universal ?? false;
+    this.orig.urlFormat = props.urlFormat;
+    this.orig.usage = props.usage;
 
-    // Convert some `fieldData` properties to class properties.. (others will become class functions)
+    // Convert some `props` properties to class properties.. (others will become class functions)
     Object.assign(this, utilObjectOmit(this.orig, ['increment', 'label', 'placeholder', 'terms']));
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -96,14 +96,6 @@ export class Field {
 
   tHtml(scope, options) {
     return this.context.systems.l10n.tHtml(`_tagging.presets.fields.${this.id}.${scope}`, options);
-  }
-
-  tAppend(scope, options) {
-    return this.context.systems.l10n.tAppend(`_tagging.presets.fields.${this.id}.${scope}`, options);
-  }
-
-  hasTextForStringID(scope) {
-    return this.context.systems.l10n.hasTextForStringID(`_tagging.presets.fields.${this.id}.${scope}`);
   }
 
   _resolveReference(prop) {

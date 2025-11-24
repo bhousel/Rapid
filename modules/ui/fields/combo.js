@@ -83,8 +83,9 @@ export function uiFieldCombo(context, uifield) {
     function displayValue(tval) {
         tval = tval || '';
 
-        if (uifield.hasTextForStringID('options.' + tval)) {
-            return uifield.t(`options.${tval}`, { default: tval });
+        const stringID = `_tagging.presets.fields.${uifield.id}.options.${tval}`;
+        if (l10n.hasTextForStringID(stringID)) {
+            return l10n.t(stringID, { default: tval });
         }
 
         if (uifield.type === 'typeCombo' && tval.toLowerCase() === 'yes') {
@@ -129,12 +130,13 @@ export function uiFieldCombo(context, uifield) {
         if (!_optarray) return;
 
         _comboData = _optarray.map(function(v) {
+            const stringID = `_tagging.presets.fields.${uifield.id}.options.${v}`;
             return {
                 key: v,
-                value: uifield.t(`options.${v}`, { default: v }),
+                value: l10n.t(stringID, { default: v }),
                 title: v,
-                display: uifield.tHtml(`options.${v}`, { default: v }),
-                klass: uifield.hasTextForStringID(`options.${v}`) ? '' : 'raw-option'
+                display: l10n.tHtml(stringID, { default: v }),
+                klass: l10n.hasTextForStringID(stringID) ? '' : 'raw-option'
             };
         });
 
@@ -202,15 +204,16 @@ export function uiFieldCombo(context, uifield) {
             _container.classed('empty-combobox', data.length === 0);
 
             _comboData = data.map(function(d) {
-                var k = d.value;
+                let k = d.value;
                 if (_isMulti) k = k.replace(uifield.key, '');
-                var label = uifield.t(`options.${k}`, { default: k });
+                const stringID = `_tagging.presets.fields.${uifield.id}.options.${k}`;
+                const label = l10n.t(stringID, { default: k });
                 return {
                     key: k,
                     value: label,
-                    display: uifield.tHtml(`options.${k}`, { default: k }),
+                    display: l10n.tHtml(stringID, { default: k }),
                     title: d.title || label,
-                    klass: uifield.hasTextForStringID(`options.${k}`) ? '' : 'raw-option'
+                    klass: l10n.hasTextForStringID(stringID) ? '' : 'raw-option'
                 };
             });
 
@@ -526,9 +529,10 @@ export function uiFieldCombo(context, uifield) {
             chips = chips.merge(enter)
                 .order()
                 .classed('raw-value', function(d) {
-                    var k = d.key;
+                    let k = d.key;
                     if (_isMulti) k = k.replace(key, '');
-                    return !uifield.hasTextForStringID('options.' + k);
+                    const stringID = `_tagging.presets.fields.${uifield.id}.placeholders.options.${k}`;
+                    return !l10n.hasTextForStringID(stringID);
                 })
                 .classed('draggable', allowDragAndDrop)
                 .classed('mixed', function(d) {
@@ -555,17 +559,17 @@ export function uiFieldCombo(context, uifield) {
             }
 
         } else {
-            var isMixed = Array.isArray(tags[key]);
-            var mixedValues = isMixed && tags[key].map(function(val) {
-                return displayValue(val);
-            }).filter(Boolean);
+            const v = tags[key];
+            const isMixed = Array.isArray(v);
+            const mixedValues = isMixed && v.map(val => displayValue(val)).filter(Boolean);
 
-            var showsValue = !isMixed && tags[key] && !(uifield.type === 'typeCombo' && tags[key] === 'yes');
-            var isRawValue = showsValue && !uifield.hasTextForStringID('options.' + tags[key]);
+            var showsValue = !isMixed && v && !(uifield.type === 'typeCombo' && v === 'yes');
+            const stringID = `_tagging.presets.fields.${uifield.id}.placeholders.options.${v}`;
+            var isRawValue = showsValue && !l10n.hasTextForStringID(stringID);
             var isKnownValue = showsValue && !isRawValue;
             var isReadOnly = !_allowCustomValues || isKnownValue;
 
-            utilGetSetValue(_input, !isMixed ? displayValue(tags[key]) : '')
+            utilGetSetValue(_input, !isMixed ? displayValue(v) : '')
                 .classed('raw-value', isRawValue)
                 .classed('known-value', isKnownValue)
                 .attr('readonly', isReadOnly ? 'readonly' : undefined)

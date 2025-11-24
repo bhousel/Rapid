@@ -10,13 +10,13 @@ export class Preset {
 
   /**
    * @constructor
-   * @param  context     Global shared application context
-   * @param  presetID    String unique ID for this field
-   * @param  presetData  Object containing the original properties for this field
-   * @param  allFields   Object reference to the index of all the fields
-   * @param  allPresets  Object reference to the index of all the presets
+   * @param  {Context}  context    - Global shared application context
+   * @param  {string}   presetID   - String unique ID for this field
+   * @param  {Object}   props      - Object containing the original properties for this field
+   * @param  {Object}   allFields  - Object reference to the index of all the fields
+   * @param  {Object}   allPresets - Object reference to the index of all the presets
    */
-  constructor(context, presetID, presetData, allFields = {}, allPresets = {}) {
+  constructor(context, presetID, props, allFields = {}, allPresets = {}) {
     this.context = context;
 
     this.id = presetID;
@@ -26,25 +26,25 @@ export class Preset {
 
     // Preserve and cleanup all original properties..
     this.orig = {};
-    this.orig.addTags = presetData.addTags ?? presetData.tags ?? {};
-    this.orig.aliases = presetData.aliases ?? [];
-    this.orig.fields = presetData.fields ?? [];
-    this.orig.geometry = presetData.geometry ?? [];
-    this.orig.icon = presetData.icon;
-    this.orig.imageURL = presetData.imageURL;
-    this.orig.locationSet = presetData.locationSet;
-    this.orig.matchScore = presetData.matchScore ?? 1;
-    this.orig.moreFields = presetData.moreFields ?? [];
-    this.orig.name = presetData.name ?? '';
-    this.orig.reference = presetData.reference ?? {};
-    this.orig.removeTags = presetData.removeTags ?? presetData.addTags ?? presetData.tags ?? {};
-    this.orig.replacement = presetData.replacement;
-    this.orig.searchable = presetData.searchable ?? true;
-    this.orig.suggestion = presetData.suggestion;  // warning - not in the schema, but code uses it
-    this.orig.tags = presetData.tags ?? {};
-    this.orig.terms = (presetData.terms ?? []).join();
+    this.orig.addTags = props.addTags ?? props.tags ?? {};
+    this.orig.aliases = props.aliases ?? [];
+    this.orig.fields = props.fields ?? [];
+    this.orig.geometry = props.geometry ?? [];
+    this.orig.icon = props.icon;
+    this.orig.imageURL = props.imageURL;
+    this.orig.locationSet = props.locationSet;
+    this.orig.matchScore = props.matchScore ?? 1;
+    this.orig.moreFields = props.moreFields ?? [];
+    this.orig.name = props.name ?? '';
+    this.orig.reference = props.reference ?? {};
+    this.orig.removeTags = props.removeTags ?? props.addTags ?? props.tags ?? {};
+    this.orig.replacement = props.replacement;
+    this.orig.searchable = props.searchable ?? true;
+    this.orig.suggestion = props.suggestion;  // warning - not in the schema, but code uses it
+    this.orig.tags = props.tags ?? {};
+    this.orig.terms = (props.terms ?? []).join();
 
-    // Convert some `presetData` properties to class properties.. (others will become class functions)
+    // Convert some `props` properties to class properties.. (others will become class functions)
     Object.assign(this, utilObjectOmit(this.orig, ['aliases', 'fields', 'matchScore', 'moreFields', 'name', 'reference', 'terms']));
 
     // caches
@@ -127,11 +127,6 @@ export class Preset {
   tHtml(scope, options) {
     const l10n = this.context.systems.l10n;
     return l10n.tHtml(`_tagging.presets.presets.${this.id}.${scope}`, options);
-  }
-
-  tAppend (scope, options) {
-    const l10n = this.context.systems.l10n;
-    return l10n.tAppend(`_tagging.presets.presets.${this.id}.${scope}`, options);
   }
 
   subtitle() {

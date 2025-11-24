@@ -46,11 +46,12 @@ export function uiFieldCycleway(context, uifield) {
             .append('li')
             .attr('class', function(d) { return 'labeled-input preset-cycleway-' + stripcolon(d); });
 
+        const stringBase = `_tagging.presets.fields.${uifield.id}.types`;
         enter
             .append('div')
             .attr('class', 'label preset-label-cycleway')
             .attr('for', function(d) { return 'preset-input-cycleway-' + stripcolon(d); })
-            .html(function(d) { return uifield.tHtml('types.' + d); });
+            .html(d => l10n.tHtml(`${stringBase}.${d}`));
 
         enter
             .append('div')
@@ -115,9 +116,10 @@ export function uiFieldCycleway(context, uifield) {
 
 
     cycleway.options = function() {
+        const stringBase = `_tagging.presets.fields.${uifield.id}.options.`;
         return uifield.presetField.options.map(function(option) {
             return {
-                title: uifield.t(`options.${option}.description`),
+                title: l10n.t(`${stringBase}.${option}.description`),
                 value: option
             };
         });

@@ -37,11 +37,12 @@ export function uiFieldAccess(context, uifield) {
       .append('li')
       .attr('class', d => `labeled-input preset-access-${d}`);
 
+    const stringBase = `_tagging.presets.fields.${uifield.id}.types`;
     enter
       .append('div')
       .attr('class', 'label preset-label-access')
       .attr('for', d => `preset-input-access-${d}`)
-      .html(d => uifield.tHtml(`types.${d}`));
+      .html(d => l10n.tHtml(`${stringBase}.${d}`));
 
     enter
       .append('div')
@@ -91,9 +92,10 @@ export function uiFieldAccess(context, uifield) {
       }
     }
 
+    const stringBase = `_tagging.presets.fields.${uifield.id}.options`;
     return options.map(val => {
       return {
-        title: uifield.t(`options.${val}.description`),
+        title: l10n.t(`${stringBase}.${val}.description`),
         value: val
       };
     });

@@ -55,16 +55,17 @@ export function uiFieldRadio(context, uifield) {
         enter = labels.enter()
             .append('label');
 
+        const stringBase = `_tagging.presets.fields.${uifield.id}.options`;
         enter
             .append('input')
             .attr('type', 'radio')
             .attr('name', uifield.id)
-            .attr('value', function(d) { return uifield.t(`options.${d}`, { 'default': d }); })
+            .attr('value', d => l10n.t(`${stringBase}.${d}`, { 'default': d }))
             .attr('checked', false);
 
         enter
             .append('span')
-            .html(function(d) { return uifield.tHtml(`options.${d}`, { 'default': d }); });
+            .html(d => l10n.tHtml(`${stringBase}.${d}`, { 'default': d }));
 
         labels = labels
             .merge(enter);

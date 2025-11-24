@@ -55,9 +55,6 @@ export class UiField {
     this.key = presetField.key;
     this.keys = presetField.keys;
     this.safeid = presetField.safeid;
-    this.t = presetField.t;
-    this.tHtml = presetField.tHtml;
-    this.hasTextForStringID = presetField.hasTextForStringID;
     this.uid = utilUniqueString(`form-field-${presetField.safeid}`);
 
     this._show = this.options.show;

@@ -10,12 +10,12 @@ export class Category {
 
   /**
    * @constructor
-   * @param  context       Global shared application context
-   * @param  categoryID    String unique ID for this field
-   * @param  categoryData  Object containing the original properties for this field
-   * @param  allPresets    Object reference to the index of all the presets
+   * @param  {Context}  context    - Global shared application context
+   * @param  {string}   categoryID - String unique ID for this field
+   * @param  {Object}   props      - Object containing the original properties for this field
+   * @param  {Object}   allPresets - Object reference to the index of all the presets
    */
-  constructor(context, categoryID, categoryData, allPresets = {}) {
+  constructor(context, categoryID, props, allPresets = {}) {
     this.context = context;
 
     this.id = categoryID;
@@ -24,12 +24,12 @@ export class Category {
 
     // Preserve and cleanup all original properties..
     this.orig = {};
-    this.orig.name = categoryData.name ?? '';
-    this.orig.icon = categoryData.icon;
+    this.orig.name = props.name ?? '';
+    this.orig.icon = props.icon;
     this.orig.matchScore = -1;
-    this.orig.members = categoryData.members ?? [];
+    this.orig.members = props.members ?? [];
 
-    // Convert some `categoryData` properties to class properties.. (others will become class functions)
+    // Convert some `props` properties to class properties.. (others will become class functions)
     Object.assign(this, utilObjectOmit(this.orig, ['name', 'matchScore', 'members']));
 
     const presets = this.orig.members.map(presetID => allPresets[presetID]).filter(Boolean);

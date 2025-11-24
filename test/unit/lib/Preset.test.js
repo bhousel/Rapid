@@ -6,6 +6,15 @@ import * as Rapid from '../../../modules/headless.js';
 describe('Preset', () => {
   const context = new Rapid.MockContext();
 
+  describe('constructor', () => {
+    it('constructs a Preset from a context and props', () => {
+      const a = new Rapid.Preset(context, 'test', {});
+      assert.instanceOf(a, Rapid.Preset);
+      assert.strictEqual(a.context, context);
+    });
+  });
+
+
   describe('fields', () => {
     it('has no fields by default', () => {
       const preset = new Rapid.Preset(context, 'test', {});
