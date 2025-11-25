@@ -119,6 +119,14 @@ describe('PresetSystem', () => {
       });
     });
 
+    describe('universalFields', () => {
+      it('gets the universal fields cache', () => {
+        const result = _presets.universalFields;
+        assert.isArray(result);
+        assert.strictEqual(result, _presets._universal);
+      });
+    });
+
 
     describe('merge', () => {
     });

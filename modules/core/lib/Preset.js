@@ -46,7 +46,15 @@ export class Preset {
     // Convert some `props` properties to class properties.. (others will become class functions)
     Object.assign(this, utilObjectOmit(this.orig, ['aliases', 'fields', 'matchScore', 'moreFields', 'name', 'reference', 'terms']));
 
-    // caches
+    this.resetCache();
+  }
+
+
+  /**
+   * resetCache
+   * Resets all cached data.
+   */
+  resetCache() {
     this._resolved = { fields: null, moreFields: null };
     this._searchName = null;
     this._searchNameStripped = null;
@@ -75,10 +83,6 @@ export class Preset {
 
   moreFields() {
     return this._resolved.moreFields || (this._resolved.moreFields = this._resolveFields('moreFields'));
-  }
-
-  resetFields() {
-    return this._resolved = { fields: null, moreFields: null };
   }
 
   matchGeometry(geom) {

@@ -28,27 +28,36 @@ export class Category {
     this.orig.name = props.name ?? '';
     this.orig.icon = props.icon;
     this.orig.matchScore = -1;
-    this.orig.members = props.members ?? [];
+    this.orig.members = props.members ?? [];  // "members" here are presetIDs
 
     // Convert some `props` properties to class properties.. (others will become class functions)
     Object.assign(this, utilObjectOmit(this.orig, ['name', 'matchScore', 'members']));
 
+    this.resetCache();
+  }
+
+
+  /**
+   * resetCache
+   * Resets all cached data.
+   */
+  resetCache() {
+    const context = this.context;
     const allPresets = context.systems.presets.allPresets;
+
+    // Include only Presets that are currently known to the PresetSystem.
     const presets = this.orig.members.map(presetID => allPresets[presetID]).filter(Boolean);
     this.members = new Collection(context, presets);
 
-    this.geometry = presets
-      .reduce((acc, preset) => {
-        for (let i in preset.geometry) {
-          const geometry = preset.geometry[i];
-          if (acc.indexOf(geometry) === -1) {
-            acc.push(geometry);
-          }
-        }
-        return acc;
-      }, []);
+    // The "geometry" for the category will include the geometries of all the presets.
+    const geometries = new Set();
+    for (const preset of presets) {
+      for (const geometry of preset.geometry) {
+        geometries.add(geometry);
+      }
+    }
+    this.geometry = Array.from(geometries);
 
-    // caches
     this._searchName = null;
     this._searchNameStripped = null;
   }
@@ -67,11 +76,13 @@ export class Category {
   }
 
   name() {
-    return this.context.systems.l10n.t(`_tagging.presets.categories.${this.id}.name`, { 'default': this.id });
+    const l10n = this.context.systems.l10n;
+    return l10n?.t(`_tagging.presets.categories.${this.id}.name`, { 'default': this.id }) || this.orig.name;
   }
 
   nameLabel() {
-    return this.context.systems.l10n.tHtml(`_tagging.presets.categories.${this.id}.name`, { 'default': this.id });
+    const l10n = this.context.systems.l10n;
+    return l10n?.tHtml(`_tagging.presets.categories.${this.id}.name`, { 'default': this.id }) || this.orig.name;
   }
 
   terms() {

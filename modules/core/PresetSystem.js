@@ -56,6 +56,9 @@ export class PresetSystem extends AbstractSystem {
 
     // Index of presets by (geometry, tag key).
     this._geometryIndex = { point: {}, vertex: {}, line: {}, area: {}, relation: {} };
+
+    // Ensure methods used as callbacks always have `this` bound correctly.
+    this.resetCaches = this.resetCaches.bind(this);
   }
 
 
@@ -69,6 +72,7 @@ export class PresetSystem extends AbstractSystem {
 
     const context = this.context;
     const assets = context.systems.assets;
+    const l10n = context.systems.l10n;
     const locations = context.systems.locations;
     const urlhash = context.systems.urlhash;
 
@@ -76,12 +80,17 @@ export class PresetSystem extends AbstractSystem {
       .then(() => {
         const prerequisites = [
           assets?.initAsync(),
+          l10n?.initAsync(),
           locations?.initAsync(),
           urlhash?.initAsync(),
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => {
+        // Setup Event Handlers..
+        // When changing localization, we need to reset all of the preset and field caches.
+        l10n?.on('localechange', this.resetCaches);
+
         // If we received a subset of addable presetIDs specified in the url hash, save them.
         const presetIDs = urlhash?.initialHashParams.get('presets');
         if (presetIDs) {
@@ -133,7 +142,7 @@ export class PresetSystem extends AbstractSystem {
   /**
    * allPresets
    * Getter to retrieve the all the presets.
-   * @return  {Object}  all the presets
+   * @return  {Object}  All the presets
    */
   get allPresets() {
     return this._presets;
@@ -142,10 +151,44 @@ export class PresetSystem extends AbstractSystem {
   /**
    * allFields
    * Getter to retrieve all the fields.
-   * @return  {Tree}  The Tree (spatial index)
+   * @return  {Object}  All the fields
    */
   get allFields() {
     return this._fields;
+  }
+
+  /**
+   * universalFields
+   * Getter to retrieve all the "universal" fields.
+   * These are fields that are always available on any preset.
+   * (If not listed as a "main" field, they will be available in the "more" fields dropdown.)
+   * @return  {Array<string>}  All the universal fields
+   */
+  get universalFields() {
+    return this._universal;
+  }
+
+
+  /**
+   * resetCaches
+   * This resets the caches in the Fields, Presets, and Categories.
+   * The caches are used to speed up localization and searching.
+   * This should be done after new data is merged in, or whenever the locale changes.
+   */
+  resetCaches() {
+    this._universal = [];
+    for (const field of Object.values(this._fields)) {
+      field.resetCache();
+      if (field.universal) {
+        this._universal.push(field);
+      }
+    }
+    for (const preset of Object.values(this._presets)) {
+      preset.resetCache();
+    }
+    for (const category of Object.values(this._categories)) {
+      category.resetCache();
+    }
   }
 
 
@@ -192,18 +235,14 @@ export class PresetSystem extends AbstractSystem {
         if (isFallback) continue;  // never override these
 
         if (p) {   // add or replace
-
 // Rename icon identifiers to match the rapid spritesheet
 if (p.icon) p.icon = p.icon.replace(/^iD-/, 'rapid-');
 
 // A few overrides to use better icons than the ones provided by the id-tagging-schema project
 if (presetID === 'address')                         p.icon = 'maki-circle-stroked';
 if (presetID === 'highway/turning_loop')            p.icon = 'maki-circle';
-//if (/^highway\/crossing/.test(presetID))            p.icon = 'temaki-pedestrian';
-//if (/^highway\/footway\/crossing/.test(presetID))   p.icon = 'temaki-pedestrian';
 if (p.icon === 'roentgen-needleleaved_tree')        p.icon = 'temaki-tree_needleleaved';
 if (p.icon === 'roentgen-tree')                     p.icon = 'temaki-tree_broadleaved';
-
 // fix: FontAwesome v7 no longer has 'fas-vector-square'
 // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
 if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_framed';
@@ -247,15 +286,11 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       }
     }
 
+    this.resetCaches();
+
     // Replace `this.collection` after changing Presets and Categories
     const all = Object.values(this._presets).concat(Object.values(this._categories));
     this.collection = new Collection(context, all);
-
-    // Rebuild universal fields array
-    this._universal = Object.values(this._fields).filter(field => field.universal);
-
-    // Reset all the preset fields - they'll need to be resolved again
-    Object.values(this._presets).forEach(preset => preset.resetFields());
 
     // Rebuild geometry index
     this._geometryIndex = { point: {}, vertex: {}, line: {}, area: {}, relation: {} };
@@ -496,10 +531,6 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     return this._fields[id];
   }
 
-  universal() {
-    return this._universal;
-  }
-
 
   /**
    * defaults
@@ -604,3 +635,12 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
   }
 
 }
+
+
+/**
+ *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
+ *  (I don't know whether this really matters much - we don't actually parse the JSDoc.)
+ *  @typedef  {string}  categoryID
+ *  @typedef  {string}  presetID
+ *  @typedef  {string}  fieldID
+ */

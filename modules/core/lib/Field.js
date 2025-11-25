@@ -61,6 +61,15 @@ export class Field {
     this.terms = this.terms.bind(this);
   }
 
+
+  /**
+   * resetCache
+   * Resets all cached data.
+   */
+  resetCache() {
+  }
+
+
   increment() {
     return this.type === 'number' ? this.orig.increment : undefined;
   }

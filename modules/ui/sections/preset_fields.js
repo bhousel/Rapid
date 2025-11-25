@@ -28,6 +28,7 @@ export function uiSectionPresetFields(context) {
   function renderDisclosureContent(selection) {
     if (!_uifields) {
       const graph = editor.staging.graph;
+      const localeCode = l10n.localeCode();
 
       const geometries = Object.keys(_entityIDs.reduce((geoms, entityID) => {
         const entity = graph.entity(entityID);
@@ -71,8 +72,7 @@ export function uiSectionPresetFields(context) {
 //      _uifields.push(new UiField(context, presets.field('restrictions'), _entityIDs));
 //    }
 
-      const localeCode = l10n.localeCode();
-      let additionalFields = utilArrayUnion(sharedMoreFields, presets.universal());
+      const additionalFields = utilArrayUnion(sharedMoreFields, presets.universalFields);
       additionalFields.sort((field1, field2) => {
         return field1.label().localeCompare(field2.label(), localeCode);
       });
