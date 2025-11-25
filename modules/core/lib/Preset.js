@@ -13,16 +13,12 @@ export class Preset {
    * @param  {Context}  context    - Global shared application context
    * @param  {string}   presetID   - String unique ID for this field
    * @param  {Object}   props      - Object containing the original properties for this field
-   * @param  {Object}   allFields  - Object reference to the index of all the fields
-   * @param  {Object}   allPresets - Object reference to the index of all the presets
    */
-  constructor(context, presetID, props, allFields = {}, allPresets = {}) {
+  constructor(context, presetID, props) {
     this.context = context;
 
     this.id = presetID;
     this.safeid = utilSafeString(presetID);    // for use in classes, element ids, css selectors
-    this.allFields = allFields;
-    this.allPresets = allPresets;
 
     // Preserve and cleanup all original properties..
     this.orig = {};
@@ -300,10 +296,12 @@ export class Preset {
   // For a preset without its own name, use names from another preset.
   // Replace {presetID} placeholders with the name of the specified presets.
   _resolveName(prop) {
+    const allPresets = this.context.systems.presets.allPresets;
+
     const val = this.orig[prop] ?? '';    // always lookup original properties, don't use the functions
     const match = val.match(/^\{(.*)\}$/);
     if (match) {
-      const preset = this.allPresets[match[1]];
+      const preset = allPresets[match[1]];
       if (preset) {
         return preset;
       } else {
@@ -317,12 +315,15 @@ export class Preset {
   // For a preset without fields, use the fields of the parent preset.
   // Replace {presetID} placeholders with the fields of the specified presets.
   _resolveFields(prop) {
+    const allPresets = this.context.systems.presets.allPresets;
+    const allFields = this.context.systems.presets.allFields;
+
     const fieldIDs = this.orig[prop] ?? [];    // always lookup original properties, don't use the functions
     let resolved = [];
 
     // Returns an Array of fields to inherit from the given presetID, if found
     const inheritFields = (presetID, prop) => {
-      const parent = this.allPresets[presetID];
+      const parent = allPresets[presetID];
       if (!parent) return [];
 
       if (prop === 'fields') {
@@ -338,8 +339,8 @@ export class Preset {
       const match = fieldID.match(/^\{(.*)\}$/);
       if (match !== null) {    // a presetID wrapped in braces {}
         resolved = resolved.concat(inheritFields(match[1], prop));
-      } else if (this.allFields[fieldID]) {    // a normal fieldID
-        resolved.push(this.allFields[fieldID]);
+      } else if (allFields[fieldID]) {    // a normal fieldID
+        resolved.push(allFields[fieldID]);
       } else {
         console.warn(`Cannot resolve "${fieldID}" found in ${this.id}.${prop}`);  // eslint-disable-line no-console
       }

@@ -5,6 +5,11 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('Collection', () => {
   const context = new Rapid.MockContext();
+  context.systems = {
+    assets:     new Rapid.AssetSystem(context),
+    l10n:       new Rapid.LocalizationSystem(context),
+    presets:    new Rapid.PresetSystem(context)
+  };
 
   const p = {
     grill: new Rapid.Preset(context, 'amenity/bbq',

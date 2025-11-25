@@ -131,6 +131,25 @@ export class PresetSystem extends AbstractSystem {
 
 
   /**
+   * allPresets
+   * Getter to retrieve the all the presets.
+   * @return  {Object}  all the presets
+   */
+  get allPresets() {
+    return this._presets;
+  }
+
+  /**
+   * allFields
+   * Getter to retrieve all the fields.
+   * @return  {Tree}  The Tree (spatial index)
+   */
+  get allFields() {
+    return this._fields;
+  }
+
+
+  /**
    * merge
    * Accepts an object containing new preset data (all properties optional):
    * {
@@ -155,7 +174,7 @@ export class PresetSystem extends AbstractSystem {
             if (VERBOSE) console.warn(`"${f.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
             continue;
           }
-          const field = new Field(context, fieldID, f, this._fields);
+          const field = new Field(context, fieldID, f);
           if (field.locationSet) newLocationSets.push(field);
           this._fields[fieldID] = field;
 
@@ -188,7 +207,7 @@ if (p.icon === 'roentgen-tree')                     p.icon = 'temaki-tree_broadl
 // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
 if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_framed';
 
-          const preset = new Preset(context, presetID, p, this._fields, this._presets);
+          const preset = new Preset(context, presetID, p);
           if (preset.locationSet) newLocationSets.push(preset);
           this._presets[presetID] = preset;
 
@@ -204,7 +223,7 @@ if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_fr
         if (c) {   // add or replace
 // Rename icon identifiers to match the rapid spritesheet
 if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
-          const category = new Category(context, categoryID, c, this._presets);
+          const category = new Category(context, categoryID, c);
           if (category.locationSet) newLocationSets.push(category);
           this._categories[categoryID] = category;
 
@@ -239,16 +258,16 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
 
     // Rebuild geometry index
     this._geometryIndex = { point: {}, vertex: {}, line: {}, area: {}, relation: {} };
-    all.forEach(preset => {
-      (preset.geometry || []).forEach(geometry => {
-        let g = this._geometryIndex[geometry];
-        for (let key in preset.tags) {
+    for (const item of all) {
+      const geometries = item.geometry || [];
+      for (const geometry of geometries) {
+        const g = this._geometryIndex[geometry];
+        for (const [key, val] of Object.entries(item.tags)) {
           g[key] = g[key] || {};
-          let value = preset.tags[key];
-          (g[key][value] = g[key][value] || []).push(preset);
+          (g[key][val] = g[key][val] || []).push(item);
         }
-      });
-    });
+      }
+    }
 
     if (locations) {
       // Merge Custom Features

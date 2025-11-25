@@ -12,14 +12,12 @@ export class Field {
    * @param  {Context}  context   - Global shared application context
    * @param  {string}   fieldID   - String unique ID for this field
    * @param  {Object}   props     - Object containing the original properties for this field
-   * @param  {Object}   allFields - Object reference to the index of all the fields
    */
-  constructor(context, fieldID, props, allFields = {}) {
+  constructor(context, fieldID, props) {
     this.context = context;
 
     this.id = fieldID;
     this.safeid = utilSafeString(fieldID);    // for use in classes, element ids, css selectors
-    this.allFields = allFields;
 
     // Preserve and cleanup all original properties..
     this.orig = {};
@@ -99,10 +97,12 @@ export class Field {
   }
 
   _resolveReference(prop) {
+    const allFields = this.context.systems.presets.allFields;
+
     const val = this.orig[prop] || '';    // always lookup original properties, don't use the functions
     const match = val.match(/^\{(.*)\}$/);
     if (match) {
-      const field = this.allFields[match[1]];
+      const field = allFields[match[1]];
       if (field) {
         return field;
       }

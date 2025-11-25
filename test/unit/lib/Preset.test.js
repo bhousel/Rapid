@@ -5,6 +5,11 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('Preset', () => {
   const context = new Rapid.MockContext();
+  context.systems = {
+    assets:     new Rapid.AssetSystem(context),
+    l10n:       new Rapid.LocalizationSystem(context),
+    presets:    new Rapid.PresetSystem(context)
+  };
 
   describe('constructor', () => {
     it('constructs a Preset from a context and props', () => {
@@ -170,13 +175,19 @@ describe('Preset', () => {
 
     it('adds default tags of fields with matching geometry', () => {
       const field = new Rapid.Field(context, 'field', { key: 'building', geometry: 'area', default: 'yes' });
-      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] }, { field: field });
+      const allFields = context.systems.presets.allFields;
+      allFields.field = field;
+
+      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] });
       assert.deepEqual(preset.setTags({}, 'area'), { area: 'yes', building: 'yes' });
     });
 
     it('adds no default tags of fields with non-matching geometry', () => {
       const field = new Rapid.Field(context, 'field', { key: 'building', geometry: 'area', default: 'yes' });
-      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] }, { field: field });
+      const allFields = context.systems.presets.allFields;
+      allFields.field = field;
+
+      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] });
       assert.deepEqual(preset.setTags({}, 'point'), {});
     });
 
@@ -216,7 +227,10 @@ describe('Preset', () => {
 
     it('removes tags that match field default tags', () => {
       const field = new Rapid.Field(context, 'field', { key: 'building', geometry: 'area', default: 'yes' });
-      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] }, { field: field });
+      const allFields = context.systems.presets.allFields;
+      allFields.field = field;
+
+      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] });
       assert.deepEqual(preset.unsetTags({ building: 'yes' }, 'area'), {});
     });
 
@@ -227,7 +241,10 @@ describe('Preset', () => {
 
     it('preserves tags that do not match field default tags', () => {
       const field = new Rapid.Field(context, 'field', { key: 'building', geometry: 'area', default: 'yes' });
-      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] }, { field: field });
+      const allFields = context.systems.presets.allFields;
+      allFields.field = field;
+
+      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] });
       assert.deepEqual(preset.unsetTags({ building: 'yep' }, 'area'), { building: 'yep' });
     });
 

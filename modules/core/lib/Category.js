@@ -13,14 +13,12 @@ export class Category {
    * @param  {Context}  context    - Global shared application context
    * @param  {string}   categoryID - String unique ID for this field
    * @param  {Object}   props      - Object containing the original properties for this field
-   * @param  {Object}   allPresets - Object reference to the index of all the presets
    */
-  constructor(context, categoryID, props, allPresets = {}) {
+  constructor(context, categoryID, props) {
     this.context = context;
 
     this.id = categoryID;
     this.safeid = utilSafeString(categoryID);    // for use in classes, element ids, css selectors
-    this.allPresets = allPresets;
 
     // Preserve and cleanup all original properties..
     this.orig = {};
@@ -32,6 +30,7 @@ export class Category {
     // Convert some `props` properties to class properties.. (others will become class functions)
     Object.assign(this, utilObjectOmit(this.orig, ['name', 'matchScore', 'members']));
 
+    const allPresets = context.systems.presets.allPresets;
     const presets = this.orig.members.map(presetID => allPresets[presetID]).filter(Boolean);
     this.members = new Collection(context, presets);
 
