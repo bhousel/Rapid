@@ -10,15 +10,18 @@ export class Preset {
 
   /**
    * @constructor
-   * @param  {Context}  context    - Global shared application context
-   * @param  {string}   presetID   - String unique ID for this field
-   * @param  {Object}   props      - Object containing the original properties for this field
+   * @param  {Context}  context - Global shared application context
+   * @param  {Object}   props   - Object containing the properties for this Preset
    */
-  constructor(context, presetID, props) {
+  constructor(context, props = {}) {
     this.context = context;
 
-    this.id = presetID;
-    this.safeid = utilSafeString(presetID);    // for use in classes, element ids, css selectors
+    if (!props.id) {
+      throw new Error('Preset missing id property');
+    }
+
+    this.id = props.id;
+    this.safeid = utilSafeString(props.id);    // for use in classes, element ids, css selectors
 
     // Preserve and cleanup all original properties..
     this.orig = {};

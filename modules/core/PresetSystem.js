@@ -27,10 +27,10 @@ export class PresetSystem extends AbstractSystem {
     this.geometries = ['point', 'vertex', 'line', 'area', 'relation'];
 
     // Create geometry fallbacks
-    const POINT = new Preset(context, 'point', { name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
-    const LINE = new Preset(context, 'line', { name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
-    const AREA = new Preset(context, 'area', { name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
-    const RELATION = new Preset(context, 'relation', { name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
+    const POINT = new Preset(context, { id: 'point', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
+    const LINE = new Preset(context, { id: 'line', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
+    const AREA = new Preset(context, { id: 'area', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
+    const RELATION = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
 
     // Collection of all Presets and Categories
     this.collection = new Collection(context, [POINT, LINE, AREA, RELATION]);
@@ -174,7 +174,7 @@ export class PresetSystem extends AbstractSystem {
             if (VERBOSE) console.warn(`"${f.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
             continue;
           }
-          const field = new Field(context, fieldID, f);
+          const field = new Field(context, { id: fieldID, ...f });
           if (field.locationSet) newLocationSets.push(field);
           this._fields[fieldID] = field;
 
@@ -189,6 +189,7 @@ export class PresetSystem extends AbstractSystem {
       for (const [presetID, p] of Object.entries(src.presets)) {
         const existing = this._presets[presetID];
         const isFallback = existing?.isFallback();
+        if (isFallback) continue;  // never override these
 
         if (p) {   // add or replace
 
@@ -207,11 +208,11 @@ if (p.icon === 'roentgen-tree')                     p.icon = 'temaki-tree_broadl
 // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
 if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_framed';
 
-          const preset = new Preset(context, presetID, p);
+          const preset = new Preset(context, { id: presetID, ...p });
           if (preset.locationSet) newLocationSets.push(preset);
           this._presets[presetID] = preset;
 
-        } else if (!isFallback) {   // remove (but not if it's a fallback)
+        } else {   // remove
           delete this._presets[presetID];
         }
       }
@@ -223,7 +224,7 @@ if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_fr
         if (c) {   // add or replace
 // Rename icon identifiers to match the rapid spritesheet
 if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
-          const category = new Category(context, categoryID, c);
+          const category = new Category(context, { id: categoryID, ...c });
           if (category.locationSet) newLocationSets.push(category);
           this._categories[categoryID] = category;
 
@@ -262,7 +263,8 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       const geometries = item.geometry || [];
       for (const geometry of geometries) {
         const g = this._geometryIndex[geometry];
-        for (const [key, val] of Object.entries(item.tags)) {
+        const tags = item.tags || {};
+        for (const [key, val] of Object.entries(tags)) {
           g[key] = g[key] || {};
           (g[key][val] = g[key][val] || []).push(item);
         }

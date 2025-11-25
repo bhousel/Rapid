@@ -11,8 +11,8 @@ describe('actionChangePreset', () => {
     presets:    new Rapid.PresetSystem(context)
   };
 
-  const oldPreset = new Rapid.Preset(context, 'old', { tags: { old: 'true' } });
-  const newPreset = new Rapid.Preset(context, 'new', { tags: { new: 'true' } });
+  const oldPreset = new Rapid.Preset(context, { id: 'old', tags: { old: 'true' } });
+  const newPreset = new Rapid.Preset(context, { id: 'new', tags: { new: 'true' } });
 
   it('changes from one preset\'s tags to another\'s', () => {
     const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { old: 'true' } });
@@ -58,7 +58,7 @@ describe('actionChangePreset', () => {
     //
     const n2before = { highway: 'crossing' };
     const w2before = { highway: 'primary' };
-    const newPreset = new Rapid.Preset(context, 'crossing', { tags: { highway: 'footway', footway: 'crossing', 'crossing:markings': 'zebra' } });
+    const newPreset = new Rapid.Preset(context, { id: 'crossing', tags: { highway: 'footway', footway: 'crossing', 'crossing:markings': 'zebra' } });
 
     const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [-1,  0], tags: {} }),

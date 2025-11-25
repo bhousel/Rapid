@@ -6,14 +6,18 @@ import * as Rapid from '../../../modules/headless.js';
 describe('Preset', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:     new Rapid.AssetSystem(context),
-    l10n:       new Rapid.LocalizationSystem(context),
-    presets:    new Rapid.PresetSystem(context)
+    assets:  new Rapid.AssetSystem(context),
+    l10n:    new Rapid.LocalizationSystem(context),
+    presets: new Rapid.PresetSystem(context)
   };
 
   describe('constructor', () => {
+    it('throws if missing an id', () => {
+      assert.throws(() => new Rapid.Preset(context), /missing id/i);
+    });
+
     it('constructs a Preset from a context and props', () => {
-      const a = new Rapid.Preset(context, 'test', {});
+      const a = new Rapid.Preset(context, { id: 'test' });
       assert.instanceOf(a, Rapid.Preset);
       assert.strictEqual(a.context, context);
     });
@@ -22,7 +26,7 @@ describe('Preset', () => {
 
   describe('fields', () => {
     it('has no fields by default', () => {
-      const preset = new Rapid.Preset(context, 'test', {});
+      const preset = new Rapid.Preset(context, { id: 'test' });
       assert.deepEqual(preset.fields(), []);
     });
   });
@@ -30,7 +34,7 @@ describe('Preset', () => {
 
   describe('moreFields', () => {
     it('has no moreFields by default', () => {
-      const preset = new Rapid.Preset(context, 'test', {});
+      const preset = new Rapid.Preset(context, { id: 'test' });
       assert.deepEqual(preset.moreFields(), []);
     });
   });
@@ -38,12 +42,12 @@ describe('Preset', () => {
 
   describe('matchGeometry', () => {
     it('returns false if it doesn\'t match', () => {
-      const preset = new Rapid.Preset(context, 'test', { geometry: ['line'] });
+      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['line'] });
       assert.isFalse(preset.matchGeometry('point'));
     });
 
     it('returns true if it does match', () => {
-      const preset = new Rapid.Preset(context, 'test', { geometry: ['point', 'line'] });
+      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['point', 'line'] });
       assert.isTrue(preset.matchGeometry('point'));
     });
   });
@@ -51,12 +55,12 @@ describe('Preset', () => {
 
   describe('matchAllGeometry', () => {
     it('returns false if they don\'t all match', () => {
-      const preset = new Rapid.Preset(context, 'test', { geometry: ['line'] });
+      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['line'] });
       assert.isFalse(preset.matchAllGeometry(['point', 'line']));
     });
 
     it('returns true if they do all match', () => {
-      const preset = new Rapid.Preset(context, 'test', { geometry: ['point', 'line'] });
+      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['point', 'line'] });
       assert.isTrue(preset.matchAllGeometry(['point', 'line']));
     });
   });
@@ -64,39 +68,41 @@ describe('Preset', () => {
 
   describe('matchScore', () => {
     it('returns -1 if preset does not match tags', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { foo: 'bar' } });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { foo: 'bar' } });
       const entity = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
       assert.strictEqual(preset.matchScore(entity.tags), -1);
     });
 
     it('returns the value of the matchScore property when matched', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { highway: 'motorway' }, matchScore: 0.2 });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { highway: 'motorway' }, matchScore: 0.2 });
       const entity = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
       assert.strictEqual(preset.matchScore(entity.tags), 0.2);
     });
 
     it('defaults to the number of matched tags', () => {
-      let preset = new Rapid.Preset(context, 'test', { tags: { highway: 'residential' } });
+      let preset = new Rapid.Preset(context, { id: 'test', tags: { highway: 'residential' } });
       let entity = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
       assert.strictEqual(preset.matchScore(entity.tags), 1);
 
-      preset = new Rapid.Preset(context, 'test', { tags: { highway: 'service', service: 'alley' } });
+      preset = new Rapid.Preset(context, { id: 'test', tags: { highway: 'service', service: 'alley' } });
       entity = new Rapid.OsmWay(context, { tags: { highway: 'service', service: 'alley' } });
       assert.strictEqual(preset.matchScore(entity.tags), 2);
     });
 
     it('counts * as a match for any value with score 0.5', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { building: '*' } });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { building: '*' } });
       const entity = new Rapid.OsmWay(context, { tags: { building: 'yep' } });
       assert.strictEqual(preset.matchScore(entity.tags), 0.5);
     });
 
     it('boosts matchScore for additional matches in addTags', () => {
-      const presetSupercenter = new Rapid.Preset(context, 'shop/supermarket/walmart_supercenter', {
+      const presetSupercenter = new Rapid.Preset(context, {
+        id: 'shop/supermarket/walmart_supercenter',
         tags: { 'brand:wikidata': 'Q483551', 'shop': 'supermarket' },
         addTags: { 'name': 'Walmart Supercenter'  }
       });
-      const presetMarket = new Rapid.Preset(context, 'shop/supermarket/walmart_market', {
+      const presetMarket = new Rapid.Preset(context, {
+        id: 'shop/supermarket/walmart_market',
         tags: { 'brand:wikidata': 'Q483551', 'shop': 'supermarket' },
         addTags: { 'name': 'Walmart Neighborhood Market'  }
       });
@@ -124,23 +130,16 @@ describe('Preset', () => {
 
 
   describe('isFallback', () => {
-    it('returns true if preset has no tags', () => {
-      const preset = new Rapid.Preset(context, 'point', { tags: {} });
-      assert.isTrue(preset.isFallback());
+    it('returns true for the special fallback presets', () => {
+      const allPresets = context.systems.presets.allPresets;
+      assert.isTrue(allPresets.point?.isFallback());
+      assert.isTrue(allPresets.line?.isFallback());
+      assert.isTrue(allPresets.area?.isFallback());
+      assert.isTrue(allPresets.relation?.isFallback());
     });
 
-    it('returns true if preset has a single \'area\' tag', () => {
-      const preset = new Rapid.Preset(context, 'area', { tags: { area: 'yes' } });
-      assert.isTrue(preset.isFallback());
-    });
-
-    it('returns false if preset has a single non-\'area\' tag', () => {
-      const preset = new Rapid.Preset(context, 'building', { tags: { building: 'yes' } });
-      assert.isFalse(preset.isFallback());
-    });
-
-    it('returns false if preset has multiple tags', () => {
-      const preset = new Rapid.Preset(context, 'building', { tags: { area: 'yes', building: 'yes' } });
+    it('returns false for other presets', () => {
+      const preset = new Rapid.Preset(context, { id: 'building', tags: { building: 'yes' } });
       assert.isFalse(preset.isFallback());
     });
   });
@@ -159,41 +158,41 @@ describe('Preset', () => {
     });
 
     it('adds match tags', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { highway: 'residential' } });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { highway: 'residential' } });
       assert.deepEqual(preset.setTags({}, 'line'), { highway: 'residential' });
     });
 
     it('adds wildcard tags with value \'yes\'', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { natural: '*' } });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { natural: '*' } });
       assert.deepEqual(preset.setTags({}, 'area'), { natural: 'yes' });
     });
 
     it('prefers to add tags of addTags property', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { building: '*' }, addTags: { building: 'ok' } });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { building: '*' }, addTags: { building: 'ok' } });
       assert.deepEqual(preset.setTags({}, 'area'), { building: 'ok' });
     });
 
     it('adds default tags of fields with matching geometry', () => {
-      const field = new Rapid.Field(context, 'field', { key: 'building', geometry: 'area', default: 'yes' });
+      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: 'area', default: 'yes' });
       const allFields = context.systems.presets.allFields;
       allFields.field = field;
 
-      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] });
+      const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.setTags({}, 'area'), { area: 'yes', building: 'yes' });
     });
 
     it('adds no default tags of fields with non-matching geometry', () => {
-      const field = new Rapid.Field(context, 'field', { key: 'building', geometry: 'area', default: 'yes' });
+      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: 'area', default: 'yes' });
       const allFields = context.systems.presets.allFields;
       allFields.field = field;
 
-      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] });
+      const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.setTags({}, 'point'), {});
     });
 
 
     describe('for a preset with no tag in areaKeys', () => {
-      const preset = new Rapid.Preset(context, 'test', { geometry: ['line', 'area'], tags: { name: 'testname', highway: 'pedestrian' } });
+      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['line', 'area'], tags: { name: 'testname', highway: 'pedestrian' } });
 
       it('doesn\'t add area=yes to non-areas', () => {
         assert.deepEqual(preset.setTags({}, 'line'), { name: 'testname', highway: 'pedestrian' });
@@ -207,12 +206,12 @@ describe('Preset', () => {
 
     describe('for a preset with a tag in areaKeys', () => {
       it('doesn\'t add area=yes automatically', () => {
-        const preset = new Rapid.Preset(context, 'test', { geometry: ['area'], tags: { name: 'testname', building: 'yes' } });
+        const preset = new Rapid.Preset(context, { id: 'test', geometry: ['area'], tags: { name: 'testname', building: 'yes' } });
         assert.deepEqual(preset.setTags({}, 'area'), { name: 'testname', building: 'yes' });
       });
 
       it('does add area=yes if asked to', () => {
-        const preset = new Rapid.Preset(context, 'test', { geometry: ['area'], tags: { name: 'testname', area: 'yes' } });
+        const preset = new Rapid.Preset(context, { id: 'test', geometry: ['area'], tags: { name: 'testname', area: 'yes' } });
         assert.deepEqual(preset.setTags({}, 'area'), { name: 'testname', area: 'yes' });
       });
     });
@@ -221,40 +220,40 @@ describe('Preset', () => {
 
   describe('unsetTags', () => {
     it('removes tags that match preset tags', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { highway: 'residential' } });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { highway: 'residential' } });
       assert.deepEqual(preset.unsetTags({ highway: 'residential' }, 'area'), {});
     });
 
     it('removes tags that match field default tags', () => {
-      const field = new Rapid.Field(context, 'field', { key: 'building', geometry: 'area', default: 'yes' });
+      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: 'area', default: 'yes' });
       const allFields = context.systems.presets.allFields;
       allFields.field = field;
 
-      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] });
+      const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.unsetTags({ building: 'yes' }, 'area'), {});
     });
 
     it('removes area=yes', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { highway: 'pedestrian' } });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { highway: 'pedestrian' } });
       assert.deepEqual(preset.unsetTags({ highway: 'pedestrian', area: 'yes' }, 'area'), {});
     });
 
     it('preserves tags that do not match field default tags', () => {
-      const field = new Rapid.Field(context, 'field', { key: 'building', geometry: 'area', default: 'yes' });
+      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: 'area', default: 'yes' });
       const allFields = context.systems.presets.allFields;
       allFields.field = field;
 
-      const preset = new Rapid.Preset(context, 'test', { fields: ['field'] });
+      const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.unsetTags({ building: 'yep' }, 'area'), { building: 'yep' });
     });
 
     it('preserves tags that are not listed in removeTags', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { a: 'b' }, removeTags: {} });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { a: 'b' }, removeTags: {} });
       assert.deepEqual(preset.unsetTags({ a: 'b' }, 'area'), { a: 'b' });
     });
 
     it('uses tags from addTags if removeTags is not defined', () => {
-      const preset = new Rapid.Preset(context, 'test', { tags: { a: 'b' }, addTags: { remove: 'me' } });
+      const preset = new Rapid.Preset(context, { id: 'test', tags: { a: 'b' }, addTags: { remove: 'me' } });
       assert.deepEqual(preset.unsetTags({ a: 'b', remove: 'me' }, 'area'), { a: 'b' });
     });
   });

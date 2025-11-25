@@ -15,6 +15,7 @@ describe('uiFieldWikipedia', () => {
   class MockLocalizationSystem {
     constructor() { }
     initAsync()   { return Promise.resolve(); }
+    startAsync()  { return Promise.resolve(); }
     t(id)         { return id; }
     tHtml(id)     { return id; }
   }
@@ -29,7 +30,8 @@ describe('uiFieldWikipedia', () => {
       this.systems = {
         assets:  new Rapid.AssetSystem(this),
         editor:  new MockEditSystem(this),
-        l10n:    new MockLocalizationSystem(this)
+        l10n:    new MockLocalizationSystem(this),
+        presets: new Rapid.PresetSystem(this)
       };
     }
     cleanTagKey(val)    { return val; }
@@ -50,8 +52,9 @@ describe('uiFieldWikipedia', () => {
     graph = new Rapid.Graph(base);
 
     selection = d3.select(document.createElement('div'));
-    field = new Rapid.Field(context, 'wikipedia', {
-      key: 'wikipedia',
+    field = new Rapid.Field(context, {
+      id:   'wikipedia',
+      key:  'wikipedia',
       keys: ['wikipedia', 'wikidata'],
       type: 'wikipedia'
     });

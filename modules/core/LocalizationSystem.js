@@ -394,8 +394,7 @@ export class LocalizationSystem extends AbstractSystem {
         }
 
         if (typeof result === 'string') {
-          for (let key in replacements) {
-            let value = replacements[key];
+          for (let [key, value] of Object.entries(replacements)) {
             if (typeof value === 'number') {
               if (value.toLocaleString) {
                 // format numbers for the locale

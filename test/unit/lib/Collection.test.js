@@ -6,41 +6,41 @@ import * as Rapid from '../../../modules/headless.js';
 describe('Collection', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:     new Rapid.AssetSystem(context),
-    l10n:       new Rapid.LocalizationSystem(context),
-    presets:    new Rapid.PresetSystem(context)
+    assets:  new Rapid.AssetSystem(context),
+    l10n:    new Rapid.LocalizationSystem(context),
+    presets: new Rapid.PresetSystem(context)
   };
 
   const p = {
-    grill: new Rapid.Preset(context, 'amenity/bbq',
-      { name: 'Grill', tags: { amenity: 'bbq' }, geometry: ['point'], terms: [] }
+    grill: new Rapid.Preset(context,
+      { id: 'amenity/bbq', name: 'Grill', tags: { amenity: 'bbq' }, geometry: ['point'], terms: [] }
     ),
-    sandpit: new Rapid.Preset(context, 'amenity/grit_bin',
-      { name: 'Sandpit', tags: { amenity: 'grit_bin' }, geometry: ['point'], terms: [] }
+    sandpit: new Rapid.Preset(context,
+      { id: 'amenity/grit_bin', name: 'Sandpit', tags: { amenity: 'grit_bin' }, geometry: ['point'], terms: [] }
     ),
-    residential: new Rapid.Preset(context, 'highway/residential',
-      { name: 'Residential Area', tags: { highway: 'residential' }, geometry: ['point', 'area'], terms: [] }
+    residential: new Rapid.Preset(context,
+      { id: 'highway/residential', name: 'Residential Area', tags: { highway: 'residential' }, geometry: ['point', 'area'], terms: [] }
     ),
-    grass1: new Rapid.Preset(context, 'landuse/grass1',
-      { name: 'Grass', tags: { landuse: 'grass' }, geometry: ['point', 'area'], terms: [] }
+    grass1: new Rapid.Preset(context,
+      { id: 'landuse/grass1', name: 'Grass', tags: { landuse: 'grass' }, geometry: ['point', 'area'], terms: [] }
     ),
-    grass2: new Rapid.Preset(context, 'landuse/grass2',
-      { name: 'Ğṝȁß', tags: { landuse: 'ğṝȁß' }, geometry: ['point', 'area'], terms: [] }
+    grass2: new Rapid.Preset(context,
+      { id: 'landuse/grass2', name: 'Ğṝȁß', tags: { landuse: 'ğṝȁß' }, geometry: ['point', 'area'], terms: [] }
     ),
-    park: new Rapid.Preset(context, 'leisure/park',
-      { name: 'Park', tags: { leisure: 'park' }, geometry: ['point', 'area'], terms: [ 'grass' ], matchScore: 0.5 }
+    park: new Rapid.Preset(context,
+      { id: 'leisure/park', name: 'Park', tags: { leisure: 'park' }, geometry: ['point', 'area'], terms: [ 'grass' ], matchScore: 0.5 }
     ),
-    parking: new Rapid.Preset(context, 'amenity/parking',
-      { name: 'Parking', tags: { amenity: 'parking' }, geometry: ['point', 'area'], terms: [ 'cars' ] }
+    parking: new Rapid.Preset(context,
+      { id: 'amenity/parking', name: 'Parking', tags: { amenity: 'parking' }, geometry: ['point', 'area'], terms: [ 'cars' ] }
     ),
-    soccer: new Rapid.Preset(context, 'leisure/pitch/soccer',
-      { name: 'Soccer Field', tags: { leisure: 'pitch', sport: 'soccer' }, geometry: ['point', 'area'], terms: ['fußball'] }
+    soccer: new Rapid.Preset(context,
+      { id: 'leisure/pitch/soccer', name: 'Soccer Field', tags: { leisure: 'pitch', sport: 'soccer' }, geometry: ['point', 'area'], terms: ['fußball'] }
     ),
-    football: new Rapid.Preset(context, 'leisure/pitch/american_football',
-      { name: 'Football Field', tags: { leisure: 'pitch', sport: 'american_football' }, geometry: ['point', 'area'], terms: ['gridiron'] }
+    football: new Rapid.Preset(context,
+      { id: 'leisure/pitch/american_football', name: 'Football Field', tags: { leisure: 'pitch', sport: 'american_football' }, geometry: ['point', 'area'], terms: ['gridiron'] }
     ),
-    excluded: new Rapid.Preset(context, 'amenity/excluded',
-      { name: 'Excluded', tags: { amenity: 'excluded' }, geometry: ['point'], terms: [], searchable: false }
+    excluded: new Rapid.Preset(context,
+      { id: 'amenity/excluded', name: 'Excluded', tags: { amenity: 'excluded' }, geometry: ['point'], terms: [], searchable: false }
     )
   };
 

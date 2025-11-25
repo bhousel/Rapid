@@ -10,15 +10,18 @@ export class Category {
 
   /**
    * @constructor
-   * @param  {Context}  context    - Global shared application context
-   * @param  {string}   categoryID - String unique ID for this field
-   * @param  {Object}   props      - Object containing the original properties for this field
+   * @param  {Context}  context - Global shared application context
+   * @param  {Object}   props   - Object containing the properties for this Category
    */
-  constructor(context, categoryID, props) {
+  constructor(context, props = {}) {
     this.context = context;
 
-    this.id = categoryID;
-    this.safeid = utilSafeString(categoryID);    // for use in classes, element ids, css selectors
+    if (!props.id) {
+      throw new Error('Category missing id property');
+    }
+
+    this.id = props.id;
+    this.safeid = utilSafeString(props.id);    // for use in classes, element ids, css selectors
 
     // Preserve and cleanup all original properties..
     this.orig = {};

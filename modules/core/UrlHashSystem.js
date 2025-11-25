@@ -14,7 +14,7 @@ let _document;
  * Supports `pause()` / `resume()` - when paused, url hash will not emit events or do anything
  *
  * Properties you can access:
- *   `initialHashParams`  Map(string -> string) containing the initial query params (e.g. `background=Bing` etc)
+ *   `initialHashParams`  Map<string, string> containing the initial query params (e.g. `background=Bing` etc)
  *   `doUpdateTitle`     `true` if we should update the document title, `false` if not (default `true`)
  *   `titleBase`         The document title to use (default `Rapid`)
  *

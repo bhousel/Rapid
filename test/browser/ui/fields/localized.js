@@ -32,7 +32,8 @@ describe('uiFieldLocalized', () => {
       this.systems = {
         assets:  new Rapid.AssetSystem(this),
         editor:  new MockEditSystem(this),
-        l10n:    new MockLocalizationSystem(this)
+        l10n:    new MockLocalizationSystem(this),
+        presets: new Rapid.PresetSystem(this)
       };
     }
     cleanTagKey(val)   { return val; }
@@ -49,7 +50,7 @@ describe('uiFieldLocalized', () => {
 
   beforeEach(() => {
     selection = d3.select(document.createElement('div'));
-    field = new Rapid.Field(context, 'name', { key: 'name', type: 'localized' });
+    field = new Rapid.Field(context, { id: 'name', key: 'name', type: 'localized' });
     field.locked = () => { return false; };
   });
 

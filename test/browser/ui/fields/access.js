@@ -10,7 +10,9 @@ describe('uiFieldAccess', () => {
     constructor() {
       this.viewport = new Rapid.sdk.Viewport();
       this.systems = {
-        l10n: new MockLocalizationSystem(this)
+        assets:  new Rapid.AssetSystem(this),
+        l10n:    new MockLocalizationSystem(this),
+        presets: new Rapid.PresetSystem(this)
       };
     }
     container()  { return selection; }
@@ -22,7 +24,8 @@ describe('uiFieldAccess', () => {
 
   beforeEach(() => {
     selection = d3.select(document.createElement('div'));
-    field = new Rapid.Field(context, 'access', {
+    field = new Rapid.Field(context, {
+      id:   'access',
       keys: ['access', 'foot', 'motor_vehicle', 'bicycle', 'horse'],
       type: 'access'
     });

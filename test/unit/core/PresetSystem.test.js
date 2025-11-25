@@ -7,8 +7,9 @@ describe('PresetSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:     new Rapid.AssetSystem(context),
-    l10n:       new Rapid.LocalizationSystem(context)
+    assets:   new Rapid.AssetSystem(context),
+    l10n:     new Rapid.LocalizationSystem(context),
+    urlhash:  new Rapid.UrlHashSystem(context)
   };
 
 
@@ -44,6 +45,23 @@ describe('PresetSystem', () => {
           .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
           .catch(err => assert.match(err, /cannot init/i));
       });
+
+      it('sets addablePresetIDs, if present in the urlhash', () => {
+        const urlhash = context.systems.urlhash;
+        urlhash.initialHashParams.set('presets', 'one,two,three');
+
+        const presets = new Rapid.PresetSystem(context);
+        const prom = presets.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            assert.deepEqual(presets.addablePresetIDs, new Set(['one', 'two', 'three']));
+          })
+          .finally(() => {
+            urlhash.initialHashParams.delete('presets');
+          });
+      });
+
     });
 
     describe('startAsync', () => {
@@ -83,6 +101,26 @@ describe('PresetSystem', () => {
 
     afterEach(() => {
       Rapid.osmSetAreaKeys(_savedAreaKeys);
+    });
+
+    describe('allPresets', () => {
+      it('gets the presets cache', () => {
+        const result = _presets.allPresets;
+        assert.isObject(result);
+        assert.strictEqual(result, _presets._presets);
+      });
+    });
+
+    describe('allFields', () => {
+      it('gets the fields cache', () => {
+        const result = _presets.allFields;
+        assert.isObject(result);
+        assert.strictEqual(result, _presets._fields);
+      });
+    });
+
+
+    describe('merge', () => {
     });
 
 
