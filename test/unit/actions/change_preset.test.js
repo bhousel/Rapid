@@ -5,6 +5,12 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('actionChangePreset', () => {
   const context = new Rapid.MockContext();
+  context.systems = {
+    assets:     new Rapid.AssetSystem(context),
+    l10n:       new Rapid.LocalizationSystem(context),
+    presets:    new Rapid.PresetSystem(context)
+  };
+
   const oldPreset = new Rapid.Preset(context, 'old', { tags: { old: 'true' } });
   const newPreset = new Rapid.Preset(context, 'new', { tags: { new: 'true' } });
 
