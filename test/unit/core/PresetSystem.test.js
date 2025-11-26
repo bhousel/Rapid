@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, it } from 'bun:test';
+import { afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -92,6 +92,7 @@ describe('PresetSystem', () => {
 
     beforeAll(() => {
       _presets = new Rapid.PresetSystem(context);
+      context.systems.presets = _presets;
       return _presets.initAsync().then(() => _presets.startAsync());
     });
 
@@ -119,6 +120,14 @@ describe('PresetSystem', () => {
       });
     });
 
+    describe('allCategories', () => {
+      it('gets the categories cache', () => {
+        const result = _presets.allCategories;
+        assert.isObject(result);
+        assert.strictEqual(result, _presets._categories);
+      });
+    });
+
     describe('universalFields', () => {
       it('gets the universal fields cache', () => {
         const result = _presets.universalFields;
@@ -127,8 +136,34 @@ describe('PresetSystem', () => {
       });
     });
 
+    describe('resetCaches', () => {
+      it('resets field, preset, and category caches', () => {
+        const field = new Rapid.Field(context, {
+          id: 'building', type: 'check', geometry: 'area', key: 'building', default: 'yes', universal: true
+        });
+        field.resetCache = mock();
 
-    describe('merge', () => {
+        const preset = new Rapid.Preset(context, {
+          id: 'residential', geometry: 'line', tags: { highway: 'residential' }
+        });
+        preset.resetCache = mock();
+
+        const category = new Rapid.Category(context, {
+          id: 'roads', geometry: 'line', members: ['residential']
+        });
+        category.resetCache = mock();
+
+        _presets._fields[field.id] = field;
+        _presets._presets[preset.id] = preset;
+        _presets._categories[category.id] = category;
+
+        _presets.resetCaches();
+
+        assert.lengthOf(field.resetCache.mock.calls, 1);     // reset called once
+        assert.lengthOf(preset.resetCache.mock.calls, 1);    // reset called once
+        assert.lengthOf(category.resetCache.mock.calls, 1);  // reset called once
+        assert.deepEqual(_presets._universal, [field]);      // universal fields setup
+      });
     });
 
 

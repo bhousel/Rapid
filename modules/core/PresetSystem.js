@@ -158,6 +158,16 @@ export class PresetSystem extends AbstractSystem {
   }
 
   /**
+   * allCategories
+   * Getter to retrieve all the categories.
+   * @return  {Object}  All the categories
+   */
+  get allCategories() {
+    return this._categories;
+  }
+
+
+  /**
    * universalFields
    * Getter to retrieve all the "universal" fields.
    * These are fields that are always available on any preset.
