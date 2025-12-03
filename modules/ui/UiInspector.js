@@ -195,7 +195,7 @@ export class UiInspector {
 
   /**
    * showPresetList
-   * Show the preset list , optionally with given selected array, and optionally with a slide-in animation
+   * Show the preset list, optionally with given selected array, and optionally with a slide-in animation
    * @param  {Array}    selected? - optional Array of presets selected
    * @param  {boolean}  animate? - whether to animate the pane
    */

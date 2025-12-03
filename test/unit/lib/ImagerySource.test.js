@@ -3,13 +3,6 @@ import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import { geoArea as d3_geoArea } from 'd3-geo';
 
-
-if (!global.window) {  // mock window for Node
-  global.window = {
-    devicePixelRatio: 1
-  };
-}
-
 // const mockResponse = {
 //   ok: true,
 //   status: 200,

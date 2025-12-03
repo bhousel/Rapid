@@ -11,15 +11,22 @@ describe('Preset', () => {
     presets: new Rapid.PresetSystem(context)
   };
 
+  const presets = context.systems.presets;
+
+  beforeAll(() => {
+    return presets.initAsync();
+  });
+
+
   describe('constructor', () => {
     it('throws if missing an id', () => {
       assert.throws(() => new Rapid.Preset(context), /missing id/i);
     });
 
     it('constructs a Preset from a context and props', () => {
-      const a = new Rapid.Preset(context, { id: 'test' });
-      assert.instanceOf(a, Rapid.Preset);
-      assert.strictEqual(a.context, context);
+      const preset = new Rapid.Preset(context, { id: 'test' });
+      assert.instanceOf(preset, Rapid.Preset);
+      assert.strictEqual(preset.context, context);
     });
   });
 
@@ -40,30 +47,30 @@ describe('Preset', () => {
   });
 
 
-  describe('matchGeometry', () => {
-    it('returns false if it doesn\'t match', () => {
-      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['line'] });
-      assert.isFalse(preset.matchGeometry('point'));
-    });
-
-    it('returns true if it does match', () => {
-      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['point', 'line'] });
-      assert.isTrue(preset.matchGeometry('point'));
-    });
-  });
-
-
-  describe('matchAllGeometry', () => {
-    it('returns false if they don\'t all match', () => {
-      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['line'] });
-      assert.isFalse(preset.matchAllGeometry(['point', 'line']));
-    });
-
-    it('returns true if they do all match', () => {
-      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['point', 'line'] });
-      assert.isTrue(preset.matchAllGeometry(['point', 'line']));
-    });
-  });
+//  describe('matchGeometry', () => {
+//    it('returns false if it doesn\'t match', () => {
+//      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['line'] });
+//      assert.isFalse(preset.matchGeometry('point'));
+//    });
+//
+//    it('returns true if it does match', () => {
+//      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['point', 'line'] });
+//      assert.isTrue(preset.matchGeometry('point'));
+//    });
+//  });
+//
+//
+//  describe('matchAllGeometry', () => {
+//    it('returns false if they don\'t all match', () => {
+//      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['line'] });
+//      assert.isFalse(preset.matchAllGeometry(['point', 'line']));
+//    });
+//
+//    it('returns true if they do all match', () => {
+//      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['point', 'line'] });
+//      assert.isTrue(preset.matchAllGeometry(['point', 'line']));
+//    });
+//  });
 
 
   describe('matchScore', () => {
@@ -131,7 +138,7 @@ describe('Preset', () => {
 
   describe('isFallback', () => {
     it('returns true for the special fallback presets', () => {
-      const allPresets = context.systems.presets.allPresets;
+      const allPresets = presets.allPresets;
       assert.isTrue(allPresets.point?.isFallback());
       assert.isTrue(allPresets.line?.isFallback());
       assert.isTrue(allPresets.area?.isFallback());
@@ -173,8 +180,8 @@ describe('Preset', () => {
     });
 
     it('adds default tags of fields with matching geometry', () => {
-      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: 'area', default: 'yes' });
-      const allFields = context.systems.presets.allFields;
+      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
+      const allFields = presets.allFields;
       allFields.field = field;
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
@@ -182,8 +189,8 @@ describe('Preset', () => {
     });
 
     it('adds no default tags of fields with non-matching geometry', () => {
-      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: 'area', default: 'yes' });
-      const allFields = context.systems.presets.allFields;
+      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
+      const allFields = presets.allFields;
       allFields.field = field;
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
@@ -225,8 +232,8 @@ describe('Preset', () => {
     });
 
     it('removes tags that match field default tags', () => {
-      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: 'area', default: 'yes' });
-      const allFields = context.systems.presets.allFields;
+      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
+      const allFields = presets.allFields;
       allFields.field = field;
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
@@ -239,8 +246,8 @@ describe('Preset', () => {
     });
 
     it('preserves tags that do not match field default tags', () => {
-      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: 'area', default: 'yes' });
-      const allFields = context.systems.presets.allFields;
+      const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
+      const allFields = presets.allFields;
       allFields.field = field;
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });

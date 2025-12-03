@@ -2,8 +2,10 @@ import { utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 
 
 /**
- *  Field
- *  A field associated with a presert
+ * Field
+ * A Field represents a user interface component that appears in the Rapid inspector.
+ * Each field corresponds to one or more "keys" (OpenStreetMap tag keys).
+ * The available fields are determined by the preset matched.
  */
 export class Field {
 
@@ -28,7 +30,7 @@ export class Field {
     this.orig.caseSensitive = props.caseSensitive ?? false;
     this.orig.customValues = props.customValues ?? true;
     this.orig.default = props.default;
-    this.orig.geometry = props.geometry;
+    this.orig.geometry = props.geometry ?? [];
     this.orig.icon = props.icon;
     this.orig.increment = props.increment ?? 1;
     this.orig.key = props.key;
@@ -52,6 +54,13 @@ export class Field {
 
     // Convert some `props` properties to class properties.. (others will become class functions)
     Object.assign(this, utilObjectOmit(this.orig, ['increment', 'label', 'placeholder', 'terms']));
+
+    const presets = context.systems.presets;
+    if (this.orig.geometry.length) {
+      this.geometries = new Set(this.orig.geometry);
+    } else {
+      this.geometries = new Set(presets.geometries);  // all geometries
+    }
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -81,7 +90,6 @@ export class Field {
   label() {
     return this._resolveReference('label').tHtml('label', { 'default': this.orig.label || this.id });
   }
-  // _this.label = () => _this._resolveReference('label').t.append('label', { 'default': this.id });  // someday?
 
   placeholder() {
     return this._resolveReference('placeholder').t('placeholder', { 'default': this.orig.placeholder });
@@ -90,14 +98,6 @@ export class Field {
   terms() {
     return this._resolveReference('terms').t('terms', { 'default': this.orig.terms })
       .toLowerCase().trim().split(/\s*,+\s*/);
-  }
-
-  matchGeometry(geom) {
-    return !this.geometry || this.geometry.indexOf(geom) !== -1;
-  }
-
-  matchAllGeometry(geometries) {
-    return !this.geometry || geometries.every(geom => this.geometry.indexOf(geom) !== -1);
   }
 
   t(scope, options) {

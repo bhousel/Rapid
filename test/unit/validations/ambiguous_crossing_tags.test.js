@@ -12,6 +12,7 @@ describe('validationAmbiguousCrossingTags', () => {
 
   const context = new Rapid.MockContext();
   context.systems = {
+    assets:     new Rapid.AssetSystem(context),
     editor:     new MockEditSystem(context),
     l10n:       new Rapid.LocalizationSystem(context),
     locations:  new Rapid.LocationSystem(context),
@@ -41,7 +42,8 @@ describe('validationAmbiguousCrossingTags', () => {
 
     return Promise.all([
       context.systems.locations.initAsync(),
-      context.systems.spatial.initAsync()
+      context.systems.spatial.initAsync(),
+      context.systems.presets.initAsync()
     ]);
   });
 

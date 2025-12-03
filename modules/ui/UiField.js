@@ -419,7 +419,7 @@ export class UiField {
     if (presetField.geometry && !this.entityIDs.every(entityID => {
       const entity = graph.hasEntity(entityID);
       if (!entity) return false;
-      return presetField.matchGeometry(entity.geometry(graph));
+      return presetField.geometries.has(entity.geometry(graph));
     })) {
       return false;
     }

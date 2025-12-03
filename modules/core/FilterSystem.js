@@ -469,9 +469,9 @@ export class FilterSystem extends AbstractSystem {
   /**
    * isHiddenPreset
    * Checks whether a given preset would be hidden by the current filtering rules
-   * @param   {Preset}   preset   - The Preset to test
-   * @param   {string}   geometry - geometry of the Preset ('point', 'line', 'vertex', 'area', 'relation')
-   * @return  {string?}  The first `filterID` which causes the Preset to be hidden, or `null`
+   * @param   {Preset|Category}  preset   - The Preset to test
+   * @param   {string}           geometry - geometry of the Preset ('point', 'line', 'vertex', 'area', 'relation')
+   * @return  {string?}          The first `filterID` which causes the Preset to be hidden, or `null`
    */
   isHiddenPreset(preset, geometry) {
     if (!this._hidden.size) return null;

@@ -39,6 +39,8 @@ describe('validationOutdatedTags', () => {
         }
       }
     };
+
+    return context.systems.presets.initAsync();
   });
 
 

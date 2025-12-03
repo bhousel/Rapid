@@ -165,6 +165,10 @@ export class AssetSystem extends AbstractSystem {
       c.tagging_preset_fields = {};
       c.tagging_preset_presets = {};
       c.tagging_preset_overrides = {};
+      c.l10n_core_en= {};
+      c.l10n_tagging_en= {};
+      c.l10n_imagery_en= {};
+      c.l10n_community_en= {};
       c.wmf_sitematrix = [ ['English', 'English', 'en'], ['German', 'Deutsch', 'de'] ];
     }
     /* c8 ignore end */
@@ -269,6 +273,10 @@ export class AssetSystem extends AbstractSystem {
           this._cache[key] = result;
           return result;
         })
+        //.catch(err => {
+        //  console.error(`key: ${key}, url: ${url}`);
+        //  throw new Error(err);
+        //})
         .finally(() => {
           delete this._inflight[url];
         });

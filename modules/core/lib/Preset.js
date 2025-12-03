@@ -4,7 +4,10 @@ import { osmAreaKeys } from '../../data/lib/tags.js';
 
 
 /**
- *  Preset
+ * Preset
+ * A Preset represents a bundle of tags that identify a feature type on OpenStreetMap.
+ * Every feature in Rapid is matched to a Preset based on its tags.
+ * Users can pick from the available presets in the Rapid editor.
  */
 export class Preset {
 
@@ -46,6 +49,13 @@ export class Preset {
     // Convert some `props` properties to class properties.. (others will become class functions)
     Object.assign(this, utilObjectOmit(this.orig, ['aliases', 'fields', 'matchScore', 'moreFields', 'name', 'reference', 'terms']));
 
+    const presets = context.systems.presets;
+    if (this.orig.geometry.length) {
+      this.geometries = new Set(this.orig.geometry);
+    } else {
+      this.geometries = new Set(presets.geometries);  // all geometries
+    }
+
     this.resetCache();
   }
 
@@ -74,7 +84,6 @@ export class Preset {
 
   nameLabel() {
     return this._resolveName('name').tHtml('name', { 'default': this.orig.name || this.id });
-    // return this._resolveName('name').t.append('name', { 'default': this.orig.name || this.id });  // someday?
   }
 
   fields() {
@@ -83,14 +92,6 @@ export class Preset {
 
   moreFields() {
     return this._resolved.moreFields || (this._resolved.moreFields = this._resolveFields('moreFields'));
-  }
-
-  matchGeometry(geom) {
-    return this.geometry.includes(geom);
-  }
-
-  matchAllGeometry(geometries) {
-    return geometries.every(geom => this.matchGeometry(geom));
   }
 
   matchScore(entityTags) {
@@ -231,7 +232,7 @@ export class Preset {
 
     if (geometry && !skipFieldDefaults) {
       this.fields().forEach(field => {
-        if (field.matchGeometry(geometry) && field.key && field.default === tags[field.key]) {
+        if (field.geometries.has(geometry) && field.key && field.default === tags[field.key]) {
           delete tags[field.key];
         }
       });
@@ -257,20 +258,19 @@ export class Preset {
       }
     }
 
-    // Add area=yes if necessary.
-    // This is necessary if the geometry is already an area (e.g. user drew an area) AND any of:
-    // 1. chosen preset could be either an area or a line (`barrier=city_wall`)
+    // Add `area=yes` tag if necessary.
+    // This tag is only needed for features that can be either a 'line' or an 'area'.
+    // Set this tag if the geometry is already an area (e.g. user drew an area) AND:
+    // 1. chosen preset could be either an 'area' or a 'line' (`barrier=city_wall`)
     // 2. chosen preset doesn't have a key in osmAreaKeys (`railway=station`)
     if (!addTags.hasOwnProperty('area')) {
       delete tags.area;
-      if (geometry === 'area') {
+      if (geometry === 'area' && this.geometries.has('line')) {  // can also be a line
         let needsAreaTag = true;
-        if (this.geometry.indexOf('line') === -1) {
-          for (let k in addTags) {
-            if (k in osmAreaKeys) {
-              needsAreaTag = false;
-              break;
-            }
+        for (let k in addTags) {
+          if (k in osmAreaKeys) {
+            needsAreaTag = false;
+            break;
           }
         }
         if (needsAreaTag) {
@@ -281,7 +281,7 @@ export class Preset {
 
     if (geometry && !skipFieldDefaults) {
       this.fields().forEach(field => {
-        if (field.matchGeometry(geometry) && field.key && !tags[field.key] && field.default) {
+        if (field.geometries.has(geometry) && field.key && !tags[field.key] && field.default) {
           tags[field.key] = field.default;
         }
       });

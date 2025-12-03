@@ -31,26 +31,6 @@ export class Collection {
     return found;
   }
 
-  index(id) {
-    return this.array.findIndex(d => d.id === id);
-  }
-
-  matchGeometry(geometry) {
-    const result = this.array.filter(d => d.matchGeometry(geometry));
-    return new Collection(this.context, result);
-  }
-
-  matchAllGeometry(geometries) {
-    const result = this.array.filter(d => d && d.matchAllGeometry(geometries));
-    return new Collection(this.context, result);
-  }
-
-  fallback(geometry) {
-    let id = geometry;
-    if (id === 'vertex') id = 'point';
-    return this.item(id);
-  }
-
   search(value, geometry, loc) {
     if (!value) return this;
 
@@ -91,7 +71,7 @@ export class Collection {
       };
     }
 
-    let pool = this.array.filter(a => a.matchGeometry(geometry));
+    let pool = this.array.filter(a => a.geometries.has(geometry));
     if (Array.isArray(loc)) {
       const locations = this.context.systems.locations;
       const validHere = locations.locationSetsAt(loc);
@@ -165,7 +145,9 @@ export class Collection {
     ).slice(0, MAXRESULTS - 1);
 
     if (typeof geometry === 'string') {
-      const fallback = this.fallback(geometry);
+      const presets = this.context.systems.presets;
+      const allPresets = presets.allPresets;
+      const fallback = allPresets[geometry];
       if (fallback) {
         results.push(fallback);
       }

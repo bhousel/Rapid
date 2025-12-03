@@ -1,4 +1,4 @@
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -11,8 +11,21 @@ describe('Category', () => {
     presets: new Rapid.PresetSystem(context)
   };
 
-  const residential = new Rapid.Preset(context, { id: 'highway/residential', tags: { highway: 'residential' }, geometry: ['line'] });
-  context.systems.presets.allPresets['highway/residential'] = residential;
+  const presets = context.systems.presets;
+
+  beforeAll(() => {
+    return presets.initAsync().then(() => {
+      const presetData = {
+        presets: {
+          'highway/residential': {
+            tags: { highway: 'residential' },
+            geometry: ['line']
+          }
+        }
+      };
+      presets.merge(presetData);
+    });
+  });
 
 
   describe('constructor', () => {
@@ -23,14 +36,14 @@ describe('Category', () => {
     it('constructs a Category from a context and props', () => {
       const props = {
         id: 'road',
-        geometry: 'line',
-        icon: 'highway',
-        name: 'roads',
-        members: [ 'highway/residential' ]
+        icon: 'rapid-highway-unclassified',
+        name: 'Minor Roads',
+        members: ['highway/residential']
       };
-      const a = new Rapid.Category(context, props);
-      assert.instanceOf(a, Rapid.Category);
-      assert.strictEqual(a.context, context);
+
+      const category = new Rapid.Category(context, props);
+      assert.instanceOf(category, Rapid.Category);
+      assert.strictEqual(category.context, context);
     });
   });
 
@@ -38,24 +51,24 @@ describe('Category', () => {
   describe('methods', () => {
     const props = {
       id: 'road',
-      geometry: 'line',
-      icon: 'highway',
-      name: 'roads',
-      members: [ 'highway/residential' ]
+      icon: 'rapid-highway-unclassified',
+      name: 'Minor Roads',
+      members: ['highway/residential']
     };
-    const category = new Rapid.Category(context, props);
 
-    it('maps members names to preset instances', () => {
+    const category = new Rapid.Category(context, props);
+    const residential = presets.item('highway/residential');
+    it('maps members presetIDs to preset instances', () => {
       assert.instanceOf(category.members, Rapid.Collection);
       assert.deepEqual(category.members.array[0], residential);
     });
 
-    describe('matchGeometry', () => {
-      it('matches the type of an entity', () => {
-        assert.isTrue(category.matchGeometry('line'));
-        assert.isFalse(category.matchGeometry('point'));
-      });
-    });
+//    describe('matchGeometry', () => {
+//      it('matches the type of an entity', () => {
+//        assert.isTrue(category.matchGeometry('line'));
+//        assert.isFalse(category.matchGeometry('point'));
+//      });
+//    });
   });
 
 });

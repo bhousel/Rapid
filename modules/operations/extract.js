@@ -26,7 +26,7 @@ export function operationExtract(context, selectedIDs) {
     if (entity.type !== 'node') {
       const preset = presets.match(entity, graph);
       // only allow extraction from ways/relations if the preset supports points
-      if (!preset.geometry.includes('point')) return null;
+      if (!preset.geometries.has('point')) return null;
     }
 
     return actionExtract(entity.id, context.viewport);

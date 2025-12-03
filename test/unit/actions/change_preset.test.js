@@ -1,4 +1,4 @@
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -11,8 +11,22 @@ describe('actionChangePreset', () => {
     presets:    new Rapid.PresetSystem(context)
   };
 
-  const oldPreset = new Rapid.Preset(context, { id: 'old', tags: { old: 'true' } });
-  const newPreset = new Rapid.Preset(context, { id: 'new', tags: { new: 'true' } });
+  let oldPreset, newPreset;
+  beforeAll(() => {
+    const presets = context.systems.presets;
+    return presets.initAsync().then(() => {
+      const presetData = {
+        presets: {
+          'old': { tags: { old: 'true' } },
+          'new': { tags: { new: 'true' } },
+          'crossing': { tags: { highway: 'footway', footway: 'crossing', 'crossing:markings': 'zebra' } }
+        }
+      };
+      presets.merge(presetData);
+      oldPreset = presets.item('old');
+      newPreset = presets.item('new');
+    });
+  });
 
   it('changes from one preset\'s tags to another\'s', () => {
     const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { old: 'true' } });
@@ -58,7 +72,9 @@ describe('actionChangePreset', () => {
     //
     const n2before = { highway: 'crossing' };
     const w2before = { highway: 'primary' };
-    const newPreset = new Rapid.Preset(context, { id: 'crossing', tags: { highway: 'footway', footway: 'crossing', 'crossing:markings': 'zebra' } });
+
+    const presets = context.systems.presets;
+    const crossingPreset = presets.item('crossing');
 
     const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [-1,  0], tags: {} }),
@@ -71,7 +87,7 @@ describe('actionChangePreset', () => {
     ]);
 
     const graph = new Rapid.Graph(base);
-    const result = Rapid.actionChangePreset('w1', null, newPreset)(graph);
+    const result = Rapid.actionChangePreset('w1', null, crossingPreset)(graph);
     assert.instanceOf(result, Rapid.Graph);
 
     // n2: 'crossing:markings=zebra' synced from w1, legacy 'crossing=marked' tag added

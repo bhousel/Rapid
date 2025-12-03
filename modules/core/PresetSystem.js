@@ -24,31 +24,17 @@ export class PresetSystem extends AbstractSystem {
     this.id = 'presets';
     this.requiredDependencies = new Set(['assets', 'l10n']);
     this.optionalDependencies = new Set(['locations', 'storage', 'urlhash']);
-    this.geometries = ['point', 'vertex', 'line', 'area', 'relation'];
+    this.geometries = new Set(['point', 'vertex', 'line', 'area', 'relation']);
 
-    // Create geometry fallbacks
-    const POINT = new Preset(context, { id: 'point', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
-    const LINE = new Preset(context, { id: 'line', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
-    const AREA = new Preset(context, { id: 'area', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
-    const RELATION = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
-
-    // Collection of all Presets and Categories
-    this.collection = new Collection(context, [POINT, LINE, AREA, RELATION]);
-
-    // Defaults are the Presets and Categories offered to the user when adding a new feature.
-    // A fallback preset is appended to the list automatically so they dont need to be included here.
-    this._defaults = {
-      point: [],
-      vertex: [],
-      line: [],
-      area: [],
-      relation: []
-    };
-
-    this._presets = { point: POINT, line: LINE, area: AREA, relation: RELATION };
+    this.collection = null;
+    this._presets = {};
     this._fields = {};
     this._categories = {};
     this._universal = [];
+
+    // Defaults are the Presets and Categories offered to the user when adding a new feature.
+    // A fallback preset is appended to the list automatically so they dont need to be included here.
+    this._defaults = { point: [], vertex: [], line: [], area: [], relation: [] };
     this._recentIDs = null;
 
     // Set of presetIDs that the user can add (if null, all are normally addable)
@@ -75,6 +61,14 @@ export class PresetSystem extends AbstractSystem {
     const l10n = context.systems.l10n;
     const locations = context.systems.locations;
     const urlhash = context.systems.urlhash;
+
+    // Create geometry fallbacks
+    const POINT = new Preset(context, { id: 'point', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
+    const LINE = new Preset(context, { id: 'line', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
+    const AREA = new Preset(context, { id: 'area', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
+    const RELATION = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
+    this._presets = { point: POINT, vertex: POINT, line: LINE, area: AREA, relation: RELATION };
+    this.collection = new Collection(context, [POINT, LINE, AREA, RELATION]);
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -332,12 +326,24 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
   }
 
 
-  item(id)                      { return this.collection.item(id); }
-  index(id)                     { return this.collection.index(id); }
-  fallback(geometry)            { return this.collection.fallback(geometry); }
-  matchGeometry(geometry)       { return this.collection.matchGeometry(geometry); }
-  matchAllGeometry(geometries)  { return this.collection.matchAllGeometry(geometries); }
-  search(value, geometry, loc)  { return this.collection.search(value, geometry, loc); }
+  /**
+   * item
+   * Returns the Preset or Catetory with the given id
+   * @param   {string}           id - a preset or category id
+   * @return  {Preset|Category}  The Preset or Catetory, or `null` if not found
+   */
+  item(id) {
+    return this._presets[id] || this._categories[id];
+  }
+
+
+  /**
+   * search
+   * Performs a search across all Presets and Categories
+   */
+  search(value, geometry, loc)  {
+    return this.collection.search(value, geometry, loc);
+  }
 
 
   /**
@@ -417,7 +423,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       }
     }
 
-    return bestMatch || this.fallback(geometry);
+    return bestMatch || this._presets[geometry];
   }
 
 
@@ -462,7 +468,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    */
   areaKeys() {
     // The ignore list is for keys that imply lines. (We always add `area=yes` for exceptions)
-    const ignore = ['barrier', 'highway', 'footway', 'railway', 'junction', 'type'];
+    const ignore = new Set(['barrier', 'highway', 'footway', 'railway', 'junction', 'type']);
     let areaKeys = {};
 
     // ignore name-suggestion-index and deprecated presets
@@ -472,16 +478,16 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     for (const p of presets) {
       const k = Object.keys(p.tags)[0];  // pick the first tag
       if (!k) continue;
-      if (ignore.includes(k)) continue;
+      if (ignore.has(k)) continue;
 
-      if (p.geometry.includes('area')) {    // probably an area..
+      if (p.geometries.has('area')) {    // probably an area..
         areaKeys[k] = areaKeys[k] || {};
       }
     }
 
     // discardlist
     for (const p of presets) {
-      if (!p.geometry.includes('line')) continue;
+      if (!p.geometries.has('line')) continue;
       for (const [k, v] of Object.entries(p.addTags)) {
         // examine all addTags to get a better sense of what can be tagged on lines - iD#6800
         // probably an area... but sometimes a line.
@@ -502,7 +508,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     const presets = Object.values(this._presets).filter(p => !p.suggestion && !p.replacement && p.searchable !== false);
 
     for (const p of presets) {
-      if (!p.geometry.includes('point')) continue;
+      if (!p.geometries.has('point')) continue;
 
       const k = Object.keys(p.tags)[0];    // pick the first tag
       const v = Object.values(p.tags)[0];  // pick the first tag
@@ -523,7 +529,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     const presets = Object.values(this._presets).filter(p => !p.suggestion && !p.replacement && p.searchable !== false);
 
     for (const p of presets) {
-      if (!p.geometry.includes('vertex')) continue;
+      if (!p.geometries.has('vertex')) continue;
 
       const k = Object.keys(p.tags)[0];    // pick the first tag
       const v = Object.values(p.tags)[0];  // pick the first tag
@@ -557,11 +563,11 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     const context = this.context;
     const locations = context.systems.locations;
 
-    let results = new Map();   // Map<itemID, item>  (may be a Preset or a Category)
+    const results = new Map();   // Map<itemID, item>  (may be a Preset or a Category)
 
     if (startWithRecents) {
       for (const preset of this.getRecents()) {
-        if (results.size < MAXRECENTS_SHOW && preset.matchGeometry(geometry)) {
+        if (results.size < MAXRECENTS_SHOW && preset.geometries.has(geometry)) {
           results.set(preset.id, preset);
         }
       }
@@ -571,19 +577,19 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     if (this.addablePresetIDs instanceof Set) {
       for (const itemID of this.addablePresetIDs) {
         const item = this.item(itemID);
-        if (item?.matchGeometry(geometry)) {
+        if (item?.geometries.has(geometry)) {
           results.set(itemID, item);
         }
       }
     } else {
       for (const item of this._defaults[geometry]) {
-        if (item.matchGeometry(geometry)) {
+        if (item.geometries.has(geometry)) {
           results.set(item.id, item);
         }
       }
     }
 
-    const fallback = this.fallback(geometry);
+    const fallback = this._presets[geometry];
     if (fallback && !results.has(fallback.id)) {
       results.set(fallback.id, fallback);
     }
@@ -595,7 +601,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       arr = arr.filter(item => !item.locationSetID || validHere[item.locationSetID]);
     }
 
-    return new Collection(this.context, arr.slice(0, limit - 1));
+    return new Collection(context, arr.slice(0, limit - 1));
   }
 
 

@@ -192,7 +192,12 @@ export class ImagerySource {
       });
 
     } else if (this.type === 'tms') {
-      const isRetina = window.devicePixelRatio && window.devicePixelRatio >= 2;
+      let isRetina = false;
+      if ('window' in globalThis) {
+        const _window = globalThis.window;
+        isRetina = _window.devicePixelRatio && _window.devicePixelRatio >= 2;
+      }
+
       result = result
         .replace('{x}', coord[0])
         .replace('{y}', coord[1])

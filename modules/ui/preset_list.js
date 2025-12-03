@@ -3,6 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import debounce from 'lodash-es/debounce.js';
 
 import { actionChangePreset } from '../actions/change_preset.js';
+import { Collection } from '../core/lib/Collection.js';
 import { operationDelete } from '../operations/delete.js';
 import { uiIcon } from './icon.js';
 import { uiPresetIcon } from './preset_icon.js';
@@ -13,17 +14,17 @@ import { utilKeybinding, utilNoAuto, utilRebind, utilTotalExtent } from '../util
 
 export function uiPresetList(context) {
   const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
   const filters = context.systems.filters;
+  const l10n = context.systems.l10n;
   const presets = context.systems.presets;
   const dispatch = d3_dispatch('cancel', 'choose');
 
   let _selection = null;
   let _entityIDs = [];
   let _currLoc = null;
-  let _geometries = [];
-  let _allPresets = null;
-  let _defaultPresets = null;
+  let _allGeometries = [];
+  let _presetCollection = null;
+  let _defaultCollection = null;
   let _selectedPresetIDs = new Set();
   let _autofocus = false;
   let _list = d3_select(null);
@@ -113,7 +114,7 @@ export function uiPresetList(context) {
     // update
     _list = listWrap.merge(listWrapEnter)
       .selectAll('.preset-list-main')
-      .call(drawList, _defaultPresets);
+      .call(drawList, _defaultCollection.array);
 
     // rebind event listener
     filters.off('filterchange', _checkFilteringRules);
@@ -173,17 +174,17 @@ export function uiPresetList(context) {
       const val = _input.property('value');
       _list.classed('filtered', val.length);
 
-      const geometry = _geometries[0];
+      const geometry = _allGeometries[0];
 
-      let collection, messageText;
+      let items, messageText;
       if (val.length) {
-        collection = _allPresets.search(val, geometry, _currLoc);
-        messageText = l10n.t('inspector.results', { n: collection.array.length, search: val });
+        items = _presetCollection.search(val, geometry, _currLoc).array;
+        messageText = l10n.t('inspector.results', { n: items.length, search: val });
       } else {
-        collection = _defaultPresets;
+        items = _defaultCollection.array;
         messageText = l10n.t('inspector.choose');
       }
-      _list.call(drawList, collection);
+      _list.call(drawList, items);
       message.text(messageText);
     }
   }
@@ -194,11 +195,11 @@ export function uiPresetList(context) {
    * Draws a collection of Presets/Categories.
    * The category items themselves may also contain sublists.
    * @param  {d3-selection}  selection  - parent selection to render list items into (in this case, a `div.preset-list`)
-   * @param  {Collection}    collection - collection of categories and presets to include in the list
+   * @param  {Array<Preset|Category>}  collection - Categories and Presets to include in the list
    */
   function drawList(selection, collection) {
     const data = [];
-    for (const item of collection.array) {
+    for (const item of collection) {
       if (!item) continue;  // not sure how this would happen
       if (item.members) {
         data.push(new CategoryItem(item));
@@ -211,7 +212,7 @@ export function uiPresetList(context) {
     // Because `d3.selectAll` uses `element.querySelectorAll`, `:scope` refers to self
     // see https://developer.mozilla.org/en-US/docs/Web/CSS/:scope
     let items = selection.selectAll(':scope > .preset-list-item')
-      .data(data, d => d.preset.id);
+      .data(data, d => d.item.id);
 
     // exit
     items.exit()
@@ -220,7 +221,7 @@ export function uiPresetList(context) {
     // enter
     const itemsEnter = items.enter()
       .append('div')
-      .attr('class', d => `preset-list-item preset-${d.preset.safeid}`)
+      .attr('class', d => `preset-list-item preset-${d.item.safeid}`)
       .style('opacity', 0)
       .transition()
       .style('opacity', 1);
@@ -229,7 +230,7 @@ export function uiPresetList(context) {
     items = items.merge(itemsEnter)
       .order()   // make them match the order of `arr`
       .each((d, i, nodes) => d3_select(nodes[i]).call(d.render))
-      .classed('current', d => _selectedPresetIDs.has(d.preset.id));
+      .classed('current', d => _selectedPresetIDs.has(d.item.id));
 
     _checkFilteringRules();
   }
@@ -314,11 +315,11 @@ export function uiPresetList(context) {
   /**
    */
   class CategoryItem {
-    constructor(preset) {
+    constructor(category) {
       this.box = null;
       this.sublist = null;
       this.shown = false;
-      this.preset = preset;
+      this.item = category;
 
       // Ensure methods used as callbacks always have `this` bound correctly.
       // (This is also necessary when using `d3-selection.call`)
@@ -330,11 +331,11 @@ export function uiPresetList(context) {
 
 
     render(selection) {
-      const preset = this.preset;
+      const category = this.item;
       const isRTL = l10n.isRTL();
 
       const wrapEnter = selection.selectAll(':scope > .preset-list-button-wrap')
-        .data([this], d => d.preset.id)
+        .data([this], d => d.item.id)
         .enter()
         .append('div')
         .attr('class', 'preset-list-button-wrap category');
@@ -344,8 +345,8 @@ export function uiPresetList(context) {
         .attr('class', 'preset-list-button')
         .classed('expanded', false)
         .call(uiPresetIcon(context)
-          .geometry(_geometries.length === 1 && _geometries[0])
-          .preset(preset))
+          .geometry(_allGeometries.length === 1 && _allGeometries[0])
+          .preset(category))
         .on('click', this._click)
         .on('keydown', this._keydown);
 
@@ -360,7 +361,7 @@ export function uiPresetList(context) {
         .attr('class', 'namepart')
         .call(uiIcon((isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward'), 'inline'))
         .append('span')
-        .html(() => preset.nameLabel() + '&hellip;');
+        .html(() => category.nameLabel() + '&hellip;');
 
       this.box = selection
         .append('div')
@@ -419,14 +420,20 @@ export function uiPresetList(context) {
           .style('opacity', '0')
           .style('max-height', '0px')
           .style('padding-bottom', '0px');
+
       } else {
         this.shown = true;
-        const collection = this.preset.members.matchAllGeometry(_geometries);
-        this.sublist.call(drawList, collection);
+        const items = [];
+        const needed = new Set(_allGeometries);
+        for (const item of this.item.members) {
+          if (!needed.isSubsetOf(item.geometries)) continue;  // skip items that don't support all geometries needed
+          items.push(item);
+        }
+        this.sublist.call(drawList, items);
         this.box.transition()
           .duration(200)
           .style('opacity', '1')
-          .style('max-height', 200 + collection.array.length * 190 + 'px')
+          .style('max-height', 200 + items.length * 190 + 'px')
           .style('padding-bottom', '10px');
       }
     }
@@ -438,7 +445,7 @@ export function uiPresetList(context) {
    */
   class PresetItem {
     constructor(preset) {
-      this.preset = preset;
+      this.item = preset;
       this.reference = uiTagReference(context, preset.reference());
 
       // Ensure methods used as callbacks always have `this` bound correctly.
@@ -448,10 +455,10 @@ export function uiPresetList(context) {
     }
 
     render(selection) {
-      const preset = this.preset;
+      const preset = this.item;
 
       const wrapEnter = selection.selectAll('.preset-list-button-wrap')
-        .data([this], d => d.preset.id)
+        .data([this], d => d.item.id)
         .enter()
         .append('div')
         .attr('class', 'preset-list-button-wrap');
@@ -460,7 +467,7 @@ export function uiPresetList(context) {
         .append('button')
         .attr('class', 'preset-list-button')
         .call(uiPresetIcon(context)
-          .geometry(_geometries.length === 1 && _geometries[0])
+          .geometry(_allGeometries.length === 1 && _allGeometries[0])
           .preset(preset))
         .on('click', this.choose)
         .on('keydown', itemKeydown);
@@ -489,18 +496,18 @@ export function uiPresetList(context) {
 
 
     choose() {
-      const preset = this.preset;
+      const item = this.item;
 // figure out how to do this without `this`
       // if (d3_select(this).classed('disabled')) return;
 
       if (!context.inIntro) {
-        presets.setMostRecent(preset);
+        presets.setMostRecent(item);
       }
 
       const combinedAction = (graph) => {
         for (const entityID of _entityIDs) {
           const oldPreset = presets.match(graph.entity(entityID), graph);
-          graph = actionChangePreset(entityID, oldPreset, preset)(graph);
+          graph = actionChangePreset(entityID, oldPreset, item)(graph);
         }
         return graph;
       };
@@ -510,7 +517,7 @@ export function uiPresetList(context) {
         annotation: l10n.t('operations.change_tags.annotation'),
         selectedIDs: _entityIDs
       });
-      dispatch.call('choose', this, preset);
+      dispatch.call('choose', this, item);
     }
 
   }
@@ -529,12 +536,12 @@ export function uiPresetList(context) {
       const selection = d3_select(nodes[i]);
 
       let filterID;  // check whether this preset would be hidden by the current filtering rules
-      for (const geometry of _geometries) {
-        filterID = filters.isHiddenPreset(d.preset, geometry);
+      for (const geometry of _allGeometries) {
+        filterID = filters.isHiddenPreset(d.item, geometry);
         if (filterID) break;
       }
 
-      const isHidden = filterID && !context.inIntro && !_selectedPresetIDs.has(d.preset.id);
+      const isHidden = filterID && !context.inIntro && !_selectedPresetIDs.has(d.item.id);
 
       selection
         .classed('disabled', isHidden);
@@ -561,9 +568,9 @@ export function uiPresetList(context) {
 
     _entityIDs = val ?? [];
     _currLoc = null;
-    _geometries = [];
-    _allPresets = null;
-    _defaultPresets = null;
+    _allGeometries = [];
+    _presetCollection = null;
+    _defaultCollection = null;
     _selectedPresetIDs = new Set();
     _input.property('value', '');
     _list.selectAll('.preset-list-item').remove();
@@ -571,10 +578,22 @@ export function uiPresetList(context) {
     if (_entityIDs.length) {
       const graph = editor.staging.graph;
 
+      // All locations in the selection
       _currLoc = utilTotalExtent(_entityIDs, graph).center();
-      _geometries = _getGeometries();
-      _allPresets = presets.matchAllGeometry(_geometries);
-      _defaultPresets = presets.defaults(_geometries[0], 36, !context.inIntro, _currLoc);
+
+      // All geometries in the selection
+      _allGeometries = _gatherGeometries();
+
+      // All presets or categories that match the geometries
+      // (we should try to avoid making these Collections and instead make the PresetSystem able to search)
+      const items = [];
+      const needed = new Set(_allGeometries);
+      for (const item of presets.collection.array) {
+        if (!needed.isSubsetOf(item.geometries)) continue;  // skip items that don't support all geometries needed
+        items.push(item);
+      }
+      _presetCollection = new Collection(context, items);
+      _defaultCollection = presets.defaults(_allGeometries[0], 36, !context.inIntro, _currLoc);
 
       // match presets
       for (const entityID of _entityIDs) {
@@ -614,7 +633,9 @@ export function uiPresetList(context) {
   };
 
 
-  function _getGeometries() {
+  // Gather the geometries present on the selected entities.
+  // They will be sorted so that the most represented geometries appear earlier in the list.
+  function _gatherGeometries() {
     const graph = editor.staging.graph;
     let counts = {};
 

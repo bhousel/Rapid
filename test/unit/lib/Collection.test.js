@@ -1,4 +1,4 @@
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -11,69 +11,95 @@ describe('Collection', () => {
     presets: new Rapid.PresetSystem(context)
   };
 
-  const p = {
-    grill: new Rapid.Preset(context,
-      { id: 'amenity/bbq', name: 'Grill', tags: { amenity: 'bbq' }, geometry: ['point'], terms: [] }
-    ),
-    sandpit: new Rapid.Preset(context,
-      { id: 'amenity/grit_bin', name: 'Sandpit', tags: { amenity: 'grit_bin' }, geometry: ['point'], terms: [] }
-    ),
-    residential: new Rapid.Preset(context,
-      { id: 'highway/residential', name: 'Residential Area', tags: { highway: 'residential' }, geometry: ['point', 'area'], terms: [] }
-    ),
-    grass1: new Rapid.Preset(context,
-      { id: 'landuse/grass1', name: 'Grass', tags: { landuse: 'grass' }, geometry: ['point', 'area'], terms: [] }
-    ),
-    grass2: new Rapid.Preset(context,
-      { id: 'landuse/grass2', name: 'Ğṝȁß', tags: { landuse: 'ğṝȁß' }, geometry: ['point', 'area'], terms: [] }
-    ),
-    park: new Rapid.Preset(context,
-      { id: 'leisure/park', name: 'Park', tags: { leisure: 'park' }, geometry: ['point', 'area'], terms: [ 'grass' ], matchScore: 0.5 }
-    ),
-    parking: new Rapid.Preset(context,
-      { id: 'amenity/parking', name: 'Parking', tags: { amenity: 'parking' }, geometry: ['point', 'area'], terms: [ 'cars' ] }
-    ),
-    soccer: new Rapid.Preset(context,
-      { id: 'leisure/pitch/soccer', name: 'Soccer Field', tags: { leisure: 'pitch', sport: 'soccer' }, geometry: ['point', 'area'], terms: ['fußball'] }
-    ),
-    football: new Rapid.Preset(context,
-      { id: 'leisure/pitch/american_football', name: 'Football Field', tags: { leisure: 'pitch', sport: 'american_football' }, geometry: ['point', 'area'], terms: ['gridiron'] }
-    ),
-    excluded: new Rapid.Preset(context,
-      { id: 'amenity/excluded', name: 'Excluded', tags: { amenity: 'excluded' }, geometry: ['point'], terms: [], searchable: false }
-    )
-  };
+  const presets = context.systems.presets;
+  let _collection;
 
-  const collection = new Rapid.Collection(context, [
-    p.grill, p.sandpit, p.residential, p.grass1, p.grass2,
-    p.park, p.parking, p.soccer, p.football, p.excluded
-  ]);
+  beforeAll(() => {
+    return presets.initAsync().then(() => {
+      const presetData = {
+        presets: {
+          'amenity/bbq': {
+            name: 'Grill', tags: { amenity: 'bbq' }, geometry: ['point'], terms: []
+          },
+          'amenity/grit_bin': {
+            name: 'Sandpit', tags: { amenity: 'grit_bin' }, geometry: ['point'], terms: []
+          },
+          'highway/residential': {
+            name: 'Residential Area', tags: { highway: 'residential' }, geometry: ['point', 'area'], terms: []
+          },
+          'landuse/grass1': {
+            name: 'Grass', tags: { landuse: 'grass' }, geometry: ['point', 'area'], terms: []
+          },
+          'landuse/grass2': {
+            name: 'Ğṝȁß', tags: { landuse: 'ğṝȁß' }, geometry: ['point', 'area'], terms: []
+          },
+          'leisure/park': {
+            name: 'Park', tags: { leisure: 'park' }, geometry: ['point', 'area'], terms: [ 'grass' ], matchScore: 0.5
+          },
+          'amenity/parking': {
+            name: 'Parking', tags: { amenity: 'parking' }, geometry: ['point', 'area'], terms: [ 'cars' ]
+          },
+          'leisure/pitch/soccer': {
+            name: 'Soccer Field', tags: { leisure: 'pitch', sport: 'soccer' }, geometry: ['point', 'area'], terms: ['fußball']
+          },
+          'leisure/pitch/american_football': {
+            name: 'Football Field', tags: { leisure: 'pitch', sport: 'american_football' }, geometry: ['point', 'area'], terms: ['gridiron']
+          },
+          'amenity/excluded': {
+            name: 'Excluded', tags: { amenity: 'excluded' }, geometry: ['point'], terms: [], searchable: false
+          }
+        }
+      };
+      presets.merge(presetData);
+
+      // construct the Collection
+      _collection = new Rapid.Collection(context, [
+        presets.item('amenity/bbq'),
+        presets.item('amenity/grit_bin'),
+        presets.item('highway/residential'),
+        presets.item('landuse/grass1'),
+        presets.item('landuse/grass2'),
+        presets.item('leisure/park'),
+        presets.item('amenity/parking'),
+        presets.item('leisure/pitch/soccer'),
+        presets.item('leisure/pitch/american_football'),
+        presets.item('amenity/excluded')
+      ]);
+
+    });
+  });
+
+
+  describe('constructor', () => {
+    it('constructs a Collection from a context and an Array of Presets', () => {
+      assert.instanceOf(_collection, Rapid.Collection);
+      assert.strictEqual(_collection.context, context);
+      assert.isArray(_collection.array);
+    });
+  });
+
 
   describe('item', () => {
     it('fetches a preset by id', () => {
-      assert.strictEqual(collection.item('highway/residential'), p.residential);
+      const bbq = presets.item('amenity/bbq');
+      assert.strictEqual(_collection.item('amenity/bbq'), bbq);
     });
   });
 
-  describe('index', () => {
-    it('return -1 when given id for preset not in the collection', () => {
-      assert.strictEqual(collection.index('foobar'), -1);
-    });
-  });
+  // describe('matchGeometry', () => {
+  //   it('returns a new collection only containing presets matching a geometry', () => {
+  //     const arr = collection.matchGeometry('area').array;
+  //     assert.includeMembers(arr, [ p.residential, p.park, p.soccer, p.football ]);
+  //     assert.notIncludeMembers(arr, [ p.grill, p.sandpit, p.excluded ]);
+  //   });
+  // });
 
-  describe('matchGeometry', () => {
-    it('returns a new collection only containing presets matching a geometry', () => {
-      const arr = collection.matchGeometry('area').array;
-      assert.includeMembers(arr, [ p.residential, p.park, p.soccer, p.football ]);
-      assert.notIncludeMembers(arr, [ p.grill, p.sandpit, p.excluded ]);
-    });
-  });
-
-  describe.skip('#search', () => {
+  describe.skip('search', () => {
 //// TODO fix - these are all messed up
     it('matches leading name', () => {
-      const result = collection.search('resid', 'area').array;
-      assert.equal(result.indexOf(p.residential), 0);  // 1. 'Residential' (by name)
+      const result = _collection.search('resid', 'area').array;
+      const residential = presets.item('highway/residential');
+      assert.equal(result.indexOf(residential), 0);  // 1. 'Residential' (by name)
     });
 
     it.skip('returns alternate matches in correct order', () => {
@@ -100,27 +126,35 @@ describe('Collection', () => {
     });
 
     it('sorts preset with matchScore penalty below others', () => {
-      const result = collection.search('par', 'point').array;
-      assert.equal(result.indexOf(p.parking), 0, 'Parking');   // 1. 'Parking' (default matchScore)
-      assert.equal(result.indexOf(p.park), 1, 'Park');         // 2. 'Park' (low matchScore)
+      const parking = presets.item('amenity/parking');
+      const park = presets.item('leisure/park');
+      const result = _collection.search('par', 'point').array;
+      assert.equal(result.indexOf(parking), 0, 'Parking');   // 1. 'Parking' (default matchScore)
+      assert.equal(result.indexOf(park), 1, 'Park');         // 2. 'Park' (low matchScore)
     });
 
     it('ignores matchScore penalty for exact name match', () => {
-      const result = collection.search('park', 'point').array;
-      assert.equal(result.indexOf(p.park), 0, 'Park');         // 1. 'Park' (low matchScore)
-      assert.equal(result.indexOf(p.parking), 1, 'Parking');   // 2. 'Parking' (default matchScore)
+      const parking = presets.item('amenity/parking');
+      const park = presets.item('leisure/park');
+      const result = _collection.search('park', 'point').array;
+      assert.equal(result.indexOf(park), 0, 'Park');         // 1. 'Park' (low matchScore)
+      assert.equal(result.indexOf(parking), 1, 'Parking');   // 2. 'Parking' (default matchScore)
     });
 
     it('considers diacritics on exact matches', () => {
-      const result = collection.search('ğṝȁ', 'point').array;
-      assert.equal(result.indexOf(p.grass2), 0, 'Ğṝȁß');    // 1. 'Ğṝȁß'  (leading name)
-      assert.equal(result.indexOf(p.grass1), 1, 'Grass');   // 2. 'Grass' (similar name)
+      const grass1 = presets.item('landuse/grass1');
+      const grass2 = presets.item('landuse/grass2');
+      const result = _collection.search('ğṝȁ', 'point').array;
+      assert.equal(result.indexOf(grass2), 0, 'Ğṝȁß');    // 1. 'Ğṝȁß'  (leading name)
+      assert.equal(result.indexOf(grass1), 1, 'Grass');   // 2. 'Grass' (similar name)
     });
 
     it('replaces diacritics on fuzzy matches', () => {
-      const result = collection.search('graß', 'point').array;
-      assert.ok(result.indexOf(p.grass1) < 2, 'Grass');   // 1. 'Grass' (similar name)
-      assert.ok(result.indexOf(p.grass2) < 2, 'Ğṝȁß');    // 2. 'Ğṝȁß'  (similar name)
+      const grass1 = presets.item('landuse/grass1');
+      const grass2 = presets.item('landuse/grass2');
+      const result = _collection.search('graß', 'point').array;
+      assert.ok(result.indexOf(grass1) < 2, 'Grass');   // 1. 'Grass' (similar name)
+      assert.ok(result.indexOf(grass2) < 2, 'Ğṝȁß');    // 2. 'Ğṝȁß'  (similar name)
     });
 
     // it('includes the appropriate fallback preset', () => {
@@ -130,8 +164,9 @@ describe('Collection', () => {
     // });
 
     it('excludes presets with searchable: false', () => {
-      const result = collection.search('excluded', 'point').array;
-      assert.ok(!result.includes(p.excluded));
+      const excluded = presets.item('amenity/excluded');
+      const result = _collection.search('excluded', 'point').array;
+      assert.ok(!result.includes(excluded));
     });
   });
 });

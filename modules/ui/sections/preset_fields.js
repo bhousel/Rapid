@@ -30,20 +30,20 @@ export function uiSectionPresetFields(context) {
       const graph = editor.staging.graph;
       const localeCode = l10n.localeCode();
 
-      const geometries = Object.keys(_entityIDs.reduce((geoms, entityID) => {
+      const allGeometries = new Set();
+      for (const entityID of _entityIDs) {
         const entity = graph.entity(entityID);
         const geometry = entity.geometry(graph);
-        geoms[geometry] = true;
-        return geoms;
-      }, {}));
+        allGeometries.add(geometry);
+      }
 
       let allFields = [];
       let allMoreFields = [];
       let sharedTotalFields;
 
       for (const preset of _presets) {
-        let fields = preset.fields();
-        let moreFields = preset.moreFields();
+        const fields = preset.fields();
+        const moreFields = preset.moreFields();
 
         allFields = utilArrayUnion(allFields, fields);
         allMoreFields = utilArrayUnion(allMoreFields, moreFields);
@@ -62,9 +62,8 @@ export function uiSectionPresetFields(context) {
 
       _uifields = [];
       for (const field of sharedFields) {
-        if (field.matchAllGeometry(geometries)) {
-          _uifields.push(new UiField(context, field, _entityIDs));
-        }
+        if (!allGeometries.isSubsetOf(field.geometries)) continue;  // skip fields that don't support all geometries needed
+        _uifields.push(new UiField(context, field, _entityIDs));
       }
 
 //    let singularEntity = _entityIDs.length === 1 && graph.hasEntity(_entityIDs[0]);
@@ -78,9 +77,9 @@ export function uiSectionPresetFields(context) {
       });
 
       for (const field of additionalFields) {
-        if (!sharedFields.includes(field) && field.matchAllGeometry(geometries)) {
-          _uifields.push(new UiField(context, field, _entityIDs, { show: false }) );
-        }
+        if (sharedFields.includes(field)) continue;                 // skip fields that were already included above
+        if (!allGeometries.isSubsetOf(field.geometries)) continue;  // skip fields that don't support all geometries needed
+        _uifields.push(new UiField(context, field, _entityIDs, { show: false }) );
       }
 
       const ids = _entityIDs.slice();  // make copy (eslint warning)

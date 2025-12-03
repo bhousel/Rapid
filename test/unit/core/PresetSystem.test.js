@@ -196,6 +196,34 @@ describe('PresetSystem', () => {
     });
 
 
+    describe('merge', () => {
+      it('builds presets from provided', () => {
+        const surfShop = new Rapid.OsmNode(context, { tags: { amenity: 'shop', 'shop:type': 'surf' } });
+        const presets = new Rapid.PresetSystem(context);
+        const presetData = {
+          presets: {
+            'amenity/shop/surf': {
+              tags: { amenity: 'shop', 'shop:type': 'surf' },
+              geometry: ['point', 'area']
+            }
+          }
+        };
+
+        return presets.initAsync().then(() => {
+          let matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
+          assert.strictEqual(matched.id, 'point');   // no surfshop preset yet, matches fallback point
+          presets.merge(presetData);
+
+          // todo: need to touch the entity now, due to change in how transients work.
+          // may need to rethink how this works.
+          surfShop.touch();
+          matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
+          assert.strictEqual(matched.id, 'amenity/shop/surf');
+        });
+      });
+    });
+
+
     describe('match', () => {
       beforeEach(() => {
         const testPresets = {
@@ -315,31 +343,6 @@ describe('PresetSystem', () => {
       });
     });
 
-
-    describe('merge', () => {
-      it('builds presets from provided', () => {
-        const surfShop = new Rapid.OsmNode(context, { tags: { amenity: 'shop', 'shop:type': 'surf' } });
-        const presets = new Rapid.PresetSystem(context);
-        const presetData = {
-          presets: {
-            'amenity/shop/surf': {
-              tags: { amenity: 'shop', 'shop:type': 'surf' },
-              geometry: ['point', 'area']
-            }
-          }
-        };
-
-        let matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
-        assert.strictEqual(matched.id, 'point');   // no surfshop preset yet, matches fallback point
-        presets.merge(presetData);
-
-        // todo: need to touch the entity now, due to change in how transients work.
-        // may need to rethink how this works.
-        surfShop.touch();
-        matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
-        assert.strictEqual(matched.id, 'amenity/shop/surf');
-      });
-    });
 
 
     describe('match', () => {

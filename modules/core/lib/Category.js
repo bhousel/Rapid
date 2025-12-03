@@ -4,7 +4,10 @@ import { Collection } from './Collection.js';
 
 
 /**
- *  Category
+ * Category
+ * A Category is a thematic collection of Presets.
+ * For example "Major Roads", "Barriers", "Buildings", "Golf Features"..
+ * The Rapid user interface shows categories as expandable folders.
  */
 export class Category {
 
@@ -43,33 +46,23 @@ export class Category {
    */
   resetCache() {
     const context = this.context;
-    const allPresets = context.systems.presets.allPresets;
+    const presets = context.systems.presets;
+    const allPresets = presets.allPresets;
 
     // Include only Presets that are currently known to the PresetSystem.
-    const presets = this.orig.members.map(presetID => allPresets[presetID]).filter(Boolean);
-    this.members = new Collection(context, presets);
+    const foundPresets = this.orig.members.map(presetID => allPresets[presetID]).filter(Boolean);
+    this.members = new Collection(context, foundPresets);
 
-    // The "geometry" for the category will include the geometries of all the presets.
-    const geometries = new Set();
-    for (const preset of presets) {
-      for (const geometry of preset.geometry) {
-        geometries.add(geometry);
-      }
+    // The geometries for this category will include all geometries of its presets.
+    this.geometries = new Set();
+    for (const preset of foundPresets) {
+      this.geometries = this.geometries.union(preset.geometries);
     }
-    this.geometry = Array.from(geometries);
 
     this._searchName = null;
     this._searchNameStripped = null;
   }
 
-
-  matchGeometry(geom) {
-    return this.geometry.includes(geom);
-  }
-
-  matchAllGeometry(geometries) {
-    return this.members.array.some(preset => preset.matchAllGeometry(geometries));
-  }
 
   matchScore() {
     return -1;
