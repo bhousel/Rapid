@@ -98,7 +98,7 @@ describe('LocationSystem', () => {
       it('merges geojson into lococation-conflation cache', () => {
         _locations.mergeCustomGeoJSON(fc);
         const loco = _locations._loco;
-        assert.deepEqual(loco._cache['colorado.geojson'], colorado);
+        assert.deepEqual(loco._cache.get('colorado.geojson'), colorado);
       });
     });
 

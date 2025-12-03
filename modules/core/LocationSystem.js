@@ -283,7 +283,7 @@ export class LocationSystem extends AbstractSystem {
         props.area = Number(area.toFixed(2));
       }
 
-      this._loco._cache[id] = feature;   // insert directly into LocationConflations internal cache
+      this._loco._cache.set(id, feature);   // insert directly into LocationConflation's internal cache
     }
   }
 
