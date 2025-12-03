@@ -183,7 +183,7 @@ export class PresetSystem extends AbstractSystem {
     this._universal = [];
     for (const field of Object.values(this._fields)) {
       field.resetCache();
-      if (field.universal) {
+      if (field.props.universal) {
         this._universal.push(field);
       }
     }
@@ -209,7 +209,7 @@ export class PresetSystem extends AbstractSystem {
    * @param  {Object}  src - preset data to merge into the caches
    */
   merge(src) {
-    const newLocationSets = [];
+    const checkLocationSets = [];
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -222,7 +222,9 @@ export class PresetSystem extends AbstractSystem {
             continue;
           }
           const field = new Field(context, { id: fieldID, ...f });
-          if (field.locationSet) newLocationSets.push(field);
+          if (field.props.locationSet) {
+            checkLocationSets.push(field.props);
+          }
           this._fields[fieldID] = field;
 
         } else {   // remove
@@ -252,7 +254,9 @@ if (p.icon === 'roentgen-tree')                     p.icon = 'temaki-tree_broadl
 if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_framed';
 
           const preset = new Preset(context, { id: presetID, ...p });
-          if (preset.locationSet) newLocationSets.push(preset);
+          if (preset.props.locationSet) {
+            checkLocationSets.push(preset.props);
+          }
           this._presets[presetID] = preset;
 
         } else {   // remove
@@ -268,7 +272,9 @@ if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_fr
 // Rename icon identifiers to match the rapid spritesheet
 if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
           const category = new Category(context, { id: categoryID, ...c });
-          if (category.locationSet) newLocationSets.push(category);
+          if (category.props.locationSet) {
+            checkLocationSets.push(category.props);
+          }
           this._categories[categoryID] = category;
 
         } else {   // remove
@@ -299,8 +305,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     // Rebuild geometry index
     this._geometryIndex = { point: {}, vertex: {}, line: {}, area: {}, relation: {} };
     for (const item of all) {
-      const geometries = item.geometry || [];
-      for (const geometry of geometries) {
+      for (const geometry of item.geometries) {
         const g = this._geometryIndex[geometry];
         const tags = item.tags || {};
         for (const [key, val] of Object.entries(tags)) {
@@ -317,8 +322,8 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       }
 
       // Resolve all locationSet features.
-      if (newLocationSets.length) {
-        locations.mergeLocationSets(newLocationSets);
+      if (checkLocationSets.length) {
+        locations.mergeLocationSets(checkLocationSets);
       }
     }
 
@@ -328,12 +333,23 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
 
   /**
    * item
-   * Returns the Preset or Catetory with the given id
-   * @param   {string}           id - a preset or category id
-   * @return  {Preset|Category}  The Preset or Catetory, or `null` if not found
+   * Returns the Preset or Catetory with the given id.
+   * @param   {string}           id - a Preset or Category id
+   * @return  {Preset|Category}  The Preset or Catetory, or `undefined` if not found
    */
   item(id) {
     return this._presets[id] || this._categories[id];
+  }
+
+
+  /**
+   * field
+   * Returns the Field with the given id.
+   * @param   {string}  id - a Field id
+   * @return  {Field}   The Field, or `undefined` if not found
+   */
+  field(id) {
+    return this._fields[id];
   }
 
 
@@ -402,7 +418,8 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
         if (score === -1) continue;
 
         // Exclude candidate if it is scoped to a location not valid here
-        if (validHere && candidate.locationSetID && !validHere[candidate.locationSetID]) continue;
+        const locID = candidate.props.locationSetID;
+        if (validHere && locID && !validHere[locID]) continue;
 
         matchCandidates.push({ score, candidate });
 
@@ -542,12 +559,6 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     return vertexTags;
   }
 
-
-  field(id) {
-    return this._fields[id];
-  }
-
-
   /**
    * defaults
    * Defaults are the Presets and Categories offered to the user when adding a new feature.
@@ -594,11 +605,15 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       results.set(fallback.id, fallback);
     }
 
-    // If a location was provided, filter results to only those valid here.
     let arr = [...results.values()];
+
+    // If a location was provided, filter results to only those valid here.
     if (locations && Array.isArray(loc)) {
       const validHere = locations.locationSetsAt(loc);
-      arr = arr.filter(item => !item.locationSetID || validHere[item.locationSetID]);
+      arr = arr.filter(item => {
+        const locID = item.props.locationSetID;
+        return !locID || validHere[locID];   // if !locID, item is valid everywhere
+      });
     }
 
     return new Collection(context, arr.slice(0, limit - 1));

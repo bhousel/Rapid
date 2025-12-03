@@ -30,7 +30,7 @@ export function uiFieldCheck(context, uifield) {
 
 
   // Prepare the values and texts that this checkbox works with
-  const options = uifield.presetField.options;
+  const options = uifield.presetField.props.options;
   if (Array.isArray(options)) {
     const stringBase = `_tagging.presets.fields.${uifield.id}.options`;
     for (const v of options) {

@@ -322,7 +322,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
           if (poiFeature.dirty) {
             let markerStyle = {
-              iconName: feature.poiPreset.icon,
+              iconName: feature.poiPreset?.props?.icon,
               iconTint: 0x111111,
               markerName: 'pin',
               markerTint: 0xffffff
@@ -530,7 +530,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       if (feature.dirty) {
         const preset = presets.match(node, graph);
-        const iconName = preset?.icon;
+        const iconName = preset?.props?.icon;
         const directions = node.directions(graph, context.viewport);
 
         // set marker style
@@ -616,13 +616,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       if (feature.dirty) {
         let preset = presets.match(node, graph);
-        let iconName = preset?.icon;
+        let iconName = preset?.props?.icon;
 
         // If we matched a generic preset without an icon, try matching it as a 'vertex'
         // This is just to choose a better icon for an otherwise empty-looking pin.
         if (!iconName) {
           preset = presets.matchTags(node.tags, 'vertex');
-          iconName = preset?.icon;
+          iconName = preset?.props?.icon;
         }
 
         const directions = node.directions(graph, context.viewport);

@@ -44,7 +44,7 @@ describe('uiFieldWikipedia', () => {
   }
 
   const context = new MockContext();
-  let entity, base, graph, selection, field;
+  let entity, base, graph, selection, field, uifield;
 
   beforeEach(() => {
     entity = new Rapid.OsmNode(context, { id: 'n-1', tags: {} });
@@ -58,6 +58,7 @@ describe('uiFieldWikipedia', () => {
       keys: ['wikipedia', 'wikidata'],
       type: 'wikipedia'
     });
+    uifield = new Rapid.UiField(context, field);
   });
 
   function delay(msec) {
@@ -76,7 +77,7 @@ describe('uiFieldWikipedia', () => {
 
 
   it('recognizes lang:title format', () => {
-    const wikipedia = Rapid.uiFieldWikipedia(context, field);
+    const wikipedia = Rapid.uiFieldWikipedia(context, uifield);
     return delay(1)  // async, so data will be available
       .then(() => {
         selection.call(wikipedia);
@@ -89,7 +90,7 @@ describe('uiFieldWikipedia', () => {
 
 
   it('sets language, value', () => {
-    const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
+    const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
     return delay(1)  // async, so data will be available
       .then(() => {
         wikipedia.on('change', changeTags);
@@ -122,7 +123,7 @@ describe('uiFieldWikipedia', () => {
 
 
   it('recognizes pasted URLs', () => {
-    const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
+    const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
     return delay(1)  // async, so data will be available
       .then(() => {
         wikipedia.on('change', changeTags);
@@ -141,13 +142,13 @@ describe('uiFieldWikipedia', () => {
 
   describe('encodePath', () => {
     it('returns an encoded URI component that contains the title with spaces replaced by underscores', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
+      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       assert.strictEqual(wikipedia.encodePath('? (film)', undefined), '%3F_(film)');
       done();
     });
 
     it('returns an encoded URI component that includes an anchor fragment', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
+      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       // this can be tested manually by entering '? (film)#Themes and style in the search box before focusing out'
       assert.strictEqual(wikipedia.encodePath('? (film)', 'Themes and style'), '%3F_(film)#Themes_and_style');
       done();
@@ -157,26 +158,26 @@ describe('uiFieldWikipedia', () => {
 
   describe('encodeURIAnchorFragment', () => {
     it('returns an encoded URI anchor fragment', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
+      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       // this can be similarly tested by entering 'Section#Arts, entertainment and media' in the search box before focusing out'
       assert.strictEqual(wikipedia.encodeURIAnchorFragment('Theme?'), '#Theme%3F');
       done();
     });
 
     it('replaces all whitespace characters with underscore', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
+      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       assert.strictEqual(wikipedia.encodeURIAnchorFragment('Themes And Styles'), '#Themes_And_Styles');
       done();
     });
 
     it('encodes % characters, does not replace them with a dot', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
+      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       assert.strictEqual(wikipedia.encodeURIAnchorFragment('Is%this_100% correct'), '#Is%25this_100%25_correct');
       done();
     });
 
     it('encodes characters that are URI encoded characters', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
+      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       assert.strictEqual(wikipedia.encodeURIAnchorFragment('Section %20%25'), '#Section_%2520%2525');
       done();
     });
@@ -184,8 +185,8 @@ describe('uiFieldWikipedia', () => {
 
 
   it('defaults to previously-used language', () => {
-    const wikipedia1 = Rapid.uiFieldWikipedia(context, field);
-    const wikipedia2 = Rapid.uiFieldWikipedia(context, field);
+    const wikipedia1 = Rapid.uiFieldWikipedia(context, uifield);
+    const wikipedia2 = Rapid.uiFieldWikipedia(context, uifield);
 
     return delay(1)  // async, so data will be available
       .then(() => {
@@ -201,7 +202,7 @@ describe('uiFieldWikipedia', () => {
 
 
   it.skip('does not set delayed wikidata tag if graph has changed', done => {
-    const wikipedia = Rapid.uiFieldWikipedia(context, field).entityIDs([entity.id]);
+    const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
     const editor = context.systems.editor;
     wikipedia.on('change', changeTags);
     selection.call(wikipedia);

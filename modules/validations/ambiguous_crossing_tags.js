@@ -41,7 +41,7 @@ export function validationAmbiguousCrossingTags(context) {
     return graph => {
       const entity = graph.entity(entityID);
       const currPreset = presets.match(entity, graph);
-      const replacementID = currPreset.replacement;
+      const replacementID = currPreset?.props?.replacement;
       const replacement = replacementID && presets.item(replacementID);
 
       if (replacement) {

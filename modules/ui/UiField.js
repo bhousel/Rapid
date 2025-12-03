@@ -51,9 +51,9 @@ export class UiField {
     this.label = presetField.label();
     this.terms = presetField.terms();
     this.placeholder = presetField.placeholder();
-    this.default = presetField.default;
-    this.key = presetField.key;
-    this.keys = presetField.keys;
+    this.default = presetField.props.default;
+    this.key = presetField.props.key;
+    this.keys = presetField.props.keys;
     this.safeid = presetField.safeid;
     this.uid = utilUniqueString(`form-field-${presetField.safeid}`);
 
@@ -416,23 +416,22 @@ export class UiField {
     }
 
     // Does this field work with all the geometries of the entities selected?
-    if (presetField.geometry && !this.entityIDs.every(entityID => {
+    for (const entityID of this.entityIDs) {
       const entity = graph.hasEntity(entityID);
       if (!entity) return false;
-      return presetField.geometries.has(entity.geometry(graph));
-    })) {
-      return false;
+      if (!presetField.geometries.has(entity.geometry(graph))) return false;
     }
 
     // Is this field allowed in this location?
-    if (this.entityExtent && presetField.locationSetID) {
+    const locID = presetField.props.locationSetID;
+    if (locID && this.entityExtent) {   // if !locID, field is valid everywhere
       const validHere = locations.locationSetsAt(this.entityExtent.center());
-      if (!validHere[presetField.locationSetID]) return false;
+      if (!validHere[locID]) return false;
     }
 
     // Does this field require another tag to be set first?
     // (ignore tagging prerequisites if the field already has a value)
-    const prerequisiteTag = presetField.prerequisiteTag;
+    const prerequisiteTag = presetField.props.prerequisiteTag;
     if (prerequisiteTag && !this.tagsContainFieldKey()) {
       const isPrerequisiteSatisfied = this.entityIDs.every(entityID => {
         const entity = graph.entity(entityID);

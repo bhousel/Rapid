@@ -8,6 +8,12 @@ import { osmAreaKeys } from '../../data/lib/tags.js';
  * A Preset represents a bundle of tags that identify a feature type on OpenStreetMap.
  * Every feature in Rapid is matched to a Preset based on its tags.
  * Users can pick from the available presets in the Rapid editor.
+ *
+ * Properties you can access:
+ *   `id` (or `presetID`)   Unique string to identify this Preset.
+ *   `safeid`               The id, but safe for use in classes, DOM element ids, css selectors..
+ *   `props`                Properties object
+ *   `geometries`           `Set<string>` Geometries that this Preset works with
  */
 export class Preset {
 
@@ -23,35 +29,36 @@ export class Preset {
       throw new Error('Preset missing id property');
     }
 
-    this.id = props.id;
-    this.safeid = utilSafeString(props.id);    // for use in classes, element ids, css selectors
+    // Preserve properties and assign some defaults
+    this.props = globalThis.structuredClone(props);
+    this.props.aliases ??= [];
+    this.props.fields ??= [];
+    this.props.geometry ??= [];
+    this.props.matchScore ||= 1;
+    this.props.moreFields ??= [];
+    this.props.name ??= '';
+    this.props.reference ??= {};
+    this.props.searchable ??= true;
+    this.props.tags ??= {};
+    this.props.terms = (props.terms ?? []).join();
 
-    // Preserve and cleanup all original properties..
-    this.orig = {};
-    this.orig.addTags = props.addTags ?? props.tags ?? {};
-    this.orig.aliases = props.aliases ?? [];
-    this.orig.fields = props.fields ?? [];
-    this.orig.geometry = props.geometry ?? [];
-    this.orig.icon = props.icon;
-    this.orig.imageURL = props.imageURL;
-    this.orig.locationSet = props.locationSet;
-    this.orig.matchScore = props.matchScore ?? 1;
-    this.orig.moreFields = props.moreFields ?? [];
-    this.orig.name = props.name ?? '';
-    this.orig.reference = props.reference ?? {};
-    this.orig.removeTags = props.removeTags ?? props.addTags ?? props.tags ?? {};
-    this.orig.replacement = props.replacement;
-    this.orig.searchable = props.searchable ?? true;
-    this.orig.suggestion = props.suggestion;  // warning - not in the schema, but code uses it
-    this.orig.tags = props.tags ?? {};
-    this.orig.terms = (props.terms ?? []).join();
+    this.props.addTags ??= this.props.tags;
+    this.props.removeTags ??= this.props.addTags;
 
-    // Convert some `props` properties to class properties.. (others will become class functions)
-    Object.assign(this, utilObjectOmit(this.orig, ['aliases', 'fields', 'matchScore', 'moreFields', 'name', 'reference', 'terms']));
+    this.id = props.id;                       // For consistency, offer a `this.id` property.
+    this.safeid = utilSafeString(props.id);   // For use in classes, element ids, css selectors
+
+    // For convenient access:
+    this.presetID = this.props.id;
+    this.tags = this.props.tags;
+    this.addTags = this.props.addTags;
+    this.removeTags = this.props.removeTags;
+    this.searchable = this.props.searchable;
+    this.suggestion = this.props.suggestion;
 
     const presets = context.systems.presets;
-    if (this.orig.geometry.length) {
-      this.geometries = new Set(this.orig.geometry);
+    if (this.props.geometry.length) {
+      this.geometries = new Set(this.props.geometry);
     } else {
       this.geometries = new Set(presets.geometries);  // all geometries
     }
@@ -73,28 +80,72 @@ export class Preset {
   }
 
 
-  aliases() {
-    return this._resolveName('name')
-      .t('aliases', { 'default': this.orig.aliases }).trim().split(/\s*[\r\n]+\s*/);
-  }
-
+  /**
+   * name
+   * Returns a localized name, if possible.  Falls back to original name.
+   * @return  {string}  Localized name
+   */
   name() {
-    return this._resolveName('name').t('name', { 'default': this.orig.name || this.id });
+    return this._resolveReference('name').t('name', { 'default': this.props.name || this.id });
   }
 
+  /**
+   * nameLabel
+   * Returns a localized name HTML, if possible.  Falls back to original name.
+   * @return  {string}  Localized name HTML
+   */
   nameLabel() {
-    return this._resolveName('name').tHtml('name', { 'default': this.orig.name || this.id });
+    return this._resolveReference('name').tHtml('name', { 'default': this.props.name || this.id });
   }
 
+  /**
+   * aliases
+   * Returns localized aliases, if possible.  Falls back to original aliases.
+   * @return  {Array<string>}  Localized aliases
+   */
+  aliases() {
+    return this._resolveReference('name')
+      .t('aliases', { 'default': this.props.aliases }).trim().split(/\s*[\r\n]+\s*/);
+  }
+
+  /**
+   * terms
+   * Returns localized search terms, if possible.  Falls back to original search terms.
+   * @return  {Array<string>}  The localized search terms
+   */
+  terms() {
+    return this._resolveReference('name')
+      .t('terms', { 'default': this.props.terms })
+      .toLowerCase().trim().split(/\s*,+\s*/);
+  }
+
+  /**
+   * fields
+   * Returns the fields for this Preset.
+   * @return  {Array<Field>}  The Fields for this preset
+   */
   fields() {
     return this._resolved.fields || (this._resolved.fields = this._resolveFields('fields'));
   }
 
+  /**
+   * moreFields
+   * Returns the "more" Fields for this Preset.  These are Fields that are offered
+   *  if the user expands the "more fields" combobox.
+   * @return  {Array<Field>}  The "more" Fields for this preset
+   */
   moreFields() {
     return this._resolved.moreFields || (this._resolved.moreFields = this._resolveFields('moreFields'));
   }
 
-  matchScore(entityTags) {
+  /**
+   * matchScore
+   * Matchscore is used for ranking search results.
+   * It is calculated by checking how many tags match the Preset tags.
+   * @param   {Object}  matchTags - Tags to match
+   * @return  {number}  The match score
+   */
+  matchScore(matchTags) {
     const tags = this.tags;
     let seen = {};
     let score = 0;
@@ -102,10 +153,10 @@ export class Preset {
     // match on tags
     for (let k in tags) {
       seen[k] = true;
-      if (entityTags[k] === tags[k]) {
-        score += this.orig.matchScore;
-      } else if (tags[k] === '*' && k in entityTags) {
-        score += this.orig.matchScore / 2;
+      if (matchTags[k] === tags[k]) {
+        score += this.props.matchScore;
+      } else if (tags[k] === '*' && k in matchTags) {
+        score += this.props.matchScore / 2;
       } else {
         return -1;
       }
@@ -114,8 +165,8 @@ export class Preset {
     // boost score for additional matches in addTags - iD#6802
     const addTags = this.addTags;
     for (let k in addTags) {
-      if (!seen[k] && entityTags[k] === addTags[k]) {
-        score += this.orig.matchScore;
+      if (!seen[k] && matchTags[k] === addTags[k]) {
+        score += this.props.matchScore;
       }
     }
 
@@ -123,16 +174,36 @@ export class Preset {
   }
 
 
+  /**
+   * t
+   * Returns a localized string, wrapper around `l10n.t`.
+   * @params  {string}  scope   - The trailing part of the stringID
+   * @params  {Object?} options - Optional options to pass to `l10n.t`
+   * @return  {string}  Localized string
+   */
   t(scope, options) {
     const l10n = this.context.systems.l10n;
     return l10n.t(`_tagging.presets.presets.${this.id}.${scope}`, options);
   }
 
+  /**
+   * tHtml
+   * Returns a localized HTML string, wrapper around `l10n.tHtml`.
+   * @params  {string}  scope   - The trailing part of the stringID
+   * @params  {Object?} options - Optional options to pass to `l10n.tHtml`
+   * @return  {string}  Localized HTML string
+   */
   tHtml(scope, options) {
     const l10n = this.context.systems.l10n;
     return l10n.tHtml(`_tagging.presets.presets.${this.id}.${scope}`, options);
   }
 
+  /**
+   * subtitle
+   * Returns a subtitle, but only for suggestion presets.
+   * Rapid displays the preset name on a second line below the brand name.
+   * @return  {string}  Localized preset subtitle, or `null` if not applicable
+   */
   subtitle() {
     if (this.suggestion) {
       const l10n = this.context.systems.l10n;
@@ -143,6 +214,12 @@ export class Preset {
     return null;
   }
 
+  /**
+   * subtitleLabel
+   * Returns an HTML subtitle, but only for suggestion presets.
+   * Rapid displays the preset name on a second line below the brand name.
+   * @return  {string}  Localized HTML preset subtitle, or `null` if not applicable
+   */
   subtitleLabel() {
     if (this.suggestion) {
       const l10n = this.context.systems.l10n;
@@ -153,22 +230,23 @@ export class Preset {
     return null;
   }
 
-
-  terms() {
-    return this._resolveName('name')
-      .t('terms', { 'default': this.orig.terms })
-      .toLowerCase().trim().split(/\s*,+\s*/);
-  }
-
-
+  /**
+   * searchName
+   * The name used for searching - basically the `name()` but forced lowercase.
+   * @return  {string}  The name used for searching
+   */
   searchName() {
     if (!this._searchName) {
-      this._searchName = (this.suggestion ? this.orig.name : this.name()).toLowerCase();
+      this._searchName = (this.suggestion ? this.props.name : this.name()).toLowerCase();
     }
     return this._searchName;
   }
 
-
+  /**
+   * searchNameStripped
+   * The name used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
+   * @return  {string}  The name used for searching, but with diacritic marks normalized.
+   */
   searchNameStripped() {
     if (!this._searchNameStripped) {
       this._searchNameStripped = this._stripDiacritics(this.searchName());
@@ -176,7 +254,11 @@ export class Preset {
     return this._searchNameStripped;
   }
 
-
+  /**
+   * searchAliases
+   * Aliases for searching - basically the `aliases`, but forced lowercase.
+   * @return  {Array<string>}  The aliases used for searching
+   */
   searchAliases() {
     if (!this._searchAliases) {
       this._searchAliases = this.aliases().map(alias => alias.toLowerCase());
@@ -184,7 +266,11 @@ export class Preset {
     return this._searchAliases;
   }
 
-
+  /**
+   * searchAliasesStripped
+   * Aliases used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
+   * @return  {Array<string>}  The aliases used for searching, but with diacritic marks normalized.
+   */
   searchAliasesStripped() {
     if (!this._searchAliasesStripped) {
       this._searchAliasesStripped = this.searchAliases().map(this._stripDiacritics);
@@ -192,14 +278,26 @@ export class Preset {
     return this._searchAliasesStripped;
   }
 
-
+  /**
+   * isFallback
+   * Is this a fallback preset?
+   * Fallback presets are created by the PresetSystem at init time and can't be overridden.
+   * The fallback presets are: 'point', 'line', 'area', 'relation'.
+   * @return  {boolean}  `true` if this is a fallback preset, `false` otherwise.
+   */
   isFallback() {
     return ['point', 'line', 'area', 'relation'].includes(this.id);
-//    const tagCount = Object.keys(this.tags).length;
-//    return tagCount === 0 || (tagCount === 1 && this.tags.hasOwnProperty('area'));
   }
 
 
+  /**
+   * reference
+   * Returns some data about how to lookup reference information about this Preset.
+   * If there is a `wikidata` identifier, lookup the QID on Wikidata.
+   * Otherwise, use whatever `key`/`value` pair is specified for the reference,
+   *  falling back to the `key`/`value` pair of the first tag.
+   * @return  {Object}  Data used to lookup reference information
+   */
   reference() {
     // Lookup documentation on Wikidata...
     const qid = (
@@ -214,8 +312,8 @@ export class Preset {
     }
 
     // Lookup documentation on OSM Wikibase...
-    const key = this.orig.reference.key || Object.keys(utilObjectOmit(this.tags, 'name'))[0];
-    const value = this.orig.reference.value || this.tags[key];
+    const key = this.props.reference.key || Object.keys(utilObjectOmit(this.tags, 'name'))[0];
+    const value = this.props.reference.value || this.tags[key];
 
     if (value === '*') {
       return { key: key };
@@ -225,24 +323,41 @@ export class Preset {
   }
 
 
-  unsetTags(tags, geometry, ignoringKeys, skipFieldDefaults) {
+  /**
+   * unsetTags
+   * Called when changing presets, this removes tags that go with the old Preset.
+   * @param   {Object}         tags - the initial tags for the Entity
+   * @param   {string}         geometry - the geometry for the Entity
+   * @param   {Array<string>}  ignoreKeys - optional Array of keys to ignore (not remove)
+   * @param   {boolean}        skipFieldDefaults - `true` to ignore tags controlled by the Fields
+   * @return  {Object}  The final tags for the Entity, after removal has happened.
+   */
+  unsetTags(tags, geometry, ignoreKeys, skipFieldDefaults) {
     // allow manually keeping some tags
-    const removeTags = ignoringKeys ? utilObjectOmit(this.removeTags, ignoringKeys) : this.removeTags;
+    const removeTags = ignoreKeys ? utilObjectOmit(this.removeTags, ignoreKeys) : this.removeTags;
     tags = utilObjectOmit(tags, Object.keys(removeTags));
 
     if (geometry && !skipFieldDefaults) {
-      this.fields().forEach(field => {
-        if (field.geometries.has(geometry) && field.key && field.default === tags[field.key]) {
-          delete tags[field.key];
+      for (const field of this.fields()) {
+        const k = field.props.key;
+        if (k && field.props.default === tags[k] && field.geometries.has(geometry)) {
+          delete tags[k];
         }
-      });
+      }
     }
 
     delete tags.area;
     return tags;
   }
 
-
+  /**
+   * setTags
+   * Called when changing presets, this adds tags that go with the new Preset.
+   * @param   {Object}    tags - the initial tags for the Entity
+   * @param   {string}    geometry - the geometry for the Entity
+   * @param   {boolean}   skipFieldDefaults - `true` to ignore tags controlled by the Fields
+   * @return  {Object}  The final tags for the Entity, after adding has happened.
+   */
   setTags(tags, geometry, skipFieldDefaults) {
     const addTags = this.addTags;
     tags = Object.assign({}, tags);   // shallow copy
@@ -280,17 +395,25 @@ export class Preset {
     }
 
     if (geometry && !skipFieldDefaults) {
-      this.fields().forEach(field => {
-        if (field.geometries.has(geometry) && field.key && !tags[field.key] && field.default) {
-          tags[field.key] = field.default;
+      for (const field of this.fields()) {
+        const k = field.props.key;
+        const v = field.props.default;
+        if (k && v && !tags[k] && field.geometries.has(geometry)) {
+          tags[k] = v;
         }
-      });
+      }
     }
 
     return tags;
   }
 
 
+  /**
+   * _stripDiacritics
+   * Internal function for normalizing strings to remove diacritic marks.
+   * @param   {string}  s - the input string to normalize
+   * @return  {string}  the normalized string
+   */
   _stripDiacritics(s) {
     // split combined diacritical characters into their parts
     if (s.normalize) s = s.normalize('NFD');
@@ -300,12 +423,17 @@ export class Preset {
   }
 
 
-  // For a preset without its own name, use names from another preset.
-  // Replace {presetID} placeholders with the name of the specified presets.
-  _resolveName(prop) {
+  /**
+   * _resolveReference
+   * Presets can inherit a property from another Preset.
+   * If the property value contains a `{presetID}` placeholder, return the other Preset with that id.
+   * @param   {string}  prop - the property to lookup
+   * @return  {Preset}  the Preset to get the name from (either this Preset or another Preset)
+   */
+  _resolveReference(prop) {
     const allPresets = this.context.systems.presets.allPresets;
 
-    const val = this.orig[prop] ?? '';    // always lookup original properties, don't use the functions
+    const val = this.props[prop] ?? '';    // always lookup original properties, don't use the functions
     const match = val.match(/^\{(.*)\}$/);
     if (match) {
       const preset = allPresets[match[1]];
@@ -319,13 +447,18 @@ export class Preset {
   }
 
 
-  // For a preset without fields, use the fields of the parent preset.
-  // Replace {presetID} placeholders with the fields of the specified presets.
+  /**
+   * _resolveFields
+   * For a Preset without its own Fields, inherit fields from another preset.
+   * Replace `{presetID}` placeholders with the fields of the other preset.
+   * @param   {string}  prop - the property to lookup (either 'fields' or 'moreFields')
+   * @return  {Array<Field>}  the resolved fields or moreFields
+   */
   _resolveFields(prop) {
     const allPresets = this.context.systems.presets.allPresets;
     const allFields = this.context.systems.presets.allFields;
 
-    const fieldIDs = this.orig[prop] ?? [];    // always lookup original properties, don't use the functions
+    const fieldIDs = this.props[prop] ?? [];  // always lookup original properties, don't use the functions
     let resolved = [];
 
     // Returns an Array of fields to inherit from the given presetID, if found

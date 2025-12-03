@@ -117,7 +117,8 @@ export function uiFieldCycleway(context, uifield) {
 
     cycleway.options = function() {
         const stringBase = `_tagging.presets.fields.${uifield.id}.options.`;
-        return uifield.presetField.options.map(function(option) {
+        const opts = uifield.presetField.props.options;
+        return opts.map(function(option) {
             return {
                 title: l10n.t(`${stringBase}.${option}.description`),
                 value: option

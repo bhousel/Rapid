@@ -696,7 +696,7 @@ export class LocalizationSystem extends AbstractSystem {
       const preset = typeof graphOrGeometry === 'string' ?
         presets.matchTags(entity.tags, graphOrGeometry) :
         presets.match(entity, graphOrGeometry);
-      presetName = preset && (preset.suggestion ? preset.subtitle() : preset.name());
+      presetName = preset && (preset.props.suggestion ? preset.subtitle() : preset.name());
     }
 
     let result;

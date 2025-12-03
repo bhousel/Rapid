@@ -46,12 +46,13 @@ describe('uiFieldLocalized', () => {
   }
 
   const context = new MockContext();
-  let selection, field;
+  let selection, field, uifield;
 
   beforeEach(() => {
     selection = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, { id: 'name', key: 'name', type: 'localized' });
-    field.locked = () => { return false; };
+    uifield = new Rapid.UiField(context, field);
+    uifield.locked = () => { return false; };
   });
 
   function delay(msec) {
@@ -60,7 +61,7 @@ describe('uiFieldLocalized', () => {
 
 
   it('adds a blank set of fields when the + button is clicked', () => {
-    const localized = Rapid.uiFieldLocalized(context, field);
+    const localized = Rapid.uiFieldLocalized(context, uifield);
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized);
@@ -74,7 +75,7 @@ describe('uiFieldLocalized', () => {
   });
 
   it('doesn\'t create a tag when the value is empty', () => {
-    const localized = Rapid.uiFieldLocalized(context, field);
+    const localized = Rapid.uiFieldLocalized(context, uifield);
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized);
@@ -95,7 +96,7 @@ describe('uiFieldLocalized', () => {
   });
 
   it('doesn\'t create a tag when the name is empty', () => {
-    const localized = Rapid.uiFieldLocalized(context, field);
+    const localized = Rapid.uiFieldLocalized(context, uifield);
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized);
@@ -116,7 +117,7 @@ describe('uiFieldLocalized', () => {
   });
 
   it('creates a tag after setting language then value', () => {
-    const localized = Rapid.uiFieldLocalized(context, field);
+    const localized = Rapid.uiFieldLocalized(context, uifield);
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized);
@@ -141,7 +142,7 @@ describe('uiFieldLocalized', () => {
   });
 
   it('creates a tag after setting value then language', () => {
-    const localized = Rapid.uiFieldLocalized(context, field);
+    const localized = Rapid.uiFieldLocalized(context, uifield);
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized);
@@ -166,7 +167,7 @@ describe('uiFieldLocalized', () => {
   });
 
   it('changes an existing language', () => {
-    const localized = Rapid.uiFieldLocalized(context, field);
+    const localized = Rapid.uiFieldLocalized(context, uifield);
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized);
@@ -184,7 +185,7 @@ describe('uiFieldLocalized', () => {
   });
 
   it('ignores similar keys like `old_name`', () => {
-    const localized = Rapid.uiFieldLocalized(context, field);
+    const localized = Rapid.uiFieldLocalized(context, uifield);
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized);
@@ -196,7 +197,7 @@ describe('uiFieldLocalized', () => {
   });
 
   it('removes the tag when the language is emptied', () => {
-    const localized = Rapid.uiFieldLocalized(context, field);
+    const localized = Rapid.uiFieldLocalized(context, uifield);
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized);
@@ -214,7 +215,7 @@ describe('uiFieldLocalized', () => {
   });
 
   it('removes the tag when the value is emptied', () => {
-    const localized = Rapid.uiFieldLocalized(context, field);
+    const localized = Rapid.uiFieldLocalized(context, uifield);
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized);

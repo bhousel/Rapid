@@ -31,8 +31,13 @@ export class Collection {
     return found;
   }
 
+
   search(value, geometry, loc) {
     if (!value) return this;
+
+    const context = this.context;
+    const locations = context.systems.locations;
+    const presets = context.systems.presets;
 
     // don't remove diacritical characters since we're assuming the user is being intentional
     value = value.toLowerCase().trim();
@@ -72,10 +77,14 @@ export class Collection {
     }
 
     let pool = this.array.filter(a => a.geometries.has(geometry));
-    if (Array.isArray(loc)) {
-      const locations = this.context.systems.locations;
+
+    // If a location was provided, filter results to only those valid here.
+    if (locations && Array.isArray(loc)) {
       const validHere = locations.locationSetsAt(loc);
-      pool = pool.filter(a => !a.locationSetID || validHere[a.locationSetID]);
+      pool = pool.filter(item => {
+        const locID = item.props.locationSetID;
+        return !locID || validHere[locID];   // if !locID, item is valid everywhere
+      });
     }
 
     const searchable = pool.filter(a => a.searchable !== false && a.suggestion !== true);
@@ -145,7 +154,6 @@ export class Collection {
     ).slice(0, MAXRESULTS - 1);
 
     if (typeof geometry === 'string') {
-      const presets = this.context.systems.presets;
       const allPresets = presets.allPresets;
       const fallback = allPresets[geometry];
       if (fallback) {

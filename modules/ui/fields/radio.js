@@ -16,7 +16,7 @@ export function uiFieldRadio(context, uifield) {
     var wrap = d3_select(null);
     var labels = d3_select(null);
     var radios = d3_select(null);
-    var radioData = (uifield.presetField.options || uifield.keys).slice();  // shallow copy
+    var radioData = (uifield.presetField.props.options || uifield.keys).slice();  // shallow copy
     var typeField;
     var layerField;
     var _oldType = {};

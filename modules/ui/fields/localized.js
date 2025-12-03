@@ -104,7 +104,7 @@ export function uiFieldLocalized(context, uifield) {
                 // see also similar logic in `outdated_tags.js`
                 var preset = presets.match(entity, graph);
                 if (preset) {
-                    var isSuggestion = preset.suggestion;
+                    var isSuggestion = preset.props.suggestion;
                     var fields = preset.fields();
                     var showsBrandField = fields.some(function(d) { return d.id === 'brand'; });
                     var showsOperatorField = fields.some(function(d) { return d.id === 'operator'; });

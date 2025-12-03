@@ -27,12 +27,12 @@ export function uiFieldCombo(context, uifield) {
     var _isMulti = (uifield.type === 'multiCombo' || uifield.type === 'manyCombo');
     var _isNetwork = (uifield.type === 'networkCombo');
     var _isSemi = (uifield.type === 'semiCombo');
-    var _optarray = presetField.options;
-    var _showTagInfoSuggestions = uifield.type !== 'manyCombo' && presetField.autoSuggestions !== false;
-    var _allowCustomValues = uifield.type !== 'manyCombo' && presetField.customValues !== false;
-    var _snake_case = (presetField.snake_case || (presetField.snake_case === undefined));
+    var _optarray = presetField.props.options;
+    var _showTagInfoSuggestions = uifield.type !== 'manyCombo' && presetField.props.autoSuggestions !== false;
+    var _allowCustomValues = uifield.type !== 'manyCombo' && presetField.props.customValues !== false;
+    var _snake_case = (presetField.props.snake_case || (presetField.props.snake_case === undefined));
     var _combobox = uiCombobox(context, 'combo-' + uifield.safeid)
-        .caseSensitive(presetField.caseSensitive)
+        .caseSensitive(presetField.props.caseSensitive)
         .minItems(_isMulti || _isSemi ? 1 : 2);
     var _container = d3_select(null);
     var _inputWrap = d3_select(null);

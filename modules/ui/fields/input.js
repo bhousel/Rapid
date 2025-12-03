@@ -122,7 +122,7 @@ export function uiFieldText(context, uifield) {
           change()();
         });
 
-    } else if (uifield.type === 'identifier' && presetField.urlFormat && presetField.pattern) {
+    } else if (uifield.type === 'identifier' && presetField.props.urlFormat && presetField.props.pattern) {
       input.attr('type', 'text');
 
       outlinkButton = wrap.selectAll('.foreign-id-permalink')
@@ -133,7 +133,7 @@ export function uiFieldText(context, uifield) {
         .call(uiIcon('#rapid-icon-out-link'))
         .attr('class', 'form-field-button foreign-id-permalink')
         .attr('title', function() {
-          const domainResults = /^https?:\/\/(.{1,}?)\//.exec(presetField.urlFormat);
+          const domainResults = /^https?:\/\/(.{1,}?)\//.exec(presetField.props.urlFormat);
           if (domainResults.length >= 2 && domainResults[1]) {
             const domain = domainResults[1];
             return l10n.t('icons.view_on', { domain: domain });
@@ -144,7 +144,7 @@ export function uiFieldText(context, uifield) {
           d3_event.preventDefault();
           const value = validIdentifierValueForLink();
           if (value) {
-            const url = presetField.urlFormat.replace(/{value}/, encodeURIComponent(value));
+            const url = presetField.props.urlFormat.replace(/{value}/, encodeURIComponent(value));
             window.open(url, '_blank');
           }
         })
@@ -182,7 +182,7 @@ export function uiFieldText(context, uifield) {
 
 
   function validIdentifierValueForLink() {
-    const pattern = uifield.presetField.pattern;
+    const pattern = uifield.presetField.props.pattern;
     const value = utilGetSetValue(input).trim().split(';')[0];
 
     if (uifield.type === 'url' && /^https?:\/\//i.test(value)) return value;
@@ -196,11 +196,11 @@ export function uiFieldText(context, uifield) {
   // clamp number to min/max
   function clamped(num) {
     const presetField = uifield.presetField;
-    if (presetField.minValue !== undefined) {
-      num = Math.max(num, presetField.minValue);
+    if (presetField.props.minValue !== undefined) {
+      num = Math.max(num, presetField.props.minValue);
     }
-    if (presetField.maxValue !== undefined) {
-      num = Math.min(num, presetField.maxValue);
+    if (presetField.props.maxValue !== undefined) {
+      num = Math.min(num, presetField.props.maxValue);
     }
     return num;
   }

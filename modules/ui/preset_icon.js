@@ -10,7 +10,7 @@ export function uiPresetIcon(context) {
 
   function getIcon(p, geom) {
     if (Array.isArray(p)) return 'rapid-icon-data';
-    if (p.icon) return p.icon;
+    if (p?.props?.icon) return p.props.icon;
     if (geom === 'line') return 'rapid-other-line';
     if (geom === 'vertex') return p.isFallback() ? '' : 'temaki-vertex';
     return 'maki-marker-stroked';
@@ -251,7 +251,7 @@ export function uiPresetIcon(context) {
     const styles = context.systems.styles;
 
     const showThirdPartyIcons = (storage.getItem('preferences.privacy.thirdpartyicons') ?? 'true') === 'true';
-    const imageURL = showThirdPartyIcons && p.imageURL;
+    const imageURL = showThirdPartyIcons && p?.props?.imageURL;
     const picon = getIcon(p, geom);
     // const showPoint = isPreset && (geom === 'point');     // not actually used
     const showVertex = isPreset && (geom === 'vertex');

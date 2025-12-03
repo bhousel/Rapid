@@ -80,8 +80,8 @@ graph = new Graph(graph);
     // It's just a working graph where we can apply changes in order to determine the final tag diff.
 
     // Upgrade preset, if a replacement is available..
-    if (preset.replacement) {
-      const newPreset = presets.item(preset.replacement);
+    if (preset.props.replacement) {
+      const newPreset = presets.item(preset.props.replacement);
       graph = actionChangePreset(entity.id, preset, newPreset, true /* skip field defaults */)(graph);
       entity = graph.entity(entity.id);
       preset = newPreset;
