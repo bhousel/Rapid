@@ -1905,7 +1905,7 @@ en:
         add_curb_nodes: "Add {type} curb nodes"
         annotation: Added curb nodes
       type:
-        yes: unspecified
+        "yes": unspecified
         flush: flush
         lowered: lowered
         raised: raised

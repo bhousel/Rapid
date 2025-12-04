@@ -2328,7 +2328,7 @@
           "annotation": "Added curb nodes"
         },
         "type": {
-          "true": "unspecified",
+          "yes": "unspecified",
           "flush": "flush",
           "lowered": "lowered",
           "raised": "raised"
