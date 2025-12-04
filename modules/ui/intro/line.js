@@ -13,7 +13,7 @@ export function uiIntroLine(context, curtain) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const ui = context.systems.ui;
   const EditMenu = ui.EditMenu;
 
@@ -21,8 +21,8 @@ export function uiIntroLine(context, curtain) {
   const tulipRoadStartExtent = new Extent([-85.63016, 41.95749], [-85.62937, 41.95843]);
   const tulipRoadMidExtent = new Extent([-85.63044, 41.95686], [-85.62900, 41.95843]);
   const tulipRoadIntersection = [-85.629745, 41.95742];
-  const roadCategory = presets.item('category-road_minor');
-  const residentialPreset = presets.item('highway/residential');
+  const roadCategory = schema.item('category-road_minor');
+  const residentialPreset = schema.item('highway/residential');
 
   const woodStreetID = 'w525';
   const woodStreetEndID = 'n2862';
@@ -331,7 +331,7 @@ export function uiIntroLine(context, curtain) {
           const modified = difference.modified();
           if (modified.length === 1) {
             const graph = editor.staging.graph;
-            if (presets.match(modified[0], graph) === residentialPreset) {
+            if (schema.match(modified[0], graph) === residentialPreset) {
               resolve(nameRoadAsync);
             } else {
               resolve(retryPresetResidentialAsync);  // didn't pick residential, retry
@@ -387,7 +387,7 @@ export function uiIntroLine(context, curtain) {
           const modified = difference.modified();
           if (modified.length === 1) {
             const graph = editor.staging.graph;
-            if (presets.match(modified[0], graph) === residentialPreset) {
+            if (schema.match(modified[0], graph) === residentialPreset) {
               resolve(nameRoadAsync);
             } else {
               resolve(chooseCategoryRoadAsync);  // didn't pick residential, retry

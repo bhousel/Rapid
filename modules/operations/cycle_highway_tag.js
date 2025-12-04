@@ -61,7 +61,7 @@ export function operationCycleHighwayTag(context, selectedIDs) {
   const editor = context.systems.editor;
   const graph = editor.staging.graph;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   // Gather eligible entities and determine which list we are cycling through..
   let _entities = [];
@@ -73,7 +73,7 @@ export function operationCycleHighwayTag(context, selectedIDs) {
     if (!entity) continue;
 
     const geometry = entity.geometry(graph);
-    const preset = presets.match(entity, graph);
+    const preset = schema.match(entity, graph);
     const isHighwayLine = (geometry === 'line' && highwayLinePresetRegex.some(regex => regex.test(preset.id)));
     const isCrossingLine = (geometry === 'line' && crossingLinePresetRegex.some(regex => regex.test(preset.id)));
     const isCrossingVertex = (geometry === 'vertex' && crossingVertexPresetRegex.some(regex => regex.test(preset.id)));
@@ -121,17 +121,17 @@ export function operationCycleHighwayTag(context, selectedIDs) {
 
     // Pick the next preset in the cycle...
     let graph = editor.staging.graph;
-    const currPreset = presets.match(_entities[0], graph);
+    const currPreset = schema.match(_entities[0], graph);
     const index = currPreset ? _presetIDs.indexOf(currPreset.id) : -1;
     const newPresetID = _presetIDs[(index + 1) % _presetIDs.length];
-    const newPreset = presets.item(newPresetID);
+    const newPreset = schema.item(newPresetID);
 
     editor.beginTransaction();
 
     // Update all eligible entities...
     for (const entity of _entities) {
       graph = editor.staging.graph;   // note that staging graph changes each time we call perform
-      const oldPreset = presets.match(entity, graph);
+      const oldPreset = schema.match(entity, graph);
       const action = actionChangePreset(entity.id, oldPreset, newPreset, true /* skip field defaults */);
       editor.perform(action);
     }

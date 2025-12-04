@@ -10,7 +10,7 @@ export function uiOsmoseDetails(context) {
   const l10n = context.systems.l10n;
   const map = context.systems.map;
   const osmose = context.services.osmose;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const scene = context.systems.gfx.scene;
 
   let _marker;
@@ -173,7 +173,7 @@ export function uiOsmoseDetails(context) {
             if (entity) {
               let name = l10n.displayName(entity.tags);  // try to use common name
               if (!name) {
-                const preset = presets.match(entity, graph);
+                const preset = schema.match(entity, graph);
                 name = preset && !preset.isFallback() && preset.name();  // fallback to preset name
               }
 

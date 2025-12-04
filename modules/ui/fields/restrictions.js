@@ -15,10 +15,11 @@
 //    const dispatch = d3_dispatch('change');
 //    const editor = context.systems.editor;
 //    const l10n = context.systems.l10n;
+//    const schema = context.systems.schema;
 //    const storage = context.systems.storage;
 //
 //    storage.removeItem('turn-restriction-via-way');                    // remove old key
-//    var storedViaWay = storage.getItem('turn-restriction-via-way0');   // use new key #6922
+//    var storedViaWay = storage.getItem('turn-restriction-via-way0');   // use new key iD#6922
 //    var storedDistance = storage.getItem('turn-restriction-distance');
 //
 //    var _maxViaWay = storedViaWay !== null ? (+storedViaWay) : 0;
@@ -605,7 +606,7 @@
 //    function displayName(entityID, graph) {
 //        var entity = graph.entity(entityID);
 //        var name = l10n.displayName(entity.tags) || '';
-//        var matched = context.systems.presets.match(entity, graph);
+//        var matched = schema.match(entity, graph);
 //        var type = (matched && matched.name()) || l10n.displayType(entity.id);
 //        return name || type;
 //    }

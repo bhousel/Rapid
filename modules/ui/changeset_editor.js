@@ -10,8 +10,9 @@ import { utilRebind, utilTriggerEvent } from '../util/index.js';
 
 export function uiChangesetEditor(context) {
     const l10n = context.systems.l10n;
-    const dispatch = d3_dispatch('change');
+    const schema = context.systems.schema;
 
+    const dispatch = d3_dispatch('change');
     var formFields = uiFormFields(context);
     var commentCombo = uiCombobox(context, 'comment').caseSensitive(true);
     var _uifields;
@@ -25,16 +26,15 @@ export function uiChangesetEditor(context) {
 
 
     function render(selection) {
-        var initial = false;
+        let initial = false;
 
         if (!_uifields) {
             initial = true;
-            var presetSysetem = context.systems.presets;
 
             _uifields = [
-                new UiField(context, presetSysetem.field('comment'), null, { show: true, revert: false }),
-                new UiField(context, presetSysetem.field('source'), null, { show: false, revert: false }),
-                new UiField(context, presetSysetem.field('hashtags'), null, { show: false, revert: false }),
+                new UiField(context, schema.field('comment'), null, { show: true, revert: false }),
+                new UiField(context, schema.field('source'), null, { show: false, revert: false }),
+                new UiField(context, schema.field('hashtags'), null, { show: false, revert: false }),
             ];
 
             _uifields.forEach(function(field) {

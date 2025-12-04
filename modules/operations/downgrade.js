@@ -6,7 +6,7 @@ import { utilCmd } from '../util/cmd.js';
 export function operationDowngrade(context, selectedIDs) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   let _affectedFeatureCount = 0;
   let _downgradeType = downgradeTypeForEntityIDs(selectedIDs);
@@ -38,7 +38,7 @@ export function operationDowngrade(context, selectedIDs) {
   function downgradeTypeForEntityID(entityID) {
     const graph = editor.staging.graph;
     const entity = graph.entity(entityID);
-    const preset = presets.match(entity, graph);
+    const preset = schema.match(entity, graph);
 
     if (!preset || preset.isFallback()) return null;
 

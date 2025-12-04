@@ -18,7 +18,7 @@ export function uiFieldText(context, uifield) {
   const assets = context.systems.assets;
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const dispatch = d3_dispatch('change');
 
   let input = d3_select(null);
@@ -48,7 +48,7 @@ export function uiFieldText(context, uifield) {
       // Features linked to Wikidata are likely important and should be protected
       if (entity.tags.wikidata) return true;
 
-      const preset = presets.match(entity, graph);
+      const preset = schema.match(entity, graph);
       const isSuggestion = preset?.suggestion;
 
       // Lock the field if there is a value and a companion `*:wikidata` value

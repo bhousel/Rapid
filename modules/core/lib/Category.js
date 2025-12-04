@@ -1,7 +1,5 @@
 import { utilSafeString } from '@rapid-sdk/util';
 
-import { Collection } from './Collection.js';
-
 
 /**
  * Category
@@ -14,7 +12,7 @@ import { Collection } from './Collection.js';
  *   `safeid`                The id, but safe for use in classes, DOM element ids, css selectors..
  *   `props`                 Properties object
  *   `geometries`            `Set<string>` Geometries that this Category works with
- *   `members`               `Collection<Preset>` Presets in this Category
+ *   `presets`               `Array<Preset>` Presets in this Category
  */
 export class Category {
 
@@ -52,16 +50,14 @@ export class Category {
    */
   resetCache() {
     const context = this.context;
-    const presets = context.systems.presets;
-    const allPresets = presets.allPresets;
+    const schema = context.systems.schema;
 
-    // Include only Presets that are currently known to the PresetSystem.
-    const foundPresets = this.props.members.map(presetID => allPresets[presetID]).filter(Boolean);
-    this.members = new Collection(context, foundPresets);
+    // Include only Presets that are currently known to the SchemaSystem.
+    this.presets = this.props.members.map(presetID => schema.presets.get(presetID)).filter(Boolean);
 
     // The geometries for this category will include all geometries of its presets.
     this.geometries = new Set();
-    for (const preset of foundPresets) {
+    for (const preset of this.presets) {
       this.geometries = this.geometries.union(preset.geometries);
     }
 

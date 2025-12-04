@@ -3,7 +3,7 @@ import { uiIcon } from './icon.js';
 
 export function uiDetectionHeader(context) {
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   let _marker;
 
 
@@ -26,7 +26,7 @@ export function uiDetectionHeader(context) {
     } else {
       const service = context.services[d.props.serviceID];
       const presetID = service && service.getDetectionPresetID(d.props.value);
-      const preset = presetID && presets.item(presetID);
+      const preset = presetID && schema.item(presetID);
       iconName = preset?.icon || 'fas-question';
     }
 

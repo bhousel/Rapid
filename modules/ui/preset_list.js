@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import debounce from 'lodash-es/debounce.js';
 
 import { actionChangePreset } from '../actions/change_preset.js';
-import { Collection } from '../core/lib/Collection.js';
+import { Category, Collection, Preset } from '../core/lib/index.js';
 import { operationDelete } from '../operations/delete.js';
 import { uiIcon } from './icon.js';
 import { uiPresetIcon } from './preset_icon.js';
@@ -16,7 +16,7 @@ export function uiPresetList(context) {
   const editor = context.systems.editor;
   const filters = context.systems.filters;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const dispatch = d3_dispatch('cancel', 'choose');
 
   let _selection = null;
@@ -34,51 +34,51 @@ export function uiPresetList(context) {
   /**
    * presetList
    * (This is the render function)
-   * @param  {d3-selection}  selection  - parent selection to render into
+   * @param  {d3-selection}  $selection  - parent selection to render into
    */
-  function presetList(selection) {
-    _selection = selection;
+  function presetList($selection) {
+    _selection = $selection;
 
     if (!_entityIDs.length) return;
 
     const isRTL = l10n.isRTL();
 
     // Header
-    const header = selection.selectAll('.header')
+    const $header = $selection.selectAll('.header')
       .data([0]);
 
     // Enter
-    const headerEnter = header.enter()
+    const $$header = $header.enter()
       .append('div')
       .attr('class', 'header fillL');
 
-    headerEnter
+    $$header
       .append('h3')
       .attr('class', 'preset-list-message')
       .text(l10n.t('inspector.choose'));
 
-    headerEnter
+    $$header
       .append('button')
       .attr('class', 'preset-choose')
       .on('click', function() { dispatch.call('cancel', this); })
       .call(uiIcon(isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward'));
 
-    const message = header.merge(headerEnter)
+    const $message = $header.merge($$header)
       .selectAll('.preset-list-message');
 
 
     // Search box
-    let search = selection.selectAll('.search-header')
+    let $search = $selection.selectAll('.search-header')
       .data([0]);
 
-    const searchEnter = search.enter()
+    const $$search = $search.enter()
       .append('div')
       .attr('class', 'search-header');
 
-    searchEnter
+    $$search
       .call(uiIcon('#rapid-icon-search'));
 
-    searchEnter
+    $$search
       .append('input')
       .attr('class', 'preset-search-input')
       .attr('placeholder', l10n.t('inspector.search'))
@@ -89,8 +89,8 @@ export function uiPresetList(context) {
       .on('input', debounce(inputevent));
 
     // update
-    search = search.merge(searchEnter);
-    _input = search.selectAll('.preset-search-input');
+    $search = $search.merge($$search);
+    _input = $search.selectAll('.preset-search-input');
 
     if (_autofocus) {
       // Safari 14 doesn't always like to focus immediately, so schedule it with setTimeout
@@ -99,20 +99,20 @@ export function uiPresetList(context) {
 
 
     // Preset List
-    const listWrap = selection.selectAll('.inspector-body')
+    const $listWrap = $selection.selectAll('.inspector-body')
       .data([0]);
 
     // enter
-    const listWrapEnter = listWrap.enter()
+    const $$listWrap = $listWrap.enter()
       .append('div')
       .attr('class', 'inspector-body');
 
-    listWrapEnter
+    $$listWrap
       .append('div')
       .attr('class', 'preset-list-main preset-list');
 
     // update
-    _list = listWrap.merge(listWrapEnter)
+    _list = $listWrap.merge($$listWrap)
       .selectAll('.preset-list-main')
       .call(drawList, _defaultCollection.array);
 
@@ -155,9 +155,9 @@ export function uiPresetList(context) {
         e.preventDefault();
         e.stopPropagation();
         // move focus to the first item in the preset list
-        let buttons = _list.selectAll('.preset-list-button');
-        if (!buttons.empty()) {
-          buttons.node().focus();
+        const $buttons = _list.selectAll('.preset-list-button');
+        if (!$buttons.empty()) {
+          $buttons.node().focus();
         }
       }
     }
@@ -184,8 +184,11 @@ export function uiPresetList(context) {
         items = _defaultCollection.array;
         messageText = l10n.t('inspector.choose');
       }
+
       _list.call(drawList, items);
-      message.text(messageText);
+
+      $message
+        .text(messageText);
     }
   }
 
@@ -194,16 +197,15 @@ export function uiPresetList(context) {
    * drawList
    * Draws a collection of Presets/Categories.
    * The category items themselves may also contain sublists.
-   * @param  {d3-selection}  selection  - parent selection to render list items into (in this case, a `div.preset-list`)
-   * @param  {Array<Preset|Category>}  collection - Categories and Presets to include in the list
+   * @param  {d3-selection}  $selection  - parent selection to render list items into (in this case, a `div.preset-list`)
+   * @param  {Array<Preset|Category>}  arr - Categories and Presets to include in the list
    */
-  function drawList(selection, collection) {
+  function drawList($selection, arr) {
     const data = [];
-    for (const item of collection) {
-      if (!item) continue;  // not sure how this would happen
-      if (item.members) {
+    for (const item of arr) {
+      if (item instanceof Category) {
         data.push(new CategoryItem(item));
-      } else {
+      } else if (item instanceof Preset) {
         data.push(new PresetItem(item));
       }
     }
@@ -211,15 +213,15 @@ export function uiPresetList(context) {
     // Select direct descendant list items only...
     // Because `d3.selectAll` uses `element.querySelectorAll`, `:scope` refers to self
     // see https://developer.mozilla.org/en-US/docs/Web/CSS/:scope
-    let items = selection.selectAll(':scope > .preset-list-item')
+    let $items = $selection.selectAll(':scope > .preset-list-item')
       .data(data, d => d.item.id);
 
     // exit
-    items.exit()
+    $items.exit()
       .remove();
 
     // enter
-    const itemsEnter = items.enter()
+    const $$items = $items.enter()
       .append('div')
       .attr('class', d => `preset-list-item preset-${d.item.safeid}`)
       .style('opacity', 0)
@@ -227,7 +229,7 @@ export function uiPresetList(context) {
       .style('opacity', 1);
 
     // update
-    items = items.merge(itemsEnter)
+    $items = $items.merge($$items)
       .order()   // make them match the order of `arr`
       .each((d, i, nodes) => d3_select(nodes[i]).call(d.render))
       .classed('current', d => _selectedPresetIDs.has(d.item.id));
@@ -236,15 +238,21 @@ export function uiPresetList(context) {
   }
 
 
+  /**
+   * itemKeydown
+   * keydown handler for the preset list
+   * This allows users to use keyboard navigation to focus different items and expand/contract Categories.
+   * @param  {KeyboardEvent}   e - the keydown event
+   */
   function itemKeydown(e) {
     const target = e.currentTarget;
-    const selection = d3_select(target);
+    const $selection = d3_select(target);
 
     // the actively focused item
-    const item = d3_select(target.closest('.preset-list-item'));
-    const node = item.node();
-    const parentItem = d3_select(node.parentNode.closest('.preset-list-item'));
-    const parentNode = parentItem.node();
+    const $item = d3_select(target.closest('.preset-list-item'));
+    const node = $item.node();
+    const $parentItem = d3_select(node.parentNode.closest('.preset-list-item'));
+    const parentNode = $parentItem.node();
     const isRTL = l10n.isRTL();
 
     // arrow down, move focus to the next, lower item
@@ -253,20 +261,20 @@ export function uiPresetList(context) {
       e.stopPropagation();
 
       // the next item in the list at the same level
-      let nextItem = d3_select(node.nextElementSibling);
+      let $nextItem = d3_select(node.nextElementSibling);
 
       // if there is no next item in this list
-      if (nextItem.empty()) {
+      if ($nextItem.empty()) {
         if (parentNode) {        // if there is a parent item
           // the item is the last item of a sublist, select the next item at the parent level
-          nextItem = d3_select(parentNode.nextElementSibling);
+          $nextItem = d3_select(parentNode.nextElementSibling);
         }
-      } else if (selection.classed('expanded')) {                    // if the focused item is expanded
-        nextItem = item.select('.subgrid .preset-list-item:first-child');  // select the first subitem instead
+      } else if ($selection.classed('expanded')) {                           // if the focused item is expanded
+        $nextItem = $item.select('.subgrid .preset-list-item:first-child');  // select the first subitem instead
       }
 
-      if (!nextItem.empty()) {
-        nextItem.select('.preset-list-button').node().focus();    // focus on the next item
+      if (!$nextItem.empty()) {
+        $nextItem.select('.preset-list-button').node().focus();    // focus on the next item
       }
 
     // arrow up, move focus to the previous, higher item
@@ -275,21 +283,20 @@ export function uiPresetList(context) {
       e.stopPropagation();
 
       // the previous item in the list at the same level
-      let previousItem = d3_select(node.previousElementSibling);
+      let $prevItem = d3_select(node.previousElementSibling);
 
       // if there is no previous item in this list
-      if (previousItem.empty()) {
-        if (!parentItem.empty()) {      // if there is a parent item
-          previousItem = parentItem;    // the item is the first subitem of a sublist select the parent item
+      if ($prevItem.empty()) {
+        if (!$parentItem.empty()) {   // if there is a parent item
+          $prevItem = $parentItem;    // the item is the first subitem of a sublist select the parent item
         }
-      // if the previous item is expanded
-      } else if (previousItem.select('.preset-list-button').classed('expanded')) {
+      } else if ($prevItem.select('.preset-list-button').classed('expanded')) { // if the previous item is expanded
         // select the last subitem of the sublist of the previous item
-        previousItem = previousItem.select('.subgrid .preset-list-item:last-child');
+        $prevItem = $prevItem.select('.subgrid .preset-list-item:last-child');
       }
 
-      if (!previousItem.empty()) {
-        previousItem.select('.preset-list-button').node().focus();     // focus on the previous item
+      if (!$prevItem.empty()) {
+        $prevItem.select('.preset-list-button').node().focus();     // focus on the previous item
       } else {
         // the focus is at the top of the list, move focus back to the search field
         _input.node().focus();
@@ -299,15 +306,15 @@ export function uiPresetList(context) {
     } else if (e.keyCode === utilKeybinding.keyCodes[isRTL ? '→' : '←']) {
       e.preventDefault();
       e.stopPropagation();
-      if (!parentItem.empty()) {     // if there is a parent item, focus on the parent item
-        parentItem.select('.preset-list-button').node().focus();
+      if (!$parentItem.empty()) {     // if there is a parent item, focus on the parent item
+        $parentItem.select('.preset-list-button').node().focus();
       }
 
     // arrow right, choose this item
     } else if (e.keyCode === utilKeybinding.keyCodes[isRTL ? '←' : '→']) {
       e.preventDefault();
       e.stopPropagation();
-      item.datum().choose();
+      $item.datum().choose();
     }
   }
 
@@ -330,17 +337,17 @@ export function uiPresetList(context) {
     }
 
 
-    render(selection) {
+    render($selection) {
       const category = this.item;
       const isRTL = l10n.isRTL();
 
-      const wrapEnter = selection.selectAll(':scope > .preset-list-button-wrap')
+      const $$wrap = $selection.selectAll(':scope > .preset-list-button-wrap')
         .data([this], d => d.item.id)
         .enter()
         .append('div')
         .attr('class', 'preset-list-button-wrap category');
 
-      const buttonEnter = wrapEnter
+      const $$button = $$wrap
         .append('button')
         .attr('class', 'preset-list-button')
         .classed('expanded', false)
@@ -350,20 +357,20 @@ export function uiPresetList(context) {
         .on('click', this._click)
         .on('keydown', this._keydown);
 
-      const labelEnter = buttonEnter
+      const $$label = $$button
         .append('div')
         .attr('class', 'label')
         .append('div')
         .attr('class', 'label-inner');
 
-      labelEnter
+      $$label
         .append('div')
         .attr('class', 'namepart')
         .call(uiIcon((isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward'), 'inline'))
         .append('span')
         .html(() => category.nameLabel() + '&hellip;');
 
-      this.box = selection
+      this.box = $selection
         .append('div')
         .attr('class', 'subgrid')
         .style('max-height', '0px')
@@ -381,18 +388,18 @@ export function uiPresetList(context) {
     _keydown(e) {
       const isRTL = l10n.isRTL();
       const target = e.currentTarget;
-      const selection = d3_select(target);
+      const $selection = d3_select(target);
       if (e.keyCode === utilKeybinding.keyCodes[isRTL ? '←' : '→']) {  // right arrow, expand the focused item
         e.preventDefault();
         e.stopPropagation();
-        if (!selection.classed('expanded')) {  // if the item isn't expanded
-          this._click(e);                      // toggle expansion (expand the item)
+        if (!$selection.classed('expanded')) {  // if the item isn't expanded
+          this._click(e);                       // toggle expansion (expand the item)
         }
       } else if (e.keyCode === utilKeybinding.keyCodes[isRTL ? '→' : '←']) {   // left arrow, collapse the focused item
         e.preventDefault();
         e.stopPropagation();
-        if (selection.classed('expanded')) {   // if the item is expanded
-          this._click(e);                      // toggle expansion (collapse the item)
+        if ($selection.classed('expanded')) {   // if the item is expanded
+          this._click(e);                       // toggle expansion (collapse the item)
         }
       } else {
         itemKeydown(e);
@@ -402,15 +409,16 @@ export function uiPresetList(context) {
     _click(e) {
       const isRTL = l10n.isRTL();
       const target = e.currentTarget;
-      const selection = d3_select(target);
-      const isExpanded = selection.classed('expanded');
+      const $selection = d3_select(target);
+      const isExpanded = $selection.classed('expanded');
       const iconName = isExpanded ? (isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward') : '#rapid-icon-down';
-      selection.classed('expanded', !isExpanded);
-      selection.selectAll('div.label-inner svg.icon use').attr('href', iconName);
+      $selection.classed('expanded', !isExpanded);
+      $selection.selectAll('div.label-inner svg.icon use').attr('href', iconName);
       this.choose();
     }
 
     choose() {
+      const category = this.item;
       if (!this.box || !this.sublist) return;
 
       if (this.shown) {
@@ -425,7 +433,7 @@ export function uiPresetList(context) {
         this.shown = true;
         const items = [];
         const needed = new Set(_allGeometries);
-        for (const item of this.item.members) {
+        for (const item of category.presets) {
           if (!needed.isSubsetOf(item.geometries)) continue;  // skip items that don't support all geometries needed
           items.push(item);
         }
@@ -454,16 +462,16 @@ export function uiPresetList(context) {
       this.render = this.render.bind(this);
     }
 
-    render(selection) {
+    render($selection) {
       const preset = this.item;
 
-      const wrapEnter = selection.selectAll('.preset-list-button-wrap')
+      const $$wrap = $selection.selectAll('.preset-list-button-wrap')
         .data([this], d => d.item.id)
         .enter()
         .append('div')
         .attr('class', 'preset-list-button-wrap');
 
-      const buttonEnter = wrapEnter
+      const $$button = $$wrap
         .append('button')
         .attr('class', 'preset-list-button')
         .call(uiPresetIcon(context)
@@ -472,7 +480,7 @@ export function uiPresetList(context) {
         .on('click', this.choose)
         .on('keydown', itemKeydown);
 
-      const labelEnter = buttonEnter
+      const $$label = $$button
         .append('div')
         .attr('class', 'label')
         .append('div')
@@ -483,15 +491,15 @@ export function uiPresetList(context) {
         preset.subtitleLabel()
       ].filter(Boolean);
 
-      labelEnter.selectAll('.namepart')
+      $$label.selectAll('.namepart')
         .data(nameparts)
         .enter()
         .append('div')
         .attr('class', 'namepart')
         .html(d => d);
 
-      wrapEnter.call(this.reference.button);
-      selection.call(this.reference.body);
+      $$wrap.call(this.reference.button);
+      $selection.call(this.reference.body);
     }
 
 
@@ -501,12 +509,12 @@ export function uiPresetList(context) {
       // if (d3_select(this).classed('disabled')) return;
 
       if (!context.inIntro) {
-        presets.setMostRecent(item);
+        schema.setMostRecent(item);
       }
 
       const combinedAction = (graph) => {
         for (const entityID of _entityIDs) {
-          const oldPreset = presets.match(graph.entity(entityID), graph);
+          const oldPreset = schema.match(graph.entity(entityID), graph);
           graph = actionChangePreset(entityID, oldPreset, item)(graph);
         }
         return graph;
@@ -527,13 +535,13 @@ export function uiPresetList(context) {
     const graph = editor.staging.graph;
     if (!_entityIDs.every(entityID => graph.hasEntity(entityID))) return;
 
-    const buttons = _list.selectAll('.preset-list-button');
+    const $buttons = _list.selectAll('.preset-list-button');
 
     // remove existing tooltips
-    buttons.call(uiTooltip(context).destroyAny);
+    $buttons.call(uiTooltip(context).destroyAny);
 
-    buttons.each((d, i, nodes) => {
-      const selection = d3_select(nodes[i]);
+    $buttons.each((d, i, nodes) => {
+      const $selection = d3_select(nodes[i]);
 
       let filterID;  // check whether this preset would be hidden by the current filtering rules
       for (const geometry of _allGeometries) {
@@ -543,11 +551,11 @@ export function uiPresetList(context) {
 
       const isHidden = filterID && !context.inIntro && !_selectedPresetIDs.has(d.item.id);
 
-      selection
+      $selection
         .classed('disabled', isHidden);
 
       if (isHidden) {
-        selection.call(uiTooltip(context)
+        $selection.call(uiTooltip(context)
           .title(l10n.t('filters.hidden_preset.manual', { features: l10n.t(`filters.${filterID}.description`) }))
           .placement(i < 2 ? 'bottom' : 'top')
         );
@@ -584,20 +592,20 @@ export function uiPresetList(context) {
       // All geometries in the selection
       _allGeometries = _gatherGeometries();
 
-      // All presets or categories that match the geometries
-      // (we should try to avoid making these Collections and instead make the PresetSystem able to search)
+      // All Presets or Categories that match the geometries
+      // (we should try to avoid making these Collections and instead make the SchemaSystem able to search)
       const items = [];
       const needed = new Set(_allGeometries);
-      for (const item of presets.collection.array) {
+      for (const item of schema.collection.array) {
         if (!needed.isSubsetOf(item.geometries)) continue;  // skip items that don't support all geometries needed
         items.push(item);
       }
       _presetCollection = new Collection(context, items);
-      _defaultCollection = presets.defaults(_allGeometries[0], 36, !context.inIntro, _currLoc);
+      _defaultCollection = schema.getDefaults(_allGeometries[0], 36, !context.inIntro, _currLoc);
 
       // match presets
       for (const entityID of _entityIDs) {
-        const matched = presets.match(graph.entity(entityID), graph);
+        const matched = schema.match(graph.entity(entityID), graph);
         if (matched) {
           _selectedPresetIDs.add(matched.id);
         }
@@ -642,7 +650,7 @@ export function uiPresetList(context) {
     for (const entityID of _entityIDs) {
       const entity = graph.entity(entityID);
       let geometry = entity.geometry(graph);
-      // Treat entities on addr:interpolation lines as points, not vertices (iD#3241)
+      // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
       if (geometry === 'vertex' && entity.isOnAddressLine(graph)) {
         geometry = 'point';
       }

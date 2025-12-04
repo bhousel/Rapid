@@ -10,8 +10,9 @@ export { uiFieldRadio as uiFieldStructureRadio };
 
 export function uiFieldRadio(context, uifield) {
     const l10n = context.systems.l10n;
-    const dispatch = d3_dispatch('change');
+    const schema = context.systems.schema;
 
+    const dispatch = d3_dispatch('change');
     var placeholder = d3_select(null);
     var wrap = d3_select(null);
     var labels = d3_select(null);
@@ -78,9 +79,8 @@ export function uiFieldRadio(context, uifield) {
 
     function structureExtras(selection, tags) {
         var selected = selectedKey() || tags.layer !== undefined;
-        var presets = context.systems.presets;
-        var type = presets.field(selected);
-        var layer = presets.field('layer');
+        var type = schema.field(selected);
+        var layer = schema.field('layer');
         var showLayer = (selected === 'bridge' || selected === 'tunnel' || tags.layer !== undefined);
 
         var extrasWrap = selection.selectAll('.structure-extras-wrap')

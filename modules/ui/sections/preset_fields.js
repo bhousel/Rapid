@@ -10,7 +10,7 @@ import { utilRebind } from '../../util/index.js';
 export function uiSectionPresetFields(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   let section = uiSection(context, 'preset-fields')
     .label(l10n.t('inspector.fields'))
@@ -67,11 +67,12 @@ export function uiSectionPresetFields(context) {
       }
 
 //    let singularEntity = _entityIDs.length === 1 && graph.hasEntity(_entityIDs[0]);
-//    if (singularEntity && singularEntity.isHighwayIntersection(graph) && presets.field('restrictions')) {
-//      _uifields.push(new UiField(context, presets.field('restrictions'), _entityIDs));
+//    const restrictions = schema.field('restrictions');
+//    if (restrictions && singularEntity?.isHighwayIntersection(graph)) {
+//      _uifields.push(new UiField(context, restrictions, _entityIDs));
 //    }
 
-      const additionalFields = utilArrayUnion(sharedMoreFields, presets.universalFields);
+      const additionalFields = utilArrayUnion(sharedMoreFields, [...schema.universal.values()]);
       additionalFields.sort((field1, field2) => {
         return field1.label().localeCompare(field2.label(), localeCode);
       });

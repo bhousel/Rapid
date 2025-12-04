@@ -11,8 +11,8 @@ import { LocationSystem } from './LocationSystem.js';
 import { Map3dSystem } from './Map3dSystem.js';
 import { MapSystem } from './MapSystem.js';
 import { PhotoSystem } from './PhotoSystem.js';
-import { PresetSystem } from './PresetSystem.js';
 import { RapidSystem } from './RapidSystem.js';
+import { SchemaSystem } from './SchemaSystem.js';
 import { SpatialSystem } from './SpatialSystem.js';
 import { StorageSystem } from './StorageSystem.js';
 import { StyleSystem } from './StyleSystem.js';
@@ -33,8 +33,8 @@ export {
   Map3dSystem,
   MapSystem,
   PhotoSystem,
-  PresetSystem,
   RapidSystem,
+  SchemaSystem,
   SpatialSystem,
   StorageSystem,
   StyleSystem,
@@ -59,8 +59,8 @@ systems.available.set('locations', LocationSystem);
 systems.available.set('map', MapSystem);
 systems.available.set('map3d', Map3dSystem);
 systems.available.set('photos', PhotoSystem);
-systems.available.set('presets', PresetSystem);
 systems.available.set('rapid', RapidSystem);
+systems.available.set('schema', SchemaSystem);
 systems.available.set('spatial', SpatialSystem);
 systems.available.set('storage', StorageSystem);
 systems.available.set('styles', StyleSystem);

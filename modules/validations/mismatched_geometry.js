@@ -17,7 +17,7 @@ export function validationMismatchedGeometry(context) {
     const type = 'mismatched_geometry';
     const editor = context.systems.editor;
     const l10n = context.systems.l10n;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
 
     function tagSuggestingLineIsArea(entity) {
         if (entity.type !== 'way' || entity.isClosed()) return null;
@@ -27,8 +27,8 @@ export function validationMismatchedGeometry(context) {
             return null;
         }
 
-        const linePreset = presets.matchTags(tagSuggestingArea, 'line');
-        const areaPreset = presets.matchTags(tagSuggestingArea, 'area');
+        const linePreset = schema.matchTags(tagSuggestingArea, 'line');
+        const areaPreset = schema.matchTags(tagSuggestingArea, 'area');
 
         if (linePreset && areaPreset) {
             // If the same preset allows both lines and areas (e.g. barrier), ignore
@@ -243,10 +243,10 @@ export function validationMismatchedGeometry(context) {
 
         if (sourceGeom === 'area') targetGeoms.unshift('line');
 
-        var asSource = presets.match(entity, graph);
+        var asSource = schema.match(entity, graph);
 
         var targetGeom = targetGeoms.find(nodeGeom => {
-            var asTarget = presets.matchTags(entity.tags, nodeGeom, loc);
+            var asTarget = schema.matchTags(entity.tags, nodeGeom, loc);
             // sometimes there are two presets with the same tags for different geometries
             if (!asSource || !asTarget || asSource === asTarget || deepEqual(asSource.tags, asTarget.tags)) return false;
 

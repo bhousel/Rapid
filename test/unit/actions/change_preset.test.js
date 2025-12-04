@@ -6,15 +6,15 @@ import * as Rapid from '../../../modules/headless.js';
 describe('actionChangePreset', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:     new Rapid.AssetSystem(context),
-    l10n:       new Rapid.LocalizationSystem(context),
-    presets:    new Rapid.PresetSystem(context)
+    assets:  new Rapid.AssetSystem(context),
+    l10n:    new Rapid.LocalizationSystem(context),
+    schema:  new Rapid.SchemaSystem(context)
   };
 
   let oldPreset, newPreset;
   beforeAll(() => {
-    const presets = context.systems.presets;
-    return presets.initAsync().then(() => {
+    const schema = context.systems.schema;
+    return schema.initAsync().then(() => {
       const presetData = {
         presets: {
           'old': { tags: { old: 'true' } },
@@ -22,9 +22,9 @@ describe('actionChangePreset', () => {
           'crossing': { tags: { highway: 'footway', footway: 'crossing', 'crossing:markings': 'zebra' } }
         }
       };
-      presets.merge(presetData);
-      oldPreset = presets.item('old');
-      newPreset = presets.item('new');
+      schema.merge(presetData);
+      oldPreset = schema.item('old');
+      newPreset = schema.item('new');
     });
   });
 
@@ -73,8 +73,8 @@ describe('actionChangePreset', () => {
     const n2before = { highway: 'crossing' };
     const w2before = { highway: 'primary' };
 
-    const presets = context.systems.presets;
-    const crossingPreset = presets.item('crossing');
+    const schema = context.systems.schema;
+    const crossingPreset = schema.item('crossing');
 
     const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [-1,  0], tags: {} }),

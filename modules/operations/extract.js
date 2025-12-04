@@ -9,7 +9,7 @@ export function operationExtract(context, selectedIDs) {
   const editor = context.systems.editor;
   const graph = editor.staging.graph;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const storage = context.systems.storage;
   const viewport = context.viewport;
 
@@ -24,7 +24,7 @@ export function operationExtract(context, selectedIDs) {
     if (entity.type === 'node' && graph.parentWays(entity).length === 0) return null;
 
     if (entity.type !== 'node') {
-      const preset = presets.match(entity, graph);
+      const preset = schema.match(entity, graph);
       // only allow extraction from ways/relations if the preset supports points
       if (!preset.geometries.has('point')) return null;
     }

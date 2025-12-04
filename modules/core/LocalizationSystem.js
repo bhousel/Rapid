@@ -21,7 +21,7 @@ export class LocalizationSystem extends AbstractSystem {
     super(context);
     this.id = 'l10n';
     this.requiredDependencies = new Set(['assets']);
-    this.optionalDependencies = new Set(['gfx', 'presets', 'urlhash']);
+    this.optionalDependencies = new Set(['gfx', 'schema', 'urlhash']);
 
     // These are the different language packs that can be loaded..
     this._scopes = new Set(['core', 'tagging', 'imagery', 'community']);
@@ -685,17 +685,17 @@ export class LocalizationSystem extends AbstractSystem {
    */
   displayLabel(entity, graphOrGeometry, verbose) {
     const context = this.context;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
 
     // Choose the display name, if possible
     const displayName = this.displayName(entity.tags);
 
     // Choose the preset name, if possible.
     let presetName;
-    if (presets) {
+    if (schema) {
       const preset = typeof graphOrGeometry === 'string' ?
-        presets.matchTags(entity.tags, graphOrGeometry) :
-        presets.match(entity, graphOrGeometry);
+        schema.matchTags(entity.tags, graphOrGeometry) :
+        schema.match(entity, graphOrGeometry);
       presetName = preset && (preset.props.suggestion ? preset.subtitle() : preset.name());
     }
 

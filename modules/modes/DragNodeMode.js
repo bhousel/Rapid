@@ -393,10 +393,10 @@ export class DragNodeMode extends AbstractMode {
     const context = this.context;
     const editor = context.systems.editor;
     const graph = editor.staging.graph;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
 
     return this.dragNode.geometry(graph) !== 'vertex' ||
-      (target.geometry(graph) === 'vertex' || presets.allowsVertex(target, graph));
+      (target.geometry(graph) === 'vertex' || schema.allowsVertex(target, graph));
   }
 
 

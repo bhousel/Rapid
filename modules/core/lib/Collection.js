@@ -5,7 +5,7 @@ const MAXRESULTS = 50;
 
 /**
  * Collection
- * Collection is a wrapper around an `Array` of presets
+ * Collection is a wrapper around an `Array` of Presets
  * and decorated with some extra methods for searching and matching geometry
  */
 export class Collection {
@@ -37,7 +37,7 @@ export class Collection {
 
     const context = this.context;
     const locations = context.systems.locations;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
 
     // don't remove diacritical characters since we're assuming the user is being intentional
     value = value.toLowerCase().trim();
@@ -154,14 +154,13 @@ export class Collection {
     ).slice(0, MAXRESULTS - 1);
 
     if (typeof geometry === 'string') {
-      const allPresets = presets.allPresets;
-      const fallback = allPresets[geometry];
+      const fallback = schema.presets.get(geometry);
       if (fallback) {
         results.push(fallback);
       }
     }
 
-    return new Collection(this.context, utilArrayUniq(results));
+    return new Collection(context, utilArrayUniq(results));
   }
 
 }

@@ -22,7 +22,7 @@ export class UiDrawModesTool {
 
     const l10n = context.systems.l10n;
     const gfx = context.systems.gfx;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
     const ui = context.systems.ui;
 
     this._keys = null;
@@ -30,21 +30,21 @@ export class UiDrawModesTool {
     this.commands = [{
       id: 'add-point',
       icon: 'point',
-      preset: presets.item('point'),
+      preset: schema.item('point'),
       getTitle: () => l10n.t('modes.add_point.title'),
       getDescription: () => l10n.t('modes.add_point.description'),
       getKey: () => l10n.t('shortcuts.command.add_point.key')
     }, {
       id: 'draw-line',
       icon: 'line',
-      preset: presets.item('line'),
+      preset: schema.item('line'),
       getTitle: () => l10n.t('modes.add_line.title'),
       getDescription: () => l10n.t('modes.add_line.description'),
       getKey: () => l10n.t('shortcuts.command.add_line.key')
     }, {
       id: 'draw-area',
       icon: 'area',
-      preset: presets.item('area'),
+      preset: schema.item('area'),
       getTitle: () => l10n.t('modes.add_area.title'),
       getDescription: () => l10n.t('modes.add_area.description'),
       getKey: () => l10n.t('shortcuts.command.add_area.key')

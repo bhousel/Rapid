@@ -133,7 +133,7 @@ export function osmNodeGeometriesForTags(tags) {
 
 // returns the any tag deprecations for the given tags.
 // This is implemented like osmAreaKeys and other functions that must first load
-// the tagging data at startup.  Consider: move some of this over to the PresetSystem.
+// the tagging data at startup.  Consider: move some of this over to the SchemaSystem.
 // Moved from OsmEntity
 export function getDeprecatedTags(tags) {
   const results = [];
@@ -186,7 +186,7 @@ export function getDeprecatedTags(tags) {
 }
 
 
-// I guess we build a cache for this? - also move to PresetSystem or something
+// I guess we build a cache for this? - also move to SchemaSystem or something
 let _deprecatedTagValuesByKey;
 export function deprecatedTagValuesByKey() {
   if (!_deprecatedTagValuesByKey) {

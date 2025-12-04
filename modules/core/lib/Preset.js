@@ -7,7 +7,7 @@ import { osmAreaKeys } from '../../data/lib/tags.js';
  * Preset
  * A Preset represents a bundle of tags that identify a feature type on OpenStreetMap.
  * Every feature in Rapid is matched to a Preset based on its tags.
- * Users can pick from the available presets in the Rapid editor.
+ * Users can pick from the available Presets in the Rapid editor.
  *
  * Properties you can access:
  *   `id` (or `presetID`)   Unique string to identify this Preset.
@@ -56,11 +56,11 @@ export class Preset {
     this.searchable = this.props.searchable;
     this.suggestion = this.props.suggestion;
 
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
     if (this.props.geometry.length) {
       this.geometries = new Set(this.props.geometry);
     } else {
-      this.geometries = new Set(presets.geometries);  // all geometries
+      this.geometries = new Set(schema.geometries);  // all geometries
     }
 
     this.resetCache();
@@ -281,7 +281,7 @@ export class Preset {
   /**
    * isFallback
    * Is this a fallback preset?
-   * Fallback presets are created by the PresetSystem at init time and can't be overridden.
+   * Fallback presets are created by the `SchemaSystem` at init time and can't be overridden.
    * The fallback presets are: 'point', 'line', 'area', 'relation'.
    * @return  {boolean}  `true` if this is a fallback preset, `false` otherwise.
    */
@@ -325,7 +325,7 @@ export class Preset {
 
   /**
    * unsetTags
-   * Called when changing presets, this removes tags that go with the old Preset.
+   * Called when changing Presets, this removes tags that go with the old Preset.
    * @param   {Object}         tags - the initial tags for the Entity
    * @param   {string}         geometry - the geometry for the Entity
    * @param   {Array<string>}  ignoreKeys - optional Array of keys to ignore (not remove)
@@ -352,7 +352,7 @@ export class Preset {
 
   /**
    * setTags
-   * Called when changing presets, this adds tags that go with the new Preset.
+   * Called when changing Presets, this adds tags that go with the new Preset.
    * @param   {Object}    tags - the initial tags for the Entity
    * @param   {string}    geometry - the geometry for the Entity
    * @param   {boolean}   skipFieldDefaults - `true` to ignore tags controlled by the Fields
@@ -431,12 +431,12 @@ export class Preset {
    * @return  {Preset}  the Preset to get the name from (either this Preset or another Preset)
    */
   _resolveReference(prop) {
-    const allPresets = this.context.systems.presets.allPresets;
+    const schema = this.context.systems.schema;
 
     const val = this.props[prop] ?? '';    // always lookup original properties, don't use the functions
     const match = val.match(/^\{(.*)\}$/);
     if (match) {
-      const preset = allPresets[match[1]];
+      const preset = schema.presets.get(match[1]);
       if (preset) {
         return preset;
       } else {
@@ -455,15 +455,14 @@ export class Preset {
    * @return  {Array<Field>}  the resolved fields or moreFields
    */
   _resolveFields(prop) {
-    const allPresets = this.context.systems.presets.allPresets;
-    const allFields = this.context.systems.presets.allFields;
+    const schema = this.context.systems.schema;
 
     const fieldIDs = this.props[prop] ?? [];  // always lookup original properties, don't use the functions
     let resolved = [];
 
     // Returns an Array of fields to inherit from the given presetID, if found
     const inheritFields = (presetID, prop) => {
-      const parent = allPresets[presetID];
+      const parent = schema.presets.get(presetID);
       if (!parent) return [];
 
       if (prop === 'fields') {
@@ -479,8 +478,8 @@ export class Preset {
       const match = fieldID.match(/^\{(.*)\}$/);
       if (match !== null) {    // a presetID wrapped in braces {}
         resolved = resolved.concat(inheritFields(match[1], prop));
-      } else if (allFields[fieldID]) {    // a normal fieldID
-        resolved.push(allFields[fieldID]);
+      } else if (schema.fields.has(fieldID)) {    // a normal fieldID
+        resolved.push(schema.fields.get(fieldID));
       } else {
         console.warn(`Cannot resolve "${fieldID}" found in ${this.id}.${prop}`);  // eslint-disable-line no-console
       }

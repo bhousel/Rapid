@@ -8,14 +8,14 @@ describe('Collection', () => {
   context.systems = {
     assets:  new Rapid.AssetSystem(context),
     l10n:    new Rapid.LocalizationSystem(context),
-    presets: new Rapid.PresetSystem(context)
+    schema:  new Rapid.SchemaSystem(context)
   };
 
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   let _collection;
 
   beforeAll(() => {
-    return presets.initAsync().then(() => {
+    return schema.initAsync().then(() => {
       const presetData = {
         presets: {
           'amenity/bbq': {
@@ -50,20 +50,20 @@ describe('Collection', () => {
           }
         }
       };
-      presets.merge(presetData);
+      schema.merge(presetData);
 
       // construct the Collection
       _collection = new Rapid.Collection(context, [
-        presets.item('amenity/bbq'),
-        presets.item('amenity/grit_bin'),
-        presets.item('highway/residential'),
-        presets.item('landuse/grass1'),
-        presets.item('landuse/grass2'),
-        presets.item('leisure/park'),
-        presets.item('amenity/parking'),
-        presets.item('leisure/pitch/soccer'),
-        presets.item('leisure/pitch/american_football'),
-        presets.item('amenity/excluded')
+        schema.item('amenity/bbq'),
+        schema.item('amenity/grit_bin'),
+        schema.item('highway/residential'),
+        schema.item('landuse/grass1'),
+        schema.item('landuse/grass2'),
+        schema.item('leisure/park'),
+        schema.item('amenity/parking'),
+        schema.item('leisure/pitch/soccer'),
+        schema.item('leisure/pitch/american_football'),
+        schema.item('amenity/excluded')
       ]);
 
     });
@@ -81,7 +81,7 @@ describe('Collection', () => {
 
   describe('item', () => {
     it('fetches a preset by id', () => {
-      const bbq = presets.item('amenity/bbq');
+      const bbq = schema.item('amenity/bbq');
       assert.strictEqual(_collection.item('amenity/bbq'), bbq);
     });
   });
@@ -98,7 +98,7 @@ describe('Collection', () => {
 //// TODO fix - these are all messed up
     it('matches leading name', () => {
       const result = _collection.search('resid', 'area').array;
-      const residential = presets.item('highway/residential');
+      const residential = schema.item('highway/residential');
       assert.equal(result.indexOf(residential), 0);  // 1. 'Residential' (by name)
     });
 
@@ -126,32 +126,32 @@ describe('Collection', () => {
     });
 
     it('sorts preset with matchScore penalty below others', () => {
-      const parking = presets.item('amenity/parking');
-      const park = presets.item('leisure/park');
+      const parking = schema.item('amenity/parking');
+      const park = schema.item('leisure/park');
       const result = _collection.search('par', 'point').array;
       assert.equal(result.indexOf(parking), 0, 'Parking');   // 1. 'Parking' (default matchScore)
       assert.equal(result.indexOf(park), 1, 'Park');         // 2. 'Park' (low matchScore)
     });
 
     it('ignores matchScore penalty for exact name match', () => {
-      const parking = presets.item('amenity/parking');
-      const park = presets.item('leisure/park');
+      const parking = schema.item('amenity/parking');
+      const park = schema.item('leisure/park');
       const result = _collection.search('park', 'point').array;
       assert.equal(result.indexOf(park), 0, 'Park');         // 1. 'Park' (low matchScore)
       assert.equal(result.indexOf(parking), 1, 'Parking');   // 2. 'Parking' (default matchScore)
     });
 
     it('considers diacritics on exact matches', () => {
-      const grass1 = presets.item('landuse/grass1');
-      const grass2 = presets.item('landuse/grass2');
+      const grass1 = schema.item('landuse/grass1');
+      const grass2 = schema.item('landuse/grass2');
       const result = _collection.search('ğṝȁ', 'point').array;
       assert.equal(result.indexOf(grass2), 0, 'Ğṝȁß');    // 1. 'Ğṝȁß'  (leading name)
       assert.equal(result.indexOf(grass1), 1, 'Grass');   // 2. 'Grass' (similar name)
     });
 
     it('replaces diacritics on fuzzy matches', () => {
-      const grass1 = presets.item('landuse/grass1');
-      const grass2 = presets.item('landuse/grass2');
+      const grass1 = schema.item('landuse/grass1');
+      const grass2 = schema.item('landuse/grass2');
       const result = _collection.search('graß', 'point').array;
       assert.ok(result.indexOf(grass1) < 2, 'Grass');   // 1. 'Grass' (similar name)
       assert.ok(result.indexOf(grass2) < 2, 'Ğṝȁß');    // 2. 'Ğṝȁß'  (similar name)
@@ -164,7 +164,7 @@ describe('Collection', () => {
     // });
 
     it('excludes presets with searchable: false', () => {
-      const excluded = presets.item('amenity/excluded');
+      const excluded = schema.item('amenity/excluded');
       const result = _collection.search('excluded', 'point').array;
       assert.ok(!result.includes(excluded));
     });

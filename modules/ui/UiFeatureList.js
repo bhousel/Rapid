@@ -403,7 +403,7 @@ export class UiFeatureList {
     const context = this.context;
     const editor = context.systems.editor;
     const l10n = context.systems.l10n;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
 
     const centerLoc = context.viewport.centerLoc();
     const q = this.$search.property('value').toLowerCase();
@@ -464,7 +464,7 @@ export class UiFeatureList {
       const name = l10n.displayName(entity.tags) || '';
       if (name.toLowerCase().indexOf(q) < 0) continue;
 
-      const matched = presets.match(entity, graph);
+      const matched = schema.match(entity, graph);
       const type = (matched && matched.name()) || l10n.displayType(entity.id);
       const extent = entity.extent(graph);
       const distance = extent ? geoSphericalDistance(centerLoc, extent.center()) : 0;
@@ -501,7 +501,7 @@ export class UiFeatureList {
 
       const tempEntity = createOsmEntity(context, attrs);
       const tempGraph = new Graph(this.context, [tempEntity]);
-      const preset = presets.match(tempEntity, tempGraph);
+      const preset = schema.match(tempEntity, tempGraph);
       const type = (preset && preset.name()) || l10n.displayType(id);
 
       results.push({

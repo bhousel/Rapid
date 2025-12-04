@@ -8,13 +8,13 @@ describe('Category', () => {
   context.systems = {
     assets:  new Rapid.AssetSystem(context),
     l10n:    new Rapid.LocalizationSystem(context),
-    presets: new Rapid.PresetSystem(context)
+    schema:  new Rapid.SchemaSystem(context)
   };
 
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   beforeAll(() => {
-    return presets.initAsync().then(() => {
+    return schema.initAsync().then(() => {
       const presetData = {
         presets: {
           'highway/residential': {
@@ -23,7 +23,7 @@ describe('Category', () => {
           }
         }
       };
-      presets.merge(presetData);
+      schema.merge(presetData);
     });
   });
 
@@ -57,10 +57,10 @@ describe('Category', () => {
     };
 
     const category = new Rapid.Category(context, props);
-    const residential = presets.item('highway/residential');
+    const residential = schema.item('highway/residential');
     it('maps members presetIDs to preset instances', () => {
-      assert.instanceOf(category.members, Rapid.Collection);
-      assert.deepEqual(category.members.array[0], residential);
+      assert.isArray(category.presets);
+      assert.deepEqual(category.presets[0], residential);
     });
 
 //    describe('matchGeometry', () => {

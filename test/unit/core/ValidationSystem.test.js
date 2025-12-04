@@ -11,7 +11,7 @@ describe('ValidationSystem', () => {
     editor:     new Rapid.EditSystem(context),
     l10n:       new Rapid.LocalizationSystem(context),
     locations:  new Rapid.LocationSystem(context),
-    presets:    new Rapid.PresetSystem(context),
+    schema:     new Rapid.SchemaSystem(context),
     spatial:    new Rapid.SpatialSystem(context),
     storage:    new Rapid.StorageSystem(context)
   };

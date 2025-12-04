@@ -5,15 +5,23 @@ import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetP
 import { Category, Collection, Field, Preset } from './lib/index.js';
 import { uiFields } from '../ui/fields/index.js';
 
-const VERBOSE = true;        // warn about v6 preset features we don't support currently
+const VERBOSE = true;        // warn about 'id-tagging-schema' features we don't support currently
 const MAXRECENTS = 30;       // how many recents to store in localstorage
 const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
 
 
 /**
- * `PresetSystem` maintains an internal index of all the presets, fields, and categories.
+ * `SchemaSystem` maintains indexes of all the Categories, Presets, and Fields.
+ *
+ * Properties you can access:
+ *   `geometries`  {Set<string>}                The geometry types ('point', 'vertex', 'line', 'area', 'relation')
+ *   `categories`  {Map<categoryID, Category>}  The categories
+ *   `presets`     {Map<presetID, Preset>}      The presets
+ *   `fields`      {Map<fieldID,  Field>}       The fields
+ *   `universal`   {Map<fieldID,  Field>}       The "universal" fields (fields that can go with any Preset)
+ *   `defaults`    {Map<string, Array<string>>}    Default items that are suggested for each geometry
  */
-export class PresetSystem extends AbstractSystem {
+export class SchemaSystem extends AbstractSystem {
 
   /**
    * @constructor
@@ -21,20 +29,25 @@ export class PresetSystem extends AbstractSystem {
    */
   constructor(context) {
     super(context);
-    this.id = 'presets';
+    this.id = 'schema';
     this.requiredDependencies = new Set(['assets', 'l10n']);
     this.optionalDependencies = new Set(['locations', 'storage', 'urlhash']);
-    this.geometries = new Set(['point', 'vertex', 'line', 'area', 'relation']);
 
-    this.collection = null;
-    this._presets = {};
-    this._fields = {};
-    this._categories = {};
-    this._universal = [];
+    this.geometries = new Set(['point', 'vertex', 'line', 'area', 'relation']);
+    this.presets = new Map();
+    this.fields = new Map();
+    this.categories = new Map();
+    this.universal = new Map();
 
     // Defaults are the Presets and Categories offered to the user when adding a new feature.
     // A fallback preset is appended to the list automatically so they dont need to be included here.
-    this._defaults = { point: [], vertex: [], line: [], area: [], relation: [] };
+    this.defaults = new Map();
+    for (const geometry of this.geometries) {
+      this.defaults.set(geometry, []);
+    }
+
+    this.collection = null;
+
     this._recentIDs = null;
 
     // Set of presetIDs that the user can add (if null, all are normally addable)
@@ -62,13 +75,18 @@ export class PresetSystem extends AbstractSystem {
     const locations = context.systems.locations;
     const urlhash = context.systems.urlhash;
 
-    // Create geometry fallbacks
-    const POINT = new Preset(context, { id: 'point', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
-    const LINE = new Preset(context, { id: 'line', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
-    const AREA = new Preset(context, { id: 'area', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
-    const RELATION = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
-    this._presets = { point: POINT, vertex: POINT, line: LINE, area: AREA, relation: RELATION };
-    this.collection = new Collection(context, [POINT, LINE, AREA, RELATION]);
+    // Create geometry fallback presets
+    const point = new Preset(context, { id: 'point', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
+    const line = new Preset(context, { id: 'line', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
+    const area = new Preset(context, { id: 'area', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
+    const relation = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
+
+    this.presets.set('point', point);
+    this.presets.set('vertex', point);  // use point for 'vertex' too.
+    this.presets.set('line', line);
+    this.presets.set('area', area);
+    this.presets.set('relation', relation);
+    this.collection = new Collection(context, [point, line, area, relation]);
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -134,63 +152,23 @@ export class PresetSystem extends AbstractSystem {
 
 
   /**
-   * allPresets
-   * Getter to retrieve the all the presets.
-   * @return  {Object}  All the presets
-   */
-  get allPresets() {
-    return this._presets;
-  }
-
-  /**
-   * allFields
-   * Getter to retrieve all the fields.
-   * @return  {Object}  All the fields
-   */
-  get allFields() {
-    return this._fields;
-  }
-
-  /**
-   * allCategories
-   * Getter to retrieve all the categories.
-   * @return  {Object}  All the categories
-   */
-  get allCategories() {
-    return this._categories;
-  }
-
-
-  /**
-   * universalFields
-   * Getter to retrieve all the "universal" fields.
-   * These are fields that are always available on any preset.
-   * (If not listed as a "main" field, they will be available in the "more" fields dropdown.)
-   * @return  {Array<string>}  All the universal fields
-   */
-  get universalFields() {
-    return this._universal;
-  }
-
-
-  /**
    * resetCaches
    * This resets the caches in the Fields, Presets, and Categories.
    * The caches are used to speed up localization and searching.
    * This should be done after new data is merged in, or whenever the locale changes.
    */
   resetCaches() {
-    this._universal = [];
-    for (const field of Object.values(this._fields)) {
+    this.universal.clear();
+    for (const field of this.fields.values()) {
       field.resetCache();
       if (field.props.universal) {
-        this._universal.push(field);
+        this.universal.set(field.id, field);
       }
     }
-    for (const preset of Object.values(this._presets)) {
+    for (const preset of this.presets.values()) {
       preset.resetCache();
     }
-    for (const category of Object.values(this._categories)) {
+    for (const category of this.categories.values()) {
       category.resetCache();
     }
   }
@@ -225,10 +203,10 @@ export class PresetSystem extends AbstractSystem {
           if (field.props.locationSet) {
             checkLocationSets.push(field.props);
           }
-          this._fields[fieldID] = field;
+          this.fields.set(fieldID, field);
 
         } else {   // remove
-          delete this._fields[fieldID];
+          this.fields.delete(fieldID);
         }
       }
     }
@@ -236,9 +214,8 @@ export class PresetSystem extends AbstractSystem {
     // Merge Presets
     if (src.presets) {
       for (const [presetID, p] of Object.entries(src.presets)) {
-        const existing = this._presets[presetID];
-        const isFallback = existing?.isFallback();
-        if (isFallback) continue;  // never override these
+        const existing = this.presets.get(presetID);
+        if (existing?.isFallback()) continue;  // never override these
 
         if (p) {   // add or replace
 // Rename icon identifiers to match the rapid spritesheet
@@ -257,10 +234,10 @@ if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_fr
           if (preset.props.locationSet) {
             checkLocationSets.push(preset.props);
           }
-          this._presets[presetID] = preset;
+          this.presets.set(presetID, preset);
 
         } else {   // remove
-          delete this._presets[presetID];
+          this.presets.delete(presetID);
         }
       }
     }
@@ -275,31 +252,33 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
           if (category.props.locationSet) {
             checkLocationSets.push(category.props);
           }
-          this._categories[categoryID] = category;
+          this.categories.set(categoryID, category);
 
         } else {   // remove
-          delete this._categories[categoryID];
+          this.categories.delete(categoryID);
         }
       }
     }
 
     // Merge Defaults
     if (src.defaults) {
-      for (const [geometry, ids] of Object.entries(src.defaults)) {
-        if (Array.isArray(ids)) {   // add or replace
-          this._defaults[geometry] = ids
-            .map(id => this._presets[id] || this._categories[id])
+      for (const [geometry, itemIDs] of Object.entries(src.defaults)) {
+        let vals;
+        if (Array.isArray(itemIDs)) {   // add or replace
+          vals = itemIDs
+            .map(id => this.item(id))
             .filter(item => item && !item.isFallback());
         } else {   // remove
-          this._defaults[geometry] = [];
+          vals = [];
         }
+        this.defaults.set(geometry, vals);
       }
     }
 
     this.resetCaches();
 
     // Replace `this.collection` after changing Presets and Categories
-    const all = Object.values(this._presets).concat(Object.values(this._categories));
+    const all = [...this.presets.values(), ...this.categories.values()];
     this.collection = new Collection(context, all);
 
     // Rebuild geometry index
@@ -338,7 +317,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    * @return  {Preset|Category}  The Preset or Catetory, or `undefined` if not found
    */
   item(id) {
-    return this._presets[id] || this._categories[id];
+    return this.presets.get(id) || this.categories.get(id);
   }
 
 
@@ -349,7 +328,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
    * @return  {Field}   The Field, or `undefined` if not found
    */
   field(id) {
-    return this._fields[id];
+    return this.fields.get(id);
   }
 
 
@@ -440,7 +419,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       }
     }
 
-    return bestMatch || this._presets[geometry];
+    return bestMatch || this.presets.get(geometry);
   }
 
 
@@ -489,7 +468,8 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     let areaKeys = {};
 
     // ignore name-suggestion-index and deprecated presets
-    const presets = Object.values(this._presets).filter(p => !p.suggestion && !p.replacement);
+    const presets = [...this.presets.values()]
+      .filter(p => !p.props.suggestion && !p.props.replacement);
 
     // keeplist
     for (const p of presets) {
@@ -522,7 +502,8 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     let pointTags = {};
 
     // ignore name-suggestion-index and deprecated presets
-    const presets = Object.values(this._presets).filter(p => !p.suggestion && !p.replacement && p.searchable !== false);
+    const presets = [...this.presets.values()]
+      .filter(p => !p.props.suggestion && !p.props.replacement && p.props.searchable);
 
     for (const p of presets) {
       if (!p.geometries.has('point')) continue;
@@ -543,7 +524,8 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     let vertexTags = {};
 
     // ignore name-suggestion-index and deprecated presets
-    const presets = Object.values(this._presets).filter(p => !p.suggestion && !p.replacement && p.searchable !== false);
+    const presets = [...this.presets.values()]
+      .filter(p => !p.props.suggestion && !p.props.replacement && p.props.searchable);
 
     for (const p of presets) {
       if (!p.geometries.has('vertex')) continue;
@@ -559,24 +541,25 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     return vertexTags;
   }
 
+
   /**
-   * defaults
+   * getDefaults
    * Defaults are the Presets and Categories offered to the user when adding a new feature.
    * Each geometry type has its own set of defaults.
    * The fallback preset for the given geometry is appended to the list automatically.
    * @param   {string}          geometry
    * @param   {number}          limit - max number of results to return
-   * @param   {boolean}         startWithRecents - `true` to start with recently used presets
+   * @param   {boolean}         includeRecents - `true` to start with recently used presets
    * @param   {Array<number>}   loc - WGS84 [lon,lat] where we are editing
    * @return  {Collection}      Collection
    */
-  defaults(geometry, limit = 10, startWithRecents = true, loc = null) {
+  getDefaults(geometry, limit = 10, includeRecents = true, loc = null) {
     const context = this.context;
     const locations = context.systems.locations;
 
     const results = new Map();   // Map<itemID, item>  (may be a Preset or a Category)
 
-    if (startWithRecents) {
+    if (includeRecents) {
       for (const preset of this.getRecents()) {
         if (results.size < MAXRECENTS_SHOW && preset.geometries.has(geometry)) {
           results.set(preset.id, preset);
@@ -593,14 +576,15 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
         }
       }
     } else {
-      for (const item of this._defaults[geometry]) {
+      const items = this.defaults.get(geometry);
+      for (const item of items) {
         if (item.geometries.has(geometry)) {
           results.set(item.id, item);
         }
       }
     }
 
-    const fallback = this._presets[geometry];
+    const fallback = this.presets.get(geometry);
     if (fallback && !results.has(fallback.id)) {
       results.set(fallback.id, fallback);
     }
@@ -638,7 +622,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     const presets = presetIDs
       .map(item => {
         const id = item?.id || item;  // previously we stored preset, now we just store presetID
-        return this._presets[id];
+        return this.presets.get(id);
       })
       .filter(Boolean);
 
@@ -658,10 +642,11 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
   setMostRecent(preset) {
     if (preset.searchable === false) return;
 
+    const storage = this.context.systems.storage;
+
     this._recentIDs.unshift(preset.id);   // prepend array
     this._recentIDs = utilArrayUniq(this._recentIDs).slice(0, MAXRECENTS);
 
-    const storage = this.context.systems.storage;
     storage?.setItem('preset_recents', JSON.stringify(this._recentIDs));
   }
 

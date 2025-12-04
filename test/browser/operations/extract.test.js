@@ -19,7 +19,7 @@ describe('operationExtract', () => {
       this.systems = {
         editor:   new MockEditSystem(),
         l10n:     new MockLocalizationSystem(),
-        presets:  new Rapid.PresetSystem(this),
+        schema:   new Rapid.SchemaSystem(this),
         storage:  new Rapid.StorageSystem(this)
       };
     }

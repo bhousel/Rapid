@@ -14,15 +14,15 @@ export function uiIntroNavigation(context, curtain) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const ui = context.systems.ui;
 
   const townHallID = 'n2061';
   const townHallExtent = new Extent([-85.63654, 41.94290], [-85.63632, 41.94307]);
   const springStreetID = 'w397';
   const springStreetExtent = new Extent([-85.63588, 41.94155], [-85.63574, 41.94278]);
-  const onewayField = presets.field('oneway');
-  const maxspeedField = presets.field('maxspeed');
+  const onewayField = schema.field('oneway');
+  const maxspeedField = schema.field('maxspeed');
 
   let _chapterCancelled = false;
   let _rejectStep = null;
@@ -408,7 +408,7 @@ export function uiIntroNavigation(context, curtain) {
       // preset match, in case the user happened to change it.
       const graph = editor.staging.graph;
       const entity = graph.entity(context.selectedIDs()[0]);
-      const preset = presets.match(entity, graph);
+      const preset = schema.match(entity, graph);
 
       curtain.reveal({
         revealSelector: '.entity-editor-pane .section-feature-type',

@@ -24,7 +24,7 @@ describe('uiFieldAccess', () => {
         assets:  new Rapid.AssetSystem(this),
         editor:  new MockEditSystem(this),
         l10n:    new MockLocalizationSystem(this),
-        presets: new Rapid.PresetSystem(this)
+        schema:  new Rapid.SchemaSystem(this)
       };
     }
     cleanTagKey(val)   { return val; }

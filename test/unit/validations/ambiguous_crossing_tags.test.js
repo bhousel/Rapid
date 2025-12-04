@@ -16,7 +16,7 @@ describe('validationAmbiguousCrossingTags', () => {
     editor:     new MockEditSystem(context),
     l10n:       new Rapid.LocalizationSystem(context),
     locations:  new Rapid.LocationSystem(context),
-    presets:    new Rapid.PresetSystem(context),
+    schema:     new Rapid.SchemaSystem(context),
     spatial:    new Rapid.SpatialSystem(context)
   };
 
@@ -43,7 +43,7 @@ describe('validationAmbiguousCrossingTags', () => {
     return Promise.all([
       context.systems.locations.initAsync(),
       context.systems.spatial.initAsync(),
-      context.systems.presets.initAsync()
+      context.systems.schema.initAsync()
     ]);
   });
 

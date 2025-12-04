@@ -17,7 +17,7 @@ describe('validationMismatchedGeometry', () => {
     l10n:       new Rapid.LocalizationSystem(context),
     locations:  new Rapid.LocationSystem(context),
     map:        new Rapid.MapSystem(context),
-    presets:    new Rapid.PresetSystem(context),
+    schema:     new Rapid.SchemaSystem(context),
     spatial:    new Rapid.SpatialSystem(context),
     storage:    new Rapid.StorageSystem(context),
     urlhash:    new Rapid.UrlHashSystem(context)
@@ -27,7 +27,7 @@ describe('validationMismatchedGeometry', () => {
 
 
   beforeAll(() => {
-    // cache test presets to avoid `preset.initAsync` from fetching them
+    // cache test presets to avoid `schema.initAsync` from fetching them
     const testPresets = {
       building: {
         tags: { building: '*' },
@@ -42,7 +42,7 @@ describe('validationMismatchedGeometry', () => {
     context.systems.assets._cache.tagging_preset_presets = testPresets;
 
     return Promise.all([
-      context.systems.presets.initAsync()
+      context.systems.schema.initAsync()
     ]);
   });
 

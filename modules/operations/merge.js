@@ -9,7 +9,7 @@ import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
 export function operationMerge(context, selectedIDs) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const storage = context.systems.storage;
 
   let action = chooseAction();
@@ -86,7 +86,7 @@ export function operationMerge(context, selectedIDs) {
       if (disabledReason === 'conflicting_relations') {
         return l10n.t('operations.merge.conflicting_relations');
       } else if (disabledReason === 'restriction' || disabledReason === 'connectivity') {
-        const preset = presets.item('type/' + disabledReason);
+        const preset = schema.item(`type/${disabledReason}`);
         return l10n.t('operations.merge.damage_relation', { relation: preset.name() });
       } else {
         return l10n.t(`operations.merge.${disabledReason}`);

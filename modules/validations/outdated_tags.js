@@ -21,7 +21,7 @@ export function validationOutdatedTags(context) {
   const type = 'outdated_tags';
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   /**
    * _isCrossingWay
@@ -46,7 +46,7 @@ export function validationOutdatedTags(context) {
   function oldTagIssues(entity, graph) {
     if (!entity.hasInterestingTags()) return [];
 
-    let preset = presets.match(entity, graph);
+    let preset = schema.match(entity, graph);
     if (!preset) return [];
 
 // make a copy
@@ -81,7 +81,7 @@ graph = new Graph(graph);
 
     // Upgrade preset, if a replacement is available..
     if (preset.props.replacement) {
-      const newPreset = presets.item(preset.props.replacement);
+      const newPreset = schema.item(preset.props.replacement);
       graph = actionChangePreset(entity.id, preset, newPreset, true /* skip field defaults */)(graph);
       entity = graph.entity(entity.id);
       preset = newPreset;

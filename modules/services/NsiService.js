@@ -42,7 +42,7 @@ export class NsiService extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'nsi';
-    this.requiredDependencies = new Set(['assets', 'presets', 'locations']);
+    this.requiredDependencies = new Set(['assets', 'schema', 'locations']);
 
     this.status = 'loading';  // 'loading', 'ok', 'failed'
 
@@ -59,7 +59,6 @@ export class NsiService extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
-        // check for presets init here?  all services are initted after all systems, idk.
       .then(() => this._loadNsiPresetsAsync())
       .then(() => this._loadNsiDataAsync())
       .then(() => this.status = 'ok')
@@ -325,12 +324,12 @@ export class NsiService extends AbstractSystem {
 
   /**
    * _loadNsiPresetsAsync
-   * @return  {Promise} Promise fulfilled when the presets have been downloaded and merged into Rapid.
+   * @return  {Promise}  Promise fulfilled when the presets have been downloaded and merged into Rapid.
    */
   _loadNsiPresetsAsync() {
     const context = this.context;
     const assets = context.systems.assets;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
 
     return (
       Promise.all([
@@ -338,11 +337,11 @@ export class NsiService extends AbstractSystem {
         assets.loadAssetAsync('nsi_features')
       ])
       .then(vals => {
-        // Add `suggestion=true` to all the nsi presets
+        // Add `suggestion=true` to all the NSI presets
         // The preset json schema doesn't include it, but the Rapid code still uses it
         Object.values(vals[0].presets).forEach(preset => preset.suggestion = true);
 
-        presets.merge({ presets: vals[0].presets, featureCollection: vals[1] });
+        schema.merge({ presets: vals[0].presets, featureCollection: vals[1] });
       })
     );
   }
@@ -350,7 +349,7 @@ export class NsiService extends AbstractSystem {
 
   /**
    * _loadNsiDataAsync
-   * @return  {Promise} Promise fulfilled when the other data have been downloaded and processed
+   * @return  {Promise}  Promise fulfilled when the other data have been downloaded and processed
    */
   _loadNsiDataAsync() {
     const context = this.context;
@@ -510,8 +509,8 @@ matcher.locationIndex = (bbox) => {
     // Only try this if we do a preset match and find nothing else remarkable about that building.
     // For example, a way with `building=yes` + `name=Westfield` may be a Westfield department store.
     // But a way with `building=yes` + `name=Westfield` + `public_transport=station` is a train station for a town named "Westfield"
-    const presets = this.context.systems.presets;
-    const preset = presets.matchTags(tags, 'area');
+    const schema = this.context.systems.schema;
+    const preset = schema.matchTags(tags, 'area');
     if (buildingPreset[preset.id]) {
       alternate.add('building/yes');
     }

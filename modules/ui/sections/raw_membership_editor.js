@@ -19,7 +19,7 @@ export function uiSectionRawMembershipEditor(context) {
     const editor = context.systems.editor;
     const l10n = context.systems.l10n;
     const map = context.systems.map;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
     const taginfo = context.services.taginfo;
     const viewport = context.viewport;
 
@@ -243,15 +243,15 @@ export function uiSectionRawMembershipEditor(context) {
         var graph = editor.staging.graph;
 
         function baseDisplayValue(entity) {
-            var matched = presets.match(entity, graph);
-            var presetName = (matched && matched.name()) || l10n.t('inspector.relation');
+            var preset = schema.match(entity, graph);
+            var presetName = preset?.name() || l10n.t('inspector.relation');
             var entityName = l10n.displayName(entity.tags) || '';
             return presetName + ' ' + entityName;
         }
 
         function baseDisplayLabel(entity) {
-            var matched = presets.match(entity, graph);
-            var presetName = (matched && matched.name()) || l10n.t('inspector.relation');
+            var preset = schema.match(entity, graph);
+            var presetName = preset?.name() || l10n.t('inspector.relation');
             var entityName = l10n.displayName(entity.tags) || '';
             var color = _getColor(entity);
 
@@ -316,6 +316,8 @@ export function uiSectionRawMembershipEditor(context) {
 
 
     function renderDisclosureContent(selection) {
+        const graph = editor.staging.graph;
+
         var memberships = getMemberships();
         var list = selection.selectAll('.member-list')
             .data([0]);
@@ -352,9 +354,7 @@ export function uiSectionRawMembershipEditor(context) {
         var labelEnter = itemsEnter
             .append('label')
             .attr('class', 'field-label')
-            .attr('for', function(d) {
-                return d.uid;
-            });
+            .attr('for', d => d.uid);
 
         var labelLink = labelEnter
             .append('span')
@@ -366,9 +366,9 @@ export function uiSectionRawMembershipEditor(context) {
         labelLink
             .append('span')
             .attr('class', 'member-entity-type')
-            .html(function(d) {
-                const matched = presets.match(d.relation, editor.staging.graph);
-                return (matched && matched.name()) || l10n.t('inspector.relation');
+            .text(d => {
+              const preset = schema.match(d.relation, graph);
+              return preset?.name() || l10n.t('inspector.relation');
             });
 
         labelLink
@@ -376,10 +376,11 @@ export function uiSectionRawMembershipEditor(context) {
             .attr('class', 'member-entity-name')
             .classed('has-color', d => !!_getColor(d.relation))
             .style('border-color', d => _getColor(d.relation))
-            .text(function(d) {
-                const matched = presets.match(d.relation, editor.staging.graph);
-                // hide the network from the name if there is NSI match
-                return l10n.displayName(d.relation.tags, matched.suggestion);
+            .text(d => {
+              const preset = schema.match(d.relation, graph);
+              const isNsiPreset = preset?.suggestion;
+              // For NSI presets, we dont want to display the network name twice
+              return l10n.displayName(d.relation.tags, isNsiPreset);
             });
 
         labelEnter

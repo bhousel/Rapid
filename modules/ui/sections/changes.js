@@ -13,9 +13,10 @@ export function uiSectionChanges(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   let _discardTags = {};
+
   assets.loadAssetAsync('tagging_discarded')
     .then(d => _discardTags = d)
     .catch(() => { /* ignore */ });
@@ -75,8 +76,8 @@ export function uiSectionChanges(context) {
       .append('strong')
       .attr('class', 'entity-type')
       .text(d => {
-        const matched = presets.match(d.entity, d.graph);
-        return (matched && matched.name()) || l10n.displayType(d.entity.id);
+        const preset = schema.match(d.entity, d.graph);
+        return (preset && preset.name()) || l10n.displayType(d.entity.id);
       });
 
     buttons

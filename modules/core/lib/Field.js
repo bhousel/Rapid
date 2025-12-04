@@ -48,11 +48,11 @@ export class Field {
     this.fieldID = this.props.id;
     this.type = this.props.type;
 
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
     if (this.props.geometry.length) {
       this.geometries = new Set(this.props.geometry);
     } else {
-      this.geometries = new Set(presets.geometries);  // all geometries
+      this.geometries = new Set(schema.geometries);  // all geometries
     }
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -143,12 +143,12 @@ export class Field {
    * @return  {Field}   the Field to get the property from (either this Field or another Field)
    */
   _resolveReference(prop) {
-    const allFields = this.context.systems.presets.allFields;
+    const schema = this.context.systems.schema;
 
     const val = this.props[prop] || '';    // always lookup original properties, don't use the functions
     const match = val.match(/^\{(.*)\}$/);
     if (match) {
-      const field = allFields[match[1]];
+      const field = schema.fields.get(match[1]);
       if (field) {
         return field;
       }

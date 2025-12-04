@@ -26,7 +26,7 @@ const crossingKeys = new Set([
 export function uiEntityEditor(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const dispatch = d3_dispatch('choose');
 
   const sections = [
@@ -371,13 +371,13 @@ export function uiEntityEditor(context) {
       const entity = graph.hasEntity(entityID);
       if (!entity) return;
 
-      const preset = presets.match(entity, graph);
+      const preset = schema.match(entity, graph);
       counts[preset.id] = (counts[preset.id] || 0) + 1;
     }
 
     const matches = Object.keys(counts)
       .sort((p1, p2) => counts[p2] - counts[p1])
-      .map(presetID => presets.item(presetID));
+      .map(presetID => schema.item(presetID));
 
     if (!isForNewSelection) {
       // A "weak" preset doesn't set any tags. (e.g. "Address")

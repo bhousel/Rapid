@@ -7,7 +7,7 @@ export function validationSuspiciousName(context) {
   const type = 'suspicious_name';
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   const keysToTestForGenericValues = [
     'aerialway', 'aeroway', 'amenity', 'building', 'craft', 'highway',
@@ -60,7 +60,7 @@ export function validationSuspiciousName(context) {
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(this.entityIds[0]);
         if (!entity) return '';
-        const preset = presets.match(entity, graph);
+        const preset = schema.match(entity, graph);
         const langName = langCode && l10n.languageName(langCode);
         return l10n.t('issues.generic_name.message' + (langName ? '_language' : ''),
           { feature: preset.name(), name: genericName, language: langName }
@@ -110,7 +110,7 @@ export function validationSuspiciousName(context) {
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(this.entityIds[0]);
         if (!entity) return '';
-        const preset = presets.match(entity, graph);
+        const preset = schema.match(entity, graph);
         const langName = langCode && l10n.languageName(langCode);
         return l10n.t('issues.incorrect_name.message' + (langName ? '_language' : ''),
           { feature: preset.name(), name: incorrectName, language: langName }

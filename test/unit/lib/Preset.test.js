@@ -8,13 +8,13 @@ describe('Preset', () => {
   context.systems = {
     assets:  new Rapid.AssetSystem(context),
     l10n:    new Rapid.LocalizationSystem(context),
-    presets: new Rapid.PresetSystem(context)
+    schema:  new Rapid.SchemaSystem(context)
   };
 
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   beforeAll(() => {
-    return presets.initAsync();
+    return schema.initAsync();
   });
 
 
@@ -138,11 +138,11 @@ describe('Preset', () => {
 
   describe('isFallback', () => {
     it('returns true for the special fallback presets', () => {
-      const allPresets = presets.allPresets;
-      assert.isTrue(allPresets.point?.isFallback());
-      assert.isTrue(allPresets.line?.isFallback());
-      assert.isTrue(allPresets.area?.isFallback());
-      assert.isTrue(allPresets.relation?.isFallback());
+      const presets = schema.presets;
+      assert.isTrue(presets.get('point')?.isFallback());
+      assert.isTrue(presets.get('line')?.isFallback());
+      assert.isTrue(presets.get('area')?.isFallback());
+      assert.isTrue(presets.get('relation')?.isFallback());
     });
 
     it('returns false for other presets', () => {
@@ -181,8 +181,7 @@ describe('Preset', () => {
 
     it('adds default tags of fields with matching geometry', () => {
       const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
-      const allFields = presets.allFields;
-      allFields.field = field;
+      schema.fields.set(field.id, field);
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.setTags({}, 'area'), { area: 'yes', building: 'yes' });
@@ -190,8 +189,7 @@ describe('Preset', () => {
 
     it('adds no default tags of fields with non-matching geometry', () => {
       const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
-      const allFields = presets.allFields;
-      allFields.field = field;
+      schema.fields.set(field.id, field);
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.setTags({}, 'point'), {});
@@ -233,8 +231,7 @@ describe('Preset', () => {
 
     it('removes tags that match field default tags', () => {
       const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
-      const allFields = presets.allFields;
-      allFields.field = field;
+      schema.fields.set(field.id, field);
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.unsetTags({ building: 'yes' }, 'area'), {});
@@ -247,8 +244,7 @@ describe('Preset', () => {
 
     it('preserves tags that do not match field default tags', () => {
       const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
-      const allFields = presets.allFields;
-      allFields.field = field;
+      schema.fields.set(field.id, field);
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.unsetTags({ building: 'yep' }, 'area'), { building: 'yep' });

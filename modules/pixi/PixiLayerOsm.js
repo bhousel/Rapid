@@ -211,7 +211,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const graph = context.systems.editor.staging.graph;
     const filters = context.systems.filters;
     const l10n = context.systems.l10n;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
     const styles = context.systems.styles;
 
     const pointsContainer = this.scene.groups.get('points');
@@ -277,7 +277,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         this.syncFeatureClasses(feature);
 
         if (feature.dirty) {
-          const preset = presets.match(entity, graph);
+          const preset = schema.match(entity, graph);
 
           const style = styles.styleMatch(entity.tags);
           style.labelTint = style.fill.color ?? style.stroke.color ?? 0xeeeeee;
@@ -475,7 +475,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const context = this.context;
     const graph = context.systems.editor.staging.graph;
     const l10n = context.systems.l10n;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
 
     // Vertices related to the selection/hover should be drawn above everything
     const selectedContainer = this.scene.layers.get('map-ui').selected;
@@ -529,7 +529,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       feature.parentContainer = parentContainer;   // change layer stacking if necessary
 
       if (feature.dirty) {
-        const preset = presets.match(node, graph);
+        const preset = schema.match(node, graph);
         const iconName = preset?.props?.icon;
         const directions = node.directions(graph, context.viewport);
 
@@ -584,7 +584,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const context = this.context;
     const graph = context.systems.editor.staging.graph;
     const l10n = context.systems.l10n;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
     const pointsContainer = this.scene.groups.get('points');
 
     const entities = data.points;
@@ -615,13 +615,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this.syncFeatureClasses(feature);
 
       if (feature.dirty) {
-        let preset = presets.match(node, graph);
+        let preset = schema.match(node, graph);
         let iconName = preset?.props?.icon;
 
         // If we matched a generic preset without an icon, try matching it as a 'vertex'
         // This is just to choose a better icon for an otherwise empty-looking pin.
         if (!iconName) {
-          preset = presets.matchTags(node.tags, 'vertex');
+          preset = schema.matchTags(node.tags, 'vertex');
           iconName = preset?.props?.icon;
         }
 

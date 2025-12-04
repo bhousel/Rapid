@@ -97,7 +97,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
    */
   renderMarkers(frame, viewport, zoom) {
     const context = this.context;
-    const presets = context.systems.presets;
+    const schema = context.systems.schema;
 
     const mapillary = context.services.mapillary;
     if (!mapillary?.started) return;
@@ -129,7 +129,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
       if (feature.dirty) {
         const isSelected = feature.hasClass('selectdetection');
         const presetID = mapillary.getDetectionPresetID(d.props.value);
-        const preset = presetID && presets.item(presetID);
+        const preset = presetID && schema.item(presetID);
 
         const style = {
           markerName: 'xlargeCircle',

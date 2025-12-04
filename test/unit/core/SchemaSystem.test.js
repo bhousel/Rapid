@@ -3,7 +3,7 @@ import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
-describe('PresetSystem', () => {
+describe('SchemaSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
@@ -16,30 +16,30 @@ describe('PresetSystem', () => {
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
-      it('constructs a PresetSystem from a context', () => {
-        const presets = new Rapid.PresetSystem(context);
-        assert.instanceOf(presets, Rapid.PresetSystem);
-        assert.strictEqual(presets.id, 'presets');
-        assert.strictEqual(presets.context, context);
-        assert.instanceOf(presets.requiredDependencies, Set);
-        assert.instanceOf(presets.optionalDependencies, Set);
-        assert.isTrue(presets.autoStart);
+      it('constructs a SchemaSystem from a context', () => {
+        const schema = new Rapid.SchemaSystem(context);
+        assert.instanceOf(schema, Rapid.SchemaSystem);
+        assert.strictEqual(schema.id, 'schema');
+        assert.strictEqual(schema.context, context);
+        assert.instanceOf(schema.requiredDependencies, Set);
+        assert.instanceOf(schema.optionalDependencies, Set);
+        assert.isTrue(schema.autoStart);
       });
     });
 
     describe('initAsync', () => {
       it('returns a promise to init', () => {
-        const presets = new Rapid.PresetSystem(context);
-        const prom = presets.initAsync();
+        const schema = new Rapid.SchemaSystem(context);
+        const prom = schema.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
           .then(val => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
-        const presets = new Rapid.PresetSystem(context);
-        presets.requiredDependencies.add('missing');
-        const prom = presets.initAsync();
+        const schema = new Rapid.SchemaSystem(context);
+        schema.requiredDependencies.add('missing');
+        const prom = schema.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
           .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
@@ -50,12 +50,12 @@ describe('PresetSystem', () => {
         const urlhash = context.systems.urlhash;
         urlhash.initialHashParams.set('presets', 'one,two,three');
 
-        const presets = new Rapid.PresetSystem(context);
-        const prom = presets.initAsync();
+        const schema = new Rapid.SchemaSystem(context);
+        const prom = schema.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            assert.deepEqual(presets.addablePresetIDs, new Set(['one', 'two', 'three']));
+            assert.deepEqual(schema.addablePresetIDs, new Set(['one', 'two', 'three']));
           })
           .finally(() => {
             urlhash.initialHashParams.delete('presets');
@@ -66,18 +66,18 @@ describe('PresetSystem', () => {
 
     describe('startAsync', () => {
       it('returns a promise to start', () => {
-        const presets = new Rapid.PresetSystem(context);
-        const prom = presets.initAsync().then(() => presets.startAsync());
+        const schema = new Rapid.SchemaSystem(context);
+        const prom = schema.initAsync().then(() => schema.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(presets.started));
+          .then(val => assert.isTrue(schema.started));
       });
     });
 
     describe('resetAsync', () => {
       it('returns a promise to reset', () => {
-        const presets = new Rapid.PresetSystem(context);
-        const prom = presets.resetAsync();
+        const schema = new Rapid.SchemaSystem(context);
+        const prom = schema.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
           .then(val => assert.isTrue(true));
@@ -88,12 +88,12 @@ describe('PresetSystem', () => {
 
   // Test an already-constructed instance of the system..
   describe('methods', () => {
-    let _presets, _savedAreaKeys;
+    let _schema, _savedAreaKeys;
 
     beforeAll(() => {
-      _presets = new Rapid.PresetSystem(context);
-      context.systems.presets = _presets;
-      return _presets.initAsync().then(() => _presets.startAsync());
+      _schema = new Rapid.SchemaSystem(context);
+      context.systems.schema = _schema;
+      return _schema.initAsync().then(() => _schema.startAsync());
     });
 
     beforeEach(() => {
@@ -104,42 +104,40 @@ describe('PresetSystem', () => {
       Rapid.osmSetAreaKeys(_savedAreaKeys);
     });
 
-    describe('allPresets', () => {
-      it('gets the presets cache', () => {
-        const result = _presets.allPresets;
-        assert.isObject(result);
-        assert.strictEqual(result, _presets._presets);
+    describe('geometries', () => {
+      it('gets all the geometry types', () => {
+        assert.deepEqual(_schema.geometries, new Set(['point', 'vertex', 'line', 'area', 'relation']));
       });
     });
 
-    describe('allFields', () => {
-      it('gets the fields cache', () => {
-        const result = _presets.allFields;
-        assert.isObject(result);
-        assert.strictEqual(result, _presets._fields);
+    describe('presets', () => {
+      it('has a presets cache', () => {
+        assert.instanceOf(_schema.presets, Map);
       });
     });
 
-    describe('allCategories', () => {
-      it('gets the categories cache', () => {
-        const result = _presets.allCategories;
-        assert.isObject(result);
-        assert.strictEqual(result, _presets._categories);
+    describe('fields', () => {
+      it('has a fields cache', () => {
+        assert.instanceOf(_schema.fields, Map);
       });
     });
 
-    describe('universalFields', () => {
-      it('gets the universal fields cache', () => {
-        const result = _presets.universalFields;
-        assert.isArray(result);
-        assert.strictEqual(result, _presets._universal);
+    describe('categories', () => {
+      it('has a categories cache', () => {
+        assert.instanceOf(_schema.categories, Map);
+      });
+    });
+
+    describe('universal', () => {
+      it('has a universal fields cache', () => {
+        assert.instanceOf(_schema.universal, Map);
       });
     });
 
     describe('resetCaches', () => {
       it('resets field, preset, and category caches', () => {
         const field = new Rapid.Field(context, {
-          id: 'building', type: 'check', geometry: 'area', key: 'building', default: 'yes', universal: true
+          id: 'wikidata', type: 'wikidata', key: 'wikidata', universal: true
         });
         field.resetCache = mock();
 
@@ -153,16 +151,19 @@ describe('PresetSystem', () => {
         });
         category.resetCache = mock();
 
-        _presets._fields[field.id] = field;
-        _presets._presets[preset.id] = preset;
-        _presets._categories[category.id] = category;
+        _schema.fields.set(field.id, field);
+        _schema.presets.set(preset.id, preset);
+        _schema.categories.set(category.id, category);
 
-        _presets.resetCaches();
+        _schema.resetCaches();
 
         assert.lengthOf(field.resetCache.mock.calls, 1);     // reset called once
         assert.lengthOf(preset.resetCache.mock.calls, 1);    // reset called once
         assert.lengthOf(category.resetCache.mock.calls, 1);  // reset called once
-        assert.deepEqual(_presets._universal, [field]);      // universal fields setup
+
+        // The universal field is also added to `universal` cache.
+        assert.lengthOf(_schema.universal, 1);
+        assert.deepEqual(_schema.universal.get('wikidata'), field);
       });
     });
 
@@ -171,27 +172,27 @@ describe('PresetSystem', () => {
       it('has a fallback point preset', () => {
         const node = new Rapid.OsmNode(context, { id: 'n' });
         const graph = new Rapid.Graph(context, [node]);
-        assert.strictEqual(_presets.match(node, graph).id, 'point');
+        assert.strictEqual(_schema.match(node, graph).id, 'point');
       });
 
       it('has a fallback line preset', () => {
         const node = new Rapid.OsmNode(context, { id: 'n' });
         const way = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'] });
         const graph = new Rapid.Graph(context, [node, way]);
-        assert.strictEqual(_presets.match(way, graph).id, 'line');
+        assert.strictEqual(_schema.match(way, graph).id, 'line');
       });
 
       it('has a fallback area preset', () => {
         const node = new Rapid.OsmNode(context, { id: 'n' });
         const way = new Rapid.OsmWay(context, { id: 'w', nodes: ['n'], tags: { area: 'yes' }});
         const graph = new Rapid.Graph(context, [node, way]);
-        assert.strictEqual(_presets.match(way, graph).id, 'area');
+        assert.strictEqual(_schema.match(way, graph).id, 'area');
       });
 
       it('has a fallback relation preset', () => {
         const relation = new Rapid.OsmRelation(context, { id: 'r' });
         const graph = new Rapid.Graph(context, [relation]);
-        assert.strictEqual(_presets.match(relation, graph).id, 'relation');
+        assert.strictEqual(_schema.match(relation, graph).id, 'relation');
       });
     });
 
@@ -199,7 +200,7 @@ describe('PresetSystem', () => {
     describe('merge', () => {
       it('builds presets from provided', () => {
         const surfShop = new Rapid.OsmNode(context, { tags: { amenity: 'shop', 'shop:type': 'surf' } });
-        const presets = new Rapid.PresetSystem(context);
+        const schema = new Rapid.SchemaSystem(context);
         const presetData = {
           presets: {
             'amenity/shop/surf': {
@@ -209,15 +210,15 @@ describe('PresetSystem', () => {
           }
         };
 
-        return presets.initAsync().then(() => {
-          let matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
+        return schema.initAsync().then(() => {
+          let matched = schema.match(surfShop, new Rapid.Graph(context, [surfShop]));
           assert.strictEqual(matched.id, 'point');   // no surfshop preset yet, matches fallback point
-          presets.merge(presetData);
+          schema.merge(presetData);
 
           // todo: need to touch the entity now, due to change in how transients work.
           // may need to rethink how this works.
           surfShop.touch();
-          matched = presets.match(surfShop, new Rapid.Graph(context, [surfShop]));
+          matched = schema.match(surfShop, new Rapid.Graph(context, [surfShop]));
           assert.strictEqual(matched.id, 'amenity/shop/surf');
         });
       });
@@ -234,45 +235,45 @@ describe('PresetSystem', () => {
       });
 
       it('returns a collection containing presets matching a geometry and tags', () => {
-        const presets = new Rapid.PresetSystem(context);
-        return presets.initAsync().then(() => {
+        const schema = new Rapid.SchemaSystem(context);
+        return schema.initAsync().then(() => {
           const way = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
           const graph = new Rapid.Graph(context, [way]);
-          assert.strictEqual(presets.match(way, graph).id, 'residential');
+          assert.strictEqual(schema.match(way, graph).id, 'residential');
         });
       });
 
       it('returns the appropriate fallback preset when no tags match', () => {
-        const presets = new Rapid.PresetSystem(context);
+        const schema = new Rapid.SchemaSystem(context);
         const point = new Rapid.OsmNode(context, );
         const line = new Rapid.OsmWay(context, { tags: { foo: 'bar' } });
         const graph = new Rapid.Graph(context, [point, line]);
 
-        return presets.initAsync().then(() => {
-          assert.strictEqual(presets.match(point, graph).id, 'point');
-          assert.strictEqual(presets.match(line, graph).id, 'line');
+        return schema.initAsync().then(() => {
+          assert.strictEqual(schema.match(point, graph).id, 'point');
+          assert.strictEqual(schema.match(line, graph).id, 'line');
         });
       });
 
       it('matches vertices on a line as points', () => {
-        const presets = new Rapid.PresetSystem(context);
+        const schema = new Rapid.SchemaSystem(context);
         const point = new Rapid.OsmNode(context, { tags: { leisure: 'park' } });
         const line = new Rapid.OsmWay(context, { nodes: [point.id], tags: { 'highway': 'residential' } });
         const graph = new Rapid.Graph(context, [point, line]);
 
-        return presets.initAsync().then(() => {
-          assert.strictEqual(presets.match(point, graph).id, 'point');
+        return schema.initAsync().then(() => {
+          assert.strictEqual(schema.match(point, graph).id, 'point');
         });
       });
 
       it('matches vertices on an addr:interpolation line as points', () => {
-        const presets = new Rapid.PresetSystem(context);
+        const schema = new Rapid.SchemaSystem(context);
         const point = new Rapid.OsmNode(context, { tags: { leisure: 'park' } });
         const line = new Rapid.OsmWay(context, { nodes: [point.id], tags: { 'addr:interpolation': 'even' } });
         const graph = new Rapid.Graph(context, [point, line]);
 
-        return presets.initAsync().then(() => {
-          assert.strictEqual(presets.match(point, graph).id, 'park');
+        return schema.initAsync().then(() => {
+          assert.strictEqual(schema.match(point, graph).id, 'park');
         });
       });
     });
@@ -293,52 +294,52 @@ describe('PresetSystem', () => {
       });
 
       it('includes keys for presets with area geometry', () => {
-        const presets = new Rapid.PresetSystem(context);
-        return presets.initAsync().then(() => {
-          assert.containsAllKeys(presets.areaKeys(), ['natural']);
+        const schema = new Rapid.SchemaSystem(context);
+        return schema.initAsync().then(() => {
+          assert.containsAllKeys(schema.areaKeys(), ['natural']);
         });
       });
 
       it('discards key-values for presets with a line geometry', () => {
-        const presets = new Rapid.PresetSystem(context);
-        return presets.initAsync().then(() => {
-          assert.containsAllKeys(presets.areaKeys().natural, ['tree_row']);
-          assert.isTrue(presets.areaKeys().natural.tree_row);
+        const schema = new Rapid.SchemaSystem(context);
+        return schema.initAsync().then(() => {
+          assert.containsAllKeys(schema.areaKeys().natural, ['tree_row']);
+          assert.isTrue(schema.areaKeys().natural.tree_row);
         });
       });
 
       it('discards key-values for presets with both area and line geometry', () => {
-        const presets = new Rapid.PresetSystem(context);
-        return presets.initAsync().then(() => {
-          assert.containsAllKeys(presets.areaKeys().leisure, ['track']);
+        const schema = new Rapid.SchemaSystem(context);
+        return schema.initAsync().then(() => {
+          assert.containsAllKeys(schema.areaKeys().leisure, ['track']);
         });
       });
 
       it('does not discard key-values for presets with neither area nor line geometry', () => {
-        const presets = new Rapid.PresetSystem(context);
-        return presets.initAsync().then(() => {
-          assert.doesNotHaveAllKeys(presets.areaKeys().natural, ['peak']);
+        const schema = new Rapid.SchemaSystem(context);
+        return schema.initAsync().then(() => {
+          assert.doesNotHaveAllKeys(schema.areaKeys().natural, ['peak']);
         });
       });
 
       it('does not discard generic \'*\' key-values', () => {
-        const presets = new Rapid.PresetSystem(context);
-        return presets.initAsync().then(() => {
-          assert.doesNotHaveAllKeys(presets.areaKeys().natural, ['natural']);
+        const schema = new Rapid.SchemaSystem(context);
+        return schema.initAsync().then(() => {
+          assert.doesNotHaveAllKeys(schema.areaKeys().natural, ['natural']);
         });
       });
 
       it('ignores keys like \'highway\' that are assumed to be lines', () => {
-        const presets = new Rapid.PresetSystem(context);
-        return presets.initAsync().then(() => {
-          assert.doesNotHaveAllKeys(presets.areaKeys(), ['highway']);
+        const schema = new Rapid.SchemaSystem(context);
+        return schema.initAsync().then(() => {
+          assert.doesNotHaveAllKeys(schema.areaKeys(), ['highway']);
         });
       });
 
       it('ignores suggestion presets', () => {
-        const presets = new Rapid.PresetSystem(context);
-        return presets.initAsync().then(() => {
-          assert.doesNotHaveAllKeys(presets.areaKeys(), ['amenity']);
+        const schema = new Rapid.SchemaSystem(context);
+        return schema.initAsync().then(() => {
+          assert.doesNotHaveAllKeys(schema.areaKeys(), ['amenity']);
         });
       });
     });
@@ -378,31 +379,31 @@ describe('PresetSystem', () => {
 
 
       it('prefers building to multipolygon', () => {
-        const presets = new Rapid.PresetSystem(context);
+        const schema = new Rapid.SchemaSystem(context);
         const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon', building: 'yes' } });
         const graph = new Rapid.Graph(context, [relation]);
-        return presets.initAsync().then(() => {
-          const match = presets.match(relation, graph);
+        return schema.initAsync().then(() => {
+          const match = schema.match(relation, graph);
           assert.strictEqual(match.id, 'building');
         });
       });
 
       it('prefers building to address', () => {
-        const presets = new Rapid.PresetSystem(context);
+        const schema = new Rapid.SchemaSystem(context);
         const way = new Rapid.OsmWay(context, { tags: { area: 'yes', building: 'yes', 'addr:housenumber': '1234' } });
         const graph = new Rapid.Graph(context, [way]);
-        return presets.initAsync().then(() => {
-          const match = presets.match(way, graph);
+        return schema.initAsync().then(() => {
+          const match = schema.match(way, graph);
           assert.strictEqual(match.id, 'building');
         });
       });
 
       it('prefers pedestrian to area', () => {
-        const presets = new Rapid.PresetSystem(context);
+        const schema = new Rapid.SchemaSystem(context);
         const way = new Rapid.OsmWay(context, { tags: { area: 'yes', highway: 'pedestrian' } });
         const graph = new Rapid.Graph(context, [way]);
-        return presets.initAsync().then(() => {
-          const match = presets.match(way, graph);
+        return schema.initAsync().then(() => {
+          const match = schema.match(way, graph);
           assert.strictEqual(match.id, 'highway/pedestrian_area');
         });
       });

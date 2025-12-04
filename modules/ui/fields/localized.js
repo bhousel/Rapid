@@ -21,7 +21,7 @@ export function uiFieldLocalized(context, uifield) {
   const assets = context.systems.assets;
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
     var dispatch = d3_dispatch('change', 'input');
     var wikipedia = context.services.wikipedia;
@@ -102,12 +102,12 @@ export function uiFieldLocalized(context, uifield) {
                 // and the preset does not display a `brand` or `operator` field.
                 // (For presets like hotels, car dealerships, post offices, the `name` should remain editable)
                 // see also similar logic in `outdated_tags.js`
-                var preset = presets.match(entity, graph);
+                var preset = schema.match(entity, graph);
                 if (preset) {
                     var isSuggestion = preset.props.suggestion;
                     var fields = preset.fields();
-                    var showsBrandField = fields.some(function(d) { return d.id === 'brand'; });
-                    var showsOperatorField = fields.some(function(d) { return d.id === 'operator'; });
+                    var showsBrandField = fields.some(d => d.id === 'brand');
+                    var showsOperatorField = fields.some(d => d.id === 'operator');
                     var setsName = preset.addTags.name;
                     var setsBrandWikidata = preset.addTags['brand:wikidata'];
                     var setsOperatorWikidata = preset.addTags['operator:wikidata'];

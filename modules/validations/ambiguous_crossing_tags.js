@@ -20,7 +20,7 @@ export function validationAmbiguousCrossingTags(context) {
   const type = 'ambiguous_crossing';
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   // These checks will be run on the parent way.
   const validation = function checkAmbiguousCrossingTags(entity, graph) {
@@ -40,9 +40,9 @@ export function validationAmbiguousCrossingTags(context) {
   function actionUpdateCrossing(entityID) {
     return graph => {
       const entity = graph.entity(entityID);
-      const currPreset = presets.match(entity, graph);
+      const currPreset = schema.match(entity, graph);
       const replacementID = currPreset?.props?.replacement;
-      const replacement = replacementID && presets.item(replacementID);
+      const replacement = replacementID && schema.item(replacementID);
 
       if (replacement) {
         graph = actionChangePreset(entityID, currPreset, replacement, true /* skip field defaults */)(graph);
@@ -65,7 +65,7 @@ export function validationAmbiguousCrossingTags(context) {
    */
   function detectCrossingWayIssues(startWay, startGraph) {
     const wayID = startWay.id;
-    const startPreset = presets.match(startWay, startGraph);
+    const startPreset = schema.match(startWay, startGraph);
     const snapshot = startGraph.snapshot();
     const copyGraph = startGraph.snapshot();
     const action = actionUpdateCrossing(wayID);
@@ -111,7 +111,7 @@ export function validationAmbiguousCrossingTags(context) {
       }
 
       // Include this child node's details in the updates Map.
-      const startPreset = presets.match(base, startGraph);
+      const startPreset = schema.match(base, startGraph);
       const tagDiff = utilTagDiff(base.tags, head.tags);
       updates.set(base.id, { name: startPreset.name(), tagDiff: tagDiff });
     }

@@ -18,7 +18,7 @@ export function uiSectionRawMemberEditor(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const taginfo = context.services.taginfo;
   const viewport = context.viewport;
 
@@ -185,9 +185,9 @@ export function uiSectionRawMemberEditor(context) {
           labelLink
             .append('span')
             .attr('class', 'member-entity-type')
-            .html(d => {
-              const matched = presets.match(d.member, editor.staging.graph);
-              return (matched && matched.name()) || l10n.displayType(d.member.id);
+            .text(d => {
+              const preset = schema.match(d.member, graph);
+              return preset?.name() || l10n.displayType(d.member.id);
             });
 
           labelLink

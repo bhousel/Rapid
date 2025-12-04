@@ -11,7 +11,7 @@ describe('validationOutdatedTags', () => {
     l10n:       new Rapid.LocalizationSystem(context),
     locations:  new Rapid.LocationSystem(context),
     map:        new Rapid.MapSystem(context),
-    presets:    new Rapid.PresetSystem(context)
+    schema:     new Rapid.SchemaSystem(context)
   };
 
   const validator = Rapid.validationOutdatedTags(context);
@@ -40,7 +40,7 @@ describe('validationOutdatedTags', () => {
       }
     };
 
-    return context.systems.presets.initAsync();
+    return context.systems.schema.initAsync();
   });
 
 

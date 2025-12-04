@@ -8,7 +8,7 @@ import { utilHighlightEntities } from '../../util/index.js';
 export function uiSectionSelectionList(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
 
   let _selectedIDs = [];
 
@@ -113,13 +113,10 @@ export function uiSectionSelectionList(context) {
       });
 
     items.selectAll('.entity-type')
-      .html(entity => presets.match(entity, graph).name());
+      .text(entity => schema.match(entity, graph).name());
 
     items.selectAll('.entity-name')
-      .html(d => {
-        const entity = graph.entity(d.id);
-        return l10n.displayName(entity.tags);
-      });
+      .text(entity => l10n.displayName(entity.tags));
   }
 
 

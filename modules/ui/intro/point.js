@@ -14,12 +14,12 @@ export function uiIntroPoint(context, curtain) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const ui = context.systems.ui;
   const EditMenu = ui.EditMenu;
 
   const buildingExtent = new Extent([-85.63261, 41.94391], [-85.63222, 41.94419]);
-  const cafePreset = presets.item('amenity/cafe');
+  const cafePreset = schema.item('amenity/cafe');
 
   let _chapterCancelled = false;
   let _rejectStep = null;
@@ -132,7 +132,7 @@ export function uiIntroPoint(context, curtain) {
           const modified = difference.modified();
           if (modified.length === 1) {
             const graph = editor.staging.graph;
-            if (presets.match(modified[0], graph) === cafePreset) {
+            if (schema.match(modified[0], graph) === cafePreset) {
               resolve(aboutFeatureEditorAsync);
             } else {
               reject();  // didn't pick cafe
@@ -285,7 +285,7 @@ export function uiIntroPoint(context, curtain) {
     // Make sure it's still a cafe, in case user somehow changed it..
     const graph = editor.staging.graph;
     const entity = graph.entity(_pointID);
-    const preset = presets.match(entity, graph);
+    const preset = schema.match(entity, graph);
     if (preset !== cafePreset) {
       editor.perform(actionChangePreset(_pointID, preset, cafePreset));
       editor.commit({

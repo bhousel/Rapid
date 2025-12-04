@@ -14,15 +14,15 @@ export function uiIntroBuilding(context, curtain) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const ui = context.systems.ui;
   const EditMenu = ui.EditMenu;
 
   const houseExtent = new Extent([-85.62836, 41.95622], [-85.62791, 41.95654]);
   const tankExtent = new Extent([-85.62766, 41.95324], [-85.62695, 41.95372]);
-  const buildingCatetory = presets.item('category-building');
-  const housePreset = presets.item('building/house');
-  const tankPreset = presets.item('man_made/storage_tank');
+  const buildingCatetory = schema.item('category-building');
+  const housePreset = schema.item('building/house');
+  const tankPreset = schema.item('man_made/storage_tank');
 
   let _chapterCancelled = false;
   let _rejectStep = null;
@@ -248,7 +248,7 @@ export function uiIntroBuilding(context, curtain) {
           const modified = difference.modified();
           if (modified.length === 1) {
             const graph = editor.staging.graph;
-            if (presets.match(modified[0], graph) === housePreset) {
+            if (schema.match(modified[0], graph) === housePreset) {
               resolve(hasHouseAsync);
             } else {
               resolve(chooseCategoryBuildingAsync);  // didn't pick house, retry
@@ -285,7 +285,7 @@ export function uiIntroBuilding(context, curtain) {
     // Make sure it's still a house, in case user somehow changed it..
     const graph = editor.staging.graph;
     const entity = graph.entity(_houseID);
-    const preset = presets.match(entity, graph);
+    const preset = schema.match(entity, graph);
     if (preset !== housePreset) {
       editor.perform(actionChangePreset(_houseID, preset, housePreset));
       editor.commit({
@@ -526,7 +526,7 @@ export function uiIntroBuilding(context, curtain) {
           const modified = difference.modified();
           if (modified.length === 1) {
             const graph = editor.staging.graph;
-            if (presets.match(modified[0], graph) === tankPreset) {
+            if (schema.match(modified[0], graph) === tankPreset) {
               resolve(hasTankAsync);
             } else {
               reject();  // didn't pick tank
@@ -580,7 +580,7 @@ export function uiIntroBuilding(context, curtain) {
     // Make sure it's still a tank, in case user somehow changed it..
     const graph = editor.staging.graph;
     const entity = graph.entity(_tankID);
-    const preset = presets.match(entity, graph);
+    const preset = schema.match(entity, graph);
     if (preset !== tankPreset) {
       editor.perform(actionChangePreset(_tankID, preset, tankPreset));
       editor.commit({

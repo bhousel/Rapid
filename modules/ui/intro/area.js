@@ -14,13 +14,13 @@ export function uiIntroArea(context, curtain) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const presets = context.systems.presets;
+  const schema = context.systems.schema;
   const ui = context.systems.ui;
 
   const playgroundExtent = new Extent([-85.63575, 41.94137], [-85.63526, 41.94180]);
-  const playgroundPreset = presets.item('leisure/playground');
-  const nameField = presets.field('name');
-  const descriptionField = presets.field('description');
+  const playgroundPreset = schema.item('leisure/playground');
+  const nameField = schema.field('name');
+  const descriptionField = schema.field('description');
 
   let _chapterCancelled = false;
   let _rejectStep = null;
@@ -188,7 +188,7 @@ export function uiIntroArea(context, curtain) {
           const modified = difference.modified();
           if (modified.length === 1) {
             const graph = editor.staging.graph;
-            if (presets.match(modified[0], graph) === playgroundPreset) {
+            if (schema.match(modified[0], graph) === playgroundPreset) {
               resolve(clickAddFieldAsync);
             } else {
               reject();  // didn't pick playground
