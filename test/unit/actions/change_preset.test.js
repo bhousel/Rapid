@@ -16,6 +16,7 @@ describe('actionChangePreset', () => {
     const schema = context.systems.schema;
     return schema.initAsync().then(() => {
       const presetData = {
+        schemaID: 'test',
         presets: {
           'old': { tags: { old: 'true' } },
           'new': { tags: { new: 'true' } },

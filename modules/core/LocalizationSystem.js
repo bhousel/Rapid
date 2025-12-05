@@ -9,7 +9,7 @@ import { utilDetect } from '../util/detect.js';
  * `LocalizationSystem` manages language and locale parameters including translated strings
  *
  * Events available:
- *   `localechange`     Fires on any change in imagery or display options
+ *   `localechange`    Fires on any change in the current locale
  */
 export class LocalizationSystem extends AbstractSystem {
 

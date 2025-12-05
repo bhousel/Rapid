@@ -17,6 +17,7 @@ describe('Collection', () => {
   beforeAll(() => {
     return schema.initAsync().then(() => {
       const presetData = {
+        schemaID: 'test',
         presets: {
           'amenity/bbq': {
             name: 'Grill', tags: { amenity: 'bbq' }, geometry: ['point'], terms: []
@@ -86,13 +87,6 @@ describe('Collection', () => {
     });
   });
 
-  // describe('matchGeometry', () => {
-  //   it('returns a new collection only containing presets matching a geometry', () => {
-  //     const arr = collection.matchGeometry('area').array;
-  //     assert.includeMembers(arr, [ p.residential, p.park, p.soccer, p.football ]);
-  //     assert.notIncludeMembers(arr, [ p.grill, p.sandpit, p.excluded ]);
-  //   });
-  // });
 
   describe.skip('search', () => {
 //// TODO fix - these are all messed up

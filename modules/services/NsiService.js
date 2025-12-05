@@ -341,7 +341,13 @@ export class NsiService extends AbstractSystem {
         // The preset json schema doesn't include it, but the Rapid code still uses it
         Object.values(vals[0].presets).forEach(preset => preset.suggestion = true);
 
-        schema.merge({ presets: vals[0].presets, featureCollection: vals[1] });
+        // Merge the name-suggestion-index presets...
+        const nsiVersion = vals[0]._meta?.version || 'unknown';
+        schema.merge({
+          schemaID: `name-suggestion-index@${nsiVersion}`,
+          presets: vals[0].presets,
+          featureCollection: vals[1]
+        });
       })
     );
   }

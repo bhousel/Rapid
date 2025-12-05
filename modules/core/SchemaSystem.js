@@ -3,7 +3,13 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 import { AbstractSystem } from './AbstractSystem.js';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../data/lib/tags.js';
 import { Category, Collection, Field, Preset } from './lib/index.js';
-import { uiFields } from '../ui/fields/index.js';
+
+// Make very sure this resolves to Rapid's `package.json`
+// If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
+import {
+  version as rapidVersion,
+  dependencies as rapidDependencies
+} from '../../package.json' with { type: 'json' };
 
 const VERBOSE = true;        // warn about 'id-tagging-schema' features we don't support currently
 const MAXRECENTS = 30;       // how many recents to store in localstorage
@@ -11,15 +17,32 @@ const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
 
 
 /**
- * `SchemaSystem` maintains indexes of all the Categories, Presets, and Fields.
+ * `SchemaSystem` maintains data and indexes of all the Categories, Presets, and Fields.
+ * (This used to be called 'presets' or 'PresetSystem')
  *
- * Properties you can access:
- *   `geometries`  {Set<string>}                The geometry types ('point', 'vertex', 'line', 'area', 'relation')
- *   `categories`  {Map<categoryID, Category>}  The categories
- *   `presets`     {Map<presetID, Preset>}      The presets
- *   `fields`      {Map<fieldID,  Field>}       The fields
- *   `universal`   {Map<fieldID,  Field>}       The "universal" fields (fields that can go with any Preset)
- *   `defaults`    {Map<string, Array<string>>}    Default items that are suggested for each geometry
+ * This system is used to identify features in OpenStreetMap based on their tagging,
+ * and to support user interface functions like searching for feature types and editing attributes.
+ *
+ * - A `Preset` represents a bundle of tags that identify a feature type.
+ * - A `Category` is a collection of Presets (e.g. "Major Roads", "Buildings", etc).
+ * - A `Field` represents a user interface component a tag or tags.
+ *
+ * In this case, "schemas" are the files containing these rules about tagging.
+ * At init time, Rapid will load the default schema files that contain these rules,
+ * but additional preset data can be merged in to supplement or override the defaults.
+ *
+ * Properties available:
+ *   `geometryTypes`  {Set<string>}                 The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
+ *   `fieldTypes`     {Set<string>}                 The supported field types (see also `ui/fields/index.js`)
+ *   `merged`         {Set<schemaID>}               Names of schemas that have been merged in
+ *   `categories`     {Map<categoryID, Category>}   The categories
+ *   `presets`        {Map<presetID, Preset>}       The presets
+ *   `fields`         {Map<fieldID,  Field>}        The fields
+ *   `universal`      {Map<fieldID,  Field>}        The "universal" fields (fields that can go with any Preset)
+ *   `defaults`       {Map<string, Array<string>>}  Default items that are suggested for each geometry
+ *
+ * Events available:
+ *   `schemachange`    Fires on any change in the available schemas
  */
 export class SchemaSystem extends AbstractSystem {
 
@@ -31,9 +54,22 @@ export class SchemaSystem extends AbstractSystem {
     super(context);
     this.id = 'schema';
     this.requiredDependencies = new Set(['assets', 'l10n']);
-    this.optionalDependencies = new Set(['locations', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set(['gfx', 'locations', 'storage', 'urlhash']);
 
-    this.geometries = new Set(['point', 'vertex', 'line', 'area', 'relation']);
+    this.geometryTypes = new Set(['point', 'vertex', 'line', 'area', 'relation']);
+
+    // The field types here must match the field types listed in `ui/fields/index.js`.
+    // Other field types may be found in a tagging schema, but these are the ones Rapid currently supports.
+    // Do not add a new field type without also adding a user interface component to support that field type.
+    this.fieldTypes = new Set([
+      'access', 'address', 'check', 'combo', 'cycleway', 'defaultCheck', 'email',
+      'identifier', 'lanes', 'localized', 'roadspeed', 'roadheight', 'manyCombo',
+      'multiCombo', 'networkCombo', 'number', 'onewayCheck', 'radio', 'restrictions',
+      'semiCombo', 'structureRadio', 'tel', 'text', 'textarea', 'typeCombo', 'url',
+      'wikidata', 'wikipedia'
+    ]);
+
+    this.merged = new Set();
     this.presets = new Map();
     this.fields = new Map();
     this.categories = new Map();
@@ -42,7 +78,7 @@ export class SchemaSystem extends AbstractSystem {
     // Defaults are the Presets and Categories offered to the user when adding a new feature.
     // A fallback preset is appended to the list automatically so they dont need to be included here.
     this.defaults = new Map();
-    for (const geometry of this.geometries) {
+    for (const geometry of this.geometryTypes) {
       this.defaults.set(geometry, []);
     }
 
@@ -57,7 +93,8 @@ export class SchemaSystem extends AbstractSystem {
     this._geometryIndex = { point: {}, vertex: {}, line: {}, area: {}, relation: {} };
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this.resetCaches = this.resetCaches.bind(this);
+    this._resetCaches = this._resetCaches.bind(this);
+    this._schemaChanged = this._schemaChanged.bind(this);
   }
 
 
@@ -100,8 +137,7 @@ export class SchemaSystem extends AbstractSystem {
       })
       .then(() => {
         // Setup Event Handlers..
-        // When changing localization, we need to reset all of the preset and field caches.
-        l10n?.on('localechange', this.resetCaches);
+        l10n?.on('localechange', this._resetCaches);
 
         // If we received a subset of addable presetIDs specified in the url hash, save them.
         const presetIDs = urlhash?.initialHashParams.get('presets');
@@ -121,12 +157,32 @@ export class SchemaSystem extends AbstractSystem {
         ]);
       })
       .then(vals => {
-        this.merge({ categories: vals[0], defaults: vals[1], presets: vals[2], fields: vals[3] });
-        this.merge(vals[4]);
+        // Determine the version of id-tagging-schema
+        // This might not be exact because the CDN can return a newer semver patch.
+        // But it's close enough, and this string is informational only.
+        // (It would be better if these files included some metadata like my other projects do).
+        let idTagSchemaVersion = 'unknown';
+        for (const [k, v] of Object.entries(rapidDependencies)) {
+          if (/id-tagging-schema$/.test(k)) {
+            idTagSchemaVersion = v.replaceAll(/[\^~]/g, '');  // no carat/tilde
+            break;
+          }
+        }
+
+        // Merge id-tagging-schema...
+        this.merge({
+          schemaID: `id-tagging-schema@${idTagSchemaVersion}`,
+          categories: vals[0],
+          defaults: vals[1],
+          presets: vals[2],
+          fields: vals[3]
+        });
+
+        // Merge rapid tagging_preset_overrides...
+        const rapidTagSchemaVersion = rapidVersion || 'unknown';
+        this.merge({ schemaID: `rapid@${rapidTagSchemaVersion}`, ...vals[4] });
+
         osmSetDeprecatedTags(vals[5]);
-        osmSetAreaKeys(this.areaKeys());
-        osmSetPointTags(this.pointTags());
-        osmSetVertexTags(this.vertexTags());
       });
   }
 
@@ -152,41 +208,30 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
-   * resetCaches
-   * This resets the caches in the Fields, Presets, and Categories.
-   * The caches are used to speed up localization and searching.
-   * This should be done after new data is merged in, or whenever the locale changes.
-   */
-  resetCaches() {
-    this.universal.clear();
-    for (const field of this.fields.values()) {
-      field.resetCache();
-      if (field.props.universal) {
-        this.universal.set(field.id, field);
-      }
-    }
-    for (const preset of this.presets.values()) {
-      preset.resetCache();
-    }
-    for (const category of this.categories.values()) {
-      category.resetCache();
-    }
-  }
-
-
-  /**
    * merge
-   * Accepts an object containing new preset data (all properties optional):
+   * Accepts an object containing new schema data (all properties except 'id' are optional):
    * {
-   *   fields: {},               // fieldID -> fieldData
-   *   presets: {},              // presetID -> presetData
-   *   categories: {},           // categoryID -> categoryData
-   *   defaults: {},             // geometry -> Array(presetIDs)
-   *   featureCollection: {}     // GeoJSON
+   *   schemaID: '',           // A string schema identifier, e.g. 'id-tagging-schema@6.13.0'
+   *   fields: {},             // Object<fieldID, fieldData>
+   *   presets: {},            // Object<presetID, presetData>
+   *   categories: {},         // Object<categoryID, categoryData>
+   *   defaults: {},           // Object<geometry, Array<presetIDs>>
+   *   featureCollection: {}   // Custom GeoJSON, possibly referenced by locationSets
    * }
    * @param  {Object}  src - preset data to merge into the caches
    */
-  merge(src) {
+  merge(src = {}) {
+    const schemaID = src.schemaID;
+
+    if (!schemaID) {
+      throw new Error('Schema missing schemaID property');
+    }
+    if (this.merged.has(schemaID)) {
+      throw new Error(`Schema "${schemaID}" already merged`);
+    }
+
+    this.merged.add(schemaID);
+
     const checkLocationSets = [];
     const context = this.context;
     const locations = context.systems.locations;
@@ -195,7 +240,7 @@ export class SchemaSystem extends AbstractSystem {
     if (src.fields) {
       for (const [fieldID, f] of Object.entries(src.fields)) {
         if (f) {   // add or replace
-          if (!uiFields[f.type]) {
+          if (!this.fieldTypes.has(f.type)) {
             if (VERBOSE) console.warn(`"${f.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
             continue;
           }
@@ -218,17 +263,17 @@ export class SchemaSystem extends AbstractSystem {
         if (existing?.isFallback()) continue;  // never override these
 
         if (p) {   // add or replace
-// Rename icon identifiers to match the rapid spritesheet
-if (p.icon) p.icon = p.icon.replace(/^iD-/, 'rapid-');
+          // Rename icon identifiers to match the rapid spritesheet
+          if (p.icon) p.icon = p.icon.replace(/^iD-/, 'rapid-');
 
-// A few overrides to use better icons than the ones provided by the id-tagging-schema project
-if (presetID === 'address')                         p.icon = 'maki-circle-stroked';
-if (presetID === 'highway/turning_loop')            p.icon = 'maki-circle';
-if (p.icon === 'roentgen-needleleaved_tree')        p.icon = 'temaki-tree_needleleaved';
-if (p.icon === 'roentgen-tree')                     p.icon = 'temaki-tree_broadleaved';
-// fix: FontAwesome v7 no longer has 'fas-vector-square'
-// see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
-if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_framed';
+          // A few overrides to use better icons than the ones provided by the id-tagging-schema project
+          if (presetID === 'address')                         p.icon = 'maki-circle-stroked';
+          if (presetID === 'highway/turning_loop')            p.icon = 'maki-circle';
+          if (p.icon === 'roentgen-needleleaved_tree')        p.icon = 'temaki-tree_needleleaved';
+          if (p.icon === 'roentgen-tree')                     p.icon = 'temaki-tree_broadleaved';
+          // fix: FontAwesome v7 no longer has 'fas-vector-square'
+          // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
+          if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_framed';
 
           const preset = new Preset(context, { id: presetID, ...p });
           if (preset.props.locationSet) {
@@ -246,8 +291,9 @@ if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_fr
     if (src.categories) {
       for (const [categoryID, c] of Object.entries(src.categories)) {
         if (c) {   // add or replace
-// Rename icon identifiers to match the rapid spritesheet
-if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
+          // Rename icon identifiers to match the rapid spritesheet
+          if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
+
           const category = new Category(context, { id: categoryID, ...c });
           if (category.props.locationSet) {
             checkLocationSets.push(category.props);
@@ -275,25 +321,6 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       }
     }
 
-    this.resetCaches();
-
-    // Replace `this.collection` after changing Presets and Categories
-    const all = [...this.presets.values(), ...this.categories.values()];
-    this.collection = new Collection(context, all);
-
-    // Rebuild geometry index
-    this._geometryIndex = { point: {}, vertex: {}, line: {}, area: {}, relation: {} };
-    for (const item of all) {
-      for (const geometry of item.geometries) {
-        const g = this._geometryIndex[geometry];
-        const tags = item.tags || {};
-        for (const [key, val] of Object.entries(tags)) {
-          g[key] = g[key] || {};
-          (g[key][val] = g[key][val] || []).push(item);
-        }
-      }
-    }
-
     if (locations) {
       // Merge Custom Features
       if (src.featureCollection && Array.isArray(src.featureCollection.features)) {
@@ -306,7 +333,7 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
       }
     }
 
-    return this;
+    this._schemaChanged();
   }
 
 
@@ -650,6 +677,66 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
     storage?.setItem('preset_recents', JSON.stringify(this._recentIDs));
   }
 
+
+  /**
+   * _resetCaches
+   * This resets the caches in the Fields, Presets, and Categories.
+   * The caches are used to speed up localization and searching.
+   * This should happen after new schema data is merged in, or whenever the locale changes.
+   */
+  _resetCaches() {
+    this.universal.clear();
+    for (const field of this.fields.values()) {
+      field.resetCache();
+      if (field.props.universal) {
+        this.universal.set(field.id, field);
+      }
+    }
+    for (const preset of this.presets.values()) {
+      preset.resetCache();
+    }
+    for (const category of this.categories.values()) {
+      category.resetCache();
+    }
+  }
+
+
+  /**
+   * _schemaChanged
+   * Called whenever something about the available schemas has changed.
+   * This should happen after new schema data has been merged in.
+   * This will trigger a redraw, and emit a 'schemachange' event.
+   */
+  _schemaChanged() {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+
+    this._resetCaches();
+
+    // Replace `this.collection` after changing Presets and Categories
+    const all = [...this.presets.values(), ...this.categories.values()];
+    this.collection = new Collection(context, all);
+
+    // Rebuild geometry index
+    this._geometryIndex = { point: {}, vertex: {}, line: {}, area: {}, relation: {} };
+    for (const item of all) {
+      for (const geometry of item.geometries) {
+        const g = this._geometryIndex[geometry];
+        const tags = item.tags || {};
+        for (const [key, val] of Object.entries(tags)) {
+          g[key] = g[key] || {};
+          (g[key][val] = g[key][val] || []).push(item);
+        }
+      }
+    }
+
+    osmSetAreaKeys(this.areaKeys());
+    osmSetPointTags(this.pointTags());
+    osmSetVertexTags(this.vertexTags());
+
+    gfx?.immediateRedraw();
+    this.emit('schemachange');
+  }
 }
 
 
@@ -659,4 +746,6 @@ if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
  *  @typedef  {string}  categoryID
  *  @typedef  {string}  presetID
  *  @typedef  {string}  fieldID
+ *  @typedef  {string}  geometryID
+ *  @typedef  {string}  schemaID
  */

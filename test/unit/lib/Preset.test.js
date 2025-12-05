@@ -47,32 +47,6 @@ describe('Preset', () => {
   });
 
 
-//  describe('matchGeometry', () => {
-//    it('returns false if it doesn\'t match', () => {
-//      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['line'] });
-//      assert.isFalse(preset.matchGeometry('point'));
-//    });
-//
-//    it('returns true if it does match', () => {
-//      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['point', 'line'] });
-//      assert.isTrue(preset.matchGeometry('point'));
-//    });
-//  });
-//
-//
-//  describe('matchAllGeometry', () => {
-//    it('returns false if they don\'t all match', () => {
-//      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['line'] });
-//      assert.isFalse(preset.matchAllGeometry(['point', 'line']));
-//    });
-//
-//    it('returns true if they do all match', () => {
-//      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['point', 'line'] });
-//      assert.isTrue(preset.matchAllGeometry(['point', 'line']));
-//    });
-//  });
-
-
   describe('matchScore', () => {
     it('returns -1 if preset does not match tags', () => {
       const preset = new Rapid.Preset(context, { id: 'test', tags: { foo: 'bar' } });

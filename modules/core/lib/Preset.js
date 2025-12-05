@@ -29,6 +29,10 @@ export class Preset {
       throw new Error('Preset missing id property');
     }
 
+    if (props.geometry && (typeof props.geometry === 'string')) {
+      props.geometry = [props.geometry];
+    }
+
     // Preserve properties and assign some defaults
     this.props = globalThis.structuredClone(props);
     this.props.aliases ??= [];
@@ -60,7 +64,7 @@ export class Preset {
     if (this.props.geometry.length) {
       this.geometries = new Set(this.props.geometry);
     } else {
-      this.geometries = new Set(schema.geometries);  // all geometries
+      this.geometries = new Set(schema.geometryTypes);  // all types allowed
     }
 
     this.resetCache();

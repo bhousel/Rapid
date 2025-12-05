@@ -16,6 +16,7 @@ describe('Category', () => {
   beforeAll(() => {
     return schema.initAsync().then(() => {
       const presetData = {
+        schemaID: 'test',
         presets: {
           'highway/residential': {
             tags: { highway: 'residential' },
@@ -62,13 +63,6 @@ describe('Category', () => {
       assert.isArray(category.presets);
       assert.deepEqual(category.presets[0], residential);
     });
-
-//    describe('matchGeometry', () => {
-//      it('matches the type of an entity', () => {
-//        assert.isTrue(category.matchGeometry('line'));
-//        assert.isFalse(category.matchGeometry('point'));
-//      });
-//    });
   });
 
 });

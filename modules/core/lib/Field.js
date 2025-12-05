@@ -27,6 +27,10 @@ export class Field {
       throw new Error('Field missing id property');
     }
 
+    if (props.geometry && (typeof props.geometry === 'string')) {
+      props.geometry = [props.geometry];
+    }
+
     // Preserve properties and assign some defaults
     this.props = globalThis.structuredClone(props);
     this.props.autoSuggestions ??= true;
@@ -52,7 +56,7 @@ export class Field {
     if (this.props.geometry.length) {
       this.geometries = new Set(this.props.geometry);
     } else {
-      this.geometries = new Set(schema.geometries);  // all geometries
+      this.geometries = new Set(schema.geometryTypes);  // all types allowed
     }
 
     // Ensure methods used as callbacks always have `this` bound correctly.
