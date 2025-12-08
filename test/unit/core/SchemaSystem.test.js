@@ -1,15 +1,17 @@
 import { afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import * as sample from './SchemaSystem.sample.js';
 
 
 describe('SchemaSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:   new Rapid.AssetSystem(context),
-    l10n:     new Rapid.LocalizationSystem(context),
-    urlhash:  new Rapid.UrlHashSystem(context)
+    assets:    new Rapid.AssetSystem(context),
+    l10n:      new Rapid.LocalizationSystem(context),
+    locations: new Rapid.LocationSystem(context),
+    urlhash:   new Rapid.UrlHashSystem(context)
   };
 
 
@@ -87,13 +89,18 @@ describe('SchemaSystem', () => {
 
 
   // Test an already-constructed instance of the system..
-  describe('properties, methods', () => {
+  // The tests in here need to run serially, because we rely on being able to
+  // merge multiple preset schemas into the SchemaSystem and then matching against them.
+  describe.serial('properties, methods', () => {
+    const spySchemaChange = mock();
     let _schema, _savedAreaKeys;
 
     beforeAll(() => {
       _schema = new Rapid.SchemaSystem(context);
       context.systems.schema = _schema;
-      return _schema.initAsync().then(() => _schema.startAsync());
+      return _schema.initAsync()
+        .then(() => _schema.startAsync())
+        .then(() => _schema.on('schemachange', spySchemaChange));
     });
 
     beforeEach(() => {
@@ -123,14 +130,14 @@ describe('SchemaSystem', () => {
         ]);
       });
 
-      it('merged', () => {
-        assert.instanceOf(_schema.merged, Set);
+      it('schemas', () => {
+        assert.instanceOf(_schema.schemas, Set);
 
-        const keys = [..._schema.merged];
-        // merged 'id-tagging-schema' preset files at init...
+        const keys = [..._schema.schemas];
+        // merged 'id-tagging-schema' data at init...
         assert.isTrue(keys.some(key => /^id-tagging-schema@/.test(key)));
-        // merged 'rapid' preset data at init...
-        assert.isTrue(keys.some(key => /^rapid@/.test(key)));
+        // merged 'rapid-preset-overrides' data at init...
+        assert.isTrue(keys.some(key => /^rapid-preset-overrides@/.test(key)));
       });
 
       it('presets', () => {
@@ -225,60 +232,293 @@ describe('SchemaSystem', () => {
         assert.isTrue(result.isFallback());
       });
     });
-  });
 
 
-  describe('merge', () => {
-    let _schema, _savedAreaKeys;
+    describe('merge', () => {
+      it('throws if schemaID is missing', () => {
+        const schemaData = {};
+        assert.throws(() => _schema.merge(schemaData), /missing schemaID/i);
+      });
 
-    beforeAll(() => {
-      _schema = new Rapid.SchemaSystem(context);
-      context.systems.schema = _schema;
-      return _schema.initAsync().then(() => _schema.startAsync());
-    });
+      it('throws if schemaID has already been merged', () => {
+        const schemaData = { schemaID: 'test1' };
+        assert.doesNotHaveAnyKeys(_schema.schemas, ['test1']);
+        assert.doesNotThrow(() => _schema.merge(schemaData));
+        assert.containsAllKeys(_schema.schemas, ['test1']);
+        assert.throws(() => _schema.merge(schemaData), /already merged/i);
+      });
 
-    it('throws if schemaID is missing', () => {
-      const schemaData = {};
-      assert.throws(() => _schema.merge(schemaData), /missing schemaID/i);
-    });
+      describe('adding', () => {
+        beforeAll(() => {
+          spySchemaChange.mockClear();  // reset call count
+          _schema.merge(sample.addSurfData);
+        });
 
-    it('throws if schema has already been merged', () => {
-      const schemaData = { schemaID: 'test1' };
-      assert.doesNotHaveAnyKeys(_schema.merged, ['test1']);
-      assert.doesNotThrow(() => _schema.merge(schemaData));
-      assert.containsAllKeys(_schema.merged, ['test1']);
-      assert.throws(() => _schema.merge(schemaData), /already merged/i);
-    });
+        it('emits schemachange after merging', () => {
+          assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
+        });
+
+        it('adds the merged schemaID to the schemas Set', () => {
+          assert.containsAllKeys(_schema.schemas, ['add-surf-data']);
+        });
+
+        describe('fields', () => {
+          it('adds a new field', () => {
+            const surfField = _schema.fields.get('surf/type');
+            assert.instanceOf(surfField, Rapid.Field);
+            assert.deepInclude(surfField.props, {
+              schemaID: 'add-surf-data',
+              id: 'surf/type',
+              label: 'Surf Type',
+              key: 'surf:type',
+              type: 'combo'
+            });
+          });
+
+          it('ignores unrecognized field types', () => {
+            assert.isUndefined(_schema.fields.get('weather'));
+          });
+        });
+
+        describe('presets', () => {
+          it('adds a new preset', () => {
+            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            assert.instanceOf(surfPreset, Rapid.Preset);
+            assert.deepInclude(surfPreset.props, {
+              schemaID: 'add-surf-data',
+              id: 'amenity/shop/surf',
+              name: 'Surf Shop'
+            });
+          });
+
+          it('rewrites icon names from iD- to rapid-', () => {
+            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            assert.deepEqual(surfPreset.props.icon, 'rapid-surfing');
+          });
+
+          it('references merged fields', () => {
+            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            const fields = surfPreset.fields();
+            assert.deepEqual(fields, [ _schema.fields.get('name'), _schema.fields.get('surf/type') ]);
+          });
+
+          it('references merged morefields', () => {
+            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            const fields = surfPreset.moreFields();
+            assert.deepEqual(fields, [ _schema.fields.get('board/type') ]);
+          });
+        });
+
+        describe('categories', () => {
+          it('adds a new category', () => {
+            const surfCategory = _schema.categories.get('category-surfing');
+            assert.instanceOf(surfCategory, Rapid.Category);
+            assert.deepInclude(surfCategory.props, {
+              schemaID: 'add-surf-data',
+              id: 'category-surfing',
+              name: 'Surf Features'
+            });
+          });
+
+          it('rewrites icon names from iD- to rapid-', () => {
+            const surfCategory = _schema.categories.get('category-surfing');
+            assert.deepEqual(surfCategory.props.icon, 'rapid-surfing');
+          });
+
+          it('references merged presets, ignores unknown presets', () => {
+            const surfCategory = _schema.categories.get('category-surfing');
+            const presets = surfCategory.presets;
+            assert.deepEqual(presets, [ _schema.presets.get('amenity/shop/surf') ]);
+          });
+        });
+
+        describe('defaults', () => {
+          it('adds itemIDs to the specified Sets', () => {
+            const expected = ['amenity/shop/surf', 'club/surf'];
+            assert.containsAllKeys(_schema.defaults.get('point'), expected);
+            assert.containsAllKeys(_schema.defaults.get('area'), expected);
+          });
+          it('ignores invalid geometry types', () => {
+            assert.isUndefined(_schema.defaults.get('dummy'));
+          });
+        });
+
+        describe('locations', () => {
+          it('adds custom locations in FeatureCollection', () => {
+            const loco = context.systems.locations._loco;
+            assert.isOk(loco._cache.get('surf-city-nj.geojson'));  // added to LocationConflation cache
+          });
+
+          it('resolved custom locations on fields', () => {
+            const surfField = _schema.fields.get('surf/type');
+            assert.deepEqual(surfField.props.locationSetID, '+[surf-city-nj.geojson]');
+          });
+
+          it('resolved custom locations on presets', () => {
+            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            assert.deepEqual(surfPreset.props.locationSetID, '+[surf-city-nj.geojson]');
+          });
+
+          it('resolved custom locations on fields', () => {
+            const surfCategory = _schema.categories.get('category-surfing');
+            assert.deepEqual(surfCategory.props.locationSetID, '+[surf-city-nj.geojson]');
+          });
+        });
+      });
 
 
-    it('builds presets from provided', () => {
-      const surfShop = new Rapid.OsmNode(context, { tags: { amenity: 'shop', 'shop:type': 'surf' } });
-      const schema = new Rapid.SchemaSystem(context);
-      const schemaData = {
-        schemaID: Bun.randomUUIDv7(),
-        presets: {
-          'amenity/shop/surf': {
-            tags: { amenity: 'shop', 'shop:type': 'surf' },
-            geometry: ['point', 'area']
-          }
-        }
-      };
+      describe('updating', () => {
+        beforeAll(() => {
+          spySchemaChange.mockClear();  // reset call count
+          _schema.merge(sample.updateSurfData);
+        });
 
-      return schema.initAsync().then(() => {
-        let matched = schema.match(surfShop, new Rapid.Graph(context, [surfShop]));
-        assert.strictEqual(matched.id, 'point');   // no surfshop preset yet, matches fallback point
+        it('emits schemachange after merging', () => {
+          assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
+        });
 
-        schema.merge(schemaData);
+        it('adds the merged schemaID to the schemas Set', () => {
+          assert.containsAllKeys(_schema.schemas, ['add-surf-data', 'update-surf-data']);
+        });
 
-        // todo: need to touch the entity now, due to change in how transients work.
-        // may need to rethink how this works.
-        surfShop.touch();
-        matched = schema.match(surfShop, new Rapid.Graph(context, [surfShop]));
-        assert.strictEqual(matched.id, 'amenity/shop/surf');
+        describe('fields', () => {
+          it('updates an existing field', () => {
+            const surfField = _schema.fields.get('surf/type');
+            assert.instanceOf(surfField, Rapid.Field);
+            assert.deepInclude(surfField.props, {
+              schemaID: 'update-surf-data',  // new schemaID
+              id: 'surf/type',
+              label: 'Surfing Type',  // new name
+              key: 'surf:type',
+              type: 'combo'
+            });
+          });
+        });
+
+        describe('presets', () => {
+          it('updates an existing preset', () => {
+            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            assert.instanceOf(surfPreset, Rapid.Preset);
+            assert.deepInclude(surfPreset.props, {
+              schemaID: 'update-surf-data',  // new schemaID
+              id: 'amenity/shop/surf',
+              name: 'Surfing Shop'   // new name
+            });
+          });
+        });
+
+        describe('categories', () => {
+          it('updates an existing category', () => {
+            const surfCategory = _schema.categories.get('category-surfing');
+            assert.instanceOf(surfCategory, Rapid.Category);
+            assert.deepInclude(surfCategory.props, {
+              schemaID: 'update-surf-data',   // new schemaID
+              id: 'category-surfing',
+              name: 'Surfing Features'  // new name
+            });
+          });
+
+          it('references merged presets, ignores unknown presets', () => {
+            const surfCategory = _schema.categories.get('category-surfing');
+            const presets = surfCategory.presets;
+            assert.deepEqual(presets, [
+              _schema.presets.get('amenity/shop/surf'),
+              _schema.presets.get('club/surf')   // newly added
+            ]);
+          });
+        });
+
+        describe('locations', () => {
+          it('adds custom locations in FeatureCollection', () => {
+            const loco = context.systems.locations._loco;
+            assert.isOk(loco._cache.get('surf-city-nc.geojson'));  // added to LocationConflation cache
+          });
+
+          it('resolved custom locations on fields', () => {
+            const surfField = _schema.fields.get('surf/type');
+            assert.deepEqual(surfField.props.locationSetID, '+[surf-city-nc.geojson,surf-city-nj.geojson]');
+          });
+
+          it('resolved custom locations on presets', () => {
+            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            assert.deepEqual(surfPreset.props.locationSetID, '+[surf-city-nc.geojson,surf-city-nj.geojson]');
+          });
+
+          it('resolved custom locations on fields', () => {
+            const surfCategory = _schema.categories.get('category-surfing');
+            assert.deepEqual(surfCategory.props.locationSetID, '+[surf-city-nc.geojson,surf-city-nj.geojson]');
+          });
+        });
+      });
+
+
+      describe('deleting', () => {
+        beforeAll(() => {
+          spySchemaChange.mockClear();  // reset call count
+          _schema.merge(sample.deleteSurfData);
+        });
+
+        it('emits schemachange after merging', () => {
+          assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
+        });
+
+        it('adds the merged schemaID to the schemas Set', () => {
+          assert.containsAllKeys(_schema.schemas, ['add-surf-data', 'update-surf-data', 'delete-surf-data']);
+        });
+
+        describe('fields', () => {
+          it('deletes an existing field', () => {
+            assert.isUndefined(_schema.fields.get('board/type'));
+          });
+        });
+
+        describe('presets', () => {
+          it('deletes an existing preset', () => {
+            assert.isUndefined(_schema.presets.get('club/surf'));
+          });
+        });
+
+        describe('categories', () => {
+          it('deletes an existing category', () => {
+            assert.isUndefined(_schema.categories.get('category-shopping'));
+          });
+        });
+      });
+    });   // merge
+
+
+    describe('item', () => {
+      it('gets a preset by its presetID', () => {
+        const result = _schema.item('amenity/shop/surf');
+        assert.instanceOf(result, Rapid.Preset);
+        assert.deepEqual(result.id, 'amenity/shop/surf');
+      });
+
+      it('gets a category by its categoryID', () => {
+        const result = _schema.item('category-surfing');
+        assert.instanceOf(result, Rapid.Category);
+        assert.deepEqual(result.id, 'category-surfing');
+      });
+
+      it('returns undefined if no presetID or categoryID found', () => {
+        assert.isUndefined(_schema.item('invalid'));
       });
     });
-  });
 
+
+    describe('field', () => {
+      it('gets a field by its fieldID', () => {
+        const result = _schema.field('surf/type');
+        assert.instanceOf(result, Rapid.Field);
+        assert.deepEqual(result.id, 'surf/type');
+      });
+
+      it('returns undefined if no fieldID found', () => {
+        assert.isUndefined(_schema.field('invalid'));
+      });
+    });
+
+  });
 
 
   describe('match', () => {

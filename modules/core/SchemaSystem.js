@@ -39,7 +39,7 @@ const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
  *   `presets`        {Map<presetID, Preset>}       The presets
  *   `fields`         {Map<fieldID,  Field>}        The fields
  *   `universal`      {Map<fieldID,  Field>}        The "universal" fields (fields that can go with any Preset)
- *   `defaults`       {Map<string, Array<string>>}  Default items that are suggested for each geometry
+ *   `defaults`       {Map<string, Set<presetID>>}  Default items that are suggested for each geometry
  *
  * Events available:
  *   `schemachange`    Fires on any change in the available schemas
@@ -69,7 +69,7 @@ export class SchemaSystem extends AbstractSystem {
       'wikidata', 'wikipedia'
     ]);
 
-    this.merged = new Set();
+    this.schemas = new Set();
     this.presets = new Map();
     this.fields = new Map();
     this.categories = new Map();
@@ -79,7 +79,7 @@ export class SchemaSystem extends AbstractSystem {
     // A fallback preset is appended to the list automatically so they dont need to be included here.
     this.defaults = new Map();
     for (const geometry of this.geometryTypes) {
-      this.defaults.set(geometry, []);
+      this.defaults.set(geometry, new Set());
     }
 
     this.collection = null;
@@ -180,7 +180,7 @@ export class SchemaSystem extends AbstractSystem {
 
         // Merge rapid tagging_preset_overrides...
         const rapidTagSchemaVersion = rapidVersion || 'unknown';
-        this.merge({ schemaID: `rapid@${rapidTagSchemaVersion}`, ...vals[4] });
+        this.merge({ schemaID: `rapid-preset-overrides@${rapidTagSchemaVersion}`, ...vals[4] });
 
         osmSetDeprecatedTags(vals[5]);
       });
@@ -226,11 +226,11 @@ export class SchemaSystem extends AbstractSystem {
     if (!schemaID) {
       throw new Error('Schema missing schemaID property');
     }
-    if (this.merged.has(schemaID)) {
+    if (this.schemas.has(schemaID)) {
       throw new Error(`Schema "${schemaID}" already merged`);
     }
 
-    this.merged.add(schemaID);
+    this.schemas.add(schemaID);
 
     const checkLocationSets = [];
     const context = this.context;
@@ -244,7 +244,7 @@ export class SchemaSystem extends AbstractSystem {
             if (VERBOSE) console.warn(`"${f.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
             continue;
           }
-          const field = new Field(context, { id: fieldID, ...f });
+          const field = new Field(context, { id: fieldID, schemaID: schemaID, ...f });
           if (field.props.locationSet) {
             checkLocationSets.push(field.props);
           }
@@ -275,7 +275,7 @@ export class SchemaSystem extends AbstractSystem {
           // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
           if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_framed';
 
-          const preset = new Preset(context, { id: presetID, ...p });
+          const preset = new Preset(context, { id: presetID, schemaID: schemaID, ...p });
           if (preset.props.locationSet) {
             checkLocationSets.push(preset.props);
           }
@@ -294,7 +294,7 @@ export class SchemaSystem extends AbstractSystem {
           // Rename icon identifiers to match the rapid spritesheet
           if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
 
-          const category = new Category(context, { id: categoryID, ...c });
+          const category = new Category(context, { id: categoryID, schemaID: schemaID, ...c });
           if (category.props.locationSet) {
             checkLocationSets.push(category.props);
           }
@@ -309,15 +309,15 @@ export class SchemaSystem extends AbstractSystem {
     // Merge Defaults
     if (src.defaults) {
       for (const [geometry, itemIDs] of Object.entries(src.defaults)) {
-        let vals;
-        if (Array.isArray(itemIDs)) {   // add or replace
-          vals = itemIDs
-            .map(id => this.item(id))
-            .filter(item => item && !item.isFallback());
-        } else {   // remove
-          vals = [];
+        const currIDs = this.defaults.get(geometry);
+        if (!currIDs) continue;   // not a valid geometry type?
+
+        const newIDs = Array.isArray(itemIDs) ? itemIDs : [];
+        for (const newID of newIDs) {
+          if (!newID || this.geometryTypes.has(newID)) continue;  // skip if empty or fallback
+          currIDs.add(newID);
         }
-        this.defaults.set(geometry, vals);
+        this.defaults.set(geometry, currIDs);
       }
     }
 
@@ -603,10 +603,11 @@ export class SchemaSystem extends AbstractSystem {
         }
       }
     } else {
-      const items = this.defaults.get(geometry);
-      for (const item of items) {
-        if (item.geometries.has(geometry)) {
-          results.set(item.id, item);
+      const itemIDs = this.defaults.get(geometry);
+      for (const itemID of itemIDs) {
+        const item = this.item(itemID);
+        if (item?.geometries.has(geometry)) {
+          results.set(itemID, item);
         }
       }
     }
