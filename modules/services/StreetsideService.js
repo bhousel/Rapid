@@ -10,7 +10,7 @@ import { utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker, GeoJSON } from '../data/index.js';
 import { uiIcon } from '../ui/icon.js';
-import { utilFetchResponse } from '../util/index.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 const TILEZOOM = 16.5;
 // By default: request 2 nearby tiles so we can connect sequences.

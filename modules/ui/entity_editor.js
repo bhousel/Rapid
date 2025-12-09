@@ -4,7 +4,7 @@ import deepEqual from 'fast-deep-equal';
 
 import { actionChangeTags, actionSyncCrossingTags } from '../actions/index.js';
 import { uiIcon } from './icon.js';
-import { utilRebind } from '../util/index.js';
+import { utilRebind } from '../util/rebind.js';
 
 import { uiSectionEntityIssues } from './sections/entity_issues.js';
 import { uiSectionFeatureType } from './sections/feature_type.js';

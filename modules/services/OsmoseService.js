@@ -5,7 +5,7 @@ import { marked } from 'marked';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker } from '../data/Marker.js';
-import { utilFetchResponse } from '../util/index.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 
 const TILEZOOM = 14;

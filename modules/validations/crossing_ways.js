@@ -9,9 +9,9 @@ import { OsmNode } from '../data/OsmNode.js';
 import {
   osmFlowingWaterwayTagValues, osmPathHighwayTagValues, osmRailwayTrackTagValues,
   osmRoutableAerowayTags, osmRoutableHighwayTagValues
-} from '../data/lib/tags.js';
-import { ValidationIssue } from '../core/lib/ValidationIssue.js';
-import { ValidationFix } from '../core/lib/ValidationFix.js';
+} from '../lib/tags.js';
+import { ValidationIssue } from '../lib/ValidationIssue.js';
+import { ValidationFix } from '../lib/ValidationFix.js';
 
 
 export function validationCrossingWays(context) {

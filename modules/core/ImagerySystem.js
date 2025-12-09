@@ -5,7 +5,7 @@ import { AbstractSystem } from './AbstractSystem.js';
 import {
   ImagerySource, ImagerySourceBing, ImagerySourceCustom,
   ImagerySourceEsri, ImagerySourceEsriWayback, ImagerySourceNone
-} from './lib/ImagerySource.js';
+} from '../lib/ImagerySource.js';
 
 
 /**

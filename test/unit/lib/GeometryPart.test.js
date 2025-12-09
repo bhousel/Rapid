@@ -1,7 +1,7 @@
 import { describe, it } from 'bun:test';
 import { assert } from 'chai';
-import * as Rapid from '../../../../modules/headless.js';
-import * as sample from '../GeoJSON.sample.js';
+import * as Rapid from '../../../modules/headless.js';
+import * as sample from '../data/GeoJSON.sample.js';
 
 
 describe('GeometryPart', () => {

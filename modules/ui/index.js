@@ -1,3 +1,12 @@
+export * from './cards/index.js';
+export * from './controls/index.js';
+export * from './fields/index.js';
+// export * from './intro/index.js';  // no index.js file here
+export * from './panes/index.js';
+export * from './sections/index.js';
+export * from './settings/index.js';
+export * from './tools/index.js';
+
 export { UiAccount } from './UiAccount.js';
 export { UiApiStatus } from './UiApiStatus.js';
 export { UiAttribution } from './UiAttribution.js';

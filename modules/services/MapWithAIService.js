@@ -1,10 +1,10 @@
 import { Tiler } from '@rapid-sdk/math';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { RapidDataset } from '../core/lib/index.js';
-import { Graph, OsmNode, OsmWay, Tree } from '../data/index.js';
+import { Graph, RapidDataset, Tree } from '../lib/index.js';
+import { OsmNode, OsmWay } from '../data/index.js';
 import { OsmXMLParser } from '../data/parsers/OsmXMLParser.js';
-import { utilFetchResponse } from '../util/index.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 
 const APIROOT = 'https://mapwith.ai/maps/ml_roads';

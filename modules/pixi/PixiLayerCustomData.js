@@ -9,7 +9,7 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeatureLine } from './PixiFeatureLine.js';
 import { PixiFeaturePoint } from './PixiFeaturePoint.js';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.js';
-import { utilFetchResponse } from '../util/index.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 const CUSTOM_COLOR = 0x00ffff;
 

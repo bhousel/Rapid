@@ -1,5 +1,5 @@
-import { ValidationIssue } from '../core/lib/ValidationIssue.js';
-import { ValidationFix } from '../core/lib/ValidationFix.js';
+import { ValidationIssue } from '../lib/ValidationIssue.js';
+import { ValidationFix } from '../lib/ValidationFix.js';
 
 
 // This validation determines whether way segments are duplicated atop one another,

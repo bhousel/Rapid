@@ -1,7 +1,7 @@
 import { actionChangeMember } from '../actions/change_member.js';
 import { actionDeleteMember } from '../actions/delete_member.js';
-import { ValidationIssue } from '../core/lib/ValidationIssue.js';
-import { ValidationFix } from '../core/lib/ValidationFix.js';
+import { ValidationIssue } from '../lib/ValidationIssue.js';
+import { ValidationFix } from '../lib/ValidationFix.js';
 
 
 export function validationMissingRole(context) {

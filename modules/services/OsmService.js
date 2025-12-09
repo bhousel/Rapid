@@ -7,7 +7,7 @@ import { AbstractSystem } from '../core/AbstractSystem.js';
 import { JXON } from '../util/jxon.js';
 import { OsmEntity, Marker } from '../data/index.js';
 import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.js';
-import { utilFetchResponse } from '../util/index.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 
 /**

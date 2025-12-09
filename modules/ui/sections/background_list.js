@@ -3,7 +3,7 @@ import { easeCubicInOut } from 'd3-ease';
 import { geoSphericalDistance, numWrap } from '@rapid-sdk/math';
 import debounce from 'lodash-es/debounce.js';
 
-import { ImagerySource } from '../../core/lib/index.js';
+import { ImagerySource } from '../../lib/ImagerySource.js';
 import { uiIcon } from '../icon.js';
 import { uiSettingsCustomBackground } from '../settings/custom_background.js';
 import { uiSection } from '../section.js';

@@ -3,7 +3,7 @@ import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { actionChangePreset } from '../../actions/change_preset.js';
-import { utilRebind } from '../../util/index.js';
+import { utilRebind } from '../../util/rebind.js';
 import { delayAsync, eventCancel, helpHtml, isMostlySquare, transitionTime } from './helper.js';
 
 

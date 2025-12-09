@@ -2,7 +2,7 @@ import { utilQsString } from '@rapid-sdk/util';
 import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { utilFetchResponse } from '../util/index.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 
 /**

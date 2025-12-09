@@ -1,6 +1,6 @@
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { RapidDataset } from '../core/lib/index.js';
-import { utilFetchResponse } from '../util/index.js';
+import { RapidDataset } from '../lib/RapidDataset.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 const PMTILES_ROOT_URL = 'https://overturemaps-tiles-us-west-2-beta.s3.us-west-2.amazonaws.com/';
 const PMTILES_CATALOG_PATH = 'pmtiles_catalog.json';

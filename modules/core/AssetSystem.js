@@ -1,5 +1,5 @@
 import { AbstractSystem } from './AbstractSystem.js';
-import { utilFetchResponse } from '../util/index.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 
 /**

@@ -5,7 +5,7 @@ import { actionDiscardTags } from '../../actions/discard_tags.js';
 import { OsmChangeset } from '../../data/OsmChangeset.js';
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
-import { utilHighlightEntities } from '../../util/index.js';
+import { utilHighlightEntities } from '../../util/util.js';
 
 
 export function uiSectionChanges(context) {

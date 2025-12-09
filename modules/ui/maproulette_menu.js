@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import { vecAdd } from '@rapid-sdk/math';
 
 import { uiIcon } from './icon.js';
-import { utilRebind } from '../util/index.js';
+import { utilRebind } from '../util/rebind.js';
 
 /**
  * uiMapRouletteMenu

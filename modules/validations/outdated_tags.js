@@ -5,11 +5,13 @@ import { actionChangeTags } from '../actions/change_tags.js';
 import { actionUpgradeTags } from '../actions/upgrade_tags.js';
 
 import {
-  Graph, getDeprecatedTags, osmIsOldMultipolygonOuterMember, osmOldMultipolygonOuterMemberOfRelation
-} from '../data/lib/index.js';
-
-import { ValidationIssue } from '../core/lib/ValidationIssue.js';
-import { ValidationFix } from '../core/lib/ValidationFix.js';
+  Graph,
+  getDeprecatedTags,
+  osmIsOldMultipolygonOuterMember,
+  osmOldMultipolygonOuterMemberOfRelation,
+  ValidationIssue,
+  ValidationFix
+} from '../lib/index.js';
 
 
 const pathVals = new Set([

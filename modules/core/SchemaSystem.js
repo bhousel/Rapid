@@ -1,8 +1,8 @@
 import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../data/lib/tags.js';
-import { Category, Collection, Field, Preset } from './lib/index.js';
+import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.js';
+import { Category, Collection, Field, Preset } from '../lib/index.js';
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.

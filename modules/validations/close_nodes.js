@@ -1,9 +1,9 @@
 import { Extent, geoMetersToLat, geoMetersToLon, geoSphericalDistance } from '@rapid-sdk/math';
 
 import { actionMergeNodes } from '../actions/merge_nodes.js';
-import { ValidationIssue } from '../core/lib/ValidationIssue.js';
-import { ValidationFix } from '../core/lib/ValidationFix.js';
-import { osmPathHighwayTagValues } from '../data/lib/tags.js';
+import { osmPathHighwayTagValues } from '../lib/tags.js';
+import { ValidationIssue } from '../lib/ValidationIssue.js';
+import { ValidationFix } from '../lib/ValidationFix.js';
 
 
 export function validationCloseNodes(context) {

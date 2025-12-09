@@ -1,5 +1,3 @@
-export * from './lib/index.js';
-
 import { AbstractSystem } from './AbstractSystem.js';
 import { AssetSystem } from './AssetSystem.js';
 import { EditSystem } from './EditSystem.js';

@@ -1,6 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
 
-import { GeometryPart } from '../data/lib/GeometryPart.js';
+import { GeometryPart } from '../lib/GeometryPart.js';
 
 
 /**

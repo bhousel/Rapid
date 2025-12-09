@@ -2,8 +2,8 @@ import { geoArea as d3_geoArea, geoMercatorRaw as d3_geoMercatorRaw } from 'd3-g
 import { utilAesDecrypt, utilQsString, utilStringQs } from '@rapid-sdk/util';
 import { geoSphericalDistance } from '@rapid-sdk/math';
 
-import { utilDateString } from '../../util/date.js';
-import { utilFetchResponse } from '../../util/fetch_response.js';
+import { utilDateString } from '../util/date.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 
 /**

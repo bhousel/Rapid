@@ -10,7 +10,7 @@ import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
 import { uiSection } from '../section.js';
 import { uiTooltip } from '../tooltip.js';
-import { utilNoAuto, utilIsColorValid, utilHighlightEntities } from '../../util/index.js';
+import { utilNoAuto, utilIsColorValid, utilHighlightEntities } from '../../util/util.js';
 
 const MAX_MEMBERSHIPS = 1000;
 

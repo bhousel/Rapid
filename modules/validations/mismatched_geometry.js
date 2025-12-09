@@ -6,11 +6,11 @@ import { actionAddVertex } from '../actions/add_vertex.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionMergeNodes } from '../actions/merge_nodes.js';
 import { actionExtract } from '../actions/extract.js';
-import { osmJoinWays } from '../data/lib/multipolygon.js';
-import { osmNodeGeometriesForTags, osmTagSuggestingArea } from '../data/lib/tags.js';
-import { geoHasSelfIntersections } from '../geo/index.js';
-import { ValidationIssue } from '../core/lib/ValidationIssue.js';
-import { ValidationFix } from '../core/lib/ValidationFix.js';
+import { osmJoinWays } from '../lib/multipolygon.js';
+import { osmNodeGeometriesForTags, osmTagSuggestingArea } from '../lib/tags.js';
+import { geoHasSelfIntersections } from '../geo/geom.js';
+import { ValidationIssue } from '../lib/ValidationIssue.js';
+import { ValidationFix } from '../lib/ValidationFix.js';
 
 
 export function validationMismatchedGeometry(context) {

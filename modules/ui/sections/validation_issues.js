@@ -4,7 +4,7 @@ import { geoSphericalDistance } from '@rapid-sdk/math';
 
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
-import { utilHighlightEntities } from '../../util/index.js';
+import { utilHighlightEntities } from '../../util/util.js';
 
 const MAX_ISSUES = 1000;
 

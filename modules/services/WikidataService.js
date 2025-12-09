@@ -1,7 +1,7 @@
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { utilFetchResponse } from '../util/index.js';
+import { utilFetchResponse } from '../util/fetch_response.js';
 
 const WIKIDATA_API = 'https://www.wikidata.org/w/api.php?';
 

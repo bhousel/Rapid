@@ -6,10 +6,10 @@ import {
 import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionMergeNodes } from '../actions/merge_nodes.js';
-import { geoHasSelfIntersections } from '../geo/index.js';
-import { osmRoutableHighwayTagValues } from '../data/lib/tags.js';
-import { ValidationIssue } from '../core/lib/ValidationIssue.js';
-import { ValidationFix } from '../core/lib/ValidationFix.js';
+import { geoHasSelfIntersections } from '../geo/geom.js';
+import { osmRoutableHighwayTagValues } from '../lib/tags.js';
+import { ValidationIssue } from '../lib/ValidationIssue.js';
+import { ValidationFix } from '../lib/ValidationFix.js';
 
 
 /**
