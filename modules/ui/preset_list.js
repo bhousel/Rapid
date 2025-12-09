@@ -24,7 +24,7 @@ export function uiPresetList(context) {
   let _currLoc = null;
   let _allGeometries = [];
   let _presetCollection = null;
-  let _defaultCollection = null;
+  let _defaults = [];
   let _selectedPresetIDs = new Set();
   let _autofocus = false;
   let _list = d3_select(null);
@@ -114,7 +114,7 @@ export function uiPresetList(context) {
     // update
     _list = $listWrap.merge($$listWrap)
       .selectAll('.preset-list-main')
-      .call(drawList, _defaultCollection.array);
+      .call(drawList, _defaults);
 
     // rebind event listener
     filters.off('filterchange', _checkFilteringRules);
@@ -181,7 +181,7 @@ export function uiPresetList(context) {
         items = _presetCollection.search(val, geometry, _currLoc).array;
         messageText = l10n.t('inspector.results', { n: items.length, search: val });
       } else {
-        items = _defaultCollection.array;
+        items = _defaults;
         messageText = l10n.t('inspector.choose');
       }
 
@@ -578,7 +578,7 @@ export function uiPresetList(context) {
     _currLoc = null;
     _allGeometries = [];
     _presetCollection = null;
-    _defaultCollection = null;
+    _defaults = [];
     _selectedPresetIDs = new Set();
     _input.property('value', '');
     _list.selectAll('.preset-list-item').remove();
@@ -601,7 +601,7 @@ export function uiPresetList(context) {
         items.push(item);
       }
       _presetCollection = new Collection(context, items);
-      _defaultCollection = schema.getDefaults(_allGeometries[0], 36, !context.inIntro, _currLoc);
+      _defaults = schema.getDefaults(_allGeometries[0], !context.inIntro, _currLoc).slice(0, 35);
 
       // match presets
       for (const entityID of _entityIDs) {

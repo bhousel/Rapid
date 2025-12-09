@@ -18,17 +18,6 @@ export class Collection {
   constructor(context, arr) {
     this.context = context;
     this.array = arr;
-    this._memo = new Map();  // Map<id, item>
-  }
-
-
-  item(id) {
-    let found = this._memo.get(id);
-    if (found) return found;
-
-    found = this.array.find(d => d.id === id);
-    if (found) this._memo.set(id, found);
-    return found;
   }
 
 
@@ -59,12 +48,12 @@ export class Collection {
         let aCompare = a[nameProp]();
         let bCompare = b[nameProp]();
 
-        // priority if search string matches preset name exactly - #4325
+        // priority if search string matches preset name exactly - iD#4325
         if (value === aCompare) return -1;
         if (value === bCompare) return 1;
 
         // priority for higher matchScore
-        let i = b.orig.matchScore - a.orig.matchScore;
+        let i = b.props.matchScore - a.props.matchScore;
         if (i !== 0) return i;
 
         // priority if search string appears earlier in preset name

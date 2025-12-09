@@ -79,15 +79,6 @@ describe('Collection', () => {
     });
   });
 
-
-  describe('item', () => {
-    it('fetches a preset by id', () => {
-      const bbq = schema.item('amenity/bbq');
-      assert.strictEqual(_collection.item('amenity/bbq'), bbq);
-    });
-  });
-
-
   describe.skip('search', () => {
 //// TODO fix - these are all messed up
     it('matches leading name', () => {

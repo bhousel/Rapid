@@ -575,12 +575,11 @@ export class SchemaSystem extends AbstractSystem {
    * Each geometry type has its own set of defaults.
    * The fallback preset for the given geometry is appended to the list automatically.
    * @param   {string}          geometry
-   * @param   {number}          limit - max number of results to return
    * @param   {boolean}         includeRecents - `true` to start with recently used presets
    * @param   {Array<number>}   loc - WGS84 [lon,lat] where we are editing
-   * @return  {Collection}      Collection
+   * @return  {Array<Category|Preset>}  Array of Categories and Presets
    */
-  getDefaults(geometry, limit = 10, includeRecents = true, loc = null) {
+  getDefaults(geometry, includeRecents = true, loc = null) {
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -628,7 +627,7 @@ export class SchemaSystem extends AbstractSystem {
       });
     }
 
-    return new Collection(context, arr.slice(0, limit - 1));
+    return arr;
   }
 
 
