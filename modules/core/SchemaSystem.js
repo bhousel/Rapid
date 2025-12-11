@@ -1,4 +1,5 @@
-import { utilArrayUniq, utilEditDistance } from '@rapid-sdk/util';
+import { utilArrayUniq } from '@rapid-sdk/util';
+import leven from 'leven';
 
 import { AbstractSystem } from './AbstractSystem.js';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.js';
@@ -421,13 +422,14 @@ export class SchemaSystem extends AbstractSystem {
         .sort(_sortItems('searchNameStripped'));
     });
 
-    _gather(function leadingTerms() {
-      return generics
+    // Note that name-suggestion-index includes alternate names in the 'terms' array.
+    _gather(function leadingSuggestionTerms() {
+      return suggestions
         .filter(a => (a.terms() || []).some(_leading));
     });
 
-    _gather(function leadingSuggestionTerms() {
-      return suggestions
+    _gather(function leadingTerms() {
+      return generics
         .filter(a => (a.terms() || []).some(_leading));
     });
 
@@ -438,16 +440,16 @@ export class SchemaSystem extends AbstractSystem {
 
     _gather(function similarName() {
       return generics
-        .map(a => ({ preset: a, dist: utilEditDistance(q, a.searchName()) }))
-        .filter(a => a.dist + Math.min(q.length - a.preset.searchName().length, 0) < 3)
+        .map(a => ({ preset: a, dist: leven(q, a.searchName(), { maxDistance: 4 }) }))
+        .filter(a => a.dist < 4)
         .sort((a, b) => a.dist - b.dist)
         .map(a => a.preset);
     });
 
-    _gather(function similarName() {
+    _gather(function similarSuggestionName() {
       return suggestions
-        .map(a => ({ preset: a, dist: utilEditDistance(q, a.searchName()) }))
-        .filter(a => a.dist + Math.min(q.length - a.preset.searchName().length, 0) < 1)
+        .map(a => ({ preset: a, dist: leven(q, a.searchName(), { maxDistance: 2 }) }))
+        .filter(a => a.dist < 2)
         .sort((a, b) => a.dist - b.dist)
         .map(a => a.preset);
       });
@@ -456,7 +458,7 @@ export class SchemaSystem extends AbstractSystem {
       return generics
         .filter(a => {
           return (a.terms() || []).some(b => {
-            return utilEditDistance(q, b) + Math.min(q.length - b.length, 0) < 3;
+            return leven(q, b, { maxDistance: 4 }) + Math.min(q.length - b.length, 0) < 4;
           });
         });
     });
