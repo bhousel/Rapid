@@ -148,3 +148,40 @@ export const deleteSurfData = {
     'category-shopping': null
   }
 };
+
+
+export const searchData = {
+  schemaID: 'search-data',
+  presets: {
+    'amenity/bbq': {
+      name: 'Grill', tags: { amenity: 'bbq' }, geometry: ['point'], terms: []
+    },
+    'amenity/grit_bin': {
+      name: 'Sandpit', tags: { amenity: 'grit_bin' }, geometry: ['point'], terms: []
+    },
+    'highway/residential': {
+      name: 'Residential Area', tags: { highway: 'residential' }, geometry: ['point', 'area'], terms: []
+    },
+    'landuse/grass1': {
+      name: 'Grass', tags: { landuse: 'grass' }, geometry: ['point', 'area'], terms: []
+    },
+    'landuse/grass2': {
+      name: 'Ğṝȁß', tags: { landuse: 'ğṝȁß' }, geometry: ['point', 'area'], terms: []
+    },
+    'leisure/park': {
+      name: 'Park', tags: { leisure: 'park' }, geometry: ['point', 'area'], terms: [ 'grass' ], matchScore: 0.5
+    },
+    'amenity/parking': {
+      name: 'Parking', tags: { amenity: 'parking' }, geometry: ['point', 'area'], terms: [ 'cars' ]
+    },
+    'leisure/pitch/soccer': {
+      name: 'Soccer Field', tags: { leisure: 'pitch', sport: 'soccer' }, geometry: ['point', 'area'], terms: ['fußball']
+    },
+    'leisure/pitch/american_football': {
+      name: 'Football Field', tags: { leisure: 'pitch', sport: 'american_football' }, geometry: ['point', 'area'], terms: ['gridiron']
+    },
+    'amenity/excluded': {
+      name: 'Excluded', tags: { amenity: 'excluded' }, geometry: ['point'], terms: [], searchable: false
+    }
+  }
+};

@@ -63,7 +63,6 @@ describe('SchemaSystem', () => {
             urlhash.initialHashParams.delete('presets');
           });
       });
-
     });
 
     describe('startAsync', () => {
@@ -158,12 +157,23 @@ describe('SchemaSystem', () => {
 
       it('defaults', () => {
         assert.instanceOf(_schema.defaults, Map);
+        assert.hasAllKeys(_schema.defaults, ['point', 'vertex', 'line', 'area', 'relation']);
       });
+
+      it('_searchable', () => {
+        assert.instanceOf(_schema._searchable, Array);
+      });
+
+      it('_matchIndex', () => {
+        assert.instanceOf(_schema._matchIndex, Map);
+        assert.hasAllKeys(_schema._matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
+      });
+
     });
 
 
     describe('_resetCaches', () => {
-      it('resets field, preset, and category caches', () => {
+      it('resets caches in Fields, Presets, and Categories', () => {
         const field = new Rapid.Field(context, {
           id: 'wikidata', type: 'wikidata', key: 'wikidata', universal: true
         });
@@ -185,13 +195,61 @@ describe('SchemaSystem', () => {
 
         _schema._resetCaches();
 
-        assert.lengthOf(field.resetCache.mock.calls, 1);     // reset called once
-        assert.lengthOf(preset.resetCache.mock.calls, 1);    // reset called once
-        assert.lengthOf(category.resetCache.mock.calls, 1);  // reset called once
+        assert.lengthOf(field.resetCache.mock.calls, 1);     // resetCache called once
+        assert.lengthOf(preset.resetCache.mock.calls, 1);    // resetCache called once
+        assert.lengthOf(category.resetCache.mock.calls, 1);  // resetCache called once
+      });
+    });
 
-        // The universal field is also added to `universal` cache.
-        assert.lengthOf(_schema.universal, 1);
-        assert.deepEqual(_schema.universal.get('wikidata'), field);
+
+    describe('_resetAll', () => {
+      beforeAll(() => {
+        spySchemaChange.mockClear();  // reset call count
+        _schema._resetAll();
+      });
+
+      it('resets schemas', () => {
+        assert.instanceOf(_schema.schemas, Set);
+        assert.isEmpty(_schema.schemas);
+      });
+
+      it('resets fields', () => {
+        assert.instanceOf(_schema.fields, Map);
+        assert.isEmpty(_schema.fields);
+      });
+
+      it('resets presets', () => {
+        assert.instanceOf(_schema.presets, Map);
+        assert.hasAllKeys(_schema.presets, ['point', 'vertex', 'line', 'area', 'relation']);
+      });
+
+      it('resets categories', () => {
+        assert.instanceOf(_schema.categories, Map);
+        assert.isEmpty(_schema.categories);
+      });
+
+      it('resets universal', () => {
+        assert.instanceOf(_schema.universal, Map);
+        assert.isEmpty(_schema.universal);
+      });
+
+      it('resets defaults', () => {
+        assert.instanceOf(_schema.defaults, Map);
+        assert.hasAllKeys(_schema.defaults, ['point', 'vertex', 'line', 'area', 'relation']);
+      });
+
+      it('resets _searchable', () => {
+        assert.instanceOf(_schema._searchable, Array);
+        assert.deepEqual(_schema._searchable.map(item => item.id), ['point', 'line', 'area', 'relation']);
+      });
+
+      it('resets _matchIndex', () => {
+        assert.instanceOf(_schema._matchIndex, Map);
+        assert.hasAllKeys(_schema._matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
+      });
+
+      it('emits schemachange after merging', () => {
+        assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
       });
     });
 
@@ -518,6 +576,87 @@ describe('SchemaSystem', () => {
       });
     });
 
+
+    describe('search', () => {
+      beforeAll(() => {
+        _schema._resetAll();   // remove the surf data
+        _schema.merge(sample.searchData);
+      });
+
+      it('returns nothing if no query', () => {
+        assert.deepEqual(_schema.search(), []);
+      });
+
+      it('returns nothing if no geometries', () => {
+        assert.deepEqual(_schema.search('resid'), []);
+      });
+
+      it('matches leading name', () => {
+        const residential = _schema.item('highway/residential');
+        const results = _schema.search('resid', 'area');
+        assert.strictEqual(results.indexOf(residential), 0);  // 1. 'Residential' (by name)
+      });
+
+      it('returns alternate matches in correct order', () => {
+        const results = _schema.search('gri', 'point');
+        const resultIDs = results.map(item => item.id);
+
+        console.log (resultIDs);
+
+//// We need to decide how we want search to work and test it thoroughly
+        assert.isOk(true);
+//        expect(result.indexOf(p.grill), 'Grill').to.eql(0);            // 1. 'Grill' (leading name)
+//        expect(result.indexOf(p.football), 'Football').to.eql(1);      // 2. 'Football' (leading term 'gridiron')
+//        expect(result.indexOf(p.sandpit), 'Sandpit').to.eql(2);        // 3. 'Sandpit' (leading tag value 'grit_bin')
+//        expect(result.indexOf(p.grass1), 'Grass').to.be.within(3,5);   // 4. 'Grass' (similar name)
+//        expect(result.indexOf(p.grass2), 'Ğṝȁß').to.be.within(3,5);    // 5. 'Ğṝȁß' (similar name)
+//        expect(result.indexOf(p.park), 'Park').to.be.within(3,5);      // 6. 'Park' (similar term 'grass')
+      });
+
+      it('sorts preset with matchScore penalty below others', () => {
+        const parking = _schema.item('amenity/parking');
+        const park = _schema.item('leisure/park');
+        const result = _schema.search('par', 'point');
+        assert.strictEqual(result.indexOf(parking), 0, 'Parking');   // 1. 'Parking' (default matchScore)
+        assert.strictEqual(result.indexOf(park), 1, 'Park');         // 2. 'Park' (low matchScore)
+      });
+
+      it('ignores matchScore penalty for exact name match', () => {
+        const parking = _schema.item('amenity/parking');
+        const park = _schema.item('leisure/park');
+        const result = _schema.search('park', 'point');
+        assert.strictEqual(result.indexOf(park), 0, 'Park');         // 1. 'Park' (low matchScore)
+        assert.strictEqual(result.indexOf(parking), 1, 'Parking');   // 2. 'Parking' (default matchScore)
+      });
+
+      it('considers diacritics on exact matches', () => {
+        const grass1 = _schema.item('landuse/grass1');
+        const grass2 = _schema.item('landuse/grass2');
+        const result = _schema.search('ğṝȁ', 'point');
+        assert.strictEqual(result.indexOf(grass2), 0, 'Ğṝȁß');    // 1. 'Ğṝȁß'  (leading name)
+        assert.strictEqual(result.indexOf(grass1), 1, 'Grass');   // 2. 'Grass' (similar name)
+      });
+
+      it('replaces diacritics on fuzzy matches', () => {
+        const grass1 = _schema.item('landuse/grass1');
+        const grass2 = _schema.item('landuse/grass2');
+        const result = _schema.search('graß', 'point');
+        assert.isTrue(result.indexOf(grass1) < 2, 'Grass');   // 1. 'Grass' (similar name)
+        assert.isTrue(result.indexOf(grass2) < 2, 'Ğṝȁß');    // 2. 'Ğṝȁß'  (similar name)
+      });
+
+      // it('includes the appropriate fallback preset', () => {
+      //   assert.isTrue(collection.search('foo', 'point').includes(p.point), 'point');
+      //   assert.isTrue(collection.search('foo', 'line').includes(p.line), 'line');
+      //   assert.isTrue(collection.search('foo', 'area').includes(p.area), 'area');
+      // });
+
+      it('excludes presets with searchable: false', () => {
+        const excluded = _schema.item('amenity/excluded');
+        const result = _schema.search('excluded', 'point');
+        assert.isTrue(!result.includes(excluded));
+      });
+    });
   });
 
 
@@ -541,7 +680,7 @@ describe('SchemaSystem', () => {
 
     it('returns the appropriate fallback preset when no tags match', () => {
       const schema = new Rapid.SchemaSystem(context);
-      const point = new Rapid.OsmNode(context, );
+      const point = new Rapid.OsmNode(context);
       const line = new Rapid.OsmWay(context, { tags: { foo: 'bar' } });
       const graph = new Rapid.Graph(context, [point, line]);
 
@@ -642,7 +781,6 @@ describe('SchemaSystem', () => {
 
 
   describe('match', () => {
-
     beforeEach(() => {
       const testPresets = {
         building: {

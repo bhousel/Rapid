@@ -1,5 +1,4 @@
 export * from './Category.js';
-export * from './Collection.js';
 export * from './Difference.js';
 export * from './Edit.js';
 export * from './Field.js';

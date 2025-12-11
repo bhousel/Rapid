@@ -33,6 +33,7 @@ export class Category {
     this.props.name ??= '';
     this.props.matchScore = -1;
     this.props.members ??= [];  // "members" here are presetIDs
+    this.props.searchable ??= true;
 
     this.id = props.id;                       // For consistency, offer a `this.id` property.
     this.safeid = utilSafeString(props.id);   // For use in classes, element ids, css selectors

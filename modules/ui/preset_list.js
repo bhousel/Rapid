@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import debounce from 'lodash-es/debounce.js';
 
 import { actionChangePreset } from '../actions/change_preset.js';
-import { Category, Collection, Preset } from '../lib/index.js';
+import { Category, Preset } from '../lib/index.js';
 import { operationDelete } from '../operations/delete.js';
 import { uiIcon } from './icon.js';
 import { uiPresetIcon } from './preset_icon.js';
@@ -23,7 +23,6 @@ export function uiPresetList(context) {
   let _entityIDs = [];
   let _currLoc = null;
   let _allGeometries = [];
-  let _presetCollection = null;
   let _defaults = [];
   let _selectedPresetIDs = new Set();
   let _autofocus = false;
@@ -171,15 +170,13 @@ export function uiPresetList(context) {
     }
 
     function inputevent() {
-      const val = _input.property('value');
-      _list.classed('filtered', val.length);
-
-      const geometry = _allGeometries[0];
+      const q = _input.property('value');
+      _list.classed('filtered', q.length);
 
       let items, messageText;
-      if (val.length) {
-        items = _presetCollection.search(val, geometry, _currLoc).array;
-        messageText = l10n.t('inspector.results', { n: items.length, search: val });
+      if (q.length) {
+        items = schema.search(q, _allGeometries, _currLoc);
+        messageText = l10n.t('inspector.results', { n: items.length, search: q });
       } else {
         items = _defaults;
         messageText = l10n.t('inspector.choose');
@@ -195,7 +192,7 @@ export function uiPresetList(context) {
 
   /**
    * drawList
-   * Draws a collection of Presets/Categories.
+   * Draws the list of Presets/Categories.
    * The category items themselves may also contain sublists.
    * @param  {d3-selection}  $selection  - parent selection to render list items into (in this case, a `div.preset-list`)
    * @param  {Array<Preset|Category>}  arr - Categories and Presets to include in the list
@@ -577,7 +574,6 @@ export function uiPresetList(context) {
     _entityIDs = val ?? [];
     _currLoc = null;
     _allGeometries = [];
-    _presetCollection = null;
     _defaults = [];
     _selectedPresetIDs = new Set();
     _input.property('value', '');
@@ -591,16 +587,6 @@ export function uiPresetList(context) {
 
       // All geometries in the selection
       _allGeometries = _gatherGeometries();
-
-      // All Presets or Categories that match the geometries
-      // (we should try to avoid making these Collections and instead make the SchemaSystem able to search)
-      const items = [];
-      const needed = new Set(_allGeometries);
-      for (const item of schema.collection.array) {
-        if (!needed.isSubsetOf(item.geometries)) continue;  // skip items that don't support all geometries needed
-        items.push(item);
-      }
-      _presetCollection = new Collection(context, items);
       _defaults = schema.getDefaults(_allGeometries[0], !context.inIntro, _currLoc).slice(0, 35);
 
       // match presets
