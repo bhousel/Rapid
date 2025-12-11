@@ -1,5 +1,7 @@
 import { utilSafeString } from '@rapid-sdk/util';
 
+import { utilNormalizeString } from '../util/string.js';
+
 
 /**
  * Category
@@ -63,7 +65,7 @@ export class Category {
     }
 
     this._searchName = null;
-    this._searchNameStripped = null;
+    this._searchNameNormalized = null;
   }
 
 
@@ -78,11 +80,11 @@ export class Category {
   }
 
   /**
-   * nameLabel
+   * nameHtml
    * Returns a localized name HTML, if possible.  Falls back to original name.
    * @return  {string}  Localized name HTML
    */
-  nameLabel() {
+  nameHtml() {
     const l10n = this.context.systems.l10n;
     return l10n?.tHtml(`_tagging.presets.categories.${this.id}.name`, { 'default': this.id }) || this.props.name;
   }
@@ -118,15 +120,15 @@ export class Category {
   }
 
   /**
-   * searchNameStripped
+   * searchNameNormalized
    * The name used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
    * @return  {string}  The name used for searching, but with diacritic marks normalized.
    */
-  searchNameStripped() {
-    if (!this._searchNameStripped) {
-      this._searchNameStripped = this._stripDiacritics(this.searchName());
+  searchNameNormalized() {
+    if (!this._searchNameNormalized) {
+      this._searchNameNormalized = utilNormalizeString(this.searchName());
     }
-    return this._searchNameStripped;
+    return this._searchNameNormalized;
   }
 
   /**
@@ -139,12 +141,12 @@ export class Category {
   }
 
   /**
-   * searchAliasesStripped
+   * searchAliasesNormalized
    * Aliases used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
    * Always returns `[]` for Categories.
    * @return  {Array<string>}  Always returns `[]` for Categories
    */
-  searchAliasesStripped() {
+  searchAliasesNormalized() {
     return [];
   }
 
@@ -155,20 +157,6 @@ export class Category {
    */
   isFallback() {
     return false;
-  }
-
-  /**
-   * _stripDiacritics
-   * Internal function for normalizing strings to remove diacritic marks.
-   * @param   {string}  s - the input string to normalize
-   * @return  {string}  the normalized string
-   */
-  _stripDiacritics(s) {
-    // split combined diacritical characters into their parts
-    if (s.normalize) s = s.normalize('NFD');
-    // remove diacritics
-    s = s.replace(/[\u0300-\u036f]/g, '');
-    return s;
   }
 
 }

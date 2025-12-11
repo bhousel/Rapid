@@ -1,5 +1,6 @@
 import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 
+import { utilNormalizeString } from '../util/string.js';
 import { osmAreaKeys } from './tags.js';
 
 
@@ -78,9 +79,9 @@ export class Preset {
   resetCache() {
     this._resolved = { fields: null, moreFields: null };
     this._searchName = null;
-    this._searchNameStripped = null;
+    this._searchNameNormalized = null;
     this._searchAliases = null;
-    this._searchAliasesStripped = null;
+    this._searchAliasesNormalized = null;
   }
 
 
@@ -94,11 +95,11 @@ export class Preset {
   }
 
   /**
-   * nameLabel
+   * nameHtml
    * Returns a localized name HTML, if possible.  Falls back to original name.
    * @return  {string}  Localized name HTML
    */
-  nameLabel() {
+  nameHtml() {
     return this._resolveReference('name').tHtml('name', { 'default': this.props.name || this.id });
   }
 
@@ -181,9 +182,9 @@ export class Preset {
   /**
    * t
    * Returns a localized string, wrapper around `l10n.t`.
-   * @params  {string}  scope   - The trailing part of the stringID
-   * @params  {Object?} options - Optional options to pass to `l10n.t`
-   * @return  {string}  Localized string
+   * @params  {string}   scope   - The trailing part of the stringID
+   * @params  {Object?}  options - Optional options to pass to `l10n.t`
+   * @return  {string}   Localized string
    */
   t(scope, options) {
     const l10n = this.context.systems.l10n;
@@ -193,9 +194,9 @@ export class Preset {
   /**
    * tHtml
    * Returns a localized HTML string, wrapper around `l10n.tHtml`.
-   * @params  {string}  scope   - The trailing part of the stringID
-   * @params  {Object?} options - Optional options to pass to `l10n.tHtml`
-   * @return  {string}  Localized HTML string
+   * @params  {string}   scope   - The trailing part of the stringID
+   * @params  {Object?}  options - Optional options to pass to `l10n.tHtml`
+   * @return  {string}   Localized HTML string
    */
   tHtml(scope, options) {
     const l10n = this.context.systems.l10n;
@@ -219,12 +220,12 @@ export class Preset {
   }
 
   /**
-   * subtitleLabel
+   * subtitleHtml
    * Returns an HTML subtitle, but only for suggestion presets.
    * Rapid displays the preset name on a second line below the brand name.
    * @return  {string}  Localized HTML preset subtitle, or `null` if not applicable
    */
-  subtitleLabel() {
+  subtitleHtml() {
     if (this.suggestion) {
       const l10n = this.context.systems.l10n;
       let path = this.id.split('/');
@@ -247,15 +248,15 @@ export class Preset {
   }
 
   /**
-   * searchNameStripped
+   * searchNameNormalized
    * The name used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
    * @return  {string}  The name used for searching, but with diacritic marks normalized.
    */
-  searchNameStripped() {
-    if (!this._searchNameStripped) {
-      this._searchNameStripped = this._stripDiacritics(this.searchName());
+  searchNameNormalized() {
+    if (!this._searchNameNormalized) {
+      this._searchNameNormalized = utilNormalizeString(this.searchName());
     }
-    return this._searchNameStripped;
+    return this._searchNameNormalized;
   }
 
   /**
@@ -271,15 +272,15 @@ export class Preset {
   }
 
   /**
-   * searchAliasesStripped
+   * searchAliasesNormalized
    * Aliases used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
    * @return  {Array<string>}  The aliases used for searching, but with diacritic marks normalized.
    */
-  searchAliasesStripped() {
-    if (!this._searchAliasesStripped) {
-      this._searchAliasesStripped = this.searchAliases().map(this._stripDiacritics);
+  searchAliasesNormalized() {
+    if (!this._searchAliasesNormalized) {
+      this._searchAliasesNormalized = this.searchAliases().map(s => utilNormalizeString(s));
     }
-    return this._searchAliasesStripped;
+    return this._searchAliasesNormalized;
   }
 
   /**
@@ -409,21 +410,6 @@ export class Preset {
     }
 
     return tags;
-  }
-
-
-  /**
-   * _stripDiacritics
-   * Internal function for normalizing strings to remove diacritic marks.
-   * @param   {string}  s - the input string to normalize
-   * @return  {string}  the normalized string
-   */
-  _stripDiacritics(s) {
-    // split combined diacritical characters into their parts
-    if (s.normalize) s = s.normalize('NFD');
-    // remove diacritics
-    s = s.replace(/[\u0300-\u036f]/g, '');
-    return s;
   }
 
 

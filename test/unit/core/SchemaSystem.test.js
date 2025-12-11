@@ -601,48 +601,53 @@ describe('SchemaSystem', () => {
         const results = _schema.search('gri', 'point');
         const resultIDs = results.map(item => item.id);
 
+        console.log (`\nsearch for 'gri'`);
         console.log (resultIDs);
 
 //// We need to decide how we want search to work and test it thoroughly
         assert.isOk(true);
-//        expect(result.indexOf(p.grill), 'Grill').to.eql(0);            // 1. 'Grill' (leading name)
-//        expect(result.indexOf(p.football), 'Football').to.eql(1);      // 2. 'Football' (leading term 'gridiron')
-//        expect(result.indexOf(p.sandpit), 'Sandpit').to.eql(2);        // 3. 'Sandpit' (leading tag value 'grit_bin')
-//        expect(result.indexOf(p.grass1), 'Grass').to.be.within(3,5);   // 4. 'Grass' (similar name)
-//        expect(result.indexOf(p.grass2), 'Ğṝȁß').to.be.within(3,5);    // 5. 'Ğṝȁß' (similar name)
-//        expect(result.indexOf(p.park), 'Park').to.be.within(3,5);      // 6. 'Park' (similar term 'grass')
+//        expect(results.indexOf(p.grill), 'Grill').to.eql(0);            // 1. 'Grill' (leading name)
+//        expect(results.indexOf(p.football), 'Football').to.eql(1);      // 2. 'Football' (leading term 'gridiron')
+//        expect(results.indexOf(p.sandpit), 'Sandpit').to.eql(2);        // 3. 'Sandpit' (leading tag value 'grit_bin')
+//        expect(results.indexOf(p.grass1), 'Grass').to.be.within(3,5);   // 4. 'Grass' (similar name)
+//        expect(results.indexOf(p.grass2), 'Ğṝȁß').to.be.within(3,5);    // 5. 'Ğṝȁß' (similar name)
+//        expect(results.indexOf(p.park), 'Park').to.be.within(3,5);      // 6. 'Park' (similar term 'grass')
       });
 
       it('sorts preset with matchScore penalty below others', () => {
         const parking = _schema.item('amenity/parking');
         const park = _schema.item('leisure/park');
-        const result = _schema.search('par', 'point');
-        assert.strictEqual(result.indexOf(parking), 0, 'Parking');   // 1. 'Parking' (default matchScore)
-        assert.strictEqual(result.indexOf(park), 1, 'Park');         // 2. 'Park' (low matchScore)
+        const results = _schema.search('par', 'point');
+        assert.strictEqual(results.indexOf(parking), 0, 'Parking');   // 1. 'Parking' (default matchScore)
+        assert.strictEqual(results.indexOf(park), 1, 'Park');         // 2. 'Park' (low matchScore)
       });
 
       it('ignores matchScore penalty for exact name match', () => {
         const parking = _schema.item('amenity/parking');
         const park = _schema.item('leisure/park');
-        const result = _schema.search('park', 'point');
-        assert.strictEqual(result.indexOf(park), 0, 'Park');         // 1. 'Park' (low matchScore)
-        assert.strictEqual(result.indexOf(parking), 1, 'Parking');   // 2. 'Parking' (default matchScore)
+        const results = _schema.search('park', 'point');
+        assert.strictEqual(results.indexOf(park), 0, 'Park');         // 1. 'Park' (low matchScore)
+        assert.strictEqual(results.indexOf(parking), 1, 'Parking');   // 2. 'Parking' (default matchScore)
       });
 
       it('considers diacritics on exact matches', () => {
         const grass1 = _schema.item('landuse/grass1');
         const grass2 = _schema.item('landuse/grass2');
-        const result = _schema.search('ğṝȁ', 'point');
-        assert.strictEqual(result.indexOf(grass2), 0, 'Ğṝȁß');    // 1. 'Ğṝȁß'  (leading name)
-        assert.strictEqual(result.indexOf(grass1), 1, 'Grass');   // 2. 'Grass' (similar name)
+        const results = _schema.search('ğṝȁ', 'point');
+        const resultIDs = results.map(item => item.id);
+
+        console.log (`\nsearch for 'ğṝȁ'`);
+        console.log (resultIDs);
+        assert.strictEqual(results.indexOf(grass2), 0, 'Ğṝȁß');    // 1. 'Ğṝȁß'  (leading name)
+        assert.strictEqual(results.indexOf(grass1), 1, 'Grass');   // 2. 'Grass' (similar name)
       });
 
       it('replaces diacritics on fuzzy matches', () => {
         const grass1 = _schema.item('landuse/grass1');
         const grass2 = _schema.item('landuse/grass2');
-        const result = _schema.search('graß', 'point');
-        assert.isTrue(result.indexOf(grass1) < 2, 'Grass');   // 1. 'Grass' (similar name)
-        assert.isTrue(result.indexOf(grass2) < 2, 'Ğṝȁß');    // 2. 'Ğṝȁß'  (similar name)
+        const results = _schema.search('graß', 'point');
+        assert.isTrue(results.indexOf(grass1) < 2, 'Grass');   // 1. 'Grass' (similar name)
+        assert.isTrue(results.indexOf(grass2) < 2, 'Ğṝȁß');    // 2. 'Ğṝȁß'  (similar name)
       });
 
       // it('includes the appropriate fallback preset', () => {
@@ -653,11 +658,11 @@ describe('SchemaSystem', () => {
 
       it('excludes presets with searchable: false', () => {
         const excluded = _schema.item('amenity/excluded');
-        const result = _schema.search('excluded', 'point');
-        assert.isTrue(!result.includes(excluded));
+        const results = _schema.search('excluded', 'point');
+        assert.isTrue(!results.includes(excluded));
       });
     });
-  });
+  });  // search
 
 
   describe('match', () => {
@@ -711,7 +716,7 @@ describe('SchemaSystem', () => {
         assert.strictEqual(schema.match(point, graph).id, 'park');
       });
     });
-  });
+  });   // match
 
 
   describe('areaKeys', () => {

@@ -91,8 +91,8 @@ export function uiSectionFeatureType(context) {
       );
 
     let names = _presets.length === 1 ? [
-      _presets[0].nameLabel(),
-      _presets[0].subtitleLabel()
+      _presets[0].nameHtml(),
+      _presets[0].subtitleHtml()
     ].filter(Boolean) : [l10n.t('inspector.multiple_types')];
 
     let label = selection.select('.label-inner');

@@ -410,16 +410,16 @@ export class SchemaSystem extends AbstractSystem {
         .sort(_sortItems('searchName'));
     });
 
-    _gather(function leadingNamesStripped() {
+    _gather(function leadingNamesNormalized() {
       return generics
-        .filter(a => _leading(a.searchNameStripped()))
-        .sort(_sortItems('searchNameStripped'));
+        .filter(a => _leading(a.searchNameNormalized()))
+        .sort(_sortItems('searchNameNormalized'));
     });
 
-    _gather(function leadingSuggestionsStripped() {
+    _gather(function leadingSuggestionsNormalized() {
       return suggestions
-        .filter(a => _leadingStrict(a.searchNameStripped()))
-        .sort(_sortItems('searchNameStripped'));
+        .filter(a => _leadingStrict(a.searchNameNormalized()))
+        .sort(_sortItems('searchNameNormalized'));
     });
 
     // Note that name-suggestion-index includes alternate names in the 'terms' array.
