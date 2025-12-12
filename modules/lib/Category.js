@@ -25,6 +25,7 @@ export class Category {
    */
   constructor(context, props = {}) {
     this.context = context;
+    this.type = 'category';
 
     if (!props.id) {
       throw new Error('Category missing id property');
@@ -58,14 +59,26 @@ export class Category {
     // Include only Presets that are currently known to the SchemaSystem.
     this.presets = this.props.members.map(presetID => schema.presets.get(presetID)).filter(Boolean);
 
-    // The geometries for this category will include all geometries of its presets.
+    // The geometries available for this category will include all geometries of its presets.
     this.geometries = new Set();
     for (const preset of this.presets) {
       this.geometries = this.geometries.union(preset.geometries);
     }
 
-    this._searchName = null;
-    this._searchNameNormalized = null;
+    // Reset localized names and cached fields used by MiniSearch.
+    const name = this.name();
+    const terms = [];
+    this.search = {
+      id: this.id,
+      type: this.type,
+      suggestion: false,
+      name: name,
+      nameNormalized: utilNormalizeString(name),
+      terms: terms
+    };
+
+    // this._searchName = null;
+    // this._searchNameNormalized = null;
   }
 
 
@@ -113,10 +126,11 @@ export class Category {
    * @return  {string}  The name used for searching
    */
   searchName() {
-    if (!this._searchName) {
-      this._searchName = this.name().toLowerCase();
-    }
-    return this._searchName;
+    return this.search.name;
+    // if (!this._searchName) {
+    //   this._searchName = this.name().toLowerCase();
+    // }
+    // return this._searchName;
   }
 
   /**
@@ -125,10 +139,11 @@ export class Category {
    * @return  {string}  The name used for searching, but with diacritic marks normalized.
    */
   searchNameNormalized() {
-    if (!this._searchNameNormalized) {
-      this._searchNameNormalized = utilNormalizeString(this.searchName());
-    }
-    return this._searchNameNormalized;
+    return this.search.nameNormalized;
+    // if (!this._searchNameNormalized) {
+    //   this._searchNameNormalized = utilNormalizeString(this.searchName());
+    // }
+    // return this._searchNameNormalized;
   }
 
   /**

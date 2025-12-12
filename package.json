@@ -67,6 +67,7 @@
     "mapillary-js": "^4.1.2",
     "maplibre-gl": "^3.6.2",
     "marked": "^16.4.1",
+    "minisearch": "^7.2.0",
     "name-suggestion-index": "~7.0.20251101",
     "node-diff3": "^3.2.0",
     "osm-auth": "~3.1.1",

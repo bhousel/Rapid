@@ -1,5 +1,6 @@
 import { utilArrayUniq } from '@rapid-sdk/util';
 import leven from 'leven';
+import MiniSearch from 'minisearch';
 
 import { AbstractSystem } from './AbstractSystem.js';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.js';
@@ -26,9 +27,9 @@ const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
  * This system is used to identify features in OpenStreetMap based on their tagging,
  * and to support user interface functions like searching for feature types and editing attributes.
  *
- * - A `Preset` represents a bundle of tags that identify a feature type.
+ * - A `Field` represents a user interface component for displaying/editing a tag or tags.
+ * - A `Preset` represents a bundle of tags that identify a feature type. A Preset can reference multiple Fields.
  * - A `Category` is a collection of Presets (e.g. "Major Roads", "Buildings", etc).
- * - A `Field` represents a user interface component a tag or tags.
  *
  * In this case, "schemas" are the files containing these rules about tagging.
  * At init time, Rapid will load the default schema files that contain these rules,
@@ -38,10 +39,10 @@ const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
  *   `geometryTypes`  {Set<string>}                 The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
  *   `fieldTypes`     {Set<string>}                 The supported field types (see also `ui/fields/index.js`)
  *   `merged`         {Set<schemaID>}               Names of schemas that have been merged in
- *   `categories`     {Map<categoryID, Category>}   The categories
- *   `presets`        {Map<presetID, Preset>}       The presets
- *   `fields`         {Map<fieldID,  Field>}        The fields
- *   `universal`      {Map<fieldID,  Field>}        The "universal" fields (fields that can go with any Preset)
+ *   `fields`         {Map<fieldID, Field>}         The Fields
+ *   `presets`        {Map<presetID, Preset>}       The Presets
+ *   `categories`     {Map<categoryID, Category>}   The Categories
+ *   `universal`      {Map<fieldID, Field>}         The "universal" fields (fields that can go with any Preset)
  *   `defaults`       {Map<string, Set<string>>}    Default items that are suggested for each geometry
  *
  * Events available:
@@ -85,6 +86,14 @@ export class SchemaSystem extends AbstractSystem {
     this._searchable = [];         // Array<Category|Preset>
     this._matchIndex = new Map();  // Map<geometryType, Object>
     this._recentIDs = null;
+
+    this._miniSearch = new MiniSearch({
+      autoVacuum: false,
+      idField: 'id',
+      fields: ['name', 'terms'  /* aliases */],
+      storeFields: ['type', 'suggestion'],
+      extractField: (item, fieldName) => item.search[fieldName]  // look in `search` Object
+    });
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._resetAll = this._resetAll.bind(this);
@@ -195,6 +204,28 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
+   * item
+   * Returns the Preset or Catetory with the given id.
+   * @param   {string}           id - a Preset or Category id
+   * @return  {Preset|Category}  The Preset or Catetory, or `undefined` if not found
+   */
+  item(id) {
+    return this.presets.get(id) || this.categories.get(id);
+  }
+
+
+  /**
+   * field
+   * Returns the Field with the given id.
+   * @param   {string}  id - a Field id
+   * @return  {Field}   The Field, or `undefined` if not found
+   */
+  field(id) {
+    return this.fields.get(id);
+  }
+
+
+  /**
    * merge
    * Accepts an object containing new schema data (all properties except 'id' are optional):
    * {
@@ -254,13 +285,13 @@ export class SchemaSystem extends AbstractSystem {
           if (p.icon) p.icon = p.icon.replace(/^iD-/, 'rapid-');
 
           // A few overrides to use better icons than the ones provided by the id-tagging-schema project
-          if (presetID === 'address')                         p.icon = 'maki-circle-stroked';
-          if (presetID === 'highway/turning_loop')            p.icon = 'maki-circle';
-          if (p.icon === 'roentgen-needleleaved_tree')        p.icon = 'temaki-tree_needleleaved';
-          if (p.icon === 'roentgen-tree')                     p.icon = 'temaki-tree_broadleaved';
+          if (presetID === 'address')                    p.icon = 'maki-circle-stroked';
+          if (presetID === 'highway/turning_loop')       p.icon = 'maki-circle';
+          if (p.icon === 'roentgen-needleleaved_tree')   p.icon = 'temaki-tree_needleleaved';
+          if (p.icon === 'roentgen-tree')                p.icon = 'temaki-tree_broadleaved';
           // fix: FontAwesome v7 no longer has 'fas-vector-square'
           // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
-          if (p.icon === 'fas-vector-square')                 p.icon = 'temaki-portrait_framed';
+          if (p.icon === 'fas-vector-square')            p.icon = 'temaki-portrait_framed';
 
           const preset = new Preset(context, { id: presetID, schemaID: schemaID, ...p });
           if (preset.props.locationSet) {
@@ -321,28 +352,6 @@ export class SchemaSystem extends AbstractSystem {
     }
 
     this._schemaChanged();
-  }
-
-
-  /**
-   * item
-   * Returns the Preset or Catetory with the given id.
-   * @param   {string}           id - a Preset or Category id
-   * @return  {Preset|Category}  The Preset or Catetory, or `undefined` if not found
-   */
-  item(id) {
-    return this.presets.get(id) || this.categories.get(id);
-  }
-
-
-  /**
-   * field
-   * Returns the Field with the given id.
-   * @param   {string}  id - a Field id
-   * @return  {Field}   The Field, or `undefined` if not found
-   */
-  field(id) {
-    return this.fields.get(id);
   }
 
 
@@ -869,6 +878,21 @@ export class SchemaSystem extends AbstractSystem {
     for (const category of this.categories.values()) {
       category.resetCache();
     }
+
+    // Gather "searchable" Presets and Categories..
+    // Note: we are doing it this way to avoid gathering 'vertex' twice.
+    this._miniSearch.removeAll();
+    this._searchable = [];
+    for (const [presetID, preset] of this.presets) {
+      if (presetID === 'vertex') continue;  // this is an intentional duplicate
+      if (!preset.props.searchable) continue;
+      this._searchable.push(preset);
+    }
+    for (const [_categoryID, category] of this.categories) {
+      if (!category.props.searchable) continue;
+      this._searchable.push(category);
+    }
+    this._miniSearch.addAll(this._searchable);
   }
 
 
@@ -892,18 +916,6 @@ export class SchemaSystem extends AbstractSystem {
       }
     }
 
-    // Gather "searchable" Presets and Categories..
-    // Note: we are doing it this way to avoid gathering 'vertex' twice.
-    this._searchable = [];
-    for (const [presetID, preset] of this.presets) {
-      if (presetID === 'vertex') continue;  // this is an intentional duplicate
-      if (!preset.props.searchable) continue;
-      this._searchable.push(preset);
-    }
-    for (const [_categoryID, category] of this.categories) {
-      if (!category.props.searchable) continue;
-      this._searchable.push(category);
-    }
 
     // Rebuild geometry match index..
     this._matchIndex.clear();

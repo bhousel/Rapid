@@ -601,8 +601,8 @@ describe('SchemaSystem', () => {
         const results = _schema.search('gri', 'point');
         const resultIDs = results.map(item => item.id);
 
-        console.log (`\nsearch for 'gri'`);
-        console.log (resultIDs);
+        console.log(`\nsearch for 'gri'`);
+        console.log(resultIDs);
 
 //// We need to decide how we want search to work and test it thoroughly
         assert.isOk(true);
@@ -636,8 +636,8 @@ describe('SchemaSystem', () => {
         const results = _schema.search('ğṝȁ', 'point');
         const resultIDs = results.map(item => item.id);
 
-        console.log (`\nsearch for 'ğṝȁ'`);
-        console.log (resultIDs);
+        console.log(`\nsearch for 'ğṝȁ'`);
+        console.log(resultIDs);
         assert.strictEqual(results.indexOf(grass2), 0, 'Ğṝȁß');    // 1. 'Ğṝȁß'  (leading name)
         assert.strictEqual(results.indexOf(grass1), 1, 'Grass');   // 2. 'Grass' (similar name)
       });

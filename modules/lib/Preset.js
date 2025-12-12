@@ -25,6 +25,7 @@ export class Preset {
    */
   constructor(context, props = {}) {
     this.context = context;
+    this.type = 'preset';
 
     if (!props.id) {
       throw new Error('Preset missing id property');
@@ -78,10 +79,23 @@ export class Preset {
    */
   resetCache() {
     this._resolved = { fields: null, moreFields: null };
-    this._searchName = null;
-    this._searchNameNormalized = null;
-    this._searchAliases = null;
-    this._searchAliasesNormalized = null;
+
+    // Reset localized names and cached fields used by MiniSearch.
+    const name = this.name();
+    const terms = this._resolveReference('name').t('terms', { 'default': this.props.terms });
+    this.search = {
+      id: this.id,
+      type: this.type,
+      suggestion: this.props.suggestion,
+      name: name,
+      nameNormalized: utilNormalizeString(name),
+      terms: terms
+    };
+
+//    this._searchName = null;
+//    this._searchNameNormalized = null;
+//    this._searchAliases = null;
+//    this._searchAliasesNormalized = null;
   }
 
 
@@ -241,10 +255,11 @@ export class Preset {
    * @return  {string}  The name used for searching
    */
   searchName() {
-    if (!this._searchName) {
-      this._searchName = (this.suggestion ? this.props.name : this.name()).toLowerCase();
-    }
-    return this._searchName;
+    return this.search.name;
+    // if (!this._searchName) {
+    //   this._searchName = (this.suggestion ? this.props.name : this.name()).toLowerCase();
+    // }
+    // return this._searchName;
   }
 
   /**
@@ -253,10 +268,11 @@ export class Preset {
    * @return  {string}  The name used for searching, but with diacritic marks normalized.
    */
   searchNameNormalized() {
-    if (!this._searchNameNormalized) {
-      this._searchNameNormalized = utilNormalizeString(this.searchName());
-    }
-    return this._searchNameNormalized;
+    return this.search.nameNormalized;
+    // if (!this._searchNameNormalized) {
+    //   this._searchNameNormalized = utilNormalizeString(this.searchName());
+    // }
+    // return this._searchNameNormalized;
   }
 
   /**
@@ -265,10 +281,11 @@ export class Preset {
    * @return  {Array<string>}  The aliases used for searching
    */
   searchAliases() {
-    if (!this._searchAliases) {
-      this._searchAliases = this.aliases().map(alias => alias.toLowerCase());
-    }
-    return this._searchAliases;
+    return this.search.aliases;
+    // if (!this._searchAliases) {
+    //   this._searchAliases = this.aliases().map(alias => alias.toLowerCase());
+    // }
+    // return this._searchAliases;
   }
 
   /**
@@ -277,10 +294,11 @@ export class Preset {
    * @return  {Array<string>}  The aliases used for searching, but with diacritic marks normalized.
    */
   searchAliasesNormalized() {
-    if (!this._searchAliasesNormalized) {
-      this._searchAliasesNormalized = this.searchAliases().map(s => utilNormalizeString(s));
-    }
-    return this._searchAliasesNormalized;
+    return this.search.aliasesNormalized;
+    // if (!this._searchAliasesNormalized) {
+    //   this._searchAliasesNormalized = this.searchAliases().map(s => utilNormalizeString(s));
+    // }
+    // return this._searchAliasesNormalized;
   }
 
   /**
