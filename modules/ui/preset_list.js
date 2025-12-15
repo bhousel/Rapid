@@ -365,7 +365,7 @@ export function uiPresetList(context) {
         .attr('class', 'namepart')
         .call(uiIcon((isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward'), 'inline'))
         .append('span')
-        .html(() => category.nameHtml() + '&hellip;');
+        .text(d => d.item.name() + '…');
 
       this.box = $selection
         .append('div')
@@ -484,8 +484,8 @@ export function uiPresetList(context) {
         .attr('class', 'label-inner');
 
       const nameparts = [
-        preset.nameHtml(),
-        preset.subtitleHtml()
+        preset.name(),
+        preset.subtitle()
       ].filter(Boolean);
 
       $$label.selectAll('.namepart')
@@ -493,7 +493,7 @@ export function uiPresetList(context) {
         .enter()
         .append('div')
         .attr('class', 'namepart')
-        .html(d => d);
+        .text(d => d);
 
       $$wrap.call(this.reference.button);
       $selection.call(this.reference.body);

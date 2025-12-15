@@ -8,6 +8,7 @@ import { utilNormalizeString } from '../util/string.js';
  * A Category is a thematic collection of Presets.
  * For example "Major Roads", "Barriers", "Buildings", "Golf Features"..
  * The Rapid user interface shows categories in the preset list as expandable folders.
+ * See: https://github.com/ideditor/schema-builder/blob/main/schemas/preset_category.json
  *
  * Properties you can access:
  *   `id` (or `categoryID`)  Unique string to identify this Category.
@@ -31,9 +32,12 @@ export class Category {
       throw new Error('Category missing id property');
     }
 
+    this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
+    this._currLocaleCode = null;  // The current locale code
+    this._currStrings = {};       // The current strings
+
     // Preserve properties and assign some defaults
     this.props = globalThis.structuredClone(props);
-    this.props.name ??= '';
     this.props.matchScore = -1;
     this.props.members ??= [];  // "members" here are presetIDs
     this.props.searchable ??= true;
@@ -44,16 +48,18 @@ export class Category {
     // For convenient access:
     this.categoryID = this.props.id;
 
-    this.resetCache();
+    this.reset();
   }
 
 
   /**
-   * resetCache
+   * reset
    * Resets all cached data.
+   * This should happen whenever SchemaSystem merges in new data.
    */
-  resetCache() {
+  reset() {
     const context = this.context;
+    const l10n = context.systems.l10n;
     const schema = context.systems.schema;
 
     // Include only Presets that are currently known to the SchemaSystem.
@@ -65,41 +71,78 @@ export class Category {
       this.geometries = this.geometries.union(preset.geometries);
     }
 
-    // Reset localized names and cached fields used by MiniSearch.
-    const name = this.name();
-    const terms = [];
-    this.search = {
+    // Invalidate any cached string localizations and redo for the current locale.
+    this._strings.clear();
+    this.setLocale(l10n?.localeCode() || 'en-US');
+  }
+
+
+  /**
+   * setLocale
+   * Changes the locale and re-localizes the strings.
+   * This should happen whenever LocalizationSystem changes the locale.
+   * This is done early because we want the strings indexed by the SchemaSystem for searching.
+   */
+  setLocale(localeCode = 'en-US') {
+    this._currLocaleCode = localeCode;
+    if (this._strings.has(localeCode)) return;  // done already
+
+    const l10n = this.context.systems.l10n;
+
+    // Pre-localize and store strings so that the Miniseach full-text search can index these.
+    // Categories are simple because they are just a `name` as a string.
+    // No `terms` or `aliases`, but we include them as empty strings for compatibility with Presets.
+    //
+    // "category-golf": {
+    //     "name": "Golf Features"
+    // },
+
+    const fallbackName = this.props.name || this.id;
+    const name = l10n?.t(`_tagging.presets.categories.${this.id}.name`, { 'default': '' }) || fallbackName;
+
+    this._currStrings = {
       id: this.id,
       type: this.type,
       suggestion: false,
-      name: name,
+      name: name.trim(),
       nameNormalized: utilNormalizeString(name),
-      terms: terms
+      terms: '',    // not used for Categories
+      aliases: ''   // not used for Categories
     };
 
-    // this._searchName = null;
-    // this._searchNameNormalized = null;
+    this._strings.set(this._currLocaleCode, this._currStrings);
   }
 
 
   /**
    * name
-   * Returns a localized name, if possible.  Falls back to original name.
+   * The name is the main display name of the Category, as shown in the user interface.
    * @return  {string}  Localized name
    */
   name() {
-    const l10n = this.context.systems.l10n;
-    return l10n?.t(`_tagging.presets.categories.${this.id}.name`, { 'default': this.id }) || this.props.name;
+    return this._currStrings.name;
   }
 
   /**
-   * nameHtml
-   * Returns a localized name HTML, if possible.  Falls back to original name.
-   * @return  {string}  Localized name HTML
+   * aliases
+   * Aliases are alternate names for this Category, they may be displayed in the user interface.
+   * This is not currently used by Categories, so it will always return an empty Array, '[]'.
+   * The Array splitting code is here to match what Preset does, in case Categories someday get this.
+   * @return  {Array<string>}  Localized aliases
    */
-  nameHtml() {
-    const l10n = this.context.systems.l10n;
-    return l10n?.tHtml(`_tagging.presets.categories.${this.id}.name`, { 'default': this.id }) || this.props.name;
+  aliases() {
+    return this._currStrings.aliases.split(/\s*[\r\n]+\s*/);
+  }
+
+  /**
+   * terms
+   * Terms are related words used for seraching for this Preset.
+   * This is not currently used by Categories, so it will always return an empty Array, '[]'.
+   * The Array splitting code is here to match what Preset does, in case Categories someday get this.
+   * @return  {Array<string>}  Localized search terms
+   */
+  terms() {
+    return this._currStrings.terms.split(',');
   }
 
   /**
@@ -111,14 +154,6 @@ export class Category {
     return -1;
   }
 
-  /**
-   * terms
-   * Search terms, always returns `[]` for Categories.
-   * @return  {Array<string>}  Always returns `[]` for Categories
-   */
-  terms() {
-    return [];
-  }
 
   /**
    * searchName
@@ -126,7 +161,7 @@ export class Category {
    * @return  {string}  The name used for searching
    */
   searchName() {
-    return this.search.name;
+    return this._currStrings.name;
     // if (!this._searchName) {
     //   this._searchName = this.name().toLowerCase();
     // }
@@ -139,7 +174,7 @@ export class Category {
    * @return  {string}  The name used for searching, but with diacritic marks normalized.
    */
   searchNameNormalized() {
-    return this.search.nameNormalized;
+    return this._currStrings.nameNormalized;
     // if (!this._searchNameNormalized) {
     //   this._searchNameNormalized = utilNormalizeString(this.searchName());
     // }

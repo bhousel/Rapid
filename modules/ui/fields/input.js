@@ -99,7 +99,7 @@ export function uiFieldText(context, uifield) {
     } else if (uifield.type === 'number') {
       input.attr('type', 'text');
 
-      const inc = presetField.increment() ?? 1;
+      const inc = +(presetField.props.increment || 1);
       let buttons = wrap.selectAll('.increment, .decrement')
         .data(l10n.isRTL() ? [inc, -inc] : [-inc, inc]);
 

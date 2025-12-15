@@ -20,6 +20,7 @@ export class UiField {
   /**
    * @constructor
    * @param  {Context}  context - Global shared application context
+   * @param  {Field}    presetField - the original Field tracked by the SchemaSystem
    */
   constructor(context, presetField, entityIDs = [], options = {}) {
     this.context = context;
@@ -44,10 +45,9 @@ export class UiField {
 //      this.options.revert = false;
 //    }
 
-    // copy some commonly used stuff from the presetField
+    // copy some commonly used stuff from the Field
     this.id = presetField.id;
     this.type = presetField.type;
-    this.title = presetField.title();
     this.label = presetField.label();
     this.terms = presetField.terms();
     this.placeholder = presetField.placeholder();

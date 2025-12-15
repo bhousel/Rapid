@@ -9,6 +9,7 @@ import { osmAreaKeys } from './tags.js';
  * A Preset represents a bundle of tags that identify a feature type on OpenStreetMap.
  * Every feature in Rapid is matched to a Preset based on its tags.
  * Users can pick from the available Presets in the Rapid editor.
+ * See:  https://github.com/ideditor/schema-builder/blob/main/schemas/preset.json
  *
  * Properties you can access:
  *   `id` (or `presetID`)   Unique string to identify this Preset.
@@ -35,6 +36,10 @@ export class Preset {
       props.geometry = [props.geometry];
     }
 
+    this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
+    this._currLocaleCode = null;  // The current locale code
+    this._currStrings = {};       // The current strings
+
     // Preserve properties and assign some defaults
     this.props = globalThis.structuredClone(props);
     this.props.aliases ??= [];
@@ -42,11 +47,10 @@ export class Preset {
     this.props.geometry ??= [];
     this.props.matchScore ||= 1;
     this.props.moreFields ??= [];
-    this.props.name ??= '';
     this.props.reference ??= {};
     this.props.searchable ??= true;
     this.props.tags ??= {};
-    this.props.terms = (props.terms ?? []).join();
+    this.props.terms ??= [];
 
     this.props.addTags ??= this.props.tags;
     this.props.removeTags ??= this.props.addTags;
@@ -69,73 +73,102 @@ export class Preset {
       this.geometries = new Set(schema.geometryTypes);  // all types allowed
     }
 
-    this.resetCache();
+    this.reset();
   }
 
 
   /**
-   * resetCache
+   * reset
    * Resets all cached data.
+   * This should happen whenever SchemaSystem merges in new data.
    */
-  resetCache() {
+  reset() {
+    const l10n = this.context.systems.l10n;
+
     this._resolved = { fields: null, moreFields: null };
 
-    // Reset localized names and cached fields used by MiniSearch.
-    const name = this.name();
-    const terms = this._resolveReference('name').t('terms', { 'default': this.props.terms });
-    this.search = {
+    // Invalidate any cached string localizations and redo for the current locale.
+    this._strings.clear();
+    this.setLocale(l10n?.localeCode() || 'en-US');
+  }
+
+
+  /**
+   * setLocale
+   * Changes the locale and re-localizes the strings.
+   * This should happen whenever LocalizationSystem changes the locale.
+   * This is done early because we need the strings indexed by the SchemaSystem for searching.
+   */
+  setLocale(localeCode = 'en-US') {
+    this._currLocaleCode = localeCode;
+    if (this._strings.has(localeCode)) return;  // done already
+
+    const l10n = this.context.systems.l10n;
+
+    // Some Presets may reference the values from another Preset.
+    const refName = this._resolveReference('name');
+    // Note that `terms` and `aliases` can't reference another Preset because they are Array properties.
+
+    // Pre-localize and store strings so that the Miniseach full-text search can index these.
+    // `name` is a string, while `terms` and `aliases` are Arrays of strings.
+    // Unfortunately, the localized values returned from Transifex are inconsistent.
+    // By convention `aliases` are newline-delimited and `terms` are comma-delimited.
+    // (Minisearch can handle tokenization of both of these).
+    //
+    // "shop/second_hand": {
+    //     "name": "Thrift Store",
+    //     "aliases": "Thrift Shop\nConsignment Store\nResale Shop\nSecondhand Shop",
+    //     "terms": "resale,second-hand,used"
+    // }
+
+    const fallbackName = this.props.name || this.id;
+    const fallbackTerms = this.props.terms.join(',');       // stringify Array
+    const fallbackAliases = this.props.aliases.join('\n');  // stringify Array
+
+    const name = l10n?.t(`_tagging.presets.presets.${refName.id}.name`, { 'default': '' }) || fallbackName;
+    const terms = l10n?.t(`_tagging.presets.presets.${this.id}.terms`, { 'default': '' }) || fallbackTerms;
+    const aliases = l10n?.t(`_tagging.presets.presets.${this.id}.aliases`, { 'default': '' }) || fallbackAliases;
+
+    this._currStrings = {
       id: this.id,
       type: this.type,
       suggestion: this.props.suggestion,
-      name: name,
+      name: name.trim(),
       nameNormalized: utilNormalizeString(name),
-      terms: terms
+      terms: terms.trim(),
+      aliases: aliases.trim()
     };
 
-//    this._searchName = null;
-//    this._searchNameNormalized = null;
-//    this._searchAliases = null;
-//    this._searchAliasesNormalized = null;
+    this._strings.set(this._currLocaleCode, this._currStrings);
   }
 
 
   /**
    * name
-   * Returns a localized name, if possible.  Falls back to original name.
+   * The name is the main display name of the Preset, as shown in the user interface.
    * @return  {string}  Localized name
    */
   name() {
-    return this._resolveReference('name').t('name', { 'default': this.props.name || this.id });
-  }
-
-  /**
-   * nameHtml
-   * Returns a localized name HTML, if possible.  Falls back to original name.
-   * @return  {string}  Localized name HTML
-   */
-  nameHtml() {
-    return this._resolveReference('name').tHtml('name', { 'default': this.props.name || this.id });
+    return this._currStrings.name;
   }
 
   /**
    * aliases
-   * Returns localized aliases, if possible.  Falls back to original aliases.
+   * Aliases are alternate names for this Preset, they may be displayed in the user interface.
    * @return  {Array<string>}  Localized aliases
    */
   aliases() {
-    return this._resolveReference('name')
-      .t('aliases', { 'default': this.props.aliases }).trim().split(/\s*[\r\n]+\s*/);
+    return this._currStrings.aliases.split(/\s*[\r\n]+\s*/);
   }
 
   /**
    * terms
-   * Returns localized search terms, if possible.  Falls back to original search terms.
-   * @return  {Array<string>}  The localized search terms
+   * Terms are related words used for seraching for this Preset.
+   * (For suggestion presets, the terms are alternate names)
+   * @return  {Array<string>}  Localized search terms
    */
   terms() {
-    return this._resolveReference('name')
-      .t('terms', { 'default': this.props.terms })
-      .toLowerCase().trim().split(/\s*,+\s*/);
+    return this._currStrings.terms.split(',');
   }
 
   /**
@@ -194,30 +227,6 @@ export class Preset {
 
 
   /**
-   * t
-   * Returns a localized string, wrapper around `l10n.t`.
-   * @params  {string}   scope   - The trailing part of the stringID
-   * @params  {Object?}  options - Optional options to pass to `l10n.t`
-   * @return  {string}   Localized string
-   */
-  t(scope, options) {
-    const l10n = this.context.systems.l10n;
-    return l10n.t(`_tagging.presets.presets.${this.id}.${scope}`, options);
-  }
-
-  /**
-   * tHtml
-   * Returns a localized HTML string, wrapper around `l10n.tHtml`.
-   * @params  {string}   scope   - The trailing part of the stringID
-   * @params  {Object?}  options - Optional options to pass to `l10n.tHtml`
-   * @return  {string}   Localized HTML string
-   */
-  tHtml(scope, options) {
-    const l10n = this.context.systems.l10n;
-    return l10n.tHtml(`_tagging.presets.presets.${this.id}.${scope}`, options);
-  }
-
-  /**
    * subtitle
    * Returns a subtitle, but only for suggestion presets.
    * Rapid displays the preset name on a second line below the brand name.
@@ -234,28 +243,12 @@ export class Preset {
   }
 
   /**
-   * subtitleHtml
-   * Returns an HTML subtitle, but only for suggestion presets.
-   * Rapid displays the preset name on a second line below the brand name.
-   * @return  {string}  Localized HTML preset subtitle, or `null` if not applicable
-   */
-  subtitleHtml() {
-    if (this.suggestion) {
-      const l10n = this.context.systems.l10n;
-      let path = this.id.split('/');
-      path.pop();  // remove brand name
-      return l10n.tHtml('_tagging.presets.presets.' + path.join('/') + '.name');
-    }
-    return null;
-  }
-
-  /**
    * searchName
    * The name used for searching - basically the `name()` but forced lowercase.
    * @return  {string}  The name used for searching
    */
   searchName() {
-    return this.search.name;
+    return this._currStrings.name;
     // if (!this._searchName) {
     //   this._searchName = (this.suggestion ? this.props.name : this.name()).toLowerCase();
     // }
@@ -268,7 +261,7 @@ export class Preset {
    * @return  {string}  The name used for searching, but with diacritic marks normalized.
    */
   searchNameNormalized() {
-    return this.search.nameNormalized;
+    return this._currStrings.nameNormalized;
     // if (!this._searchNameNormalized) {
     //   this._searchNameNormalized = utilNormalizeString(this.searchName());
     // }
@@ -281,7 +274,7 @@ export class Preset {
    * @return  {Array<string>}  The aliases used for searching
    */
   searchAliases() {
-    return this.search.aliases;
+    return this._currStrings.aliases;
     // if (!this._searchAliases) {
     //   this._searchAliases = this.aliases().map(alias => alias.toLowerCase());
     // }
@@ -294,7 +287,7 @@ export class Preset {
    * @return  {Array<string>}  The aliases used for searching, but with diacritic marks normalized.
    */
   searchAliasesNormalized() {
-    return this.search.aliasesNormalized;
+    return this._currStrings.aliasesNormalized;
     // if (!this._searchAliasesNormalized) {
     //   this._searchAliasesNormalized = this.searchAliases().map(s => utilNormalizeString(s));
     // }
@@ -441,14 +434,16 @@ export class Preset {
   _resolveReference(prop) {
     const schema = this.context.systems.schema;
 
-    const val = this.props[prop] ?? '';    // always lookup original properties, don't use the functions
-    const match = val.match(/^\{(.*)\}$/);
-    if (match) {
-      const preset = schema.presets.get(match[1]);
-      if (preset) {
-        return preset;
-      } else {
-        console.warn(`Unable to resolve referenced preset: ${match[1]}.${prop}`);  // eslint-disable-line no-console
+    const val = this.props[prop];
+    if (val && (typeof val === 'string')) {   // This will only work for strings
+      const match = val.match(/^\{(.*)\}$/);
+      if (match) {
+        const preset = schema.presets.get(match[1]);
+        if (preset) {
+          return preset;
+        } else {
+          console.warn(`Unable to resolve referenced preset: ${this.id}.${prop} -> ${match[1]}`);  // eslint-disable-line no-console
+        }
       }
     }
     return this;

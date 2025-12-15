@@ -32,8 +32,11 @@ const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
  * - A `Category` is a collection of Presets (e.g. "Major Roads", "Buildings", etc).
  *
  * In this case, "schemas" are the files containing these rules about tagging.
- * At init time, Rapid will load the default schema files that contain these rules,
- * but additional preset data can be merged in to supplement or override the defaults.
+ * At init time, Rapid will load the default schema data from the `id-tagging-schema` project
+ * but additional preset data can be merged in to supplement or override the defaults,
+ *
+ * For the schema definition, see: https://github.com/ideditor/schema-builder
+ * For the default schema data, see: https://github.com/openstreetmap/id-tagging-schema
  *
  * Properties available:
  *   `geometryTypes`  {Set<string>}                 The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
@@ -57,8 +60,8 @@ export class SchemaSystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'schema';
-    this.requiredDependencies = new Set(['assets', 'l10n']);
-    this.optionalDependencies = new Set(['gfx', 'locations', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set(['assets']);
+    this.optionalDependencies = new Set(['gfx', 'l10n', 'locations', 'storage', 'urlhash']);
 
     this.geometryTypes = new Set(['point', 'vertex', 'line', 'area', 'relation']);
 
@@ -87,17 +90,16 @@ export class SchemaSystem extends AbstractSystem {
     this._matchIndex = new Map();  // Map<geometryType, Object>
     this._recentIDs = null;
 
-    this._miniSearch = new MiniSearch({
-      autoVacuum: false,
-      idField: 'id',
-      fields: ['name', 'terms'  /* aliases */],
-      storeFields: ['type', 'suggestion'],
-      extractField: (item, fieldName) => item.search[fieldName]  // look in `search` Object
-    });
+    // We will keep a MiniSearch fulltext search index for each needed locale code.
+    // Most of the time people would just use Rapid in one language.
+    // But this allows users to switch their locale/language while Rapid is running.
+    this._searchIndexes = new Map();  // Map<localeCode, MiniSearch>
+    this._currLocaleCode = null;      // The current locale code
+    this._currSearchIndex = null;     // The current search index
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._resetAll = this._resetAll.bind(this);
-    this._resetCaches = this._resetCaches.bind(this);
+    this._localeChanged = this._localeChanged.bind(this);
     this._schemaChanged = this._schemaChanged.bind(this);
   }
 
@@ -128,7 +130,7 @@ export class SchemaSystem extends AbstractSystem {
       })
       .then(() => {
         // Setup Event Handlers..
-        l10n?.on('localechange', this._resetCaches);
+        l10n?.on('localechange', this._localeChanged);
 
         // Clear data and create the fallback Presets
         this._resetAll();
@@ -357,7 +359,7 @@ export class SchemaSystem extends AbstractSystem {
 
   /**
    * search
-   * Performs a string search across all Presets and Categories.
+   * Performs a full-text search across all Presets and Categories.
    * @param   {string}             q - the value to search
    * @param   {OneOrMore<string>}  geometries - geometries to include in the results
    * @param   {Array<number>}      loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
@@ -863,25 +865,78 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
-   * _resetCaches
-   * This resets the caches in the Fields, Presets, and Categories.
-   * The caches are used to speed up localization and searching.
-   * This should happen after new schema data is merged in, or whenever the locale changes.
+   * _localeChanged
+   * Call this whenever the locale changes.
+   * It will lock in the new locale and prepare a search index for that locale.
+   * These are cached, so switching back to an already-seen locale should be fast.
+   * @param  {string}  localeCode - optional new locale code (fallback to getting it from LocalizationSystem, or en-US)
    */
-  _resetCaches() {
+  _localeChanged(localeCode) {
+    const l10n = this.context.systems.l10n;
+
+    // Ensure that we have a current locale code.
+    localeCode ||= l10n?.localeCode() || 'en-US';
+    this._currLocaleCode = localeCode;
+
+    // Re-localize the Category, Preset, Field strings, if needed.
     for (const field of this.fields.values()) {
-      field.resetCache();
+      field.setLocale(localeCode);
     }
     for (const preset of this.presets.values()) {
-      preset.resetCache();
+      preset.setLocale(localeCode);
     }
     for (const category of this.categories.values()) {
-      category.resetCache();
+      category.setLocale(localeCode);
+    }
+
+    this._prepareSearchIndex();
+  }
+
+
+  /**
+   * _prepareSearchIndex
+   * This prepares a MiniSearch index for the current locale code.
+   * These are cached, so switching back to an already-seen locale should be fast.
+   */
+  _prepareSearchIndex() {
+    const l10n = this.context.systems.l10n;
+
+    // Ensure that we have a current locale code.
+    this._currLocaleCode ||= l10n?.localeCode() || 'en-US';
+
+    // Switch the search index, create a new one if needed.
+    this._currSearchIndex = this._searchIndexes.get(this._currLocaleCode);
+
+    if (!this._currSearchIndex) {
+      this._currSearchIndex = new MiniSearch({
+        autoVacuum: false,
+        idField: 'id',
+        fields: ['name', 'terms'  /* aliases */],
+        storeFields: ['type', 'suggestion'],
+        extractField: (item, fieldName) => item._currStrings[fieldName]   // look in `currStrings` Object
+      });
+
+      this._searchIndexes.set(this._currLocaleCode, this._currSearchIndex);
+      this._rebuildSearchIndex();
+    }
+  }
+
+
+  /**
+   * _rebuildSearchIndex
+   * Rebuild the current MiniSearch full-text search index.
+   * This happens when we switch to a new search index for the first time.
+   * This may be a bit slow, so consider making this async.
+   */
+  _rebuildSearchIndex() {
+    // Ensure that we have a current serach index.
+    if (!this._currSearchIndex) {
+      this._prepareSearchIndex();
     }
 
     // Gather "searchable" Presets and Categories..
     // Note: we are doing it this way to avoid gathering 'vertex' twice.
-    this._miniSearch.removeAll();
+    this._currSearchIndex.removeAll();
     this._searchable = [];
     for (const [presetID, preset] of this.presets) {
       if (presetID === 'vertex') continue;  // this is an intentional duplicate
@@ -892,21 +947,37 @@ export class SchemaSystem extends AbstractSystem {
       if (!category.props.searchable) continue;
       this._searchable.push(category);
     }
-    this._miniSearch.addAll(this._searchable);
+    this._currSearchIndex.addAll(this._searchable);
   }
 
 
   /**
    * _schemaChanged
-   * Called whenever something about the available schemas has changed.
+   * Called whenever the available schemas has changed.
    * This should happen after new schema data has been merged in.
+   * Remove all cached data and cached fulltext search index.
+   * (The new schema may have different presets with different strings)
    * This will trigger a redraw, and emit a 'schemachange' event.
    */
   _schemaChanged() {
     const context = this.context;
     const gfx = context.systems.gfx;
 
-    this._resetCaches();
+    // Reset the Category, Preset, Field cached data
+    for (const field of this.fields.values()) {
+      field.reset();
+    }
+    for (const preset of this.presets.values()) {
+      preset.reset();
+    }
+    for (const category of this.categories.values()) {
+      category.reset();
+    }
+
+    // Reset and rebuild the search index
+    this._searchIndexes.clear();
+    this._prepareSearchIndex();
+
 
     // Gather "universal" fields..
     this.universal.clear();
@@ -915,7 +986,6 @@ export class SchemaSystem extends AbstractSystem {
         this.universal.set(field.id, field);
       }
     }
-
 
     // Rebuild geometry match index..
     this._matchIndex.clear();
@@ -978,7 +1048,7 @@ export class SchemaSystem extends AbstractSystem {
     this.presets.set('area', area);
     this.presets.set('relation', relation);
 
-    this._schemaChanged();
+    this._schemaChanged();  // this will reset the search index too
   }
 
 }

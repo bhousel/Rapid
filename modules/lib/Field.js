@@ -6,6 +6,7 @@ import { utilSafeString } from '@rapid-sdk/util';
  * A Field represents a user interface component that appears in the Rapid inspector.
  * Each field corresponds to one or more "keys" (OpenStreetMap tag keys).
  * The available fields are determined by the preset matched.
+ * See:  https://github.com/ideditor/schema-builder/blob/main/schemas/field.json
  *
  * Properties you can access:
  *   `id` (or `fieldID`)   Unique string to identify this Field.
@@ -31,6 +32,10 @@ export class Field {
       props.geometry = [props.geometry];
     }
 
+    this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
+    this._currLocaleCode = null;  // The current locale code
+    this._currStrings = {};       // The current strings
+
     // Preserve properties and assign some defaults
     this.props = globalThis.structuredClone(props);
     this.props.autoSuggestions ??= true;
@@ -39,10 +44,8 @@ export class Field {
     this.props.geometry ??= [];
     this.props.increment ||= 1;
     this.props.keys ??= [this.props.key];
-    this.props.label ??= '';
-    this.props.placeholder ??= '';
     this.props.snake_case ??= true;
-    this.props.terms = (props.terms ?? []).join();
+    this.props.terms ??= [];
     this.props.universal ??= false;
 
     this.id = props.id;                       // For consistency, offer a `this.id` property.
@@ -61,83 +64,123 @@ export class Field {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
-    this.title = this.title.bind(this);
     this.label = this.label.bind(this);
-    this.placeholder = this.placeholder.bind(this);
     this.terms = this.terms.bind(this);
+    this.placeholder = this.placeholder.bind(this);
+
+    this.reset();
   }
 
 
   /**
-   * resetCache
+   * reset
    * Resets all cached data.
+   * This should happen whenever SchemaSystem merges in new data.
    */
-  resetCache() {
+  reset() {
+    const l10n = this.context.systems.l10n;
+
+    // Invalidate any cached string localizations and redo for the current locale.
+    this._strings.clear();
+    this.setLocale(l10n?.localeCode() || 'en-US');
   }
 
-
-  increment() {
-    return this.type === 'number' ? this.props.increment : undefined;
-  }
 
   /**
-   * title
-   * Returns a localized field name, if possible.  Falls back to original label.
-   * @return  {string}  Localized name
+   * setLocale
+   * Changes the locale and re-localizes the strings.
+   * This should happen whenever LocalizationSystem changes the locale.
+   * Note that unlike with Presets and Categories, we don't need to index these strings,
+   *  but it is worth pre-localizing them for performance.
    */
-  title() {
-    return this._resolveReference('label').t('label', { 'default': this.props.label || this.id });
+  setLocale(localeCode = 'en-US') {
+    this._currLocaleCode = localeCode;
+    if (this._strings.has(localeCode)) return;  // done already
+
+    const l10n = this.context.systems.l10n;
+
+    // Some Fields may reference the values from another Field.
+    const labelRef = this._resolveReference('label');
+    const placeholderRef = this._resolveReference('placeholder');
+    // Note that `terms` can't reference another Field because it is an Array property.
+
+    // Pre-localize and store strings (although there is no full-text search for now).
+    // `name` and `placeholder` are strings, while `terms` is an Array of strings.
+    // By convention `terms` are comma-delimited.
+    //
+    //  "website": {
+    //      "label": "Website",
+    //      "terms": "internet presence,uri,url,webpage",
+    //      "placeholder": "https://example.com"
+    //  },
+
+    const fallbackLabel = this.props.label || this.id;
+    const fallbackTerms = this.props.terms.join(',');    // stringify Array
+    const fallbackPlaceholder = this.props.placeholder || '';
+    const label = l10n?.t(`_tagging.presets.presets.${labelRef.id}.label`, { 'default': '' }) || fallbackLabel;
+    const terms = l10n?.t(`_tagging.presets.presets.${this.id}.terms`, { 'default': '' }) || fallbackTerms;
+    const placeholder = l10n?.t(`_tagging.presets.presets.${placeholderRef.id}.placeholder`, { 'default': '' }) || fallbackPlaceholder;
+
+    this._currStrings = {
+      id: this.id,
+      label: label.trim(),
+      terms: terms.trim(),
+      placeholder: placeholder.trim()
+    };
+
+    this._strings.set(this._currLocaleCode, this._currStrings);
   }
+
 
   /**
    * label
-   * Returns a localized field name HTML, if possible.  Falls back to original label.
-   * @return  {string}  Localized name HTML
+   * The label is the main display name of the Field, as shown in the user interface.
+   * @return  {string}  Localized name
    */
   label() {
-    return this._resolveReference('label').tHtml('label', { 'default': this.props.label || this.id });
-  }
-
-  /**
-   * placeholder
-   * Returns a localized field placeholder value, if possible.  Falls back to original placeholder value.
-   * @return  {string}  Localized placeholder value
-   */
-  placeholder() {
-    return this._resolveReference('placeholder').t('placeholder', { 'default': this.props.placeholder });
+    return this._currStrings.label;
   }
 
   /**
    * terms
-   * Returns localized search terms, if possible.  Falls back to original search terms.
-   * @return  {Array<string>}  The localized search terms
+   * Terms are related words used for seearching for this Field.
+   * @return  {Array<string>}  Localized search terms
    */
   terms() {
-    return this._resolveReference('terms').t('terms', { 'default': this.props.terms })
-      .toLowerCase().trim().split(/\s*,+\s*/);
+    return this._currStrings.terms.split(',');
   }
 
   /**
-   * t
-   * Returns a localized string, wrapper around `l10n.t`.
-   * @params  {string}  scope   - The trailing part of the stringID
-   * @params  {Object?} options - Optional options to pass to `l10n.t`
-   * @return  {string}  Localized string
+   * placeholder
+   * A placeholder value appears in the field before the user enters a real value.
+   * @return  {string}  Localized placeholder
    */
-  t(scope, options) {
-    return this.context.systems.l10n.t(`_tagging.presets.fields.${this.id}.${scope}`, options);
+  placeholder() {
+    return this._currStrings.placeholder;
   }
 
-  /**
-   * tHtml
-   * Returns a localized HTML string, wrapper around `l10n.tHtml`.
-   * @params  {string}  scope   - The trailing part of the stringID
-   * @params  {Object?} options - Optional options to pass to `l10n.tHtml`
-   * @return  {string}  Localized HTML string
-   */
-  tHtml(scope, options) {
-    return this.context.systems.l10n.tHtml(`_tagging.presets.fields.${this.id}.${scope}`, options);
-  }
+
+  // /**
+  //  * t
+  //  * Returns a localized string, wrapper around `l10n.t`.
+  //  * @params  {string}  scope   - The trailing part of the stringID
+  //  * @params  {Object?} options - Optional options to pass to `l10n.t`
+  //  * @return  {string}  Localized string
+  //  */
+  // t(scope, options) {
+  //   return this.context.systems.l10n.t(`_tagging.presets.fields.${this.id}.${scope}`, options);
+  // }
+
+  // /**
+  //  * tHtml
+  //  * Returns a localized HTML string, wrapper around `l10n.tHtml`.
+  //  * @params  {string}  scope   - The trailing part of the stringID
+  //  * @params  {Object?} options - Optional options to pass to `l10n.tHtml`
+  //  * @return  {string}  Localized HTML string
+  //  */
+  // tHtml(scope, options) {
+  //   return this.context.systems.l10n.tHtml(`_tagging.presets.fields.${this.id}.${scope}`, options);
+  // }
 
   /**
    * _resolveReference
@@ -149,14 +192,16 @@ export class Field {
   _resolveReference(prop) {
     const schema = this.context.systems.schema;
 
-    const val = this.props[prop] || '';    // always lookup original properties, don't use the functions
-    const match = val.match(/^\{(.*)\}$/);
-    if (match) {
-      const field = schema.fields.get(match[1]);
-      if (field) {
-        return field;
+    const val = this.props[prop];
+    if (val && (typeof val === 'string')) {   // This will only work for strings
+      const match = val.match(/^\{(.*)\}$/);
+      if (match) {
+        const field = schema.fields.get(match[1]);
+        if (field) {
+          return field;
+        }
+        console.warn(`Unable to resolve referenced field: ${this.id}.${prop} -> ${match[1]}`);  // eslint-disable-line no-console
       }
-      console.error(`Unable to resolve referenced field: ${match[1]}`);  // eslint-disable-line no-console
     }
     return this;
   }
