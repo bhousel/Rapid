@@ -6,6 +6,8 @@ import { AbstractSystem } from './AbstractSystem.js';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.js';
 import { Category, Field, Preset } from '../lib/index.js';
 import { utilIterable } from '../util/iterable.js';
+import { utilWildcard } from '../util/string.js';
+
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
@@ -238,6 +240,18 @@ export class SchemaSystem extends AbstractSystem {
    *   defaults: {},           // Object<geometry, Array<presetIDs>>
    *   featureCollection: {}   // Custom GeoJSON, possibly referenced by locationSets
    * }
+   *
+   * When merging:
+   *  - Items are processed in the order they appear.
+   *  - You can't replace the fallback presets.
+   *     `"point": { name: 'My Point', … },`            <-- silently ignored
+   *  - New items will replace existing items that have the same `id`.
+   *     `"barrier/fence": { name: 'My Fence', … },`    <-- `barrier/fence` preset replaced
+   *  - If no new data supplied, this is treated as a delete.
+   *     `"barrier/fence": null,`                       <-- `barrier/fence` preset deleted
+   *  - Wildcard characters '*' and '?' are allowed when deleting.
+   *     `"barrier/*": null,`                           <-- all `barrier/*` presets deleted
+   *
    * @param  {Object}  src - preset data to merge into the caches
    */
   merge(src = {}) {
@@ -271,7 +285,16 @@ export class SchemaSystem extends AbstractSystem {
           this.fields.set(fieldID, field);
 
         } else {   // remove
-          this.fields.delete(fieldID);
+          const wildcard = utilWildcard(fieldID);
+          if (wildcard) {
+            for (const k of this.fields.keys()) {
+              if (wildcard.test(k)) {
+                this.fields.delete(k);
+              }
+            }
+          } else {
+            this.fields.delete(fieldID);
+          }
         }
       }
     }
@@ -302,7 +325,16 @@ export class SchemaSystem extends AbstractSystem {
           this.presets.set(presetID, preset);
 
         } else {   // remove
-          this.presets.delete(presetID);
+          const wildcard = utilWildcard(presetID);
+          if (wildcard) {
+            for (const k of this.presets.keys()) {
+              if (wildcard.test(k)) {
+                this.presets.delete(k);
+              }
+            }
+          } else {
+            this.presets.delete(presetID);
+          }
         }
       }
     }
@@ -321,7 +353,16 @@ export class SchemaSystem extends AbstractSystem {
           this.categories.set(categoryID, category);
 
         } else {   // remove
-          this.categories.delete(categoryID);
+          const wildcard = utilWildcard(categoryID);
+          if (wildcard) {
+            for (const k of this.categories.keys()) {
+              if (wildcard.test(k)) {
+                this.categories.delete(k);
+              }
+            }
+          } else {
+            this.categories.delete(categoryID);
+          }
         }
       }
     }

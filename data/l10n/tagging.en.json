@@ -2330,12 +2330,7 @@
           }
         },
         "crossing": {
-          "label": "Type",
-          "options": {
-            "traffic_signals": "Crossing With Traffic Signals",
-            "uncontrolled": "Only Road Markings",
-            "unmarked": "No Road Markings or Traffic Signals"
-          }
+          "label": "Crossing Type"
         },
         "crop": {
           "label": "Crops",
@@ -4057,24 +4052,7 @@
         "crossing/markings_yes-DE-AT-CH": {},
         "crossing/markings_yes-BG": {},
         "crossing/markings": {
-          "label": "Crossing Markings",
-          "options": {
-            "zebra": "Longitudinal Bars",
-            "lines": "Transverse Lines",
-            "no": "Unmarked",
-            "ladder": "Ladder With Longitudinal Bars",
-            "dots": "Dotted Transverse Lines",
-            "dashes": "Dashed Transverse Lines",
-            "yes": "Marked Somehow",
-            "surface": "Surface Treatment Only",
-            "ladder:skewed": "Ladder With Diagonal Bars",
-            "pictograms": "Painted Pictograms",
-            "lines:paired": "Double Transverse Lines",
-            "zebra:double": "Triple-Four",
-            "zebra:paired": "Paired Longitudinal Bars",
-            "zebra:bicolour": "Longitudinal Bars With Alternating Colors",
-            "ladder:paired": "Ladder With Paired Longitudinal Bars"
-          }
+          "label": "Crossing Markings"
         },
         "crossing/markings-PL": {},
         "crossing/markings-DE-AT-CH": {},
@@ -4243,13 +4221,7 @@
             "alphabetic": "Alphabetic"
           }
         },
-        "crossing2": {
-          "label": "Crossing Type"
-        },
-        "crossing2/markings": {
-          "label": "Crossing Markings"
-        },
-        "crossing2/signals": {
+        "crossing/signals": {
           "label": "Crossing Signals"
         }
       },
@@ -6414,8 +6386,7 @@
           "terms": "tree line"
         },
         "natural/tree": {
-          "name": "Tree",
-          "terms": "bole,trunk"
+          "name": "Tree (Unspecified Type)"
         },
         "natural/strait": {
           "name": "Strait",
@@ -6607,10 +6578,12 @@
           "terms": "detention,drain,overflow,rain,retention"
         },
         "natural/tree/needleleaved": {
-          "name": "Needleleaved Tree"
+          "name": "Tree (Needle-leaved)",
+          "terms": "evergreen,pine"
         },
         "natural/tree/broadleaved": {
-          "name": "Broadleaved Tree"
+          "name": "Tree (Broad-leaved)",
+          "terms": "deciduous,leafy"
         },
         "natural/tree/needleleaved/evergreen": {
           "name": "Needleleaved Tree (evergreen)",
@@ -7996,7 +7969,7 @@
           "terms": "bicycle path,bike path,cycling path"
         },
         "highway/crossing": {
-          "name": "Crossing",
+          "name": "Pedestrian Crossing",
           "terms": "crosswalk,foot path crossing,pedestrian crossing"
         },
         "highway/corridor": {
@@ -8073,7 +8046,7 @@
         },
         "highway/footway/crossing": {
           "name": "Pedestrian Crossing",
-          "terms": "crosswalk,foot path crossing"
+          "terms": "crosswalk,foot path crossing,pedestrian crossing"
         },
         "highway/footway/conveying": {
           "name": "Moving Walkway",
@@ -8087,8 +8060,7 @@
           "name": "Informal Foot Path"
         },
         "highway/footway/crossing/unmarked": {
-          "name": "Unmarked Crossing",
-          "terms": "unmarked crosswalk,unmarked foot path crossing,unmarked pedestrian crossing"
+          "name": "Unmarked Crossing"
         },
         "highway/footway/crossing/uncontrolled": {
           "name": "Marked Crossing",
@@ -8098,7 +8070,9 @@
           "name": "Crossing With Pedestrian Signals",
           "terms": "crosswalk (lights),pedestrian traffic lights,pedestrian traffic signals,pedestrian crossing (lights)"
         },
-        "highway/footway/crossing/zebra": {},
+        "highway/footway/crossing/zebra": {
+          "name": "Marked Crossing (Zebra)"
+        },
         "highway/footway/crossing/marked": {},
         "highway/cycleway/moped_link-NL": {
           "name": "Moped Link"
@@ -8108,7 +8082,8 @@
           "terms": "bicycle and foot path,bike and pedestrian path,green way,greenway,mixed-use trail,multi-use trail,segregated trail,shared path,shared use path,rail trail"
         },
         "highway/cycleway/crossing": {
-          "name": "Cycle Crossing"
+          "name": "Cycle & Foot Crossing",
+          "terms": "bicycle and foot crosswalk,bike and pedestrian crossing,cycleway,cycling,cyclist"
         },
         "highway/cycleway/crossing/unmarked": {
           "name": "Unmarked Cycle Crossing",
@@ -8128,8 +8103,7 @@
         },
         "highway/cycleway/crossing/marked": {},
         "highway/crossing/unmarked": {
-          "name": "Unmarked Crossing",
-          "terms": "unmarked crosswalk,unmarked foot path crossing,unmarked pedestrian crossing"
+          "name": "Unmarked Crossing"
         },
         "highway/crossing/uncontrolled": {
           "name": "Marked Crossing",
@@ -8139,7 +8113,9 @@
           "name": "Crossing With Pedestrian Signals",
           "terms": "bicycle crossing (lights),crosswalk (lights),pedestrian crossing (lights),pedestrian traffic lights,pedestrian traffic signals"
         },
-        "highway/crossing/zebra": {},
+        "highway/crossing/zebra": {
+          "name": "Marked Crossing (Zebra)"
+        },
         "highway/crossing/marked": {},
         "healthcare/speech_therapist": {
           "name": "Speech Therapist",
@@ -10375,170 +10351,135 @@
         "barrier/kerb/flush/tactile": {
           "name": "Flush Curb, Tactile Paving"
         },
-        "natural/tree2": {
-          "name": "Tree (Unspecified Type)"
-        },
-        "natural/tree2/broadleaved": {
-          "name": "Tree (Broad-leaved)",
-          "terms": "deciduous,leafy"
-        },
-        "natural/tree2/needleleaved": {
-          "name": "Tree (Needle-leaved)",
-          "terms": "evergreen,pine"
-        },
-        "natural/tree2/cactus": {
+        "natural/tree/cactus": {
           "name": "Tree (Cactus)",
           "terms": "saguero"
         },
-        "natural/tree2/palm": {
+        "natural/tree/palm": {
           "name": "Tree (Palm)",
           "terms": "coconut"
         },
-        "natural/tree2/none": {
+        "natural/tree/none": {
           "name": "Tree (No Leaves)"
         },
-        "highway/cycleway/crossing2": {
-          "name": "Cycle & Foot Crossing",
-          "terms": "bicycle and foot crosswalk,bike and pedestrian crossing,cycleway,cycling,cyclist"
-        },
-        "highway/cycleway/crossing2/LEGACY": {
+        "highway/cycleway/crossing/LEGACY": {
           "name": "Cycle & Foot Crossing (Other)",
           "terms": "bicycle and foot crosswalk,bike and pedestrian crossing,cycleway,cycling,cyclist"
         },
-        "highway/footway/crossing2": {
-          "name": "Pedestrian Crossing",
-          "terms": "crosswalk,foot path crossing,pedestrian crossing"
-        },
-        "highway/footway/crossing2/LEGACY": {
+        "highway/footway/crossing/LEGACY": {
           "name": "Crossing (Other)",
           "terms": "crosswalk,foot path crossing,pedestrian crossing"
         },
-        "highway/footway/crossing2/LEGACY/marked": {
+        "highway/footway/crossing/LEGACY/marked": {
           "name": "Crossing (Marked)"
         },
-        "highway/footway/crossing2/LEGACY/traffic_signals": {
+        "highway/footway/crossing/LEGACY/traffic_signals": {
           "name": "Crossing (Traffic Signals)"
         },
-        "highway/footway/crossing2/LEGACY/uncontrolled": {
+        "highway/footway/crossing/LEGACY/uncontrolled": {
           "name": "Crossing (Uncontrolled)"
         },
-        "highway/footway/crossing2/LEGACY/unmarked": {
+        "highway/footway/crossing/LEGACY/unmarked": {
           "name": "Crossing (Unmarked)"
         },
-        "highway/footway/crossing2/LEGACY/zebra": {
+        "highway/footway/crossing/LEGACY/zebra": {
           "name": "Crossing (Zebra)"
         },
-        "highway/footway/crossing2/dashes": {
+        "highway/footway/crossing/dashes": {
           "name": "Marked Crossing (Dashes)"
         },
-        "highway/footway/crossing2/dots": {
+        "highway/footway/crossing/dots": {
           "name": "Marked Crossing (Dots)"
         },
-        "highway/footway/crossing2/ladder": {
+        "highway/footway/crossing/ladder": {
           "name": "Marked Crossing (Ladder)"
         },
-        "highway/footway/crossing2/ladder:paired": {
+        "highway/footway/crossing/ladder:paired": {
           "name": "Marked Crossing (Paired Ladder)"
         },
-        "highway/footway/crossing2/ladder:skewed": {
+        "highway/footway/crossing/ladder:skewed": {
           "name": "Marked Crossing (Skewed Ladder)"
         },
-        "highway/footway/crossing2/lines": {
+        "highway/footway/crossing/lines": {
           "name": "Marked Crossing (Lines)"
         },
-        "highway/footway/crossing2/lines:paired": {
+        "highway/footway/crossing/lines:paired": {
           "name": "Marked Crossing (Paired Lines)"
         },
-        "highway/footway/crossing2/other": {
+        "highway/footway/crossing/other": {
           "name": "Marked Crossing (Other)"
         },
-        "highway/footway/crossing2/surface": {
+        "highway/footway/crossing/surface": {
           "name": "Marked Crossing (Surface Treatment)"
         },
-        "highway/footway/crossing2/unmarked": {
-          "name": "Unmarked Crossing"
-        },
-        "highway/footway/crossing2/zebra": {
-          "name": "Marked Crossing (Zebra)"
-        },
-        "highway/footway/crossing2/zebra:bicolour": {
+        "highway/footway/crossing/zebra:bicolour": {
           "name": "Marked Crossing (Bicolor Zebra)"
         },
-        "highway/footway/crossing2/zebra:double": {
+        "highway/footway/crossing/zebra:double": {
           "name": "Marked Crossing (Double Zebra)"
         },
-        "highway/footway/crossing2/zebra:paired": {
+        "highway/footway/crossing/zebra:paired": {
           "name": "Marked Crossing (Paired Zebra)"
         },
-        "highway/footway/crossing2/signals": {
+        "highway/footway/crossing/signals": {
           "name": "Signalized Crossing"
         },
-        "highway/crossing2": {
-          "name": "Pedestrian Crossing",
-          "terms": "crosswalk,foot path crossing,pedestrian crossing"
-        },
-        "highway/crossing2/LEGACY": {
+        "highway/crossing/LEGACY": {
           "name": "Crossing (Other)",
           "terms": "crosswalk,foot path crossing,pedestrian crossing"
         },
-        "highway/crossing2/LEGACY/marked": {
+        "highway/crossing/LEGACY/marked": {
           "name": "Crossing (Marked)"
         },
-        "highway/crossing2/LEGACY/traffic_signals": {
+        "highway/crossing/LEGACY/traffic_signals": {
           "name": "Crossing (Traffic Signals)"
         },
-        "highway/crossing2/LEGACY/uncontrolled": {
+        "highway/crossing/LEGACY/uncontrolled": {
           "name": "Crossing (Uncontrolled)"
         },
-        "highway/crossing2/LEGACY/unmarked": {
+        "highway/crossing/LEGACY/unmarked": {
           "name": "Crossing (Unmarked)"
         },
-        "highway/crossing2/LEGACY/zebra": {
+        "highway/crossing/LEGACY/zebra": {
           "name": "Crossing (Zebra)"
         },
-        "highway/crossing2/dashes": {
+        "highway/crossing/dashes": {
           "name": "Marked Crossing (Dashes)"
         },
-        "highway/crossing2/dots": {
+        "highway/crossing/dots": {
           "name": "Marked Crossing (Dots)"
         },
-        "highway/crossing2/ladder": {
+        "highway/crossing/ladder": {
           "name": "Marked Crossing (Ladder)"
         },
-        "highway/crossing2/ladder:paired": {
+        "highway/crossing/ladder:paired": {
           "name": "Marked Crossing (Paired Ladder)"
         },
-        "highway/crossing2/ladder:skewed": {
+        "highway/crossing/ladder:skewed": {
           "name": "Marked Crossing (Skewed Ladder)"
         },
-        "highway/crossing2/lines": {
+        "highway/crossing/lines": {
           "name": "Marked Crossing (Lines)"
         },
-        "highway/crossing2/lines:paired": {
+        "highway/crossing/lines:paired": {
           "name": "Marked Crossing (Paired Lines)"
         },
-        "highway/crossing2/other": {
+        "highway/crossing/other": {
           "name": "Marked Crossing (Other)"
         },
-        "highway/crossing2/surface": {
+        "highway/crossing/surface": {
           "name": "Marked Crossing (Surface Treatment)"
         },
-        "highway/crossing2/unmarked": {
-          "name": "Unmarked Crossing"
-        },
-        "highway/crossing2/zebra": {
-          "name": "Marked Crossing (Zebra)"
-        },
-        "highway/crossing2/zebra:bicolour": {
+        "highway/crossing/zebra:bicolour": {
           "name": "Marked Crossing (Bicolor Zebra)"
         },
-        "highway/crossing2/zebra:double": {
+        "highway/crossing/zebra:double": {
           "name": "Marked Crossing (Double Zebra)"
         },
-        "highway/crossing2/zebra:paired": {
+        "highway/crossing/zebra:paired": {
           "name": "Marked Crossing (Paired Zebra)"
         },
-        "highway/crossing2/signals": {
+        "highway/crossing/signals": {
           "name": "Signalized Crossing"
         }
       }

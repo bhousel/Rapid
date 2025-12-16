@@ -33,3 +33,25 @@ export function utilNormalizeString(str) {
       .toLowerCase()
   );
 }
+
+
+/**
+ * utilWildcard
+ * This checks if a string looks like a "wildcard" string (contains '*' or '?')
+ * and if so, converts it to a regular expression.
+ *
+ * @see https://stackoverflow.com/a/57527468/7620
+ * @param  {string}  str - the string to check
+ * @return {RegExp}  a regular expression, or `null` if not a wildcard string.
+ */
+export function utilWildcard(str) {
+  if (typeof str !== 'string') return null;
+  if (!(/[*?]/.test(str))) return null;   // no wildcard chars
+
+  const wild = str
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')   // escape special regex characters
+    .replace(/\*/g, '.*')                   // * match
+    .replace(/\?/g, '.');                   // ? match
+
+  return new RegExp(`^${wild}$`);
+}
