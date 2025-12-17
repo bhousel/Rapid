@@ -171,44 +171,6 @@ describe('SchemaSystem', () => {
     });
 
 
-    describe('fallbacks', () => {
-      it('has a fallback point Preset', () => {
-        const result = _schema.presets.get('point');
-        assert.instanceOf(result, Rapid.Preset);
-        assert.deepEqual(result.id, 'point');
-        assert.isTrue(result.isFallback());
-      });
-
-      it('returns the fallback point Preset for vertex', () => {
-        const result = _schema.presets.get('vertex');
-        assert.instanceOf(result, Rapid.Preset);
-        assert.deepEqual(result.id, 'point');
-        assert.isTrue(result.isFallback());
-      });
-
-      it('has a fallback line Preset', () => {
-        const result = _schema.presets.get('line');
-        assert.instanceOf(result, Rapid.Preset);
-        assert.deepEqual(result.id, 'line');
-        assert.isTrue(result.isFallback());
-      });
-
-      it('has a fallback area Preset', () => {
-        const result = _schema.presets.get('area');
-        assert.instanceOf(result, Rapid.Preset);
-        assert.deepEqual(result.id, 'area');
-        assert.isTrue(result.isFallback());
-      });
-
-      it('has a fallback relation Preset', () => {
-        const result = _schema.presets.get('relation');
-        assert.instanceOf(result, Rapid.Preset);
-        assert.deepEqual(result.id, 'relation');
-        assert.isTrue(result.isFallback());
-      });
-    });
-
-
     describe('merge', () => {
       it('throws if schemaID is missing', () => {
         const schemaData = {};
@@ -617,6 +579,48 @@ describe('SchemaSystem', () => {
     });  // search
 
 
+    describe('getFallback', () => {
+      it('gets the fallback point Preset', () => {
+        const result = _schema.getFallback('point');
+        assert.instanceOf(result, Rapid.Preset);
+        assert.deepEqual(result.id, 'point');
+        assert.isTrue(result.isFallback());
+      });
+
+      it('returns the fallback point Preset for vertex', () => {
+        const result = _schema.getFallback('vertex');
+        assert.instanceOf(result, Rapid.Preset);
+        assert.deepEqual(result.id, 'point');
+        assert.isTrue(result.isFallback());
+      });
+
+      it('gets the fallback line Preset', () => {
+        const result = _schema.getFallback('line');
+        assert.instanceOf(result, Rapid.Preset);
+        assert.deepEqual(result.id, 'line');
+        assert.isTrue(result.isFallback());
+      });
+
+      it('gets the fallback area Preset', () => {
+        const result = _schema.getFallback('area');
+        assert.instanceOf(result, Rapid.Preset);
+        assert.deepEqual(result.id, 'area');
+        assert.isTrue(result.isFallback());
+      });
+
+      it('gets the fallback relation Preset', () => {
+        const result = _schema.getFallback('relation');
+        assert.instanceOf(result, Rapid.Preset);
+        assert.deepEqual(result.id, 'relation');
+        assert.isTrue(result.isFallback());
+      });
+
+      it('returns undefined for unrecognized geometry type values', () => {
+        assert.isUndefined(_schema.getFallback('fake'));
+      });
+    });
+
+
     describe('getDefaults', () => {
     });
 
@@ -805,7 +809,7 @@ describe('SchemaSystem', () => {
 
       it('resets presets', () => {
         assert.instanceOf(_schema.presets, Map);
-        assert.hasAllKeys(_schema.presets, ['point', 'vertex', 'line', 'area', 'relation']);
+        assert.hasAllKeys(_schema.presets, ['point', 'line', 'area', 'relation']);
       });
 
       it('resets categories', () => {

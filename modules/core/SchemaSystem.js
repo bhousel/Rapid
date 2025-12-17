@@ -517,7 +517,7 @@ export class SchemaSystem extends AbstractSystem {
 
     // Append fallback preset(s)
     for (const geom of geoms) {
-      const fallback = this.presets.get(geom);
+      const fallback = this.getFallback(geom);
       if (fallback) {
         results.set(fallback.id, fallback);
       }
@@ -673,7 +673,7 @@ export class SchemaSystem extends AbstractSystem {
       }
     }
 
-    return bestMatch || this.presets.get(geometry);
+    return bestMatch || this.getFallback(geometry);
   }
 
 
@@ -797,6 +797,19 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
+   * getFallback
+   * Gets the fallback preset for the given geometry.
+   * For most geometries we just return the Preset with that `id`, but for `vertex' we return 'point'.
+   * @param   {geometryType}  geometry - 'point', 'vertex', 'line', 'area', or 'relation'
+   * @return  {Preset}        The fallback preset, or `undefined` if not found
+   */
+  getFallback(geometry) {
+    if (geometry === 'vertex')  geometry = 'point';
+    return this.presets.get(geometry);
+  }
+
+
+  /**
    * getDefaults
    * Defaults are the Presets and Categories offered to the user when adding a new feature.
    * Each geometry type has its own set of defaults.
@@ -838,7 +851,7 @@ export class SchemaSystem extends AbstractSystem {
       }
     }
 
-    const fallback = this.presets.get(geometry);
+    const fallback = this.getFallback(geometry);
     if (fallback && !results.has(fallback.id)) {
       results.set(fallback.id, fallback);
     }
@@ -976,15 +989,14 @@ export class SchemaSystem extends AbstractSystem {
     }
 
     // Gather "searchable" Presets and Categories..
-    // Note: we are doing it this way to avoid gathering 'vertex' twice.
     this._currSearchIndex.removeAll();
     this._searchable = [];
-    for (const [presetID, preset] of this.presets) {
-      if (presetID === 'vertex') continue;  // this is an intentional duplicate
+
+    for (const preset of this.presets.values()) {
       if (!preset.props.searchable) continue;
       this._searchable.push(preset);
     }
-    for (const [_categoryID, category] of this.categories) {
+    for (const category of this.categories.values()) {
       if (!category.props.searchable) continue;
       this._searchable.push(category);
     }
@@ -1084,7 +1096,6 @@ export class SchemaSystem extends AbstractSystem {
     const relation = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
 
     this.presets.set('point', point);
-    this.presets.set('vertex', point);  // use point for 'vertex' too.
     this.presets.set('line', line);
     this.presets.set('area', area);
     this.presets.set('relation', relation);
