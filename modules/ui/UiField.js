@@ -202,41 +202,41 @@ export class UiField {
 
   /**
    * render
-   * @param  `selection`  A d3-selection to a parent element that the field should render itself into
+   * @param  `$selection`  A d3-selection to a parent element that the field should render itself into
    */
-  render(selection) {
+  render($selection) {
     const l10n = this.context.systems.l10n;
 
-    let container = selection.selectAll('.form-field')
+    let $container = $selection.selectAll('.form-field')
       .data([this]);
 
     // Enter
-    let enter = container.enter()
+    let $$container = $container.enter()
       .append('div')
       .attr('class', `form-field form-field-${this.safeid}`)
       .classed('nowrap', !this.options.wrap);
 
     if (this.options.wrap) {
-      let labelEnter = enter
+      let $$label = $$container
         .append('label')
         .attr('class', 'field-label')
         .attr('for', this.uid);
 
-      let textEnter = labelEnter
+      let $$text = $$label
         .append('span')
         .attr('class', 'label-text');
 
-      textEnter
+      $$text
         .append('span')
         .attr('class', 'label-textvalue')
-        .html(this.label);
+        .text(this.label);
 
-      textEnter
+      $$text
         .append('span')
         .attr('class', 'label-textannotation');
 
       if (this.options.remove) {
-        labelEnter
+        $$label
           .append('button')
           .attr('class', 'remove-icon')
           .attr('title', l10n.t('icons.remove'))
@@ -244,7 +244,7 @@ export class UiField {
       }
 
       if (this.options.revert) {
-        labelEnter
+        $$label
           .append('button')
           .attr('class', 'modified-icon')
           .attr('title', l10n.t('icons.undo'))
@@ -254,19 +254,19 @@ export class UiField {
 
 
     // Update
-    container = container
-      .merge(enter);
+    $container = $container
+      .merge($$container);
 
-    container.select('.field-label > .remove-icon')  // propagate bound data
+    $container.select('.field-label > .remove-icon')  // propagate bound data
       .on('click', this.remove);
 
-    container.select('.field-label > .modified-icon')  // propagate bound data
+    $container.select('.field-label > .modified-icon')  // propagate bound data
       .on('click', this.revert);
 
 // kind of a convoluted way to do it.. selection.each over one thing that is just `this`? :-/
-    container
+    $container
       .each((d, i, nodes) => {
-        let selection = d3_select(nodes[i]);
+        let $selection = d3_select(nodes[i]);
 
         if (!this._internal) {
           this._createField();
@@ -292,12 +292,12 @@ export class UiField {
           }
         }
 
-        selection
+        $selection
           .call(this._internal);
 
 //        // add field help components
 //        if (help) {
-//          selection
+//          $selection
 //            .call(help.body)
 //            .select('.field-label')
 //            .call(help.button);
@@ -305,7 +305,7 @@ export class UiField {
 
         // add tag reference components
         if (reference) {
-          selection
+          $selection
             .call(reference.body)
             .select('.field-label')
             .call(reference.button);
@@ -315,26 +315,26 @@ export class UiField {
       });
 
 
-    container
+    $container
       .classed('locked', this._locked)
       .classed('modified', this.isModified())
       .classed('present', this.tagsContainFieldKey());
 
     // show a tip and lock icon if the field is locked
-    let annotation = container.selectAll('.field-label .label-textannotation');
-    let icon = annotation.selectAll('.icon')
+    let $annotation = $container.selectAll('.field-label .label-textannotation');
+    let $icon = $annotation.selectAll('.icon')
       .data(this._locked ? [0]: []);
 
-    icon.exit()
+    $icon.exit()
       .remove();
 
-    icon.enter()
+    $icon.enter()
       .append('svg')
       .attr('class', 'icon')
       .append('use')
       .attr('xlink:href', '#fas-lock');
 
-    container.call(this._locked ? this._lockedTip : this._lockedTip.destroy);
+    $container.call(this._locked ? this._lockedTip : this._lockedTip.destroy);
   }
 
 

@@ -25,7 +25,7 @@ export function uiSectionPresetFields(context) {
   let _entityIDs;
 
 
-  function renderDisclosureContent(selection) {
+  function renderDisclosureContent($selection) {
     if (!_uifields) {
       const graph = editor.staging.graph;
       const localeCode = l10n.localeCode();
@@ -99,7 +99,7 @@ export function uiSectionPresetFields(context) {
     }
 
 
-    selection
+    $selection
       .call(formFields
         .fieldsArr(_uifields)
         .state(_state)
@@ -107,7 +107,7 @@ export function uiSectionPresetFields(context) {
       );
 
 
-    selection.selectAll('.wrap-form-field input')
+    $selection.selectAll('.wrap-form-field input')
       .on('keydown', function(d3_event) {
         // if user presses enter, and combobox is not active, accept edits..
         if (d3_event.keyCode === 13 && context.container().select('.combobox').empty()) {   // ↩ Return

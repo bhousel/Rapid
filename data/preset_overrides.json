@@ -3,8 +3,6 @@
   "defaults": {},
 
   "fields": {
-
-    "crossing": null,
     "crossing/markings*": null,
     "crossing/signals*": null,
 
@@ -44,7 +42,6 @@
   },
 
   "presets": {
-
     "natural/tree*": null,
     "highway/crossing*": null,
     "highway/cycleway/crossing*": null,

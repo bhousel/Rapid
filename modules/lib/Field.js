@@ -117,9 +117,9 @@ export class Field {
     const fallbackLabel = this.props.label || this.id;
     const fallbackTerms = this.props.terms.join(',');    // stringify Array
     const fallbackPlaceholder = this.props.placeholder || '';
-    const label = l10n?.t(`_tagging.presets.presets.${labelRef.id}.label`, { 'default': '' }) || fallbackLabel;
-    const terms = l10n?.t(`_tagging.presets.presets.${this.id}.terms`, { 'default': '' }) || fallbackTerms;
-    const placeholder = l10n?.t(`_tagging.presets.presets.${placeholderRef.id}.placeholder`, { 'default': '' }) || fallbackPlaceholder;
+    const label = l10n?.t(`_tagging.presets.fields.${labelRef.id}.label`, { 'default': '' }) || fallbackLabel;
+    const terms = l10n?.t(`_tagging.presets.fields.${this.id}.terms`, { 'default': '' }) || fallbackTerms;
+    const placeholder = l10n?.t(`_tagging.presets.fields.${placeholderRef.id}.placeholder`, { 'default': '' }) || fallbackPlaceholder;
 
     this._currStrings = {
       id: this.id,

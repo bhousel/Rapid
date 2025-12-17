@@ -13,46 +13,46 @@ export function uiFormFields(context) {
   let _klass = '';
 
 
-  function formFields(selection) {
+  function formFields($selection) {
     const allowedFields = _uifields.filter(uifield => uifield.isAllowed());
     const shown = allowedFields.filter(uifield => uifield.isShown());
     const notShown = allowedFields.filter(uifield => !uifield.isShown());
 
-    let container = selection.selectAll('.form-fields-container')
+    let $container = $selection.selectAll('.form-fields-container')
       .data([0]);
 
-    container = container.enter()
+    $container = $container.enter()
       .append('div')
       .attr('class', 'form-fields-container ' + (_klass || ''))
-      .merge(container);
+      .merge($container);
 
 
-    let fields = container.selectAll('.wrap-form-field')
+    let $fields = $container.selectAll('.wrap-form-field')
       .data(shown, d => (d.id + (d.entityIDs ? d.entityIDs.join() : '')));
 
-    fields.exit()
+    $fields.exit()
       .remove();
 
     // Enter
-    let enter = fields.enter()
+    const $$fields = $fields.enter()
       .append('div')
       .attr('class', d => `wrap-form-field wrap-form-field-${d.safeid}`);
 
     // Update
-    fields = fields
-      .merge(enter);
+    $fields = $fields
+      .merge($$fields);
 
-    fields
+    $fields
       .order()
       .each((d, i, nodes) => {
         d3_select(nodes[i]).call(d.render);
       });
 
 
-    let titles = [];
+    let labels = [];
     let moreFields = notShown.map(uifield => {
-      const title = uifield.title;
-      titles.push(title);
+      const label = uifield.label;
+      labels.push(label);
 
       let terms = uifield.terms;
       if (uifield.key)  terms.push(uifield.key);
@@ -60,50 +60,50 @@ export function uiFormFields(context) {
 
       return {
         display: uifield.label,
-        value: title,
-        title: title,
+        value: label,
+        title: label,
         field: uifield,
         terms: terms
       };
     });
 
 
-    let placeholder = titles.slice(0,3).join(', ') + ((titles.length > 3) ? '…' : '');
+    let placeholder = labels.slice(0,3).join(', ') + ((labels.length > 3) ? '…' : '');
 
-    let more = selection.selectAll('.more-fields')
+    let $more = $selection.selectAll('.more-fields')
       .data((_state === 'hover' || moreFields.length === 0) ? [] : [0]);
 
-    more.exit()
+    $more.exit()
       .remove();
 
-    let moreEnter = more.enter()
+    const $$more = $more.enter()
       .append('div')
       .attr('class', 'more-fields')
       .append('label');
 
-    moreEnter
+    $$more
       .append('span')
       .text(l10n.t('inspector.add_fields'));
 
-    more = moreEnter
-      .merge(more);
+    $more = $more
+      .merge($$more);
 
 
-    let input = more.selectAll('.value')
+    let $input = $more.selectAll('.value')
       .data([0]);
 
-    input.exit()
+    $input.exit()
       .remove();
 
-    input = input.enter()
+    $input = $input.enter()
       .append('input')
       .attr('class', 'value')
       .attr('type', 'text')
       .attr('placeholder', placeholder)
       .call(utilNoAuto)
-      .merge(input);
+      .merge($input);
 
-    input
+    $input
       .call(utilGetSetValue, '')
       .call(moreCombo
         .data(moreFields)
@@ -111,14 +111,14 @@ export function uiFormFields(context) {
           if (!d) return;  // user entered something that was not matched
           const uifield = d.field;
           uifield.show();
-          selection.call(formFields);  // rerender
+          $selection.call(formFields);  // rerender
           uifield.focus();
         })
       );
 
     // avoid updating placeholder excessively (triggers style recalc)
     if (_lastPlaceholder !== placeholder) {
-      input.attr('placeholder', placeholder);
+      $input.attr('placeholder', placeholder);
       _lastPlaceholder = placeholder;
     }
   }
