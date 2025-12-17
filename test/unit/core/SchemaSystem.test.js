@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './SchemaSystem.sample.js';
@@ -90,7 +90,7 @@ describe('SchemaSystem', () => {
   // Test an already-constructed instance of the system..
   // The tests in here need to run serially, because we rely on being able to
   // merge multiple preset schemas into the SchemaSystem and then matching against them.
-  describe.serial('properties, methods', () => {
+  describe.serial('methods', () => {
     const spySchemaChange = mock();
     let _schema, _savedAreaKeys;
 
@@ -168,89 +168,6 @@ describe('SchemaSystem', () => {
         assert.instanceOf(_schema._matchIndex, Map);
         assert.hasAllKeys(_schema._matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
       });
-
-    });
-
-
-//    describe('_resetCaches', () => {
-//      it('resets caches in Fields, Presets, and Categories', () => {
-//        const field = new Rapid.Field(context, {
-//          id: 'wikidata', type: 'wikidata', key: 'wikidata', universal: true
-//        });
-//        field.reset = mock();
-//
-//        const preset = new Rapid.Preset(context, {
-//          id: 'residential', geometry: ['line'], tags: { highway: 'residential' }
-//        });
-//        preset.reset = mock();
-//
-//        const category = new Rapid.Category(context, {
-//          id: 'roads', members: ['residential']
-//        });
-//        category.reset = mock();
-//
-//        _schema.fields.set(field.id, field);
-//        _schema.presets.set(preset.id, preset);
-//        _schema.categories.set(category.id, category);
-//
-//        _schema._resetCaches();
-//
-//        assert.lengthOf(field.reset.mock.calls, 1);     // reset called once
-//        assert.lengthOf(preset.reset.mock.calls, 1);    // reset called once
-//        assert.lengthOf(category.reset.mock.calls, 1);  // reset called once
-//      });
-//    });
-
-
-    describe('_resetAll', () => {
-      beforeAll(() => {
-        spySchemaChange.mockClear();  // reset call count
-        _schema._resetAll();
-      });
-
-      it('resets schemas', () => {
-        assert.instanceOf(_schema.schemas, Set);
-        assert.isEmpty(_schema.schemas);
-      });
-
-      it('resets fields', () => {
-        assert.instanceOf(_schema.fields, Map);
-        assert.isEmpty(_schema.fields);
-      });
-
-      it('resets presets', () => {
-        assert.instanceOf(_schema.presets, Map);
-        assert.hasAllKeys(_schema.presets, ['point', 'vertex', 'line', 'area', 'relation']);
-      });
-
-      it('resets categories', () => {
-        assert.instanceOf(_schema.categories, Map);
-        assert.isEmpty(_schema.categories);
-      });
-
-      it('resets universal', () => {
-        assert.instanceOf(_schema.universal, Map);
-        assert.isEmpty(_schema.universal);
-      });
-
-      it('resets defaults', () => {
-        assert.instanceOf(_schema.defaults, Map);
-        assert.hasAllKeys(_schema.defaults, ['point', 'vertex', 'line', 'area', 'relation']);
-      });
-
-      it('resets _searchable', () => {
-        assert.instanceOf(_schema._searchable, Array);
-        assert.deepEqual(_schema._searchable.map(item => item.id), ['point', 'line', 'area', 'relation']);
-      });
-
-      it('resets _matchIndex', () => {
-        assert.instanceOf(_schema._matchIndex, Map);
-        assert.hasAllKeys(_schema._matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
-      });
-
-      it('emits schemachange after merging', () => {
-        assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
-      });
     });
 
 
@@ -306,10 +223,17 @@ describe('SchemaSystem', () => {
         assert.throws(() => _schema.merge(schemaData), /already merged/i);
       });
 
-      describe('adding', () => {
+      describe('merge add', () => {
+        const orig = console.warn;
+
         beforeAll(() => {
+          console.warn = () => {};   // temporarily silence the warning
           spySchemaChange.mockClear();  // reset call count
           _schema.merge(sample.addSurfData);
+        });
+
+        afterAll(() => {
+          console.warn = orig;  // restore console.warn
         });
 
         it('emits schemachange after merging', () => {
@@ -425,7 +349,7 @@ describe('SchemaSystem', () => {
       });
 
 
-      describe('updating', () => {
+      describe('merge update', () => {
         beforeAll(() => {
           spySchemaChange.mockClear();  // reset call count
           _schema.merge(sample.updateSurfData);
@@ -509,8 +433,7 @@ describe('SchemaSystem', () => {
         });
       });
 
-
-      describe('deleting', () => {
+      describe('merge delete', () => {
         beforeAll(() => {
           spySchemaChange.mockClear();  // reset call count
           _schema.merge(sample.deleteSurfData);
@@ -525,20 +448,50 @@ describe('SchemaSystem', () => {
         });
 
         describe('fields', () => {
-          it('deletes an existing field', () => {
+          it('deletes an existing fieldID', () => {
             assert.isUndefined(_schema.fields.get('board/type'));
+          });
+
+          it(`deletes wildcard fieldIDs containing '?'`, () => {
+            assert.isUndefined(_schema.fields.get('field/foo1'));
+            assert.isUndefined(_schema.fields.get('field/foo2'));
+          });
+
+          it(`deletes wildcard fieldIDs containing '*'`, () => {
+            assert.isUndefined(_schema.fields.get('field/ban'));
+            assert.isUndefined(_schema.fields.get('field/bun'));
           });
         });
 
         describe('presets', () => {
-          it('deletes an existing preset', () => {
+          it('deletes an existing presetID', () => {
             assert.isUndefined(_schema.presets.get('club/surf'));
+          });
+
+          it(`deletes wildcard presetIDs containing '?'`, () => {
+            assert.isUndefined(_schema.fields.get('preset/foo1'));
+            assert.isUndefined(_schema.fields.get('preset/foo2'));
+          });
+
+          it(`deletes wildcard presetIDs containing '*'`, () => {
+            assert.isUndefined(_schema.fields.get('preset/ban'));
+            assert.isUndefined(_schema.fields.get('preset/bun'));
           });
         });
 
         describe('categories', () => {
-          it('deletes an existing category', () => {
+          it('deletes an existing categoryID', () => {
             assert.isUndefined(_schema.categories.get('category-shopping'));
+          });
+
+          it(`deletes wildcard categoryIDs containing '?'`, () => {
+            assert.isUndefined(_schema.fields.get('category-foo1'));
+            assert.isUndefined(_schema.fields.get('category-foo2'));
+          });
+
+          it(`deletes wildcard categoryIDs containing '*'`, () => {
+            assert.isUndefined(_schema.fields.get('category-ban'));
+            assert.isUndefined(_schema.fields.get('category-bun'));
           });
         });
       });
@@ -661,8 +614,231 @@ describe('SchemaSystem', () => {
         const results = _schema.search('excluded', 'point');
         assert.isTrue(!results.includes(excluded));
       });
+    });  // search
+
+
+    describe('getDefaults', () => {
     });
-  });  // search
+
+
+    describe('getRecents', () => {
+    });
+
+
+    describe('setMostRecent', () => {
+    });
+
+
+    describe('_localeChanged', () => {
+      let field, preset, category;
+
+      beforeAll(() => {
+        field = new Rapid.Field(context, { id: 'wikidata', type: 'wikidata', key: 'wikidata', universal: true });
+        preset = new Rapid.Preset(context, { id: 'residential', geometry: ['line'], tags: { highway: 'residential' } });
+        category = new Rapid.Category(context, { id: 'roads', members: ['residential'] });
+
+        field.setLocale = mock();
+        preset.setLocale = mock();
+        category.setLocale = mock();
+
+        _schema.fields.set(field.id, field);
+        _schema.presets.set(preset.id, preset);
+        _schema.categories.set(category.id, category);
+      });
+
+      it(`defaults to en-US, calls 'setLocale' on Fields, Presets, Categories`, () => {
+        field.setLocale.mockClear();
+        preset.setLocale.mockClear();
+        category.setLocale.mockClear();
+
+        _schema._currLocaleCode = null;
+        _schema._localeChanged();
+
+        assert.strictEqual(_schema._currLocaleCode, 'en-US');
+
+        assert.lengthOf(field.setLocale.mock.calls, 1);     // setLocale called once
+        assert.lengthOf(preset.setLocale.mock.calls, 1);    // setLocale called once
+        assert.lengthOf(category.setLocale.mock.calls, 1);  // setLocale called once
+
+        assert.deepEqual(field.setLocale.mock.lastCall, ['en-US']);
+        assert.deepEqual(preset.setLocale.mock.lastCall, ['en-US']);
+        assert.deepEqual(category.setLocale.mock.lastCall, ['en-US']);
+      });
+
+      it(`accepts a localeCode, calls 'setLocale' on Fields, Presets, Categories`, () => {
+        field.setLocale.mockClear();
+        preset.setLocale.mockClear();
+        category.setLocale.mockClear();
+
+        _schema._currLocaleCode = null;
+        _schema._localeChanged('de');
+
+        assert.strictEqual(_schema._currLocaleCode, 'de');
+
+        assert.lengthOf(field.setLocale.mock.calls, 1);     // setLocale called once
+        assert.lengthOf(preset.setLocale.mock.calls, 1);    // setLocale called once
+        assert.lengthOf(category.setLocale.mock.calls, 1);  // setLocale called once
+
+        assert.deepEqual(field.setLocale.mock.lastCall, ['de']);
+        assert.deepEqual(preset.setLocale.mock.lastCall, ['de']);
+        assert.deepEqual(category.setLocale.mock.lastCall, ['de']);
+      });
+    });
+
+
+    describe('_prepareSearchIndex', () => {
+      it(`defaults to 'en-US', creates a search index`, () => {
+        _schema._searchIndexes.clear();
+        _schema._currLocaleCode = null;
+        _schema._currSearchIndex = null;
+
+        _schema._prepareSearchIndex();
+
+        assert.strictEqual(_schema._currLocaleCode, 'en-US');
+        const index = _schema._searchIndexes.get('en-US');
+        assert.strictEqual(index.constructor.name, 'MiniSearch');
+        assert.strictEqual(_schema._currSearchIndex, index);
+      });
+
+      it(`reuses an existing search index when changing locales`, () => {
+        _schema._searchIndexes.clear();
+        _schema._currSearchIndex = null;
+
+        _schema._currLocaleCode = 'en-US';
+        _schema._prepareSearchIndex();
+
+        assert.strictEqual(_schema._currLocaleCode, 'en-US');
+        const index1 = _schema._currSearchIndex;
+
+        _schema._currLocaleCode = 'de';
+        _schema._prepareSearchIndex();
+
+        assert.strictEqual(_schema._currLocaleCode, 'de');
+        const index2 = _schema._currSearchIndex;
+
+        _schema._currLocaleCode = 'en-US';
+        _schema._prepareSearchIndex();
+        const index3 = _schema._currSearchIndex;
+
+        assert.notStrictEqual(index1, index2);
+        assert.strictEqual(index1, index3);
+      });
+    });
+
+
+    describe('_rebuildSearchIndex', () => {
+      it(`calls '_prepareSearchIndex' if needed`, () => {
+        _schema._searchIndexes.clear();
+        _schema._currLocaleCode = null;
+        _schema._currSearchIndex = null;
+
+        _schema._rebuildSearchIndex();
+
+        assert.strictEqual(_schema._currLocaleCode, 'en-US');
+        const index = _schema._currSearchIndex;
+        assert.strictEqual(index.constructor.name, 'MiniSearch');
+      });
+
+      it(`rebuilds the search index`, () => {
+        _schema._searchIndexes.clear();
+        _schema._currSearchIndex = null;
+
+        _schema._currLocaleCode = 'en-US';
+        _schema._prepareSearchIndex();
+
+        const index = _schema._currSearchIndex;
+        index.removeAll();  // clear it
+        assert.strictEqual(index.documentCount, 0);  // has no documents
+
+        _schema._rebuildSearchIndex();
+        assert.isAbove(index.documentCount, 0);  // has documents
+      });
+    });
+
+
+    describe('_schemaChanged', () => {
+      let field, preset, category;
+
+      beforeAll(() => {
+        field = new Rapid.Field(context, { id: 'wikidata', type: 'wikidata', key: 'wikidata', universal: true });
+        preset = new Rapid.Preset(context, { id: 'residential', geometry: ['line'], tags: { highway: 'residential' } });
+        category = new Rapid.Category(context, { id: 'roads', members: ['residential'] });
+
+        field.reset = mock();
+        preset.reset = mock();
+        category.reset = mock();
+
+        _schema.fields.set(field.id, field);
+        _schema.presets.set(preset.id, preset);
+        _schema.categories.set(category.id, category);
+
+        _schema._schemaChanged();
+      });
+
+      it(`calls 'reset' on Fields, Presets, and Categories`, () => {
+        assert.lengthOf(field.reset.mock.calls, 1);     // reset called once
+        assert.lengthOf(preset.reset.mock.calls, 1);    // reset called once
+        assert.lengthOf(category.reset.mock.calls, 1);  // reset called once
+      });
+
+      it('updates the universal field cache', () => {
+        assert.strictEqual(_schema.universal.get('wikidata'), field);
+      });
+    });
+
+
+    describe('_resetAll', () => {
+      beforeAll(() => {
+        spySchemaChange.mockClear();  // reset call count
+        _schema._resetAll();
+      });
+
+      it('resets schemas', () => {
+        assert.instanceOf(_schema.schemas, Set);
+        assert.isEmpty(_schema.schemas);
+      });
+
+      it('resets fields', () => {
+        assert.instanceOf(_schema.fields, Map);
+        assert.isEmpty(_schema.fields);
+      });
+
+      it('resets presets', () => {
+        assert.instanceOf(_schema.presets, Map);
+        assert.hasAllKeys(_schema.presets, ['point', 'vertex', 'line', 'area', 'relation']);
+      });
+
+      it('resets categories', () => {
+        assert.instanceOf(_schema.categories, Map);
+        assert.isEmpty(_schema.categories);
+      });
+
+      it('resets universal', () => {
+        assert.instanceOf(_schema.universal, Map);
+        assert.isEmpty(_schema.universal);
+      });
+
+      it('resets defaults', () => {
+        assert.instanceOf(_schema.defaults, Map);
+        assert.hasAllKeys(_schema.defaults, ['point', 'vertex', 'line', 'area', 'relation']);
+      });
+
+      it('resets _searchable', () => {
+        assert.instanceOf(_schema._searchable, Array);
+        assert.deepEqual(_schema._searchable.map(item => item.id), ['point', 'line', 'area', 'relation']);
+      });
+
+      it('resets _matchIndex', () => {
+        assert.instanceOf(_schema._matchIndex, Map);
+        assert.hasAllKeys(_schema._matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
+      });
+
+      it('emits schemachange after merging', () => {
+        assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
+      });
+    });
+
+  });  // methods
 
 
   describe('match', () => {

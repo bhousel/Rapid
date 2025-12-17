@@ -32,41 +32,56 @@ export const surfCityNC = {
 export const addSurfData = {
   schemaID: 'add-surf-data',
   fields: {
-    name: { 'key': 'name', 'type': 'localized', 'universal': true },
-    weather: { 'key': 'weather', 'type': 'weather', 'universal': true },
+    'field/foo1':  { key: 'foo1', type: 'text' },
+    'field/foo2':  { key: 'foo2', type: 'text' },
+    'field/ban':   { key: 'ban', type: 'text' },
+    'field/bun':   { key: 'bun', type: 'text' },
+
+    'name':    { key: 'name', type: 'localized', universal: true },
+    'weather': { key: 'weather', type: 'weather', universal: true },
+
     'surf/type': {
       label: 'Surf Type',
       key: 'surf:type',
       type: 'combo',
-      locationSet: { 'include': ['surf-city-nj.geojson'] }
+      locationSet: { include: ['surf-city-nj.geojson'] }
     },
     'board/type': {
       label: 'Board Type',
       key: 'board:type',
       type: 'combo',
-      locationSet: { 'include': ['surf-city-nj.geojson'] }
+      locationSet: { include: ['surf-city-nj.geojson'] }
     }
   },
+
   presets: {
+    'preset/foo1':  { fields: ['field/foo1'] },
+    'preset/foo2':  { fields: ['field/foo2'] },
+    'preset/ban':   { fields: ['field/ban'] },
+    'preset/bun':   { fields: ['field/bun'] },
+
     'amenity/shop/surf': {
       name: 'Surf Shop',
       icon: 'iD-surfing',
-      locationSet: { 'include': ['surf-city-nj.geojson'] },
+      locationSet: { include: ['surf-city-nj.geojson'] },
       fields: [ 'name', 'surf/type' ],
       moreFields: [ 'weather', 'board/type' ],
       tags: { amenity: 'shop', 'surf:type': 'surf' },
       geometry: ['point', 'area']
     }
   },
+
   categories: {
+    'category-foo1':  { members: ['preset/foo1'] },
+    'category-foo2':  { members: ['preset/foo2'] },
+    'category-ban':   { members: ['preset/ban'] },
+    'category-bun':   { members: ['preset/bun'] },
+
     'category-surfing': {
       name: 'Surf Features',
       icon: 'iD-surfing',
-      locationSet: { 'include': ['surf-city-nj.geojson'] },
-      members: [
-        'amenity/shop/surf',
-        'club/surf'
-      ]
+      locationSet: { include: ['surf-city-nj.geojson'] },
+      members: ['amenity/shop/surf', 'club/surf']
     }
   },
   defaults: {
@@ -85,20 +100,20 @@ export const updateSurfData = {
       label: 'Surfing Type',
       key: 'surf:type',
       type: 'combo',
-      locationSet: { 'include': ['surf-city-nc.geojson', 'surf-city-nj.geojson'] }
+      locationSet: { include: ['surf-city-nc.geojson', 'surf-city-nj.geojson'] }
     },
     'board/type': {
       label: 'Board Type',
       key: 'board:type',
       type: 'combo',
-      locationSet: { 'include': ['surf-city-nc.geojson', 'surf-city-nj.geojson'] }
+      locationSet: { include: ['surf-city-nc.geojson', 'surf-city-nj.geojson'] }
     }
   },
   presets: {
     'amenity/shop/surf': {
       name: 'Surfing Shop',
       icon: 'iD-surfing',
-      locationSet: { 'include': ['surf-city-nc.geojson', 'surf-city-nj.geojson'] },
+      locationSet: { include: ['surf-city-nc.geojson', 'surf-city-nj.geojson'] },
       fields: [ 'name', 'surf/type' ],
       moreFields: [ 'weather', 'board/type' ],
       tags: { amenity: 'shop', 'surf:type': 'surf' },
@@ -107,7 +122,7 @@ export const updateSurfData = {
     'club/surf': {
       name: 'Surfing Club',
       icon: 'iD-surfing',
-      locationSet: { 'include': ['surf-city-nc.geojson', 'surf-city-nj.geojson'] },
+      locationSet: { include: ['surf-city-nc.geojson', 'surf-city-nj.geojson'] },
       fields: [ 'name', 'surf/type' ],
       moreFields: [ 'weather', 'board/type' ],
       tags: { club: 'surfing', 'surf:type': 'surf' },
@@ -118,18 +133,13 @@ export const updateSurfData = {
     'category-surfing': {
       name: 'Surfing Features',
       icon: 'iD-surfing',
-      locationSet: { 'include': ['surf-city-nc.geojson', 'surf-city-nj.geojson'] },
-      members: [
-        'amenity/shop/surf',
-        'club/surf'
-      ]
+      locationSet: { include: ['surf-city-nc.geojson', 'surf-city-nj.geojson'] },
+      members: ['amenity/shop/surf', 'club/surf']
     },
     'category-shopping': {
       name: 'Shopping Features',
       icon: 'iD-shopping',
-      members: [
-        'amenity/shop/surf'
-      ]
+      members: ['amenity/shop/surf']
     }
   },
   featureCollection: surfCityNC
@@ -139,12 +149,18 @@ export const updateSurfData = {
 export const deleteSurfData = {
   schemaID: 'delete-surf-data',
   fields: {
+    'field/foo?': null,
+    'field/b*n': null,
     'board/type': null,
   },
   presets: {
+    'preset/foo?': null,
+    'preset/b*n': null,
     'club/surf': null,
   },
   categories: {
+    'category-foo?': null,
+    'category-b*n': null,
     'category-shopping': null
   }
 };
