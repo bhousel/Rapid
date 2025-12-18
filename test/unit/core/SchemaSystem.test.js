@@ -160,10 +160,6 @@ describe('SchemaSystem', () => {
         assert.hasAllKeys(_schema.defaults, ['point', 'vertex', 'line', 'area', 'relation']);
       });
 
-      it('_searchable', () => {
-        assert.instanceOf(_schema._searchable, Array);
-      });
-
       it('_matchIndex', () => {
         assert.instanceOf(_schema._matchIndex, Map);
         assert.hasAllKeys(_schema._matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
@@ -825,11 +821,6 @@ describe('SchemaSystem', () => {
       it('resets defaults', () => {
         assert.instanceOf(_schema.defaults, Map);
         assert.hasAllKeys(_schema.defaults, ['point', 'vertex', 'line', 'area', 'relation']);
-      });
-
-      it('resets _searchable', () => {
-        assert.instanceOf(_schema._searchable, Array);
-        assert.deepEqual(_schema._searchable.map(item => item.id), ['point', 'line', 'area', 'relation']);
       });
 
       it('resets _matchIndex', () => {

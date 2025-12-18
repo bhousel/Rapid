@@ -1,5 +1,4 @@
 import { utilArrayUniq } from '@rapid-sdk/util';
-import leven from 'leven';
 import MiniSearch from 'minisearch';
 
 import { AbstractSystem } from './AbstractSystem.js';
@@ -17,7 +16,6 @@ import {
 } from '../../package.json' with { type: 'json' };
 
 const VERBOSE = true;        // warn about 'id-tagging-schema' features we don't support currently
-const MAXSEARCH = 50;        // how many search results to return
 const MAXRECENTS = 30;       // how many recents to store in localstorage
 const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
 
@@ -88,7 +86,6 @@ export class SchemaSystem extends AbstractSystem {
     this.universal = new Map();    // Map<fieldID, Field>  (for universal fields)
     this.defaults = new Map();     // Map<geometryType, Set<presetID|categoryID>>
 
-    this._searchable = [];         // Array<Category|Preset>
     this._matchIndex = new Map();  // Map<geometryType, Object>
     this._recentIDs = null;
 
@@ -100,7 +97,6 @@ export class SchemaSystem extends AbstractSystem {
     this._currSearchIndex = null;     // The current search index
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._resetAll = this._resetAll.bind(this);
     this._localeChanged = this._localeChanged.bind(this);
     this._schemaChanged = this._schemaChanged.bind(this);
   }
@@ -253,6 +249,7 @@ export class SchemaSystem extends AbstractSystem {
    *     `"barrier/*": null,`                           <-- all `barrier/*` presets deleted
    *
    * @param  {Object}  src - preset data to merge into the caches
+   * @throws  Will throw if given data does not contain a `schemaID`, or if the `schemaID` has already been merged
    */
   merge(src = {}) {
     const schemaID = src.schemaID;
@@ -401,196 +398,70 @@ export class SchemaSystem extends AbstractSystem {
   /**
    * search
    * Performs a full-text search across all Presets and Categories.
-   * @param   {string}             q - the value to search
+   * This is powered by the Minisearch library and returns a result like:
+   *  {
+   *    id: string;
+   *    match: MatchInfo;
+   *    queryTerms: string[];
+   *    score: number;
+   *    terms: string[];
+   *    [key: string]: any;
+   *  }
+   * @see https://lucaong.github.io/minisearch/index.html
+   *
+   * @param   {string}             query - the value to search
    * @param   {OneOrMore<string>}  geometries - geometries to include in the results
    * @param   {Array<number>}      loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
-   * @return  {Array<Category|Preset>}  Array of Categories and Presets matching the search value
+   * @return  {SearchResult}       A Minisearch `SearchResult`, containing the score and information about the match
+   * @throws  Will throw if the search index is not ready
    */
-  search(q = '', geometries = [], loc = null) {
-    // Note: don't remove diacritical marks - we're assuming the user is being intentional.
-    q = q.toLowerCase().trim();
-    if (!q || !geometries) return [];
+  search(query = '', geometries = [], loc = null) {
+    if (!this._currSearchIndex) {   // shouldn't happen
+      throw new Error('Search index not ready');
+    }
+
+    if (!query || !geometries.length) return [];
 
     const context = this.context;
     const locations = context.systems.locations;
 
-    // If we care about location, gather the locationSets allowed at this location.
-    const validHere = Array.isArray(loc) ? locations?.locationSetsAt(loc) : null;
+    const filterGeometries = new Set(utilIterable(geometries));
+    const filterLocationSets = Array.isArray(loc) ? locations?.locationSetsAt(loc) : null;
 
-    // Prepare `generics` and `suggestions` Arrays to search through.
-    const seenIDs = new Set();
-    const generics = [];      // "generic" presets / categories
-    const suggestions = [];   // name-suggestion-index presets
-    const geoms = utilIterable(geometries);
+    const _filter = (result) => {
+      const item = this.item(result.id);
+      if (!item) return false;
+      if (!filterGeometries.isSubsetOf(item.geometries)) return false;
 
-    for (const geom of geoms) {   // Note: it's almost always a single geometry
-      for (const item of this._searchable) {
-        if (seenIDs.has(item.id)) continue;
-        if (!item.geometries.has(geom)) continue;
-
-        if (validHere) {
-          const locID = item.props.locationSetID;
-          if (locID && !validHere[locID]) continue;   // if !locID, item is valid everywhere
-        }
-
-        seenIDs.add(item.id);  // avoid duplicates (e.g. multiple geometries)
-        if (item.props.suggestion) {
-          suggestions.push(item);
-        } else {
-          generics.push(item);
-        }
+      if (filterLocationSets) {
+        const locID = item.props.locationSetID;
+        if (locID && !filterLocationSets[locID]) return false;   // if !locID, item is valid everywhere
       }
-    }
+      return true;
+    };
 
-    // Gather results
-    // Call functions to gather more search results up to the max amount,
-    // leaving space for fallback presets to be appended to the end.
-    // `_gather` will return early once the max amount has been reached.
-    const fallbackCount = geoms.length ?? geoms.size;
-    const maxCount = MAXSEARCH - fallbackCount;
-    let results = new Map();
+    const _boostDocument = (documentID, term, stored) => {
+      if (stored.suggestion) return 0.5;            // rank suggestion presets lower than normal presets
+      if (stored.type === 'category') return 0.5;   // rank categories lower than presets
+      return 1;
+    };
 
-    _gather(function leadingNames() {
-      return generics
-        .filter(a => _leading(a.searchName()))
-        .sort(_sortItems('searchName'));
-    });
-
-    _gather(function leadingSuggestions() {
-      return suggestions
-        .filter(a => _leadingStrict(a.searchName()))
-        .sort(_sortItems('searchName'));
-    });
-
-    _gather(function leadingNamesNormalized() {
-      return generics
-        .filter(a => _leading(a.searchNameNormalized()))
-        .sort(_sortItems('searchNameNormalized'));
-    });
-
-    _gather(function leadingSuggestionsNormalized() {
-      return suggestions
-        .filter(a => _leadingStrict(a.searchNameNormalized()))
-        .sort(_sortItems('searchNameNormalized'));
-    });
-
-    // Note that name-suggestion-index includes alternate names in the 'terms' array.
-    _gather(function leadingSuggestionTerms() {
-      return suggestions
-        .filter(a => (a.terms() || []).some(_leading));
-    });
-
-    _gather(function leadingTerms() {
-      return generics
-        .filter(a => (a.terms() || []).some(_leading));
-    });
-
-    _gather(function leadingTagValues() {
-      return generics
-        .filter(a => Object.values(a.tags || {}).filter(val => val !== '*').some(_leading));
-    });
-
-    _gather(function similarName() {
-      return generics
-        .map(a => ({ preset: a, dist: leven(q, a.searchName(), { maxDistance: 4 }) }))
-        .filter(a => a.dist < 4)
-        .sort((a, b) => a.dist - b.dist)
-        .map(a => a.preset);
-    });
-
-    _gather(function similarSuggestionName() {
-      return suggestions
-        .map(a => ({ preset: a, dist: leven(q, a.searchName(), { maxDistance: 2 }) }))
-        .filter(a => a.dist < 2)
-        .sort((a, b) => a.dist - b.dist)
-        .map(a => a.preset);
-      });
-
-    _gather(function similarTerms() {
-      return generics
-        .filter(a => {
-          return (a.terms() || []).some(b => {
-            return leven(q, b, { maxDistance: 4 }) + Math.min(q.length - b.length, 0) < 4;
-          });
-        });
-    });
-
-    // Append fallback preset(s)
-    for (const geom of geoms) {
-      const fallback = this.getFallback(geom);
-      if (fallback) {
-        results.set(fallback.id, fallback);
+    const options = {
+      boost: {
+        primary: 2,
+        alternate: 1
+      },
+      boostDocument: _boostDocument,
+      fuzzy: true,    // allow fuzzy (match strings with nearby edit distance)
+      prefix: true,   // allow prefix (partial match beginning of a string)
+      filter: _filter,
+      weights: {
+        fuzzy: 0.4,
+        prefix: 0.5
       }
-    }
+    };
 
-    return [...results.values()];
-
-
-    /**
-     * _gather
-     * Internal function to gather more search results.
-     * Stops once maxCount has been reached.
-     * @param  {Function}  fn - predicate function to gather items
-     */
-    function _gather(fn) {
-      if (results.size >= maxCount) return;
-
-      for (const item of fn()) {
-        if (results.has(item.id)) continue;  // avoid duplicates
-        results.set(item.id, item);
-        if (results.size >= maxCount) return;
-      }
-    }
-
-    /**
-     * _leading
-     * Match at name beginning or just after a space (e.g. "office" -> match "Law Office")
-     * @param   {string}   s - the substring to look for
-     * @return  {boolean}  `true` if it matches, `false` if not
-     */
-    function _leading(s) {
-      const index = s.indexOf(q);
-      return index === 0 || s[index - 1] === ' ';
-    }
-
-    /**
-     * _leadingStrict
-     * Match at name beginning only
-     * @param   {string}   s - the substring to look for
-     * @return  {boolean}  `true` if it matches, `false` if not
-     */
-    function _leadingStrict(a) {
-      const index = a.indexOf(q);
-      return index === 0;
-    }
-
-    /**
-     * _sortItems
-     * Returns a compare function for sorting the Presets or Categories based on a property.
-     * @param   {string}    sortBy - the property to sort by, will be used as the function name to call
-     * @return  {function}  a compare function to be used by Array.sort()
-     */
-    function _sortItems(sortBy) {
-      return function sortNames(a, b) {
-        let aCompare = a[sortBy]();
-        let bCompare = b[sortBy]();
-
-        // priority if search string matches preset name exactly - iD#4325
-        if (q === aCompare) return -1;
-        if (q === bCompare) return 1;
-
-        // priority for higher matchScore
-        let i = b.props.matchScore - a.props.matchScore;
-        if (i !== 0) return i;
-
-        // priority if search string appears earlier in preset name
-        i = aCompare.indexOf(q) - bCompare.indexOf(q);
-        if (i !== 0) return i;
-
-        // priority for shorter preset names
-        return aCompare.length - bCompare.length;
-      };
-    }
+    return this._currSearchIndex.search(query, options);
   }
 
 
@@ -965,9 +836,9 @@ export class SchemaSystem extends AbstractSystem {
       this._currSearchIndex = new MiniSearch({
         autoVacuum: false,
         idField: 'id',
-        fields: ['name', 'terms'  /* aliases */],
+        fields: ['primary', 'alternate'],
         storeFields: ['type', 'suggestion'],
-        extractField: (item, fieldName) => item._currStrings[fieldName]   // look in `currStrings` Object
+        extractField: (item, fieldName) => item._currStrings[fieldName]
       });
 
       this._searchIndexes.set(this._currLocaleCode, this._currSearchIndex);
@@ -990,17 +861,15 @@ export class SchemaSystem extends AbstractSystem {
 
     // Gather "searchable" Presets and Categories..
     this._currSearchIndex.removeAll();
-    this._searchable = [];
 
     for (const preset of this.presets.values()) {
       if (!preset.props.searchable) continue;
-      this._searchable.push(preset);
+      this._currSearchIndex.add(preset);
     }
     for (const category of this.categories.values()) {
       if (!category.props.searchable) continue;
-      this._searchable.push(category);
+      this._currSearchIndex.add(category);
     }
-    this._currSearchIndex.addAll(this._searchable);
   }
 
 

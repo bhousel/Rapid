@@ -1,6 +1,6 @@
 import { utilSafeString } from '@rapid-sdk/util';
 
-import { utilNormalizeString } from '../util/string.js';
+import { utilGatherTokens } from '../util/string.js';
 
 
 /**
@@ -100,14 +100,26 @@ export class Category {
     const fallbackName = this.props.name || this.id;
     const name = l10n?.t(`_tagging.presets.categories.${this.id}.name`, { 'default': '' }) || fallbackName;
 
+    // We'll gather the search tokens ourselves into "primary" and "alternate" sets.
+    // This is because once a token is seen in one field, we don't want it to appear again in another field.
+    // (When search terms match in multiple fields, this can boost the Minisearch score, so a Preset
+    // that happens to have redundant terms gets unfairly boosted in the search results)
+    // The "primary" set will contain things like the preset name and similar names.
+    // The "alternate" set will contain things like related terms and tag values a user might search for.
+    const primary = new Set();
+    const alternate = new Set();
+    utilGatherTokens(name, primary, alternate, true);
+
     this._currStrings = {
       id: this.id,
       type: this.type,
       suggestion: false,
       name: name.trim(),
-      nameNormalized: utilNormalizeString(name),
       terms: '',    // not used for Categories
-      aliases: ''   // not used for Categories
+      aliases: '',  // not used for Categories
+      tags: '',     // not used for Categories
+      primary: [...primary].join(),      // Primary search terms (generally the name)
+      alternate: [...alternate].join()   // Alternate search terms (aliases, tags, etc)
     };
 
     this._strings.set(this._currLocaleCode, this._currStrings);

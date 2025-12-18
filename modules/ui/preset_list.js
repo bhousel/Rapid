@@ -11,6 +11,8 @@ import { uiTagReference } from './tag_reference.js';
 import { uiTooltip } from './tooltip.js';
 import { utilKeybinding, utilNoAuto, utilRebind, utilTotalExtent } from '../util/index.js';
 
+const MAXSEARCH = 50;   // how many search results to show
+
 
 export function uiPresetList(context) {
   const editor = context.systems.editor;
@@ -170,16 +172,29 @@ export function uiPresetList(context) {
     }
 
     function inputevent() {
-      const q = _input.property('value');
-      _list.classed('filtered', q.length);
+      const query = _input.property('value');
+      _list.classed('filtered', query.length);
 
       let items, messageText;
-      if (q.length) {
-        items = schema.search(q, _allGeometries, _currLoc);
-        messageText = l10n.t('inspector.results', { n: items.length, search: q });
-      } else {
-        items = _defaults;
+      if (query.length) {  // do search
+        const fallbackCount = _allGeometries.length;
+        const maxCount = MAXSEARCH - fallbackCount;
+        const results = schema.search(query, _allGeometries, _currLoc);
+
+        messageText = l10n.t('inspector.results', { n: results.length, search: query });
+        items = results.map(result => schema.item(result.id)).slice(0, maxCount);
+
+        // Append fallback preset(s)
+        for (const geom of _allGeometries) {
+          const fallback = schema.getFallback(geom);
+          if (fallback) {
+            items.push(fallback);
+          }
+        }
+
+      } else {   // show defaults
         messageText = l10n.t('inspector.choose');
+        items = _defaults;
       }
 
       _list.call(drawList, items);

@@ -1,6 +1,6 @@
 import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 
-import { utilNormalizeString } from '../util/string.js';
+import { utilGatherTokens } from '../util/string.js';
 import { osmAreaKeys } from './tags.js';
 
 
@@ -113,7 +113,7 @@ export class Preset {
     // `name` is a string, while `terms` and `aliases` are Arrays of strings.
     // Unfortunately, the localized values returned from Transifex are inconsistent.
     // By convention `aliases` are newline-delimited and `terms` are comma-delimited.
-    // (Minisearch can handle tokenization of both of these).
+    // We will also make the OSM tag values available for searching.
     //
     // "shop/second_hand": {
     //     "name": "Thrift Store",
@@ -128,15 +128,32 @@ export class Preset {
     const name = l10n?.t(`_tagging.presets.presets.${refName.id}.name`, { 'default': '' }) || fallbackName;
     const terms = l10n?.t(`_tagging.presets.presets.${this.id}.terms`, { 'default': '' }) || fallbackTerms;
     const aliases = l10n?.t(`_tagging.presets.presets.${this.id}.aliases`, { 'default': '' }) || fallbackAliases;
+    const tags = Object.values(this.props.addTags).filter(v => v !== '*').filter(Boolean).join(',');
+
+    // We'll gather the search tokens ourselves into "primary" and "alternate" sets.
+    // This is because once a token is seen in one field, we don't want it to appear again in another field.
+    // (When search terms match in multiple fields, this can boost the Minisearch score, so a Preset
+    // that happens to have redundant terms gets unfairly boosted in the search results)
+    // The "primary" set will contain things like the preset name and similar names.
+    // The "alternate" set will contain things like related terms and tag values a user might search for.
+    const primary = new Set();
+    const alternate = new Set();
+    utilGatherTokens(name, primary, alternate, true);
+    utilGatherTokens(terms, primary, alternate, false);
+    if (!this.props.suggestion) {
+      utilGatherTokens(aliases, primary, alternate, false);
+      utilGatherTokens(tags, primary, alternate, false);
+    }
 
     this._currStrings = {
       id: this.id,
       type: this.type,
       suggestion: this.props.suggestion,
-      name: name.trim(),
-      nameNormalized: utilNormalizeString(name),
-      terms: terms.trim(),
-      aliases: aliases.trim()
+      name: name.trim(),                 // Display Name
+      terms: terms.trim(),               // Display Terms
+      aliases: aliases.trim(),           // Display Aliases
+      primary: [...primary].join(),      // Primary search terms (generally the name)
+      alternate: [...alternate].join()   // Alternate search terms (aliases, tags, etc)
     };
 
     this._strings.set(this._currLocaleCode, this._currStrings);

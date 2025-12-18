@@ -36,6 +36,64 @@ export function utilNormalizeString(str) {
 
 
 /**
+ * utilTokenize
+ * This splits the string on word and punctuation to extract "tokens".
+ * @param  {string}  str - the input string
+ * @return {Array<string>}  tokens found
+ */
+export function utilTokenize(str) {
+  if (typeof str !== 'string') return [];
+
+  const spaceOrPunctuation = /[\n\r\p{Z}\p{P}]+/u;
+  return str.split(spaceOrPunctuation).filter(Boolean);
+}
+
+
+/**
+ * utilGatherTokens
+ * This is used by the Preset code to extract tokens from the given string,
+ *  sorts them into either the 'primary' or 'alternate' set based on the given `isPrimary` param.
+ * This function also automatically checks whether removing diacritics would result in
+ *  a different string, and if so, adds it to the 'alternate' set.
+ * The "primary" set should contain things like the preset name and similar names.
+ * The "alternate" set should contain things like related terms and tag values a user might search for.
+ * @param  {string}       str - the input string
+ * @param  {Set<string>}  primary - set of 'primary' tokens
+ * @param  {Set<string>}  alternate - set of 'alternate' tokens
+ * @param  {boolean}      isPrimary - pass `true` to put the tokens into the 'primary' Set.
+ */
+export function utilGatherTokens(str, primary, alternate, isPrimary) {
+  if (typeof str !== 'string') return;
+
+  for (let s of utilTokenize(str)) {  // Gather tokens from the input string
+    s = s.trim().toLowerCase();
+
+    // Get diacritic marks into a consistent format, perfer them combined into fewer characters.
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
+    if (typeof s.normalize === 'function') {
+      s = s.normalize('NFKC');
+    }
+
+    if (!s || primary.has(s) || alternate.has(s)) continue;  // seen this string before
+
+    if (isPrimary) {
+      primary.add(s);
+    } else {
+      alternate.add(s);
+    }
+
+    // Generate a version with the diacritics folded, e.g. 'ö' -> 'o'
+    // If it differs from the original, add it as an alternate match.
+    // (extra 'i' hack for Turkish, for BİM, İşbank - NSI#5017, NSI#8261)
+    const s2 = diacritics.remove(s.replace(/(İ|i̇)/ig, 'i'));
+    if (s2 !== s) {
+      alternate.add(s2);
+    }
+  }
+}
+
+
+/**
  * utilWildcard
  * This checks if a string looks like a "wildcard" string (contains '*' or '?')
  * and if so, converts it to a regular expression.

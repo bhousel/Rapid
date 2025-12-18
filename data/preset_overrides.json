@@ -42,8 +42,8 @@
   },
 
   "presets": {
-    "natural/tree*": null,
-    "highway/crossing*": null,
+    "natural/tree/*": null,
+    "highway/crossing/*": null,
     "highway/cycleway/crossing*": null,
     "highway/footway/crossing*": null,
 
