@@ -422,6 +422,10 @@ export class SchemaSystem extends AbstractSystem {
 
     if (!query || !geometries.length) return [];
 
+    // Get diacritic marks into a consistent format, perfer them combined into fewer characters.
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
+    query = query.normalize('NFKC');
+
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -452,12 +456,13 @@ export class SchemaSystem extends AbstractSystem {
         alternate: 1
       },
       boostDocument: _boostDocument,
+      combineWith: 'AND',
       fuzzy: true,    // allow fuzzy (match strings with nearby edit distance)
       prefix: true,   // allow prefix (partial match beginning of a string)
       filter: _filter,
       weights: {
-        fuzzy: 0.4,
-        prefix: 0.5
+        fuzzy: 0.2,
+        prefix: 0.3
       }
     };
 

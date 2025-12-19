@@ -1,4 +1,5 @@
 import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
+import diacritics from 'diacritics';
 
 import { utilGatherTokens } from '../util/string.js';
 import { osmAreaKeys } from './tags.js';
@@ -47,6 +48,7 @@ export class Preset {
     this.props.geometry ??= [];
     this.props.matchScore ||= 1;
     this.props.moreFields ??= [];
+    this.props.name ??= '';
     this.props.reference ??= {};
     this.props.searchable ??= true;
     this.props.tags ??= {};
@@ -105,42 +107,56 @@ export class Preset {
 
     const l10n = this.context.systems.l10n;
 
-    // Some Presets may reference the values from another Preset.
-    const refName = this._resolveReference('name');
-    // Note that `terms` and `aliases` can't reference another Preset because they are Array properties.
-
-    // Pre-localize and store strings so that the Miniseach full-text search can index these.
-    // `name` is a string, while `terms` and `aliases` are Arrays of strings.
-    // Unfortunately, the localized values returned from Transifex are inconsistent.
-    // By convention `aliases` are newline-delimited and `terms` are comma-delimited.
-    // We will also make the OSM tag values available for searching.
-    //
-    // "shop/second_hand": {
-    //     "name": "Thrift Store",
-    //     "aliases": "Thrift Shop\nConsignment Store\nResale Shop\nSecondhand Shop",
-    //     "terms": "resale,second-hand,used"
-    // }
-
-    const fallbackName = this.props.name || this.id;
-    const fallbackTerms = this.props.terms.join(',');       // stringify Array
-    const fallbackAliases = this.props.aliases.join('\n');  // stringify Array
-
-    const name = l10n?.t(`_tagging.presets.presets.${refName.id}.name`, { 'default': '' }) || fallbackName;
-    const terms = l10n?.t(`_tagging.presets.presets.${this.id}.terms`, { 'default': '' }) || fallbackTerms;
-    const aliases = l10n?.t(`_tagging.presets.presets.${this.id}.aliases`, { 'default': '' }) || fallbackAliases;
-    const tags = Object.values(this.props.addTags).filter(v => v !== '*').filter(Boolean).join(',');
-
-    // We'll gather the search tokens ourselves into "primary" and "alternate" sets.
-    // This is because once a token is seen in one field, we don't want it to appear again in another field.
-    // (When search terms match in multiple fields, this can boost the Minisearch score, so a Preset
-    // that happens to have redundant terms gets unfairly boosted in the search results)
-    // The "primary" set will contain things like the preset name and similar names.
-    // The "alternate" set will contain things like related terms and tag values a user might search for.
     const primary = new Set();
     const alternate = new Set();
-    utilGatherTokens(name, primary, alternate, true);
-    utilGatherTokens(terms, primary, alternate, false);
-    if (!this.props.suggestion) {
+    let name, terms, aliases;
+
+    // Performance optimization:
+    // We can skip a lot of this for "suggestion" presets from NSI.
+    // They will never have a hit in the translation system nor reference another preset's props.
+    if (this.props.suggestion) {
+      name = this.props.name.replace(/\s+\(.*?\)/g, '');  // remove parenthesis, e.g. "(USA)"
+      terms = this.props.terms.join(',');                 // already contains the names
+      aliases = '';                                       // there won't be aliases
+
+      primary.add(name);
+      this._gatherSuggestionTerms(primary, alternate);
+      this._gatherSuggestionTags(primary, alternate);
+
+    } else {
+      // Some Presets may reference the values from another Preset.
+      const refName = this._resolveReference('name');
+      // Note that `terms` and `aliases` can't reference another Preset because they are Array properties.
+
+      // Pre-localize and store strings so that the Miniseach full-text search can index these.
+      // `name` is a string, while `terms` and `aliases` are Arrays of strings.
+      // Unfortunately, the localized values returned from Transifex are inconsistent.
+      // By convention `aliases` are newline-delimited and `terms` are comma-delimited.
+      // We will also make the OSM tag values available for searching.
+      //
+      // "shop/second_hand": {
+      //     "name": "Thrift Store",
+      //     "aliases": "Thrift Shop\nConsignment Store\nResale Shop\nSecondhand Shop",
+      //     "terms": "resale,second-hand,used"
+      // }
+
+      const fallbackName = this.props.name || this.id;
+      const fallbackTerms = this.props.terms.join(',');       // stringify Array
+      const fallbackAliases = this.props.aliases.join('\n');  // stringify Array
+      const tags = Object.values(this.props.tags).filter(v => v !== '*').filter(Boolean).join(',');
+
+      name = l10n?.t(`_tagging.presets.presets.${refName.id}.name`, { 'default': '' }) || fallbackName;
+      terms = l10n?.t(`_tagging.presets.presets.${this.id}.terms`, { 'default': '' }) || fallbackTerms;
+      aliases = l10n?.t(`_tagging.presets.presets.${this.id}.aliases`, { 'default': '' }) || fallbackAliases;
+
+      // We'll gather the search tokens ourselves into "primary" and "alternate" sets.
+      // This is because once a token is seen in one field, we don't want it to appear again in another field.
+      // (When search terms match in multiple fields, this can boost the Minisearch score, so a Preset
+      // that happens to have redundant terms gets unfairly boosted in the search results)
+      // The "primary" set will contain the preset name.
+      // The "alternate" set will contain related terms and tag values a user might search for.
+      utilGatherTokens(name, primary, alternate, true);
+      utilGatherTokens(terms, primary, alternate, false);
       utilGatherTokens(aliases, primary, alternate, false);
       utilGatherTokens(tags, primary, alternate, false);
     }
@@ -158,7 +174,6 @@ export class Preset {
 
     this._strings.set(this._currLocaleCode, this._currStrings);
   }
-
 
   /**
    * name
@@ -206,6 +221,7 @@ export class Preset {
   moreFields() {
     return this._resolved.moreFields || (this._resolved.moreFields = this._resolveFields('moreFields'));
   }
+
 
   /**
    * matchScore
@@ -259,57 +275,6 @@ export class Preset {
     return null;
   }
 
-  /**
-   * searchName
-   * The name used for searching - basically the `name()` but forced lowercase.
-   * @return  {string}  The name used for searching
-   */
-  searchName() {
-    return this._currStrings.name;
-    // if (!this._searchName) {
-    //   this._searchName = (this.suggestion ? this.props.name : this.name()).toLowerCase();
-    // }
-    // return this._searchName;
-  }
-
-  /**
-   * searchNameNormalized
-   * The name used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
-   * @return  {string}  The name used for searching, but with diacritic marks normalized.
-   */
-  searchNameNormalized() {
-    return this._currStrings.nameNormalized;
-    // if (!this._searchNameNormalized) {
-    //   this._searchNameNormalized = utilNormalizeString(this.searchName());
-    // }
-    // return this._searchNameNormalized;
-  }
-
-  /**
-   * searchAliases
-   * Aliases for searching - basically the `aliases`, but forced lowercase.
-   * @return  {Array<string>}  The aliases used for searching
-   */
-  searchAliases() {
-    return this._currStrings.aliases;
-    // if (!this._searchAliases) {
-    //   this._searchAliases = this.aliases().map(alias => alias.toLowerCase());
-    // }
-    // return this._searchAliases;
-  }
-
-  /**
-   * searchAliasesNormalized
-   * Aliases used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
-   * @return  {Array<string>}  The aliases used for searching, but with diacritic marks normalized.
-   */
-  searchAliasesNormalized() {
-    return this._currStrings.aliasesNormalized;
-    // if (!this._searchAliasesNormalized) {
-    //   this._searchAliasesNormalized = this.searchAliases().map(s => utilNormalizeString(s));
-    // }
-    // return this._searchAliasesNormalized;
-  }
 
   /**
    * isFallback
@@ -520,6 +485,46 @@ export class Preset {
     }
 
     return utilArrayUniq(resolved);
+  }
+
+
+  /**
+   * _gatherSuggestionTerms
+   * A simpler version of `utilGatherTokens` to gather 'terms' from suggestion presets
+   * The `terms` is already an Array of strings that can function as search names.
+   */
+  _gatherSuggestionTerms(primary, alternate) {
+    for (const s of this.props.terms) {
+      if (!s || primary.has(s) || alternate.has(s)) continue;  // seen it before
+      primary.add(s);
+
+      // Generate a version with the diacritics folded, e.g. 'ö' -> 'o'
+      // If it differs from the original, add it as an alternate match.
+      // (extra 'i' hack for Turkish, for BİM, İşbank - NSI#5017, NSI#8261)
+      const s2 = diacritics.remove(s.replace(/(İ|i̇)/ig, 'i'));
+      if (s2 !== s) {
+        alternate.add(s2);
+      }
+    }
+  }
+
+  /**
+   * _gatherSuggestionTags
+   * A simpler version of `utilGatherTokens` to gather 'tags' from suggestion presets.
+   */
+  _gatherSuggestionTags(primary, alternate) {
+    for (const s of Object.values(this.props.tags)) {
+      if (!s || primary.has(s) || alternate.has(s)) continue;  // seen it before
+      alternate.add(s);
+
+      // Generate a version with the diacritics folded, e.g. 'ö' -> 'o'
+      // If it differs from the original, add it as an alternate match.
+      // (extra 'i' hack for Turkish, for BİM, İşbank - NSI#5017, NSI#8261)
+      const s2 = diacritics.remove(s.replace(/(İ|i̇)/ig, 'i'));
+      if (s2 !== s) {
+        alternate.add(s2);
+      }
+    }
   }
 
 }

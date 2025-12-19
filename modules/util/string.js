@@ -36,27 +36,16 @@ export function utilNormalizeString(str) {
 
 
 /**
- * utilTokenize
- * This splits the string on word and punctuation to extract "tokens".
- * @param  {string}  str - the input string
- * @return {Array<string>}  tokens found
- */
-export function utilTokenize(str) {
-  if (typeof str !== 'string') return [];
-
-  const spaceOrPunctuation = /[\n\r\p{Z}\p{P}]+/u;
-  return str.split(spaceOrPunctuation).filter(Boolean);
-}
-
-
-/**
  * utilGatherTokens
- * This is used by the Preset code to extract tokens from the given string,
- *  sorts them into either the 'primary' or 'alternate' set based on the given `isPrimary` param.
+ * This is used by the Preset code to extract tokens from the given string.
+ * It sorts them into either the 'primary' or 'alternate' set based on the given `isPrimary` param.
  * This function also automatically checks whether removing diacritics would result in
  *  a different string, and if so, adds it to the 'alternate' set.
  * The "primary" set should contain things like the preset name and similar names.
  * The "alternate" set should contain things like related terms and tag values a user might search for.
+ * For example:
+ *   input:  'Juan Valdes Café' ->  primary: ['juan','valdes','café'], alternate: ['cafe']
+ *
  * @param  {string}       str - the input string
  * @param  {Set<string>}  primary - set of 'primary' tokens
  * @param  {Set<string>}  alternate - set of 'alternate' tokens
@@ -65,16 +54,13 @@ export function utilTokenize(str) {
 export function utilGatherTokens(str, primary, alternate, isPrimary) {
   if (typeof str !== 'string') return;
 
-  for (let s of utilTokenize(str)) {  // Gather tokens from the input string
+  const spaceOrPunctuation = /[\n\r\p{Z}\p{P}]+/u;
+  const tokens = str.split(spaceOrPunctuation).filter(Boolean);
+
+  for (let s of tokens) {  // Gather tokens from the input string
     s = s.trim().toLowerCase();
 
-    // Get diacritic marks into a consistent format, perfer them combined into fewer characters.
-    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
-    if (typeof s.normalize === 'function') {
-      s = s.normalize('NFKC');
-    }
-
-    if (!s || primary.has(s) || alternate.has(s)) continue;  // seen this string before
+    if (s.length < 2 || primary.has(s) || alternate.has(s)) continue;  // too small, or seen it before
 
     if (isPrimary) {
       primary.add(s);

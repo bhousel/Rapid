@@ -376,8 +376,12 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
       //   }
       // }
       //
-      for (const [pluralRule, tstring] of Object.entries(tstrings)) {
+      for (let [pluralRule, tstring] of Object.entries(tstrings)) {  // eslint-disable-line prefer-const
         if (!tstring)  throw new Error(`Missing plural string for '${stringID}' - '${pluralRule}'`);
+
+        // Get diacritic marks into a consistent format, perfer them combined into fewer characters.
+        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
+        tstring = tstring.normalize('NFKC');
 
         // Skip this translated string if it's identical to the source or fallback string..
         if (tstring === fstrings[pluralRule] || tstring === sstrings[pluralRule]) {
@@ -409,8 +413,12 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
       //
       const leaf = path.pop();
       const pluralRule = 'other';
-      const tstring = tstrings[pluralRule];
+      let tstring = tstrings[pluralRule];
       if (!tstring)  throw new Error(`Missing singular string for '${stringID}' - '${pluralRule}'`);
+
+      // Get diacritic marks into a consistent format, perfer them combined into fewer characters.
+      // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
+      tstring = tstring.normalize('NFKC');
 
       // Skip this translated string if it's identical to the source or fallback string..
       if (tstring === fstrings[pluralRule] || tstring === sstrings[pluralRule]) {

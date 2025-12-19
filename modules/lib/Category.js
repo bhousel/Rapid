@@ -104,8 +104,8 @@ export class Category {
     // This is because once a token is seen in one field, we don't want it to appear again in another field.
     // (When search terms match in multiple fields, this can boost the Minisearch score, so a Preset
     // that happens to have redundant terms gets unfairly boosted in the search results)
-    // The "primary" set will contain things like the preset name and similar names.
-    // The "alternate" set will contain things like related terms and tag values a user might search for.
+    // The "primary" set will contain the preset name.
+    // The "alternate" set will contain related terms and tag values a user might search for.
     const primary = new Set();
     const alternate = new Set();
     utilGatherTokens(name, primary, alternate, true);
@@ -164,52 +164,6 @@ export class Category {
    */
   matchScore() {
     return -1;
-  }
-
-
-  /**
-   * searchName
-   * The name used for searching - basically the `name()` but forced lowercase.
-   * @return  {string}  The name used for searching
-   */
-  searchName() {
-    return this._currStrings.name;
-    // if (!this._searchName) {
-    //   this._searchName = this.name().toLowerCase();
-    // }
-    // return this._searchName;
-  }
-
-  /**
-   * searchNameNormalized
-   * The name used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
-   * @return  {string}  The name used for searching, but with diacritic marks normalized.
-   */
-  searchNameNormalized() {
-    return this._currStrings.nameNormalized;
-    // if (!this._searchNameNormalized) {
-    //   this._searchNameNormalized = utilNormalizeString(this.searchName());
-    // }
-    // return this._searchNameNormalized;
-  }
-
-  /**
-   * searchAliases
-   * Aliases for searching, always returns `[]` for Categories.
-   * @return  {Array<string>}  Always returns `[]` for Categories
-   */
-  searchAliases() {
-    return [];
-  }
-
-  /**
-   * searchAliasesNormalized
-   * Aliases used for searching, but with diacritic marks normalized (e.g. 'á' -> 'a').
-   * Always returns `[]` for Categories.
-   * @return  {Array<string>}  Always returns `[]` for Categories
-   */
-  searchAliasesNormalized() {
-    return [];
   }
 
   /**
