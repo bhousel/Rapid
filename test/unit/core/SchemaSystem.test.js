@@ -502,76 +502,130 @@ describe('SchemaSystem', () => {
         assert.deepEqual(_schema.search('resid'), []);
       });
 
-      it('matches leading name', () => {
-        const residential = _schema.item('highway/residential');
-        const results = _schema.search('resid', 'area');
-        assert.strictEqual(results.indexOf(residential), 0);  // 1. 'Residential' (by name)
+      it('scores exact primary match above fuzzy primary match', () => {
+        const results = _schema.search('park', ['area']);
+        // console.log(`\nsearch for 'park'`);
+        // console.log(results);
+        assert.lengthOf(results, 2);
+
+        assert.strictEqual(results[0].id, 'leisure/park');   // "Park"
+        assert.deepEqual(results[0].terms, ['park']);
+        assert.deepEqual(results[0].match.park, ['primary']);
+        assert.isAbove(results[0].score, 50);   // exact primary match has high score
+
+        assert.strictEqual(results[1].id, 'amenity/parking');  // "Parking"
+        assert.deepEqual(results[1].terms, ['parking']);
+        assert.deepEqual(results[1].match.parking, ['primary']);
+        assert.isBelow(results[1].score, 10);   // fuzzy match has low score
+      });
+
+      it('scores exact alternate match above fuzzy primary match', () => {
+        const results = _schema.search('sand', ['point']);
+        // console.log(`\nsearch for 'sand'`);
+        // console.log(results);
+        assert.lengthOf(results, 2);
+
+        assert.strictEqual(results[0].id, 'amenity/shop/surf');   // "Surf Shop"
+        assert.deepEqual(results[0].terms, ['sand']);
+        assert.deepEqual(results[0].match.sand, ['alternate']);
+        assert.isBelow(results[0].score, 50);   // exact alternate match has medium score
+        assert.isAbove(results[0].score, 10);
+
+        assert.strictEqual(results[1].id, 'amenity/grit_bin');  // "Sandpit"
+        assert.deepEqual(results[1].terms, ['sandpit']);
+        assert.deepEqual(results[1].match.sandpit, ['primary']);
+        assert.isBelow(results[1].score, 10);   // fuzzy match has low score
       });
 
       it('returns alternate matches in correct order', () => {
         const results = _schema.search('gri', 'point');
-        const resultIDs = results.map(item => item.id);
+        // console.log(`\nsearch for 'gri'`);
+        // console.log(results);
+        assert.lengthOf(results, 3);
 
-        console.log(`\nsearch for 'gri'`);
-        console.log(resultIDs);
+        assert.strictEqual(results[0].id, 'amenity/bbq');
+        assert.deepEqual(results[0].terms, ['grill']);
+        assert.deepEqual(results[0].match.grill, ['primary']);
 
-//// We need to decide how we want search to work and test it thoroughly
-        assert.isOk(true);
-//        expect(results.indexOf(p.grill), 'Grill').to.eql(0);            // 1. 'Grill' (leading name)
-//        expect(results.indexOf(p.football), 'Football').to.eql(1);      // 2. 'Football' (leading term 'gridiron')
-//        expect(results.indexOf(p.sandpit), 'Sandpit').to.eql(2);        // 3. 'Sandpit' (leading tag value 'grit_bin')
-//        expect(results.indexOf(p.grass1), 'Grass').to.be.within(3,5);   // 4. 'Grass' (similar name)
-//        expect(results.indexOf(p.grass2), 'Ğṝȁß').to.be.within(3,5);    // 5. 'Ğṝȁß' (similar name)
-//        expect(results.indexOf(p.park), 'Park').to.be.within(3,5);      // 6. 'Park' (similar term 'grass')
+        assert.strictEqual(results[1].id, 'amenity/grit_bin');
+        assert.deepEqual(results[1].terms, ['grit']);
+        assert.deepEqual(results[1].match.grit, ['alternate']);
+
+        assert.strictEqual(results[2].id, 'leisure/pitch/american_football');
+        assert.deepEqual(results[2].terms, ['gridiron']);
+        assert.deepEqual(results[2].match.gridiron, ['alternate']);
       });
 
-      it('sorts preset with matchScore penalty below others', () => {
-        const parking = _schema.item('amenity/parking');
-        const park = _schema.item('leisure/park');
-        const results = _schema.search('par', 'point');
-        assert.strictEqual(results.indexOf(parking), 0, 'Parking');   // 1. 'Parking' (default matchScore)
-        assert.strictEqual(results.indexOf(park), 1, 'Park');         // 2. 'Park' (low matchScore)
+      it('preserves diacritics in the query, allowing for exact diacritic matches', () => {
+        const results = _schema.search('ğṝȁ', 'area');
+        // console.log(`\nsearch for 'ğṝȁ'`);
+        // console.log(results);
+        assert.lengthOf(results, 1);
+
+        assert.strictEqual(results[0].id, 'landuse/grass2');
+        assert.deepEqual(results[0].terms, ['ğṝȁß']);
+        assert.deepEqual(results[0].match.ğṝȁß, ['primary']);
       });
 
-      it('ignores matchScore penalty for exact name match', () => {
-        const parking = _schema.item('amenity/parking');
-        const park = _schema.item('leisure/park');
-        const results = _schema.search('park', 'point');
-        assert.strictEqual(results.indexOf(park), 0, 'Park');         // 1. 'Park' (low matchScore)
-        assert.strictEqual(results.indexOf(parking), 1, 'Parking');   // 2. 'Parking' (default matchScore)
+      it('matches diacritic-folded terms as alternate matches', () => {
+        const results = _schema.search('grass', 'area');
+        // console.log(`\nsearch for 'grass'`);
+        // console.log(results);
+        assert.lengthOf(results, 3);
+
+        assert.strictEqual(results[0].id, 'landuse/grass1');    // name: "Grass"
+        assert.deepEqual(results[0].terms, ['grass']);
+        assert.deepEqual(results[0].match.grass, ['primary']);
+        assert.isAbove(results[0].score, 50);       // exact match has high score
+
+        assert.strictEqual(results[1].id, 'landuse/grass2');    // name: "Ğṝȁß"
+        assert.deepEqual(results[1].terms, ['grass']);
+        assert.deepEqual(results[1].match.grass, ['alternate']);
+        assert.isBelow(results[1].score, 50);
+
+        assert.strictEqual(results[2].id, 'leisure/park');    // name: "Park", terms includes "grass"
+        assert.deepEqual(results[2].terms, ['grass']);
+        assert.deepEqual(results[2].match.grass, ['alternate']);
+        assert.isBelow(results[2].score, 50);
       });
 
-      it('considers diacritics on exact matches', () => {
-        const grass1 = _schema.item('landuse/grass1');
-        const grass2 = _schema.item('landuse/grass2');
-        const results = _schema.search('ğṝȁ', 'point');
-        const resultIDs = results.map(item => item.id);
+      it('filtered results must be valid for geometries requested', () => {
+        const results = _schema.search('sand', ['point', 'area']);
+        // console.log(`\nsearch for 'sand'`);
+        // console.log(results);
+        assert.lengthOf(results, 1);
+        // no "Grit Bin" - it only supports "point" and not "area"
 
-        console.log(`\nsearch for 'ğṝȁ'`);
-        console.log(resultIDs);
-        assert.strictEqual(results.indexOf(grass2), 0, 'Ğṝȁß');    // 1. 'Ğṝȁß'  (leading name)
-        assert.strictEqual(results.indexOf(grass1), 1, 'Grass');   // 2. 'Grass' (similar name)
+        assert.strictEqual(results[0].id, 'amenity/shop/surf');
+        assert.deepEqual(results[0].terms, ['sand']);
+        assert.deepEqual(results[0].match.sand, ['alternate']);
       });
 
-      it('replaces diacritics on fuzzy matches', () => {
-        const grass1 = _schema.item('landuse/grass1');
-        const grass2 = _schema.item('landuse/grass2');
-        const results = _schema.search('graß', 'point');
-        assert.isTrue(results.indexOf(grass1) < 2, 'Grass');   // 1. 'Grass' (similar name)
-        assert.isTrue(results.indexOf(grass2) < 2, 'Ğṝȁß');    // 2. 'Ğṝȁß'  (similar name)
+      it('filtered results must be valid at location requested', () => {
+        const results = _schema.search('sand', ['point'], [-75.1638, 39.9526]);
+        // console.log(`\nsearch for 'sand'`);
+        // console.log(results);
+        assert.lengthOf(results, 1);
+        // no "Surf Shop" - it is not supported at the given location
+
+        assert.strictEqual(results[0].id, 'amenity/grit_bin');  // "Sandpit"
+        assert.deepEqual(results[0].terms, ['sandpit']);
+        assert.deepEqual(results[0].match.sandpit, ['primary']);
       });
 
-      // it('includes the appropriate fallback preset', () => {
-      //   assert.isTrue(collection.search('foo', 'point').includes(p.point), 'point');
-      //   assert.isTrue(collection.search('foo', 'line').includes(p.line), 'line');
-      //   assert.isTrue(collection.search('foo', 'area').includes(p.area), 'area');
-      // });
 
       it('excludes presets with searchable: false', () => {
-        const excluded = _schema.item('amenity/excluded');
         const results = _schema.search('excluded', 'point');
-        assert.isTrue(!results.includes(excluded));
+        // console.log(`\nsearch for 'excluded'`);
+        // console.log(results);
+        assert.isEmpty(results);
       });
+
+      it('throws if no search index available', () => {  // run this test last!
+        _schema._currSearchIndex = null;
+        assert.throws(() => _schema.search('grass'), /not ready/i);
+      });
+
     });  // search
 
 
@@ -617,15 +671,169 @@ describe('SchemaSystem', () => {
     });
 
 
-    describe('getDefaults', () => {
+    describe('setMostRecent', () => {
+      beforeAll(() => {
+        _schema._resetAll();
+        _schema.merge(sample.searchData);  // use the sample search data
+        _schema._recentIDs = null;
+      });
+
+      it('ignores invalid preset parameter', () => {
+        assert.doesNotThrow(() => _schema.setMostRecent());
+        assert.isNull(_schema._recentIDs);
+      });
+
+      it('ignores unsearchable presets', () => {
+        const excluded = _schema.item('amenity/excluded');
+        _schema.setMostRecent(excluded);
+        assert.isNull(_schema._recentIDs);
+      });
+
+      it('adds searchable presets in reverse order', () => {
+        const sandpit = _schema.item('amenity/grit_bin');
+        const surfing = _schema.item('amenity/shop/surf');
+        _schema.setMostRecent(sandpit);
+        _schema.setMostRecent(surfing);
+        assert.deepEqual(_schema._recentIDs, ['amenity/shop/surf', 'amenity/grit_bin']);
+      });
+
+      it('removes seen duplicates', () => {
+        const sandpit = _schema.item('amenity/grit_bin');
+        _schema.setMostRecent(sandpit);   // Prepend "Sandpit" back to the beginning of the list
+        assert.deepEqual(_schema._recentIDs, ['amenity/grit_bin', 'amenity/shop/surf']);
+      });
     });
 
 
     describe('getRecents', () => {
+      beforeAll(() => {
+        _schema._resetAll();
+        _schema.merge(sample.searchData);  // use the sample search data
+        _schema._recentIDs = null;
+      });
+
+      it('if no recentIDs, returns an empty array', () => {
+        const result = _schema.getRecents();
+        assert.deepEqual(result, []);
+        assert.deepEqual(_schema._recentIDs, []);
+      });
+
+      it('converts recognized recentIDs to Presets', () => {
+        const sandpit = _schema.item('amenity/grit_bin');
+        const surfing = _schema.item('amenity/shop/surf');
+        _schema._recentIDs = [surfing.id, sandpit.id];
+        const result = _schema.getRecents();
+        assert.deepEqual(result, [surfing, sandpit]);
+      });
+
+      it('ignores unrecognized recentIDs', () => {
+        _schema._recentIDs = ['amenity/fake'];
+        const result = _schema.getRecents();
+        assert.deepEqual(result, []);
+      });
     });
 
 
-    describe('setMostRecent', () => {
+    describe('getDefaults', () => {
+      beforeAll(() => {
+        _schema._resetAll();
+        _schema.merge(sample.searchData);  // use the sample search data
+      });
+
+      it('if no geometry, returns an empty array', () => {
+        const result = _schema.getDefaults();
+        assert.deepEqual(result, []);
+      });
+
+      it('no recents and no defaults, returns only the fallback preset', () => {
+        _schema._recentIDs = [];
+        _schema.defaults.set('point', []);
+        _schema.addablePresetIDs = null;
+
+        const point = _schema.item('point');
+
+        const result = _schema.getDefaults('point');
+        assert.deepEqual(result, [point]);
+      });
+
+      it('has recents but no defaults, returns recents and fallback preset', () => {
+        _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
+        _schema.defaults.set('point', []);
+        _schema.addablePresetIDs = null;
+
+        const sandpit = _schema.item('amenity/grit_bin');
+        const surfing = _schema.item('amenity/shop/surf');
+        const point = _schema.item('point');
+
+        const result = _schema.getDefaults('point');
+        assert.deepEqual(result, [sandpit, surfing, point]);
+      });
+
+      it('has defaults but no recents, returns defaults and fallback preset', () => {
+        _schema._recentIDs = [];
+        _schema.defaults.set('point', ['amenity/bbq']);
+        _schema.addablePresetIDs = null;
+
+        const bbq = _schema.item('amenity/bbq');
+        const point = _schema.item('point');
+
+        const result = _schema.getDefaults('point');
+        assert.deepEqual(result, [bbq, point]);
+      });
+
+      it('has recents and defaults, returns recents, then defaults, then fallback preset', () => {
+        _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
+        _schema.defaults.set('point', ['amenity/bbq']);
+        _schema.addablePresetIDs = null;
+
+        const sandpit = _schema.item('amenity/grit_bin');
+        const surfing = _schema.item('amenity/shop/surf');
+        const bbq = _schema.item('amenity/bbq');
+        const point = _schema.item('point');
+
+        const result = _schema.getDefaults('point');
+        assert.deepEqual(result, [sandpit, surfing, bbq, point]);
+      });
+
+      it('optionally uses the addablePresetIDs instead of the defaults', () => {
+        _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
+        _schema.defaults.set('point', ['amenity/bbq']);
+        _schema.addablePresetIDs = new Set(['amenity/parking']);
+
+        const sandpit = _schema.item('amenity/grit_bin');
+        const surfing = _schema.item('amenity/shop/surf');
+        const parking = _schema.item('amenity/parking');
+        const point = _schema.item('point');
+
+        const result = _schema.getDefaults('point');
+        assert.deepEqual(result, [sandpit, surfing, parking, point]);
+      });
+
+      it('optionally skips the recents', () => {
+        _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
+        _schema.defaults.set('point', ['amenity/bbq']);
+        _schema.addablePresetIDs = new Set(['amenity/parking']);
+
+        const parking = _schema.item('amenity/parking');
+        const point = _schema.item('point');
+
+        const result = _schema.getDefaults('point', false  /* no recents */);
+        assert.deepEqual(result, [parking, point]);
+      });
+
+      it('optionally filters by location, if location provided', () => {
+        _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
+        _schema.defaults.set('point', ['amenity/bbq']);
+        _schema.addablePresetIDs = null;
+
+        const sandpit = _schema.item('amenity/grit_bin');
+        const bbq = _schema.item('amenity/bbq');
+        const point = _schema.item('point');
+
+        const result = _schema.getDefaults('point', true, [-75.1638, 39.9526]);
+        assert.deepEqual(result, [sandpit, bbq, point]);
+        // no "Surf Shop" - it is not supported at the given location
+      });
     });
 
 

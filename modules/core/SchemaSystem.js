@@ -450,23 +450,46 @@ export class SchemaSystem extends AbstractSystem {
       return 1;
     };
 
-    const options = {
-      boost: {
-        primary: 2,
-        alternate: 1
-      },
+    // Perform the search twice - once with exact matching and once with fuzzy matching.
+    // We do this because:  we want exact matches to *always* beat fuzzy matches.
+    // We don't want additional fuzzy matches to bump a result above an exact match.
+    // For example:   query = "shop"
+    //   "Shop" should be the top result.  "Shoe Shop" should never outrank it.
+    //
+    const exactResults = this._currSearchIndex.search(query, {
+      boost: { primary: 20, alternate: 10 },
       boostDocument: _boostDocument,
       combineWith: 'AND',
+      filter: _filter,
+      fuzzy: false,   // no fuzzy (match strings with nearby edit distance)
+      prefix: false   // no prefix (partial match beginning of a string)
+    });
+
+    const fuzzyResults = this._currSearchIndex.search(query, {
+      boost: { primary: 2, alternate: 1 },
+      boostDocument: _boostDocument,
+      combineWith: 'AND',
+      filter: _filter,
       fuzzy: true,    // allow fuzzy (match strings with nearby edit distance)
       prefix: true,   // allow prefix (partial match beginning of a string)
-      filter: _filter,
       weights: {
         fuzzy: 0.2,
         prefix: 0.3
       }
-    };
+    });
 
-    return this._currSearchIndex.search(query, options);
+    const results = new Map();   // Map<docID, SearchResult>
+
+    for (const hit of exactResults) {
+      results.set(hit.id, hit);
+    }
+    for (const hit of fuzzyResults) {
+      if (!results.has(hit.id)) {
+        results.set(hit.id, hit);
+      }
+    }
+
+    return [...results.values()];
   }
 
 
@@ -696,6 +719,8 @@ export class SchemaSystem extends AbstractSystem {
    * @return  {Array<Category|Preset>}  Array of Categories and Presets
    */
   getDefaults(geometry, includeRecents = true, loc = null) {
+    if (!geometry) return [];
+
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -749,7 +774,7 @@ export class SchemaSystem extends AbstractSystem {
 
   /**
    * getRecents
-   * Returns the recently used presets
+   * Returns the recently used presets.
    * If this._recentIDs is unset, try to load them from localStorage
    * @return  {Array<Preset>}  An Array of recent presets
    */
@@ -757,12 +782,16 @@ export class SchemaSystem extends AbstractSystem {
     const context = this.context;
     const storage = context.systems.storage;
 
-    let presetIDs = this._recentIDs;
-    if (storage && !presetIDs) {  // first time, try to get them from localStorage
-      presetIDs = JSON.parse(storage.getItem('preset_recents')) || [];
+    let itemIDs = this._recentIDs;
+    if (!Array.isArray(itemIDs)) {  // first time, try to get them from localStorage
+      if (storage) {
+        itemIDs = JSON.parse(storage.getItem('preset_recents')) || [];
+      } else {
+        itemIDs = [];
+      }
     }
 
-    const presets = presetIDs
+    const presets = itemIDs
       .map(item => {
         const id = item?.id || item;  // previously we stored preset, now we just store presetID
         return this.presets.get(id);
@@ -779,13 +808,17 @@ export class SchemaSystem extends AbstractSystem {
 
   /**
    * setMostRecent
-   * Prepends a preset to the recently used presets array
+   * Prepends a preset to the recently used Presets array.
    * @param  {Preset}  A preset to add
    */
   setMostRecent(preset) {
-    if (!preset.props.searchable) return;
+    if (!preset?.props?.searchable) return;
 
     const storage = this.context.systems.storage;
+
+    if (!Array.isArray(this._recentIDs)) {
+      this._recentIDs = [];
+    }
 
     this._recentIDs.unshift(preset.id);   // prepend array
     this._recentIDs = utilArrayUniq(this._recentIDs).slice(0, MAXRECENTS);
