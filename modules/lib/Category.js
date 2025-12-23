@@ -47,8 +47,6 @@ export class Category {
 
     // For convenient access:
     this.categoryID = this.props.id;
-
-    this.reset();
   }
 
 
@@ -56,6 +54,7 @@ export class Category {
    * reset
    * Resets all cached data.
    * This should happen whenever SchemaSystem merges in new data.
+   * You must add the Category to the SchemaSystem and call `reset` before using the Category.
    */
   reset() {
     const context = this.context;
@@ -98,7 +97,7 @@ export class Category {
     // },
 
     const fallbackName = this.props.name || this.id;
-    const name = l10n?.t(`_tagging.presets.categories.${this.id}.name`, { 'default': '' }) || fallbackName;
+    const nameStr = l10n?.t(`_tagging.presets.categories.${this.id}.name`, { 'default': '' }) || fallbackName;
 
     // We'll gather the search tokens ourselves into "primary" and "alternate" sets.
     // This is because once a token is seen in one field, we don't want it to appear again in another field.
@@ -108,16 +107,15 @@ export class Category {
     // The "alternate" set will contain related terms and tag values a user might search for.
     const primary = new Set();
     const alternate = new Set();
-    utilGatherTokens(name, primary, alternate, true);
+    utilGatherTokens(nameStr, primary, alternate, true);
 
     this._currStrings = {
       id: this.id,
       type: this.type,
       suggestion: false,
-      name: name.trim(),
-      terms: '',    // not used for Categories
-      aliases: '',  // not used for Categories
-      tags: '',     // not used for Categories
+      name: nameStr.trim(),
+      terms: [],    // not used for Categories
+      aliases: [],  // not used for Categories
       primary: [...primary].join(),      // Primary search terms (generally the name)
       alternate: [...alternate].join()   // Alternate search terms (aliases, tags, etc)
     };
@@ -139,22 +137,20 @@ export class Category {
    * aliases
    * Aliases are alternate names for this Category, they may be displayed in the user interface.
    * This is not currently used by Categories, so it will always return an empty Array, '[]'.
-   * The Array splitting code is here to match what Preset does, in case Categories someday get this.
-   * @return  {Array<string>}  Localized aliases
+   * @return  {Array<string>}  Localized aliases, always empty Array '[]' for Categories
    */
   aliases() {
-    return this._currStrings.aliases.split(/\s*[\r\n]+\s*/);
+    return [];
   }
 
   /**
    * terms
    * Terms are related words used for seraching for this Preset.
    * This is not currently used by Categories, so it will always return an empty Array, '[]'.
-   * The Array splitting code is here to match what Preset does, in case Categories someday get this.
-   * @return  {Array<string>}  Localized search terms
+   * @return  {Array<string>}  Localized search terms, always empty Array '[]' for Categories
    */
   terms() {
-    return this._currStrings.terms.split(',');
+    return [];
   }
 
   /**

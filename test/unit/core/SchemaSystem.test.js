@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock, spyOn } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './SchemaSystem.sample.js';
@@ -839,15 +839,16 @@ describe('SchemaSystem', () => {
 
     describe('_localeChanged', () => {
       let field, preset, category;
+      let fieldSpy, presetSpy, categorySpy;
 
       beforeAll(() => {
         field = new Rapid.Field(context, { id: 'wikidata', type: 'wikidata', key: 'wikidata', universal: true });
         preset = new Rapid.Preset(context, { id: 'residential', geometry: ['line'], tags: { highway: 'residential' } });
         category = new Rapid.Category(context, { id: 'roads', members: ['residential'] });
 
-        field.setLocale = mock();
-        preset.setLocale = mock();
-        category.setLocale = mock();
+        fieldSpy = spyOn(field, 'setLocale');
+        presetSpy = spyOn(preset, 'setLocale');
+        categorySpy = spyOn(category, 'setLocale');
 
         _schema.fields.set(field.id, field);
         _schema.presets.set(preset.id, preset);
@@ -855,41 +856,41 @@ describe('SchemaSystem', () => {
       });
 
       it(`defaults to en-US, calls 'setLocale' on Fields, Presets, Categories`, () => {
-        field.setLocale.mockClear();
-        preset.setLocale.mockClear();
-        category.setLocale.mockClear();
+        fieldSpy.mockClear();
+        presetSpy.mockClear();
+        categorySpy.mockClear();
 
         _schema._currLocaleCode = null;
         _schema._localeChanged();
 
         assert.strictEqual(_schema._currLocaleCode, 'en-US');
 
-        assert.lengthOf(field.setLocale.mock.calls, 1);     // setLocale called once
-        assert.lengthOf(preset.setLocale.mock.calls, 1);    // setLocale called once
-        assert.lengthOf(category.setLocale.mock.calls, 1);  // setLocale called once
+        assert.lengthOf(fieldSpy.mock.calls, 1);     // setLocale called once
+        assert.lengthOf(presetSpy.mock.calls, 1);    // setLocale called once
+        assert.lengthOf(categorySpy.mock.calls, 1);  // setLocale called once
 
-        assert.deepEqual(field.setLocale.mock.lastCall, ['en-US']);
-        assert.deepEqual(preset.setLocale.mock.lastCall, ['en-US']);
-        assert.deepEqual(category.setLocale.mock.lastCall, ['en-US']);
+        assert.deepEqual(fieldSpy.mock.lastCall, ['en-US']);
+        assert.deepEqual(presetSpy.mock.lastCall, ['en-US']);
+        assert.deepEqual(categorySpy.mock.lastCall, ['en-US']);
       });
 
       it(`accepts a localeCode, calls 'setLocale' on Fields, Presets, Categories`, () => {
-        field.setLocale.mockClear();
-        preset.setLocale.mockClear();
-        category.setLocale.mockClear();
+        fieldSpy.mockClear();
+        presetSpy.mockClear();
+        categorySpy.mockClear();
 
         _schema._currLocaleCode = null;
         _schema._localeChanged('de');
 
         assert.strictEqual(_schema._currLocaleCode, 'de');
 
-        assert.lengthOf(field.setLocale.mock.calls, 1);     // setLocale called once
-        assert.lengthOf(preset.setLocale.mock.calls, 1);    // setLocale called once
-        assert.lengthOf(category.setLocale.mock.calls, 1);  // setLocale called once
+        assert.lengthOf(fieldSpy.mock.calls, 1);     // setLocale called once
+        assert.lengthOf(presetSpy.mock.calls, 1);    // setLocale called once
+        assert.lengthOf(categorySpy.mock.calls, 1);  // setLocale called once
 
-        assert.deepEqual(field.setLocale.mock.lastCall, ['de']);
-        assert.deepEqual(preset.setLocale.mock.lastCall, ['de']);
-        assert.deepEqual(category.setLocale.mock.lastCall, ['de']);
+        assert.deepEqual(fieldSpy.mock.lastCall, ['de']);
+        assert.deepEqual(presetSpy.mock.lastCall, ['de']);
+        assert.deepEqual(categorySpy.mock.lastCall, ['de']);
       });
     });
 
@@ -966,15 +967,16 @@ describe('SchemaSystem', () => {
 
     describe('_schemaChanged', () => {
       let field, preset, category;
+      let fieldSpy, presetSpy, categorySpy;
 
       beforeAll(() => {
         field = new Rapid.Field(context, { id: 'wikidata', type: 'wikidata', key: 'wikidata', universal: true });
         preset = new Rapid.Preset(context, { id: 'residential', geometry: ['line'], tags: { highway: 'residential' } });
         category = new Rapid.Category(context, { id: 'roads', members: ['residential'] });
 
-        field.reset = mock();
-        preset.reset = mock();
-        category.reset = mock();
+        fieldSpy = spyOn(field, 'reset');
+        presetSpy = spyOn(preset, 'reset');
+        categorySpy = spyOn(category, 'reset');
 
         _schema.fields.set(field.id, field);
         _schema.presets.set(preset.id, preset);
@@ -984,9 +986,9 @@ describe('SchemaSystem', () => {
       });
 
       it(`calls 'reset' on Fields, Presets, and Categories`, () => {
-        assert.lengthOf(field.reset.mock.calls, 1);     // reset called once
-        assert.lengthOf(preset.reset.mock.calls, 1);    // reset called once
-        assert.lengthOf(category.reset.mock.calls, 1);  // reset called once
+        assert.lengthOf(fieldSpy.mock.calls, 1);     // reset called once
+        assert.lengthOf(presetSpy.mock.calls, 1);    // reset called once
+        assert.lengthOf(categorySpy.mock.calls, 1);  // reset called once
       });
 
       it('updates the universal field cache', () => {

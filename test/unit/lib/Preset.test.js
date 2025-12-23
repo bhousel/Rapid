@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import * as sample from './Preset.sample.js';
 
 
 describe('Preset', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     assets:  new Rapid.AssetSystem(context),
-    l10n:    new Rapid.LocalizationSystem(context),
     schema:  new Rapid.SchemaSystem(context)
   };
 
@@ -28,6 +28,133 @@ describe('Preset', () => {
       assert.instanceOf(preset, Rapid.Preset);
       assert.strictEqual(preset.context, context);
     });
+
+    it('accepts geometry property as an Array', () => {
+      const preset = new Rapid.Preset(context, { id: 'test', geometry: ['point', 'area'] });
+      assert.deepEqual(preset.props.geometry, ['point', 'area']);
+    });
+
+    it('accepts geometry property as a string, wrapping it in an Array', () => {
+      const preset = new Rapid.Preset(context, { id: 'test', geometry: 'point' });
+      assert.deepEqual(preset.props.geometry, ['point']);
+    });
+  });
+
+
+  // Test some already-constructed Presets..
+  describe('methods', () => {
+    let _preset, _suggestion, _star;
+
+    beforeAll(() => {
+      _preset = new Rapid.Preset(context, sample.presetProps);
+      _suggestion = new Rapid.Preset(context, sample.suggestionProps);
+      _star = new Rapid.Preset(context, sample.starProps);
+
+      schema.presets.set(_preset.id, _preset);
+      schema.presets.set(_suggestion.id, _suggestion);
+      schema.presets.set(_star.id, _star);
+
+      _preset.reset();
+      _suggestion.reset();
+      _star.reset();
+    });
+
+    describe('geometries', () => {
+      it('computes geometries as a Set of all supported geometries for the Preset', () => {
+        assert.instanceOf(_preset.geometries, Set);
+        assert.hasAllKeys(_preset.geometries, ['point', 'area']);
+      });
+    });
+
+    describe('strings (normal)', () => {
+      it('has a Map to hold prelocalized strings', () => {
+        assert.instanceOf(_preset._strings, Map);
+        assert.hasAllKeys(_preset._strings, ['en-US']);
+      });
+
+      it('stores the current locale code', () => {
+        assert.deepEqual(_preset._currLocaleCode, 'en-US');
+      });
+
+      it('stores the current strings', () => {
+        const currStrings = _preset._currStrings;
+        assert.isObject(currStrings);
+        assert.strictEqual(currStrings, _preset._strings.get('en-US'));
+        assert.deepEqual(currStrings, sample.presetStrings);
+      });
+    });
+
+    describe('strings (suggestion)', () => {
+      it('has a Map to hold prelocalized strings', () => {
+        assert.instanceOf(_suggestion._strings, Map);
+        assert.hasAllKeys(_suggestion._strings, ['en-US']);
+      });
+
+      it('stores the current locale code', () => {
+        assert.deepEqual(_suggestion._currLocaleCode, 'en-US');
+      });
+
+      it('stores the current strings', () => {
+        const currStrings = _suggestion._currStrings;
+        assert.isObject(currStrings);
+        assert.strictEqual(currStrings, _suggestion._strings.get('en-US'));
+        assert.deepEqual(currStrings, sample.suggestionStrings);
+      });
+    });
+
+    describe('name', () => {
+      it('returns the prelocalized name', () => {
+        assert.strictEqual(_preset.name(), _preset._currStrings.name);
+        assert.strictEqual(_preset.name(), sample.presetStrings.name);
+
+        assert.strictEqual(_suggestion.name(), _suggestion._currStrings.name);
+        assert.strictEqual(_suggestion.name(), sample.suggestionStrings.name);
+      });
+    });
+
+    describe('aliases', () => {
+      it('returns the prelocalized aliases', () => {
+        assert.deepEqual(_preset.aliases(), _preset._currStrings.aliases);
+        assert.deepEqual(_preset.aliases(), sample.presetStrings.aliases);
+
+        assert.deepEqual(_suggestion.aliases(), _suggestion._currStrings.aliases);
+        assert.deepEqual(_suggestion.aliases(), sample.suggestionStrings.aliases);
+      });
+    });
+
+    describe('terms', () => {
+      it('returns the prelocalized terms', () => {
+        assert.deepEqual(_preset.terms(), _preset._currStrings.terms);
+        assert.deepEqual(_preset.terms(), sample.presetStrings.terms);
+
+        assert.deepEqual(_suggestion.terms(), _suggestion._currStrings.terms);
+        assert.deepEqual(_suggestion.terms(), sample.suggestionStrings.terms);
+      });
+    });
+
+    describe('subtitle', () => {
+      it('returns null for normal presets', () => {
+        assert.isNull(_preset.subtitle());
+      });
+      it('returns the preset name for suggestion presets', () => {
+        // This preset doesn't exist in the SchemaSystem, so it returns the fallback presetID.
+        assert.strictEqual(_suggestion.subtitle(), 'amenity/cafe/coffee_shop');
+      });
+    });
+
+    describe('reference', () => {
+      it('returns key/value for normal presets', () => {
+        assert.deepEqual(_preset.reference(), { key: 'shop', value: 'second_hand' });
+      });
+
+      it('returns key only for star presets', () => {
+        assert.deepEqual(_star.reference(), { key: 'traffic_calming' });
+      });
+
+      it('returns QID for suggestion presets', () => {
+        assert.deepEqual(_suggestion.reference(), { qid: 'Q37158' });
+      });
+    });
   });
 
 
@@ -38,14 +165,12 @@ describe('Preset', () => {
     });
   });
 
-
   describe('moreFields', () => {
     it('has no moreFields by default', () => {
       const preset = new Rapid.Preset(context, { id: 'test' });
       assert.deepEqual(preset.moreFields(), []);
     });
   });
-
 
   describe('matchScore', () => {
     it('returns -1 if preset does not match tags', () => {

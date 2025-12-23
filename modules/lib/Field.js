@@ -67,8 +67,6 @@ export class Field {
     this.label = this.label.bind(this);
     this.terms = this.terms.bind(this);
     this.placeholder = this.placeholder.bind(this);
-
-    this.reset();
   }
 
 
@@ -76,6 +74,7 @@ export class Field {
    * reset
    * Resets all cached data.
    * This should happen whenever SchemaSystem merges in new data.
+   * You must add the Field to the SchemaSystem and call `reset` before using the Field.
    */
   reset() {
     const l10n = this.context.systems.l10n;
@@ -101,8 +100,8 @@ export class Field {
 
     // Some Fields may reference the values from another Field.
     const labelRef = this._resolveReference('label');
+    const termsRef = this;   // Note that `terms` can't reference another Field because it is an Array property.
     const placeholderRef = this._resolveReference('placeholder');
-    // Note that `terms` can't reference another Field because it is an Array property.
 
     // Pre-localize and store strings (although there is no full-text search for now).
     // `name` and `placeholder` are strings, while `terms` is an Array of strings.
@@ -114,18 +113,21 @@ export class Field {
     //      "placeholder": "https://example.com"
     //  },
 
-    const fallbackLabel = this.props.label || this.id;
-    const fallbackTerms = this.props.terms.join(',');    // stringify Array
-    const fallbackPlaceholder = this.props.placeholder || '';
-    const label = l10n?.t(`_tagging.presets.fields.${labelRef.id}.label`, { 'default': '' }) || fallbackLabel;
-    const terms = l10n?.t(`_tagging.presets.fields.${this.id}.terms`, { 'default': '' }) || fallbackTerms;
-    const placeholder = l10n?.t(`_tagging.presets.fields.${placeholderRef.id}.placeholder`, { 'default': '' }) || fallbackPlaceholder;
+    const fallbackLabel = labelRef.props.label || labelRef.id;
+    const fallbackTerms = termsRef.props.terms.join(',');    // stringify Array
+    const fallbackPlaceholder = placeholderRef.props.placeholder || '';
+
+    const labelStr = l10n?.t(`_tagging.presets.fields.${labelRef.id}.label`, { 'default': '' }) || fallbackLabel;
+    const termsStr = l10n?.t(`_tagging.presets.fields.${termsRef.id}.terms`, { 'default': '' }) || fallbackTerms;
+    const placeholderStr = l10n?.t(`_tagging.presets.fields.${placeholderRef.id}.placeholder`, { 'default': '' }) || fallbackPlaceholder;
+
+    const termsArr = termsStr.split(',').map(s => s.trim()).filter(Boolean);   // Arrayify string
 
     this._currStrings = {
       id: this.id,
-      label: label.trim(),
-      terms: terms.trim(),
-      placeholder: placeholder.trim()
+      label: labelStr.trim(),
+      terms: termsArr,
+      placeholder: placeholderStr.trim()
     };
 
     this._strings.set(this._currLocaleCode, this._currStrings);
@@ -147,7 +149,7 @@ export class Field {
    * @return  {Array<string>}  Localized search terms
    */
   terms() {
-    return this._currStrings.terms.split(',');
+    return this._currStrings.terms;
   }
 
   /**
@@ -159,28 +161,6 @@ export class Field {
     return this._currStrings.placeholder;
   }
 
-
-  // /**
-  //  * t
-  //  * Returns a localized string, wrapper around `l10n.t`.
-  //  * @params  {string}  scope   - The trailing part of the stringID
-  //  * @params  {Object?} options - Optional options to pass to `l10n.t`
-  //  * @return  {string}  Localized string
-  //  */
-  // t(scope, options) {
-  //   return this.context.systems.l10n.t(`_tagging.presets.fields.${this.id}.${scope}`, options);
-  // }
-
-  // /**
-  //  * tHtml
-  //  * Returns a localized HTML string, wrapper around `l10n.tHtml`.
-  //  * @params  {string}  scope   - The trailing part of the stringID
-  //  * @params  {Object?} options - Optional options to pass to `l10n.tHtml`
-  //  * @return  {string}  Localized HTML string
-  //  */
-  // tHtml(scope, options) {
-  //   return this.context.systems.l10n.tHtml(`_tagging.presets.fields.${this.id}.${scope}`, options);
-  // }
 
   /**
    * _resolveReference

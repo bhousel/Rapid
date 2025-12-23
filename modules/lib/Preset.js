@@ -40,6 +40,7 @@ export class Preset {
     this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
     this._currLocaleCode = null;  // The current locale code
     this._currStrings = {};       // The current strings
+    this._resolved = { fields: null, moreFields: null };
 
     // Preserve properties and assign some defaults
     this.props = globalThis.structuredClone(props);
@@ -51,6 +52,7 @@ export class Preset {
     this.props.name ??= '';
     this.props.reference ??= {};
     this.props.searchable ??= true;
+    this.props.suggestion ??= false;
     this.props.tags ??= {};
     this.props.terms ??= [];
 
@@ -74,8 +76,6 @@ export class Preset {
     } else {
       this.geometries = new Set(schema.geometryTypes);  // all types allowed
     }
-
-    this.reset();
   }
 
 
@@ -83,6 +83,7 @@ export class Preset {
    * reset
    * Resets all cached data.
    * This should happen whenever SchemaSystem merges in new data.
+   * You must add the Preset to the SchemaSystem and call `reset` before using the Preset.
    */
   reset() {
     const l10n = this.context.systems.l10n;
@@ -109,24 +110,25 @@ export class Preset {
 
     const primary = new Set();
     const alternate = new Set();
-    let name, terms, aliases;
+    let nameStr, termsArr, aliasesArr;
 
     // Performance optimization:
     // We can skip a lot of this for "suggestion" presets from NSI.
     // They will never have a hit in the translation system nor reference another preset's props.
     if (this.props.suggestion) {
-      name = this.props.name.replace(/\s+\(.*?\)/g, '');  // remove parenthesis, e.g. "(USA)"
-      terms = this.props.terms.join(',');                 // already contains the names
-      aliases = '';                                       // there won't be aliases
+      nameStr = this.props.name.replace(/\s+\(.*?\)/g, '');  // remove parenthesis, e.g. "(USA)"
+      termsArr = this.props.terms;                           // already contains alternate names
+      aliasesArr = [];                                       // there won't be aliases
 
-      primary.add(name);
+      primary.add(nameStr);
       this._gatherSuggestionTerms(primary, alternate);
       this._gatherSuggestionTags(primary, alternate);
 
     } else {
       // Some Presets may reference the values from another Preset.
       const refName = this._resolveReference('name');
-      // Note that `terms` and `aliases` can't reference another Preset because they are Array properties.
+      const refTerms = this;     // Note that `terms` and `aliases` can't reference
+      const refAliases = this;   // other Presets because they are Array properties.
 
       // Pre-localize and store strings so that the Miniseach full-text search can index these.
       // `name` is a string, while `terms` and `aliases` are Arrays of strings.
@@ -140,14 +142,14 @@ export class Preset {
       //     "terms": "resale,second-hand,used"
       // }
 
-      const fallbackName = this.props.name || this.id;
-      const fallbackTerms = this.props.terms.join(',');       // stringify Array
-      const fallbackAliases = this.props.aliases.join('\n');  // stringify Array
-      const tags = Object.values(this.props.tags).filter(v => v !== '*').filter(Boolean).join(',');
+      const fallbackName = refName.props.name || refName.id;
+      const fallbackTerms = refTerms.props.terms.join(',');       // stringify Array
+      const fallbackAliases = refAliases.props.aliases.join('\n');  // stringify Array
 
-      name = l10n?.t(`_tagging.presets.presets.${refName.id}.name`, { 'default': '' }) || fallbackName;
-      terms = l10n?.t(`_tagging.presets.presets.${this.id}.terms`, { 'default': '' }) || fallbackTerms;
-      aliases = l10n?.t(`_tagging.presets.presets.${this.id}.aliases`, { 'default': '' }) || fallbackAliases;
+      nameStr = l10n?.t(`_tagging.presets.presets.${refName.id}.name`, { 'default': '' }) || fallbackName;
+      const termsStr = l10n?.t(`_tagging.presets.presets.${refTerms.id}.terms`, { 'default': '' }) || fallbackTerms;
+      const aliasesStr = l10n?.t(`_tagging.presets.presets.${refAliases.id}.aliases`, { 'default': '' }) || fallbackAliases;
+      const tagsStr = Object.values(this.props.tags).filter(v => v !== '*').filter(Boolean).join(',');
 
       // We'll gather the search tokens ourselves into "primary" and "alternate" sets.
       // This is because once a token is seen in one field, we don't want it to appear again in another field.
@@ -155,19 +157,22 @@ export class Preset {
       // that happens to have redundant terms gets unfairly boosted in the search results)
       // The "primary" set will contain the preset name.
       // The "alternate" set will contain related terms and tag values a user might search for.
-      utilGatherTokens(name, primary, alternate, true);
-      utilGatherTokens(terms, primary, alternate, false);
-      utilGatherTokens(aliases, primary, alternate, false);
-      utilGatherTokens(tags, primary, alternate, false);
+      utilGatherTokens(nameStr, primary, alternate, true);
+      utilGatherTokens(termsStr, primary, alternate, false);
+      utilGatherTokens(aliasesStr, primary, alternate, false);
+      utilGatherTokens(tagsStr, primary, alternate, false);
+
+      termsArr = termsStr.split(',').map(s => s.trim()).filter(Boolean);                  // Arrayify string
+      aliasesArr = aliasesStr.split(/\s*[\r\n]+\s*/).map(s => s.trim()).filter(Boolean);  // Arrayify string
     }
 
     this._currStrings = {
       id: this.id,
       type: this.type,
       suggestion: this.props.suggestion,
-      name: name.trim(),                 // Display Name
-      terms: terms.trim(),               // Display Terms
-      aliases: aliases.trim(),           // Display Aliases
+      name: nameStr.trim(),              // Display Name
+      terms: termsArr,                   // Display Terms
+      aliases: aliasesArr,               // Display Aliases
       primary: [...primary].join(),      // Primary search terms (generally the name)
       alternate: [...alternate].join()   // Alternate search terms (aliases, tags, etc)
     };
@@ -190,7 +195,7 @@ export class Preset {
    * @return  {Array<string>}  Localized aliases
    */
   aliases() {
-    return this._currStrings.aliases.split(/\s*[\r\n]+\s*/);
+    return this._currStrings.aliases;
   }
 
   /**
@@ -200,7 +205,7 @@ export class Preset {
    * @return  {Array<string>}  Localized search terms
    */
   terms() {
-    return this._currStrings.terms.split(',');
+    return this._currStrings.terms;
   }
 
   /**
@@ -266,13 +271,17 @@ export class Preset {
    * @return  {string}  Localized preset subtitle, or `null` if not applicable
    */
   subtitle() {
-    if (this.suggestion) {
-      const l10n = this.context.systems.l10n;
-      let path = this.id.split('/');
-      path.pop();  // remove brand name
-      return l10n.t('_tagging.presets.presets.' + path.join('/') + '.name');
-    }
-    return null;
+    if (!this.props.suggestion) return null;
+
+    const schema = this.context.systems.schema;
+
+    let path = this.id.split('/');
+    path.pop();  // remove brand name
+
+    const parentID = path.join('/');
+    const parentPreset = schema.presets.get(parentID);
+
+    return parentPreset?.name() || parentID;
   }
 
 
