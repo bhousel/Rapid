@@ -180,7 +180,7 @@ export class Field {
         if (field) {
           return field;
         }
-        console.warn(`Unable to resolve referenced field: ${this.id}.${prop} -> ${match[1]}`);  // eslint-disable-line no-console
+        console.warn(`Unable to resolve referenced fieldID: ${this.id}.${prop} -> ${match[1]}`);  // eslint-disable-line no-console
       }
     }
     return this;

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, it } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './Preset.sample.js';
@@ -43,116 +43,226 @@ describe('Preset', () => {
 
   // Test some already-constructed Presets..
   describe('methods', () => {
-    let _preset, _suggestion, _star;
+    let _name, _phone, _shopping, _secondhand;
+    let _shop, _thrift, _coffee, _starbucks;
 
     beforeAll(() => {
-      _preset = new Rapid.Preset(context, sample.presetProps);
-      _suggestion = new Rapid.Preset(context, sample.suggestionProps);
-      _star = new Rapid.Preset(context, sample.starProps);
+      // Fields
+      _name = new Rapid.Field(context, sample.nameProps);
+      _phone = new Rapid.Field(context, sample.phoneProps);
+      _shopping = new Rapid.Field(context, sample.shoppingProps);
+      _secondhand = new Rapid.Field(context, sample.secondhandProps);
 
-      schema.presets.set(_preset.id, _preset);
-      schema.presets.set(_suggestion.id, _suggestion);
-      schema.presets.set(_star.id, _star);
+      schema.fields.set(_name.id, _name);
+      schema.fields.set(_phone.id, _phone);
+      schema.fields.set(_shopping.id, _shopping);
+      schema.fields.set(_secondhand.id, _secondhand);
 
-      _preset.reset();
-      _suggestion.reset();
-      _star.reset();
+      _name.reset();
+      _phone.reset();
+      _shopping.reset();
+      _secondhand.reset();
+
+      // Presets
+      _shop = new Rapid.Preset(context, sample.shopProps);
+      _thrift = new Rapid.Preset(context, sample.thriftProps);
+      _coffee = new Rapid.Preset(context, sample.coffeeProps);
+      _starbucks = new Rapid.Preset(context, sample.starbucksProps);
+
+      schema.presets.set(_shop.id, _shop);
+      schema.presets.set(_thrift.id, _thrift);
+      schema.presets.set(_coffee.id, _coffee);
+      schema.presets.set(_starbucks.id, _starbucks);
+
+      _shop.reset();
+      _thrift.reset();
+      _coffee.reset();
+      _starbucks.reset();
     });
 
     describe('geometries', () => {
       it('computes geometries as a Set of all supported geometries for the Preset', () => {
-        assert.instanceOf(_preset.geometries, Set);
-        assert.hasAllKeys(_preset.geometries, ['point', 'area']);
+        assert.instanceOf(_thrift.geometries, Set);
+        assert.hasAllKeys(_thrift.geometries, ['point', 'area']);
       });
     });
 
-    describe('strings (normal)', () => {
+    describe('strings (normal preset)', () => {
       it('has a Map to hold prelocalized strings', () => {
-        assert.instanceOf(_preset._strings, Map);
-        assert.hasAllKeys(_preset._strings, ['en-US']);
+        assert.instanceOf(_thrift._strings, Map);
+        assert.hasAllKeys(_thrift._strings, ['en-US']);
       });
 
       it('stores the current locale code', () => {
-        assert.deepEqual(_preset._currLocaleCode, 'en-US');
+        assert.deepEqual(_thrift._currLocaleCode, 'en-US');
       });
 
       it('stores the current strings', () => {
-        const currStrings = _preset._currStrings;
+        const currStrings = _thrift._currStrings;
         assert.isObject(currStrings);
-        assert.strictEqual(currStrings, _preset._strings.get('en-US'));
-        assert.deepEqual(currStrings, sample.presetStrings);
+        assert.strictEqual(currStrings, _thrift._strings.get('en-US'));
+        assert.deepEqual(currStrings, sample.thriftStrings);
       });
     });
 
-    describe('strings (suggestion)', () => {
+    describe('strings (suggestion preset)', () => {
       it('has a Map to hold prelocalized strings', () => {
-        assert.instanceOf(_suggestion._strings, Map);
-        assert.hasAllKeys(_suggestion._strings, ['en-US']);
+        assert.instanceOf(_starbucks._strings, Map);
+        assert.hasAllKeys(_starbucks._strings, ['en-US']);
       });
 
       it('stores the current locale code', () => {
-        assert.deepEqual(_suggestion._currLocaleCode, 'en-US');
+        assert.deepEqual(_starbucks._currLocaleCode, 'en-US');
       });
 
       it('stores the current strings', () => {
-        const currStrings = _suggestion._currStrings;
+        const currStrings = _starbucks._currStrings;
         assert.isObject(currStrings);
-        assert.strictEqual(currStrings, _suggestion._strings.get('en-US'));
-        assert.deepEqual(currStrings, sample.suggestionStrings);
+        assert.strictEqual(currStrings, _starbucks._strings.get('en-US'));
+        assert.deepEqual(currStrings, sample.starbucksStrings);
       });
     });
 
     describe('name', () => {
       it('returns the prelocalized name', () => {
-        assert.strictEqual(_preset.name(), _preset._currStrings.name);
-        assert.strictEqual(_preset.name(), sample.presetStrings.name);
+        assert.strictEqual(_thrift.name(), _thrift._currStrings.name);
+        assert.strictEqual(_thrift.name(), sample.thriftStrings.name);
 
-        assert.strictEqual(_suggestion.name(), _suggestion._currStrings.name);
-        assert.strictEqual(_suggestion.name(), sample.suggestionStrings.name);
+        assert.strictEqual(_starbucks.name(), _starbucks._currStrings.name);
+        assert.strictEqual(_starbucks.name(), sample.starbucksStrings.name);
       });
     });
 
     describe('aliases', () => {
       it('returns the prelocalized aliases', () => {
-        assert.deepEqual(_preset.aliases(), _preset._currStrings.aliases);
-        assert.deepEqual(_preset.aliases(), sample.presetStrings.aliases);
+        assert.deepEqual(_thrift.aliases(), _thrift._currStrings.aliases);
+        assert.deepEqual(_thrift.aliases(), sample.thriftStrings.aliases);
 
-        assert.deepEqual(_suggestion.aliases(), _suggestion._currStrings.aliases);
-        assert.deepEqual(_suggestion.aliases(), sample.suggestionStrings.aliases);
+        assert.deepEqual(_starbucks.aliases(), _starbucks._currStrings.aliases);
+        assert.deepEqual(_starbucks.aliases(), sample.starbucksStrings.aliases);
       });
     });
 
     describe('terms', () => {
       it('returns the prelocalized terms', () => {
-        assert.deepEqual(_preset.terms(), _preset._currStrings.terms);
-        assert.deepEqual(_preset.terms(), sample.presetStrings.terms);
+        assert.deepEqual(_thrift.terms(), _thrift._currStrings.terms);
+        assert.deepEqual(_thrift.terms(), sample.thriftStrings.terms);
 
-        assert.deepEqual(_suggestion.terms(), _suggestion._currStrings.terms);
-        assert.deepEqual(_suggestion.terms(), sample.suggestionStrings.terms);
+        assert.deepEqual(_starbucks.terms(), _starbucks._currStrings.terms);
+        assert.deepEqual(_starbucks.terms(), sample.starbucksStrings.terms);
       });
     });
 
     describe('subtitle', () => {
       it('returns null for normal presets', () => {
-        assert.isNull(_preset.subtitle());
+        assert.isNull(_thrift.subtitle());
       });
       it('returns the preset name for suggestion presets', () => {
-        // This preset doesn't exist in the SchemaSystem, so it returns the fallback presetID.
-        assert.strictEqual(_suggestion.subtitle(), 'amenity/cafe/coffee_shop');
+        assert.strictEqual(_starbucks.subtitle(), 'Coffeehouse');
       });
     });
 
     describe('reference', () => {
       it('returns key/value for normal presets', () => {
-        assert.deepEqual(_preset.reference(), { key: 'shop', value: 'second_hand' });
+        assert.deepEqual(_thrift.reference(), { key: 'shop', value: 'second_hand' });
       });
 
       it('returns key only for star presets', () => {
-        assert.deepEqual(_star.reference(), { key: 'traffic_calming' });
+        assert.deepEqual(_shop.reference(), { key: 'shop' });
       });
 
       it('returns QID for suggestion presets', () => {
-        assert.deepEqual(_suggestion.reference(), { qid: 'Q37158' });
+        assert.deepEqual(_starbucks.reference(), { qid: 'Q37158' });
+      });
+    });
+
+    describe('_resolveReference', () => {
+      const orig = console.warn;
+      const spyWarn = mock();
+
+      beforeAll(() => {
+        console.warn = spyWarn;
+      });
+
+      beforeEach(() => {
+        spyWarn.mockClear();  // reset call count
+      });
+
+      afterAll(() => {
+        console.warn = orig;
+      });
+
+      it('a Preset property without a reference resolves to itself', () => {
+        assert.strictEqual(_thrift._resolveReference('name'), _thrift);
+      });
+
+      it('a Preset property with a reference to a known Preset resolves to the other Preset', () => {
+        assert.strictEqual(_thrift._resolveReference('icon'), _shop);
+      });
+
+      it('a Preset property with a reference to an unknown Preset resolves to itself and issues a warning', () => {
+        assert.strictEqual(_thrift._resolveReference('dummy'), _thrift);
+        assert.lengthOf(spyWarn.mock.calls, 1);   // console.warn called once
+        assert.match(spyWarn.mock.lastCall[0], /^unable to resolve/i);
+      });
+    });
+
+    describe('_resolveFields', () => {
+      const orig = console.warn;
+      const spyWarn = mock();
+
+      beforeAll(() => {
+        console.warn = spyWarn;
+      });
+
+      beforeEach(() => {
+        spyWarn.mockClear();  // reset call count
+      });
+
+      afterAll(() => {
+        console.warn = orig;
+      });
+
+      it(`resolves 'fields' directly`, () => {
+        assert.deepEqual(_shop._resolveFields('fields'), [_name, _shopping]);
+
+        assert.lengthOf(spyWarn.mock.calls, 1);   // console.warn called once
+        assert.match(spyWarn.mock.lastCall[0], /^unable to resolve referenced fieldid.*fake1/i);
+      });
+
+      it(`resolves 'moreFields' directly`, () => {
+        assert.deepEqual(_shop._resolveFields('moreFields'), [_phone]);
+
+        assert.lengthOf(spyWarn.mock.calls, 1);   // console.warn called once
+        assert.match(spyWarn.mock.lastCall[0], /^unable to resolve referenced fieldid.*fake2/i);
+      });
+
+      it('returns empty array for invalid property name', () => {
+        assert.deepEqual(_shop._resolveFields('dummy'), []);
+      });
+
+      it(`resolves 'fields' that reference another presetID`, () => {
+        assert.deepEqual(_thrift._resolveFields('fields'), [_name, _shopping, _secondhand]);
+
+        assert.lengthOf(spyWarn.mock.calls, 2);   // console.warn called twice
+        assert.match(spyWarn.mock.calls[0][0], /^unable to resolve referenced fieldid.*fake1/i);
+        assert.match(spyWarn.mock.calls[1][0], /^unable to resolve referenced presetid.*dummy1/i);
+      });
+
+      it(`resolves 'moreFields' that reference another presetID`, () => {
+        assert.deepEqual(_thrift._resolveFields('moreFields'), [_phone]);
+
+        assert.lengthOf(spyWarn.mock.calls, 2);   // console.warn called twice
+        assert.match(spyWarn.mock.calls[0][0], /^unable to resolve referenced fieldid.*fake2/i);
+        assert.match(spyWarn.mock.calls[1][0], /^unable to resolve referenced presetid.*dummy2/i);
+      });
+
+      it(`inherits 'fields' from parent Preset if there are no 'fields'`, () => {
+        assert.deepEqual(_starbucks._resolveFields('fields'), [_name]);
+      });
+
+      it(`inherits 'moreFields' from parent Preset if there are no 'moreFields'`, () => {
+        assert.deepEqual(_starbucks._resolveFields('moreFields'), [_phone]);
       });
     });
   });

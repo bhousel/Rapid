@@ -443,7 +443,7 @@ export class Preset {
 
   /**
    * _resolveFields
-   * For a Preset without its own Fields, inherit fields from another preset.
+   * For a Preset without its own Fields, inherit fields from another Preset.
    * Replace `{presetID}` placeholders with the fields of the other preset.
    * @param   {string}  prop - the property to lookup (either 'fields' or 'moreFields')
    * @return  {Array<Field>}  the resolved fields or moreFields
@@ -456,13 +456,15 @@ export class Preset {
 
     // Returns an Array of fields to inherit from the given presetID, if found
     const inheritFields = (presetID, prop) => {
-      const parent = schema.presets.get(presetID);
-      if (!parent) return [];
-
+      const other = schema.presets.get(presetID);
+      if (!other) {
+        console.warn(`Unable to resolve referenced presetID: ${this.id}.${prop} -> ${presetID}`);  // eslint-disable-line no-console
+        return [];
+      }
       if (prop === 'fields') {
-        return parent.fields();
+        return other.fields();
       } else if (prop === 'moreFields') {
-        return parent.moreFields();
+        return other.moreFields();
       } else {
         return [];
       }
@@ -475,7 +477,7 @@ export class Preset {
       } else if (schema.fields.has(fieldID)) {    // a normal fieldID
         resolved.push(schema.fields.get(fieldID));
       } else {
-        console.warn(`Cannot resolve "${fieldID}" found in ${this.id}.${prop}`);  // eslint-disable-line no-console
+        console.warn(`Unable to resolve referenced fieldID: ${this.id}.${prop} -> ${fieldID}`);  // eslint-disable-line no-console
       }
     }
 

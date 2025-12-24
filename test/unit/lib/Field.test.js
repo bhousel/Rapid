@@ -1,4 +1,4 @@
-import { beforeAll, describe, it } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './Field.sample.js';
@@ -110,6 +110,37 @@ describe('Field', () => {
         assert.deepEqual(_two.placeholder(), sample.field2Strings.placeholder);
       });
     });
-  });
 
+    describe('_resolveReference', () => {
+      const orig = console.warn;
+      const spyWarn = mock();
+
+      beforeAll(() => {
+        console.warn = spyWarn;
+      });
+
+      beforeEach(() => {
+        spyWarn.mockClear();  // reset call count
+      });
+
+      afterAll(() => {
+        console.warn = orig;
+      });
+
+      it('a Field property without a reference resolves to itself', () => {
+        assert.strictEqual(_two._resolveReference('name'), _two);
+      });
+
+      it('a Field property with a reference to a known Field resolves to the other Field', () => {
+        assert.strictEqual(_two._resolveReference('placeholder'), _one);
+      });
+
+      it('a Field property with a reference to an unknown Field resolves to itself and issues a warning', () => {
+        assert.strictEqual(_two._resolveReference('dummy'), _two);
+        assert.lengthOf(spyWarn.mock.calls, 1);   // console.warn called once
+        assert.match(spyWarn.mock.lastCall[0], /^unable to resolve/i);
+      });
+    });
+
+  });
 });

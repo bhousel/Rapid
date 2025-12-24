@@ -1,20 +1,58 @@
+// Some fields
+export const nameProps = { id: 'name', label: 'Name', key: 'name', type: 'text' };
+export const phoneProps = { id: 'phone', label: 'Phone', key: 'phone', type: 'tel' };
+export const shoppingProps = { id: 'shopping', label: 'Shopping', key: 'shopping', type: 'check' };
+export const secondhandProps = { id: 'second_hand', label: 'Second-hand', key: 'second_hand', type: 'check' };
 
-// A normal preset
-export const presetProps = {
+
+// Some normal presets
+export const shopProps = {
+  id: 'shop',
+  name: 'Shop',
+  icon: 'maki-shop',
+  geometry: ['point', 'area'],
+  fields: ['name', 'shopping', 'fake1'],
+  moreFields: ['phone', 'fake2'],
+  tags: {
+    shop: '*'
+  },
+  matchScore: 0.4
+};
+
+export const thriftProps = {
   id: 'shop/second_hand',
   name: 'Thrift Store',
-  icon: 'maki-shop',
+  icon: '{shop}',
+  dummy: '{dummy}',
   geometry: ['point', 'area'],
   terms: ['resale', 'second-hand', 'used'],
   aliases: ['Thrift Shop', 'Consignment Store', 'Resale Shop', 'Secondhand Shop'],
-  fields: ['{shop}', 'second_hand'],
+  fields: ['{shop}', 'second_hand', '{dummy1}'],
+  moreFields: ['{shop}', '{dummy2}'],
   tags: {
     shop: 'second_hand'
   }
 };
 
+export const coffeeProps = {
+  id: 'amenity/cafe/coffee_shop',
+  name: 'Coffeehouse',
+  icon: 'temaki-hot_drink_cup',
+  geometry: ['point', 'area'],
+  fields: ['name'],
+  moreFields: ['phone'],
+  tags: {
+    amenity: 'cafe',
+    cuisine: 'coffee_shop'
+  },
+  reference: {
+    key: 'cuisine',
+    value: 'coffee_shop'
+  }
+};
+
 // A "suggestion" preset
-export const suggestionProps = {
+export const starbucksProps = {
   id: 'amenity/cafe/coffee_shop/starbucks-795f60',
   name: 'Starbucks (USA)',
   locationSet: { 'include': ['us'] },
@@ -22,7 +60,7 @@ export const suggestionProps = {
   geometry: ['point', 'area'],
   matchScore: 2,
   suggestion: true,
-  imageURL: 'https://graph.facebook.com/StarbucksPhilippines/picture?type=large',
+  imageURL: 'https://graph.facebook.com/Starbucks/picture?type=large',
   terms: ['starbucks', 'starbucks us', 'starbucks coffee'],
   reference: {
     key: 'cuisine',
@@ -44,20 +82,8 @@ export const suggestionProps = {
   }
 };
 
-// A preset with a '*' tag
-export const starProps = {
-  id: 'traffic_calming',
-  icon: 'temaki-diamond',
-  fields: ['traffic_calming'],
-  geometry: ['vertex'],
-  tags: {
-    traffic_calming: '*'
-  },
-  matchScore: 0.4
-};
 
-
-export const presetStrings = {
+export const thriftStrings = {
   id: 'shop/second_hand',
   type: 'preset',
   suggestion: false,
@@ -68,7 +94,7 @@ export const presetStrings = {
   alternate: 'resale,second,hand,used,shop,consignment,secondhand'
 };
 
-export const suggestionStrings = {
+export const starbucksStrings = {
   id: 'amenity/cafe/coffee_shop/starbucks-795f60',
   type: 'preset',
   suggestion: true,

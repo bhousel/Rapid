@@ -12,6 +12,7 @@ export const field1Props = {
 export const field2Props = {
   id: 'second',
   label: '{first}',
+  dummy: '{dummy}',
   key: 'second',
   type: 'text',
   terms: ['two', '2nd'],
