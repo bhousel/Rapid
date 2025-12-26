@@ -87,20 +87,20 @@ describe('Category', () => {
 
     describe('name', () => {
       it('returns the prelocalized name', () => {
-        assert.strictEqual(_category.name(), _category._currStrings.name);
-        assert.strictEqual(_category.name(), sample.categoryStrings.name);
+        assert.strictEqual(_category.name, _category._currStrings.name);
+        assert.strictEqual(_category.name, sample.categoryStrings.name);
       });
     });
 
     describe('aliases', () => {
       it('returns the prelocalized aliases', () => {
-        assert.deepEqual(_category.aliases(), []);   // always [] for Categories
+        assert.deepEqual(_category.aliases, []);   // always [] for Categories
       });
     });
 
     describe('terms', () => {
       it('returns the prelocalized terms', () => {
-        assert.deepEqual(_category.terms(), []);   // always [] for Categories
+        assert.deepEqual(_category.terms, []);   // always [] for Categories
       });
     });
 

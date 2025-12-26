@@ -98,7 +98,7 @@ async function buildImagery() {
       continue;
     }
 
-    const item = {
+    const props = {
       id: sourceID,
       name: source.name,
       type: source.type,
@@ -107,7 +107,7 @@ async function buildImagery() {
 
     // Some sources support 512px tiles
     if (sourceID === 'mtbmap-no') {
-      item.tileSize = 512;
+      props.tileSize = 512;
     }
 
     // Some WMS sources are supported, check projection
@@ -118,7 +118,7 @@ async function buildImagery() {
         continue;
       }
       // if (sources.some(other => other.name === source.name && other.type !== source.type)) continue;
-      item.projection = projection;
+      props.projection = projection;
     }
 
 
@@ -132,7 +132,7 @@ async function buildImagery() {
           // console.log(`discarding ${sourceID}  (${endDate.toDateString()} too old)`);
           continue;
         }
-        item.endDate = endDate;
+        props.endDate = endDate;
       }
     }
 
@@ -140,26 +140,26 @@ async function buildImagery() {
       startDate = new Date(source.start_date);
       isValid = !isNaN(startDate.getTime());
       if (isValid) {
-        item.startDate = startDate;
+        props.startDate = startDate;
       }
     }
 
     const extent = source.extent || {};
     if (extent.min_zoom || extent.max_zoom) {
-      item.zoomExtent = [
+      props.zoomExtent = [
         extent.min_zoom || 0,
         extent.max_zoom || 22
       ];
     }
 
     if (source.zoomRange) {
-      item.zoomRange = source.zoomRange;
+      props.zoomRange = source.zoomRange;
     }
 
     if (extent.polygon) {
-      item.polygon = extent.polygon;
+      props.polygon = extent.polygon;
     } else if (extent.bbox) {
-      item.polygon = [[
+      props.polygon = [[
         [extent.bbox.min_lon, extent.bbox.min_lat],
         [extent.bbox.min_lon, extent.bbox.max_lat],
         [extent.bbox.max_lon, extent.bbox.max_lat],
@@ -170,22 +170,22 @@ async function buildImagery() {
 
     const attribution = source.attribution || {};
     if (attribution.url) {
-      item.terms_url = attribution.url;
+      props.terms_url = attribution.url;
     }
     if (attribution.text) {
-      item.terms_text = attribution.text;
+      props.terms_text = attribution.text;
     }
     if (attribution.html) {
-      item.terms_html = attribution.html;
+      props.terms_html = attribution.html;
     }
 
     for (const prop of ['best', 'default', 'description', 'encrypted', 'icon', 'overlay', 'tileSize']) {
       if (source[prop]) {
-        item[prop] = source[prop];
+        props[prop] = source[prop];
       }
     }
 
-    imagery.push(item);
+    imagery.push(props);
   };
 
 

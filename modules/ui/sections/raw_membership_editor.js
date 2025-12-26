@@ -244,14 +244,14 @@ export function uiSectionRawMembershipEditor(context) {
 
         function baseDisplayValue(entity) {
             var preset = schema.match(entity, graph);
-            var presetName = preset?.name() || l10n.t('inspector.relation');
+            var presetName = preset?.name || l10n.t('inspector.relation');
             var entityName = l10n.displayName(entity.tags) || '';
             return presetName + ' ' + entityName;
         }
 
         function baseDisplayLabel(entity) {
             var preset = schema.match(entity, graph);
-            var presetName = preset?.name() || l10n.t('inspector.relation');
+            var presetName = preset?.name || l10n.t('inspector.relation');
             var entityName = l10n.displayName(entity.tags) || '';
             var color = _getColor(entity);
 
@@ -368,7 +368,7 @@ export function uiSectionRawMembershipEditor(context) {
             .attr('class', 'member-entity-type')
             .text(d => {
               const preset = schema.match(d.relation, graph);
-              return preset?.name() || l10n.t('inspector.relation');
+              return preset?.name || l10n.t('inspector.relation');
             });
 
         labelLink

@@ -284,7 +284,7 @@ export function uiIntroLine(context, curtain) {
         curtain.reveal({
           revealNode: categoryButton.node(),
           revealPadding: 5,
-          tipHtml: helpHtml(context, 'intro.lines.choose_category_road', { category: roadCategory.name() })
+          tipHtml: helpHtml(context, 'intro.lines.choose_category_road', { category: roadCategory.name })
         });
 
         categoryButton.on('click.intro', () => resolve(choosePresetResidentialAsync));
@@ -343,7 +343,7 @@ export function uiIntroLine(context, curtain) {
           revealNode: subgrid.node(),
           revealPadding: 5,
           tipSelector: '.preset-highway_residential .preset-list-button',
-          tipHtml: helpHtml(context, 'intro.lines.choose_preset_residential', { preset: residentialPreset.name() })
+          tipHtml: helpHtml(context, 'intro.lines.choose_preset_residential', { preset: residentialPreset.name })
         });
       }))
       .finally(() => {
@@ -398,7 +398,7 @@ export function uiIntroLine(context, curtain) {
         curtain.reveal({
           revealNode: presetButton.node(),
           revealPadding: 5,
-          tipHtml: helpHtml(context, 'intro.lines.retry_preset_residential', { preset: residentialPreset.name() })
+          tipHtml: helpHtml(context, 'intro.lines.retry_preset_residential', { preset: residentialPreset.name })
         });
       }))
       .finally(() => {

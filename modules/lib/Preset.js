@@ -101,6 +101,7 @@ export class Preset {
    * Changes the locale and re-localizes the strings.
    * This should happen whenever LocalizationSystem changes the locale.
    * This is done early because we need the strings indexed by the SchemaSystem for searching.
+   * @param  {string}  localeCode - the locale code to switch to (defaults to 'en-US')
    */
   setLocale(localeCode = 'en-US') {
     this._currLocaleCode = localeCode;
@@ -184,8 +185,9 @@ export class Preset {
    * name
    * The name is the main display name of the Preset, as shown in the user interface.
    * @return  {string}  Localized name
+   * @readonly
    */
-  name() {
+  get name() {
     return this._currStrings.name;
   }
 
@@ -193,8 +195,9 @@ export class Preset {
    * aliases
    * Aliases are alternate names for this Preset, they may be displayed in the user interface.
    * @return  {Array<string>}  Localized aliases
+   * @readonly
    */
-  aliases() {
+  get aliases() {
     return this._currStrings.aliases;
   }
 
@@ -203,8 +206,9 @@ export class Preset {
    * Terms are related words used for seraching for this Preset.
    * (For suggestion presets, the terms are alternate names)
    * @return  {Array<string>}  Localized search terms
+   * @readonly
    */
-  terms() {
+  get terms() {
     return this._currStrings.terms;
   }
 
@@ -281,7 +285,7 @@ export class Preset {
     const parentID = path.join('/');
     const parentPreset = schema.presets.get(parentID);
 
-    return parentPreset?.name() || parentID;
+    return parentPreset?.name || parentID;
   }
 
 

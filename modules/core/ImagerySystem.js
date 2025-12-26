@@ -31,8 +31,8 @@ export class ImagerySystem extends AbstractSystem {
   constructor(context) {
     super(context);
     this.id = 'imagery';
-    this.requiredDependencies = new Set(['assets', 'l10n']);
-    this.optionalDependencies = new Set(['gfx', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set(['assets']);
+    this.optionalDependencies = new Set(['gfx', 'l10n', 'storage', 'urlhash']);
 
     this._imageryIndex = null;
     this._baseLayer = null;
@@ -49,6 +49,7 @@ export class ImagerySystem extends AbstractSystem {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashchange = this._hashchange.bind(this);
     this._imageryChanged = this._imageryChanged.bind(this);
+    this._localeChanged = this._localeChanged.bind(this);
   }
 
 
@@ -63,6 +64,7 @@ export class ImagerySystem extends AbstractSystem {
     const context = this.context;
     const assets = context.systems.assets;
     const gfx = context.systems.gfx;
+    const l10n = context.systems.l10n;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
 
@@ -71,6 +73,7 @@ export class ImagerySystem extends AbstractSystem {
         const prerequisites = [
           assets?.initAsync(),
           gfx?.initAsync(),      // `gfx.scene` will exist after `initAsync`
+          l10n?.initAsync(),
           storage?.initAsync(),
           urlhash?.initAsync()
         ];
@@ -80,99 +83,10 @@ export class ImagerySystem extends AbstractSystem {
         // Setup event handlers..
         urlhash?.on('hashchange', this._hashchange);
         gfx?.scene?.on('layerchange', this._imageryChanged);
+        l10n?.on('localechange', this._localeChanged);
       })
       .then(() => assets.loadAssetAsync('imagery'))
       .then(data => this._initImageryIndex(data));
-  }
-
-
-  /**
-   * _initImageryIndex
-   * Set up the imagery index after it has been downloaded
-   * It contains these properties:
-   *   {
-   *     features:  Map<id, GeoJSON feature>
-   *     sources:   Map<id, ImagerySource>
-   *     query:     A which-polygon index to perform spatial queries against
-   *   }
-   *  @param  data  {Object}  imagery index data
-   */
-  _initImageryIndex(data) {
-    const context = this.context;
-    const storage = context.systems.storage;
-    const wayback = context.services.wayback;
-
-    const arr = data.imagery || [];
-
-    this._imageryIndex = {
-      features: new Map(),   // Map<id, GeoJSON feature>
-      sources: new Map(),    // Map<id, ImagerySource>
-      query: null            // which-polygon index
-    };
-
-    // Extract a GeoJSON feature for each imagery item.
-    const features = arr.map(d => {
-      if (!d.polygon) return null;
-
-      // Workaround for editor-layer-index weirdness..
-      // Add an extra array nest to each element in `d.polygon`
-      // so the rings are not treated as a bunch of holes:
-      //   what we get:  [ [[outer],[hole],[hole]] ]
-      //   what we want: [ [[outer]],[[outer]],[[outer]] ]
-      const rings = d.polygon.map(ring => [ring]);
-
-      const feature = {
-        type: 'Feature',
-        properties: { id: d.id },
-        geometry: { type: 'MultiPolygon', coordinates: rings }
-      };
-
-      this._imageryIndex.features.set(d.id.toLowerCase(), feature);
-      return feature;
-    }).filter(Boolean);
-
-    // Create a which-polygon index to support efficient spatial querying.
-    this._imageryIndex.query = whichPolygon({ type: 'FeatureCollection', features: features });
-
-    // Instantiate `ImagerySource` objects for each imagery item.
-    for (const d of arr) {
-      let source;
-      if (d.type === 'bing') {
-        source = new ImagerySourceBing(context, d);
-      } else if (/^EsriWorldImagery/.test(d.id)) {
-        source = new ImagerySourceEsri(context, d);
-      } else {
-        source = new ImagerySource(context, d);
-      }
-      this._imageryIndex.sources.set(d.id.toLowerCase(), source);
-
-      // When we add 'Esri World Imagery', add an additional source for 'Esri Wayback', if supported.
-      if (wayback && d.id === 'EsriWorldImagery') {
-        const props = Object.assign({}, d);  // copy
-        props.id = 'EsriWayback';
-        props.name = 'Esri Wayback';
-        props.description = 'Esri Wayback contains archived snapshots of Esri World Imagery created over time.';
-        props.startDate = null;  // user will choose
-        props.endDate = null;    // user will choose
-        source = new ImagerySourceEsriWayback(context, props);
-        this._imageryIndex.sources.set(props.id.toLowerCase(), source);
-      }
-    }
-
-    // Add 'None'
-    const none = new ImagerySourceNone(context);
-    this._imageryIndex.sources.set(none.id.toLowerCase(), none);
-
-    // Add 'Custom' - seed it with whatever template the user has used previously
-    const custom = new ImagerySourceCustom(context);
-    custom.template = storage?.getItem('background-custom-template') || '';
-    this._imageryIndex.sources.set(custom.id.toLowerCase(), custom);
-
-    // Default the locator overlay to "on"..
-    const locator = this._imageryIndex.sources.get('mapbox_locator_overlay');
-    if (locator) {
-      this.toggleOverlayLayer(locator);
-    }
   }
 
 
@@ -193,96 +107,6 @@ export class ImagerySystem extends AbstractSystem {
    */
   resetAsync() {
     return Promise.resolve();
-  }
-
-
-  /**
-   * _hashchange
-   * Respond to any changes appearing in the url hash
-   * @param  {Map<string, string>}  currParams - The current hash parameters
-   * @param  {Map<string, string>}  prevParams - The previous hash parameters
-   */
-  _hashchange(currParams, prevParams) {
-    // background
-    const newBackground = currParams.get('background');
-    const oldBackground = prevParams.get('background');
-    if (!newBackground || newBackground !== oldBackground) {
-      let foundSource;
-      if (typeof newBackground === 'string') {
-        foundSource = this.getSourceByID(newBackground);
-      }
-      if (foundSource) {
-        this.setSourceByID(newBackground);
-      } else {
-        this.baseLayerSource(this.chooseDefaultSource());
-      }
-    }
-
-    // overlays
-    const newOverlays = currParams.get('overlays');
-    const oldOverlays = prevParams.get('overlays');
-    if (newOverlays !== oldOverlays) {
-      let toEnableIDs = new Set();
-      if (typeof newOverlays === 'string') {
-        const vals = newOverlays.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-        toEnableIDs = new Set(vals);
-      }
-      this.enableOverlayLayers(toEnableIDs);
-    }
-
-    // offset
-    const newOffset = currParams.get('offset');
-    const oldOffset = prevParams.get('offset');
-    if (newOffset !== oldOffset) {
-      let x, y;
-      if (typeof newOffset === 'string') {
-        [x, y] = newOffset.replace(/;/g, ',').split(',').map(s => s.trim()).map(Number);
-      }
-      if (isNaN(x) || !isFinite(x)) x = 0;
-      if (isNaN(y) || !isFinite(y)) y = 0;
-      this.offset = geoMetersToOffset([x, y]);
-    }
-  }
-
-
-  /**
-   * _imageryChanged
-   * Called whenever the imagery changes.
-   * This will update the urlhash, trigger a redraw, and emit an 'imagerychange' event.
-   */
-  _imageryChanged() {
-    const context = this.context;
-    const gfx = context.systems.gfx;
-    const urlhash = context.systems.urlhash;
-
-    const baseLayer = this._baseLayer;
-    if (urlhash && baseLayer && !context.inIntro) {
-      // Gather info about enabled base imagery
-      let baseLayerID = baseLayer.key;  // note: use `key` here - for Wayback it will include the date
-      if (baseLayerID === 'custom') {
-        baseLayerID = `custom:${baseLayer.template}`;
-      }
-
-      // Gather info about enabled overlay imagery (ignore locator)
-      let overlayIDs = [];
-      for (const overlay of this._overlayLayers.values()) {
-        if (overlay.isLocatorOverlay()) continue;
-        overlayIDs.push(overlay.id);
-      }
-
-      // Update hash params: 'background', 'overlays', 'offset'
-      urlhash.setParam('background', baseLayerID);
-      urlhash.setParam('overlays', overlayIDs.length ? overlayIDs.join(',') : null);
-
-      const meters = geoOffsetToMeters(baseLayer.offset);
-      const EPSILON = 0.01;
-      const x = +meters[0].toFixed(2);
-      const y = +meters[1].toFixed(2);
-      urlhash.setParam('offset', (Math.abs(x) > EPSILON || Math.abs(y) > EPSILON) ? `${x},${y}` : null);
-    }
-
-    gfx?.immediateRedraw();
-    this.emit('imagerychange');
   }
 
 
@@ -341,17 +165,17 @@ export class ImagerySystem extends AbstractSystem {
 
     if (blocklistChanged) {
       for (const source of sources) {
-        source.isBlocked = blocklists.some(regex => regex.test(source.template));
+        source.props.isBlocked = blocklists.some(regex => regex.test(source.template));
       }
       this._checkedBlocklists = blocklists.map(regex => String(regex));
     }
 
     return sources.filter(source => {
-      if (currSource === source) return true;  // always include the current imagery
-      if (source.isBlocked) return false;      // even bundled sources may be blocked - iD#7905
-      if (!source.polygon) return true;        // always include imagery with worldwide coverage
-      if (zoom && zoom < 6) return false;      // optionally exclude local imagery at low zooms
-      return visible.has(source.id);           // include imagery visible in given extent
+      if (currSource === source) return true;    // always include the current imagery
+      if (source.props.isBlocked) return false;  // even bundled sources may be blocked - iD#7905
+      if (!source.props.polygon) return true;    // always include imagery with worldwide coverage
+      if (zoom && zoom < 6) return false;        // optionally exclude local imagery at low zooms
+      return visible.has(source.id);             // include imagery visible in given extent
     });
   }
 
@@ -402,7 +226,7 @@ export class ImagerySystem extends AbstractSystem {
 
     const available = this.visibleSources();
     const first = available[0];
-    const best = available.find(s => s.best);
+    const best = available.find(s => s.props.best);
 
     // Consider previously chosen imagery unless it was 'none'
     let previousID = storage?.getItem('background-last-used') || 'none';
@@ -626,4 +450,216 @@ export class ImagerySystem extends AbstractSystem {
     this._imageryChanged();
   }
 
+
+
+  /**
+   * _initImageryIndex
+   * Set up the imagery index after it has been downloaded
+   * It contains these properties:
+   *   {
+   *     features:  Map<id, GeoJSON feature>
+   *     sources:   Map<id, ImagerySource>
+   *     query:     A which-polygon index to perform spatial queries against
+   *   }
+   *  @param  data  {Object}  imagery index data
+   */
+  _initImageryIndex(data) {
+    const context = this.context;
+    const storage = context.systems.storage;
+    const wayback = context.services.wayback;
+
+    const arr = data.imagery || [];
+
+    this._imageryIndex = {
+      features: new Map(),   // Map<id, GeoJSON feature>
+      sources: new Map(),    // Map<id, ImagerySource>
+      query: null            // which-polygon index
+    };
+
+    // Extract a GeoJSON feature for each imagery item.
+    const features = arr.map(d => {
+      if (!d.polygon) return null;
+
+      // Workaround for editor-layer-index weirdness..
+      // Add an extra array nest to each element in `d.polygon`
+      // so the rings are not treated as a bunch of holes:
+      //   what we get:  [ [[outer],[hole],[hole]] ]
+      //   what we want: [ [[outer]],[[outer]],[[outer]] ]
+      const rings = d.polygon.map(ring => [ring]);
+
+      const feature = {
+        type: 'Feature',
+        properties: { id: d.id },
+        geometry: { type: 'MultiPolygon', coordinates: rings }
+      };
+
+      this._imageryIndex.features.set(d.id.toLowerCase(), feature);
+      return feature;
+    }).filter(Boolean);
+
+    // Create a which-polygon index to support efficient spatial querying.
+    this._imageryIndex.query = whichPolygon({ type: 'FeatureCollection', features: features });
+
+    // Instantiate `ImagerySource` objects for each imagery item.
+    for (const d of arr) {
+      let source;
+      if (d.type === 'bing') {
+        source = new ImagerySourceBing(context, d);
+      } else if (/^EsriWorldImagery/.test(d.id)) {
+        source = new ImagerySourceEsri(context, d);
+      } else {
+        source = new ImagerySource(context, d);
+      }
+      this._imageryIndex.sources.set(d.id.toLowerCase(), source);
+
+      // When we add 'Esri World Imagery', add an additional source for 'Esri Wayback', if supported.
+      if (wayback && d.id === 'EsriWorldImagery') {
+        const props = Object.assign({}, d);  // copy
+        props.id = 'EsriWayback';
+        props.name = 'Esri Wayback';
+        props.description = 'Esri Wayback contains archived snapshots of Esri World Imagery created over time.';
+        props.startDate = null;  // user will choose
+        props.endDate = null;    // user will choose
+        source = new ImagerySourceEsriWayback(context, props);
+        this._imageryIndex.sources.set(props.id.toLowerCase(), source);
+      }
+    }
+
+    // Add 'None'
+    const none = new ImagerySourceNone(context);
+    this._imageryIndex.sources.set(none.id.toLowerCase(), none);
+
+    // Add 'Custom' - seed it with whatever template the user has used previously
+    const custom = new ImagerySourceCustom(context);
+    custom.template = storage?.getItem('background-custom-template') || '';
+    this._imageryIndex.sources.set(custom.id.toLowerCase(), custom);
+
+    // Default the locator overlay to "on"..
+    const locator = this._imageryIndex.sources.get('mapbox_locator_overlay');
+    if (locator) {
+      this.toggleOverlayLayer(locator);
+    }
+
+    // Reset and localize the ImagerySources
+    for (const source of this._imageryIndex.sources.values()) {
+      source.reset();
+    }
+  }
+
+
+  /**
+   * _hashchange
+   * Respond to any changes appearing in the url hash
+   * @param  {Map<string, string>}  currParams - The current hash parameters
+   * @param  {Map<string, string>}  prevParams - The previous hash parameters
+   */
+  _hashchange(currParams, prevParams) {
+    // background
+    const newBackground = currParams.get('background');
+    const oldBackground = prevParams.get('background');
+    if (!newBackground || newBackground !== oldBackground) {
+      let foundSource;
+      if (typeof newBackground === 'string') {
+        foundSource = this.getSourceByID(newBackground);
+      }
+      if (foundSource) {
+        this.setSourceByID(newBackground);
+      } else {
+        this.baseLayerSource(this.chooseDefaultSource());
+      }
+    }
+
+    // overlays
+    const newOverlays = currParams.get('overlays');
+    const oldOverlays = prevParams.get('overlays');
+    if (newOverlays !== oldOverlays) {
+      let toEnableIDs = new Set();
+      if (typeof newOverlays === 'string') {
+        const vals = newOverlays.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        toEnableIDs = new Set(vals);
+      }
+      this.enableOverlayLayers(toEnableIDs);
+    }
+
+    // offset
+    const newOffset = currParams.get('offset');
+    const oldOffset = prevParams.get('offset');
+    if (newOffset !== oldOffset) {
+      let x, y;
+      if (typeof newOffset === 'string') {
+        [x, y] = newOffset.replace(/;/g, ',').split(',').map(s => s.trim()).map(Number);
+      }
+      if (isNaN(x) || !isFinite(x)) x = 0;
+      if (isNaN(y) || !isFinite(y)) y = 0;
+      this.offset = geoMetersToOffset([x, y]);
+    }
+  }
+
+
+  /**
+   * _imageryChanged
+   * Called whenever the imagery changes.
+   * This will update the urlhash, trigger a redraw, and emit an 'imagerychange' event.
+   */
+  _imageryChanged() {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const urlhash = context.systems.urlhash;
+
+    const baseLayer = this._baseLayer;
+    if (urlhash && baseLayer && !context.inIntro) {
+      // Gather info about enabled base imagery
+      let baseLayerID = baseLayer.key;  // note: use `key` here - for Wayback it will include the date
+      if (baseLayerID === 'custom') {
+        baseLayerID = `custom:${baseLayer.template}`;
+      }
+
+      // Gather info about enabled overlay imagery (ignore locator)
+      let overlayIDs = [];
+      for (const overlay of this._overlayLayers.values()) {
+        if (overlay.isLocatorOverlay()) continue;
+        overlayIDs.push(overlay.id);
+      }
+
+      // Update hash params: 'background', 'overlays', 'offset'
+      urlhash.setParam('background', baseLayerID);
+      urlhash.setParam('overlays', overlayIDs.length ? overlayIDs.join(',') : null);
+
+      const meters = geoOffsetToMeters(baseLayer.offset);
+      const EPSILON = 0.01;
+      const x = +meters[0].toFixed(2);
+      const y = +meters[1].toFixed(2);
+      urlhash.setParam('offset', (Math.abs(x) > EPSILON || Math.abs(y) > EPSILON) ? `${x},${y}` : null);
+    }
+
+    gfx?.immediateRedraw();
+    this.emit('imagerychange');
+  }
+
+
+  /**
+   * _localeChanged
+   * Call this whenever the locale changes.
+   * It will lock in the new locale and relocalize all the imagery sources.
+   * These are cached, so switching back to an already-seen locale should be fast.
+   * @param  {string}  localeCode - optional new locale code (fallback to getting it from LocalizationSystem, or en-US)
+   */
+  _localeChanged(localeCode) {
+    const l10n = this.context.systems.l10n;
+
+    // Ensure that we have a current locale code.
+    localeCode ||= l10n?.localeCode() || 'en-US';
+
+    // Reset and localize the ImagerySources
+    for (const source of this._imageryIndex.sources.values()) {
+      source.setLocale(localeCode);
+    }
+  }
+
 }
+
+
+/**
+ *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
+ *  @typedef  {string}  imageryID
+ */

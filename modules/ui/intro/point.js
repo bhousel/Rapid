@@ -146,7 +146,7 @@ export function uiIntroPoint(context, curtain) {
 
         curtain.reveal({
           revealSelector: '.preset-search-input',
-          tipHtml: helpHtml(context, 'intro.points.search_cafe', { preset: cafePreset.name() })
+          tipHtml: helpHtml(context, 'intro.points.search_cafe', { preset: cafePreset.name })
         });
 
         container.select('.preset-search-input')
@@ -162,7 +162,7 @@ export function uiIntroPoint(context, curtain) {
           curtain.reveal({
             revealNode: first.select('.preset-list-button').node(),
             revealPadding: 5,
-            tipHtml: helpHtml(context, 'intro.points.choose_cafe', { preset: cafePreset.name() })
+            tipHtml: helpHtml(context, 'intro.points.choose_cafe', { preset: cafePreset.name })
           });
 
           container.select('.preset-search-input')

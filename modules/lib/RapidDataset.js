@@ -5,8 +5,8 @@ export class RapidDataset {
 
   /**
    * @constructor
-   * @param {Context}  context - Global shared application context
-   * @param {Object}   props   - Object containing the dataset properties
+   * @param  {Context}  context - Global shared application context
+   * @param  {Object}   props   - Object containing the dataset properties
    */
   constructor(context, props) {
     this.context = context;

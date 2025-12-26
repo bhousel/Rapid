@@ -62,7 +62,7 @@ export function uiSectionBackgroundList(context) {
   }
 
   function isNotOverlay(d) {
-    return !d.overlay;
+    return !d.props.overlay;
   }
 
 
@@ -297,7 +297,7 @@ export function uiSectionBackgroundList(context) {
     const listItemsEnter = listItems.enter()
       .append('li')
       .classed('layer-custom', d => d.id === 'custom')
-      .classed('best', d => d.best);
+      .classed('best', d => d.props.best);
 
     const label = listItemsEnter
       .append('label');
@@ -350,7 +350,7 @@ export function uiSectionBackgroundList(context) {
         }
 
         // "Best" backgrounds get a badge
-        if (d.best) {
+        if (d.props.best) {
           li
             .selectAll('label')
             .append('span')

@@ -87,7 +87,7 @@ export function operationMerge(context, selectedIDs) {
         return l10n.t('operations.merge.conflicting_relations');
       } else if (disabledReason === 'restriction' || disabledReason === 'connectivity') {
         const preset = schema.item(`type/${disabledReason}`);
-        return l10n.t('operations.merge.damage_relation', { relation: preset.name() });
+        return l10n.t('operations.merge.damage_relation', { relation: preset.name });
       } else {
         return l10n.t(`operations.merge.${disabledReason}`);
       }

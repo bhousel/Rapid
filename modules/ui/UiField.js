@@ -48,9 +48,9 @@ export class UiField {
     // copy some commonly used stuff from the Field
     this.id = presetField.id;
     this.type = presetField.type;
-    this.label = presetField.label();
-    this.terms = presetField.terms();
-    this.placeholder = presetField.placeholder();
+    this.label = presetField.label;
+    this.terms = presetField.terms;
+    this.placeholder = presetField.placeholder;
     this.default = presetField.props.default;
     this.key = presetField.props.key;
     this.keys = presetField.props.keys;

@@ -61,12 +61,6 @@ export class Field {
     } else {
       this.geometries = new Set(schema.geometryTypes);  // all types allowed
     }
-
-    // Ensure methods used as callbacks always have `this` bound correctly.
-    // (This is also necessary when using `d3-selection.call`)
-    this.label = this.label.bind(this);
-    this.terms = this.terms.bind(this);
-    this.placeholder = this.placeholder.bind(this);
   }
 
 
@@ -91,6 +85,7 @@ export class Field {
    * This should happen whenever LocalizationSystem changes the locale.
    * Note that unlike with Presets and Categories, we don't need to index these strings,
    *  but it is worth pre-localizing them for performance.
+   * @param  {string}  localeCode - the locale code to switch to (defaults to 'en-US')
    */
   setLocale(localeCode = 'en-US') {
     this._currLocaleCode = localeCode;
@@ -138,8 +133,9 @@ export class Field {
    * label
    * The label is the main display name of the Field, as shown in the user interface.
    * @return  {string}  Localized name
+   * @readonly
    */
-  label() {
+  get label() {
     return this._currStrings.label;
   }
 
@@ -147,8 +143,9 @@ export class Field {
    * terms
    * Terms are related words used for seearching for this Field.
    * @return  {Array<string>}  Localized search terms
+   * @readonly
    */
-  terms() {
+  get terms() {
     return this._currStrings.terms;
   }
 
@@ -156,8 +153,9 @@ export class Field {
    * placeholder
    * A placeholder value appears in the field before the user enters a real value.
    * @return  {string}  Localized placeholder
+   * @readonly
    */
-  placeholder() {
+  get placeholder() {
     return this._currStrings.placeholder;
   }
 

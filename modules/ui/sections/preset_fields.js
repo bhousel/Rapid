@@ -74,7 +74,7 @@ export function uiSectionPresetFields(context) {
 
       const additionalFields = utilArrayUnion(sharedMoreFields, [...schema.universal.values()]);
       additionalFields.sort((field1, field2) => {
-        return field1.label().localeCompare(field2.label(), localeCode);
+        return field1.label.localeCompare(field2.label, localeCode);
       });
 
       for (const field of additionalFields) {

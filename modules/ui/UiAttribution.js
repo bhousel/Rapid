@@ -10,7 +10,7 @@ export class UiAttribution {
 
   /**
    * @constructor
-   * @param  `conttext`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     this.context = context;
@@ -81,9 +81,12 @@ export class UiAttribution {
     if (isRapidEnabled) {
       data[1].sources.push({
         id: '__mapwithai',
-        overlay: true,
-        terms_text: l10n.t('map_data.layers.rapid.license'),
-        terms_url: 'https://mapwith.ai/doc/license/MapWithAILicense.pdf'
+        key: '__mapwithai',
+        attribution: l10n.t('map_data.layers.rapid.license'),
+        props: {
+          overlay: true,
+          terms_url: 'https://mapwith.ai/doc/license/MapWithAILicense.pdf'
+        }
       });
     }
 
@@ -100,7 +103,7 @@ export class UiAttribution {
 
     // attribution links
     let $attributions = $sections.selectAll('.attribution')
-      .data(d => d.sources, d => d.id);
+      .data(d => d.sources, d => d.key);
 
     $attributions.exit()
       .remove();
@@ -109,21 +112,21 @@ export class UiAttribution {
       .append('a')
       .attr('class', 'attribution')
       .attr('target', '_blank')
-      .attr('href', d => d.terms_url || null)
+      .attr('href', d => d.props.terms_url || null)
       .each((d, i, nodes) => {
         const $$link = select(nodes[i]);
 
         // add html directly (maybe we shouldn't?)
-        if (d.terms_html) {
-          $$link.html(d.terms_html);
+        if (d.props.terms_html) {
+          $$link.html(d.props.terms_html);
           return;
         }
 
-        if (d.icon && !d.overlay && showThirdPartyIcons) {
+        if (d.props.icon && !d.props.overlay && showThirdPartyIcons) {
           $$link
             .append('img')
             .attr('class', 'attribution-image')
-            .attr('src', d.icon);
+            .attr('src', d.props.icon);
         }
 
         $$link
@@ -134,11 +137,9 @@ export class UiAttribution {
     // update
     $attributions = $attributions.merge($$attributions);
 
+    // note: we previously showed "terms_text" here, but most terms texts are too long and
+    // not really an appropriate string for this use, so we just show the "name" instead.
     $attributions.selectAll('.attribution-text')
-      .text(d => {
-        return l10n.t(`_imagery.imagery.${d.idtx}.attribution.text`, {
-          default: d.terms_text || d.id || d.name
-        });
-      });
+      .text(d => d.name);
   }
 }

@@ -92,7 +92,7 @@ export function validationAmbiguousCrossingTags(context) {
 
     // First, collect the parent way (include it whether it changed or not, tagDiff may be `[]`).
     const tagDiff = utilTagDiff(startWay.tags, endWay.tags);
-    updates.set(wayID, { name: startPreset.name(), tagDiff: tagDiff });
+    updates.set(wayID, { name: startPreset.name, tagDiff: tagDiff });
     const isParentChanged = (tagDiff.length > 0);
 
     // Next, collect any child nodes that got changed.
@@ -113,7 +113,7 @@ export function validationAmbiguousCrossingTags(context) {
       // Include this child node's details in the updates Map.
       const startPreset = schema.match(base, startGraph);
       const tagDiff = utilTagDiff(base.tags, head.tags);
-      updates.set(base.id, { name: startPreset.name(), tagDiff: tagDiff });
+      updates.set(base.id, { name: startPreset.name, tagDiff: tagDiff });
     }
 
     // If we haven't already, create the 'not a crossing' choice to remove the crossing tags completely.

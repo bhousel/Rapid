@@ -7,8 +7,7 @@ describe('ImagerySystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:   new Rapid.AssetSystem(context),
-    l10n:     new Rapid.LocalizationSystem(context)
+    assets:  new Rapid.AssetSystem(context)
   };
 
   // Test construction and startup of the system..

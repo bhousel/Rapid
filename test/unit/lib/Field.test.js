@@ -83,31 +83,31 @@ describe('Field', () => {
 
     describe('label', () => {
       it('returns the prelocalized label', () => {
-        assert.strictEqual(_one.label(), _one._currStrings.label);
-        assert.strictEqual(_one.label(), sample.field1Strings.label);
+        assert.strictEqual(_one.label, _one._currStrings.label);
+        assert.strictEqual(_one.label, sample.field1Strings.label);
 
-        assert.strictEqual(_two.label(), _two._currStrings.label);
-        assert.strictEqual(_two.label(), sample.field2Strings.label);
+        assert.strictEqual(_two.label, _two._currStrings.label);
+        assert.strictEqual(_two.label, sample.field2Strings.label);
       });
     });
 
     describe('terms', () => {
       it('returns the prelocalized terms', () => {
-        assert.deepEqual(_one.terms(), _one._currStrings.terms);
-        assert.deepEqual(_one.terms(), sample.field1Strings.terms);
+        assert.deepEqual(_one.terms, _one._currStrings.terms);
+        assert.deepEqual(_one.terms, sample.field1Strings.terms);
 
-        assert.deepEqual(_two.terms(), _two._currStrings.terms);
-        assert.deepEqual(_two.terms(), sample.field2Strings.terms);
+        assert.deepEqual(_two.terms, _two._currStrings.terms);
+        assert.deepEqual(_two.terms, sample.field2Strings.terms);
       });
     });
 
     describe('placeholder', () => {
       it('returns the prelocalized placeholder', () => {
-        assert.deepEqual(_one.placeholder(), _one._currStrings.placeholder);
-        assert.deepEqual(_one.placeholder(), sample.field1Strings.placeholder);
+        assert.deepEqual(_one.placeholder, _one._currStrings.placeholder);
+        assert.deepEqual(_one.placeholder, sample.field1Strings.placeholder);
 
-        assert.deepEqual(_two.placeholder(), _two._currStrings.placeholder);
-        assert.deepEqual(_two.placeholder(), sample.field2Strings.placeholder);
+        assert.deepEqual(_two.placeholder, _two._currStrings.placeholder);
+        assert.deepEqual(_two.placeholder, sample.field2Strings.placeholder);
       });
     });
 

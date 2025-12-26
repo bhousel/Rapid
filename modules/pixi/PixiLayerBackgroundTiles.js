@@ -154,7 +154,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     }
 
 // worldcoordinates
-    const tileSize = source.tileSize || 256;
+    const tileSize = source.props.tileSize || 256;
 //    const z = geoScaleToZoom(t.k, tileSize);  // Use actual zoom for this, not effective zoom
     const log2ts = Math.log2(tileSize);
     const z = t.z - (log2ts - 8);   // adjust zoom for tile sizes not 256px (log2(256) = 8)
@@ -170,17 +170,17 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     // Make sure the min zoom is at least 1.
     // z=0 causes a bug for Mapbox layers to disappear, these use very large tile size.
     // Also the locator overlay should always show its labels, which start at zoom 1.
-    const maxZoom = Math.max(1, Math.ceil(z));                 // the zoom we want (round up for sharper imagery)
-    const minZoom = Math.max(1, maxZoom - source.zoomRange);   // the mininimum zoom we'll accept
+    const maxZoom = Math.max(1, Math.ceil(z));         // the zoom we want (round up for sharper imagery)
+    const minZoom = Math.max(1, maxZoom - source.props.zoomRange);   // the mininimum zoom we'll accept
 
     let covered = false;
     for (let tryZoom = maxZoom; !covered && tryZoom >= minZoom; tryZoom--) {
-      if (!source.validZoom(tryZoom)) continue;  // not valid here, zoom out
+      if (!source.isValidZoom(tryZoom)) continue;  // not valid here, zoom out
       if (source.isLocatorOverlay() && maxZoom > 17) continue;   // overlay is blurry if zoomed in this far
 
       const result = this._tiler
         .tileSize(tileSize)
-        .skipNullIsland(!!source.overlay)
+        .skipNullIsland(!!source.props.overlay)
         .zoomRange(tryZoom)
         .getTiles(this.isMinimap ? viewport : context.viewport);  // minimap passes in its own viewport
 
@@ -215,7 +215,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 //      sprite.anchor.set(0, 1);    // left, bottom
 sprite.anchor.set(0, 0);  // left, top
       sprite.zIndex = tile.xyz[2];   // draw zoomed tiles above unzoomed tiles
-      sprite.alpha = source.alpha;
+      sprite.alpha = source.props.alpha;
       sourceContainer.addChild(sprite);
       tile.sprite = sprite;
       tileMap.set(tileID, tile);
@@ -260,7 +260,7 @@ sprite.anchor.set(0, 0);  // left, top
 
       // Keep base (not overlay) tiles around a little while longer,
       // so they can stand in for a needed tile that has not loaded yet.
-      } else if (!source.overlay) {
+      } else if (!source.props.overlay) {
         keepTile = (timestamp - tile.timestamp < 3000);  // 3 sec
       }
 
@@ -274,7 +274,7 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
         tile.sprite.width = size;
         tile.sprite.height = size;
 
-        if (showDebug && debugContainer && !source.overlay) {
+        if (showDebug && debugContainer && !source.props.overlay) {
           // Display debug tile info
           if (!tile.debug) {
             tile.debug = new PIXI.Graphics();

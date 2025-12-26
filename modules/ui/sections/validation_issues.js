@@ -10,9 +10,9 @@ const MAX_ISSUES = 1000;
 
 
 /**
- *  uiSectionValidateIssues
- *  @param  `context`    Global shared application context
- *  @param  `severity`   String 'error', 'warning', or 'suggestion'
+ * uiSectionValidateIssues
+ * @param  {Context}  context - Global shared application context
+ * @param  {string}   severity - String 'error', 'warning', or 'suggestion'
  */
 export function uiSectionValidationIssues(context, severity) {
   const editor = context.systems.editor;

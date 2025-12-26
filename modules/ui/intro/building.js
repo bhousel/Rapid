@@ -220,7 +220,7 @@ export function uiIntroBuilding(context, curtain) {
         curtain.reveal({
           revealNode: button.node(),
           revealPadding: 5,
-          tipHtml: helpHtml(context, 'intro.buildings.choose_category_building', { category: buildingCatetory.name() })
+          tipHtml: helpHtml(context, 'intro.buildings.choose_category_building', { category: buildingCatetory.name })
         });
 
         button.on('click.intro', () => resolve(choosePresetHouse));
@@ -265,7 +265,7 @@ export function uiIntroBuilding(context, curtain) {
         curtain.reveal({
           revealNode: button.node(),
           revealPadding: 5,
-          tipHtml: helpHtml(context, 'intro.buildings.choose_preset_house', { preset: housePreset.name() })
+          tipHtml: helpHtml(context, 'intro.buildings.choose_preset_house', { preset: housePreset.name })
         });
 
       }))
@@ -540,7 +540,7 @@ export function uiIntroBuilding(context, curtain) {
 
         curtain.reveal({
           revealSelector: '.preset-search-input',
-          tipHtml: helpHtml(context, 'intro.buildings.search_tank', { preset: tankPreset.name() })
+          tipHtml: helpHtml(context, 'intro.buildings.search_tank', { preset: tankPreset.name })
         });
 
         container.select('.preset-search-input')
@@ -556,7 +556,7 @@ export function uiIntroBuilding(context, curtain) {
           curtain.reveal({
             revealNode: first.select('.preset-list-button').node(),
             revealPadding: 5,
-            tipHtml: helpHtml(context, 'intro.buildings.choose_tank', { preset: tankPreset.name() })
+            tipHtml: helpHtml(context, 'intro.buildings.choose_tank', { preset: tankPreset.name })
           });
 
           container.select('.preset-search-input')

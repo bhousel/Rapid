@@ -125,31 +125,31 @@ describe('Preset', () => {
 
     describe('name', () => {
       it('returns the prelocalized name', () => {
-        assert.strictEqual(_thrift.name(), _thrift._currStrings.name);
-        assert.strictEqual(_thrift.name(), sample.thriftStrings.name);
+        assert.strictEqual(_thrift.name, _thrift._currStrings.name);
+        assert.strictEqual(_thrift.name, sample.thriftStrings.name);
 
-        assert.strictEqual(_starbucks.name(), _starbucks._currStrings.name);
-        assert.strictEqual(_starbucks.name(), sample.starbucksStrings.name);
+        assert.strictEqual(_starbucks.name, _starbucks._currStrings.name);
+        assert.strictEqual(_starbucks.name, sample.starbucksStrings.name);
       });
     });
 
     describe('aliases', () => {
       it('returns the prelocalized aliases', () => {
-        assert.deepEqual(_thrift.aliases(), _thrift._currStrings.aliases);
-        assert.deepEqual(_thrift.aliases(), sample.thriftStrings.aliases);
+        assert.deepEqual(_thrift.aliases, _thrift._currStrings.aliases);
+        assert.deepEqual(_thrift.aliases, sample.thriftStrings.aliases);
 
-        assert.deepEqual(_starbucks.aliases(), _starbucks._currStrings.aliases);
-        assert.deepEqual(_starbucks.aliases(), sample.starbucksStrings.aliases);
+        assert.deepEqual(_starbucks.aliases, _starbucks._currStrings.aliases);
+        assert.deepEqual(_starbucks.aliases, sample.starbucksStrings.aliases);
       });
     });
 
     describe('terms', () => {
       it('returns the prelocalized terms', () => {
-        assert.deepEqual(_thrift.terms(), _thrift._currStrings.terms);
-        assert.deepEqual(_thrift.terms(), sample.thriftStrings.terms);
+        assert.deepEqual(_thrift.terms, _thrift._currStrings.terms);
+        assert.deepEqual(_thrift.terms, sample.thriftStrings.terms);
 
-        assert.deepEqual(_starbucks.terms(), _starbucks._currStrings.terms);
-        assert.deepEqual(_starbucks.terms(), sample.starbucksStrings.terms);
+        assert.deepEqual(_starbucks.terms, _starbucks._currStrings.terms);
+        assert.deepEqual(_starbucks.terms, sample.starbucksStrings.terms);
       });
     });
 

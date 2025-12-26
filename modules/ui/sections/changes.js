@@ -77,7 +77,7 @@ export function uiSectionChanges(context) {
       .attr('class', 'entity-type')
       .text(d => {
         const preset = schema.match(d.entity, d.graph);
-        return (preset && preset.name()) || l10n.displayType(d.entity.id);
+        return (preset && preset.name) || l10n.displayType(d.entity.id);
       });
 
     buttons

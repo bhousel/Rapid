@@ -187,7 +187,7 @@ export function uiSectionRawMemberEditor(context) {
             .attr('class', 'member-entity-type')
             .text(d => {
               const preset = schema.match(d.member, graph);
-              return preset?.name() || l10n.displayType(d.member.id);
+              return preset?.name || l10n.displayType(d.member.id);
             });
 
           labelLink

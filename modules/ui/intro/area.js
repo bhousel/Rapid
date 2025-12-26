@@ -201,7 +201,7 @@ export function uiIntroArea(context, curtain) {
 
         curtain.reveal({
           revealSelector: '.preset-search-input',
-          tipHtml: helpHtml(context, 'intro.areas.search_playground', { preset: playgroundPreset.name() })
+          tipHtml: helpHtml(context, 'intro.areas.search_playground', { preset: playgroundPreset.name })
         });
 
         container.select('.preset-search-input')
@@ -217,7 +217,7 @@ export function uiIntroArea(context, curtain) {
           curtain.reveal({
             revealNode: first.select('.preset-list-button').node(),
             revealPadding: 5,
-            tipHtml: helpHtml(context, 'intro.areas.search_playground', { preset: playgroundPreset.name() })
+            tipHtml: helpHtml(context, 'intro.areas.search_playground', { preset: playgroundPreset.name })
           });
 
           container.select('.preset-search-input')
@@ -287,8 +287,8 @@ export function uiIntroArea(context, curtain) {
             revealSelector: '.more-fields .combobox-input',
             revealPadding: 5,
             tipHtml: helpHtml(context, 'intro.areas.add_field', {
-              name: nameField.label(),
-              description: descriptionField.label()
+              name: nameField.label,
+              description: descriptionField.label
             })
           });
 
@@ -352,7 +352,7 @@ export function uiIntroArea(context, curtain) {
       curtain.reveal({
         revealSelector: 'div.combobox',
         revealPadding: 5,
-        tipHtml: helpHtml(context, 'intro.areas.choose_field', { field: descriptionField.label() })
+        tipHtml: helpHtml(context, 'intro.areas.choose_field', { field: descriptionField.label })
       });
 
     })
@@ -403,7 +403,7 @@ export function uiIntroArea(context, curtain) {
 
       curtain.reveal({
         revealSelector: '.entity-editor-pane',
-        tipHtml: helpHtml(context, 'intro.areas.retry_add_field', { field: descriptionField.label() }),
+        tipHtml: helpHtml(context, 'intro.areas.retry_add_field', { field: descriptionField.label }),
         buttonText: l10n.t('intro.ok'),
         buttonCallback: () => resolve(clickAddFieldAsync)
       });

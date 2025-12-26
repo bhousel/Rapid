@@ -466,7 +466,7 @@ export class UiFeatureList {
       if (name.toLowerCase().indexOf(q) < 0) continue;
 
       const matched = schema.match(entity, graph);
-      const type = (matched && matched.name()) || l10n.displayType(entity.id);
+      const type = (matched && matched.name) || l10n.displayType(entity.id);
       const extent = entity.extent(graph);
       const distance = extent ? geoSphericalDistance(centerLoc, extent.center()) : 0;
 
@@ -503,7 +503,7 @@ export class UiFeatureList {
       const tempEntity = createOsmEntity(context, attrs);
       const tempGraph = new Graph(this.context, [tempEntity]);
       const preset = schema.match(tempEntity, tempGraph);
-      const type = (preset && preset.name()) || l10n.displayType(id);
+      const type = (preset && preset.name) || l10n.displayType(id);
 
       results.push({
         id: tempEntity.id,

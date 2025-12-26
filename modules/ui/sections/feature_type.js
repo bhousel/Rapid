@@ -91,7 +91,7 @@ export function uiSectionFeatureType(context) {
       );
 
     let names = _presets.length === 1 ? [
-      _presets[0].name(),
+      _presets[0].name,
       _presets[0].subtitle()
     ].filter(Boolean) : [l10n.t('inspector.multiple_types')];
 

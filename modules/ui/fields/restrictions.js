@@ -608,7 +608,7 @@
 //        var entity = graph.entity(entityID);
 //        var name = l10n.displayName(entity.tags) || '';
 //        var matched = schema.match(entity, graph);
-//        var type = (matched && matched.name()) || l10n.displayType(entity.id);
+//        var type = (matched && matched.name) || l10n.displayType(entity.id);
 //        return name || type;
 //    }
 //

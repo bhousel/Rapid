@@ -113,7 +113,7 @@ export function uiSectionSelectionList(context) {
       });
 
     items.selectAll('.entity-type')
-      .text(entity => schema.match(entity, graph).name());
+      .text(entity => schema.match(entity, graph).name);
 
     items.selectAll('.entity-name')
       .text(entity => l10n.displayName(entity.tags));

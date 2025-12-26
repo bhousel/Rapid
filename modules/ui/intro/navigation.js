@@ -413,7 +413,7 @@ export function uiIntroNavigation(context, curtain) {
       curtain.reveal({
         revealSelector: '.entity-editor-pane .section-feature-type',
         revealPadding: 5,
-        tipHtml: helpHtml(context, 'intro.navigation.preset_townhall', { preset: preset.name() }),
+        tipHtml: helpHtml(context, 'intro.navigation.preset_townhall', { preset: preset.name }),
         buttonText: l10n.t('intro.ok'),
         buttonCallback: () => resolve(fieldsTownHallAsync)
       });
@@ -586,8 +586,8 @@ export function uiIntroNavigation(context, curtain) {
       const tipHtml = helpHtml(context, 'intro.navigation.street_different_fields') + '{br}' +
         helpHtml(context, 'intro.navigation.editor_street', {
           button: icon(iconName, 'inline'),
-          field1: onewayField.label(),
-          field2: maxspeedField.label()
+          field1: onewayField.label,
+          field2: maxspeedField.label
         });
 
       curtain.reveal({

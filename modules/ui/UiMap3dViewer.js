@@ -9,7 +9,7 @@ export class UiMap3dViewer {
 
   /**
    * @constructor
-   * @param  `conttext`  Global shared application context
+   * @param  {Context}  context - Global shared application context
    */
   constructor(context) {
     this.context = context;

@@ -63,7 +63,7 @@ export function validationSuspiciousName(context) {
         const preset = schema.match(entity, graph);
         const langName = langCode && l10n.languageName(langCode);
         return l10n.t('issues.generic_name.message' + (langName ? '_language' : ''),
-          { feature: preset.name(), name: genericName, language: langName }
+          { feature: preset.name, name: genericName, language: langName }
         );
       },
       reference: showReference,
@@ -113,7 +113,7 @@ export function validationSuspiciousName(context) {
         const preset = schema.match(entity, graph);
         const langName = langCode && l10n.languageName(langCode);
         return l10n.t('issues.incorrect_name.message' + (langName ? '_language' : ''),
-          { feature: preset.name(), name: incorrectName, language: langName }
+          { feature: preset.name, name: incorrectName, language: langName }
         );
       },
       reference: showReference,

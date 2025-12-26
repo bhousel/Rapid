@@ -92,7 +92,7 @@ export function uiKeepRightDetails(context) {
           let name = l10n.displayName(entity.tags);  // try to use common name
           if (!name && !isObjectLink) {
             const preset = schema.match(entity, graph);
-            name = preset && !preset.isFallback() && preset.name();  // fallback to preset name
+            name = preset && !preset.isFallback() && preset.name;  // fallback to preset name
           }
 
           if (name) {

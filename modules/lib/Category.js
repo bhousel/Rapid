@@ -81,6 +81,7 @@ export class Category {
    * Changes the locale and re-localizes the strings.
    * This should happen whenever LocalizationSystem changes the locale.
    * This is done early because we want the strings indexed by the SchemaSystem for searching.
+   * @param  {string}  localeCode - the locale code to switch to (defaults to 'en-US')
    */
   setLocale(localeCode = 'en-US') {
     this._currLocaleCode = localeCode;
@@ -128,8 +129,9 @@ export class Category {
    * name
    * The name is the main display name of the Category, as shown in the user interface.
    * @return  {string}  Localized name
+   * @readonly
    */
-  name() {
+  get name() {
     return this._currStrings.name;
   }
 
@@ -138,8 +140,9 @@ export class Category {
    * Aliases are alternate names for this Category, they may be displayed in the user interface.
    * This is not currently used by Categories, so it will always return an empty Array, '[]'.
    * @return  {Array<string>}  Localized aliases, always empty Array '[]' for Categories
+   * @readonly
    */
-  aliases() {
+  get aliases() {
     return [];
   }
 
@@ -148,8 +151,9 @@ export class Category {
    * Terms are related words used for seraching for this Preset.
    * This is not currently used by Categories, so it will always return an empty Array, '[]'.
    * @return  {Array<string>}  Localized search terms, always empty Array '[]' for Categories
+   * @readonly
    */
-  terms() {
+  get terms() {
     return [];
   }
 
