@@ -1,4 +1,4 @@
-export * from './Category.js';
+export * from './Category.ts';
 export * from './Difference.js';
 export * from './Edit.ts';
 export * from './Field.js';

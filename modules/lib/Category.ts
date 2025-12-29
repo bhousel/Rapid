@@ -1,10 +1,41 @@
 import { utilSafeString } from '@rapid-sdk/util';
 
+import type { Context } from '../core/types.js';
+import type { Preset } from './Preset.js';
 import { utilGatherTokens } from '../util/string.js';
 
 
 /**
- * Category
+ * Properties that define a Category.
+ */
+export interface CategoryProps {
+  /** Unique identifier for this Category */
+  id: string;
+  /** Display name (fallback if localization unavailable) */
+  name: string;
+  /** Array of preset IDs that belong to this Category */
+  members: string[];
+  /** Whether this Category appears in search results */
+  searchable: boolean;
+  /** Match score for ranking search results (always -1 for Categories) */
+  matchScore: number;
+}
+
+
+/** Localized strings for a Category */
+interface CategoryStrings {
+  id: string;
+  type: string;
+  suggestion: boolean;
+  name: string;
+  terms: string[];
+  aliases: string[];
+  primary: string;
+  alternate: string;
+}
+
+
+/**
  * A Category is a thematic collection of Presets.
  * For example "Major Roads", "Barriers", "Buildings", "Golf Features"..
  * The Rapid user interface shows categories in the preset list as expandable folders.
@@ -18,13 +49,25 @@ import { utilGatherTokens } from '../util/string.js';
  *   `presets`               `Array<Preset>` Presets in this Category
  */
 export class Category {
+  context: Context;
+  type: 'category' = 'category';
+  id: string;
+  safeid: string;
+  categoryID: string;
+  props: CategoryProps;
+  geometries: Set<string>;
+  presets: Preset[];
+
+  private _strings: Map<string, CategoryStrings>;
+  private _currLocaleCode: string | null;
+  private _currStrings: CategoryStrings;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
-   * @param  {Object}   props   - Object containing the properties for this Category
+   * @param context - Global shared application context
+   * @param props - Properties for this Category
    */
-  constructor(context, props = {}) {
+  constructor(context: Context, props: Partial<CategoryProps> = {}) {
     this.context = context;
     this.type = 'category';
 
@@ -34,10 +77,11 @@ export class Category {
 
     this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
     this._currLocaleCode = null;  // The current locale code
-    this._currStrings = {};       // The current strings
+    this._currStrings = {} as CategoryStrings;  // The current strings
 
     // Preserve properties and assign some defaults
-    this.props = globalThis.structuredClone(props);
+    this.props = globalThis.structuredClone(props) as CategoryProps;
+    this.props.name ??= props.id;  // default to id if not provided
     this.props.matchScore = -1;
     this.props.members ??= [];  // "members" here are presetIDs
     this.props.searchable ??= true;
@@ -47,6 +91,8 @@ export class Category {
 
     // For convenient access:
     this.categoryID = this.props.id;
+    this.geometries = new Set();
+    this.presets = [];
   }
 
 
@@ -56,13 +102,15 @@ export class Category {
    * This should happen whenever SchemaSystem merges in new data.
    * You must add the Category to the SchemaSystem and call `reset` before using the Category.
    */
-  reset() {
+  reset(): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const schema = context.systems.schema;
 
     // Include only Presets that are currently known to the SchemaSystem.
-    this.presets = this.props.members.map(presetID => schema.presets.get(presetID)).filter(Boolean);
+    this.presets = (this.props.members ?? [])
+      .map(presetID => (schema as any).presets.get(presetID))
+      .filter(Boolean);
 
     // The geometries available for this category will include all geometries of its presets.
     this.geometries = new Set();
@@ -72,7 +120,7 @@ export class Category {
 
     // Invalidate any cached string localizations and redo for the current locale.
     this._strings.clear();
-    this.setLocale(l10n?.localeCode() || 'en-US');
+    this.setLocale((l10n as any)?.localeCode() || 'en-US');
   }
 
 
@@ -81,13 +129,13 @@ export class Category {
    * Changes the locale and re-localizes the strings.
    * This should happen whenever LocalizationSystem changes the locale.
    * This is done early because we want the strings indexed by the SchemaSystem for searching.
-   * @param  {string}  localeCode - the locale code to switch to (defaults to 'en-US')
+   * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode = 'en-US') {
+  setLocale(localeCode: string = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
-    const l10n = this.context.systems.l10n;
+    const l10n = this.context.systems.l10n as any;
 
     // Pre-localize and store strings so that the Miniseach full-text search can index these.
     // Categories are simple because they are just a `name` as a string.
@@ -106,8 +154,8 @@ export class Category {
     // that happens to have redundant terms gets unfairly boosted in the search results)
     // The "primary" set will contain the preset name.
     // The "alternate" set will contain related terms and tag values a user might search for.
-    const primary = new Set();
-    const alternate = new Set();
+    const primary = new Set<string>();
+    const alternate = new Set<string>();
     utilGatherTokens(nameStr, primary, alternate, true);
 
     this._currStrings = {
@@ -128,10 +176,10 @@ export class Category {
   /**
    * name
    * The name is the main display name of the Category, as shown in the user interface.
-   * @return  {string}  Localized name
+   * @return  Localized name
    * @readonly
    */
-  get name() {
+  get name(): string {
     return this._currStrings.name;
   }
 
@@ -139,10 +187,10 @@ export class Category {
    * aliases
    * Aliases are alternate names for this Category, they may be displayed in the user interface.
    * This is not currently used by Categories, so it will always return an empty Array, '[]'.
-   * @return  {Array<string>}  Localized aliases, always empty Array '[]' for Categories
+   * @return  Localized aliases, always empty Array '[]' for Categories
    * @readonly
    */
-  get aliases() {
+  get aliases(): string[] {
     return [];
   }
 
@@ -150,29 +198,28 @@ export class Category {
    * terms
    * Terms are related words used for seraching for this Preset.
    * This is not currently used by Categories, so it will always return an empty Array, '[]'.
-   * @return  {Array<string>}  Localized search terms, always empty Array '[]' for Categories
+   * @return  Localized search terms, always empty Array '[]' for Categories
    * @readonly
    */
-  get terms() {
+  get terms(): string[] {
     return [];
   }
 
   /**
    * matchScore
    * Matchscore is used for ranking search results.  Always returns `-1` for Categories
-   * @return  {number}  Always returns `-1` for Categories
+   * @return  Always returns `-1` for Categories
    */
-  matchScore() {
+  matchScore(): number {
     return -1;
   }
 
   /**
    * isFallback
    * Is this a fallback preset?  Always returns `false` for Categories.
-   * @return  {boolean}  Always returns `false` for Categories
+   * @return  Always returns `false` for Categories
    */
-  isFallback() {
+  isFallback(): boolean {
     return false;
   }
-
 }
