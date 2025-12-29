@@ -13,5 +13,5 @@ export * from './Preset.ts';
 export * from './RapidDataset.js';
 export * from './tags.js';
 export * from './Tree.js';
-export * from './ValidationFix.js';
-export * from './ValidationIssue.js';
+export * from './ValidationFix.ts';
+export * from './ValidationIssue.ts';

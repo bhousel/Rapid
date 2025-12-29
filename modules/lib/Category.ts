@@ -1,7 +1,7 @@
 import { utilSafeString } from '@rapid-sdk/util';
 
-import type { Context } from '../core/types.js';
-import type { Preset } from './Preset.js';
+import type { Context } from '../core/types.ts';
+import type { Preset } from './Preset.ts';
 import { utilGatherTokens } from '../util/string.js';
 
 

@@ -5,10 +5,10 @@
  */
 
 // Re-export commonly needed types from data module for convenience
-export type { Entity, EntityID, EntityType, Vec2, Tags } from '../data/types.js';
+export type { Entity, EntityID, EntityType, Vec2, Tags } from '../data/types.ts';
 
 // Re-export Context for convenience (used by almost every class)
-export type { Context } from '../core/types.js';
+export type { Context } from '../core/types.ts';
 
 
 // ============================================================================
@@ -86,7 +86,7 @@ export interface ValidationIssueProps {
 // Difference
 // ============================================================================
 
-import type { Entity as EntityInterface } from '../data/types.js';
+import type { Entity as EntityInterface } from '../data/types.ts';
 
 /**
  * Represents a change to a single entity between two graphs.

@@ -78,6 +78,19 @@ export class Category {
 - Use `import type { ... }` for type-only imports
 - This prevents circular dependencies and improves tree-shaking
 
+### Import Extensions
+- This is a **Bun project** - use `.ts` extensions for TypeScript file imports
+- For files that have been converted to TypeScript, import with `.ts`:
+  ```typescript
+  import type { Context } from '../core/types.ts';
+  import { ValidationFix } from './ValidationFix.ts';
+  ```
+- For files still in JavaScript, continue using `.js`:
+  ```typescript
+  import { osmAreaKeys } from './tags.js';
+  ```
+- The `tsconfig.json` has `allowImportingTsExtensions: true` to support this
+
 ## Testing
 
 After making changes:
