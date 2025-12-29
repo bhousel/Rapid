@@ -1,6 +1,6 @@
 export * from './Category.js';
 export * from './Difference.js';
-export * from './Edit.js';
+export * from './Edit.ts';
 export * from './Field.js';
 export * from './Geometry.js';
 export * from './GeometryPart.js';
