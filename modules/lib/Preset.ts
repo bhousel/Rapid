@@ -3,7 +3,7 @@ import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 import diacritics from 'diacritics';
 
 import type { Context } from '../core/types.js';
-import type { Field } from './Field.js';
+import type { Field } from './Field.ts';
 import type { Tags } from '../data/types.js';
 import { utilGatherTokens } from '../util/string.js';
 import { osmAreaKeys } from './tags.js';
@@ -11,6 +11,7 @@ import { osmAreaKeys } from './tags.js';
 
 /**
  * Properties that define a Preset.
+ * @see https://github.com/ideditor/schema-builder/blob/main/schemas/preset.json
  */
 export interface PresetProps {
   /** Unique identifier for this Preset */
@@ -436,9 +437,8 @@ export class Preset {
 
     if (geometry && !skipFieldDefaults) {
       for (const field of this.fields()) {
-        const fieldProps = field.props as { key?: string; default?: string };
-        const k = fieldProps.key;
-        if (k && fieldProps.default === tags[k] && field.geometries.has(geometry)) {
+        const k = field.props.key;
+        if (k && field.props.default === tags[k] && field.geometries.has(geometry)) {
           delete tags[k];
         }
       }
@@ -494,9 +494,8 @@ export class Preset {
 
     if (geometry && !skipFieldDefaults) {
       for (const field of this.fields()) {
-        const fieldProps = field.props as { key?: string; default?: string };
-        const k = fieldProps.key;
-        const v = fieldProps.default;
+        const k = field.props.key;
+        const v = field.props.default;
         if (k && v && !tags[k] && field.geometries.has(geometry)) {
           tags[k] = v;
         }

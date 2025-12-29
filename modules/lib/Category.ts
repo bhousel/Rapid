@@ -7,6 +7,7 @@ import { utilGatherTokens } from '../util/string.js';
 
 /**
  * Properties that define a Category.
+ * @see https://github.com/ideditor/schema-builder/blob/main/schemas/preset_category.json
  */
 export interface CategoryProps {
   /** Unique identifier for this Category */
