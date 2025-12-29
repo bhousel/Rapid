@@ -1,8 +1,77 @@
 import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
+// @ts-expect-error - diacritics has no type definitions
 import diacritics from 'diacritics';
 
+import type { Context } from '../core/types.js';
+import type { Field } from './Field.js';
+import type { Tags } from '../data/types.js';
 import { utilGatherTokens } from '../util/string.js';
 import { osmAreaKeys } from './tags.js';
+
+
+/**
+ * Properties that define a Preset.
+ */
+export interface PresetProps {
+  /** Unique identifier for this Preset */
+  id: string;
+  /** Display name */
+  name: string;
+  /** Alternate names that may be displayed in the UI */
+  aliases: string[];
+  /** Related words used for searching */
+  terms: string[];
+  /** Tags that identify this Preset */
+  tags: Tags;
+  /** Tags to add when applying this Preset */
+  addTags: Tags;
+  /** Tags to remove when removing this Preset */
+  removeTags: Tags;
+  /** Field IDs for this Preset */
+  fields: string[];
+  /** Additional Field IDs shown in "more fields" */
+  moreFields: string[];
+  /** Geometry types this Preset works with */
+  geometry: string[];
+  /** Score for ranking search results */
+  matchScore: number;
+  /** Whether this Preset appears in search results */
+  searchable: boolean;
+  /** Whether this is a suggestion preset (from NSI) */
+  suggestion: boolean;
+  /** Reference data for documentation lookup */
+  reference: { key?: string; value?: string };
+  /** Name of preset icon which represents this preset */
+  icon: string;
+  /** URL of a remote image that is more specific than 'icon' */
+  imageURL: string;
+  /** The ID of a preset that is preferable to this one (for deprecated presets) */
+  replacement: string;
+  /** Region IDs where this preset is or isn't valid. See: https://github.com/ideditor/location-conflation */
+  locationSet: { include?: string[]; exclude?: string[] };
+  /** Resolved locationSet ID (added by SchemaSystem after processing locationSet) */
+  locationSetID: string;
+}
+
+
+/** Localized strings for a Preset */
+interface PresetStrings {
+  id: string;
+  type: string;
+  suggestion: boolean;
+  name: string;
+  terms: string[];
+  aliases: string[];
+  primary: string;
+  alternate: string;
+}
+
+
+/** Resolved fields cache */
+interface ResolvedFields {
+  fields: Field[] | null;
+  moreFields: Field[] | null;
+}
 
 
 /**
@@ -19,13 +88,30 @@ import { osmAreaKeys } from './tags.js';
  *   `geometries`           `Set<string>` Geometries that this Preset works with
  */
 export class Preset {
+  context: Context;
+  type = 'preset' as const;
+  id: string;
+  safeid: string;
+  presetID: string;
+  props: PresetProps;
+  geometries: Set<string>;
+  tags: Tags;
+  addTags: Tags;
+  removeTags: Tags;
+  searchable: boolean;
+  suggestion: boolean;
+
+  private _strings: Map<string, PresetStrings>;
+  private _currLocaleCode: string | null;
+  private _currStrings: PresetStrings;
+  private _resolved: ResolvedFields;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
-   * @param  {Object}   props   - Object containing the properties for this Preset
+   * @param context - Global shared application context
+   * @param props - Properties for this Preset
    */
-  constructor(context, props = {}) {
+  constructor(context: Context, props: Partial<PresetProps> = {}) {
     this.context = context;
     this.type = 'preset';
 
@@ -39,11 +125,11 @@ export class Preset {
 
     this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
     this._currLocaleCode = null;  // The current locale code
-    this._currStrings = {};       // The current strings
+    this._currStrings = {} as PresetStrings;  // The current strings
     this._resolved = { fields: null, moreFields: null };
 
     // Preserve properties and assign some defaults
-    this.props = globalThis.structuredClone(props);
+    this.props = globalThis.structuredClone(props) as PresetProps;
     this.props.aliases ??= [];
     this.props.fields ??= [];
     this.props.geometry ??= [];
@@ -70,7 +156,7 @@ export class Preset {
     this.searchable = this.props.searchable;
     this.suggestion = this.props.suggestion;
 
-    const schema = context.systems.schema;
+    const schema = (context.systems.schema as any);
     if (this.props.geometry.length) {
       this.geometries = new Set(this.props.geometry);
     } else {
@@ -85,8 +171,8 @@ export class Preset {
    * This should happen whenever SchemaSystem merges in new data.
    * You must add the Preset to the SchemaSystem and call `reset` before using the Preset.
    */
-  reset() {
-    const l10n = this.context.systems.l10n;
+  reset(): void {
+    const l10n = (this.context.systems.l10n as any);
 
     this._resolved = { fields: null, moreFields: null };
 
@@ -101,17 +187,17 @@ export class Preset {
    * Changes the locale and re-localizes the strings.
    * This should happen whenever LocalizationSystem changes the locale.
    * This is done early because we need the strings indexed by the SchemaSystem for searching.
-   * @param  {string}  localeCode - the locale code to switch to (defaults to 'en-US')
+   * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode = 'en-US') {
+  setLocale(localeCode: string = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
-    const l10n = this.context.systems.l10n;
+    const l10n = (this.context.systems.l10n as any);
 
-    const primary = new Set();
-    const alternate = new Set();
-    let nameStr, termsArr, aliasesArr;
+    const primary = new Set<string>();
+    const alternate = new Set<string>();
+    let nameStr: string, termsArr: string[], aliasesArr: string[];
 
     // Performance optimization:
     // We can skip a lot of this for "suggestion" presets from NSI.
@@ -163,8 +249,8 @@ export class Preset {
       utilGatherTokens(aliasesStr, primary, alternate, false);
       utilGatherTokens(tagsStr, primary, alternate, false);
 
-      termsArr = termsStr.split(',').map(s => s.trim()).filter(Boolean);                  // Arrayify string
-      aliasesArr = aliasesStr.split(/\s*[\r\n]+\s*/).map(s => s.trim()).filter(Boolean);  // Arrayify string
+      termsArr = termsStr.split(',').map((s: string) => s.trim()).filter(Boolean);                  // Arrayify string
+      aliasesArr = aliasesStr.split(/\s*[\r\n]+\s*/).map((s: string) => s.trim()).filter(Boolean);  // Arrayify string
     }
 
     this._currStrings = {
@@ -215,9 +301,9 @@ export class Preset {
   /**
    * fields
    * Returns the fields for this Preset.
-   * @return  {Array<Field>}  The Fields for this preset
+   * @return The Fields for this preset
    */
-  fields() {
+  fields(): Field[] {
     return this._resolved.fields || (this._resolved.fields = this._resolveFields('fields'));
   }
 
@@ -225,9 +311,9 @@ export class Preset {
    * moreFields
    * Returns the "more" Fields for this Preset.  These are Fields that are offered
    *  if the user expands the "more fields" combobox.
-   * @return  {Array<Field>}  The "more" Fields for this preset
+   * @return The "more" Fields for this preset
    */
-  moreFields() {
+  moreFields(): Field[] {
     return this._resolved.moreFields || (this._resolved.moreFields = this._resolveFields('moreFields'));
   }
 
@@ -236,16 +322,16 @@ export class Preset {
    * matchScore
    * Matchscore is used for ranking search results.
    * It is calculated by checking how many tags match the Preset tags.
-   * @param   {Object}  matchTags - Tags to match
-   * @return  {number}  The match score
+   * @param matchTags - Tags to match
+   * @return The match score
    */
-  matchScore(matchTags) {
+  matchScore(matchTags: Tags): number {
     const tags = this.tags;
-    let seen = {};
+    const seen: Record<string, boolean> = {};
     let score = 0;
 
     // match on tags
-    for (let k in tags) {
+    for (const k in tags) {
       seen[k] = true;
       if (matchTags[k] === tags[k]) {
         score += this.props.matchScore;
@@ -258,7 +344,7 @@ export class Preset {
 
     // boost score for additional matches in addTags - iD#6802
     const addTags = this.addTags;
-    for (let k in addTags) {
+    for (const k in addTags) {
       if (!seen[k] && matchTags[k] === addTags[k]) {
         score += this.props.matchScore;
       }
@@ -272,14 +358,14 @@ export class Preset {
    * subtitle
    * Returns a subtitle, but only for suggestion presets.
    * Rapid displays the preset name on a second line below the brand name.
-   * @return  {string}  Localized preset subtitle, or `null` if not applicable
+   * @return Localized preset subtitle, or `null` if not applicable
    */
-  subtitle() {
+  subtitle(): string | null {
     if (!this.props.suggestion) return null;
 
-    const schema = this.context.systems.schema;
+    const schema = (this.context.systems.schema as any);
 
-    let path = this.id.split('/');
+    const path = this.id.split('/');
     path.pop();  // remove brand name
 
     const parentID = path.join('/');
@@ -294,9 +380,9 @@ export class Preset {
    * Is this a fallback preset?
    * Fallback presets are created by the `SchemaSystem` at init time and can't be overridden.
    * The fallback presets are: 'point', 'line', 'area', 'relation'.
-   * @return  {boolean}  `true` if this is a fallback preset, `false` otherwise.
+   * @return `true` if this is a fallback preset, `false` otherwise.
    */
-  isFallback() {
+  isFallback(): boolean {
     return ['point', 'line', 'area', 'relation'].includes(this.id);
   }
 
@@ -307,9 +393,9 @@ export class Preset {
    * If there is a `wikidata` identifier, lookup the QID on Wikidata.
    * Otherwise, use whatever `key`/`value` pair is specified for the reference,
    *  falling back to the `key`/`value` pair of the first tag.
-   * @return  {Object}  Data used to lookup reference information
+   * @return Data used to lookup reference information
    */
-  reference() {
+  reference(): { qid?: string; key?: string; value?: string } {
     // Lookup documentation on Wikidata...
     const qid = (
       this.tags.wikidata ||
@@ -323,7 +409,7 @@ export class Preset {
     }
 
     // Lookup documentation on OSM Wikibase...
-    const key = this.props.reference.key || Object.keys(utilObjectOmit(this.tags, 'name'))[0];
+    const key = this.props.reference.key || Object.keys(utilObjectOmit(this.tags, ['name']))[0];
     const value = this.props.reference.value || this.tags[key];
 
     if (value === '*') {
@@ -337,21 +423,22 @@ export class Preset {
   /**
    * unsetTags
    * Called when changing Presets, this removes tags that go with the old Preset.
-   * @param   {Object}         tags - the initial tags for the Entity
-   * @param   {string}         geometry - the geometry for the Entity
-   * @param   {Array<string>}  ignoreKeys - optional Array of keys to ignore (not remove)
-   * @param   {boolean}        skipFieldDefaults - `true` to ignore tags controlled by the Fields
-   * @return  {Object}  The final tags for the Entity, after removal has happened.
+   * @param tags - the initial tags for the Entity
+   * @param geometry - the geometry for the Entity
+   * @param ignoreKeys - optional Array of keys to ignore (not remove)
+   * @param skipFieldDefaults - `true` to ignore tags controlled by the Fields
+   * @return The final tags for the Entity, after removal has happened.
    */
-  unsetTags(tags, geometry, ignoreKeys, skipFieldDefaults) {
+  unsetTags(tags: Tags, geometry: string, ignoreKeys?: string[], skipFieldDefaults?: boolean): Tags {
     // allow manually keeping some tags
     const removeTags = ignoreKeys ? utilObjectOmit(this.removeTags, ignoreKeys) : this.removeTags;
     tags = utilObjectOmit(tags, Object.keys(removeTags));
 
     if (geometry && !skipFieldDefaults) {
       for (const field of this.fields()) {
-        const k = field.props.key;
-        if (k && field.props.default === tags[k] && field.geometries.has(geometry)) {
+        const fieldProps = field.props as { key?: string; default?: string };
+        const k = fieldProps.key;
+        if (k && fieldProps.default === tags[k] && field.geometries.has(geometry)) {
           delete tags[k];
         }
       }
@@ -364,16 +451,16 @@ export class Preset {
   /**
    * setTags
    * Called when changing Presets, this adds tags that go with the new Preset.
-   * @param   {Object}    tags - the initial tags for the Entity
-   * @param   {string}    geometry - the geometry for the Entity
-   * @param   {boolean}   skipFieldDefaults - `true` to ignore tags controlled by the Fields
-   * @return  {Object}  The final tags for the Entity, after adding has happened.
+   * @param tags - the initial tags for the Entity
+   * @param geometry - the geometry for the Entity
+   * @param skipFieldDefaults - `true` to ignore tags controlled by the Fields
+   * @return The final tags for the Entity, after adding has happened.
    */
-  setTags(tags, geometry, skipFieldDefaults) {
+  setTags(tags: Tags, geometry: string, skipFieldDefaults?: boolean): Tags {
     const addTags = this.addTags;
     tags = Object.assign({}, tags);   // shallow copy
 
-    for (let k in addTags) {
+    for (const k in addTags) {
       if (addTags[k] === '*') {
         // if this tag is ancillary, don't override an existing value since any value is okay
         if (this.tags[k] || !tags[k] || tags[k] === 'no') {
@@ -393,7 +480,7 @@ export class Preset {
       delete tags.area;
       if (geometry === 'area' && this.geometries.has('line')) {  // can also be a line
         let needsAreaTag = true;
-        for (let k in addTags) {
+        for (const k in addTags) {
           if (k in osmAreaKeys) {
             needsAreaTag = false;
             break;
@@ -407,8 +494,9 @@ export class Preset {
 
     if (geometry && !skipFieldDefaults) {
       for (const field of this.fields()) {
-        const k = field.props.key;
-        const v = field.props.default;
+        const fieldProps = field.props as { key?: string; default?: string };
+        const k = fieldProps.key;
+        const v = fieldProps.default;
         if (k && v && !tags[k] && field.geometries.has(geometry)) {
           tags[k] = v;
         }
@@ -423,11 +511,11 @@ export class Preset {
    * _resolveReference
    * Presets can inherit a property from another Preset.
    * If the property value contains a `{presetID}` placeholder, return the other Preset with that id.
-   * @param   {string}  prop - the property to lookup
-   * @return  {Preset}  the Preset to get the name from (either this Preset or another Preset)
+   * @param prop - the property to lookup
+   * @return the Preset to get the name from (either this Preset or another Preset)
    */
-  _resolveReference(prop) {
-    const schema = this.context.systems.schema;
+  private _resolveReference(prop: keyof PresetProps): Preset {
+    const schema = (this.context.systems.schema as any);
 
     const val = this.props[prop];
     if (val && (typeof val === 'string')) {   // This will only work for strings
@@ -449,17 +537,17 @@ export class Preset {
    * _resolveFields
    * For a Preset without its own Fields, inherit fields from another Preset.
    * Replace `{presetID}` placeholders with the fields of the other preset.
-   * @param   {string}  prop - the property to lookup (either 'fields' or 'moreFields')
-   * @return  {Array<Field>}  the resolved fields or moreFields
+   * @param prop - the property to lookup (either 'fields' or 'moreFields')
+   * @return the resolved fields or moreFields
    */
-  _resolveFields(prop) {
-    const schema = this.context.systems.schema;
+  private _resolveFields(prop: 'fields' | 'moreFields'): Field[] {
+    const schema = (this.context.systems.schema as any);
 
     const fieldIDs = this.props[prop] ?? [];  // always lookup original properties, don't use the functions
-    let resolved = [];
+    let resolved: Field[] = [];
 
     // Returns an Array of fields to inherit from the given presetID, if found
-    const inheritFields = (presetID, prop) => {
+    const inheritFields = (presetID: string, prop: 'fields' | 'moreFields'): Field[] => {
       const other = schema.presets.get(presetID);
       if (!other) {
         console.warn(`Unable to resolve referenced presetID: ${this.id}.${prop} -> ${presetID}`);  // eslint-disable-line no-console
@@ -490,7 +578,7 @@ export class Preset {
     //  `highway/footway/crossing`
     //  `highway/footway`
     //  `highway`
-    let parts = this.id.split('/');
+    const parts = this.id.split('/');
     while (!resolved.length && parts.length) {
       parts.pop();
       const parentID = parts.join('/');
@@ -508,7 +596,7 @@ export class Preset {
    * A simpler version of `utilGatherTokens` to gather 'terms' from suggestion presets
    * The `terms` is already an Array of strings that can function as search names.
    */
-  _gatherSuggestionTerms(primary, alternate) {
+  private _gatherSuggestionTerms(primary: Set<string>, alternate: Set<string>): void {
     for (const s of this.props.terms) {
       if (!s || primary.has(s) || alternate.has(s)) continue;  // seen it before
       primary.add(s);
@@ -527,7 +615,7 @@ export class Preset {
    * _gatherSuggestionTags
    * A simpler version of `utilGatherTokens` to gather 'tags' from suggestion presets.
    */
-  _gatherSuggestionTags(primary, alternate) {
+  private _gatherSuggestionTags(primary: Set<string>, alternate: Set<string>): void {
     for (const s of Object.values(this.props.tags)) {
       if (!s || primary.has(s) || alternate.has(s)) continue;  // seen it before
       alternate.add(s);

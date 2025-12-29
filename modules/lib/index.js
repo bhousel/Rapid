@@ -9,7 +9,7 @@ export * from './ImagerySource.js';
 export * from './intersection.js';
 export * from './lanes.js';
 export * from './multipolygon.js';
-export * from './Preset.js';
+export * from './Preset.ts';
 export * from './RapidDataset.js';
 export * from './tags.js';
 export * from './Tree.js';

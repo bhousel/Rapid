@@ -82,5 +82,6 @@ export class Category {
 
 After making changes:
 1. Run `bun tsc --noEmit` to check types
-2. Run `bun run build:js` to verify build
-3. Run `bun test` for full test suite
+2. Run `bun run lint` to perform linting
+3. Run `bun run build:js` to verify build
+4. Run `bun test` for full test suite

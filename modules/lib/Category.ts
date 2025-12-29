@@ -50,7 +50,7 @@ interface CategoryStrings {
  */
 export class Category {
   context: Context;
-  type: 'category' = 'category';
+  type = 'category' as const;
   id: string;
   safeid: string;
   categoryID: string;
