@@ -5,7 +5,7 @@ export * from './Field.ts';
 export * from './Geometry.js';
 export * from './GeometryPart.js';
 export * from './Graph.js';
-export * from './ImagerySource.js';
+export * from './ImagerySource.ts';
 export * from './intersection.js';
 export * from './lanes.js';
 export * from './multipolygon.js';

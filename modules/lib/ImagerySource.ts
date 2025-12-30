@@ -1,9 +1,86 @@
-import { geoArea as d3_geoArea, geoMercatorRaw as d3_geoMercatorRaw } from 'd3-geo';
+// @types/d3-geo incorrectly types geoMercatorRaw as a factory function,
+// but it's actually directly callable with (lambda, phi) returning [x, y].
+import { geoArea as d3_geoArea, geoMercatorRaw as _geoMercatorRaw } from 'd3-geo';
+const d3_geoMercatorRaw = _geoMercatorRaw as unknown as (lambda: number, phi: number) => [number, number];
+
 import { DEG2RAD, RAD2DEG, TAU, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rapid-sdk/util';
 
 import { utilDateString } from '../util/date.js';
 import { utilFetchResponse } from '../util/fetch_response.js';
+
+import type { Context } from '../core/types.ts';
+import type { Vec2 } from '../data/types.ts';
+
+// Cast utilAesDecrypt to allow optional key parameter (matches runtime behavior)
+const aesDecrypt = utilAesDecrypt as (cipherText: string | undefined, key?: number[]) => string;
+
+
+/**
+ * ImagerySourceStrings
+ * Pre-localized strings for an ImagerySource.
+ */
+interface ImagerySourceStrings {
+  id: string;
+  name: string;
+  description: string;
+}
+
+/**
+ * Vintage date range information for imagery metadata.
+ */
+export interface VintageRange {
+  /** Start date as ISO string (YYYY-MM-DD) */
+  start: string;
+  /** End date as ISO string (YYYY-MM-DD) */
+  end: string;
+  /** Formatted date range string for display */
+  range?: string;
+}
+
+/**
+ * Properties that define an ImagerySource.
+ */
+export interface ImagerySourceProps {
+  /** Unique identifier for this imagery source (required) */
+  id: string;
+  /** URL template for fetching tiles */
+  template?: string;
+  /** Whether the template is encrypted */
+  encrypted?: boolean;
+  /** Imagery type: 'tms', 'wms', or 'bing' */
+  type?: 'tms' | 'wms' | 'bing';
+  /** Display name of the imagery source */
+  name?: string;
+  /** Description text for the imagery source */
+  description?: string;
+  /** String ID for localized name */
+  nameStringID?: string;
+  /** String ID for localized description */
+  descriptionStringID?: string;
+  /** Tile opacity (0-1) */
+  alpha?: number;
+  /** Size of tiles in pixels */
+  tileSize?: number;
+  /** [minZoom, maxZoom] for this imagery */
+  zoomExtent?: [number, number];
+  /** Zoom range for the imagery source */
+  zoomRange?: number;
+  /** Polygon defining the coverage area */
+  polygon?: number[][][];
+  /** Terms of service text */
+  terms_text?: string;
+  /** Terms of service URL */
+  terms_url?: string;
+  /** Start date for imagery (ISO string) */
+  startDate?: string;
+  /** End date for imagery (ISO string) */
+  endDate?: string;
+  /** Projection used (e.g., 'EPSG:3857', 'EPSG:4326') */
+  projection?: string;
+  /** Whether the imagery is blocked */
+  isBlocked?: boolean;
+}
 
 
 /**
@@ -16,13 +93,25 @@ import { utilFetchResponse } from '../util/fetch_response.js';
  *   `props`                Properties object
  */
 export class ImagerySource {
+  context: Context;
+  props: ImagerySourceProps;
+  id: string;
+  safeid: string;
+  imageryID: string;
+  type: 'tms' | 'wms' | 'bing' | undefined;
+  offset: Vec2;
+
+  protected _template: string;
+  protected _strings: Map<string, ImagerySourceStrings>;
+  protected _currLocaleCode: string | null;
+  protected _currStrings: Partial<ImagerySourceStrings>;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
-   * @param  {Object}   props   - Object containing the properties for this ImagerySource
+   * @param context - Global shared application context
+   * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context, props = {}) {
+  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
     this.context = context;
 
     if (!props.id) {
@@ -30,18 +119,18 @@ export class ImagerySource {
     }
 
     // Preserve properties and assign some defaults
-    this.props = globalThis.structuredClone(props);
+    this.props = globalThis.structuredClone(props) as ImagerySourceProps;
     this.props.alpha ||= 1;
     this.props.tileSize ||= 256;
-    this.props.zoomExtent ||= [0, 22];
+    this.props.zoomExtent ??= [0, 22];
     this.props.zoomRange ||= 5;
     this.props.isBlocked = false;
 
     this.offset = [0, 0];
 
-    this.id = props.id;                       // For consistency, offer a `this.id` property.
-    this.safeid = utilSafeString(props.id);   // For use in classes, element ids, css selectors
-    this._template = props.encrypted ? utilAesDecrypt(props.template) : props.template;
+    this.id = props.id;                         // For consistency, offer a `this.id` property.
+    this.safeid = utilSafeString(props.id);     // For use in classes, element ids, css selectors
+    this._template = props.encrypted ? aesDecrypt(props.template) : (props.template ?? '');
 
     this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
     this._currLocaleCode = null;  // The current locale code
@@ -63,8 +152,8 @@ export class ImagerySource {
    * This should happen whenever ImagerySystem merges in new data.
    * You must add the ImagerySource to the ImagerySystem and call `reset` before using the ImagerySource.
    */
-  reset() {
-    const l10n = this.context.systems.l10n;
+  reset(): void {
+    const l10n = (this.context.systems.l10n as any);
 
     // Invalidate any cached string localizations and redo for the current locale.
     this._strings.clear();
@@ -76,18 +165,17 @@ export class ImagerySource {
    * setLocale
    * Changes the locale and re-localizes the strings.
    * This should happen whenever LocalizationSystem changes the locale.
-   * @param  {string}  localeCode - the locale code to switch to (defaults to 'en-US')
+   * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode = 'en-US') {
+  setLocale(localeCode: string = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
-    const l10n = this.context.systems.l10n;
+    const l10n = (this.context.systems.l10n as any);
 
     // Pre-localize and store strings
     const fallbackName = this.props.name || this.id;
     const fallbackDesc = this.props.description || '';
-    const fallbackAttr = this.props.terms_text || fallbackName;
     const nameStr = l10n?.t(this.props.nameStringID, { default: '' }) || fallbackName;
     const descStr = l10n?.t(this.props.descriptionStringID, { default: '' }) || fallbackDesc;
 
@@ -97,58 +185,58 @@ export class ImagerySource {
       description: descStr.trim(),
     };
 
-    this._strings.set(this._currLocaleCode, this._currStrings);
+    this._strings.set(this._currLocaleCode, this._currStrings as ImagerySourceStrings);
   }
 
 
   /**
    * name
    * The name is the main display name of the ImagerySource, as shown in the user interface.
-   * @return  {string}  Localized name
+   * @return Localized name
    * @readonly
    */
-  get name() {
-    return this._currStrings.name;
+  get name(): string {
+    return this._currStrings.name ?? '';
   }
 
   /**
    * description
    * Provides additional descriptive text about the ImagerySource.
-   * @return  {string}  Localized description
+   * @return Localized description
    * @readonly
    */
-  get description() {
-    return this._currStrings.description;
+  get description(): string {
+    return this._currStrings.description ?? '';
   }
 
   /**
    * key
    * The `key` can be used to uniquely identify this imagery source.
    * It is usually just the `safeid`, but for 'wayback' it will also include the `date`.
-   * @return  {string}  The key
+   * @return The key
    * @readonly
    */
-  get key() {
+  get key(): string {
     return this.safeid;
   }
 
   /**
    * imageryUsed
    * Returns a string that can be used as the "imagery_used" changeset metadata.
-   * @return  {string}  The imagery used string
+   * @return The imagery used string
    * @readonly
    */
-  get imageryUsed() {
-    return this._currStrings.name;
+  get imageryUsed(): string | null {
+    return this._currStrings.name ?? null;
   }
 
   /**
    * template
    * Returns the imagery URL template
-   * @return  {string}  The imagery URL template
+   * @return The imagery URL template
    * @readonly
    */
-  get template() {
+  get template(): string {
     return this._template;
   }
 
@@ -157,10 +245,10 @@ export class ImagerySource {
    * Returns the area of this imagery extent.
    * This area is in steradians (square radians) which is unusual, but useful for comparing areas.
    * @see https://d3js.org/d3-geo/math#geoArea
-   * @return  {number}  Area in steradians
+   * @return Area in steradians
    * @readonly
    */
-  get area() {
+  get area(): number {
     if (!this.props.polygon) return Number.MAX_VALUE;  // worldwide
     const area = d3_geoArea({ type: 'MultiPolygon', coordinates: [ this.props.polygon ] });
     return isNaN(area) ? 0 : area;
@@ -169,20 +257,20 @@ export class ImagerySource {
   /**
    * isValidZoom
    * Is the imagery valid at the given zoom?
-   * @return  {boolean}  `true` if the imagery is valid at the given zoom, `false` if not
+   * @return `true` if the imagery is valid at the given zoom, `false` if not
    */
-  isValidZoom(z) {
+  isValidZoom(z: number): boolean {
     if (Number.isNaN(z)) return false;
-    const [min, max] = this.props.zoomExtent;
+    const [min, max] = this.props.zoomExtent!;
     return (z >= min) && (z <= max);
   }
 
   /**
    * isLocatorOverlay
    * Is this source the "mapbox locator overlay"?
-   * @return  {boolean}  `true` if the imagery is the locator overlay, `false` if not
+   * @return `true` if the imagery is the locator overlay, `false` if not
    */
-  isLocatorOverlay() {
+  isLocatorOverlay(): boolean {
     return this.id === 'mapbox_locator_overlay';
   }
 
@@ -190,13 +278,13 @@ export class ImagerySource {
   /**
    * getMetadata
    * Calls the callback with an object containing metadata for this imagery source.
-   * @param  {Tile}      tile - The tile to get metadata for
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param tile - The tile to get metadata for
+   * @param callback - errback-style callback function to call with results
    */
-  getMetadata(tile, callback) {
-    const vintage = {
-      start: utilDateString(this.props.startDate),
-      end: utilDateString(this.props.endDate)
+  getMetadata(tile: any, callback?: (err: string | null, metadata: any) => void): void {
+    const vintage: VintageRange = {
+      start: utilDateString(this.props.startDate as any),
+      end: utilDateString(this.props.endDate as any)
     };
     vintage.range = this._vintageRange(vintage);
 
@@ -210,10 +298,10 @@ export class ImagerySource {
   /**
    * nudge
    * Adjust the imagery offset, in pixels [dx,dy]
-   * @param  {Vec2}    delta - pixels to nudge, as [dx, dy]
-   * @param  {number}  zoom  - the current zoom
+   * @param delta - pixels to nudge, as [dx, dy]
+   * @param zoom - the current zoom
    */
-  nudge(delta, zoom) {
+  nudge(delta: Vec2, zoom: number): void {
     this.offset[0] += delta[0] / Math.pow(2, zoom);
     this.offset[1] += delta[1] / Math.pow(2, zoom);
   }
@@ -222,15 +310,15 @@ export class ImagerySource {
   /**
    * url
    * Return the url to fetch the imagery for the given tile coordinate
-   * @param   {Vec3}    coord - Tile coordinate as [x,y,z]
-   * @return  {string}  The url to fetch imagery (empty string if no imagery, for example 'none' source)
+   * @param coord - Tile coordinate as [x,y,z]
+   * @return The url to fetch imagery (empty string if no imagery, for example 'none' source)
    */
-  url(coord) {
+  url(coord: [number, number, number]): string {
     const urlTemplate = this.template;
     let result = urlTemplate;
     if (result === '') return result;   // source 'none'
 
-    function _tileToProjectedCoords(proj, x, y, z) {
+    function _tileToProjectedCoords(proj: string, x: number, y: number, z: number): { x: number; y: number } {
       const zoomSize = Math.pow(2, z);
       const lon = x / zoomSize * TAU - Math.PI;
       const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / zoomSize)));
@@ -265,16 +353,16 @@ export class ImagerySource {
     }
 
     if (this.type === 'wms') {
-      const tileSize = this.props.tileSize;
-      const projection = this.props.projection;
+      const tileSize = this.props.tileSize!;
+      const projection = this.props.projection ?? 'EPSG:3857';
       const minXmaxY = _tileToProjectedCoords(projection, coord[0], coord[1], coord[2]);
       const maxXminY = _tileToProjectedCoords(projection, coord[0] + 1, coord[1] + 1, coord[2]);
 
-      result = result.replace(/\{(\w+)\}/g, (match, capture) => {
+      result = result.replace(/\{(\w+)\}/g, (match, capture): string => {
         switch (capture) {
           case 'width':
           case 'height':
-            return tileSize;
+            return String(tileSize);
           case 'proj':
             return projection;
           case 'wkid':
@@ -288,13 +376,13 @@ export class ImagerySource {
               return minXmaxY.x + ',' + maxXminY.y + ',' + maxXminY.x + ',' + minXmaxY.y;
             }
           case 'w':
-            return minXmaxY.x;
+            return String(minXmaxY.x);
           case 's':
-            return maxXminY.y;
+            return String(maxXminY.y);
           case 'n':
-            return maxXminY.x;
+            return String(maxXminY.x);
           case 'e':
-            return minXmaxY.y;
+            return String(minXmaxY.y);
           default:
             return match;
         }
@@ -304,15 +392,15 @@ export class ImagerySource {
       let isRetina = false;
       if ('window' in globalThis) {
         const _window = globalThis.window;
-        isRetina = _window.devicePixelRatio && _window.devicePixelRatio >= 2;
+        isRetina = !!(_window.devicePixelRatio && _window.devicePixelRatio >= 2);
       }
 
       result = result
-        .replace('{x}', coord[0])
-        .replace('{y}', coord[1])
+        .replace('{x}', String(coord[0]))
+        .replace('{y}', String(coord[1]))
         // TMS-flipped y coordinate
-        .replace(/\{[t-]y\}/, Math.pow(2, coord[2]) - coord[1] - 1)
-        .replace(/\{z(oom)?\}/, coord[2])
+        .replace(/\{[t-]y\}/, String(Math.pow(2, coord[2]) - coord[1] - 1))
+        .replace(/\{z(oom)?\}/, String(coord[2]))
         // only fetch retina tiles for retina screens
         .replace(/\{@2x\}|\{r\}/, isRetina ? '@2x' : '');
 
@@ -344,10 +432,10 @@ export class ImagerySource {
   /**
    * _vintageRange
    * Helper function to format `start` and `end` dates as a range
-   * @param   {Object}  vintage - An Object with `start`, `end` strings
-   * @return  {string}  The string as a range
+   * @param vintage - A VintageRange object with `start`, `end` strings
+   * @return The string as a range
    */
-  _vintageRange(vintage) {
+  _vintageRange(vintage: VintageRange): string | undefined {
     let s;
     if (vintage.start || vintage.end) {
       s = (vintage.start || '?');
@@ -368,9 +456,9 @@ export class ImagerySource {
 export class ImagerySourceNone extends ImagerySource {
   /**
    * @constructor
-   * @param  {Context}  context  - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context, {
       id: 'none',
       template: '',
@@ -383,20 +471,20 @@ export class ImagerySourceNone extends ImagerySource {
    * area
    * Returns -1 for ImagerySourceNone.
    * Because area is used for sorting the imagery sources, this returns -1 for sorting.
-   * @return  {number}  Always returns -1
+   * @return Always returns -1
    * @readonly
    */
-  get area() {
+  get area(): number {
     return -1;  // sources in background pane are sorted by area
   }
 
   /**
    * imageryUsed
    * Returns `null` for ImagerySourceNone.
-   * @return  {string}  Always returns `null`
+   * @return Always returns `null`
    * @readonly
    */
-  get imageryUsed() {
+  get imageryUsed(): null {
     return null;
   }
 }
@@ -410,10 +498,10 @@ export class ImagerySourceNone extends ImagerySource {
 export class ImagerySourceCustom extends ImagerySource {
   /**
    * @constructor
-   * @param  {Context}  context  - Global shared application context
-   * @param  {string}   template - the url teplate to use for this custom imagery
+   * @param context - Global shared application context
+   * @param template - the url teplate to use for this custom imagery
    */
-  constructor(context, template = '') {
+  constructor(context: Context, template: string = '') {
     super(context, {
       id: 'custom',
       template: template,
@@ -426,10 +514,10 @@ export class ImagerySourceCustom extends ImagerySource {
    * area
    * Returns -2 for ImagerySourceCustom.
    * Because area is used for sorting the imagery sources, this returns -1 for sorting.
-   * @return  {number}  Always returns -2
+   * @return Always returns -2
    * @readonly
    */
-  get area() {
+  get area(): number {
     return -2;  // sources in background pane are sorted by area
   }
 
@@ -438,17 +526,17 @@ export class ImagerySourceCustom extends ImagerySource {
    * Returns a string that can be used as the "imagery_used" changeset metadata.
    * For custom sources, it will look like "Custom (…)" with the url template string.
    * (but with sensitive details removed from the url template string).
-   * @return  {string}  The imagery used string
+   * @return The imagery used string
    * @readonly
    */
-  get imageryUsed() {
+  get imageryUsed(): string {
     // Sanitize personal connection tokens - iD#6801
     let cleaned = this.template;
 
     // Sanitize query string parameters
-    let [url, params] = cleaned.split('?', 2);
+    const [url, params] = cleaned.split('?', 2);
     if (params) {
-      const qs = utilStringQs(params);
+      const qs = utilStringQs(params) as Record<string, string>;
       for (const k of Object.keys(qs)) {
         if (/^(access_token|connectid|key|signature|token)$/i.test(k)) {
           qs[k] = '{apikey}';
@@ -466,10 +554,10 @@ export class ImagerySourceCustom extends ImagerySource {
   }
 
   // only 'custom' imagery source allows the template to be changed
-  set template(val) {
+  set template(val: string) {
     this._template = val;
   }
-  get template() {
+  get template(): string {
     return this._template;
   }
 }
@@ -486,10 +574,10 @@ export class ImagerySourceCustom extends ImagerySource {
 export class ImagerySourceBing extends ImagerySource {
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
-   * @param  {Object}   props   - Object containing the properties for this ImagerySource
+   * @param context - Global shared application context
+   * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context, props = {}) {
+  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
     super(context, props);
 
     // missing tile image strictness param (n=)
@@ -508,12 +596,16 @@ export class ImagerySourceBing extends ImagerySource {
  * Overrides the getMetadata function to get more imagery metadata.
  */
 export class ImagerySourceEsri extends ImagerySource {
+  protected _cache: Record<string, any>;
+  protected _inflight: Record<string, boolean>;
+  protected _prevLoc: Vec2 | null;
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
-   * @param  {Object}   props   - Object containing the properties for this ImagerySource
+   * @param context - Global shared application context
+   * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context, props = {}) {
+  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
     super(context, props);
 
     // In addition to using the tilemap at zoom level 20, overzoom real tiles
@@ -530,7 +622,7 @@ export class ImagerySourceEsri extends ImagerySource {
 
   // Use a tilemap service to set maximum zoom for Esri tiles dynamically
   // https://developers.arcgis.com/documentation/tiled-elevation-service/
-  fetchTilemap(loc) {
+  fetchTilemap(loc: Vec2): void {
     // skip if we have already fetched a tilemap within 5km
     if (this._prevLoc && geoSphericalDistance(loc, this._prevLoc) < 5000) return;
     this._prevLoc = loc;
@@ -545,24 +637,24 @@ export class ImagerySourceEsri extends ImagerySource {
     const y = (Math.floor((1 - Math.log(Math.tan(loc[1] * DEG2RAD) + 1 / Math.cos(loc[1] * DEG2RAD)) / Math.PI) / 2 * Math.pow(2, z)));
 
     // fetch an 8x8 grid to leverage cache
-    let tilemapUrl = dummyUrl.replace(/tile\/[0-9]+\/[0-9]+\/[0-9]+\?blankTile=false/, 'tilemap') + '/' + z + '/' + y + '/' + x + '/8/8';
+    const tilemapUrl = dummyUrl.replace(/tile\/[0-9]+\/[0-9]+\/[0-9]+\?blankTile=false/, 'tilemap') + '/' + z + '/' + y + '/' + x + '/8/8';
 
     // make the request and inspect the response from the tilemap server
     fetch(tilemapUrl)
-      .then(utilFetchResponse)
+      .then(utilFetchResponse as (response: Response) => any)
       .then(tilemap => {
         if (!tilemap) {
           throw new Error('Unknown Error');
         }
         let hasTiles = true;
-        for (const d of tilemap.data) {
+        for (const d of (tilemap as any).data) {
           // 0 means an individual tile in the grid doesn't exist
           if (!d) {
             hasTiles = false;
           }
         }
         // if any tiles are missing at level 20 we restrict maxZoom to 19
-        this.props.zoomExtent[1] = (hasTiles ? 22 : 19);
+        this.props.zoomExtent![1] = (hasTiles ? 22 : 19);
       })
       .catch(e => console.error(e));  // eslint-disable-line
   }
@@ -571,21 +663,21 @@ export class ImagerySourceEsri extends ImagerySource {
   /**
    * getMetadata
    * Calls the callback with an object containing metadata for this imagery source.
-   * @param  {Tile}      tile - The tile to get metadata for
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param tile - The tile to get metadata for
+   * @param callback - errback-style callback function to call with results
    */
-  getMetadata(tile, callback) {
+  override getMetadata(tile: any, callback?: (err: string | null, metadata?: any) => void): void {
     const context = this.context;
-    const l10n = context.systems.l10n;
+    const l10n = (context.systems.l10n as any);
 
     const loc = tile.wgs84Extent.center();
     const tileID = tile.xyz.join('/');
-    const zoom = Math.min(tile.xyz[2], this.props.zoomExtent[1]);
+    const zoom = Math.min(tile.xyz[2], this.props.zoomExtent![1]);
     const unknown = l10n?.t('inspector.unknown') || 'unknown';
 
     if (this._inflight[tileID]) return;
 
-    let metadataLayer;
+    let metadataLayer: number;
     switch (true) {
       case (zoom >= 20 && this.id === 'EsriWorldImageryClarity'):
         metadataLayer = 4;
@@ -604,7 +696,7 @@ export class ImagerySourceEsri extends ImagerySource {
     }
 
     // build up query using the layer appropriate to the current zoom
-    let url;
+    let url: string;
     if (this.id === 'EsriWorldImagery') {
       url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/';
     } else if (this.id === 'EsriWorldImageryClarity') {
@@ -619,12 +711,13 @@ export class ImagerySourceEsri extends ImagerySource {
       this._cache[tileID] = {};
     }
     if (this._cache[tileID] && this._cache[tileID].metadata) {
-      return callback(null, this._cache[tileID].metadata);
+      if (callback) callback(null, this._cache[tileID].metadata);
+      return;
     }
 
     // accurate metadata is only available >= 13
-    let vintage = {};
-    let metadata = {};
+    let vintage: any = {};
+    let metadata: any = {};
     if (metadataLayer === 99) {
       vintage = {
         start: null,
@@ -639,13 +732,13 @@ export class ImagerySourceEsri extends ImagerySource {
         accuracy: unknown
       };
 
-      callback(null, metadata);
+      if (callback) callback(null, metadata);
 
     } else {
       this._inflight[tileID] = true;
       fetch(url)
-        .then(utilFetchResponse)
-        .then(result => {
+        .then(utilFetchResponse as (response: Response) => any)
+        .then((result: any) => {
           delete this._inflight[tileID];
 
           if (!result) {
@@ -691,7 +784,7 @@ export class ImagerySourceEsri extends ImagerySource {
         });
     }
 
-    function clean(val) {
+    function clean(val: any): string {
       return String(val).trim() || unknown;
     }
   }
@@ -709,10 +802,10 @@ export class ImagerySourceEsri extends ImagerySource {
 export class ImagerySourceEsriWayback extends ImagerySourceEsri {
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
-   * @param  {Object}   props   - Object containing the properties for this ImagerySource
+   * @param context - Global shared application context
+   * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context, props = {}) {
+  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
     props.nameStringID = 'background.wayback.name';
     props.descriptionStringID = 'background.wayback.description';
     super(context, props);
@@ -722,10 +815,10 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * key
    * The `key` can be used to uniquely identify this imagery source.
    * It is usually just the `safeid`, but for 'wayback' it will also include the `date`.
-   * @return  {string}  The key
+   * @return The key
    * @readonly
    */
-  get key() {
+  override get key(): string {
     let s = this.safeid;
     const date = this.date;
     if (date) {
@@ -735,8 +828,8 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
   }
 
   // Get the url template for the selected release
-  get template() {
-    const wayback = this.context.services.wayback;
+  override get template(): string {
+    const wayback = (this.context.services as any).wayback;
     const release = wayback.byReleaseDate.get(this.date);
     return release?.template || this._template;
   }
@@ -745,11 +838,11 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * imageryUsed
    * Returns a string that can be used as the "imagery_used" changeset metadata.
    * It is usually just the name, but for 'wayback', append the date if there is one, e.g. `Esri Wayback (2024-01-01)`
-   * @return  {string}  The imagery used string
+   * @return The imagery used string
    * @readonly
    */
-  get imageryUsed() {
-    let s = this._currStrings.name;
+  override get imageryUsed(): string {
+    let s = this._currStrings.name ?? '';
     const date = this.date;
     if (date) {
       s += ` (${date})`;
@@ -762,17 +855,17 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * Wayback imagery has a `date` getter/setter.
    * Pick the closest supported date from the Wayback archive, without going over.
    * The date is stored in both `startDate` and `endDate` props.
-   * @return  {string}  Localized name
+   * @return The date string
    */
-  set date(val) {
-    const wayback = this.context.services.wayback;
+  set date(val: string | undefined) {
+    const wayback = (this.context.services as any).wayback;
     const chooseDate = wayback.chooseClosestDate(val);
 
     this.props.startDate = chooseDate;
     this.props.endDate = chooseDate;
   }
 
-  get date() {
+  get date(): string | undefined {
     return this.props.startDate;
   }
 
@@ -780,13 +873,13 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * getMetadata
    * Calls the callback with an object containing metadata for this imagery source.
    * The Wayback service will get the metadata for the given tile.
-   * @param  {Tile}      tile - the tile to get metadata for
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param tile - the tile to get metadata for
+   * @param callback - errback-style callback function to call with results
    */
-  getMetadata(tile, callback) {
+  override getMetadata(tile: any, callback?: (err: any, metadata?: any) => void): void {
     const context = this.context;
-    const l10n = context.systems.l10n;
-    const wayback = context.services.wayback;
+    const l10n = (context.systems.l10n as any);
+    const wayback = (context.services as any).wayback;
     const unknown = l10n?.t('inspector.unknown') || 'unknown';
 
     const release = wayback.byReleaseDate.get(this.date);
@@ -798,8 +891,8 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
     }
 
     wayback.getMetadataAsync(tile, this.date)
-      .then(result => {
-        const metadata = {
+      .then((result: any) => {
+        const metadata: any = {
           vintage: {
             start: result.captureDate,
             end:   result.captureDate,
@@ -825,11 +918,11 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
           callback(null, metadata);
         }
 
-        function clean(val) {
+        function clean(val: any): string {
           return String(val).trim() || unknown;
         }
       })
-      .catch(err => {
+      .catch((err: any) => {
         console.error(err);  // eslint-disable-line no-console
         if (typeof callback === 'function') {
           callback(err, {});
@@ -838,4 +931,3 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
   }
 
 }
-

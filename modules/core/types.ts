@@ -102,7 +102,7 @@ export interface Systems {
  * Contains references to all core components and shared state.
  *
  * Context is passed to almost every class constructor in the codebase.
- * It provides access to systems, viewport, and utility functions.
+ * It provides access to systems, services, viewport, and utility functions.
  */
 export interface Context extends EventEmitter {
   /** Application version string */
@@ -110,6 +110,9 @@ export interface Context extends EventEmitter {
 
   /** All initialized systems */
   systems: Systems;
+
+  /** All initialized services (external data sources, APIs) */
+  services: Record<string, any>;
 
   /** The map viewport (projection, pan, zoom) */
   viewport: Viewport;

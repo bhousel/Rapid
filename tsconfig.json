@@ -30,6 +30,7 @@
     "checkJs": false
   },
   "include": [
+    "global.d.ts",
     "modules/**/*"
   ],
   "exclude": [
