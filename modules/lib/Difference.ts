@@ -1,5 +1,23 @@
 import deepEqual from 'fast-deep-equal';
 
+import type { DifferenceChange, DifferenceFlags, Entity, EntityID, RelationMember, WayEntity, RelationEntity } from './types.ts';
+import type { Graph } from './Graph.js';
+
+
+/**
+ * Summary entry describing a change to an entity.
+ */
+interface SummaryEntry {
+  /** The entity that changed */
+  entity: Entity;
+
+  /** The Graph where the entity can be found (head or base) */
+  graph: Graph;
+
+  /** The type of change: 'created', 'modified', or 'deleted' */
+  changeType: 'created' | 'modified' | 'deleted';
+}
+
 
 /**
  *  Difference
@@ -11,17 +29,25 @@ import deepEqual from 'fast-deep-equal';
  *  child and parent relationships.
  */
 export class Difference {
+  private _base: Graph | null;
+  private _head: Graph;
+  private _changes: Map<EntityID, DifferenceChange>;
+  private _summary: Map<EntityID, SummaryEntry> | null;
+  private _complete: Map<EntityID, Entity | undefined> | null;
+
+  /** Flags indicating what types of changes occurred */
+  didChange: DifferenceFlags;
 
   /**
    * @constructor
-   * @param  {Graph?}  base - Base Graph
-   * @param  {Graph}   head - Head Graph
+   * @param  base - Base Graph (null for fresh head graph)
+   * @param  head - Head Graph
    */
-  constructor(base, head) {
+  constructor(base: Graph | null, head: Graph) {
     this._base = base;
     this._head = head;
-    this._changes = new Map();   // Map<entityID, Object>
-    this.didChange = {};         // 'addition', 'deletion', 'geometry', 'properties'
+    this._changes = new Map();
+    this.didChange = {};
     this._summary = null;
     this._complete = null;
 
@@ -85,19 +111,19 @@ export class Difference {
   /**
    * changes
    * @readonly
-   * @return  {Map<entityID, Object>  The change details
+   * @return  The change details
    */
-  get changes() {
+  get changes(): Map<EntityID, DifferenceChange> {
     return this._changes;
   }
 
 
   /**
    * modified
-   * @return  {Array<Entity>}  Array of Entities modified
+   * @return  Array of Entities modified
    */
-  modified() {
-    let result = [];
+  modified(): Entity[] {
+    const result: Entity[] = [];
     for (const change of this._changes.values()) {
       if (change.base && change.head) {
         result.push(change.head);
@@ -109,10 +135,10 @@ export class Difference {
 
   /**
    * created
-   * @return  {Array<Entity>}  Array of Entities created
+   * @return  Array of Entities created
    */
-  created() {
-    let result = [];
+  created(): Entity[] {
+    const result: Entity[] = [];
     for (const change of this._changes.values()) {
       if (!change.base && change.head) {
         result.push(change.head);
@@ -124,10 +150,10 @@ export class Difference {
 
   /**
    * deleted
-   * @return  {Array<Entity>}  Array of Entities deleted
+   * @return  Array of Entities deleted
    */
-  deleted() {
-    let result = [];
+  deleted(): Entity[] {
+    const result: Entity[] = [];
     for (const change of this._changes.values()) {
       if (change.base && !change.head) {
         result.push(change.base);
@@ -154,14 +180,14 @@ export class Difference {
    *      changeType:  String, one of 'created', 'modified', or 'deleted'
    *    }
    *  }
-   * @return  {Map<entityID, Object>  Returns a summary of changes
+   * @return  Returns a summary of changes
    */
-  summary() {
+  summary(): Map<EntityID, SummaryEntry> {
     if (this._summary) return this._summary;  // done already
 
-    const base = this._base;
+    const base = this._base!;
     const head = this._head;
-    const result = new Map();  // Map<entityID, change detail>
+    const result = new Map<EntityID, SummaryEntry>();
 
     for (const change of this._changes.values()) {
       const h = change.head;
@@ -204,52 +230,52 @@ export class Difference {
    * Returns complete set of Entities affected by the changes in this difference.
    * This is used to know which Entities need redraw or revalidation.
    * Recurses up to include all ancestor Entities in the result, parentWays and parentRelations.
-   * @return  {Map<entityID, Entity>  Returns the complete set of entities affected by the change
+   * @return  Returns the complete set of entities affected by the change
    */
-  complete() {
+  complete(): Map<EntityID, Entity | undefined> {
     if (this._complete) return this._complete;  // done already
 
     const head = this._head;
-    const result = new Map();  // Map<entityID, Entity>
+    const result = new Map<EntityID, Entity | undefined>();
 
     for (const [entityID, change] of this._changes) {
       const h = change.head;
       const b = change.base;
-      const entity = h || b;
+      const entity = h ?? b;
 
       result.set(entityID, h);
 
-      if (entity.type === 'way') {
-        const headNodes = new Set(h?.nodes);
-        const baseNodes = new Set(b?.nodes);
+      if (entity?.type === 'way') {
+        const headNodes = new Set((h as WayEntity | undefined)?.nodes);
+        const baseNodes = new Set((b as WayEntity | undefined)?.nodes);
         for (const nodeID of headNodes.union(baseNodes)) {
-          result.set(nodeID, head.hasEntity(nodeID));
+          result.set(nodeID as EntityID, head.hasEntity(nodeID as EntityID));
         }
       }
 
-      if (entity.type === 'relation' && entity.isMultipolygon()) {
-        const headMembers = new Set(h?.members?.map(m => m.id));
-        const baseMembers = new Set(b?.members?.map(m => m.id));
+      if (entity?.type === 'relation' && entity.isMultipolygon()) {
+        const headMembers = new Set((h as RelationEntity | undefined)?.members?.map((m: RelationMember) => m.id));
+        const baseMembers = new Set((b as RelationEntity | undefined)?.members?.map((m: RelationMember) => m.id));
         for (const memberID of headMembers.union(baseMembers)) {
-          const member = head.hasEntity(memberID);
+          const member = head.hasEntity(memberID as EntityID);
           if (!member) continue;   // not downloaded
-          result.set(memberID, member);
+          result.set(memberID as EntityID, member);
         }
       }
 
-      _gatherParents(head.parentWays(entity), result);
-      _gatherParents(head.parentRelations(entity), result);
+      _gatherParents(head.parentWays(entity!), result);
+      _gatherParents(head.parentRelations(entity!), result);
     }
 
     this._complete = result;
     return result;
 
 
-    function _gatherParents(parents) {
+    function _gatherParents(parents: Iterable<Entity>, result: Map<EntityID, Entity | undefined>): void {
       for (const parent of parents) {
         if (result.has(parent.id)) continue;
         result.set(parent.id, parent);
-        _gatherParents(head.parentRelations(parent));  // recurse up to parent relations
+        _gatherParents(head.parentRelations(parent), result);  // recurse up to parent relations
       }
     }
   }

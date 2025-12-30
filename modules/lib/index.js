@@ -1,5 +1,5 @@
 export * from './Category.ts';
-export * from './Difference.js';
+export * from './Difference.ts';
 export * from './Edit.ts';
 export * from './Field.ts';
 export * from './Geometry.js';

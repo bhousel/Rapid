@@ -5,7 +5,7 @@
  */
 
 // Re-export commonly needed types from data module for convenience
-export type { Entity, EntityID, EntityType, Vec2, Tags } from '../data/types.ts';
+export type { Entity, EntityID, EntityType, NodeEntity, WayEntity, RelationEntity, RelationMember, Vec2, Tags } from '../data/types.ts';
 
 // Re-export Context for convenience (used by almost every class)
 export type { Context } from '../core/types.ts';

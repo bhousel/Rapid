@@ -55,6 +55,30 @@ export interface Entity extends DataElement {
 
   /** Whether the entity is visible */
   visible?: boolean;
+
+  /** Geographic location [lon, lat] - present on nodes only */
+  loc?: Vec2;
+
+  /**
+   * Get the geometry type of this entity.
+   * @param graph - The graph to use for determining geometry
+   * @return The geometry type: 'point', 'vertex', 'line', 'area', 'relation'
+   */
+  geometry(graph: unknown): string;
+
+  /**
+   * Check if this entity has tags that are considered "interesting".
+   * (i.e., not just name, source, or other metadata tags)
+   * @return True if the entity has interesting tags
+   */
+  hasInterestingTags(): boolean;
+
+  /**
+   * Check if this entity is a multipolygon relation.
+   * Only relations can be multipolygons; for other entity types returns false.
+   * @return True if this is a multipolygon relation
+   */
+  isMultipolygon(): boolean;
 }
 
 
