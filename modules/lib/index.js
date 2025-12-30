@@ -10,7 +10,7 @@ export * from './intersection.js';
 export * from './lanes.js';
 export * from './multipolygon.js';
 export * from './Preset.ts';
-export * from './RapidDataset.js';
+export * from './RapidDataset.ts';
 export * from './tags.js';
 export * from './Tree.js';
 export * from './ValidationFix.ts';
