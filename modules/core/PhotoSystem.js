@@ -1,7 +1,7 @@
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { utilDate, utilDateString } from '../util/date.js';
+import { utilDate, utilDateString } from '../util/date.ts';
 
 
 /**

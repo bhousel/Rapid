@@ -1,5 +1,5 @@
 export * from './cmd.js';
-export * from './date.js';
+export * from './date.ts';
 export * from './detect.js';
 export * from './dimensions.js';
 export * from './fetch_response.js';

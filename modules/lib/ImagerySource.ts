@@ -2,7 +2,7 @@ import { geoArea as d3_geoArea, geoMercatorRaw as d3_geoMercatorRaw } from 'd3-g
 import { DEG2RAD, RAD2DEG, TAU, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rapid-sdk/util';
 
-import { utilDateString } from '../util/date.js';
+import { utilDateString } from '../util/date.ts';
 import { utilFetchResponse } from '../util/fetch_response.js';
 
 import type { Context } from '../core/types.ts';
