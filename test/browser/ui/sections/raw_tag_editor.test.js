@@ -91,7 +91,7 @@ describe('uiSectionRawTagEditor', () => {
       assert.deepEqual(tags, { highway: undefined });
       done();
     });
-    Rapid.utilTriggerEvent(wrap.selectAll('button.remove'), 'mousedown');
+    wrap.selectAll('button.remove').node()?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
   });
 
 

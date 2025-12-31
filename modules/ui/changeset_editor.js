@@ -5,7 +5,7 @@ import { uiIcon } from './icon.js';
 import { uiCombobox} from './combobox.js';
 import { UiField } from './UiField.js';
 import { uiFormFields } from './form_fields.js';
-import { utilRebind, utilTriggerEvent } from '../util/index.js';
+import { utilRebind } from '../util/index.js';
 
 
 export function uiChangesetEditor(context) {
@@ -66,7 +66,7 @@ export function uiChangesetEditor(context) {
 
             // trigger a 'blur' event so that comment field can be cleaned
             // and checked for hashtags, even if retrieved from localstorage
-            utilTriggerEvent(commentField, 'blur');
+            commentField.node()?.dispatchEvent(new Event('blur', { bubbles: true, cancelable: true }));
 
             // Populate dropdown with user's recent changeset comments, if possible
             const osm = context.services.osm;

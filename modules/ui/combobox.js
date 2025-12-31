@@ -1,7 +1,7 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { select as d3_select } from 'd3-selection';
 
-import { utilGetSetValue, utilRebind, utilTriggerEvent } from '../util/index.js';
+import { utilGetSetValue, utilRebind } from '../util/index.js';
 
 
 // This code assumes that the combobox values will not have duplicate entries.
@@ -421,7 +421,7 @@ export function uiCombobox(context, klass) {
 
             if (d) {   // user clicked on a suggestion
                 utilGetSetValue(input, d.value);    // replace field contents
-                utilTriggerEvent(input, 'change');
+                input.node()?.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
             }
 
             // clear (and keep) selection
