@@ -1,5 +1,6 @@
 import deepEqual from 'fast-deep-equal';
 
+import type { Iterable } from '../util/iterable.ts';
 import type { Entity, EntityID, RelationMember, WayEntity, RelationEntity } from './types.ts';
 import type { Graph } from './Graph.ts';
 

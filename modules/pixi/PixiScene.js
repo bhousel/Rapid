@@ -20,7 +20,7 @@ import { PixiLayerRapid } from './PixiLayerRapid.js';
 import { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.js';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.js';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
-import { utilIterable } from '../util/iterable.js';
+import { utilIterable } from '../util/iterable.ts';
 
 
 /**

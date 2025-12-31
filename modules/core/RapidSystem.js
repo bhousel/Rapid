@@ -2,7 +2,7 @@ import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { utilIterable } from '../util/iterable.js';
+import { utilIterable } from '../util/iterable.ts';
 
 const RAPID_MAGENTA = '#da26d3';
 const OVERTURE_CYAN = '#00ffff';

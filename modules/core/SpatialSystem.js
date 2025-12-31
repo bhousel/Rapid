@@ -2,7 +2,7 @@ import RBush from 'rbush';
 
 import { Graph } from '../lib/Graph.js';
 import { AbstractSystem } from './AbstractSystem.js';
-import { utilIterable } from '../util/iterable.js';
+import { utilIterable } from '../util/iterable.ts';
 
 
 /**

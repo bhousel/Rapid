@@ -8,7 +8,7 @@ import { modes } from './modes/index.js';
 import { services } from './services/index.js';
 import { systems } from './core/index.js';
 
-import { utilIterable } from './util/iterable.js';
+import { utilIterable } from './util/iterable.ts';
 import { utilKeybinding } from './util/keybinding.js';
 
 const MINZOOM = 15;

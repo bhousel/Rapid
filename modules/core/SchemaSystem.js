@@ -4,7 +4,7 @@ import MiniSearch from 'minisearch';
 import { AbstractSystem } from './AbstractSystem.js';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.js';
 import { Category, Field, Preset } from '../lib/index.ts';
-import { utilIterable } from '../util/iterable.js';
+import { utilIterable } from '../util/iterable.ts';
 import { utilWildcard } from '../util/string.js';
 
 

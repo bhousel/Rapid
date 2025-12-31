@@ -4,7 +4,7 @@ export * from './detect.js';
 export * from './dimensions.js';
 export * from './fetch_response.js';
 export * from './get_set_value.js';
-export * from './iterable.js';
+export * from './iterable.ts';
 export * from './keybinding.js';
 export * from './rebind.js';
 export * from './string.js';

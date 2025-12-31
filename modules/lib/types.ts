@@ -15,16 +15,7 @@ export type { Entity, EntityID, EntityType, NodeEntity, WayEntity, RelationEntit
 export type { Context } from '../core/types.ts';
 
 
-// ============================================================================
-// Utility Types
-// ============================================================================
 
-/**
- * OneOrMore<T>
- * Allows a single value or an array of values.
- * Used for functions that accept either one item or multiple items.
- */
-export type OneOrMore<T> = T | T[];
 
 
 // ============================================================================

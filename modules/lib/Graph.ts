@@ -1,7 +1,8 @@
 import { Difference } from './Difference.ts';
-import { utilIterable } from '../util/iterable.js';
+import { utilIterable } from '../util/iterable.ts';
 
-import type { Context, Entity, EntityID, NodeEntity, OneOrMore, RelationEntity, WayEntity } from './types.ts';
+import type { Iterable, OneOrMore } from '../util/iterable.ts';
+import type { Context, Entity, EntityID, NodeEntity, RelationEntity, WayEntity } from './types.ts';
 
 
 /**
@@ -261,7 +262,7 @@ export class Graph {
       throw new Error(`Do not call 'replace' on a base graph`);
     }
 
-    const arr = utilIterable(entities).sort(this._nodesFirst) as Entity[];
+    const arr = [...utilIterable(entities)].sort(this._nodesFirst);
     for (const entity of arr) {
       const entityID = entity.id;
       const current = this.hasEntity(entityID);
@@ -286,7 +287,7 @@ export class Graph {
       throw new Error(`Do not call 'remove' on a base graph`);
     }
 
-    const arr = utilIterable(entities).sort(this._nodesFirst) as Entity[];
+    const arr = [...utilIterable(entities)].sort(this._nodesFirst);
     for (const entity of arr) {
       const entityID = entity.id;
       const current = this.hasEntity(entityID);
@@ -416,7 +417,7 @@ export class Graph {
     const restoreIDs = new Set<EntityID>();
     const newIDs = new Set<EntityID>();
 
-    const arr = utilIterable(entities).sort(this._nodesFirst) as Entity[];
+    const arr = [...utilIterable(entities)].sort(this._nodesFirst);
     for (const entity of arr) {
       if (!entity.visible || (!force && base.entities.has(entity.id))) continue;
 

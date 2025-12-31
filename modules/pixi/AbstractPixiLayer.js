@@ -1,4 +1,4 @@
-import { utilIterable } from '../util/iterable.js';
+import { utilIterable } from '../util/iterable.ts';
 
 
 /**

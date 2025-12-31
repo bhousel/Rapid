@@ -1,6 +1,6 @@
 import { select } from 'd3-selection';
 
-import { utilIterable } from './iterable.js';
+import { utilIterable } from './iterable.ts';
 
 
 export function utilKeybinding(namespace) {
