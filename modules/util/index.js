@@ -7,6 +7,6 @@ export * from './get_set_value.js';
 export * from './iterable.ts';
 export * from './keybinding.js';
 export * from './rebind.js';
-export * from './string.js';
+export * from './string.ts';
 export * from './trigger_event.js';
 export * from './util.js';

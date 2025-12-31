@@ -1,11 +1,10 @@
 import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
-// @ts-expect-error - diacritics has no type definitions
 import diacritics from 'diacritics';
 
 import type { Context } from '../core/types.ts';
 import type { Field } from './Field.ts';
 import type { Tags } from '../data/types.ts';
-import { utilGatherTokens } from '../util/string.js';
+import { utilGatherTokens } from '../util/string.ts';
 import { osmAreaKeys } from './tags.js';
 
 

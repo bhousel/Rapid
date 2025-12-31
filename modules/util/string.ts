@@ -13,17 +13,20 @@ import diacritics from 'diacritics';
  *
  * @see https://dev.to/tillsanders/let-s-stop-using-a-za-z-4a0m
  * @see https://stackoverflow.com/questions/4328500/how-can-i-strip-all-punctuation-from-a-string-in-javascript-using-regex
- * @param  {string}  str - the input string
- * @return {string}  the normalized string
+ *
+ * @param str - The input string
+ * @returns The normalized string
+ *
+ * @example
+ * utilNormalizeString('Héllo Wörld!')  // returns 'helloworld'
+ * utilNormalizeString('Rock & Roll')   // returns 'rockandroll'
  */
-export function utilNormalizeString(str) {
+export function utilNormalizeString(str: string): string {
   if (typeof str !== 'string') return '';
 
-  // Get diacritic marks into a consistent format, perfer them combined into fewer characters.
+  // Get diacritic marks into a consistent format, prefer them combined into fewer characters.
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
-  if (typeof str.normalize === 'function') {
-    str = str.normalize('NFKC');
-  }
+  str = str.normalize('NFKC');
 
   return diacritics.remove(
     str
@@ -40,18 +43,23 @@ export function utilNormalizeString(str) {
  * This is used by the Preset code to extract tokens from the given string.
  * It sorts them into either the 'primary' or 'alternate' set based on the given `isPrimary` param.
  * This function also automatically checks whether removing diacritics would result in
- *  a different string, and if so, adds it to the 'alternate' set.
+ * a different string, and if so, adds it to the 'alternate' set.
  * The "primary" set should contain things like the preset name and similar names.
  * The "alternate" set should contain things like related terms and tag values a user might search for.
- * For example:
- *   input:  'Juan Valdes Café' ->  primary: ['juan','valdes','café'], alternate: ['cafe']
  *
- * @param  {string}       str - the input string
- * @param  {Set<string>}  primary - set of 'primary' tokens
- * @param  {Set<string>}  alternate - set of 'alternate' tokens
- * @param  {boolean}      isPrimary - pass `true` to put the tokens into the 'primary' Set.
+ * @param str - The input string
+ * @param primary - Set of 'primary' tokens
+ * @param alternate - Set of 'alternate' tokens
+ * @param isPrimary - Pass `true` to put the tokens into the 'primary' Set
+ *
+ * @example
+ * const primary = new Set<string>();
+ * const alternate = new Set<string>();
+ * utilGatherTokens('Juan Valdes Café', primary, alternate, true);
+ * // primary: Set(['juan', 'valdes', 'café'])
+ * // alternate: Set(['cafe'])
  */
-export function utilGatherTokens(str, primary, alternate, isPrimary) {
+export function utilGatherTokens(str: string, primary: Set<string>, alternate: Set<string>, isPrimary: boolean): void {
   if (typeof str !== 'string') return;
 
   const spaceOrPunctuation = /[\n\r\p{Z}\p{P}]+/u;
@@ -85,10 +93,16 @@ export function utilGatherTokens(str, primary, alternate, isPrimary) {
  * and if so, converts it to a regular expression.
  *
  * @see https://stackoverflow.com/a/57527468/7620
- * @param  {string}  str - the string to check
- * @return {RegExp}  a regular expression, or `null` if not a wildcard string.
+ *
+ * @param str - The string to check
+ * @returns A regular expression, or `null` if not a wildcard string
+ *
+ * @example
+ * utilWildcard('foo*')     // returns /^foo.*$/
+ * utilWildcard('foo?bar')  // returns /^foo.bar$/
+ * utilWildcard('foobar')   // returns null (no wildcards)
  */
-export function utilWildcard(str) {
+export function utilWildcard(str: string): RegExp | null {
   if (typeof str !== 'string') return null;
   if (!(/[*?]/.test(str))) return null;   // no wildcard chars
 

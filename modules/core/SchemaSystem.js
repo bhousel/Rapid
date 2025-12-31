@@ -5,7 +5,7 @@ import { AbstractSystem } from './AbstractSystem.js';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.js';
 import { Category, Field, Preset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
-import { utilWildcard } from '../util/string.js';
+import { utilWildcard } from '../util/string.ts';
 
 
 // Make very sure this resolves to Rapid's `package.json`
