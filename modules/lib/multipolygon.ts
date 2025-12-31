@@ -23,14 +23,19 @@ export interface JoinedWaysResult extends Array<JoinedWaySequence> {
 }
 
 
-// "Old" multipolyons, previously known as "simple" multipolygons, are as follows:
-//
-// 1. Relation tagged with `type=multipolygon` and no interesting tags.
-// 2. One and only one member with the `outer` role. Must be a way with interesting tags.
-// 3. No members without a role.
-//
-// Old multipolygons are no longer recommended but are still rendered as areas.
-
+/**
+ * "Old" multipolygons, previously known as "simple" multipolygons, are as follows:
+ *
+ * 1. Relation tagged with `type=multipolygon` and no interesting tags.
+ * 2. One and only one member with the `outer` role. Must be a way with interesting tags.
+ * 3. No members without a role.
+ *
+ * Old multipolygons are no longer recommended but are still rendered as areas.
+ *
+ * @param entity - The entity to check (should be a relation)
+ * @param graph - The graph containing the entity
+ * @returns The outer member way if entity is a valid old multipolygon relation, false otherwise
+ */
 export function osmOldMultipolygonOuterMemberOfRelation(entity: Entity, graph: Graph): WayEntity | false {
   if (entity.type !== 'relation' ||
     !entity.isMultipolygon()
@@ -57,8 +62,15 @@ export function osmOldMultipolygonOuterMemberOfRelation(entity: Entity, graph: G
 }
 
 
-// For fixing up rendering of multipolygons with tags on the outer member.
-// https://github.com/openstreetmap/iD/issues/613
+/**
+ * Checks if an entity is the outer member of an old-style multipolygon.
+ * Used for fixing up rendering of multipolygons with tags on the outer member.
+ * @see https://github.com/openstreetmap/iD/issues/613
+ *
+ * @param entity - The entity to check (should be a way)
+ * @param graph - The graph containing the entity
+ * @returns The parent relation if entity is an old multipolygon outer member, false otherwise
+ */
 export function osmIsOldMultipolygonOuterMember(entity: Entity, graph: Graph): RelationEntity | false {
   if (entity.type !== 'way' ||
     Object.keys(entity.tags).filter(osmIsInterestingTag).length === 0) {
@@ -89,6 +101,13 @@ export function osmIsOldMultipolygonOuterMember(entity: Entity, graph: Graph): R
 }
 
 
+/**
+ * Gets the outer member of an old-style multipolygon that contains the given entity.
+ *
+ * @param entity - The entity to check (should be a way)
+ * @param graph - The graph containing the entity
+ * @returns The outer member way entity, or false if not found or not applicable
+ */
 export function osmOldMultipolygonOuterMember(entity: Entity, graph: Graph): WayEntity | false {
   if (entity.type !== 'way') return false;
 
@@ -121,31 +140,36 @@ export function osmOldMultipolygonOuterMember(entity: Entity, graph: Graph): Way
 }
 
 
-// Join `toJoin` array into sequences of connecting ways.
-
-// Segments which share identical start/end nodes will, as much as possible,
-// be connected with each other.
-//
-// The return value is a nested array. Each constituent array contains elements
-// of `toJoin` which have been determined to connect.
-//
-// Each consitituent array also has a `nodes` property whose value is an
-// ordered array of member nodes, with appropriate order reversal and
-// start/end coordinate de-duplication.
-//
-// Members of `toJoin` must have, at minimum, `type` and `id` properties.
-// Thus either an array of `OsmWay`s or a relation member array may be used.
-//
-// If an member is an `OsmWay`, its tags and childnodes may be reversed via
-// `actionReverse` in the output.
-//
-// The returned sequences array also has an `actions` array property, containing
-// any reversal actions that should be applied to the graph, should the calling
-// code attempt to actually join the given ways.
-//
-// Incomplete members (those for which `graph.hasEntity(element.id)` returns
-// false) and non-way members are ignored.
-//
+/**
+ * Joins an array of ways or relation members into sequences of connecting ways.
+ *
+ * Segments which share identical start/end nodes will, as much as possible,
+ * be connected with each other.
+ *
+ * The return value is a nested array. Each constituent array contains elements
+ * of `toJoin` which have been determined to connect.
+ *
+ * Each constituent array also has a `nodes` property whose value is an
+ * ordered array of member nodes, with appropriate order reversal and
+ * start/end coordinate de-duplication.
+ *
+ * Members of `toJoin` must have, at minimum, `type` and `id` properties.
+ * Thus either an array of `OsmWay`s or a relation member array may be used.
+ *
+ * If a member is an `OsmWay`, its tags and child nodes may be reversed via
+ * `actionReverse` in the output.
+ *
+ * The returned sequences array also has an `actions` array property, containing
+ * any reversal actions that should be applied to the graph, should the calling
+ * code attempt to actually join the given ways.
+ *
+ * Incomplete members (those for which `graph.hasEntity(element.id)` returns
+ * false) and non-way members are ignored.
+ *
+ * @param toJoin - Array of ways or relation members to join
+ * @param graph - The graph containing the entities
+ * @returns Array of joined way sequences, each with a `nodes` property
+ */
 export function osmJoinWays(toJoin: (RelationMember | WayEntity)[], graph: Graph): JoinedWaysResult {
   type JoinableItem = RelationMember | WayEntity;
 
@@ -160,15 +184,15 @@ export function osmJoinWays(toJoin: (RelationMember | WayEntity)[], graph: Graph
   }
 
   // make a copy containing only the items to join
-  let items: JoinableItem[] = toJoin.filter((member): member is JoinableItem => {
+  const items: JoinableItem[] = toJoin.filter((member): member is JoinableItem => {
     return member.type === 'way' && graph.hasEntity(member.id) !== undefined;
   });
 
   // Are the things we are joining relation members or `OsmWays`?
   // If `OsmWays`, skip the "prefer a forward path" code below (see iD#4872)
   let joinAsMembers = true;
-  for (let i = 0; i < items.length; i++) {
-    if (items[i] instanceof OsmWay) {
+  for (const item of items) {
+    if (item instanceof OsmWay) {
       joinAsMembers = false;
       break;
     }

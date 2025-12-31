@@ -11,7 +11,7 @@ export * from './lanes.ts';
 export * from './multipolygon.ts';
 export * from './Preset.ts';
 export * from './RapidDataset.ts';
-export * from './tags.js';
+export * from './tags.ts';
 export * from './Tree.js';
 export * from './ValidationFix.ts';
 export * from './ValidationIssue.ts';
