@@ -1,7 +1,32 @@
 import deepEqual from 'fast-deep-equal';
 
-import type { DifferenceChange, DifferenceFlags, Entity, EntityID, RelationMember, WayEntity, RelationEntity } from './types.ts';
+import type { Entity, EntityID, RelationMember, WayEntity, RelationEntity } from './types.ts';
 import type { Graph } from './Graph.ts';
+
+
+/**
+ * Represents a change to a single entity between two graphs.
+ */
+export interface DifferenceChange {
+  /** The entity in the base graph (undefined if added) */
+  base: Entity | undefined;
+  /** The entity in the head graph (undefined if deleted) */
+  head: Entity | undefined;
+}
+
+/**
+ * Flags indicating what types of changes occurred.
+ */
+export interface DifferenceFlags {
+  /** An entity was added */
+  addition?: boolean;
+  /** An entity was deleted */
+  deletion?: boolean;
+  /** An entity's geometry changed */
+  geometry?: boolean;
+  /** An entity's properties/tags changed */
+  properties?: boolean;
+}
 
 
 /**
@@ -10,10 +35,8 @@ import type { Graph } from './Graph.ts';
 interface SummaryEntry {
   /** The entity that changed */
   entity: Entity;
-
   /** The Graph where the entity can be found (head or base) */
   graph: Graph;
-
   /** The type of change: 'created', 'modified', or 'deleted' */
   changeType: 'created' | 'modified' | 'deleted';
 }

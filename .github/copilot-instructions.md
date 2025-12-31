@@ -69,10 +69,25 @@ export class Category {
 - Keep JSDoc block on constructor
 - Avoid duplicating property docs in the class body
 
+### Interface Formatting
+- Use concise formatting for interface properties (no blank lines between properties)
+- Each property should have a JSDoc comment on the line directly above it
+- Example:
+  ```typescript
+  export interface GraphCache {
+    /** Map of entity ID to Entity */
+    entities: Map<EntityID, Entity | undefined>;
+    /** Map of entity ID to Set of parent Way IDs */
+    parentWays: Map<EntityID, Set<EntityID>>;
+  }
+  ```
+
 ### Shared Types
 - `types.ts` files exist per folder for **cross-file shared types only**
-- Examples: `Context`, `Entity`, `EntityID`, `Tags`, `Vec2`
+- Examples: `Context`, `Entity`, `EntityID`, `Tags`, `Vec2`, GeoJSON types
 - Class-specific types (like `FooProps`) stay with the class
+- **Never duplicate types** - if a type already exists in a class file, don't add it to `types.ts`
+- When converting a file, check if types already exist before adding new ones
 
 ### Type Imports
 - Use `import type { ... }` for type-only imports
