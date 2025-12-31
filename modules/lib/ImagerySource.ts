@@ -3,7 +3,7 @@ import { DEG2RAD, RAD2DEG, TAU, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rapid-sdk/util';
 
 import { utilDateString } from '../util/date.ts';
-import { utilFetchResponse } from '../util/fetch_response.js';
+import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../core/types.ts';
 import type { Vec2 } from '../data/types.ts';

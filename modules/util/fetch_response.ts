@@ -1,12 +1,15 @@
 import { DOMParser } from '@xmldom/xmldom';
 
-
 /**
  * FetchError
  * Pack up the parts of the response that we may need later for error handling.
  */
 export class FetchError extends Error {
-  constructor(response) {
+  status: number;
+  statusText: string;
+  response: Response;
+
+  constructor(response: Response) {
     const message = response.status + ' ' + response.statusText;    // e.g. '404 Not Found'
     super(message);
 
@@ -19,8 +22,8 @@ export class FetchError extends Error {
 
 
 /**
- * fetchResponse
- * Handle the response from a `fetch`
+ * utilFetchResponse
+ * Handle the response from a `fetch`.
  * d3-fetch previously did some of this for us, see https://github.com/d3/d3-fetch
  *
  * @example
@@ -32,12 +35,15 @@ export class FetchError extends Error {
  *      if (err.name === 'FetchError') …        // deal with error
  *   })
  *
- * @param    {Response}   response  - The `Response` from a `fetch`
- * @param    {DOMParser}  domParser - Optional, specify a DOMParser to handle XML with
- * @returns  {*}          Result suitable to be returned to a `.then()` (a value or Promise)
- * @throws   {FetchError}
+ * @param response - The `Response` from a `fetch`
+ * @param domParser - Optional, specify a DOMParser to handle XML with
+ * @returns Result suitable to be returned to a `.then()` (a value or Promise)
+ * @throws FetchError
  */
-export function utilFetchResponse(response, domParser) {
+export function utilFetchResponse(
+  response: Response,
+  domParser?: DOMParser
+): Promise<any> | any {
   if (!response.ok) {
     throw new FetchError(response);
   }

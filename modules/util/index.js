@@ -2,7 +2,7 @@ export * from './cmd.js';
 export * from './date.ts';
 export * from './detect.js';
 export * from './dimensions.js';
-export * from './fetch_response.js';
+export * from './fetch_response.ts';
 export * from './get_set_value.js';
 export * from './iterable.ts';
 export * from './keybinding.js';

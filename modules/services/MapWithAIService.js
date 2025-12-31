@@ -4,7 +4,7 @@ import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Graph, RapidDataset, Tree } from '../lib/index.ts';
 import { OsmNode, OsmWay } from '../data/index.js';
 import { OsmXMLParser } from '../data/parsers/OsmXMLParser.js';
-import { utilFetchResponse } from '../util/fetch_response.js';
+import { utilFetchResponse } from '../util/fetch_response.ts';
 
 
 const APIROOT = 'https://mapwith.ai/maps/ml_roads';

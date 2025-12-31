@@ -10,7 +10,7 @@ import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { GeoJSON } from '../data/GeoJSON.js';
-import { utilFetchResponse } from '../util/fetch_response.js';
+import { utilFetchResponse } from '../util/fetch_response.ts';
 
 
 /**

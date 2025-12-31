@@ -5,7 +5,7 @@ import Protobuf from 'pbf';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker, GeoJSON } from '../data/index.js';
-import { utilFetchResponse } from '../util/fetch_response.js';
+import { utilFetchResponse } from '../util/fetch_response.ts';
 
 const accessToken = 'MLY|3376030635833192|f13ab0bdf6b2f7b99e0d8bd5868e1d88';
 const apiUrl = 'https://graph.mapillary.com/';

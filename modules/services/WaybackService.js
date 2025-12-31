@@ -3,7 +3,7 @@ import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { utilDateString } from '../util/date.ts';
-import { FetchError, utilFetchResponse } from '../util/fetch_response.js';
+import { FetchError, utilFetchResponse } from '../util/fetch_response.ts';
 
 const WAYBACK_SERVICE_BASE_PROD = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';
 //const WAYBACK_SERVICE_BASE_DEV = 'https://waybackdev.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';

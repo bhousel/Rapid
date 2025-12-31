@@ -4,7 +4,7 @@ import { utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Graph, RapidDataset, Tree } from '../lib/index.ts';
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.js';
-import { utilFetchResponse } from '../util/fetch_response.js';
+import { utilFetchResponse } from '../util/fetch_response.ts';
 
 
 const GROUPID = 'bdf6c800b3ae453b9db239e03d7c1727';

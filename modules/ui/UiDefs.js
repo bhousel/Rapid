@@ -1,6 +1,6 @@
 import { selection, select } from 'd3-selection';
 
-import { utilFetchResponse } from '../util/fetch_response.js';
+import { utilFetchResponse } from '../util/fetch_response.ts';
 
 
 /**
