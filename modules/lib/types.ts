@@ -28,6 +28,21 @@ export type OneOrMore<T> = T | T[];
 
 
 // ============================================================================
+// Action Types
+// ============================================================================
+
+// Forward declaration to avoid circular imports
+import type { Graph } from './Graph.ts';
+
+/**
+ * Action
+ * An action function that transforms a Graph and returns a new Graph.
+ * Actions are the fundamental unit of graph modification in Rapid.
+ */
+export type Action = (graph: Graph) => Graph;
+
+
+// ============================================================================
 // GeoJSON Types
 // ============================================================================
 

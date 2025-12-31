@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import debounce from 'lodash-es/debounce.js';
 
 import { actionChangePreset } from '../actions/change_preset.js';
-import { Category, Preset } from '../lib/index.js';
+import { Category, Preset } from '../lib/index.ts';
 import { operationDelete } from '../operations/delete.js';
 import { uiIcon } from './icon.js';
 import { uiPresetIcon } from './preset_icon.js';

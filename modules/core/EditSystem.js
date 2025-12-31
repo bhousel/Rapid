@@ -5,7 +5,7 @@ import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/u
 import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { Difference, Edit, Graph, Tree } from '../lib/index.js';
+import { Difference, Edit, Graph, Tree } from '../lib/index.ts';
 import { OsmEntity, createOsmEntity } from '../data/index.js';
 import { uiLoading } from '../ui/loading.js';
 

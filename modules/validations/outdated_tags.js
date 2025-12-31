@@ -11,7 +11,7 @@ import {
   osmOldMultipolygonOuterMemberOfRelation,
   ValidationIssue,
   ValidationFix
-} from '../lib/index.js';
+} from '../lib/index.ts';
 
 
 const pathVals = new Set([

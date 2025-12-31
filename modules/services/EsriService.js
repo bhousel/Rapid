@@ -2,7 +2,7 @@ import { Extent, Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.js';
-import { Graph, RapidDataset, Tree } from '../lib/index.js';
+import { Graph, RapidDataset, Tree } from '../lib/index.ts';
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.js';
 import { utilFetchResponse } from '../util/fetch_response.js';
 
