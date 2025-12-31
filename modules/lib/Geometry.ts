@@ -1,6 +1,13 @@
 import { Extent } from '@rapid-sdk/math';
 
-import { GeometryPart } from './GeometryPart.js';
+import { GeometryPart } from './GeometryPart.ts';
+import type {
+  Context,
+  GeoJSONObject,
+  GeometryOrigData,
+  GeometryWorldData,
+  SingularGeometry
+} from './types.ts';
 
 
 /**
@@ -16,16 +23,26 @@ import { GeometryPart } from './GeometryPart.js';
  *   `parts`          Array of GeometryParts
  */
 export class Geometry {
+  context: Context | null;
+
+  /** Array of GeometryPart elements */
+  parts: GeometryPart[];
+
+  /** Original data, in WGS84 coordinates ([0,0] is Null Island) */
+  orig: GeometryOrigData | null;
+
+  /** Projected data, in world coordinates ([0,0] is the top left corner of a 256x256 Web Mercator world) */
+  world: GeometryWorldData | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     this.context = context;
-
-    this.parts = [];  // Array<GeometryPart>
-    this.reset();
+    this.parts = [];
+    this.orig = null;
+    this.world = null;
   }
 
 
@@ -34,7 +51,7 @@ export class Geometry {
    * Release memory.
    * Do not use the geometry after calling `destroy()`.
    */
-  destroy() {
+  destroy(): void {
     this.reset();
     this.context = null;
   }
@@ -44,13 +61,8 @@ export class Geometry {
    * reset
    * Remove all stored data
    */
-  reset() {
-    // Original data, in WGS84 coordinates
-    // ([0,0] is Null Island)
+  reset(): void {
     this.orig = null;
-
-    // Projected data, in world coordinates
-    // ([0,0] is the top left corner of a 256x256 Web Mercator world)
     this.world = null;
 
     for (const part of this.parts) {
@@ -64,15 +76,15 @@ export class Geometry {
    * clone
    * Returns a clone of this Geometry object
    * It clones both the calculated extents as well as the GeometryParts in the collection.
-   * @return  {Geometry}  A new Geometry
+   * @return  A new Geometry
    */
-  clone() {
-    const copy = new Geometry(this.context);
-    for (const obj of ['orig', 'world']) {
+  clone(): Geometry {
+    const copy = new Geometry(this.context!);
+    for (const obj of ['orig', 'world'] as const) {
       const src = this[obj];
       if (!src) continue;
 
-      const dst = copy[obj] = {};
+      const dst: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(src)) {
         if (v instanceof Extent) {
           dst[k] = new Extent(v);
@@ -82,10 +94,15 @@ export class Geometry {
         /* c8 ignore end */
         }
       }
+      if (obj === 'orig') {
+        copy.orig = dst as unknown as GeometryOrigData;
+      } else {
+        copy.world = dst as unknown as GeometryWorldData;
+      }
     }
 
     for (const part of this.parts) {
-      copy.parts.push(part.clone(this.context));
+      copy.parts.push(part.clone());
     }
 
     return copy;
@@ -98,12 +115,12 @@ export class Geometry {
    * It will automatically break multitypes and collections into parts
    *  and create separate GeometryPart elements for each part.
    * If there is any existing data, it is first removed.
-   * @param  {Object}  geojson - source GeoJSON data
+   * @param  geojson - source GeoJSON data
    */
-  setData(geojson = {}) {
+  setData(geojson: Partial<GeoJSONObject> = {}): void {
     this.reset();
 
-    const geojsonParts = this._geojsonToParts(geojson);
+    const geojsonParts = this._geojsonToParts(geojson as GeoJSONObject);
     if (!geojsonParts.length) return; // do nothing if we found no usable parts
 
     const origExtent = new Extent();
@@ -111,7 +128,7 @@ export class Geometry {
     let isValid = false;
 
     for (const geojsonPart of geojsonParts) {
-      const part = new GeometryPart(this.context);
+      const part = new GeometryPart(this.context!);
       part.setData(geojsonPart);
       if (!part.orig || !part.world) continue;  // if the GeometryPart was invalid, skip it
 
@@ -132,45 +149,49 @@ export class Geometry {
    * _geojsonToParts
    * Break arbitrary GeoJSON into Geometry parts.
    * This will recurse down through the collection types if needed.
-   * @param   {Object?}         geojson - source GeoJSON data
-   * @param   {Array<Object>}   parts - collected GeoJSON single geometry parts (Point, LineString, or Polygon)
-   * @param   {number}          depth - recursion depth
-   * @return  {Array<Object>}   An array of singular GeoJSON geometries
+   * @param   geojson - source GeoJSON data
+   * @param   parts - collected GeoJSON single geometry parts (Point, LineString, or Polygon)
+   * @param   depth - recursion depth
+   * @return  An array of singular GeoJSON geometries
    */
-  _geojsonToParts(geojson, parts = [], depth = 0) {
+  private _geojsonToParts(
+    geojson: GeoJSONObject | undefined,
+    parts: SingularGeometry[] = [],
+    depth: number = 0
+  ): SingularGeometry[] {
     if (!geojson?.type) return parts;
     if (depth > 4) return parts;  // limit recursion
 
     if (geojson.type === 'Feature') {
-      this._geojsonToParts(geojson.geometry, parts, depth + 1);
+      this._geojsonToParts(geojson.geometry as GeoJSONObject | undefined, parts, depth + 1);
 
     } else if (geojson.type === 'FeatureCollection') {
-      for (const feature of (geojson.features || [])) {
-        this._geojsonToParts(feature, parts, depth + 1);
+      for (const feature of (geojson.features ?? [])) {
+        this._geojsonToParts(feature as GeoJSONObject, parts, depth + 1);
       }
 
     } else if (geojson.type === 'GeometryCollection') {
-      for (const geometry of (geojson.geometries || [])) {
-        this._geojsonToParts(geometry, parts, depth + 1);
+      for (const geometry of (geojson.geometries ?? [])) {
+        this._geojsonToParts(geometry as GeoJSONObject, parts, depth + 1);
       }
 
     } else if (geojson.type === 'MultiPoint') {
-      for (const coords of (geojson.coordinates || [])) {
+      for (const coords of (geojson.coordinates ?? [])) {
         parts.push({ type: 'Point', coordinates: coords });
       }
 
     } else if (geojson.type === 'MultiLineString') {
-      for (const coords of (geojson.coordinates || [])) {
+      for (const coords of (geojson.coordinates ?? [])) {
         parts.push({ type: 'LineString', coordinates: coords });
       }
 
     } else if (geojson.type === 'MultiPolygon') {
-      for (const coords of (geojson.coordinates || [])) {
+      for (const coords of (geojson.coordinates ?? [])) {
         parts.push({ type: 'Polygon', coordinates: coords });
       }
 
     } else if (/^(Point|LineString|Polygon)$/.test(geojson.type)) {
-      parts.push(geojson);  // singular geometry parts are what we want
+      parts.push(geojson as SingularGeometry);  // singular geometry parts are what we want
     }
 
     return parts;

@@ -4,7 +4,7 @@
  * @module
  */
 
-import type { Geometry } from '../lib/Geometry.js';
+import type { Geometry } from '../lib/Geometry.ts';
 
 
 /** 2D vector as [x, y], typically [longitude, latitude] in WGS84 for geographic coordinates */

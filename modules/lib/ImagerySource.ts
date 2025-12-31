@@ -1,8 +1,4 @@
-// @types/d3-geo incorrectly types geoMercatorRaw as a factory function,
-// but it's actually directly callable with (lambda, phi) returning [x, y].
-import { geoArea as d3_geoArea, geoMercatorRaw as _geoMercatorRaw } from 'd3-geo';
-const d3_geoMercatorRaw = _geoMercatorRaw as unknown as (lambda: number, phi: number) => [number, number];
-
+import { geoArea as d3_geoArea, geoMercatorRaw as d3_geoMercatorRaw } from 'd3-geo';
 import { DEG2RAD, RAD2DEG, TAU, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rapid-sdk/util';
 

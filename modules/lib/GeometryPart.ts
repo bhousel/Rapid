@@ -2,6 +2,19 @@ import { Extent, geomGetSmallestSurroundingRectangle, vecInterp } from '@rapid-s
 import { polygonArea, polygonCentroid, polygonHull } from 'd3-polygon';
 import polylabel from '@mapbox/polylabel';
 
+import type {
+  Context,
+  GeometryPartOrigData,
+  GeometryPartWorldData,
+  SingularGeometry,
+  SingularGeometryType,
+  SSRData,
+  Vec2
+} from './types.ts';
+
+// Re-export for convenience
+export type { SingularGeometry, SingularGeometryType };
+
 
 /**
  * GeometryPart
@@ -26,14 +39,22 @@ import polylabel from '@mapbox/polylabel';
  *   `world.ssr`      Projected smallest surrounding rectangle data (angle, poly)
  */
 export class GeometryPart {
+  context: Context | null;
+
+  /** Original data, in WGS84 coordinates ([0,0] is Null Island) */
+  orig: GeometryPartOrigData | null;
+
+  /** Projected data, in world coordinates ([0,0] is the top left corner of a 256x256 Web Mercator world) */
+  world: GeometryPartWorldData | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     this.context = context;
-    this.reset();
+    this.orig = null;
+    this.world = null;
   }
 
 
@@ -42,7 +63,7 @@ export class GeometryPart {
    * Release memory.
    * Do not use the geometry part after calling `destroy()`.
    */
-  destroy() {
+  destroy(): void {
     this.reset();
     this.context = null;
   }
@@ -52,13 +73,8 @@ export class GeometryPart {
    * reset
    * Remove all stored data
    */
-  reset() {
-    // Original data, in WGS84 coordinates
-    // ([0,0] is Null Island)
+  reset(): void {
     this.orig = null;
-
-    // Projected data, in world coordinates
-    // ([0,0] is the top left corner of a 256x256 Web Mercator world)
     this.world = null;
   }
 
@@ -66,22 +82,27 @@ export class GeometryPart {
   /**
    * clone
    * Returns a clone of this GeometryPart object
-   * @return  {GeometryPart}  A new GeometryPart
+   * @return  A new GeometryPart
    */
-  clone() {
-    const copy = new GeometryPart(this.context);
+  clone(): GeometryPart {
+    const copy = new GeometryPart(this.context!);
 
-    for (const obj of ['orig', 'world']) {
+    for (const obj of ['orig', 'world'] as const) {
       const src = this[obj];
       if (!src) continue;
 
-      const dst = copy[obj] = {};
+      const dst: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(src)) {
         if (v instanceof Extent) {
           dst[k] = new Extent(v);
         } else {
           dst[k] = globalThis.structuredClone(v);
         }
+      }
+      if (obj === 'orig') {
+        copy.orig = dst as unknown as GeometryPartOrigData;
+      } else {
+        copy.world = dst as unknown as GeometryPartWorldData;
       }
     }
 
@@ -92,10 +113,10 @@ export class GeometryPart {
   /**
    * type
    * The original data format is GeoJSON, this is just a convenience getter.
-   * @return  {string}  One of 'Point', 'LineString', 'Polygon'
+   * @return  One of 'Point', 'LineString', 'Polygon'
    * @readonly
    */
-  get type() {
+  get type(): SingularGeometryType | undefined {
     return this.orig?.geojson?.type;
   }
 
@@ -104,30 +125,34 @@ export class GeometryPart {
    * setData
    * This setter accepts singular GeoJSON Geometries only:  'Point', 'LineString', and 'Polygon'
    * If there is any existing data, it is first removed.
-   * @param  {Object}  geojson - GeoJSON geometry data
+   * @param  geojson - GeoJSON geometry data
    */
-  setData(geojson = {}) {
+  setData(geojson: Partial<SingularGeometry> = {}): void {
     this.reset();
 
     const type = geojson.type;
     const coords = geojson.coordinates;
-    if (!(/^(Point|LineString|Polygon)$/.test(type)) || !coords) return;  // do nothing
+    if (!(/^(Point|LineString|Polygon)$/.test(type ?? '')) || !coords) return;  // do nothing
 
-    const orig = this.orig = {};
-    orig.geojson = globalThis.structuredClone(geojson);
+    const orig: GeometryPartOrigData = {
+      geojson: globalThis.structuredClone(geojson) as SingularGeometry,
+      coords: undefined as unknown as Vec2 | Vec2[] | Vec2[][],
+      extent: undefined as unknown as Extent
+    };
     orig.coords = orig.geojson.coordinates;
 
     // Determine extent (bounds)
     if (type === 'Point') {
-      orig.extent = new Extent(coords);
+      orig.extent = new Extent(coords as Vec2);
     } else {
       orig.extent = new Extent();
-      const outer = (type === 'LineString') ? coords : coords[0];  // outer only
+      const outer = (type === 'LineString') ? coords as Vec2[] : (coords as Vec2[][])[0];  // outer only
       for (const loc of outer) {
         orig.extent.extendSelf(loc);
       }
     }
 
+    this.orig = orig;
     this.updateWorld();
   }
 
@@ -136,95 +161,99 @@ export class GeometryPart {
    * updateWorld
    * This projects original source data in WGS84 coordinates.
    */
-  updateWorld() {
+  updateWorld(): void {
     if (!this.orig || this.world) return;  // can't do it, or done already
 
-    const viewport = this.context.viewport;
+    const viewport = this.context!.viewport;
     const origCoords = this.orig.coords;
     const type = this.type;
 
-    // Reset all projected properties
-    const world = this.world = {};
-
     // Points are simple, just project once.
     if (type === 'Point') {
-      world.coords = viewport.wgs84ToWorld(origCoords);
-      world.extent = new Extent(world.coords);
-      world.centroid = world.coords;
-      world.poi = world.coords;
+      const coords = viewport.wgs84ToWorld(origCoords as Vec2) as Vec2;
+      this.world = {
+        coords,
+        extent: new Extent(coords),
+        centroid: coords,
+        poi: coords
+      };
       return;
     }
 
     // A line or a polygon.
     // Project the coordinate data..
     // Preallocate Arrays to avoid garbage collection formerly caused by excessive Array.push()
-    world.extent = new Extent();
-    const origRings = (type === 'LineString') ? [origCoords] : origCoords;
-    const projRings = new Array(origRings.length);
+    const worldExtent = new Extent();
+    const origRings = (type === 'LineString') ? [origCoords as Vec2[]] : origCoords as Vec2[][];
+    const projRings: Vec2[][] = new Array(origRings.length);
 
     for (let i = 0; i < origRings.length; i++) {
       const origRing = origRings[i];
       projRings[i] = new Array(origRing.length);
 
       for (let j = 0; j < origRing.length; j++) {
-        const xy = viewport.wgs84ToWorld(origRing[j]);
+        const xy = viewport.wgs84ToWorld(origRing[j]) as Vec2;
         projRings[i][j] = xy;
 
         if (i === 0) {  // the outer ring
-          world.extent.extendSelf(xy);
+          worldExtent.extendSelf(xy);
         }
       }
     }
 
-    if (type === 'LineString') {
-      world.coords = projRings[0];
-      world.outer = projRings[0];
-    } else {   // Polygon
-      world.coords = projRings;
-      world.outer = projRings[0];
-    }
+    const world: GeometryPartWorldData = {
+      coords: (type === 'LineString') ? projRings[0] : projRings,
+      extent: worldExtent,
+      outer: projRings[0]
+    };
 
     // Calculate hull, centroid, poi, ssr if possible
-    if (world.outer.length === 0) {          // no coordinates? - shouldn't happen
+    if (world.outer!.length === 0) {          // no coordinates? - shouldn't happen
       // no-op
 
-    } else if (world.outer.length === 1) {   // single coordinate? - wrong but can happen
-      world.centroid = world.outer[0];
+    } else if (world.outer!.length === 1) {   // single coordinate? - wrong but can happen
+      world.centroid = world.outer![0];
       world.poi = world.centroid;
 
-    } else if (world.outer.length === 2) {   // 2 coordinate line
-      world.centroid = vecInterp(world.outer[0], world.outer[1], 0.5);  // average the 2 points
+    } else if (world.outer!.length === 2) {   // 2 coordinate line
+      world.centroid = vecInterp(world.outer![0], world.outer![1], 0.5) as Vec2;  // average the 2 points
       world.poi = world.centroid;
 
     } else {   // > 2 coordinates...
 
       // check area/winding?
-      world.area = polygonArea(world.outer);
+      world.area = polygonArea(world.outer!);
       // if (world.area < 0) {
       //   world.area *= -1;
       //   world.outer.reverse();
       // }
 
       // Convex Hull
-      world.hull = polygonHull(world.outer);
+      world.hull = polygonHull(world.outer!) as Vec2[] | undefined;
 
       // Centroid
-      if (world.hull.length === 2) {
-        world.centroid = vecInterp(world.hull[0], world.hull[1], 0.5);  // average the 2 points
-      } else {
-        world.centroid = polygonCentroid(world.hull);
+      if (world.hull) {
+        if (world.hull.length === 2) {
+          world.centroid = vecInterp(world.hull[0], world.hull[1], 0.5) as Vec2;  // average the 2 points
+        } else {
+          world.centroid = polygonCentroid(world.hull) as Vec2;
+        }
       }
 
       // Pole of Inaccessability (for polygons)
       if (type === 'LineString') {
         world.poi = world.centroid;
       } else {
-        world.poi = polylabel(world.coords);   // it expects outer + rings
+        world.poi = polylabel(world.coords as Vec2[][]) as Vec2;   // it expects outer + rings
       }
 
       // Smallest Surrounding Rectangle
-      world.ssr = geomGetSmallestSurroundingRectangle(world.hull);
+      if (world.hull) {
+        world.ssr = geomGetSmallestSurroundingRectangle(world.hull) as SSRData;
+      }
     }
+
+    this.world = world;
   }
 
 }

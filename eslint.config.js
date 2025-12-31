@@ -95,7 +95,7 @@ const rules = {
     "@typescript-eslint/array-type": "off",
     "@typescript-eslint/class-literal-property-style": "off",
     "@typescript-eslint/no-empty-function": "off",
-    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-inferrable-types": ["warn", { "ignoreParameters": true }],
     "@typescript-eslint/no-this-alias": "warn",
     "@typescript-eslint/no-unused-vars": ["warn", { "vars": "all", "args": "none", "varsIgnorePattern": "^_", "caughtErrors": "none"  }]
