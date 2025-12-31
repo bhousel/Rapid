@@ -4,7 +4,7 @@ export * from './Edit.ts';
 export * from './Field.ts';
 export * from './Geometry.ts';
 export * from './GeometryPart.ts';
-export * from './Graph.js';
+export * from './Graph.ts';
 export * from './ImagerySource.ts';
 export * from './intersection.ts';
 export * from './lanes.ts';

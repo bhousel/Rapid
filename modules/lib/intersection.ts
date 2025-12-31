@@ -4,7 +4,7 @@ import { utilArrayDifference, utilArrayUniq } from '@rapid-sdk/util';
 import { actionDeleteRelation } from '../actions/delete_relation.js';
 import { actionReverse } from '../actions/reverse.js';
 import { actionSplit } from '../actions/split.js';
-import { Graph } from './Graph.js';
+import { Graph } from './Graph.ts';
 
 import type { Context, Entity, EntityID, NodeEntity, WayEntity, Vec2 } from './types.ts';
 

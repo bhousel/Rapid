@@ -180,6 +180,12 @@ export interface WayEntity extends Entity {
    * @return A new way with updated values
    */
   update(updates: Record<string, unknown>): WayEntity;
+
+  /**
+   * Update the geometry for this way based on the current graph.
+   * @param graph - The graph to use for node positions
+   */
+  updateGeometry(graph: unknown): void;
 }
 
 
@@ -206,4 +212,10 @@ export interface RelationEntity extends Entity {
 
   /** Array of relation members */
   members: RelationMember[];
+
+  /**
+   * Update the geometry for this relation based on the current graph.
+   * @param graph - The graph to use for member positions
+   */
+  updateGeometry(graph: unknown): void;
 }

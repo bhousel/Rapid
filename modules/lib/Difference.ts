@@ -1,7 +1,7 @@
 import deepEqual from 'fast-deep-equal';
 
 import type { DifferenceChange, DifferenceFlags, Entity, EntityID, RelationMember, WayEntity, RelationEntity } from './types.ts';
-import type { Graph } from './Graph.js';
+import type { Graph } from './Graph.ts';
 
 
 /**
@@ -81,14 +81,14 @@ export class Difference {
 
       if (h && b) {
         if (type === 'relation') {
-          if (!deepEqual(h.members, b.members)) {
+          if (!deepEqual((h as RelationEntity).members, (b as RelationEntity).members)) {
             this._changes.set(id, { base: b, head: h });
             this.didChange.geometry = true;
             this.didChange.properties = true;
             continue;
           }
         } else if (type === 'way') {
-          if (!deepEqual(h.nodes, b.nodes)) {
+          if (!deepEqual((h as WayEntity).nodes, (b as WayEntity).nodes)) {
             this._changes.set(id, { base: b, head: h });
             this.didChange.geometry = true;
           }
