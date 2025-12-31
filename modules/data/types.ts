@@ -79,6 +79,47 @@ export interface Entity extends DataElement {
    * @return True if this is a multipolygon relation
    */
   isMultipolygon(): boolean;
+
+  /**
+   * Check if this entity is a turn restriction relation.
+   * @return True if this is a restriction relation
+   */
+  isRestriction(): boolean;
+
+  /**
+   * Check if this restriction relation is valid.
+   * @param graph - The graph to validate against
+   * @return True if the restriction is valid
+   */
+  isValidRestriction(graph: unknown): boolean;
+
+  /**
+   * Check if all members of this entity are present in the graph.
+   * @param graph - The graph to check
+   * @return True if the entity is complete
+   */
+  isComplete(graph: unknown): boolean;
+
+  /**
+   * Get a relation member by role.
+   * @param role - The role to search for
+   * @return The member with that role, or undefined
+   */
+  memberByRole(role: string): RelationMember | undefined;
+
+  /**
+   * Get all relation members with a given role.
+   * @param role - The role to search for
+   * @return Array of members with that role
+   */
+  membersByRole(role: string): RelationMember[];
+
+  /**
+   * Create a copy of this entity with updated properties.
+   * @param updates - Properties to update
+   * @return A new entity with updated values
+   */
+  update(updates: Record<string, unknown>): Entity;
 }
 
 
@@ -108,6 +149,37 @@ export interface WayEntity extends Entity {
    * @return True if the way is oneway
    */
   isOneWay(): boolean;
+
+  /**
+   * Check if this way forms an area (closed polygon).
+   * @return True if the way is an area
+   */
+  isArea(): boolean;
+
+  /**
+   * Check if this way is degenerate (too few nodes).
+   * @return True if the way is degenerate
+   */
+  isDegenerate(): boolean;
+
+  /**
+   * Get the first node ID of this way.
+   * @return The first node ID
+   */
+  first(): EntityID;
+
+  /**
+   * Get the last node ID of this way.
+   * @return The last node ID
+   */
+  last(): EntityID;
+
+  /**
+   * Create a copy of this way with updated properties.
+   * @param updates - Properties to update
+   * @return A new way with updated values
+   */
+  update(updates: Record<string, unknown>): WayEntity;
 }
 
 

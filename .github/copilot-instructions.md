@@ -96,6 +96,19 @@ export class Category {
 - **4-space indent** indicates legacy code that hasn't been touched in a while
 - When converting a file to TypeScript, also update to 2-space indent
 
+### Variable Declarations
+- Put each variable declaration on its own line
+- This makes types easier to read, especially for complex types
+- Example - prefer this:
+  ```typescript
+  let leaf: WayEntity | undefined;
+  let survivor: WayEntity | undefined;
+  ```
+  Over this:
+  ```typescript
+  let leaf: WayEntity | undefined, survivor: WayEntity | undefined;
+  ```
+
 ### Type Declarations
 - **Module augmentations** (fixing incorrect external types): Add to `global.d.ts` with `export {}`
 - **Ambient module declarations** (no @types package available): Add to `modules/types/*.d.ts` without export

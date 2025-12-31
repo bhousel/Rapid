@@ -120,6 +120,9 @@ export interface Context extends EventEmitter {
   /** Whether the app is in the intro walkthrough */
   inIntro: boolean;
 
+  /** Sequence counters for generating unique IDs */
+  sequences: Record<string, number>;
+
   /**
    * Generate a unique sequential ID with the given prefix.
    * @param prefix - The prefix for the ID (e.g. 'graph', 'node')
