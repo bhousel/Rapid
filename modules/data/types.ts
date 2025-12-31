@@ -101,6 +101,13 @@ export interface WayEntity extends Entity {
 
   /** Ordered array of node IDs that make up this way */
   nodes: EntityID[];
+
+  /**
+   * Check if this way is a oneway street.
+   * Based on explicit oneway tags or implied from other tags.
+   * @return True if the way is oneway
+   */
+  isOneWay(): boolean;
 }
 
 

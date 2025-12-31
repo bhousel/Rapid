@@ -7,7 +7,7 @@ export * from './GeometryPart.ts';
 export * from './Graph.js';
 export * from './ImagerySource.ts';
 export * from './intersection.js';
-export * from './lanes.js';
+export * from './lanes.ts';
 export * from './multipolygon.js';
 export * from './Preset.ts';
 export * from './RapidDataset.ts';

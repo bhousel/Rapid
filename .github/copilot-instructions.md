@@ -91,6 +91,16 @@ export class Category {
   ```
 - The `tsconfig.json` has `allowImportingTsExtensions: true` to support this
 
+### Indentation
+- **2-space indent** is the modern standard
+- **4-space indent** indicates legacy code that hasn't been touched in a while
+- When converting a file to TypeScript, also update to 2-space indent
+
+### Type Declarations
+- **Module augmentations** (fixing incorrect external types): Add to `global.d.ts` with `export {}`
+- **Ambient module declarations** (no @types package available): Add to `modules/types/*.d.ts` without export
+- Example: `global.d.ts` has the fix for `d3-geo`'s `geoMercatorRaw` return type
+
 ## Testing
 
 After making changes:
