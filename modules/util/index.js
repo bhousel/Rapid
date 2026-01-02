@@ -3,7 +3,7 @@ export * from './date.ts';
 export * from './detect.js';
 export * from './dimensions.ts';
 export * from './fetch_response.ts';
-export * from './get_set_value.js';
+export * from './get_set_value.ts';
 export * from './iterable.ts';
 export * from './keybinding.js';
 export * from './rebind.ts';
