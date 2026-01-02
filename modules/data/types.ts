@@ -120,6 +120,13 @@ export interface Entity extends DataElement {
    * @return A new entity with updated values
    */
   update(updates: Record<string, unknown>): Entity;
+
+  /**
+   * Get the bounding extent of this entity.
+   * @param graph - The graph to use for determining extent
+   * @return The bounding Extent of this entity
+   */
+  extent(graph: unknown): unknown;
 }
 
 

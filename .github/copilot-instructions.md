@@ -23,6 +23,7 @@ Rapid is an AI-enhanced editor for OpenStreetMap, built with JavaScript/TypeScri
 - Use ES module syntax (`import`/`export`)
 - Prefer `??` (nullish coalescing) over `||` for defaults
 - Use `?.` (optional chaining) for safe property access
+- **No trailing whitespace** - ensure lines don't end with spaces or tabs
 
 ## TypeScript Patterns
 
@@ -128,6 +129,21 @@ export class Category {
 - **Module augmentations** (fixing incorrect external types): Add to `global.d.ts` with `export {}`
 - **Ambient module declarations** (no @types package available): Add to `modules/types/*.d.ts` without export
 - Example: `global.d.ts` has the fix for `d3-geo`'s `geoMercatorRaw` return type
+
+### Working with Untyped Systems
+- It's OK to assert `as any` for parts of the codebase that haven't been converted to TypeScript yet
+- This is especially common for `context.systems.*` which are typed as `System | undefined`
+- Cast upfront, then use optional chaining throughout:
+  ```typescript
+  const gfx = context.systems.gfx as any;
+  const editor = context.systems.editor as any;
+
+  // Then use optional chaining for safe access
+  gfx?.immediateRedraw();
+  const graph = editor?.staging?.graph;
+  ```
+- This pattern keeps code readable while allowing gradual TypeScript adoption
+- As systems get properly typed, these `as any` casts can be removed
 
 ## Testing
 

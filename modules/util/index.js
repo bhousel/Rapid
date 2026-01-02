@@ -8,4 +8,4 @@ export * from './iterable.ts';
 export * from './keybinding.js';
 export * from './rebind.ts';
 export * from './string.ts';
-export * from './util.js';
+export * from './util.ts';
