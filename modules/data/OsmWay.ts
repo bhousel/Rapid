@@ -1,14 +1,39 @@
 import { Extent, vecCross } from '@rapid-sdk/math';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
-import { OsmEntity } from './OsmEntity.js';
+import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmLanes } from '../lib/lanes.ts';
 import { osmTagSuggestingArea, osmOneWayTags, osmRightSideIsInsideTags, osmRemoveLifecyclePrefix } from '../lib/tags.ts';
+import type { Context } from '../core/types.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { GeoJSONFeature, GeoJSONGeometry } from '../lib/types.ts';
+import type { EntityID, Vec2 } from './types.ts';
 
 
 // Filter function to eliminate consecutive duplicates.
-function noRepeatNodes(node, i, arr) {
+function noRepeatNodes(node: EntityID, i: number, arr: EntityID[]): boolean {
   return i === 0 || node !== arr[i - 1];
+}
+
+
+/**
+ * Properties for OsmWay data elements.
+ */
+export interface OsmWayProps extends OsmEntityProps {
+  /** Ordered array of node IDs that make up this way */
+  nodes: EntityID[];
+}
+
+
+/**
+ * Segment data for a way.
+ */
+export interface Segment {
+  id: string;
+  wayId: string;
+  index: number;
+  nodes: [EntityID, EntityID];
+  extent: (graph: Graph) => Extent | false;
 }
 
 
@@ -28,11 +53,11 @@ export class OsmWay extends OsmEntity {
    * @constructor
    * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
-   * @param  {Object}                props  - Properties to assign to the data element
+   * @param otherOrContext - copy another data element, or pass application context
+   * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext, props = {}) {
-    super(otherOrContext, props);
+  constructor(otherOrContext: OsmWay | Context, props: Partial<OsmWayProps> = {}) {
+    super(otherOrContext as any, props);
     this.props.type = 'way';
 
     if (!this.props.id) {  // no ID provided - generate one
@@ -42,8 +67,8 @@ export class OsmWay extends OsmEntity {
     // For consistency, offer a `this.id` property.
     this.id = this.props.id;
 
-    if (!this.props.nodes) {
-      this.props.nodes = [];
+    if (!(this.props as OsmWayProps).nodes) {
+      (this.props as OsmWayProps).nodes = [];
     }
   }
 
@@ -52,24 +77,24 @@ export class OsmWay extends OsmEntity {
    * get/set the nodes property
    * @readonly
    */
-  get nodes() {
-    return this.props.nodes;
+  get nodes(): EntityID[] {
+    return (this.props as OsmWayProps).nodes;
   }
 
   /**
    * asGeoJSON
    * Returns a GeoJSON representation of the OsmWay.
    * Ways are represented by a Feature with either LineString or a Polygon geometry.
-   * @param   {Graph}   graph - the Graph that holds the topology needed
-   * @return  {Object}  GeoJSON representation of the OsmWay
+   * @param graph - the Graph that holds the topology needed
+   * @return GeoJSON representation of the OsmWay
    */
-  asGeoJSON(graph) {
+  asGeoJSON(graph: Graph): GeoJSONFeature {
     return this.transient('geojson', () => {
 
-      let geometry = null;
-      const coords = [];
+      let geometry: GeoJSONGeometry | null = null;
+      const coords: Vec2[] = [];
       for (const nodeID of this.nodes) {
-        const node = graph.hasEntity(nodeID);
+        const node = graph.hasEntity(nodeID) as any;
         if (node?.loc) {
           coords.push(node.loc);
         }
@@ -94,7 +119,7 @@ export class OsmWay extends OsmEntity {
         id: this.id,
         properties: this.tags,
         geometry: geometry
-      };
+      } as GeoJSONFeature;
 
     });
   }
@@ -104,11 +129,11 @@ export class OsmWay extends OsmEntity {
    * asJXON
    * Returns a JXON representation of the OsmWay.
    * For OSM Entities, this is used to prepare an OSM changeset XML.
-   * @param   {string}  changesetID - optional changeset ID to include in the output
-   * @return  {Object}  JXON representation of the OsmWay
+   * @param changesetID - optional changeset ID to include in the output
+   * @return JXON representation of the OsmWay
    */
-  asJXON(changesetID) {
-    const result = {
+  asJXON(changesetID?: string): Record<string, unknown> {
+    const result: any = {
       way: {
         '@id': this.osmId(),
         '@version': this.props.version || 0,
@@ -133,27 +158,27 @@ export class OsmWay extends OsmEntity {
    * Copied entities will start out with a fresh `id` and cleared out metadata.
    * This is like the sort of copy you would want when copy-pasting a feature.
    * When completed, the `memo` argument will contain all the copied data elements.
-   * @param   {Graph}   fromGraph - The Graph that owns the source object (needed for some data types)
-   * @param   {Object}  memo      - An Object to store seen copies (to prevent circular/infinite copying)
-   * @return  {OsmWay}  a copy of this OsmWay
+   * @param fromGraph - The Graph that owns the source object (needed for some data types)
+   * @param memo - An Object to store seen copies (to prevent circular/infinite copying)
+   * @return a copy of this OsmWay
    */
-  copy(fromGraph, memo = {}) {
+  copy(fromGraph: Graph, memo: Record<string, OsmEntity> = {}): OsmWay {
     if (memo[this.id]) {
-      return memo[this.id];
+      return memo[this.id] as OsmWay;
     }
 
     // copy self
-    const copy = new OsmWay(this, { id: undefined, user: undefined, version: undefined, v: undefined });
+    const copy = new OsmWay(this, { id: undefined, user: undefined, version: undefined, v: undefined } as any);
     memo[this.id] = copy;
 
     // copy nodes too
-    const nodes = [];
+    const nodes: EntityID[] = [];
     for (const nodeID of this.nodes) {
-      const source = fromGraph.entity(nodeID);
+      const source = fromGraph.entity(nodeID) as any;
       const result = source.copy(fromGraph, memo);
       nodes.push(result.id);
     }
-    copy.props.nodes = nodes;
+    (copy.props as OsmWayProps).nodes = nodes;
     return copy;
   }
 
@@ -161,28 +186,28 @@ export class OsmWay extends OsmEntity {
   /**
    * first
    * Returns the first nodeID in the node list.
-   * @return  {string}  The first nodeID in the node list, or `undefined` if no nodes.
+   * @return The first nodeID in the node list, or `undefined` if no nodes.
    */
-  first() {
+  first(): EntityID | undefined {
     return this.nodes.at(0);
   }
 
   /**
    * last
    * Returns the last nodeID in the node list.
-   * @return  {string}  The last nodeID in the node list, or `undefined` if no nodes.
+   * @return The last nodeID in the node list, or `undefined` if no nodes.
    */
-  last() {
+  last(): EntityID | undefined {
     return this.nodes.at(-1);
   }
 
   /**
    * contains
    * Returns true if the node list contains the given nodeID.
-   * @param   {string}   The nodeID to check
-   * @return  {boolean}  `true` if the nodeID is in the node list, `false` if not.
+   * @param nodeID - The nodeID to check
+   * @return `true` if the nodeID is in the node list, `false` if not.
    */
-  contains(nodeID) {
+  contains(nodeID: EntityID): boolean {
     return this.nodes.includes(nodeID);
   }
 
@@ -190,10 +215,10 @@ export class OsmWay extends OsmEntity {
    * affix
    * Returns 'prefix' or if the given nodeID is at the beginning the node list
    *  or 'suffix' if the given nodeID is at the end of the node list.
-   * @param   {string}   The nodeID to check
-   * @return  {string}  'prefix', 'suffix' or `undefined`
+   * @param nodeID - The nodeID to check
+   * @return 'prefix', 'suffix' or `undefined`
    */
-  affix(nodeID) {
+  affix(nodeID: EntityID): 'prefix' | 'suffix' | undefined {
     if (this.nodes.at(0) === nodeID) return 'prefix';
     if (this.nodes.at(-1) === nodeID) return 'suffix';
   }
@@ -203,12 +228,12 @@ export class OsmWay extends OsmEntity {
    * Returns a numeric layer for this way, given the tags present.
    * '0' is considered "ground level", negative numbers are underground and positive numbers are aboveground.
    * The numbers are currently clamped in the range of [-10..10].
-   * @return  {number}  A number that can be used for rendering layer
+   * @return A number that can be used for rendering layer
    */
-  layer() {
+  layer(): number {
 // TODO - we should stop doing this, it's a holdover from when iD used SVG groups for this.
     // explicit layer tag, clamp between -10, 10..
-    if (isFinite(this.tags.layer)) {
+    if (isFinite(+(this.tags.layer))) {
       return Math.max(-10, Math.min(+(this.tags.layer), 10));
     }
 
@@ -234,10 +259,10 @@ export class OsmWay extends OsmEntity {
    * impliedLineWidthMeters
    * Returns the approximate width of the line, given the tags present.
    * (This does not look for an actual `width` tag, it looks at other tags to imply a width.)
-   * @return  {number}  A number that can be used for the width, in meters
+   * @return A number that can be used for the width, in meters
    */
-  impliedLineWidthMeters() {
-    const averageWidths = {
+  impliedLineWidthMeters(): number | null {
+    const averageWidths: Record<string, Record<string, number>> = {
       highway: { // width is for single lane
         motorway: 5, motorway_link: 5, trunk: 4.5, trunk_link: 4.5,
         primary: 4, secondary: 4, tertiary: 4,
@@ -258,7 +283,7 @@ export class OsmWay extends OsmEntity {
 
     for (const [k, group] of Object.entries(averageWidths)) {
       const v = this.tags[k];
-      let width = v && group[v];
+      const width = v && group[v];
       if (width) {
         if (k === 'highway') {
           let laneCount = this.tags.lanes && parseInt(this.tags.lanes, 10);
@@ -276,11 +301,11 @@ export class OsmWay extends OsmEntity {
   /**
    * isOneWay
    * Returns whether a line is oneway, given the tags present.
-   * @return  {boolean}  `true` if the tags suggest that this is a oneway, `false` if not.
+   * @return `true` if the tags suggest that this is a oneway, `false` if not.
    */
-  isOneWay() {
+  isOneWay(): boolean {
     // explicit oneway tag..
-    const values = {
+    const values: Record<string, boolean> = {
       'yes': true,
       '1': true,
       '-1': true,
@@ -294,9 +319,9 @@ export class OsmWay extends OsmEntity {
     }
 
     // implied oneway tag..
-    for (var key in this.tags) {
+    for (const key in this.tags) {
       if (key in osmOneWayTags &&
-        (this.tags[key] in osmOneWayTags[key])) {
+        (this.tags[key] in (osmOneWayTags as any)[key])) {
         return true;
       }
     }
@@ -308,19 +333,19 @@ export class OsmWay extends OsmEntity {
    * Returns some identifier for tag that implies that this way is "sided",
    *  i.e. the right side is the 'inside' (e.g. the right side of a
    *   natural=cliff is lower).
-   * @return  {string}  The tag that indicates the sidedness
+   * @return The tag that indicates the sidedness
    */
-  sidednessIdentifier() {
+  sidednessIdentifier(): string | null {
     for (const realKey in this.tags) {
       const value = this.tags[realKey];
       const key = osmRemoveLifecyclePrefix(realKey);
-      if (key in osmRightSideIsInsideTags && (value in osmRightSideIsInsideTags[key])) {
-        if (osmRightSideIsInsideTags[key][value] === true) {
+      if (key in osmRightSideIsInsideTags && (value in (osmRightSideIsInsideTags as any)[key])) {
+        if ((osmRightSideIsInsideTags as any)[key][value] === true) {
           return key;
         } else {
           // if the value is something other than a literal true, we should use it so we can
           // special case some keys (e.g. natural=coastline is handled differently to other naturals).
-          return osmRightSideIsInsideTags[key][value];
+          return (osmRightSideIsInsideTags as any)[key][value];
         }
       }
     }
@@ -331,9 +356,9 @@ export class OsmWay extends OsmEntity {
   /**
    * isSided
    * Returns whether a line sided, given the tags present.
-   * @return  {boolean}  `true` if the tags suggest that the line is sided, `false` if not.
+   * @return `true` if the tags suggest that the line is sided, `false` if not.
    */
-  isSided() {
+  isSided(): boolean {
     if (this.tags.two_sided === 'yes') {
       return false;
     }
@@ -343,32 +368,32 @@ export class OsmWay extends OsmEntity {
   /**
    * lanes
    * Returns lane information for the given way, given the tags present.
-   * @return  {Object}  An object containing the lane details for this way
+   * @return An object containing the lane details for this way
    */
-  lanes() {
-    return osmLanes(this);
+  lanes(): object | null {
+    return osmLanes(this as any);
   }
 
   /**
    * isClosed
    * A way is "closed" if the first and last nodeID is the same.
-   * @return  {boolean}  `true` if the way is closed, `false` if not
+   * @return `true` if the way is closed, `false` if not
    */
-  isClosed() {
+  isClosed(): boolean {
     return this.nodes.length > 1 && this.first() === this.last();
   }
 
   /**
    * isConvex
    * Checks the node angles to determine if the way is a convex polygon or not.
-   * @param   {Graph}   graph - the Graph that holds the topology needed
-   * @return  {boolean}  `true` if the way is a convex polygon, `false` if concave polygon, `null` if unclosed or degenerate
+   * @param graph - the Graph that holds the topology needed
+   * @return `true` if the way is a convex polygon, `false` if concave polygon, `null` if unclosed or degenerate
    */
-  isConvex(graph) {
+  isConvex(graph: Graph): boolean | null {
     if (!this.isClosed() || this.isDegenerate()) return null;
 
-    const nodes = utilArrayUniq(graph.childNodes(this));
-    const coords = nodes.map(node => node.loc);
+    const nodes = utilArrayUniq(graph.childNodes(this as any));
+    const coords = nodes.map((node: any) => node.loc);
     let curr = 0;
     let prev = 0;
 
@@ -392,18 +417,18 @@ export class OsmWay extends OsmEntity {
   /**
    * tagSuggestingArea
    * Returns an Object with the tag that implies that this way is an area (polygon).
-   * @return  {Object}  The tag that indicates the area
+   * @return The tag that indicates the area
    */
-  tagSuggestingArea() {
-    return osmTagSuggestingArea(this.tags);
+  tagSuggestingArea(): Record<string, string> | null {
+    return osmTagSuggestingArea(this.tags) as Record<string, string> | null;
   }
 
   /**
    * isArea
    * Returns whether this way is a closed area (polygon), given the tags present.
-   * @return  {boolean}  `true` if the tags suggest that the way is an area, `false` if not.
+   * @return `true` if the tags suggest that the way is an area, `false` if not.
    */
-  isArea() {
+  isArea(): boolean {
     if (this.tags.area === 'yes') return true;
     if (!this.isClosed() || this.tags.area === 'no') return false;
     return this.tagSuggestingArea() !== null;
@@ -412,18 +437,18 @@ export class OsmWay extends OsmEntity {
   /**
    * isDegenerate
    * The way is "degenerate" if it is a line with <2 nodes or an area with <3 nodes.
-   * @return  {boolean}  `true` if the way is degenerate, `false` if not.
+   * @return `true` if the way is degenerate, `false` if not.
    */
-  isDegenerate() {
+  isDegenerate(): boolean {
     return (new Set(this.nodes).size < (this.isClosed() ? 3 : 2));
   }
 
   /**
    * isAdjacent
    * Checks whether the given nodeIDs are adjacent in the node list.
-   * @return  {boolean}  `true` if the way is degenerate, `false` if not.
+   * @return `true` if the nodes are adjacent, `false` if not.
    */
-  isAdjacent(n1, n2) {
+  isAdjacent(n1: EntityID, n2: EntityID): boolean {
     for (let i = 0; i < this.nodes.length; i++) {
       if (this.nodes[i] === n1) {
         if (this.nodes[i - 1] === n2) return true;
@@ -436,10 +461,10 @@ export class OsmWay extends OsmEntity {
   /**
    * geometry
    * Returns 'area' if this way is an area (polygon), or 'line' if it is a line.
-   * @param   {Graph}   graph - the Graph that holds the topology needed
-   * @return  {string}  'area' or 'line'
+   * @param graph - the Graph that holds the topology needed
+   * @return 'area' or 'line'
    */
-  geometry(graph) {
+  geometry(graph: Graph): 'area' | 'line' {
     return this.transient('geometry', () => {
       return this.isArea() ? 'area' : 'line';
     });
@@ -448,14 +473,15 @@ export class OsmWay extends OsmEntity {
   /**
    * segments
    * Returns an Array of Objects representing the segments between the nodes in this way
-   * @param   {Graph}          graph - the Graph that holds the topology needed
-   * @return  {Array<Object>}  Array of segment data
+   * @param graph - the Graph that holds the topology needed
+   * @return Array of segment data
    */
-  segments(graph) {
+  segments(graph: Graph): Segment[] {
+    const self = this;
 
-    function segmentExtent(graph) {
-      const n1 = graph.hasEntity(this.nodes[0]);
-      const n2 = graph.hasEntity(this.nodes[1]);
+    function segmentExtent(this: Segment, graph: Graph): Extent | false {
+      const n1 = graph.hasEntity(this.nodes[0]) as any;
+      const n2 = graph.hasEntity(this.nodes[1]) as any;
       return n1 && n2 && new Extent(
         [ Math.min(n1.loc[0], n2.loc[0]), Math.min(n1.loc[1], n2.loc[1]) ],
         [ Math.max(n1.loc[0], n2.loc[0]), Math.max(n1.loc[1], n2.loc[1]) ]
@@ -463,13 +489,13 @@ export class OsmWay extends OsmEntity {
     }
 
     return this.transient('segments', () => {
-      const segments = [];
-      for (let i = 0; i < this.nodes.length - 1; i++) {
+      const segments: Segment[] = [];
+      for (let i = 0; i < self.nodes.length - 1; i++) {
         segments.push({
-          id: this.props.id + '-' + i,
-          wayId: this.props.id,
+          id: self.id + '-' + i,
+          wayId: self.id,
           index: i,
-          nodes: [this.nodes[i], this.nodes[i + 1]],
+          nodes: [self.nodes[i], self.nodes[i + 1]],
           extent: segmentExtent
         });
       }
@@ -480,26 +506,26 @@ export class OsmWay extends OsmEntity {
   /**
    * close
    * If this way is not closed, append the beginning node to the end of the nodelist to close it.
-   * @return  {OsmWay}  This Way, or a new Way that has a closed node list
+   * @return This Way, or a new Way that has a closed node list
    */
-  close() {
+  close(): OsmWay {
     if (this.isClosed() || !this.nodes.length) return this;
 
     let nodes = this.nodes.slice();
     nodes = nodes.filter(noRepeatNodes);
     nodes.push(nodes[0]);
-    return this.update({ nodes: nodes });
+    return this.update({ nodes: nodes } as any) as OsmWay;
   }
 
   /**
    * unclose
    * If this way is closed, remove any connector nodes from the end of the nodelist to unclose it.
-   * @return  {OsmWay}  This Way, or a new Way that has an unclosed node list
+   * @return This Way, or a new Way that has an unclosed node list
    */
-  unclose() {
+  unclose(): OsmWay {
     if (!this.isClosed()) return this;
 
-    const connector = this.first();
+    const connector = this.first()!;
     let nodes = this.nodes.slice();
     let i = nodes.length - 1;
 
@@ -510,7 +536,7 @@ export class OsmWay extends OsmEntity {
     }
 
     nodes = nodes.filter(noRepeatNodes);
-    return this.update({ nodes: nodes });
+    return this.update({ nodes: nodes } as any) as OsmWay;
   }
 
 
@@ -521,15 +547,15 @@ export class OsmWay extends OsmEntity {
    *   or just before the final connecting node for circular ways.
    * Consecutive duplicates are eliminated including existing ones.
    * Circularity is always preserved when adding a node.
-   * @param   {string}  nodeID - the nodeID to add
-   * @param   {number}  index - the index to add the node into the node list
-   * @return  {OsmWay}  A new Way copied from this Way, but with the updated node list
-   * @throws  Will throw if the given index is out of range 0..max
+   * @param nodeID - the nodeID to add
+   * @param index - the index to add the node into the node list
+   * @return A new Way copied from this Way, but with the updated node list
+   * @throws Will throw if the given index is out of range 0..max
    */
-  addNode(nodeID, index) {
-    let isClosed = this.isClosed();
+  addNode(nodeID: EntityID, index?: number): OsmWay {
     let nodes = this.nodes.slice();
-    let max = isClosed ? nodes.length - 1 : nodes.length;
+    const isClosed = this.isClosed();
+    const max = isClosed ? nodes.length - 1 : nodes.length;
 
     if (index === undefined) {
       index = max;
@@ -542,7 +568,7 @@ export class OsmWay extends OsmEntity {
     // If this is a closed way, remove all connector nodes except the first one
     // (there may be duplicates) and adjust index if necessary..
     if (isClosed) {
-      const connector = this.first();
+      const connector = this.first()!;
 
       // leading connectors..
       let i = 1;
@@ -568,7 +594,7 @@ export class OsmWay extends OsmEntity {
       nodes.push(nodes[0]);
     }
 
-    return this.update({ nodes: nodes });
+    return this.update({ nodes: nodes } as any) as OsmWay;
   }
 
 
@@ -577,15 +603,15 @@ export class OsmWay extends OsmEntity {
    * Replaces the node which is currently at the given index with the given nodeID.
    * Consecutive duplicates are eliminated including existing ones.
    * Circularity is preserved when updating a node.
-   * @param   {string}  nodeID - the nodeID to add into the node list
-   * @param   {number}  index - the index to add the node into the node list
-   * @return  {OsmWay}  A new Way copied from this Way, but with the updated node list
-   * @throws  Will throw if the given index is out of range 0..max
+   * @param nodeID - the nodeID to add into the node list
+   * @param index - the index to add the node into the node list
+   * @return A new Way copied from this Way, but with the updated node list
+   * @throws Will throw if the given index is out of range 0..max
    */
-  updateNode(nodeID, index) {
+  updateNode(nodeID: EntityID, index: number): OsmWay {
     let nodes = this.nodes.slice();
-    let isClosed = this.isClosed();
-    let max = nodes.length - 1;
+    const isClosed = this.isClosed();
+    const max = nodes.length - 1;
 
     if (index === undefined || index < 0 || index > max) {
       throw new RangeError(`index ${index} out of range 0..${max}`);
@@ -594,7 +620,7 @@ export class OsmWay extends OsmEntity {
     // If this is a closed way, remove all connector nodes except the first one
     // (there may be duplicates) and adjust index if necessary..
     if (isClosed) {
-      const connector = this.first();
+      const connector = this.first()!;
 
       // leading connectors..
       let i = 1;
@@ -620,7 +646,7 @@ export class OsmWay extends OsmEntity {
       nodes.push(nodes[0]);
     }
 
-    return this.update({ nodes: nodes });
+    return this.update({ nodes: nodes } as any) as OsmWay;
   }
 
 
@@ -629,13 +655,13 @@ export class OsmWay extends OsmEntity {
    * Replaces each occurrence of nodeID needle with replacement.
    * Consecutive duplicates are eliminated including existing ones.
    * Circularity is preserved.
-   * @param   {string}  needleID - the nodeID to find
-   * @param   {string}  replacementID - the nodeID to replace it with
-   * @return  {OsmWay}  A new Way copied from this Way, but with the updated node list
+   * @param needleID - the nodeID to find
+   * @param replacementID - the nodeID to replace it with
+   * @return A new Way copied from this Way, but with the updated node list
    */
-  replaceNode(needleID, replacementID) {
-    const isClosed = this.isClosed();
+  replaceNode(needleID: EntityID, replacementID: EntityID): OsmWay {
     let nodes = this.nodes.slice();
+    const isClosed = this.isClosed();
 
     for (let i = 0; i < nodes.length; i++) {
       if (nodes[i] === needleID) {
@@ -650,7 +676,7 @@ export class OsmWay extends OsmEntity {
       nodes.push(nodes[0]);
     }
 
-    return this.update({ nodes: nodes });
+    return this.update({ nodes: nodes } as any) as OsmWay;
   }
 
 
@@ -659,10 +685,10 @@ export class OsmWay extends OsmEntity {
    * Removes each occurrence of the given nodeID.
    * Consecutive duplicates are eliminated including existing ones.
    * Circularity is preserved.
-   * @param   {string}  nodeID - the nodeID to remove
-   * @return  {OsmWay}  A new Way copied from this Way, but with the updated node list
+   * @param nodeID - the nodeID to remove
+   * @return A new Way copied from this Way, but with the updated node list
    */
-  removeNode(nodeID) {
+  removeNode(nodeID: EntityID): OsmWay {
     const isClosed = this.isClosed();
     let nodes = this.nodes.slice();
 
@@ -675,6 +701,6 @@ export class OsmWay extends OsmEntity {
       nodes.push(nodes[0]);
     }
 
-    return this.update({ nodes: nodes });
+    return this.update({ nodes: nodes } as any) as OsmWay;
   }
 }

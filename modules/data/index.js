@@ -7,7 +7,7 @@ import { OsmChangeset } from './OsmChangeset.js';
 import { OsmEntity } from './OsmEntity.ts';
 import { OsmNode } from './OsmNode.ts';
 import { OsmRelation } from './OsmRelation.js';
-import { OsmWay } from './OsmWay.js';
+import { OsmWay } from './OsmWay.ts';
 
 export {
   AbstractData,
