@@ -3,6 +3,7 @@
  * For our purposes, we limit iterables to Arrays and Sets (no Maps, strings, etc.)
  * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_iterable_protocol
  */
+import type { Nullable } from '../core/types.ts';
 export type Iterable<T> = T[] | Set<T>;
 
 /**
@@ -26,7 +27,7 @@ export type OneOrMore<T> = T | Iterable<T>;
  * utilIterable(5)             // returns [5]
  * utilIterable(null)          // returns []
  */
-export function utilIterable<T>(vals: OneOrMore<T> | null | undefined): Iterable<T> {
+export function utilIterable<T>(vals: Nullable<OneOrMore<T>>): Iterable<T> {
   if (Array.isArray(vals)) return vals;
   if (vals instanceof Set) return vals;
   if (vals === null || vals === undefined) return [];

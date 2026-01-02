@@ -1,4 +1,6 @@
 
+import type { Nullable } from '../core/types.ts';
+
 /** A value that can be converted to a Date: Date object, numeric timestamp, or date string */
 export type DateLike = Date | number | string;
 
@@ -18,7 +20,7 @@ export type DateLike = Date | number | string;
  * utilDate('2024-01-01')         // returns Date, treated as UTC
  * utilDate('invalid')            // returns null
  */
-export function utilDate(val: DateLike | null | undefined): Date | null {
+export function utilDate(val: Nullable<DateLike>): Date | null {
   let d: Date | undefined;
 
   if (val instanceof Date) {
@@ -54,7 +56,7 @@ export function utilDate(val: DateLike | null | undefined): Date | null {
  * utilDateString(1704067200000)           // returns '2024-01-01'
  * utilDateString('invalid')               // returns ''
  */
-export function utilDateString(val: DateLike | null | undefined): string {
+export function utilDateString(val: Nullable<DateLike>): string {
   const d = utilDate(val);
   if (!d) return '';
 

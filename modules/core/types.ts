@@ -6,8 +6,14 @@
 
 import type { Viewport } from '@rapid-sdk/math';
 import type { EventEmitter } from 'tseep';
+import type { Selection } from 'd3-selection';
 
 import type { Graph } from '../lib/Graph.js';
+
+/** Common D3 selection type used throughout the UI layer */
+export type D3Selection = Selection<Element, unknown, Element | null, unknown>;
+/** A type that can be T, null, or undefined */
+export type Nullable<T> = T | null | undefined;
 
 
 /** System ID string used to identify systems in Context.systems */
