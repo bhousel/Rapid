@@ -10,8 +10,8 @@ import type { Selection } from 'd3-selection';
 
 import type { Graph } from '../lib/Graph.js';
 
-/** Common D3 selection type used throughout the UI layer */
-export type D3Selection = Selection<Element, unknown, Element | null, unknown>;
+/** Permissive D3 selection type - accepts any selection without strict type checking */
+export type D3Selection = Selection<any, any, any, any>;
 /** A type that can be T, null, or undefined */
 export type Nullable<T> = T | null | undefined;
 
