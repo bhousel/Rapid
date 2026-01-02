@@ -6,6 +6,6 @@ export * from './fetch_response.ts';
 export * from './get_set_value.js';
 export * from './iterable.ts';
 export * from './keybinding.js';
-export * from './rebind.js';
+export * from './rebind.ts';
 export * from './string.ts';
 export * from './util.js';
