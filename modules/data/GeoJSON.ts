@@ -1,4 +1,17 @@
-import { AbstractData } from './AbstractData.js';
+import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+import type { Context } from '../core/types.ts';
+import type { GeoJSONObject, GeoJSONProperties } from '../lib/types.ts';
+
+
+/**
+ * Properties for GeoJSON data elements.
+ */
+export interface GeoJSONProps extends AbstractDataProps {
+  /** The raw GeoJSON source data */
+  geojson: GeoJSONObject;
+  /** Associated service ID (e.g. 'mapillary', 'keepright') */
+  serviceID: string;
+}
 
 
 /**
@@ -10,16 +23,16 @@ import { AbstractData } from './AbstractData.js';
  *   `geoms`   Geometry object (inherited from `AbstractData`)
  *   `props`   Properties object (inherited from `AbstractData`)
  */
-export class GeoJSON extends AbstractData {
+export class GeoJSON extends AbstractData<GeoJSONProps> {
 
   /**
    * @constructor
    * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
-   * @param  {Object}                props  - Properties to assign to the data element
+   * @param otherOrContext - copy another data element, or pass application context
+   * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext, props = {}) {
+  constructor(otherOrContext: GeoJSON | Context, props: Partial<GeoJSONProps> = {}) {
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one
@@ -35,10 +48,9 @@ export class GeoJSON extends AbstractData {
   /**
    * updateGeometry
    * Forces a recomputation of the internal geometry data.
-   * @return  {GeoJSON}  this same data element
-   * @abstract
+   * @returns this same data element
    */
-  updateGeometry() {
+  updateGeometry(): this {
     this.geoms.setData(this.asGeoJSON());
     return this;
   }
@@ -46,17 +58,18 @@ export class GeoJSON extends AbstractData {
   /**
    * asGeoJSON
    * We expect to find the original GeoJSON source in a `geojson` property.
-   * @return  {Object}  GeoJSON representation of this data element
+   * @returns GeoJSON representation of this data element
    */
-  asGeoJSON() {
-    if (this.props.geojson) {
-      return Object.assign({}, this.props.geojson, { id: this.id });
+  asGeoJSON(): GeoJSONObject {
+    const geojson = this.props.geojson;
+    if (geojson) {
+      return Object.assign({}, geojson, { id: this.id });
 
     } else {  // fallback
       return {
         type: 'Feature',
         id: this.id,
-        properties: this.props,
+        properties: this.props as GeoJSONProperties,
         geometry: null
       };
     }
@@ -66,21 +79,20 @@ export class GeoJSON extends AbstractData {
    * serviceID
    * GeoJSON may be associated with a 'serviceID' string.
    * For example 'keepright', 'maproulette', 'mapillary', etc.
-   * @return  {string?}
    * @readonly
    */
-  get serviceID() {
+  get serviceID(): string | undefined {
     return this.props.serviceID;
   }
 
   /**
    * properties
    * Get the real GeoJSON properties.
-   * @return  {Object}
    * @readonly
    */
-  get properties() {
-    return this.props.geojson?.properties || {};
+  get properties(): Record<string, unknown> {
+    const geojson = this.props.geojson;
+    return (geojson as any)?.properties ?? {};
   }
 
 }

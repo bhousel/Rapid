@@ -7,16 +7,12 @@
 import type { Context } from '../core/types.ts';
 import type { Geometry } from '../lib/Geometry.ts';
 
-
 /** 2D vector as [x, y], typically [longitude, latitude] in WGS84 for geographic coordinates */
 export type Vec2 = [number, number];
-
 /** OSM tags as key-value string pairs */
 export type Tags = Record<string, string>;
-
 /** Entity ID string (e.g. 'n123', 'w456', 'r789') */
 export type EntityID = string;
-
 /** Entity type discriminator */
 export type EntityType = 'node' | 'way' | 'relation';
 
@@ -37,13 +33,10 @@ export type DataConstructor<T> = new (
 export interface DataElement {
   /** Unique identifier for this data element */
   readonly id: string;
-
   /** The type of data element */
   readonly type: string;
-
   /** Geometry wrapper containing original and projected data */
   geoms: Geometry;
-
   /** Properties object */
   props: Record<string, unknown>;
 }
@@ -56,86 +49,33 @@ export interface DataElement {
 export interface Entity extends DataElement {
   /** Entity type: 'node', 'way', or 'relation' */
   readonly type: EntityType;
-
   /** OSM tags */
   tags: Tags;
-
   /** OSM object version number */
   version?: number;
-
   /** Whether the entity is visible */
   visible?: boolean;
-
   /** Geographic location [lon, lat] - present on nodes only */
   loc?: Vec2;
-
-  /**
-   * Get the geometry type of this entity.
-   * @param graph - The graph to use for determining geometry
-   * @return The geometry type: 'point', 'vertex', 'line', 'area', 'relation'
-   */
+  /** Get the geometry type of this entity */
   geometry(graph: unknown): string;
-
-  /**
-   * Check if this entity has tags that are considered "interesting".
-   * (i.e., not just name, source, or other metadata tags)
-   * @return True if the entity has interesting tags
-   */
+  /** Check if this entity has tags that are considered "interesting" */
   hasInterestingTags(): boolean;
-
-  /**
-   * Check if this entity is a multipolygon relation.
-   * Only relations can be multipolygons; for other entity types returns false.
-   * @return True if this is a multipolygon relation
-   */
+  /** Check if this entity is a multipolygon relation */
   isMultipolygon(): boolean;
-
-  /**
-   * Check if this entity is a turn restriction relation.
-   * @return True if this is a restriction relation
-   */
+  /** Check if this entity is a turn restriction relation */
   isRestriction(): boolean;
-
-  /**
-   * Check if this restriction relation is valid.
-   * @param graph - The graph to validate against
-   * @return True if the restriction is valid
-   */
+  /** Check if this restriction relation is valid */
   isValidRestriction(graph: unknown): boolean;
-
-  /**
-   * Check if all members of this entity are present in the graph.
-   * @param graph - The graph to check
-   * @return True if the entity is complete
-   */
+  /** Check if all members of this entity are present in the graph */
   isComplete(graph: unknown): boolean;
-
-  /**
-   * Get a relation member by role.
-   * @param role - The role to search for
-   * @return The member with that role, or undefined
-   */
+  /** Get a relation member by role */
   memberByRole(role: string): RelationMember | undefined;
-
-  /**
-   * Get all relation members with a given role.
-   * @param role - The role to search for
-   * @return Array of members with that role
-   */
+  /** Get all relation members with a given role */
   membersByRole(role: string): RelationMember[];
-
-  /**
-   * Create a copy of this entity with updated properties.
-   * @param updates - Properties to update
-   * @return A new entity with updated values
-   */
+  /** Create a copy of this entity with updated properties */
   update(updates: Record<string, unknown>): Entity;
-
-  /**
-   * Get the bounding extent of this entity.
-   * @param graph - The graph to use for determining extent
-   * @return The bounding Extent of this entity
-   */
+  /** Get the bounding extent of this entity */
   extent(graph: unknown): unknown;
 }
 
@@ -145,7 +85,6 @@ export interface Entity extends DataElement {
  */
 export interface NodeEntity extends Entity {
   readonly type: 'node';
-
   /** Geographic location [lon, lat] */
   loc: Vec2;
 }
@@ -156,52 +95,21 @@ export interface NodeEntity extends Entity {
  */
 export interface WayEntity extends Entity {
   readonly type: 'way';
-
   /** Ordered array of node IDs that make up this way */
   nodes: EntityID[];
-
-  /**
-   * Check if this way is a oneway street.
-   * Based on explicit oneway tags or implied from other tags.
-   * @return True if the way is oneway
-   */
+  /** Check if this way is a oneway street */
   isOneWay(): boolean;
-
-  /**
-   * Check if this way forms an area (closed polygon).
-   * @return True if the way is an area
-   */
+  /** Check if this way forms an area (closed polygon) */
   isArea(): boolean;
-
-  /**
-   * Check if this way is degenerate (too few nodes).
-   * @return True if the way is degenerate
-   */
+  /** Check if this way is degenerate (too few nodes) */
   isDegenerate(): boolean;
-
-  /**
-   * Get the first node ID of this way.
-   * @return The first node ID
-   */
+  /** Get the first node ID of this way */
   first(): EntityID;
-
-  /**
-   * Get the last node ID of this way.
-   * @return The last node ID
-   */
+  /** Get the last node ID of this way */
   last(): EntityID;
-
-  /**
-   * Create a copy of this way with updated properties.
-   * @param updates - Properties to update
-   * @return A new way with updated values
-   */
+  /** Create a copy of this way with updated properties */
   update(updates: Record<string, unknown>): WayEntity;
-
-  /**
-   * Update the geometry for this way based on the current graph.
-   * @param graph - The graph to use for node positions
-   */
+  /** Update the geometry for this way based on the current graph */
   updateGeometry(graph: unknown): void;
 }
 
@@ -212,10 +120,8 @@ export interface WayEntity extends Entity {
 export interface RelationMember {
   /** Entity ID of the member */
   id: EntityID;
-
   /** Type of the member entity */
   type: EntityType;
-
   /** Role of this member in the relation */
   role: string;
 }
@@ -226,13 +132,8 @@ export interface RelationMember {
  */
 export interface RelationEntity extends Entity {
   readonly type: 'relation';
-
   /** Array of relation members */
   members: RelationMember[];
-
-  /**
-   * Update the geometry for this relation based on the current graph.
-   * @param graph - The graph to use for member positions
-   */
+  /** Update the geometry for this relation based on the current graph */
   updateGeometry(graph: unknown): void;
 }

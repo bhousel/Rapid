@@ -36,16 +36,18 @@ export interface AbstractDataProps {
  *   `v`                 Internal version of the data element, can be used to detect changes
  *   `geoms`             Geometry object
  *   `props`             Properties object
+ *
+ * @template P - The props interface for this data element (must extend AbstractDataProps)
  */
-export class AbstractData {
+export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   /** Unique identifier for this data element */
   id: string;
   /** Application context */
   context: Context;
   /** Geometry wrapper containing original and projected data */
   geoms: Geometry;
-  /** Properties object - partial base props plus any additional properties */
-  props: Partial<AbstractDataProps> & Record<string, unknown>;
+  /** Properties object */
+  props: Partial<P>;
 
   /**
    * @constructor
@@ -54,13 +56,13 @@ export class AbstractData {
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: AbstractData | Context, props: Partial<AbstractDataProps> = {}) {
+  constructor(otherOrContext: AbstractData<P> | Context, props: Partial<P> = {}) {
     this.id = '';  // put this first so debug inspect shows it first
 
     if (otherOrContext instanceof AbstractData) {  // copy other
       const other = otherOrContext;
       this.context = other.context;
-      this.props = globalThis.structuredClone(other.props);
+      this.props = globalThis.structuredClone(other.props) as Partial<P>;
       this.geoms = other.geoms.clone();
 
     } else {
@@ -99,7 +101,7 @@ export class AbstractData {
    * @param props - the updated properties
    * @returns a new data element
    */
-  update(props: Partial<AbstractDataProps>): this {
+  update(props: Partial<P>): this {
     const Type = this.constructor as DataConstructor<this>;
     return new Type(this, props).touch();
   }
@@ -173,7 +175,7 @@ export class AbstractData {
    * @readonly
    */
   get type(): string {
-    return this.props.type ?? '';
+    return (this.props as Partial<AbstractDataProps>).type ?? '';
   }
 
   /**
@@ -191,7 +193,7 @@ export class AbstractData {
    * @readonly
    */
   get v(): number {
-    return this.props.v || 0;
+    return (this.props as Partial<AbstractDataProps>).v || 0;
   }
 
   /**

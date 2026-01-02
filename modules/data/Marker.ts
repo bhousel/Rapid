@@ -1,4 +1,20 @@
-import { AbstractData } from './AbstractData.js';
+import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+import type { Context } from '../core/types.ts';
+import type { GeoJSONObject, GeoJSONProperties, PointGeometry } from '../lib/types.ts';
+import type { Vec2 } from './types.ts';
+
+
+/**
+ * Properties for Marker data elements.
+ */
+export interface MarkerProps extends AbstractDataProps {
+  /** Location in WGS84 [lon, lat] */
+  loc: Vec2;
+  /** Associated service ID (e.g. 'keepright', 'maproulette', 'mapillary') */
+  serviceID: string;
+  /** Whether this is a new marker */
+  isNew: boolean;
+}
 
 
 /**
@@ -11,16 +27,16 @@ import { AbstractData } from './AbstractData.js';
  *   `geoms`   Geometry object (inherited from `AbstractData`)
  *   `props`   Properties object (inherited from `AbstractData`)
  */
-export class Marker extends AbstractData {
+export class Marker extends AbstractData<MarkerProps> {
 
   /**
    * @constructor
    * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
-   * @param  {Object}                props  - Properties to assign to the data element
+   * @param otherOrContext - copy another data element, or pass application context
+   * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext, props = {}) {
+  constructor(otherOrContext: Marker | Context, props: Partial<MarkerProps> = {}) {
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one
@@ -36,10 +52,9 @@ export class Marker extends AbstractData {
   /**
    * updateGeometry
    * Forces a recomputation of the internal geometry data.
-   * @return  {Marker}  this same Marker
-   * @abstract
+   * @returns this same Marker
    */
-  updateGeometry() {
+  updateGeometry(): this {
     this.geoms.setData(this.asGeoJSON());
     return this;
   }
@@ -48,10 +63,10 @@ export class Marker extends AbstractData {
    * asGeoJSON
    * Returns a GeoJSON representation of the Marker.
    * Markers are represented by a Feature with a Point geometry.
-   * @return  {Object}  GeoJSON representation of the Marker
+   * @returns GeoJSON representation of the Marker
    */
-  asGeoJSON() {
-    let geometry = null;
+  asGeoJSON(): GeoJSONObject {
+    let geometry: PointGeometry | null = null;
 
     const coords = this.loc;
     if (Array.isArray(coords) && coords.length >= 2) {
@@ -64,7 +79,7 @@ export class Marker extends AbstractData {
     return {
       type: 'Feature',
       id: this.id,
-      properties: this.props,
+      properties: this.props as GeoJSONProperties,
       geometry: geometry
     };
   }
@@ -74,7 +89,7 @@ export class Marker extends AbstractData {
    * Markers should have a `loc` property to represent the location in WGS84 lat/lon
    * @readonly
    */
-  get loc() {
+  get loc(): Vec2 | undefined {
     return this.props.loc;
   }
 
@@ -82,10 +97,9 @@ export class Marker extends AbstractData {
    * serviceID
    * Markers are usually associated with a 'serviceID' string.
    * For example 'keepright', 'maproulette', 'mapillary', etc.
-   * @return  {string?}
    * @readonly
    */
-  get serviceID() {
+  get serviceID(): string | undefined {
     return this.props.serviceID;
   }
 
@@ -93,11 +107,10 @@ export class Marker extends AbstractData {
    * isNew
    * In the old QAItem class we had some OSM-like code to consider negative ids as new.
    * Instead we'll just set an isNew property for new markers.
-   * @return  {boolean}
    * @readonly
    */
-  get isNew() {
-    return this.props.isNew || false;
+  get isNew(): boolean {
+    return this.props.isNew ?? false;
   }
 
 }

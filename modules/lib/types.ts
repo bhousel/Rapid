@@ -15,9 +15,6 @@ export type { Entity, EntityID, EntityType, NodeEntity, WayEntity, RelationEntit
 export type { Context } from '../core/types.ts';
 
 
-
-
-
 // ============================================================================
 // Action Types
 // ============================================================================
@@ -93,11 +90,16 @@ export type GeoJSONGeometry =
   | MultiPolygonGeometry
   | GeoJSONGeometryCollection;
 
+
+/** GeoJSON Properties */
+export type GeoJSONProperties = Record<string, unknown>;
+
 /** GeoJSON Feature */
 export interface GeoJSONFeature {
   type: 'Feature';
-  geometry?: GeoJSONGeometry;
-  properties?: Record<string, unknown>;
+  id?: string | number;
+  geometry?: GeoJSONGeometry | null;
+  properties?: GeoJSONProperties | null;
 }
 
 /** GeoJSON FeatureCollection */
