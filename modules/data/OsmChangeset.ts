@@ -1,4 +1,24 @@
-import { OsmEntity } from './OsmEntity.js';
+import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
+import type { Context } from '../core/types.ts';
+import type { GeoJSONFeature } from '../lib/types.ts';
+
+
+/**
+ * Properties for OsmChangeset data elements.
+ * Changesets don't have additional properties beyond the base OsmEntityProps.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface OsmChangesetProps extends OsmEntityProps {}
+
+
+/**
+ * Changes to be included in an osmChange document.
+ */
+export interface OsmChanges {
+  created: OsmEntity[];
+  modified: OsmEntity[];
+  deleted: OsmEntity[];
+}
 
 
 /**
@@ -16,11 +36,11 @@ export class OsmChangeset extends OsmEntity {
    * @constructor
    * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
-   * @param  {Object}                props  - Properties to assign to the data element
+   * @param otherOrContext - copy another data element, or pass application context
+   * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext, props = {}) {
-    super(otherOrContext, props);
+  constructor(otherOrContext: OsmChangeset | Context, props: Partial<OsmChangesetProps> = {}) {
+    super(otherOrContext as any, props);
     this.props.type = 'changeset';
 
     if (!this.props.id) {  // no ID provided - generate one
@@ -35,9 +55,9 @@ export class OsmChangeset extends OsmEntity {
    * asGeoJSON
    * Returns a GeoJSON representation of the OsmChangeset.
    * (This currently returns an unlocated Feature, but we could return a bounding box or something)
-   * @return  {Object}  An empty object
+   * @return An empty object
    */
-  asGeoJSON() {
+  asGeoJSON(): GeoJSONFeature {
     return {
       type: 'Feature',
       id: this.id,
@@ -50,9 +70,9 @@ export class OsmChangeset extends OsmEntity {
    * asJXON
    * Returns a JXON representation of the OsmChangeset.
    * For OSM Entities, this is used to prepare an OSM changeset XML.
-   * @return  {Object}  JXON representation of the OsmChangeset
+   * @return JXON representation of the OsmChangeset
    */
-  asJXON() {
+  asJXON(): Record<string, unknown> {
     return {
       osm: {
         changeset: {
@@ -69,9 +89,9 @@ export class OsmChangeset extends OsmEntity {
   /**
    * geometry
    * Returns 'changeset'
-   * @return  {string}  'changeset'
+   * @return 'changeset'
    */
-  geometry() {
+  geometry(): 'changeset' {
     return 'changeset';
   }
 
@@ -79,19 +99,19 @@ export class OsmChangeset extends OsmEntity {
   /**
    * osmChangeJXON
    * @see http://wiki.openstreetmap.org/wiki/OsmChange
-   * @return  {string}
+   * @return JXON representation of an osmChange document
    */
-  osmChangeJXON(changes) {
+  osmChangeJXON(changes: OsmChanges): Record<string, unknown> {
     const changesetID = this.props.id;
 
-    function nest(arr, order) {
-      const groups = {};
+    function nest(arr: Record<string, any>[], order: string[]): Record<string, any[]> {
+      const groups: Record<string, any[]> = {};
       for (const item of arr) {
         const tagName = Object.keys(item)[0];
         if (!groups[tagName]) groups[tagName] = [];
         groups[tagName].push(item[tagName]);
       }
-      const ordered = {};
+      const ordered: Record<string, any[]> = {};
       for (const k of order) {
         if (groups[k]) ordered[k] = groups[k];
       }
@@ -100,23 +120,23 @@ export class OsmChangeset extends OsmEntity {
 
 
     // sort relations in a changeset by dependencies
-    function sort(changes) {
+    function sort(changes: Record<string, any[]>): Record<string, any[]> {
       // find a referenced relation in the current changeset
-      function resolve(item) {
+      function resolve(item: any): any {
         return relations.find(relation => {
           return item.keyAttributes.type === 'relation' && item.keyAttributes.ref === relation['@id'];
         });
       }
 
       // a new item is an item that has not been already processed
-      function isNew(item) {
+      function isNew(item: any): boolean {
         return !sorted[ item['@id'] ] && !processing.find(proc => {
           return proc['@id'] === item['@id'];
         });
       }
 
-      let processing = [];
-      const sorted = {};
+      let processing: any[] = [];
+      const sorted: Record<string, any> = {};
       const relations = changes.relation;
       if (!relations) return changes;
 
@@ -127,8 +147,8 @@ export class OsmChangeset extends OsmEntity {
         }
 
         while (processing.length > 0) {
-          var next = processing[0],
-          deps = next.member.map(resolve).filter(Boolean).filter(isNew);
+          const next = processing[0];
+          const deps = next.member.map(resolve).filter(Boolean).filter(isNew);
           if (deps.length === 0) {
             sorted[next['@id']] = next;
             processing.shift();
@@ -142,7 +162,7 @@ export class OsmChangeset extends OsmEntity {
       return changes;
     }
 
-    function rep(entity) {
+    function rep(entity: OsmEntity): Record<string, unknown> {
       return entity.asJXON(changesetID);
     }
 

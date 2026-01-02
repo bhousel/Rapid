@@ -25,6 +25,11 @@ Rapid is an AI-enhanced editor for OpenStreetMap, built with JavaScript/TypeScri
 - Use `?.` (optional chaining) for safe property access
 - **No trailing whitespace** - ensure lines don't end with spaces or tabs
 
+### File Operations
+- Use VS Code file tools (`create_file`, `replace_string_in_file`) instead of terminal commands
+- This shows changes in VS Code's diff view for easier review
+- Avoid using `cat` with heredoc or other terminal-based file writing
+
 ## TypeScript Patterns
 
 ### File Conversion
