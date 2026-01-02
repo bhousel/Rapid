@@ -4,7 +4,7 @@ import { AbstractData } from './AbstractData.ts';
 import { GeoJSON } from './GeoJSON.ts';
 import { Marker } from './Marker.ts';  // was "QAItem"
 import { OsmChangeset } from './OsmChangeset.js';
-import { OsmEntity } from './OsmEntity.js';
+import { OsmEntity } from './OsmEntity.ts';
 import { OsmNode } from './OsmNode.js';
 import { OsmRelation } from './OsmRelation.js';
 import { OsmWay } from './OsmWay.js';
