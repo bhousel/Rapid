@@ -1,8 +1,29 @@
 import { geoArea as d3_geoArea } from 'd3-geo';
 import { geomPolygonContainsPolygon, geomPolygonIntersectsPolygon } from '@rapid-sdk/math';
 
-import { OsmEntity } from './OsmEntity.js';
+import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
+import type { Context } from '../core/types.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { GeoJSONFeature, GeoJSONFeatureCollection, GeoJSONObject, Vec2 } from '../lib/types.ts';
+import type { EntityID, EntityType, RelationMember } from './types.ts';
+
+
+/**
+ * Indexed member with additional index property.
+ */
+export interface IndexedMember extends RelationMember {
+  index: number;
+}
+
+
+/**
+ * Properties for OsmRelation data elements.
+ */
+export interface OsmRelationProps extends OsmEntityProps {
+  /** Array of relation members */
+  members: RelationMember[];
+}
 
 
 /**
@@ -21,11 +42,11 @@ export class OsmRelation extends OsmEntity {
    * @constructor
    * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
-   * @param  {Object}                props  - Properties to assign to the data element
+   * @param otherOrContext - copy another data element, or pass application context
+   * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext, props = {}) {
-    super(otherOrContext, props);
+  constructor(otherOrContext: OsmRelation | Context, props: Partial<OsmRelationProps> = {}) {
+    super(otherOrContext as any, props);
     this.props.type = 'relation';
 
     if (!this.props.id) {  // no ID provided - generate one
@@ -35,8 +56,8 @@ export class OsmRelation extends OsmEntity {
     // For consistency, offer a `this.id` property.
     this.id = this.props.id;
 
-    if (!this.props.members) {
-      this.props.members = [];
+    if (!(this.props as OsmRelationProps).members) {
+      (this.props as OsmRelationProps).members = [];
     }
   }
 
@@ -45,8 +66,8 @@ export class OsmRelation extends OsmEntity {
    * get/set the members property
    * @readonly
    */
-  get members() {
-    return this.props.members;
+  get members(): RelationMember[] {
+    return (this.props as OsmRelationProps).members;
   }
 
   /**
@@ -55,11 +76,11 @@ export class OsmRelation extends OsmEntity {
    * Relations are represented by either:
    *  a Feature with MultiPolygon geometry, or
    *  a FeatureCollection containing the Relation's child members.
-   * @param   {Graph}        graph - the Graph that holds the topology needed
-   * @param   {Set<string>}  seen - seen ids, used to avoid infinite loops and cycles.
-   * @return  {Object}       GeoJSON representation of the OsmRelation
+   * @param graph - the Graph that holds the topology needed
+   * @param seen - seen ids, used to avoid infinite loops and cycles.
+   * @return GeoJSON representation of the OsmRelation
    */
-  asGeoJSON(graph, seen) {
+  asGeoJSON(graph: Graph, seen?: Set<string>): GeoJSONObject {
     return this.transient('geojson', () => {
 
       if (this.isMultipolygon()) {
@@ -71,7 +92,7 @@ export class OsmRelation extends OsmEntity {
             type: 'MultiPolygon',
             coordinates: this.multipolygon(graph)
           }
-        };
+        } as GeoJSONFeature;
 
       } else {  // Gather children into a FeatureCollection
 
@@ -79,14 +100,14 @@ export class OsmRelation extends OsmEntity {
           seen = new Set();
         }
         if (seen.has(this.id)) {
-          return {};  // seen this already, avoid infinite loops and cycles
+          return {} as GeoJSONObject;  // seen this already, avoid infinite loops and cycles
         } else {
           seen.add(this.id);
         }
 
-        const features = [];
+        const features: any[] = [];
         for (const member of this.members) {
-          const entity = graph.hasEntity(member.id);
+          const entity = graph.hasEntity(member.id) as any;
           if (!entity) continue;
 
           const child = entity.asGeoJSON(graph, seen);
@@ -101,7 +122,7 @@ export class OsmRelation extends OsmEntity {
           id: this.id,
           properties: this.tags,  // `properties` here is not GeoJSON spec
           features: features
-        };
+        } as GeoJSONFeatureCollection;
       }
 
     });
@@ -111,11 +132,11 @@ export class OsmRelation extends OsmEntity {
    * asJXON
    * Returns a JXON representation of the OsmRelation.
    * For OSM Entities, this is used to prepare an OSM changeset XML.
-   * @param   {string}  changesetID - optional changeset ID to include in the output
-   * @return  {Object}  JXON representation of the OsmRelation
+   * @param changesetID - optional changeset ID to include in the output
+   * @return JXON representation of the OsmRelation
    */
-  asJXON(changesetID) {
-    var result = {
+  asJXON(changesetID?: string): Record<string, unknown> {
+    const result: any = {
       relation: {
         '@id': this.osmId(),
         '@version': this.props.version || 0,
@@ -127,7 +148,7 @@ export class OsmRelation extends OsmEntity {
               ref: OsmEntity.toOSM(member.id)
             }
           };
-        }, this),
+        }),
         tag: Object.keys(this.tags).map(k => {
           return { keyAttributes: { k: k, v: this.tags[k] } };
         })
@@ -146,27 +167,27 @@ export class OsmRelation extends OsmEntity {
    * Copied entities will start out with a fresh `id` and cleared out metadata.
    * This is like the sort of copy you would want when copy-pasting a feature.
    * When completed, the `memo` argument will contain all the copied data elements.
-   * @param   {Graph}        fromGraph - The Graph that owns the source object (needed for some data types)
-   * @param   {Object}       memo      - An Object to store seen copies (to prevent circular/infinite copying)
-   * @return  {OsmRelation}  a copy of this OsmRelation
+   * @param fromGraph - The Graph that owns the source object (needed for some data types)
+   * @param memo - An Object to store seen copies (to prevent circular/infinite copying)
+   * @return a copy of this OsmRelation
    */
-  copy(fromGraph, memo = {}) {
+  copy(fromGraph: Graph, memo: Record<string, OsmEntity> = {}): OsmRelation {
     if (memo[this.id]) {
-      return memo[this.id];
+      return memo[this.id] as OsmRelation;
     }
 
     // copy self
-    const copy = new OsmRelation(this, { id: undefined, user: undefined, version: undefined, v: undefined });
+    const copy = new OsmRelation(this, { id: undefined, user: undefined, version: undefined, v: undefined } as any);
     memo[this.id] = copy;
 
     // copy members too
-    const members = [];
+    const members: RelationMember[] = [];
     for (const member of this.members) {
-      const source = fromGraph.entity(member.id);
+      const source = fromGraph.entity(member.id) as any;
       const result = source.copy(fromGraph, memo);
-      members.push(Object.assign({}, member, { id: result.id }));
+      members.push({ ...member, id: result.id });
     }
-    copy.props.members = members;
+    (copy.props as OsmRelationProps).members = members;
     return copy;
   }
 
@@ -174,10 +195,10 @@ export class OsmRelation extends OsmEntity {
   /**
    * geometry
    * Returns 'area' if this Relation is a multipolygon, or 'relation' otherwise.
-   * @param   {Graph}   graph - the Graph that holds the topology needed
-   * @return  {string}  'area' or 'relation'
+   * @param graph - the Graph that holds the topology needed
+   * @return 'area' or 'relation'
    */
-  geometry() {
+  geometry(graph?: Graph): 'area' | 'relation' {
     return this.transient('geometry', () => {
       return this.isMultipolygon() ? 'area' : 'relation';
     });
@@ -186,9 +207,9 @@ export class OsmRelation extends OsmEntity {
   /**
    * isDegenerate
    * A relation is "degenerate" it has no members.
-   * @return  {boolean}  `true` if the relation is degenerate, `false` if not.
+   * @return `true` if the relation is degenerate, `false` if not.
    */
-  isDegenerate() {
+  isDegenerate(): boolean {
     return this.members.length === 0;
   }
 
@@ -196,12 +217,12 @@ export class OsmRelation extends OsmEntity {
    * indexedMembers
    * Return an array of members, each extended with an `index` property whose value
    * is the member index.
-   * @return  {Array<Object>}  An Array of members, including an `index` property
+   * @return An Array of members, including an `index` property
    */
-  indexedMembers() {
-    const result = new Array(this.members.length);
+  indexedMembers(): IndexedMember[] {
+    const result: IndexedMember[] = new Array(this.members.length);
     for (let i = 0; i < this.members.length; i++) {
-      result[i] = Object.assign({}, this.members[i], { index: i });
+      result[i] = { ...this.members[i], index: i };
     }
     return result;
   }
@@ -210,28 +231,28 @@ export class OsmRelation extends OsmEntity {
    * memberByRole
    * Return the first member with the given role. A copy of the member object
    * is returned, extended with an `index` property whose value is the member index.
-   * @param   {string}  The role to search for
-   * @return  {Object}  The member with the given role, including an `index` property
+   * @param role - The role to search for
+   * @return The member with the given role, including an `index` property
    */
-  memberByRole(role) {
+  memberByRole(role: string): IndexedMember | undefined {
     for (let i = 0; i < this.members.length; i++) {
       if (this.members[i].role === role) {
-        return Object.assign({}, this.members[i], { index: i });
+        return { ...this.members[i], index: i };
       }
     }
   }
 
   /**
-   * memberByRole
+   * membersByRole
    * Same as `memberByRole`, but returns all members with the given role.
-   * @param   {string}  The role to search for
-   * @return  {Array<Object>}  An Array of members, including an `index` property
+   * @param role - The role to search for
+   * @return An Array of members, including an `index` property
    */
-  membersByRole(role) {
-    const results = [];
+  membersByRole(role: string): IndexedMember[] {
+    const results: IndexedMember[] = [];
     for (let i = 0; i < this.members.length; i++) {
       if (this.members[i].role === role) {
-        results.push(Object.assign({}, this.members[i], { index: i }));
+        results.push({ ...this.members[i], index: i });
       }
     }
     return results;
@@ -241,13 +262,13 @@ export class OsmRelation extends OsmEntity {
    * memberById
    * Return the first member with the given id. A copy of the member object
    * is returned, extended with an `index` property whose value is the member index.
-   * @param   {string}  The id to search for
-   * @return  {Object}  The member with the given id, including an `index` property
+   * @param id - The id to search for
+   * @return The member with the given id, including an `index` property
    */
-  memberById(id) {
+  memberById(id: EntityID): IndexedMember | undefined {
     for (let i = 0; i < this.members.length; i++) {
       if (this.members[i].id === id) {
-        return Object.assign({}, this.members[i], { index: i });
+        return { ...this.members[i], index: i };
       }
     }
   }
@@ -256,14 +277,14 @@ export class OsmRelation extends OsmEntity {
    * memberByIdAndRole
    * Return the first member with the given id and role. A copy of the member object
    * is returned, extended with an `index` property whose value is the member index.
-   * @param   {string}  The id to search for
-   * @param   {string}  The role to search for
-   * @return  {Object}  The member with the given id, including an `index` property
+   * @param id - The id to search for
+   * @param role - The role to search for
+   * @return The member with the given id, including an `index` property
    */
-  memberByIdAndRole(id, role) {
+  memberByIdAndRole(id: EntityID, role: string): IndexedMember | undefined {
     for (let i = 0; i < this.members.length; i++) {
       if (this.members[i].id === id && this.members[i].role === role) {
-        return Object.assign({}, this.members[i], { index: i });
+        return { ...this.members[i], index: i };
       }
     }
   }
@@ -272,63 +293,63 @@ export class OsmRelation extends OsmEntity {
    * addMember
    * Inserts a member into the members list at the given index.
    * If index is undefined, the member will be added to the end of the members list.
-   * @param   {Object}       member - the member to add
-   * @param   {number}       index - the index to insert at, or `undefined`
-   * @return  {OsmRelation}  A new Relation copied from this Relation, but with the updated members list
+   * @param member - the member to add
+   * @param index - the index to insert at, or `undefined`
+   * @return A new Relation copied from this Relation, but with the updated members list
    */
-  addMember(member, index) {
+  addMember(member: RelationMember, index?: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index === undefined ? members.length : index, 0, member);
-    return this.update({ members: members });
+    return this.update({ members: members } as any) as OsmRelation;
   }
 
   /**
    * updateMember
    * Replaces the member which is currently at the given index with the given member.
-   * @param   {Object}       member - the member to add
-   * @param   {number}       index - the index to replace
-   * @return  {OsmRelation}  A new Relation copied from this Relation, but with the updated members list
+   * @param member - the member to add
+   * @param index - the index to replace
+   * @return A new Relation copied from this Relation, but with the updated members list
    */
-  updateMember(member, index) {
+  updateMember(member: Partial<RelationMember>, index: number): OsmRelation {
     const members = this.members.slice();
-    members.splice(index, 1, Object.assign({}, members[index], member));
-    return this.update({ members: members });
+    members.splice(index, 1, { ...members[index], ...member });
+    return this.update({ members: members } as any) as OsmRelation;
   }
 
   /**
    * removeMember
    * Removes the member at the given index.
-   * @param   {number}       index - the index to remove
-   * @return  {OsmRelation}  A new Relation copied from this Relation, but with the updated members list
+   * @param index - the index to remove
+   * @return A new Relation copied from this Relation, but with the updated members list
    */
-  removeMember(index) {
+  removeMember(index: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index, 1);
-    return this.update({ members: members });
+    return this.update({ members: members } as any) as OsmRelation;
   }
 
   /**
    * removeMembersWithID
    * Removes any members from the member list with the given id.
-   * @param   {string}       id - the id to search for
-   * @return  {OsmRelation}  A new Relation copied from this Relation, but with the updated members list
+   * @param id - the id to search for
+   * @return A new Relation copied from this Relation, but with the updated members list
    */
-  removeMembersWithID(id) {
+  removeMembersWithID(id: EntityID): OsmRelation {
     const members = this.members.filter(m => m.id !== id);
-    return this.update({ members: members });
+    return this.update({ members: members } as any) as OsmRelation;
   }
 
   /**
    * moveMember
    * Moves a members from one index in the members list to another.
-   * @param   {number}       fromIndex - the index to move it from
-   * @param   {number}       toIndex   - the index to move it to
-   * @return  {OsmRelation}  A new Relation copied from this Relation, but with the updated members list
+   * @param fromIndex - the index to move it from
+   * @param toIndex - the index to move it to
+   * @return A new Relation copied from this Relation, but with the updated members list
    */
-  moveMember(fromIndex, toIndex) {
+  moveMember(fromIndex: number, toIndex: number): OsmRelation {
     const members = this.members.slice();
     members.splice(toIndex, 0, members.splice(fromIndex, 1)[0]);
-    return this.update({ members: members });
+    return this.update({ members: members } as any) as OsmRelation;
   }
 
   /**
@@ -336,15 +357,15 @@ export class OsmRelation extends OsmEntity {
    * Wherever a member appears with id `needle.id`, replace it with a member
    * with id `replacement.id`, type `replacement.type`, and the original role,
    * By default, adding a duplicate member (by id and role) is prevented.
-   * @param   {string}       needle - the member to find
-   * @param   {string}       replacement - the member to replace it with
-   * @param   {boolean}      keepDuplicates - `true` to preserve duplicate members
-   * @return  {OsmRelation}  A new Relation copied from this Relation, but with the updated members list
+   * @param needle - the member to find
+   * @param replacement - the member to replace it with
+   * @param keepDuplicates - `true` to preserve duplicate members
+   * @return A new Relation copied from this Relation, but with the updated members list
    */
-  replaceMember(needle, replacement, keepDuplicates) {
+  replaceMember(needle: { id: EntityID }, replacement: { id: EntityID; type: EntityType }, keepDuplicates?: boolean): OsmRelation {
     if (!this.memberById(needle.id)) return this;
 
-    const members = [];
+    const members: RelationMember[] = [];
 
     for (const member of this.members) {
       if (member.id !== needle.id) {
@@ -354,15 +375,15 @@ export class OsmRelation extends OsmEntity {
       }
     }
 
-    return this.update({ members: members });
+    return this.update({ members: members } as any) as OsmRelation;
   }
 
   /**
    * isMultipolygon
    * Returns whether this relation is an OSM multipolygon, given the tags present.
-   * @return  {boolean}  `true` if the relation is a multipolygon, `false` if not.
+   * @return `true` if the relation is a multipolygon, `false` if not.
    */
-  isMultipolygon() {
+  isMultipolygon(): boolean {
     return this.tags.type === 'multipolygon';
   }
 
@@ -371,10 +392,10 @@ export class OsmRelation extends OsmEntity {
    * Returns whether this relation's members all exist in the given graph.
    * Because OSM Relations are downloaded lazily, the members may not all exist in the graph
    *  until the relation has been fully downloaded.
-   * @param   {Graph}    graph - the Graph that holds the topology needed
-   * @return  {boolean} `true` if the all members are present in the graph, `false` if not
+   * @param graph - the Graph that holds the topology needed
+   * @return `true` if the all members are present in the graph, `false` if not
    */
-  isComplete(graph) {
+  isComplete(graph: Graph): boolean {
     for (const member of this.members) {
       if (!graph.hasEntity(member.id)) {
         return false;
@@ -387,9 +408,9 @@ export class OsmRelation extends OsmEntity {
    * hasFromViaTo
    * Returns whether this relation has members with 'from', 'via', and 'to' roles.
    * These roles are required for `restriction` or `manoeuvre` relations.
-   * @return  {boolean} `true` if the all members are present in the graph, `false` if not
+   * @return `true` if the all members are present in the graph, `false` if not
    */
-  hasFromViaTo() {
+  hasFromViaTo(): boolean {
     return (
       this.members.some(m => m.role === 'from') &&
       this.members.some(m => m.role === 'via') &&
@@ -400,18 +421,18 @@ export class OsmRelation extends OsmEntity {
   /**
    * isConnectivity
    * Returns whether this relation is a 'connectivity' relation, given the tags present.
-   * @return  {boolean}  `true` if the relation is a connectivity relation, `false` if not.
+   * @return `true` if the relation is a connectivity relation, `false` if not.
    */
-  isConnectivity() {
+  isConnectivity(): boolean {
     return /^connectivity:?/.test(this.tags.type);
   }
 
   /**
    * isRestriction
    * Returns whether this relation is a 'restriction' relation, given the tags present.
-   * @return  {boolean}  `true` if the relation is a restriction relation, `false` if not.
+   * @return `true` if the relation is a restriction relation, `false` if not.
    */
-  isRestriction() {
+  isRestriction(): boolean {
     return /^restriction:?/.test(this.tags.type);
   }
 
@@ -419,9 +440,9 @@ export class OsmRelation extends OsmEntity {
    * isValidRestriction
    * Returns whether this relation is a valid 'restriction' relation, given the tags present.
    * Valid restrictions have a 'restriction' type and an appropriate amount of 'from', 'via', 'to' members.
-   * @return  {boolean}  `true` if the relation is a valid restriction relation, `false` if not.
+   * @return `true` if the relation is a valid restriction relation, `false` if not.
    */
-  isValidRestriction() {
+  isValidRestriction(): boolean {
     if (!this.isRestriction()) return false;
 
     const froms = this.members.filter(m => m.role === 'from');
@@ -452,35 +473,36 @@ export class OsmRelation extends OsmEntity {
    * includes the nodes of all way members, but some `Nds` may be unclosed and some inner
    * rings not matched with the intended outer ring.
    *
-   * @param   {Graph}    graph - the Graph that holds the topology needed
-   * @return  {Array<Array<number>>}  An array of closed rings
+   * @param graph - the Graph that holds the topology needed
+   * @return An array of closed rings
    */
-  multipolygon(graph) {
-    let outers = this.members.filter(m => 'outer' === (m.role || 'outer'));
-    let inners = this.members.filter(m => 'inner' === m.role);
+  multipolygon(graph: Graph): Vec2[][][] {
+    let outers: any[] = this.members.filter(m => 'outer' === (m.role || 'outer'));
+    let inners: any[] = this.members.filter(m => 'inner' === m.role);
 
     outers = osmJoinWays(outers, graph);
     inners = osmJoinWays(inners, graph);
 
-    function sequenceToLineString(sequence) {
+    function sequenceToLineString(sequence: any): Vec2[] {
       // close unclosed parts to ensure correct area rendering - iD#2945
       if (sequence.nodes.length > 2 && sequence.nodes.at(0) !== sequence.nodes.at(-1)) {
         sequence.nodes.push(sequence.nodes.at(0));
       }
-      return sequence.nodes.map(node => node.loc);
+      return sequence.nodes.map((node: any) => node.loc);
     }
 
     outers = outers.map(sequenceToLineString);
     inners = inners.map(sequenceToLineString);
 
-    const result = outers.map(o => {
+    const result: Vec2[][][] = outers.map(o => {
       // Heuristic for detecting counterclockwise winding order. Assumes
       // that OpenStreetMap polygons are not hemisphere-spanning.
       return [d3_geoArea({ type: 'Polygon', coordinates: [o] }) > 2 * Math.PI ? o.reverse() : o];
     });
 
-    function findOuter(inner) {
-      let o, outer;
+    function findOuter(inner: Vec2[]): number | undefined {
+      let o: number;
+      let outer: Vec2[];
       for (o = 0; o < outers.length; o++) {
         outer = outers[o];
         if (geomPolygonContainsPolygon(outer, inner)) {

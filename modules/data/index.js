@@ -6,7 +6,7 @@ import { Marker } from './Marker.ts';  // was "QAItem"
 import { OsmChangeset } from './OsmChangeset.js';
 import { OsmEntity } from './OsmEntity.ts';
 import { OsmNode } from './OsmNode.ts';
-import { OsmRelation } from './OsmRelation.js';
+import { OsmRelation } from './OsmRelation.ts';
 import { OsmWay } from './OsmWay.ts';
 
 export {
