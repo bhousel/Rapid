@@ -1,4 +1,4 @@
-export * from './cmd.js';
+export * from './cmd.ts';
 export * from './date.ts';
 export * from './detect.js';
 export * from './dimensions.ts';
