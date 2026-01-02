@@ -38,9 +38,10 @@
     "svg:rapid": "svg-sprite --symbol --symbol-dest . --shape-id-generator \"rapid-%s\" --symbol-sprite dist/svg/rapid-sprite.svg \"svg/rapid-sprite/**/*.svg\"",
     "svg:roentgen": "svg-sprite --symbol --symbol-dest . --shape-id-generator \"roentgen-%s\" --symbol-sprite dist/svg/roentgen-sprite.svg svg/roentgen/*.svg",
     "svg:temaki": "svg-sprite --symbol --symbol-dest . --shape-id-generator \"temaki-%s\" --symbol-sprite dist/svg/temaki-sprite.svg node_modules/@rapideditor/temaki/icons/*.svg",
-    "test": "run-s lint test:unit test:browser",
+    "test": "run-s lint test:unit test:browser test:ts",
     "test:browser": "bun test --dots --preload ./test/test_setup.js ./test/browser/**/*.js",
     "test:unit": "bun test --dots --coverage ./test/unit",
+    "test:ts": "tsc --noEmit",
     "translations": "node --experimental-strip-types ./scripts/tx_pull.ts",
     "translations_BUN": "bun ./scripts/tx_pull.js"
   },

@@ -8,12 +8,6 @@ import type { Graph } from '../lib/Graph.ts';
 /** GeoJSON input - either a Feature or FeatureCollection */
 type GeoJSONInput = GeoJSONFeature | GeoJSONFeatureCollection;
 
-/** Minimal interface for a graphics layer */
-interface Layer {
-  setClass(className: string, entityID: EntityID): void;
-  clearClass(className: string): void;
-}
-
 
 /**
  * utilTotalExtent
