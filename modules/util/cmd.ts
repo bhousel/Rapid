@@ -1,4 +1,4 @@
-import { utilDetect } from './detect.js';
+import { utilDetect } from './detect.ts';
 import type { Context } from '../core/types.ts';
 
 

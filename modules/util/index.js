@@ -1,6 +1,6 @@
 export * from './cmd.ts';
 export * from './date.ts';
-export * from './detect.js';
+export * from './detect.ts';
 export * from './dimensions.ts';
 export * from './fetch_response.ts';
 export * from './get_set_value.ts';
