@@ -1,7 +1,20 @@
 import { RAD2DEG, vecAngle } from '@rapid-sdk/math';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
-import { OsmEntity } from './OsmEntity.js';
+import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
+import type { Context } from '../core/types.ts';
+import type { GeoJSONFeature, GeoJSONObject, PointGeometry } from '../lib/types.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { Vec2 } from './types.ts';
+
+
+/**
+ * Properties for OsmNode data elements.
+ */
+export interface OsmNodeProps extends OsmEntityProps {
+  /** Geographic location in WGS84 [lon, lat] */
+  loc: Vec2;
+}
 
 
 /**
@@ -20,10 +33,10 @@ export class OsmNode extends OsmEntity {
    * @constructor
    * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
-   * @param  {Object}                props  - Properties to assign to the data element
+   * @param otherOrContext - copy another data element, or pass application context
+   * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext, props = {}) {
+  constructor(otherOrContext: OsmNode | Context, props: Partial<OsmNodeProps> = {}) {
     super(otherOrContext, props);
     this.props.type = 'node';
 
@@ -40,21 +53,22 @@ export class OsmNode extends OsmEntity {
 
   /**
    * loc
+   * Geographic location in WGS84 [lon, lat]
    * @readonly
    */
-  get loc() {
-    return this.props.loc;
+  get loc(): Vec2 | undefined {
+    return (this.props as Partial<OsmNodeProps>).loc;
   }
 
   /**
    * asGeoJSON
    * Returns a GeoJSON representation of the OsmNode.
    * Nodes are represented by a Feature with a Point geometry.
-   * @param   {Graph}   graph - Unused for OsmNode
-   * @return  {Object}  GeoJSON representation of the OsmNode
+   * @param _graph - Unused for OsmNode
+   * @returns GeoJSON representation of the OsmNode
    */
-  asGeoJSON() {
-    let geometry = null;
+  asGeoJSON(_graph?: Graph): GeoJSONObject {
+    let geometry: PointGeometry | null = null;
 
     const coords = this.loc;
     if (Array.isArray(coords) && coords.length >= 2) {
@@ -69,22 +83,23 @@ export class OsmNode extends OsmEntity {
       id: this.id,
       properties: this.tags,
       geometry: geometry
-    };
+    } as GeoJSONFeature;
   }
 
   /**
    * asJXON
    * Returns a JXON representation of the OsmNode.
    * For OSM Entities, this is used to prepare an OSM changeset XML.
-   * @param   {string}  changesetID - optional changeset ID to include in the output
-   * @return  {Object}  JXON representation of the OsmNode
+   * @param changesetID - optional changeset ID to include in the output
+   * @returns JXON representation of the OsmNode
    */
-  asJXON(changesetID) {
-    const result = {
+  asJXON(changesetID?: string): Record<string, unknown> {
+    const loc = this.loc;
+    const result: Record<string, unknown> = {
       node: {
         '@id': this.osmId(),
-        '@lon': this.loc[0],
-        '@lat': this.loc[1],
+        '@lon': loc?.[0],
+        '@lat': loc?.[1],
         '@version': (this.props.version || 0),
         tag: Object.keys(this.tags).map(k => {
           return { keyAttributes: { k: k, v: this.tags[k] } };
@@ -92,7 +107,7 @@ export class OsmNode extends OsmEntity {
       }
     };
     if (changesetID) {
-      result.node['@changeset'] = changesetID;
+      (result.node as Record<string, unknown>)['@changeset'] = changesetID;
     }
     return result;
   }
@@ -100,12 +115,12 @@ export class OsmNode extends OsmEntity {
   /**
    * geometry
    * Returns 'point' if this Node is standalone, or 'vertex' if is along a parent Way.
-   * @param   {Graph}   graph - the Graph that holds the topology needed
-   * @return  {string}  'point' or 'vertex'
+   * @param graph - the Graph that holds the topology needed
+   * @returns 'point' or 'vertex'
    */
-  geometry(graph) {
+  geometry(graph: Graph): string {
     return this.transient('geometry', () => {
-      const parents = graph.parentWays(this);
+      const parents = graph.parentWays(this as any);
       return parents.length === 0 ? 'point' : 'vertex';
     });
   }
@@ -113,19 +128,19 @@ export class OsmNode extends OsmEntity {
   /**
    * move
    * Moves this node to a new location.
-   * @param   {Array<number>}  loc - the new location, in WGS84 coordinate [longitude, latitude]
-   * @return  {OsmNode}  A new Node copied from this Node, but with the updated location
+   * @param loc - the new location, in WGS84 coordinate [longitude, latitude]
+   * @returns A new Node copied from this Node, but with the updated location
    */
-  move(loc) {
-    return this.update({ loc: loc });
+  move(loc: Vec2): this {
+    return this.update({ loc: loc } as any);
   }
 
   /**
    * isDegenerate
    * A node is "degenerate" if its location is not a proper WGS84 [longitude,latitude] coordinate.
-   * @return  {boolean}  `true` if the node is degenerate, `false` if not.
+   * @returns `true` if the node is degenerate, `false` if not.
    */
-  isDegenerate() {
+  isDegenerate(): boolean {
     const loc = this.loc;
     return !(
       Array.isArray(loc) && loc.length === 2 &&
@@ -137,11 +152,11 @@ export class OsmNode extends OsmEntity {
   /**
    * directions
    * Returns the directions, in degrees, that this node points, given the tags present.
-   * @param   {Graph}          graph - the Graph that holds the topology needed
-   * @return  {Array<number>}  Array of azimuth angles in degrees
+   * @param graph - the Graph that holds the topology needed
+   * @returns Array of azimuth angles in degrees
    */
-  directions(graph) {
-    let val;
+  directions(graph: Graph): number[] {
+    let val: string;
 
     // which tag to use?
     if (this.isHighwayIntersection(graph) && (this.tags.stop || '').toLowerCase() === 'all') {
@@ -164,7 +179,7 @@ export class OsmNode extends OsmEntity {
 
     if (val === '') return [];
 
-    const cardinal = {
+    const cardinal: Record<string, number> = {
       north: 0,             n: 0,
       northnortheast: 22,   nne: 22,
       northeast: 45,        ne: 45,
@@ -185,12 +200,12 @@ export class OsmNode extends OsmEntity {
 
 
     const vals = val.split(';');
-    const results = [];
+    const results: number[] = [];
 
     for (let v of vals) {
       // swap cardinal for numeric directions
       if (cardinal[v] !== undefined) {
-        v = cardinal[v];
+        v = String(cardinal[v]);
       }
 
       // `v` looks like a numeric direction - just append to results
@@ -205,8 +220,8 @@ export class OsmNode extends OsmEntity {
       if (!lookForward && !lookBackward) continue;
 
       // Gather nodes to look at
-      const nodeIDs = new Set();
-      for (const parent of graph.parentWays(this)) {
+      const nodeIDs = new Set<string>();
+      for (const parent of graph.parentWays(this as any)) {
         if (parent.geometry(graph) !== 'line') continue;
         if (!(parent.tags.highway || parent.tags.railway || parent.tags.waterway || parent.tags.aeroway)) continue;  // not routable?
 
@@ -224,14 +239,9 @@ export class OsmNode extends OsmEntity {
       }
 
       for (const nodeID of nodeIDs) {
-// using loc
-//        const a = viewport.project(this.loc);
-//        const b = viewport.project(graph.entity(nodeID).loc);
-//        results.push( (vecAngle(a, b) * 180 / Math.PI) + 90 );
-// using world coords - no projection!
         // +90 because vecAngle returns angle from X axis, not Y (north)
-        const a = this.geoms.parts[0]?.world?.coords ?? null;
-        const b = graph.entity(nodeID).geoms.parts[0]?.world?.coords ?? null;
+        const a = this.geoms.parts[0]?.world?.coords as Vec2 | null ?? null;
+        const b = graph.entity(nodeID).geoms.parts[0]?.world?.coords as Vec2 | null ?? null;
         if (a === null || b === null) continue;
         results.push((vecAngle(a, b) * RAD2DEG) + 90);
       }
@@ -243,13 +253,13 @@ export class OsmNode extends OsmEntity {
   /**
    * isEndpoint
    * Returns `true` if this node is an endpoint of a parent way.
-   * @param   {Graph}    graph - the Graph that holds the topology needed
-   * @return  {boolean}  `true` if this node is an endpoint on a parent way, `false` if not
+   * @param graph - the Graph that holds the topology needed
+   * @returns `true` if this node is an endpoint on a parent way, `false` if not
    */
-  isEndpoint(graph) {
+  isEndpoint(graph: Graph): boolean {
     return this.transient('isEndpoint', () => {
       const id = this.id;
-      return graph.parentWays(this).filter(parent => {
+      return graph.parentWays(this as any).filter((parent: any) => {
         return !parent.isClosed() && !!parent.affix(id);
       }).length > 0;
     });
@@ -258,19 +268,19 @@ export class OsmNode extends OsmEntity {
   /**
    * isConnected
    * Returns `true` if this node is connected to multiple parent ways
-   * @param   {Graph}    graph - the Graph that holds the topology needed
-   * @return  {boolean}  `true` if this node is connected to multiple parent ways, `false` if not
+   * @param graph - the Graph that holds the topology needed
+   * @returns `true` if this node is connected to multiple parent ways, `false` if not
    */
-  isConnected(graph) {
+  isConnected(graph: Graph): boolean {
     return this.transient('isConnected', () => {
-      const parents = graph.parentWays(this);
+      const parents = graph.parentWays(this as any);
 
       if (parents.length > 1) {  // vertex is connected to multiple parent ways
-        for (let i in parents) {
+        for (const i in parents) {
           if (parents[i].geometry(graph) === 'line' && parents[i].hasInterestingTags()) return true;
         }
       } else if (parents.length === 1) {
-        const way = parents[0];
+        const way = parents[0] as any;
         const nodes = way.nodes.slice();
         if (way.isClosed()) { nodes.pop(); }  // ignore connecting node if closed
 
@@ -287,18 +297,18 @@ export class OsmNode extends OsmEntity {
    * Returns `true` if this node has multiple connections:
    *  - a Node with multiple parents, OR
    *  - a Node connected to a single parent in multiple places.
-   * @param   {Graph}    graph - the Graph that holds the topology needed
-   * @return  {boolean}  `true` if this node has multiple connections
+   * @param graph - the Graph that holds the topology needed
+   * @returns `true` if this node has multiple connections
    */
-  isShared(graph) {
+  isShared(graph: Graph): boolean {
     return this.transient('isShared', () => {
-      const parents = graph.parentWays(this);
+      const parents = graph.parentWays(this as any);
 
       if (parents.length === 0) return false;  // no parents
       if (parents.length > 1) return true;     // multiple parents
 
       // single parent
-      const parent = parents[0];
+      const parent = parents[0] as any;
 
       // If parent is a closed loop, don't count the last node in the nodelist as doubly connected
       const end = parent.isClosed() ? parent.nodes.length - 1 : parent.nodes.length;
@@ -313,13 +323,13 @@ export class OsmNode extends OsmEntity {
   /**
    * parentIntersectionWays
    * Returns an array of parent ways that intersect at this node.
-   * Only linear parent ways with taggins for 'highway', 'railway', 'aeroway', 'waterway' are considered.
-   * @param   {Graph}          graph - the Graph that holds the topology needed
-   * @return  {Array<OsmWay>}  parent ways that intersect at this node.
+   * Only linear parent ways with tagging for 'highway', 'railway', 'aeroway', 'waterway' are considered.
+   * @param graph - the Graph that holds the topology needed
+   * @returns parent ways that intersect at this node.
    */
-  parentIntersectionWays(graph) {
+  parentIntersectionWays(graph: Graph): unknown[] {
     return this.transient('parentIntersectionWays', () => {
-      return graph.parentWays(this).filter(parent => {
+      return graph.parentWays(this as any).filter(parent => {
         return (parent.tags.highway ||
           parent.tags.waterway ||
           parent.tags.railway ||
@@ -332,22 +342,23 @@ export class OsmNode extends OsmEntity {
   /**
    * isIntersection
    * Returns `true` if this node is an intersection, see `parentIntersectionWays`.
-   * @param   {Graph}    graph - the Graph that holds the topology needed
-   * @return  {boolean}  `true` if this node is an intersection of parent ways, `false` if not
+   * @param graph - the Graph that holds the topology needed
+   * @returns `true` if this node is an intersection of parent ways, `false` if not
    */
-  isIntersection(graph) {
+  isIntersection(graph: Graph): boolean {
     return this.parentIntersectionWays(graph).length > 1;
   }
 
   /**
    * isHighwayIntersection
    * Like `isIntersection`, but just for highways.
-   * @param   {Graph}    graph - the Graph that holds the topology needed
-   * @return  {boolean}  `true` if this node is an intersection of parent highways, `false` if not
+   * @param graph - the Graph that holds the topology needed
+   * @returns `true` if this node is an intersection of parent highways, `false` if not
    */
-  isHighwayIntersection(graph) {
+  isHighwayIntersection(graph?: Graph): boolean {
+    if (!graph) return false;
     return this.transient('isHighwayIntersection', () => {
-      return graph.parentWays(this).filter(parent => {
+      return graph.parentWays(this as any).filter(parent => {
         return parent.tags.highway && parent.geometry(graph) === 'line';
       }).length > 1;
     });
@@ -356,12 +367,12 @@ export class OsmNode extends OsmEntity {
   /**
    * isOnAddressLine
    * Returns `true` if this node is along an address interpolation line.
-   * @param   {Graph}    graph - the Graph that holds the topology needed
-   * @return  {boolean}  `true` if this node is along an address interpolation line, `false` if not
+   * @param graph - the Graph that holds the topology needed
+   * @returns `true` if this node is along an address interpolation line, `false` if not
    */
-  isOnAddressLine(graph) {
+  isOnAddressLine(graph: Graph): boolean {
     return this.transient('isOnAddressLine', () => {
-      return graph.parentWays(this).filter(parent => {
+      return graph.parentWays(this as any).filter(parent => {
         return parent.tags.hasOwnProperty('addr:interpolation') && parent.geometry(graph) === 'line';
       }).length > 0;
     });
