@@ -5,6 +5,7 @@ export * from './dimensions.ts';
 export * from './fetch_response.ts';
 export * from './get_set_value.ts';
 export * from './iterable.ts';
+export * from './jsonp_request.ts';
 export * from './keybinding.ts';
 export * from './rebind.ts';
 export * from './string.ts';
