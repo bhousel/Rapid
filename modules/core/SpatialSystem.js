@@ -1,6 +1,6 @@
 import RBush from 'rbush';
 
-import { Graph } from '../lib/Graph.js';
+import { Graph } from '../lib/Graph.ts';
 import { AbstractSystem } from './AbstractSystem.js';
 import { utilIterable } from '../util/iterable.ts';
 

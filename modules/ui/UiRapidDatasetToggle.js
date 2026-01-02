@@ -5,7 +5,7 @@ import { uiIcon } from './icon.js';
 import { uiModal } from './modal.js';
 import { uiRapidColorpicker } from './rapid_colorpicker.js';
 import { UiRapidCatalog } from './UiRapidCatalog.js';
-import { utilCmd } from '../util/cmd.js';
+import { utilCmd } from '../util/cmd.ts';
 
 
 /**

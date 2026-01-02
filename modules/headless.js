@@ -4,7 +4,7 @@ export * from './data/index.js';
 export * from './geo/index.js';
 export * from './lib/index.ts';
 export * from './services/index.js';
-export * from './util/index.js';
+export * from './util/index.ts';
 export * from './validations/index.js';
 
 // These Systems and Services can work without browser and UI.

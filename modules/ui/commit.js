@@ -10,7 +10,7 @@ import { uiChangesetEditor } from './changeset_editor.js';
 import { uiSectionChanges } from './sections/changes.js';
 import { uiCommitWarnings } from './commit_warnings.js';
 import { uiSectionRawTagEditor } from './sections/raw_tag_editor.js';
-import { utilDetect, utilRebind } from '../util/index.js';
+import { utilDetect, utilRebind } from '../util/index.ts';
 
 
 const readOnlyTags = [

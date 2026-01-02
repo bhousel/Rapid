@@ -5,7 +5,7 @@ import { uiIcon } from './icon.js';
 import { uiMapRouletteDetails } from './maproulette_details.js';
 import { uiMapRouletteHeader } from './maproulette_header.js';
 import { UiViewOn } from './UiViewOn.js';
-import { utilNoAuto, utilRebind } from '../util/index.js';
+import { utilNoAuto, utilRebind } from '../util/index.ts';
 
 
 export function uiMapRouletteEditor(context) {

@@ -1,6 +1,6 @@
 import { select as d3_select } from 'd3-selection';
 
-import { utilFunctor } from '../util/util.js';
+import { utilFunctor } from '../util/util.ts';
 
 var _popoverID = 0;
 

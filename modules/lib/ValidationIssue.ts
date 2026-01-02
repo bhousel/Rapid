@@ -4,7 +4,7 @@ import type { Context } from '../core/types.ts';
 import type { EntityID, Vec2 } from '../data/types.ts';
 import type { Graph } from './Graph.js';
 import { ValidationFix } from './ValidationFix.ts';
-import { utilTotalExtent } from '../util/util.js';
+import { utilTotalExtent } from '../util/util.ts';
 
 
 /** Severity level for validation issues */

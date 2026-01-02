@@ -7,9 +7,9 @@ import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionMergeNodes } from '../actions/merge_nodes.js';
 import { geoHasSelfIntersections } from '../geo/geom.js';
-import { osmRoutableHighwayTagValues } from '../lib/tags.js';
-import { ValidationIssue } from '../lib/ValidationIssue.js';
-import { ValidationFix } from '../lib/ValidationFix.js';
+import { osmRoutableHighwayTagValues } from '../lib/tags.ts';
+import { ValidationIssue } from '../lib/ValidationIssue.ts';
+import { ValidationFix } from '../lib/ValidationFix.ts';
 
 
 /**

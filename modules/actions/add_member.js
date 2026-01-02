@@ -1,6 +1,6 @@
 import { utilArrayGroupBy, utilObjectOmit } from '@rapid-sdk/util';
 
-import { osmJoinWays } from '../lib/multipolygon.js';
+import { osmJoinWays } from '../lib/multipolygon.ts';
 import { OsmWay } from '../data/OsmWay.js';
 
 

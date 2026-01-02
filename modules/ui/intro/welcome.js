@@ -2,7 +2,7 @@ import { Extent } from '@rapid-sdk/math';
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 
 import { helpHtml } from './helper.js';
-import { utilRebind } from '../../util/rebind.js';
+import { utilRebind } from '../../util/rebind.ts';
 
 
 export function uiIntroWelcome(context, curtain) {

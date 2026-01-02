@@ -3,12 +3,12 @@ import { easeCubicInOut } from 'd3-ease';
 import { geoSphericalDistance, numWrap } from '@rapid-sdk/math';
 import debounce from 'lodash-es/debounce.js';
 
-import { ImagerySource } from '../../lib/ImagerySource.js';
+import { ImagerySource } from '../../lib/ImagerySource.ts';
 import { uiIcon } from '../icon.js';
 import { uiSettingsCustomBackground } from '../settings/custom_background.js';
 import { uiSection } from '../section.js';
 import { uiTooltip } from '../tooltip.js';
-import { utilCmd } from '../../util/cmd.js';
+import { utilCmd } from '../../util/cmd.ts';
 
 
 /** uiSectionBackgroundList

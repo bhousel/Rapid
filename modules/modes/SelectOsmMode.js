@@ -7,7 +7,7 @@ import { AbstractMode } from './AbstractMode.js';
 import { actionDeleteRelation } from '../actions/delete_relation.js';
 import { actionMove, actionRotate } from '../actions/index.js';
 import * as Operations from '../operations/index.js';
-import { utilCmd, utilKeybinding, utilTotalExtent } from '../util/index.js';
+import { utilCmd, utilKeybinding, utilTotalExtent } from '../util/index.ts';
 
 
 /**

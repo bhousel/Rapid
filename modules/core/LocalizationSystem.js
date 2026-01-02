@@ -2,7 +2,7 @@ import { numClamp, numWrap } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
 import { utilDate } from '../util/date.ts';
-import { utilDetect } from '../util/detect.js';
+import { utilDetect } from '../util/detect.ts';
 
 
 /**

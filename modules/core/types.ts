@@ -8,7 +8,7 @@ import type { Viewport } from '@rapid-sdk/math';
 import type { EventEmitter } from 'tseep';
 import type { Selection } from 'd3-selection';
 
-import type { Graph } from '../lib/Graph.js';
+import type { Graph } from '../lib/Graph.ts';
 
 /** Permissive D3 selection type - accepts any selection without strict type checking */
 export type D3Selection = Selection<any, any, any, any>;

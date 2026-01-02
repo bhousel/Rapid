@@ -3,7 +3,7 @@ import { Extent } from '@rapid-sdk/math';
 import { gpx, kml } from '@tmcw/togeojson';
 import { parse as wktParse } from 'wkt';
 
-import { geojsonFeatures } from '../util/util.js';
+import { geojsonFeatures } from '../util/util.ts';
 import { GeoJSON } from '../data/GeoJSON.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.js';
 import { PixiFeatureLine } from './PixiFeatureLine.js';

@@ -1,6 +1,6 @@
 import { actionChangeTags } from '../actions/change_tags.js';
 import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
-import { utilCmd } from '../util/cmd.js';
+import { utilCmd } from '../util/cmd.ts';
 
 
 export function operationDowngrade(context, selectedIDs) {

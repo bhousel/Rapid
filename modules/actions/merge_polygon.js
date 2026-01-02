@@ -2,7 +2,7 @@ import { geomPolygonContainsPolygon } from '@rapid-sdk/math';
 import { utilArrayGroupBy, utilArrayIntersection, utilObjectOmit } from '@rapid-sdk/util';
 
 import { OsmRelation } from '../data/OsmRelation.js';
-import { osmJoinWays } from '../lib/multipolygon.js';
+import { osmJoinWays } from '../lib/multipolygon.ts';
 
 
 export function actionMergePolygon(ids, newRelationID) {

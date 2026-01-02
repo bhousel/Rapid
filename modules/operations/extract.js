@@ -2,7 +2,7 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { actionExtract } from '../actions/extract.js';
 import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
-import { utilTotalExtent } from '../util/util.js';
+import { utilTotalExtent } from '../util/util.ts';
 
 
 export function operationExtract(context, selectedIDs) {

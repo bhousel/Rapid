@@ -2,7 +2,7 @@ import { select, selection } from 'd3-selection';
 
 import { uiIcon } from '../icon.js';
 import { uiTooltip } from '../tooltip.js';
-import { utilCmd, utilKeybinding } from '../../util/index.js';
+import { utilCmd, utilKeybinding } from '../../util/index.ts';
 
 
 /**

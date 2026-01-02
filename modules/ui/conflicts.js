@@ -2,10 +2,10 @@ import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { select as d3_select } from 'd3-selection';
 import { Extent, numWrap } from '@rapid-sdk/math';
 
-import { JXON } from '../util/jxon.js';
+import { JXON } from '../util/jxon.ts';
 import { OsmChangeset } from '../data/OsmChangeset.js';
 import { uiIcon } from './icon.js';
-import { utilHighlightEntities, utilKeybinding, utilRebind } from '../util/index.js';
+import { utilHighlightEntities, utilKeybinding, utilRebind } from '../util/index.ts';
 
 
 export function uiConflicts(context) {

@@ -1,6 +1,6 @@
 import { selection } from 'd3-selection';
 
-import { JXON } from '../../util/jxon.js';
+import { JXON } from '../../util/jxon.ts';
 import { OsmChangeset } from '../../data/OsmChangeset.js';
 import { actionDiscardTags } from '../../actions/discard_tags.js';
 import { uiIcon } from '../icon.js';

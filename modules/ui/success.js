@@ -4,7 +4,7 @@ import { resolveStrings } from 'osm-community-index';
 
 import { uiIcon } from './icon.js';
 import { uiDisclosure } from '../ui/disclosure.js';
-import { utilRebind } from '../util/rebind.js';
+import { utilRebind } from '../util/rebind.ts';
 
 
 let _oci = null;

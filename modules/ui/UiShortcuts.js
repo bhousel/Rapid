@@ -3,7 +3,7 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { uiIcon } from './icon.js';
 import { uiModal } from './modal.js';
-import { utilCmd, utilDetect } from '../util/index.js';
+import { utilCmd, utilDetect } from '../util/index.ts';
 
 
 /**

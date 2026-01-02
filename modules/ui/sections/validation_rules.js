@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 
 import { uiTooltip } from '../tooltip.js';
 import { uiSection } from '../section.js';
-import { utilGetSetValue, utilNoAuto } from '../../util/index.js';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 
 export function uiSectionValidationRules(context) {

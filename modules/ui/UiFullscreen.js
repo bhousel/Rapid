@@ -1,4 +1,4 @@
-import { utilCmd, utilDetect } from '../util/index.js';
+import { utilCmd, utilDetect } from '../util/index.ts';
 
 
 /**

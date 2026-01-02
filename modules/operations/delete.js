@@ -3,7 +3,7 @@ import { utilGetAllNodes } from '@rapid-sdk/util';
 
 import { actionDeleteMultiple } from '../actions/delete_multiple.js';
 import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
-import { utilCmd, utilTotalExtent } from '../util/index.js';
+import { utilCmd, utilTotalExtent } from '../util/index.ts';
 
 
 export function operationDelete(context, selectedIDs) {

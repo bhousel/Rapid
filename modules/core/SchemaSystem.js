@@ -2,7 +2,7 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 import MiniSearch from 'minisearch';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.js';
+import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.ts';
 import { Category, Field, Preset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilWildcard } from '../util/string.ts';

@@ -5,7 +5,7 @@ import { utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.js';
 import { Marker, GeoJSON } from '../data/index.js';
 import { uiIcon } from '../ui/icon.js';
-import { utilFetchResponse, utilSetTransform } from '../util/index.js';
+import { utilFetchResponse, utilSetTransform } from '../util/index.ts';
 
 
 const KARTAVIEW_API = 'https://kartaview.org';

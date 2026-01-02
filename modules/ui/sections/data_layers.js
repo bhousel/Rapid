@@ -4,7 +4,7 @@ import { uiTooltip } from '../tooltip.js';
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
 import { uiSettingsCustomData } from '../settings/custom_data.js';
-import { utilCmd } from '../../util/cmd.js';
+import { utilCmd } from '../../util/cmd.ts';
 
 
 /** uiSectionDataLayers

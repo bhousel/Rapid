@@ -3,7 +3,7 @@ import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
 import { OsmNode, Marker } from '../data/index.js';
-import { utilDetect } from '../util/detect.js';
+import { utilDetect } from '../util/detect.ts';
 
 const NEAR_TOLERANCE = 1;
 const FAR_TOLERANCE = 4;

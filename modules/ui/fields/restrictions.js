@@ -6,9 +6,9 @@
 //import { actionRestrictTurn } from '../../actions/restrict_turn.js';
 //import { actionUnrestrictTurn } from '../../actions/unrestrict_turn.js';
 //import { OsmWay } from '../../data/OsmWay.js';
-//import { osmIntersection, osmInferRestriction, osmTurn } from '../../lib/index.js';
+//import { osmIntersection, osmInferRestriction, osmTurn } from '../../lib/index.ts';
 //import { svgLayers, svgLines, svgTurns, svgVertices } from '../../svg/index.js';
-//import { utilFunctor, utilRebind } from '../../util/index.js';
+//import { utilFunctor, utilRebind } from '../../util/index.ts';
 //import { utilGetDimensions, utilSetDimensions } from '../../util/dimensions.ts';
 //
 //

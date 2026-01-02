@@ -2,7 +2,7 @@ import { select } from 'd3-selection';
 import { vecAdd } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { utilDetect } from '../util/detect.js';
+import { utilDetect } from '../util/detect.ts';
 
 import {
   UiApiStatus, UiDefs, uiEditMenu, uiFlash, UiFullscreen, uiIntro,

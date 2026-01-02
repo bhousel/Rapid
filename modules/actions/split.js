@@ -2,7 +2,7 @@ import { geoSphericalDistance, numWrap } from '@rapid-sdk/math';
 import { utilArrayIntersection, utilArrayUniq } from '@rapid-sdk/util';
 
 import { actionAddMember } from './add_member.js';
-import { osmIsOldMultipolygonOuterMember } from '../lib/multipolygon.js';
+import { osmIsOldMultipolygonOuterMember } from '../lib/multipolygon.ts';
 import { OsmRelation } from '../data/OsmRelation.js';
 import { OsmWay } from '../data/OsmWay.js';
 

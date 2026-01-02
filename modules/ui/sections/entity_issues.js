@@ -3,7 +3,7 @@ import { utilArrayIdentical } from '@rapid-sdk/util';
 
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
-import { utilHighlightEntities } from '../../util/util.js';
+import { utilHighlightEntities } from '../../util/util.ts';
 
 
 export function uiSectionEntityIssues(context) {

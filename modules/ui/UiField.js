@@ -7,7 +7,7 @@ import { uiTooltip } from './tooltip.js';
 // import { uiFieldHelp } from './field_help.js';
 import { uiFields } from './fields/index.js';
 import { uiTagReference } from './tag_reference.js';
-import { utilRebind, utilTotalExtent } from '../util/index.js';
+import { utilRebind, utilTotalExtent } from '../util/index.ts';
 import { LANGUAGE_SUFFIX_REGEX } from './fields/localized.js';
 
 

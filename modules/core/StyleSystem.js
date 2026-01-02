@@ -1,5 +1,5 @@
 import { AbstractSystem } from './AbstractSystem.js';
-import { osmPavedTags } from '../lib/tags.js';
+import { osmPavedTags } from '../lib/tags.ts';
 
 
 const roadVals = new Set([

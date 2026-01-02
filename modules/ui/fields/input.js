@@ -2,7 +2,7 @@ import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { select as d3_select } from 'd3-selection';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.js';
+import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 import { uiIcon } from '../icon.js';
 
 export {

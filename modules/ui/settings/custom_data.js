@@ -2,7 +2,7 @@ import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { marked } from 'marked';
 
 import { uiConfirm } from '../confirm.js';
-import { utilNoAuto, utilRebind } from '../../util/index.js';
+import { utilNoAuto, utilRebind } from '../../util/index.ts';
 
 
 export function uiSettingsCustomData(context) {

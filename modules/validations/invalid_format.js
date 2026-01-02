@@ -1,4 +1,4 @@
-import { ValidationIssue } from '../lib/ValidationIssue.js';
+import { ValidationIssue } from '../lib/ValidationIssue.ts';
 
 
 export function validationFormatting(context) {

@@ -1,6 +1,6 @@
 import { select as d3_select } from 'd3-selection';
 
-import { utilHighlightEntities } from '../util/util.js';
+import { utilHighlightEntities } from '../util/util.ts';
 import { marked } from 'marked';
 
 export function uiMapRouletteDetails(context) {

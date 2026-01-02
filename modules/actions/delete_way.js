@@ -1,4 +1,4 @@
-import { osmNodeGeometriesForTags } from '../lib/tags.js';
+import { osmNodeGeometriesForTags } from '../lib/tags.ts';
 import { actionDeleteRelation } from './delete_relation.js';
 
 

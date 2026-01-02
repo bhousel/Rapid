@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import { roadSpeedUnit } from '@rapideditor/country-coder';
 
 import { uiCombobox } from '../combobox.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.js';
+import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
 
 export function uiFieldRoadspeed(context, uifield) {

@@ -6,7 +6,7 @@ import { uiConfirm } from '../ui/confirm.js';
 import { uiConflicts } from '../ui/conflicts.js';
 import { uiLoading } from '../ui/loading.js';
 import { uiSuccess } from '../ui/success.js';
-import { utilKeybinding } from '../util/index.js';
+import { utilKeybinding } from '../util/index.ts';
 
 const DEBUG = false;
 

@@ -6,7 +6,7 @@ import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
 import { uiSection } from '../section.js';
 import { uiTagReference } from '../tag_reference.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.js';
+import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
 
 export function uiSectionRawTagEditor(context, id) {

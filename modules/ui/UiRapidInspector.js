@@ -6,7 +6,7 @@ import { uiIcon } from './icon.js';
 import { uiFlash } from './flash.js';
 //import { uiRapidFirstEditDialog } from './rapid_first_edit_dialog.js';
 import { uiTooltip } from './tooltip.js';
-import { utilKeybinding } from '../util/keybinding.js';
+import { utilKeybinding } from '../util/keybinding.ts';
 
 const ACCEPT_FEATURES_LIMIT = 50;
 

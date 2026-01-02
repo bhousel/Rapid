@@ -1,6 +1,6 @@
 import { AbstractBehavior } from './AbstractBehavior.js';
 // import { geoChooseEdge } from '../geo/geom.js';
-import { utilDetect } from '../util/detect.js';
+import { utilDetect } from '../util/detect.ts';
 
 
 /**

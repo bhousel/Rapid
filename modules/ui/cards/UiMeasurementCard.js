@@ -7,7 +7,7 @@ import { utilGetAllNodes } from '@rapid-sdk/util';
 import { AbstractUiCard } from './AbstractUiCard.js';
 import { Marker } from '../../data/Marker.js';
 import { uiIcon } from '../icon.js';
-import { utilCmd } from '../../util/cmd.js';
+import { utilCmd } from '../../util/cmd.ts';
 
 
 // using WGS84 authalic radius (6371007.1809 m)

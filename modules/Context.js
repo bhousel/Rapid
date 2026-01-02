@@ -9,7 +9,7 @@ import { services } from './services/index.js';
 import { systems } from './core/index.js';
 
 import { utilIterable } from './util/iterable.ts';
-import { utilKeybinding } from './util/keybinding.js';
+import { utilKeybinding } from './util/keybinding.ts';
 
 const MINZOOM = 15;
 

@@ -6,7 +6,7 @@ import { uiNoteComments } from './note_comments.js';
 import { uiNoteHeader } from './note_header.js';
 import { uiNoteReport } from './note_report.js';
 import { UiViewOn } from './UiViewOn.js';
-import { utilNoAuto, utilRebind } from '../util/index.js';
+import { utilNoAuto, utilRebind } from '../util/index.ts';
 
 
 export function uiNoteEditor(context) {

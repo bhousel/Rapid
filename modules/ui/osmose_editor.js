@@ -4,7 +4,7 @@ import { uiOsmoseDetails } from './osmose_details.js';
 import { uiOsmoseHeader } from './osmose_header.js';
 import { uiIcon } from './icon.js';
 import { UiViewOn } from './UiViewOn.js';
-import { utilRebind } from '../util/rebind.js';
+import { utilRebind } from '../util/rebind.ts';
 
 
 export function uiOsmoseEditor(context) {

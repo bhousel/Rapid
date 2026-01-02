@@ -6,7 +6,7 @@ import {
 
 import { AbstractSystem } from './AbstractSystem.js';
 import { Marker } from '../data/Marker.js';
-import { utilTotalExtent } from '../util/util.js';
+import { utilTotalExtent } from '../util/util.ts';
 
 const MIN_Z = 2;
 const MAX_Z = 24;

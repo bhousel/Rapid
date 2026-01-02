@@ -3,7 +3,7 @@ import { interpolateRgb } from 'd3-interpolate';
 
 import { uiIcon } from '../icon.js';
 import { uiTooltip } from '../tooltip.js';
-import { utilCmd } from '../../util/cmd.js';
+import { utilCmd } from '../../util/cmd.ts';
 
 
 /**

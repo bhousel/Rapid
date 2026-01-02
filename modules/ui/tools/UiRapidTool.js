@@ -3,7 +3,7 @@ import { selection } from 'd3-selection';
 import { UiRapidDatasetToggle } from '../UiRapidDatasetToggle.js';
 import { UiRapidPowerUserFeatures } from '../UiRapidPowerUserFeatures.js';
 import { uiTooltip } from '../tooltip.js';
-import { utilCmd } from '../../util/cmd.js';
+import { utilCmd } from '../../util/cmd.ts';
 
 
 /**

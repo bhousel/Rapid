@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import { utilArrayUnion } from '@rapid-sdk/util';
 
 import { UiField } from '../UiField.js';
-import { utilRebind } from '../../util/rebind.js';
+import { utilRebind } from '../../util/rebind.ts';
 
 export { uiFieldRadio as uiFieldStructureRadio };
 

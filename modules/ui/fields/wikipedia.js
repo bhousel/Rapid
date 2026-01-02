@@ -4,7 +4,7 @@ import { select as d3_select } from 'd3-selection';
 import { actionChangeTags } from '../../actions/change_tags.js';
 import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.js';
+import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
 
 export function uiFieldWikipedia(context, uifield) {

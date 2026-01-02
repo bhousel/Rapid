@@ -2,8 +2,8 @@ import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '
 
 import { actionAddMidpoint, actionChangeTags, actionSplit} from '../actions/index.js';
 import { OsmNode } from '../data/OsmNode.js';
-import { ValidationIssue } from '../lib/ValidationIssue.js';
-import { ValidationFix } from '../lib/ValidationFix.js';
+import { ValidationIssue } from '../lib/ValidationIssue.ts';
+import { ValidationFix } from '../lib/ValidationFix.ts';
 import { uiIcon } from '../ui/icon.js';
 
 

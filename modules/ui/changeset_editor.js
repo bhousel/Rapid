@@ -5,7 +5,7 @@ import { uiIcon } from './icon.js';
 import { uiCombobox} from './combobox.js';
 import { UiField } from './UiField.js';
 import { uiFormFields } from './form_fields.js';
-import { utilRebind } from '../util/index.js';
+import { utilRebind } from '../util/index.ts';
 
 
 export function uiChangesetEditor(context) {

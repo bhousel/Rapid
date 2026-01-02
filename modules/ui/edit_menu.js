@@ -4,7 +4,7 @@ import { vecAdd } from '@rapid-sdk/math';
 
 import { uiTooltip } from './tooltip.js';
 import { uiIcon } from './icon.js';
-import { utilHighlightEntities, utilRebind } from '../util/index.js';
+import { utilHighlightEntities, utilRebind } from '../util/index.ts';
 
 
 export function uiEditMenu(context) {

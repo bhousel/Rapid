@@ -4,7 +4,7 @@ import debounce from 'lodash-es/debounce.js';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
 import { uiIcon } from '../icon.js';
-import { utilCmd } from '../../util/cmd.js';
+import { utilCmd } from '../../util/cmd.ts';
 
 const METADATA_KEYS = ['zoom', 'vintage', 'source', 'description', 'resolution', 'accuracy'];
 

@@ -3,8 +3,8 @@ import { utilArrayGroupBy, utilArrayIdentical, utilArrayIntersection } from '@ra
 
 import { actionDeleteRelation } from './delete_relation.js';
 import { actionDeleteWay } from './delete_way.js';
-import { osmIsInterestingTag } from '../lib/tags.js';
-import { osmJoinWays } from '../lib/multipolygon.js';
+import { osmIsInterestingTag } from '../lib/tags.ts';
+import { osmJoinWays } from '../lib/multipolygon.ts';
 
 
 // Join ways at the end node they share.

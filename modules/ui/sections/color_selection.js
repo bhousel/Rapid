@@ -1,7 +1,7 @@
 import { uiTooltip } from '../tooltip.js';
 import { uiCombobox } from '../combobox.js';
 import { uiSection } from '../section.js';
-import { utilNoAuto } from '../../util/util.js';
+import { utilNoAuto } from '../../util/util.ts';
 
 
 // This was an experiment that is currently commented out and won't work.

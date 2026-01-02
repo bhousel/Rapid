@@ -4,7 +4,7 @@ import { Color } from 'pixi.js';
 import throttle from 'lodash-es/throttle.js';
 
 import { AbstractSystem } from './AbstractSystem.js';
-import { utilCmd } from '../util/cmd.js';
+import { utilCmd } from '../util/cmd.ts';
 
 const SELECTION_COLOR = '#01d4fa';
 

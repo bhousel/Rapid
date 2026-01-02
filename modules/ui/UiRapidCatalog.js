@@ -4,7 +4,7 @@ import { marked } from 'marked';
 
 import { uiIcon } from './icon.js';
 import { uiCombobox} from './combobox.js';
-import { utilKeybinding, utilNoAuto } from '../util/index.js';
+import { utilKeybinding, utilNoAuto } from '../util/index.ts';
 
 const MAXRESULTS = 100;
 

@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
-import { utilHighlightEntities } from '../../util/util.js';
+import { utilHighlightEntities } from '../../util/util.ts';
 
 
 export function uiSectionSelectionList(context) {

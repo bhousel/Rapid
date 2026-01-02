@@ -5,7 +5,7 @@ import { uiIcon } from './icon.js';
 import { uiKeepRightDetails } from './keepRight_details.js';
 import { uiKeepRightHeader } from './keepRight_header.js';
 import { UiViewOn } from './UiViewOn.js';
-import { utilNoAuto, utilRebind } from '../util/index.js';
+import { utilNoAuto, utilRebind } from '../util/index.ts';
 
 
 export function uiKeepRightEditor(context) {

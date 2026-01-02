@@ -3,7 +3,7 @@ import { Extent, vecSubtract } from '@rapid-sdk/math';
 import { AbstractBehavior } from './AbstractBehavior.js';
 import { actionCopyEntities } from '../actions/copy_entities.js';
 import { actionMove } from '../actions/move.js';
-import { utilDetect } from '../util/detect.js';
+import { utilDetect } from '../util/detect.ts';
 
 
 

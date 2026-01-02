@@ -4,10 +4,10 @@ import { drag as d3_drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-import { deprecatedTagValuesByKey } from '../../lib/tags.js';
+import { deprecatedTagValuesByKey } from '../../lib/tags.ts';
 import { uiCombobox } from '../combobox.js';
-import { utilKeybinding } from '../../util/keybinding.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.js';
+import { utilKeybinding } from '../../util/keybinding.ts';
+import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
 export {
     uiFieldCombo as uiFieldManyCombo,

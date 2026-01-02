@@ -3,7 +3,7 @@ import { utilArrayDifference, utilGetAllNodes } from '@rapid-sdk/util';
 import { actionStraightenNodes } from '../actions/straighten_nodes.js';
 import { actionStraightenWay } from '../actions/straighten_way.js';
 import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
-import { utilTotalExtent } from '../util/util.js';
+import { utilTotalExtent } from '../util/util.ts';
 
 
 export function operationStraighten(context, selectedIDs) {

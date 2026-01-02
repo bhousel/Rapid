@@ -2,7 +2,7 @@ import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
 // import { geoChooseEdge } from '../geo/geom.js';
-import { utilDetect } from '../util/detect.js';
+import { utilDetect } from '../util/detect.ts';
 
 const NEAR_TOLERANCE = 4;
 const FAR_TOLERANCE = 12;

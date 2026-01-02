@@ -9,7 +9,7 @@ export * from './operations/index.js';
 export * from './pixi/index.js';
 export * from './services/index.js';
 export * from './ui/index.js';
-export * from './util/index.js';
+export * from './util/index.ts';
 export * from './validations/index.js';
 
 export { Context } from './Context.js';

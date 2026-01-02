@@ -4,7 +4,7 @@ import { UiBackgroundCard } from './cards/UiBackgroundCard.js';
 import { UiHistoryCard } from './cards/UiHistoryCard.js';
 import { UiLocationCard } from './cards/UiLocationCard.js';
 import { UiMeasurementCard } from './cards/UiMeasurementCard.js';
-import { utilCmd } from '../util/cmd.js';
+import { utilCmd } from '../util/cmd.ts';
 
 
 /**

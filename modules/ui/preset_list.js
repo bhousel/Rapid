@@ -9,7 +9,7 @@ import { uiIcon } from './icon.js';
 import { uiPresetIcon } from './preset_icon.js';
 import { uiTagReference } from './tag_reference.js';
 import { uiTooltip } from './tooltip.js';
-import { utilKeybinding, utilNoAuto, utilRebind, utilTotalExtent } from '../util/index.js';
+import { utilKeybinding, utilNoAuto, utilRebind, utilTotalExtent } from '../util/index.ts';
 
 const MAXSEARCH = 50;   // how many search results to show
 

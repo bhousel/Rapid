@@ -1,6 +1,6 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 
-import { utilRebind } from '../../util/rebind.js';
+import { utilRebind } from '../../util/rebind.ts';
 import { utilGetDimensions } from '../../util/dimensions.ts';
 
 

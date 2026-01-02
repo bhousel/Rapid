@@ -4,7 +4,7 @@ import { AbstractBehavior } from './AbstractBehavior.js';
 import { GeoJSON, Marker, OsmEntity, OsmNode, OsmWay } from '../data/index.js';
 import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { geoChooseEdge } from '../geo/geom.js';
-import { utilDetect } from '../util/detect.js';
+import { utilDetect } from '../util/detect.ts';
 
 const NEAR_TOLERANCE = 4;
 const FAR_TOLERANCE = 12;

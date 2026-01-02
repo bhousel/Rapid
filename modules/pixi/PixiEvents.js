@@ -1,7 +1,7 @@
 import { EventEmitter } from 'tseep';
 import { vecRotate } from '@rapid-sdk/math';
 
-import { utilDetect } from '../util/detect.js';
+import { utilDetect } from '../util/detect.ts';
 
 
 /**

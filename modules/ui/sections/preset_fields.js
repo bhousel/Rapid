@@ -4,7 +4,7 @@ import { utilArrayIdentical, utilArrayUnion } from '@rapid-sdk/util';
 import { UiField } from '../UiField.js';
 import { uiFormFields } from '../form_fields.js';
 import { uiSection } from '../section.js';
-import { utilRebind } from '../../util/rebind.js';
+import { utilRebind } from '../../util/rebind.ts';
 
 
 export function uiSectionPresetFields(context) {

@@ -1,5 +1,5 @@
 import { geoSphericalDistance, vecNormalizedDot } from '@rapid-sdk/math';
-import { utilCmd } from '../../util/cmd.js';
+import { utilCmd } from '../../util/cmd.ts';
 
 /**
  * Insert an icon

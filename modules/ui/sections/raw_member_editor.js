@@ -9,7 +9,7 @@ import { actionMoveMember } from '../../actions/move_member.js';
 import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
 import { uiSection } from '../section.js';
-import { utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../../util/util.js';
+import { utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../../util/util.ts';
 
 const MAX_MEMBERS = 1000;
 

@@ -1,7 +1,7 @@
 import { utilArrayGroupBy } from '@rapid-sdk/util';
 
 import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
-import { utilCmd, utilTotalExtent } from '../util/index.js';
+import { utilCmd, utilTotalExtent } from '../util/index.ts';
 
 
 export function operationCopy(context, selectedIDs) {

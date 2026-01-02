@@ -2,7 +2,7 @@ import { Extent } from '@rapid-sdk/math';
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { select as d3_select } from 'd3-selection';
 
-import { utilRebind } from '../../util/rebind.js';
+import { utilRebind } from '../../util/rebind.ts';
 import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.js';
 
 

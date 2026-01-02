@@ -5,7 +5,7 @@ import { AbstractSystem } from './AbstractSystem.js';
 import { PixiEvents } from '../pixi/PixiEvents.js';
 import { PixiScene } from '../pixi/PixiScene.js';
 import { PixiTextures } from '../pixi/PixiTextures.js';
-import { utilSetTransform } from '../util/util.js';
+import { utilSetTransform } from '../util/util.ts';
 
 const THROTTLE = 250;  // throttled rendering milliseconds (for now)
 

@@ -6,7 +6,7 @@ import { iso1A2Code } from '@rapideditor/country-coder';
 
 import { geoChooseEdge } from '../../geo/geom.js';
 import { uiCombobox } from '../combobox.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.js';
+import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
 
 export function uiFieldAddress(context, uifield) {
