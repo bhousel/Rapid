@@ -4,6 +4,7 @@
  * @module
  */
 
+import type { Context } from '../core/types.ts';
 import type { Geometry } from '../lib/Geometry.ts';
 
 
@@ -18,6 +19,15 @@ export type EntityID = string;
 
 /** Entity type discriminator */
 export type EntityType = 'node' | 'way' | 'relation';
+
+/**
+ * Constructor type for AbstractData and subclasses.
+ * Used for polymorphic copy-on-write update patterns.
+ */
+export type DataConstructor<T> = new (
+  otherOrContext: T | Context,
+  props?: Record<string, unknown>
+) => T;
 
 
 /**

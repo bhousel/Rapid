@@ -70,6 +70,21 @@ export class Category {
 - Keep JSDoc block on constructor
 - Avoid duplicating property docs in the class body
 
+### Destroy Methods and Nullability
+- Declare class properties as **non-null** if they are always valid during normal usage
+- In `destroy()` methods, use `null!` to set properties to null while satisfying the type checker
+- This keeps the type declarations clean and avoids `!` assertions throughout the class
+- Example:
+  ```typescript
+  class Foo {
+    context: Context;  // non-null during normal usage
+
+    destroy(): void {
+      this.context = null!;  // null! satisfies the type checker
+    }
+  }
+  ```
+
 ### Interface Formatting
 - Use concise formatting for interface properties (no blank lines between properties)
 - Each property should have a JSDoc comment on the line directly above it
@@ -144,6 +159,33 @@ export class Category {
   ```
 - This pattern keeps code readable while allowing gradual TypeScript adoption
 - As systems get properly typed, these `as any` casts can be removed
+
+### Browser Globals
+- Prefer `globalThis` over `window` for browser globals
+- This is more portable and works in all JavaScript environments
+- When augmenting global types, extend the `Window` interface in `global.d.ts`
+
+### Converting Legacy Patterns
+- **IIFE singletons** → Convert to classes with static methods
+- **Function with static properties** → Use TypeScript namespace merging (add `// eslint-disable-next-line @typescript-eslint/no-namespace`)
+
+## Conversion Status
+
+Track TypeScript conversion progress here:
+
+| Folder | Status | Notes |
+|--------|--------|-------|
+| `modules/util/` | ✅ Complete | All 14 files converted |
+| `modules/lib/` | 🔄 Partial | `Tree.js`, `tag_classes.js` remain |
+| `modules/pixi/lib/` | 🔄 Partial | `DashLine.js`, `AtlasAllocator.js` remain |
+| `modules/core/` | 🔄 Partial | `types.ts` exists; systems still JS |
+| `modules/actions/` | ❌ Not started | |
+| `modules/behaviors/` | ❌ Not started | |
+| `modules/modes/` | ❌ Not started | |
+| `modules/operations/` | ❌ Not started | |
+| `modules/services/` | ❌ Not started | |
+| `modules/ui/` | ❌ Not started | |
+| `modules/validations/` | ❌ Not started | |
 
 ## Testing
 

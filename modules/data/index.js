@@ -1,6 +1,6 @@
 export * from './parsers/index.js';
 
-import { AbstractData } from './AbstractData.js';
+import { AbstractData } from './AbstractData.ts';
 import { GeoJSON } from './GeoJSON.js';
 import { Marker } from './Marker.js';  // was "QAItem"
 import { OsmChangeset } from './OsmChangeset.js';

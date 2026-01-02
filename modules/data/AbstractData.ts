@@ -1,4 +1,24 @@
+import { Extent } from '@rapid-sdk/math';
+
 import { Geometry } from '../lib/Geometry.ts';
+import type { Context } from '../core/types.ts';
+import type { GeoJSONObject } from '../lib/types.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { DataConstructor } from './types.ts';
+
+
+/**
+ * Properties for AbstractData
+ * Base properties shared by all data elements.
+ */
+export interface AbstractDataProps {
+  /** Unique identifier for this data element */
+  id: string;
+  /** String describing what kind of data element this is (e.g. 'node', 'way', 'relation') */
+  type: string;
+  /** Internal version number, used to detect changes */
+  v: number;
+}
 
 
 /**
@@ -18,15 +38,23 @@ import { Geometry } from '../lib/Geometry.ts';
  *   `props`             Properties object
  */
 export class AbstractData {
+  /** Unique identifier for this data element */
+  id: string;
+  /** Application context */
+  context: Context;
+  /** Geometry wrapper containing original and projected data */
+  geoms: Geometry;
+  /** Properties object - partial base props plus any additional properties */
+  props: Partial<AbstractDataProps> & Record<string, unknown>;
 
   /**
    * @constructor
    * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
-   * @param  {AbstractData|Context}  otherOrContext - copy another data element, or pass application context
-   * @param  {Object}                props  - Properties to assign to the data element
+   * @param otherOrContext - copy another data element, or pass application context
+   * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext, props = {}) {
+  constructor(otherOrContext: AbstractData | Context, props: Partial<AbstractDataProps> = {}) {
     this.id = '';  // put this first so debug inspect shows it first
 
     if (otherOrContext instanceof AbstractData) {  // copy other
@@ -55,11 +83,11 @@ export class AbstractData {
    * Do not use the data element after calling `destroy()`.
    * @abstract
    */
-  destroy() {
+  destroy(): void {
     this.geoms.destroy();
-    this.geoms = null;
-    this.props = null;
-    this.context = null;
+    this.geoms = null!;
+    this.props = null!;
+    this.context = null!;
   }
 
   /**
@@ -68,11 +96,11 @@ export class AbstractData {
    * Data elements are intended to be immutable.  To modify a data element,
    *  pass in the properties to change, and you'll get a new data element.
    * The new data element will have an updated `v` internal version number.
-   * @param   {Object}        props - the updated properties
-   * @return  {AbstractData}  a new data element
+   * @param props - the updated properties
+   * @returns a new data element
    */
-  update(props) {
-    const Type = this.constructor;
+  update(props: Partial<AbstractDataProps>): this {
+    const Type = this.constructor as DataConstructor<this>;
     return new Type(this, props).touch();
   }
 
@@ -80,34 +108,34 @@ export class AbstractData {
    * updateGeometry
    * Forces a recomputation of the internal geometry data.
    * The Graph param is only needed for OSM data types that require a Graph to know their topology.
-   * @param   {Graph?}        graph - optional param, used only for some OSM Entities
-   * @return  {AbstractData}  this same data element
+   * @param _graph - optional param, used only for some OSM Entities
+   * @returns this same data element
    * @abstract
    */
-  updateGeometry(graph) {
+  updateGeometry(_graph?: Graph): this {
     throw new Error(`Do not call 'updateGeometry' on AbstractData`);
   }
 
   /**
    * asGeoJSON
    * Returns a GeoJSON representation of this data element.
-   * @param   {Graph?}  graph - optional param, used only for some OSM Entities
-   * @return  {Object}  GeoJSON representation of the OsmNode
+   * @param _graph - optional param, used only for some OSM Entities
+   * @returns GeoJSON representation of the data element
    * @abstract
    */
-  asGeoJSON() {
+  asGeoJSON(_graph?: Graph): GeoJSONObject {
     throw new Error(`Do not call 'asGeoJSON' on AbstractData`);
   }
 
   /**
    * extent
    * Get an Extent (in WGS84 lon/lat) from this data elemenent's geometry.
-   * Note that this may return `null` in situations where an Extent could not be determined.
+   * Note that this may return `undefined` in situations where an Extent could not be determined.
    * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
-   * @return  {Extent}  Extent representing the data element's bounding box, or `null`
+   * @returns Extent representing the data element's bounding box, or `undefined`
    */
-  extent() {
-    return this.geoms.orig?.extent;
+  extent(): Extent | undefined {
+    return this.geoms?.orig?.extent;
   }
 
   /**
@@ -115,11 +143,11 @@ export class AbstractData {
    * Test if this data element intersects the given other Extent
    * Note that this may return `false` in situations where an Extent could not be determined.
    * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
-   * @param   {Extent}   other - the test extent
-   * @return  {boolean}  `true` if it intersects, `false` if not
+   * @param other - the test extent
+   * @returns `true` if it intersects, `false` if not
    */
-  intersects(other) {
-    const extent = this.geoms.orig?.extent;
+  intersects(other: Extent): boolean {
+    const extent = this.geoms?.orig?.extent;
     return extent?.intersects(other) ?? false;
   }
 
@@ -130,9 +158,9 @@ export class AbstractData {
    * We did it this way to avoid situations where you undo to a previous version
    *  you don't want it to increment it back to the same version and appear unchanged.
    * @see Rapid@9ac2776a
-   * @return  {AbstractData}  this data element
+   * @returns this data element
    */
-  touch() {
+  touch(): this {
     this.props.v = this.context.next('v');
     return this;
   }
@@ -142,40 +170,36 @@ export class AbstractData {
    * A string describing what kind of data element this is (e.g. 'node', 'way', 'relation')
    * The meaning of this type is data-dependant.  For OSM data it will be something like
    *  'node', 'way', 'relation', but for other data may be unset.
-   * @return  {string}  string describing what kind of data element this is
    * @readonly
    */
-  get type() {
+  get type(): string {
     return this.props.type ?? '';
   }
 
   /**
    * dataID
    * Unique string to identify this data element
-   * @return  {string}
    * @readonly
    */
-  get dataID() {
+  get dataID(): string {
     return this.id;
   }
 
   /**
    * v
    * Internal version of the data element, can be used to detect changes.
-   * @return  {number}
    * @readonly
    */
-  get v() {
+  get v(): number {
     return this.props.v || 0;
   }
 
   /**
    * key
    * The 'key' includes both the id and the version
-   * @return   {string}  The id and the version, for example "n1v0"
    * @readonly
    */
-  get key() {
+  get key(): string {
     return `${this.id}v${this.v}`;
   }
 

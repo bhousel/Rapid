@@ -39,11 +39,9 @@ export type { SingularGeometry, SingularGeometryType };
  *   `world.ssr`      Projected smallest surrounding rectangle data (angle, poly)
  */
 export class GeometryPart {
-  context: Context | null;
-
+  context: Context;
   /** Original data, in WGS84 coordinates ([0,0] is Null Island) */
   orig: GeometryPartOrigData | null;
-
   /** Projected data, in world coordinates ([0,0] is the top left corner of a 256x256 Web Mercator world) */
   world: GeometryPartWorldData | null;
 
@@ -65,7 +63,7 @@ export class GeometryPart {
    */
   destroy(): void {
     this.reset();
-    this.context = null;
+    this.context = null!;
   }
 
 
@@ -85,7 +83,7 @@ export class GeometryPart {
    * @return  A new GeometryPart
    */
   clone(): GeometryPart {
-    const copy = new GeometryPart(this.context!);
+    const copy = new GeometryPart(this.context);
 
     for (const obj of ['orig', 'world'] as const) {
       const src = this[obj];
@@ -164,7 +162,7 @@ export class GeometryPart {
   updateWorld(): void {
     if (!this.orig || this.world) return;  // can't do it, or done already
 
-    const viewport = this.context!.viewport;
+    const viewport = this.context.viewport;
     const origCoords = this.orig.coords;
     const type = this.type;
 

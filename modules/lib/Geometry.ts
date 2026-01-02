@@ -23,14 +23,11 @@ import type {
  *   `parts`          Array of GeometryParts
  */
 export class Geometry {
-  context: Context | null;
-
+  context: Context;
   /** Array of GeometryPart elements */
   parts: GeometryPart[];
-
   /** Original data, in WGS84 coordinates ([0,0] is Null Island) */
   orig: GeometryOrigData | null;
-
   /** Projected data, in world coordinates ([0,0] is the top left corner of a 256x256 Web Mercator world) */
   world: GeometryWorldData | null;
 
@@ -53,7 +50,7 @@ export class Geometry {
    */
   destroy(): void {
     this.reset();
-    this.context = null;
+    this.context = null!;
   }
 
 
@@ -79,7 +76,7 @@ export class Geometry {
    * @return  A new Geometry
    */
   clone(): Geometry {
-    const copy = new Geometry(this.context!);
+    const copy = new Geometry(this.context);
     for (const obj of ['orig', 'world'] as const) {
       const src = this[obj];
       if (!src) continue;
@@ -128,7 +125,7 @@ export class Geometry {
     let isValid = false;
 
     for (const geojsonPart of geojsonParts) {
-      const part = new GeometryPart(this.context!);
+      const part = new GeometryPart(this.context);
       part.setData(geojsonPart);
       if (!part.orig || !part.world) continue;  // if the GeometryPart was invalid, skip it
 
