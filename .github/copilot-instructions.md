@@ -137,12 +137,12 @@ export class Category {
 - This makes types easier to read, especially for complex types
 - Example - prefer this:
   ```typescript
-  let leaf: WayEntity | undefined;
-  let survivor: WayEntity | undefined;
+  let leaf: OsmWay | undefined;
+  let survivor: OsmWay | undefined;
   ```
   Over this:
   ```typescript
-  let leaf: WayEntity | undefined, survivor: WayEntity | undefined;
+  let leaf: OsmWay | undefined, survivor: OsmWay | undefined;
   ```
 
 ### Type Declarations

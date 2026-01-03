@@ -7,9 +7,7 @@
 import { Extent } from '@rapid-sdk/math';
 
 import type { Vec2 } from '../data/types.ts';
-
-// Re-export commonly needed types from data module for convenience
-export type { Entity, EntityID, EntityType, NodeEntity, WayEntity, RelationEntity, RelationMember, Vec2, Tags } from '../data/types.ts';
+export type { Vec2 } from '../data/types.ts';
 
 // Re-export Context for convenience (used by almost every class)
 export type { Context } from '../core/types.ts';
@@ -19,7 +17,6 @@ export type { Context } from '../core/types.ts';
 // Action Types
 // ============================================================================
 
-// Forward declaration to avoid circular imports
 import type { Graph } from './Graph.ts';
 
 /**

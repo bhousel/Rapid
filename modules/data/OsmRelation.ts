@@ -5,24 +5,35 @@ import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
 import type { Context } from '../core/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { GeoJSONFeature, GeoJSONFeatureCollection, GeoJSONObject, Vec2 } from '../lib/types.ts';
-import type { EntityID, EntityType, RelationMember } from './types.ts';
+import type { GeoJSONFeature, GeoJSONFeatureCollection, GeoJSONObject } from '../lib/types.ts';
+import type { EntityID, EntityType, Vec2 } from './types.ts';
 
+
+/**
+ * Member of an OSM Relation.
+ */
+export interface OsmRelationMember {
+  /** Entity ID of the member */
+  id: EntityID;
+  /** Type of the member entity */
+  type: EntityType;
+  /** Role of this member in the relation */
+  role: string;
+}
 
 /**
  * Indexed member with additional index property.
  */
-export interface IndexedMember extends RelationMember {
+export interface IndexedMember extends OsmRelationMember {
   index: number;
 }
-
 
 /**
  * Properties for OsmRelation data elements.
  */
 export interface OsmRelationProps extends OsmEntityProps {
   /** Array of relation members */
-  members: RelationMember[];
+  members: OsmRelationMember[];
 }
 
 
@@ -66,7 +77,7 @@ export class OsmRelation extends OsmEntity {
    * get/set the members property
    * @readonly
    */
-  get members(): RelationMember[] {
+  get members(): OsmRelationMember[] {
     return (this.props as OsmRelationProps).members;
   }
 
@@ -181,7 +192,7 @@ export class OsmRelation extends OsmEntity {
     memo[this.id] = copy;
 
     // copy members too
-    const members: RelationMember[] = [];
+    const members: OsmRelationMember[] = [];
     for (const member of this.members) {
       const source = fromGraph.entity(member.id) as any;
       const result = source.copy(fromGraph, memo);
@@ -297,7 +308,7 @@ export class OsmRelation extends OsmEntity {
    * @param index - the index to insert at, or `undefined`
    * @return A new Relation copied from this Relation, but with the updated members list
    */
-  addMember(member: RelationMember, index?: number): OsmRelation {
+  addMember(member: OsmRelationMember, index?: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index === undefined ? members.length : index, 0, member);
     return this.update({ members: members } as any) as OsmRelation;
@@ -310,7 +321,7 @@ export class OsmRelation extends OsmEntity {
    * @param index - the index to replace
    * @return A new Relation copied from this Relation, but with the updated members list
    */
-  updateMember(member: Partial<RelationMember>, index: number): OsmRelation {
+  updateMember(member: Partial<OsmRelationMember>, index: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index, 1, { ...members[index], ...member });
     return this.update({ members: members } as any) as OsmRelation;
@@ -365,7 +376,7 @@ export class OsmRelation extends OsmEntity {
   replaceMember(needle: { id: EntityID }, replacement: { id: EntityID; type: EntityType }, keepDuplicates?: boolean): OsmRelation {
     if (!this.memberById(needle.id)) return this;
 
-    const members: RelationMember[] = [];
+    const members: OsmRelationMember[] = [];
 
     for (const member of this.members) {
       if (member.id !== needle.id) {

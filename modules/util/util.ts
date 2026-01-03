@@ -1,6 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
 import type { Context, D3Selection, Nullable } from '../core/types.ts';
-import type { Entity, EntityID } from '../data/types.ts';
+import type { OsmEntity, EntityID } from '../data/types.ts';
 import type { GeoJSONFeature, GeoJSONFeatureCollection, GeoJSONGeometry, Vec2 } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 
@@ -16,12 +16,12 @@ type GeoJSONInput = GeoJSONFeature | GeoJSONFeatureCollection;
  * @param graph - The graph to look up entities
  * @returns Total Extent that contains the given Entities
  */
-export function utilTotalExtent(vals: Iterable<Entity | EntityID>, graph: Graph): Extent {
+export function utilTotalExtent(vals: Iterable<OsmEntity | EntityID>, graph: Graph): Extent {
   const extent = new Extent();
 
   for (const val of vals) {
-    const entity = (typeof val === 'string' ? graph.hasEntity(val) : val) as Entity | undefined;
-    const other = entity?.extent(graph) as Extent | undefined;
+    const entity = (typeof val === 'string' ? graph.hasEntity(val) : val);
+    const other = entity?.extent();
     if (other) {
       extent.extendSelf(other);
     }

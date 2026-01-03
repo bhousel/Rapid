@@ -1,4 +1,4 @@
-import type { Tags, WayEntity } from './types.ts';
+import type { Tags, OsmWay } from '../data/types.ts';
 
 /**
  * Valid turn lane values per OSM tagging.
@@ -87,7 +87,7 @@ export interface LanesInfo {
  * @param entity - The way entity to parse lanes from
  * @returns Parsed lane information, or null if not applicable
  */
-export function osmLanes(entity: WayEntity): LanesInfo | null {
+export function osmLanes(entity: OsmWay): LanesInfo | null {
   if (entity.type !== 'way') return null;
   if (!entity.tags.highway) return null;
 
@@ -268,7 +268,7 @@ function parseTurnLanes(tag: string | undefined): TurnLaneValue[][] | undefined 
       if (s === '') s = 'none';
       return s.split(';')
         .map(function (d): TurnLaneValue {
-          return validValues.indexOf(d as TurnLaneValue) === -1 ? 'unknown' : d as TurnLaneValue;
+          return !validValues.includes(d as TurnLaneValue) ? 'unknown' : d as TurnLaneValue;
         });
     });
 }
@@ -297,7 +297,7 @@ function parseMiscLanes(tag: string | undefined): MiscLaneValue[] | undefined {
   return tag.split('|')
     .map(function (s): MiscLaneValue {
       if (s === '') s = 'no';
-      return validValues.indexOf(s as MiscLaneValue) === -1 ? 'unknown' : s as MiscLaneValue;
+      return !validValues.includes(s as MiscLaneValue) ? 'unknown' : s as MiscLaneValue;
     });
 }
 
@@ -312,7 +312,7 @@ function parseBicycleWay(tag: string | undefined): BicyclewayLaneValue[] | undef
   return tag.split('|')
     .map(function (s): BicyclewayLaneValue {
       if (s === '') s = 'no';
-      return validValues.indexOf(s as BicyclewayLaneValue) === -1 ? 'unknown' : s as BicyclewayLaneValue;
+      return !validValues.includes(s as BicyclewayLaneValue) ? 'unknown' : s as BicyclewayLaneValue;
     });
 }
 

@@ -24,6 +24,8 @@ export interface OsmEntityProps extends AbstractDataProps {
   changeset: string;
   /** Timestamp of last edit */
   timestamp: string;
+  /** Allow extra properties (e.g. __via, __oneWay for intersection analysis) */
+  [key: string]: unknown;
 }
 
 
@@ -146,6 +148,16 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    */
   asJXON(_changesetID?: string): Record<string, unknown> {
     throw new Error(`Do not call 'asJXON' on OSMEntity`);
+  }
+
+  /**
+   * geometry
+   * Returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type.
+   * @param graph - the Graph that holds the topology needed
+   * @returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type
+   */
+  geometry(graph: Graph): string {
+    throw new Error(`Do not call 'geometry' on OSMEntity`);
   }
 
   /**

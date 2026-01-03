@@ -1,17 +1,21 @@
 import { actionReverse } from '../actions/reverse.js';
 import { osmIsInterestingTag } from './tags.js';
+
+import { OsmNode } from '../data/OsmNode.js';
+import { OsmRelation } from '../data/OsmRelation.js';
 import { OsmWay } from '../data/OsmWay.js';
 
 import type { Graph } from './Graph.ts';
-import type { Action, Entity, NodeEntity, RelationEntity, RelationMember, WayEntity } from './types.ts';
+import type { OsmEntity, OsmRelationMember } from '../data/types.ts';
+import type { Action } from './types.ts';
 
 
 /**
  * A sequence of joined ways with their nodes.
  */
-export interface JoinedWaySequence extends Array<RelationMember | WayEntity> {
+export interface JoinedWaySequence extends Array<OsmRelationMember | OsmWay> {
   /** Ordered array of nodes after joining */
-  nodes: NodeEntity[];
+  nodes: OsmNode[];
 }
 
 /**
@@ -36,21 +40,21 @@ export interface JoinedWaysResult extends Array<JoinedWaySequence> {
  * @param graph - The graph containing the entity
  * @returns The outer member way if entity is a valid old multipolygon relation, false otherwise
  */
-export function osmOldMultipolygonOuterMemberOfRelation(entity: Entity, graph: Graph): WayEntity | false {
+export function osmOldMultipolygonOuterMemberOfRelation(entity: OsmEntity, graph: Graph): OsmWay | false {
   if (entity.type !== 'relation' ||
-    !entity.isMultipolygon()
+    !(entity as OsmRelation).isMultipolygon()
     || Object.keys(entity.tags).filter(osmIsInterestingTag).length > 1) {
     return false;
   }
 
-  let outerMember: WayEntity | undefined;
-  for (const member of (entity as RelationEntity).members) {
+  let outerMember: OsmWay | undefined;
+  for (const member of (entity as OsmRelation).members) {
     if (!member.role || member.role === 'outer') {
       if (outerMember) return false;
       if (member.type !== 'way') return false;
       if (!graph.hasEntity(member.id)) return false;
 
-      outerMember = graph.entity(member.id) as WayEntity;
+      outerMember = graph.entity(member.id) as OsmWay;
 
       if (Object.keys(outerMember.tags).filter(osmIsInterestingTag).length === 0) {
         return false;
@@ -71,7 +75,7 @@ export function osmOldMultipolygonOuterMemberOfRelation(entity: Entity, graph: G
  * @param graph - The graph containing the entity
  * @returns The parent relation if entity is an old multipolygon outer member, false otherwise
  */
-export function osmIsOldMultipolygonOuterMember(entity: Entity, graph: Graph): RelationEntity | false {
+export function osmIsOldMultipolygonOuterMember(entity: OsmEntity, graph: Graph): OsmRelation | false {
   if (entity.type !== 'way' ||
     Object.keys(entity.tags).filter(osmIsInterestingTag).length === 0) {
     return false;
@@ -108,7 +112,7 @@ export function osmIsOldMultipolygonOuterMember(entity: Entity, graph: Graph): R
  * @param graph - The graph containing the entity
  * @returns The outer member way entity, or false if not found or not applicable
  */
-export function osmOldMultipolygonOuterMember(entity: Entity, graph: Graph): WayEntity | false {
+export function osmOldMultipolygonOuterMember(entity: OsmEntity, graph: Graph): OsmWay | false {
   if (entity.type !== 'way') return false;
 
   const parents = graph.parentRelations(entity);
@@ -120,7 +124,7 @@ export function osmOldMultipolygonOuterMember(entity: Entity, graph: Graph): Way
     return false;
   }
 
-  let outerMember: RelationMember | undefined;
+  let outerMember: OsmRelationMember | undefined;
   for (const member of parent.members) {
     if (!member.role || member.role === 'outer') {
       if (outerMember) return false; // Not a simple multipolygon
@@ -130,7 +134,7 @@ export function osmOldMultipolygonOuterMember(entity: Entity, graph: Graph): Way
 
   if (!outerMember) return false;
 
-  const outerEntity = graph.hasEntity(outerMember.id) as WayEntity | undefined;
+  const outerEntity = graph.hasEntity(outerMember.id) as OsmWay | undefined;
   if (!outerEntity ||
     !Object.keys(outerEntity.tags).filter(osmIsInterestingTag).length) {
     return false;
@@ -170,17 +174,17 @@ export function osmOldMultipolygonOuterMember(entity: Entity, graph: Graph): Way
  * @param graph - The graph containing the entities
  * @returns Array of joined way sequences, each with a `nodes` property
  */
-export function osmJoinWays(toJoin: (RelationMember | WayEntity)[], graph: Graph): JoinedWaysResult {
-  type JoinableItem = RelationMember | WayEntity;
+export function osmJoinWays(toJoin: (OsmRelationMember | OsmWay)[], graph: Graph): JoinedWaysResult {
+  type JoinableItem = OsmRelationMember | OsmWay;
 
-  function resolve(member: JoinableItem): NodeEntity[] {
-    return graph.childNodes(graph.entity(member.id) as WayEntity);
+  function resolve(member: JoinableItem): OsmNode[] {
+    return graph.childNodes(graph.entity(member.id) as OsmWay);
   }
 
   function reverse(item: JoinableItem): JoinableItem {
     const action = actionReverse(item.id, { reverseOneway: true }) as Action;
     sequences.actions.push(action);
-    return (item instanceof OsmWay) ? action(graph).entity(item.id) as WayEntity : item;
+    return (item instanceof OsmWay) ? action(graph).entity(item.id) as OsmWay : item;
   }
 
   // make a copy containing only the items to join
@@ -205,7 +209,7 @@ export function osmJoinWays(toJoin: (RelationMember | WayEntity)[], graph: Graph
     // start a new sequence
     let item = items.shift()!;
     const currWays = [item] as unknown as JoinedWaySequence;
-    const currNodes: NodeEntity[] = resolve(item).slice();
+    const currNodes: OsmNode[] = resolve(item).slice();
 
     // add to it
     let i: number;
@@ -213,7 +217,7 @@ export function osmJoinWays(toJoin: (RelationMember | WayEntity)[], graph: Graph
       let start = currNodes[0];
       let end = currNodes[currNodes.length - 1];
       let joinAtEnd: boolean | null = null;
-      let nodes: NodeEntity[] | null = null;
+      let nodes: OsmNode[] | null = null;
 
       // Find the next way/member to join.
       for (i = 0; i < items.length; i++) {

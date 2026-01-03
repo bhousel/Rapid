@@ -1,7 +1,7 @@
 import { Difference } from './Difference.ts';
 import { type Iterable, type OneOrMore, utilIterable } from '../util/iterable.ts';
 
-import type { Context, Entity, EntityID, NodeEntity, RelationEntity, WayEntity } from './types.ts';
+import type { Context, OsmEntity, EntityID, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
 
 
 /**
@@ -21,8 +21,8 @@ export interface GraphProps {
  * Internal cache structure used to store entities and their relationships
  */
 export interface GraphCache {
-  /** Map<entityID, Entity> - stores all entities */
-  entities: Map<EntityID, Entity | undefined>;
+  /** Map<entityID, OsmEntity> - stores all entities */
+  entities: Map<EntityID, OsmEntity | undefined>;
   /** Map<entityID, Set<entityIDs>> - maps child IDs to parent Way IDs */
   parentWays: Map<EntityID, Set<EntityID>>;
   /** Map<entityID, Set<entityIDs>> - maps child IDs to parent Relation IDs */
@@ -61,7 +61,7 @@ export class Graph {
    * @param  otherOrContext  - copy another Graph, or pass application context
    * @param  propsOrEntities - optional properties or base Entities to include in the graph.
    */
-  constructor(otherOrContext: Graph | Context, propsOrEntities: Entity[] | Partial<GraphProps> = {}) {
+  constructor(otherOrContext: Graph | Context, propsOrEntities: OsmEntity[] | Partial<GraphProps> = {}) {
     this.id = '';  // put this first so debug inspect shows it first
 
     // A Graph derived from a predecessor Graph
@@ -176,11 +176,11 @@ export class Graph {
 
   /**
    * hasEntity
-   * Gets an Entity, searches the local cache first, then the base cache.
+   * Gets an OsmEntity, searches the local cache first, then the base cache.
    * @param   entityID - The entityID to lookup
-   * @return  Entity from either local or base cache, or `undefined` if not found.
+   * @return  OsmEntity from either local or base cache, or `undefined` if not found.
    */
-  hasEntity(entityID: EntityID): Entity | undefined {
+  hasEntity(entityID: EntityID): OsmEntity | undefined {
     const base = this.base.entities;
     const local = this.local.entities;
     return local.has(entityID) ? local.get(entityID) : base.get(entityID);
@@ -189,16 +189,16 @@ export class Graph {
 
   /**
    * entity
-   * Gets an Entity, searches the local cache first, then the base cache.
+   * Gets an OsmEntity, searches the local cache first, then the base cache.
    * (same as `hasEntity` but throws if not found)
    * @param   entityID - The entityID to lookup
-   * @return  Entity from either local or base cache
+   * @return  OsmEntity from either local or base cache
    * @throws  Will throw if the entity is not found
    */
-  entity(entityID: EntityID): Entity {
+  entity(entityID: EntityID): OsmEntity {
     const entity = this.hasEntity(entityID);
     if (!entity) {
-      throw new Error(`Entity ${entityID} not found`);
+      throw new Error(`OsmEntity ${entityID} not found`);
     }
     return entity;
   }
@@ -206,57 +206,57 @@ export class Graph {
 
   /**
    * parentWays
-   * Makes an Array containing parent Ways for the given Entity.
+   * Makes an Array containing parent Ways for the given OsmEntity.
    * Makes a shallow copy (i.e. the Array is new, but the Entities in it are references)
-   * @param   entity - The Entity to get parentWays for
+   * @param   entity - The OsmEntity to get parentWays for
    * @return  Array of parent Ways
    * @throws  Will throw if any parent Way is not found
    */
-  parentWays(entity: Entity): WayEntity[] {
+  parentWays(entity: OsmEntity): OsmWay[] {
     const base = this.base.parentWays;
     const local = this.local.parentWays;
     const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set();
-    return Array.from(parentIDs).map(parentID => this.entity(parentID) as WayEntity);
+    return Array.from(parentIDs).map(parentID => this.entity(parentID) as OsmWay);
   }
 
 
   /**
    * parentRelations
-   * Makes an Array containing parent Relations for the given Entity.
+   * Makes an Array containing parent Relations for the given OsmEntity.
    * Makes a shallow copy (i.e. the Array is new, but the Entities in it are references)
-   * @param   entity - The Entity to get parentRelations for
+   * @param   entity - The OsmEntity to get parentRelations for
    * @return  Array of parent Relations
    * @throws  Will throw if any parent Relation is not found
    */
-  parentRelations(entity: Entity): RelationEntity[] {
+  parentRelations(entity: OsmEntity): OsmRelation[] {
     const base = this.base.parentRels;
     const local = this.local.parentRels;
     const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set();
-    return Array.from(parentIDs).map(parentID => this.entity(parentID) as RelationEntity);
+    return Array.from(parentIDs).map(parentID => this.entity(parentID) as OsmRelation);
   }
 
 
   /**
    * childNodes
-   * Makes an Array containing child Nodes for the given Entity.
+   * Makes an Array containing child Nodes for the given OsmEntity.
    * Makes a shallow copy (i.e. the Array is new, but the Entities in it are references)
-   * @param   entity - The Entity to get childNodes for
+   * @param   entity - The OsmEntity to get childNodes for
    * @return  Array of child Nodes
    */
-  childNodes(entity: WayEntity): NodeEntity[] {
+  childNodes(entity: OsmWay): OsmNode[] {
     if (!entity.nodes) return [];  // not a way?
-    return entity.nodes.map(nodeID => this.entity(nodeID) as NodeEntity);
+    return entity.nodes.map(nodeID => this.entity(nodeID) as OsmNode);
   }
 
 
   /**
    * replace
-   * Replace an Entity in this Graph
+   * Replace an OsmEntity in this Graph
    * @param   entities - entities to replace
    * @return  this Graph
    * @throws  Will throw if called on a base graph
    */
-  replace(entities: OneOrMore<Entity>): Graph {
+  replace(entities: OneOrMore<OsmEntity>): Graph {
     if (this.isBaseGraph) {
       throw new Error(`Do not call 'replace' on a base graph`);
     }
@@ -276,12 +276,12 @@ export class Graph {
 
   /**
    * remove
-   * Remove an Entity from this Graph
+   * Remove an OsmEntity from this Graph
    * @param   entities - entities to remove
    * @return  this Graph
    * @throws  Will throw if called on a base graph
    */
-  remove(entities: OneOrMore<Entity>): Graph {
+  remove(entities: OneOrMore<OsmEntity>): Graph {
     if (this.isBaseGraph) {
       throw new Error(`Do not call 'remove' on a base graph`);
     }
@@ -301,7 +301,7 @@ export class Graph {
 
   /**
    * revert
-   * Revert an Entity back to whatever state it had in the base graph
+   * Revert an OsmEntity back to whatever state it had in the base graph
    * @param   entityIDs - the entityIDs of the Entities to revert
    * @return  this Graph
    * @throws  Will throw if called on a base graph
@@ -367,12 +367,12 @@ export class Graph {
    * @return  this Graph
    * @throws  Will throw if called on a base graph
    */
-  load(entities: Record<EntityID, Entity | undefined> = {}): Graph {
+  load(entities: Record<EntityID, OsmEntity | undefined> = {}): Graph {
     if (this.isBaseGraph) {
       throw new Error(`Do not call 'load' on a base graph`);
     }
 
-    const _loadOne = (entityID: EntityID, entity: Entity | undefined): void => {
+    const _loadOne = (entityID: EntityID, entity: OsmEntity | undefined): void => {
       const current = this.hasEntity(entityID);
       const replacement = entity || undefined;
       this.local.entities.set(entityID, replacement);
@@ -381,12 +381,12 @@ export class Graph {
 
     // we want to process the nodes first..
     for (const [entityID, entity] of Object.entries(entities)) {
-      if ((entity as Entity | undefined)?.type === 'node') {
+      if ((entity as OsmEntity | undefined)?.type === 'node') {
         _loadOne(entityID, entity);
       }
     }
     for (const [entityID, entity] of Object.entries(entities)) {
-      if ((entity as Entity | undefined)?.type !== 'node') {
+      if ((entity as OsmEntity | undefined)?.type !== 'node') {
         _loadOne(entityID, entity);
       }
     }
@@ -406,7 +406,7 @@ export class Graph {
    * @param  force - If `true`, always update, if `false` skip Entities that we've seen already
    * @throws  Will throw if _not_ called on a base graph
    */
-  rebase(entities: OneOrMore<Entity>, stack: Graph[] = [], force: boolean = false): void {
+  rebase(entities: OneOrMore<OsmEntity>, stack: Graph[] = [], force: boolean = false): void {
 //    if (!this.isBaseGraph) {
 //      throw new Error(`Must call 'rebase' on a base graph`);
 //    }
@@ -430,7 +430,7 @@ export class Graph {
       // that Node was shared with another way.  If we detect this condition, restore the node.
       // (A "delete" is stored as: setting that entity = `undefined`)
       if (head && entity.type === 'way') {
-        for (const id of (entity as WayEntity).nodes) {
+        for (const id of (entity as OsmWay).nodes) {
           if (head.has(id) && head.get(id) === undefined) {  // was deleted
             restoreIDs.add(id);
           }
@@ -448,12 +448,12 @@ export class Graph {
 
   /**
    * _updateCaches
-   * Internal function, used to update internal caches after an Entity update.
-   * @param  previous  - The previous Entity, may be undefined if new
-   * @param  current   - The current Entity, may be undefined if delete
+   * Internal function, used to update internal caches after an OsmEntity update.
+   * @param  previous  - The previous OsmEntity, may be undefined if new
+   * @param  current   - The current OsmEntity, may be undefined if delete
    * @param  caches    - which caches to update, defaults to the local caches
    */
-  _updateCaches(previous: Entity | undefined, current: Entity | undefined, caches?: GraphCache): void {
+  _updateCaches(previous: OsmEntity | undefined, current: OsmEntity | undefined, caches?: GraphCache): void {
     const base = this.base;
     const local = this.local;
     const which = caches ?? local;
@@ -464,8 +464,8 @@ export class Graph {
     if (!entity) return;   // Either current or previous must be set
 
     if (entity.type === 'way') {  // update parentWays
-      const prevNodes = new Set<EntityID>((previous as WayEntity | undefined)?.nodes);
-      const currNodes = new Set<EntityID>((current as WayEntity | undefined)?.nodes);
+      const prevNodes = new Set<EntityID>((previous as OsmWay | undefined)?.nodes);
+      const currNodes = new Set<EntityID>((current as OsmWay | undefined)?.nodes);
       const removed = prevNodes.difference(currNodes);
       const added = currNodes.difference(prevNodes);
 
@@ -483,8 +483,8 @@ export class Graph {
 
     } else if (entity.type === 'relation') {  // Update parentRels
       // diff only on the IDs since the same entity can be a member multiple times with different roles
-      const prevMembers = new Set<EntityID>((previous as RelationEntity | undefined)?.members?.map(m => m.id));
-      const currMembers = new Set<EntityID>((current as RelationEntity | undefined)?.members?.map(m => m.id));
+      const prevMembers = new Set<EntityID>((previous as OsmRelation | undefined)?.members?.map(m => m.id));
+      const currMembers = new Set<EntityID>((current as OsmRelation | undefined)?.members?.map(m => m.id));
       const removed = prevMembers.difference(currMembers);
       const added = currMembers.difference(prevMembers);
 
@@ -549,7 +549,7 @@ export class Graph {
 
   /**
    * _updateGeometries
-   * Internal function, used to update Entity geometries affected by recent graph changes.
+   * Internal function, used to update OsmEntity geometries affected by recent graph changes.
    * This needs to be called after all `_updateCaches` calls have finished.
    */
   _updateGeometries(entityIDs: Iterable<EntityID>): void {
@@ -557,7 +557,7 @@ export class Graph {
       const entity = this.hasEntity(entityID);
       if (!entity) continue;                  // entity was deleted
       if (entity.type === 'node') continue;   // nodes don't need this
-      (entity as WayEntity | RelationEntity).updateGeometry(this);
+      (entity as OsmWay | OsmRelation).updateGeometry(this);
     }
   }
 
@@ -566,7 +566,7 @@ export class Graph {
    * _nodesFirst
    * Internal function, compare function to sort nodes first.
    */
-  _nodesFirst(a: Entity, b: Entity): number {
+  _nodesFirst(a: OsmEntity, b: OsmEntity): number {
     const aIsNode = (a.type === 'node');
     const bIsNode = (b.type === 'node');
     return (aIsNode && !bIsNode) ? -1 : (!aIsNode && bIsNode) ? 1 : 0;

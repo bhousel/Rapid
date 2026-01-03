@@ -1,4 +1,4 @@
-import type { Tags } from './types.ts';
+import type { Tags } from '../data/types.ts';
 
 
 // ============================================================================
@@ -267,7 +267,7 @@ export function getDeprecatedTags(tags: Tags): DeprecatedTagEntry[] {
       if (vals.length === 0) {
         return false;
       } else if (vals.length > 1) {
-        return vals.indexOf(d.old[oldKey]) !== -1;
+        return vals.includes(d.old[oldKey]);
       } else {
         if (tags[oldKey] === d.old[oldKey]) {
           if (d.replace && d.old[oldKey] === d.replace[oldKey]) {

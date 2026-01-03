@@ -1,7 +1,7 @@
 import deepEqual from 'fast-deep-equal';
 
 import type { Iterable } from '../util/iterable.ts';
-import type { Entity, EntityID, RelationMember, WayEntity, RelationEntity } from './types.ts';
+import type { OsmEntity, EntityID, OsmRelationMember, OsmNode, OsmWay, OsmRelation } from '../data/types.ts';
 import type { Graph } from './Graph.ts';
 
 
@@ -10,9 +10,9 @@ import type { Graph } from './Graph.ts';
  */
 export interface DifferenceChange {
   /** The entity in the base graph (undefined if added) */
-  base: Entity | undefined;
+  base: OsmEntity | undefined;
   /** The entity in the head graph (undefined if deleted) */
-  head: Entity | undefined;
+  head: OsmEntity | undefined;
 }
 
 /**
@@ -35,7 +35,7 @@ export interface DifferenceFlags {
  */
 interface SummaryEntry {
   /** The entity that changed */
-  entity: Entity;
+  entity: OsmEntity;
   /** The Graph where the entity can be found (head or base) */
   graph: Graph;
   /** The type of change: 'created', 'modified', or 'deleted' */
@@ -57,7 +57,7 @@ export class Difference {
   private _head: Graph;
   private _changes: Map<EntityID, DifferenceChange>;
   private _summary: Map<EntityID, SummaryEntry> | null;
-  private _complete: Map<EntityID, Entity | undefined> | null;
+  private _complete: Map<EntityID, OsmEntity | undefined> | null;
 
   /** Flags indicating what types of changes occurred */
   didChange: DifferenceFlags;
@@ -105,19 +105,19 @@ export class Difference {
 
       if (h && b) {
         if (type === 'relation') {
-          if (!deepEqual((h as RelationEntity).members, (b as RelationEntity).members)) {
+          if (!deepEqual((h as OsmRelation).members, (b as OsmRelation).members)) {
             this._changes.set(id, { base: b, head: h });
             this.didChange.geometry = true;
             this.didChange.properties = true;
             continue;
           }
         } else if (type === 'way') {
-          if (!deepEqual((h as WayEntity).nodes, (b as WayEntity).nodes)) {
+          if (!deepEqual((h as OsmWay).nodes, (b as OsmWay).nodes)) {
             this._changes.set(id, { base: b, head: h });
             this.didChange.geometry = true;
           }
         } else if (type === 'node') {
-          if (!deepEqual(h.loc, b.loc)) {
+          if (!deepEqual((h as OsmNode).loc, (b as OsmNode).loc)) {
             this._changes.set(id, { base: b, head: h });
             this.didChange.geometry = true;
           }
@@ -146,8 +146,8 @@ export class Difference {
    * modified
    * @return  Array of Entities modified
    */
-  modified(): Entity[] {
-    const result: Entity[] = [];
+  modified(): OsmEntity[] {
+    const result: OsmEntity[] = [];
     for (const change of this._changes.values()) {
       if (change.base && change.head) {
         result.push(change.head);
@@ -161,8 +161,8 @@ export class Difference {
    * created
    * @return  Array of Entities created
    */
-  created(): Entity[] {
-    const result: Entity[] = [];
+  created(): OsmEntity[] {
+    const result: OsmEntity[] = [];
     for (const change of this._changes.values()) {
       if (!change.base && change.head) {
         result.push(change.head);
@@ -176,8 +176,8 @@ export class Difference {
    * deleted
    * @return  Array of Entities deleted
    */
-  deleted(): Entity[] {
-    const result: Entity[] = [];
+  deleted(): OsmEntity[] {
+    const result: OsmEntity[] = [];
     for (const change of this._changes.values()) {
       if (change.base && !change.head) {
         result.push(change.base);
@@ -199,7 +199,7 @@ export class Difference {
    * Returns a result about the Entities that changed:
    *  {
    *    entityID: {
-   *      entity:      The Entity that changed
+   *      entity:      The OsmEntity that changed
    *      graph:       The Graph it can be found in (head or base)
    *      changeType:  String, one of 'created', 'modified', or 'deleted'
    *    }
@@ -224,7 +224,7 @@ export class Difference {
         result.set(b.id, { entity: b, graph: base, changeType: 'deleted' });
 
       } else if (b && h) {  // modified vertex
-        const moved = !deepEqual(b.loc, h.loc);
+        const moved = !deepEqual((b as OsmNode).loc, (h as OsmNode).loc);
         const retagged = !deepEqual(b.tags, h.tags);
         if (moved) {
           for (const parent of head.parentWays(h)) {
@@ -256,11 +256,11 @@ export class Difference {
    * Recurses up to include all ancestor Entities in the result, parentWays and parentRelations.
    * @return  Returns the complete set of entities affected by the change
    */
-  complete(): Map<EntityID, Entity | undefined> {
+  complete(): Map<EntityID, OsmEntity | undefined> {
     if (this._complete) return this._complete;  // done already
 
     const head = this._head;
-    const result = new Map<EntityID, Entity | undefined>();
+    const result = new Map<EntityID, OsmEntity | undefined>();
 
     for (const [entityID, change] of this._changes) {
       const h = change.head;
@@ -270,16 +270,16 @@ export class Difference {
       result.set(entityID, h);
 
       if (entity?.type === 'way') {
-        const headNodes = new Set((h as WayEntity | undefined)?.nodes);
-        const baseNodes = new Set((b as WayEntity | undefined)?.nodes);
+        const headNodes = new Set((h as OsmWay | undefined)?.nodes);
+        const baseNodes = new Set((b as OsmWay | undefined)?.nodes);
         for (const nodeID of headNodes.union(baseNodes)) {
           result.set(nodeID as EntityID, head.hasEntity(nodeID as EntityID));
         }
       }
 
-      if (entity?.type === 'relation' && entity.isMultipolygon()) {
-        const headMembers = new Set((h as RelationEntity | undefined)?.members?.map((m: RelationMember) => m.id));
-        const baseMembers = new Set((b as RelationEntity | undefined)?.members?.map((m: RelationMember) => m.id));
+      if (entity?.type === 'relation' && (entity as OsmRelation).isMultipolygon()) {
+        const headMembers = new Set((h as OsmRelation | undefined)?.members?.map((m: OsmRelationMember) => m.id));
+        const baseMembers = new Set((b as OsmRelation | undefined)?.members?.map((m: OsmRelationMember) => m.id));
         for (const memberID of headMembers.union(baseMembers)) {
           const member = head.hasEntity(memberID as EntityID);
           if (!member) continue;   // not downloaded
@@ -295,7 +295,7 @@ export class Difference {
     return result;
 
 
-    function _gatherParents(parents: Iterable<Entity>, result: Map<EntityID, Entity | undefined>): void {
+    function _gatherParents(parents: Iterable<OsmEntity>, result: Map<EntityID, OsmEntity | undefined>): void {
       for (const parent of parents) {
         if (result.has(parent.id)) continue;
         result.set(parent.id, parent);
