@@ -1,4 +1,4 @@
-export * from './parsers/index.js';
+export * from './parsers/index.ts';
 
 import { AbstractData } from './AbstractData.ts';
 import { GeoJSON } from './GeoJSON.ts';

@@ -1,5 +1,24 @@
 import { DOMParser } from '@xmldom/xmldom';
 
+import type {
+  ParserDataType,
+  ParserOptions,
+  ParserResult,
+  ParsedApi,
+  ParsedBounds,
+  ParsedChangeset,
+  ParsedComment,
+  ParsedNode,
+  ParsedPolicy,
+  ParsedPreferences,
+  ParsedRelation,
+  ParsedNote,
+  ParsedUser,
+  ParsedUserBlock,
+  ParsedWay,
+} from './types.ts';
+import type { Tags } from '../types.ts';
+
 
 /**
  * OsmXMLParser
@@ -48,6 +67,8 @@ import { DOMParser } from '@xmldom/xmldom';
  *  'bounds'         (returned with the `/map` API call)
  */
 export class OsmXMLParser {
+  _seen: Set<string>;
+  types: Set<ParserDataType>;
 
   /**
    * @constructor
@@ -69,7 +90,7 @@ export class OsmXMLParser {
     this._parseBounds = this._parseBounds.bind(this);
     this._getTags = this._getTags.bind(this);
 
-    this.types = new Set([
+    this.types = new Set<ParserDataType>([
       'node', 'way', 'relation', 'changeset', 'note', 'user', 'user_block', 'preferences', 'api', 'policy', 'bounds'
     ]);
   }
@@ -79,7 +100,7 @@ export class OsmXMLParser {
    * reset
    * Call reset to clear the caches.
    */
-  reset() {
+  reset(): void {
     this._seen.clear();
   }
 
@@ -87,12 +108,12 @@ export class OsmXMLParser {
   /**
    * parse
    * Parse the given content and extract whatatever OSM data we find in it.
-   * @param   {Object|string}  content - the content to parse
-   * @param   {Object}         options - parsing options
-   * @return  {Object}   Result object containing the information parsed
+   * @param   content - the content to parse
+   * @param   options - parsing options
+   * @return  Result object containing the information parsed
    * @throws  Will throw if nothing could be parsed, or errors found
    */
-  parse(content, options = {}) {
+  parse(content: Document | string, options: Partial<ParserOptions> = {}): ParserResult {
     if (!content)  {
       throw new Error('No content');
     }
@@ -101,7 +122,7 @@ export class OsmXMLParser {
     const skipSeen = options.skipSeen ?? true;
 
     // include only these in the results (e.g. ['node','way','relation'])
-    let filter;
+    let filter: Set<string>;
     if (options.filter instanceof Set) {
       filter = options.filter;
     } else if (Array.isArray(options.filter)) {
@@ -111,14 +132,14 @@ export class OsmXMLParser {
     }
 
     // Note: I'd like to try to find a way to avoid seenIDs, See note in EditSystem.merge()..
-    const results = { osm: {}, data: [], seenIDs: new Set() };
-    const xml = (typeof content === 'string' ? new DOMParser().parseFromString(content, 'application/xml') : content);
+    const results: ParserResult = { osm: {}, data: [], seenIDs: new Set() };
+    const xml: Document = (typeof content === 'string' ? new DOMParser().parseFromString(content, 'application/xml') : content);
 
     if (!xml?.childNodes) {
       throw new Error('No XML');
     }
 
-    const osmElement = Array.from(xml.childNodes).find(child => child.nodeName === 'osm');
+    const osmElement = Array.from(xml.childNodes).find(child => child.nodeName === 'osm') as Element | undefined;
     if (!osmElement?.childNodes) {
       throw new Error('No OSM Element');
     }
@@ -137,34 +158,35 @@ export class OsmXMLParser {
     }
 
     for (const child of children) {
-      let parser, id;
+      let parser: ((xml: Element, id: string) => any) | undefined;
+      let id: string | undefined;
 
       if (child.nodeName === 'node' && filter.has('node')) {
-        id = 'n' + child.attributes.getNamedItem('id').value;
+        id = 'n' + (child as Element).getAttribute('id');
         results.seenIDs.add(id);
         parser = this._parseNode;
 
       } else if (child.nodeName === 'way' && filter.has('way')) {
-        id = 'w' + child.attributes.getNamedItem('id').value;
+        id = 'w' + (child as Element).getAttribute('id');
         results.seenIDs.add(id);
         parser = this._parseWay;
 
       } else if (child.nodeName === 'relation' && filter.has('relation')) {
-        id = 'r' + child.attributes.getNamedItem('id').value;
+        id = 'r' + (child as Element).getAttribute('id');
         results.seenIDs.add(id);
         parser = this._parseRelation;
 
       } else if (child.nodeName === 'changeset' && filter.has('changeset')) {
-        id = 'c' + child.attributes.getNamedItem('id').value;
+        id = 'c' + (child as Element).getAttribute('id');
         results.seenIDs.add(id);
         parser = this._parseChangeset;
 
       } else if (child.nodeName === 'note' && filter.has('note')) {
-        id = 'note' + child.getElementsByTagName('id')[0].textContent;
+        id = 'note' + (child as Element).getElementsByTagName('id')[0]?.textContent;
         parser = this._parseNote;
 
       } else if (child.nodeName === 'user' && filter.has('user')) {
-        id = 'user' + child.attributes.getNamedItem('id').value;
+        id = 'user' + (child as Element).getAttribute('id');
         parser = this._parseUser;
 
       } else if (child.nodeName === 'user_block' && filter.has('user_block')) {
@@ -190,7 +212,7 @@ export class OsmXMLParser {
         this._seen.add(id);
       }
 
-      const parsed = parser(child, id);
+      const parsed = parser(child as Element, id ?? '');
       if (parsed) {
         results.data.push(parsed);
       }
@@ -203,13 +225,13 @@ export class OsmXMLParser {
   /**
    * _parseNode
    * Parse the given `<node>` element.
-   * @param   {DOMNode}  xml - the DOM node
-   * @param   {string}   id  - the OSM nodeID (e.g. 'n1')
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @param   id  - the OSM nodeID (e.g. 'n1')
+   * @return  Object of parsed properties
    */
-  _parseNode(xml, id) {
+  _parseNode(xml: Element, id: string): ParsedNode {
     const attrs = getCleanAttributes(xml);
-    const props = {
+    const props: any = {
       type: 'node',
       id: id,
       visible: attrs.visible ?? true,
@@ -218,23 +240,23 @@ export class OsmXMLParser {
     };
 
     for (const [k, v] of Object.entries(attrs)) {  // grab everything else
-      if (k === 'lon' || k === 'lat' || props.hasOwnProperty(k)) continue;
+      if (k === 'lon' || k === 'lat' || Object.hasOwn(props, k)) continue;
       props[k] = v;
     }
-    return props;
+    return props as ParsedNode;
   }
 
 
   /**
    * _parseWay
    * Parse the given `<way>` element.
-   * @param   {DOMNode}  xml - the DOM node
-   * @param   {string}   id  - the OSM wayID (e.g. 'w1')
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @param   id  - the OSM wayID (e.g. 'w1')
+   * @return  Object of parsed properties
    */
-  _parseWay(xml, id) {
+  _parseWay(xml: Element, id: string): ParsedWay {
     const attrs = getCleanAttributes(xml);
-    const props = {
+    const props: any = {
       type: 'way',
       id: id,
       visible: attrs.visible ?? true,
@@ -242,28 +264,28 @@ export class OsmXMLParser {
     };
 
     for (const [k, v] of Object.entries(attrs)) {  // grab everything else
-      if (props.hasOwnProperty(k)) continue;
+      if (Object.hasOwn(props, k)) continue;
       props[k] = v;
     }
 
     // collect nodes
     const elems = Array.from(xml.getElementsByTagName('nd'));
-    props.nodes = elems.map(elem => 'n' + elem.attributes.getNamedItem('ref').value);
+    props.nodes = elems.map(elem => 'n' + elem.getAttribute('ref'));
 
-    return props;
+    return props as ParsedWay;
   }
 
 
   /**
    * _parseRelation
    * Parse the given `<relation>` element.
-   * @param   {DOMNode}  xml - the DOM node
-   * @param   {string}   id  - the OSM relationID (e.g. 'r1')
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @param   id  - the OSM relationID (e.g. 'r1')
+   * @return  Object of parsed properties
    */
-  _parseRelation(xml, id) {
+  _parseRelation(xml: Element, id: string): ParsedRelation {
     const attrs = getCleanAttributes(xml);
-    const props = {
+    const props: any = {
       type: 'relation',
       id: id,
       visible: attrs.visible ?? true,
@@ -271,42 +293,44 @@ export class OsmXMLParser {
     };
 
     for (const [k, v] of Object.entries(attrs)) {  // grab everything else
-      if (props.hasOwnProperty(k)) continue;
+      if (Object.hasOwn(props, k)) continue;
       props[k] = v;
     }
 
     // collect members
     const elems = Array.from(xml.getElementsByTagName('member'));
     props.members = elems.map(elem => {
-      const attrs = getRawAttributes(elem);
+      const memberType = elem.getAttribute('type') || '';
+      const memberRef = elem.getAttribute('ref') || '';
+      const memberRole = elem.getAttribute('role') || '';
       return {
-        id: attrs.type[0] + attrs.ref,
-        type: attrs.type,
-        role: attrs.role
+        id: memberType[0] + memberRef,
+        type: memberType,
+        role: memberRole
       };
     });
 
-    return props;
+    return props as ParsedRelation;
   }
 
 
   /**
    * _parseChangeset
    * Parse the given `<changeset>` element.
-   * @param   {DOMNode}  xml - the DOM node
-   * @param   {string}   id  - the OSM changesetID (e.g. 'c1')
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @param   id  - the OSM changesetID (e.g. 'c1')
+   * @return  Object of parsed properties
    */
-  _parseChangeset(xml, id) {
+  _parseChangeset(xml: Element, id: string): ParsedChangeset {
     const attrs = getCleanAttributes(xml);
-    const props = {
+    const props: any = {
       type: 'changeset',
       id: id,
       tags: this._getTags(xml)
     };
 
     for (const [k, v] of Object.entries(attrs)) {  // grab everything else
-      if (props.hasOwnProperty(k)) continue;
+      if (Object.hasOwn(props, k)) continue;
       props[k] = v;
     }
 
@@ -316,25 +340,25 @@ export class OsmXMLParser {
       props.comments = this._parseComments(discussion);
     }
 
-    return props;
+    return props as ParsedChangeset;
   }
 
 
   /**
    * _parseNote
    * Parse the given `<note>` element.
-   * @param   {DOMNode}  xml - the DOM node
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @return  Object of parsed properties
    */
-  _parseNote(xml) {
+  _parseNote(xml: Element): ParsedNote {
     const attrs = getCleanAttributes(xml);
-    const props = {
+    const props: any = {
       type: 'note',
       loc: [ attrs.lon, attrs.lat ]
     };
 
     for (const [k, v] of Object.entries(attrs)) {  // grab everything else
-      if (k === 'lon' || k === 'lat' || props.hasOwnProperty(k)) continue;
+      if (k === 'lon' || k === 'lat' || Object.hasOwn(props, k)) continue;
       props[k] = v;
     }
 
@@ -345,18 +369,18 @@ export class OsmXMLParser {
       if (nodeName === '#text') continue;
 
       if (nodeName === 'comments') {
-        props.comments = this._parseComments(node);
+        props.comments = this._parseComments(node as Element);
 
-      } else if (!props.hasOwnProperty(nodeName)) {  // 'id', 'date_created', 'status', etc.
+      } else if (!Object.hasOwn(props, nodeName)) {  // 'id', 'date_created', 'status', etc.
         if (/date/.test(nodeName)) {
-          props[nodeName] = unstringify(node.textContent);
+          props[nodeName] = unstringify(node.textContent || '');
         } else {
           props[nodeName] = node.textContent;
         }
       }
     }
 
-    return props;
+    return props as ParsedNote;
   }
 
 
@@ -365,22 +389,22 @@ export class OsmXMLParser {
    * This parses 2 kinds of comments:
    *  - `parseNote()`: comments in a `<comments>` element
    *  - `parseChangeset()`: comments in a `<discussion>` element
-   * @param   {DOMNode}        xml - the DOM node
-   * @return  {Array<Object>}  Array of parsed comments
+   * @param   xml - the DOM element
+   * @return  Array of parsed comments
    */
-  _parseComments(xml) {
-    let results = [];
+  _parseComments(xml: Element): ParsedComment[] {
+    const results: ParsedComment[] = [];
 
     const comments = Array.from(xml.getElementsByTagName('comment'));
     for (const comment of comments) {
       // collect attributes
       const attrs = getCleanAttributes(comment);
-      const props = {
+      const props: any = {
         visible: attrs.visible ?? true
       };
 
       for (const [k, v] of Object.entries(attrs)) {
-        // if (props.hasOwnProperty(k)) continue;  // can't happen, no props to overwrite
+        // if (Object.hasOwn(props, k)) continue;  // can't happen, no props to overwrite
         props[k] = v;
       }
 
@@ -390,14 +414,14 @@ export class OsmXMLParser {
         if (nodeName === '#text') continue;
 
         if (/date/.test(nodeName)) {
-          props[nodeName] = unstringify(node.textContent);
+          props[nodeName] = unstringify(node.textContent || '');
         } else {
           props[nodeName] = node.textContent;
         }
       }
 
       if (Object.keys(props).length) {
-        results.push(props);
+        results.push(props as ParsedComment);
       }
     }
 
@@ -408,15 +432,15 @@ export class OsmXMLParser {
   /**
    * _parseUser
    * Parse the given `<user>` element.
-   * @param   {DOMNode}  xml - the DOM node
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @return  Object of parsed properties
    */
-  _parseUser(xml) {
-    const props = { type: 'user' };
+  _parseUser(xml: Element): ParsedUser {
+    const props: any = { type: 'user' };
 
     const attrs = getCleanAttributes(xml);
     for (const [k, v] of Object.entries(attrs)) {  // grab 'id', 'display_name', 'account_created'
-      if (props.hasOwnProperty(k)) continue;
+      if (Object.hasOwn(props, k)) continue;
       props[k] = v;
     }
 
@@ -487,22 +511,22 @@ export class OsmXMLParser {
       }
     }
 
-    return props;
+    return props as ParsedUser;
   }
 
 
   /**
    * _parseUserBlock
    * Parse the given `<user_block>` element.
-   * @param   {DOMNode}  xml - the DOM node
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @return  Object of parsed properties
    */
-  _parseUserBlock(xml) {
-    const props = { type: 'user_block' };
+  _parseUserBlock(xml: Element): ParsedUserBlock {
+    const props: any = { type: 'user_block' };
 
     const attrs = getCleanAttributes(xml);
     for (const [k, v] of Object.entries(attrs)) {  // grab 'id', 'created_at', 'updated_at', etc.
-      // if (props.hasOwnProperty(k)) continue;  // can't happen, no props to overwrite
+      // if (Object.hasOwn(props, k)) continue;  // can't happen, no props to overwrite
       props[k] = v;
     }
 
@@ -528,18 +552,18 @@ export class OsmXMLParser {
       props.reason = '';
     }
 
-    return props;
+    return props as ParsedUserBlock;
   }
 
 
   /**
    * _parsePreferences
    * Parse the given `<preferences>` element.
-   * @param   {DOMNode}  xml - the DOM node
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @return  Object of parsed properties
    */
-  _parsePreferences(xml) {
-    const props = {
+  _parsePreferences(xml: Element): ParsedPreferences {
+    const props: ParsedPreferences = {
       type: 'preferences',
       preferences: {}
     };
@@ -547,9 +571,8 @@ export class OsmXMLParser {
     // very similar to tags
     const elems = Array.from(xml.getElementsByTagName('preference'));
     for (const elem of elems) {
-      const attrs = getRawAttributes(elem);
-      const k = (attrs.k ?? '').trim();
-      const v = (attrs.v ?? '').trim();
+      const k = (elem.getAttribute('k') ?? '').trim();
+      const v = (elem.getAttribute('v') ?? '').trim();
       if (k) {
         props.preferences[k] = v;
       }
@@ -562,29 +585,29 @@ export class OsmXMLParser {
   /**
    * _parseApi
    * Parse the given `<api>` element.
-   * @param   {DOMNode}  xml - the DOM element
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @return  Object of parsed properties
    */
-  _parseApi(xml) {
-    const props = { type: 'api' };
+  _parseApi(xml: Element): ParsedApi {
+    const props: any = { type: 'api' };
 
     for (const node of getChildNodes(xml)) {
       if (node.nodeName === '#text') continue;
-      props[node.nodeName] = getCleanAttributes(node);
+      props[node.nodeName] = getCleanAttributes(node as Element);
     }
 
-    return props;
+    return props as ParsedApi;
   }
 
 
   /**
    * _parsePolicy
    * Parse the given `<policy>` element.
-   * @param   {DOMNode}  xml - the DOM element
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @return  Object of parsed properties
    */
-  _parsePolicy(xml) {
-    const props = { type: 'policy' };
+  _parsePolicy(xml: Element): ParsedPolicy {
+    const props: ParsedPolicy = { type: 'policy' };
 
     const imagery = xml.getElementsByTagName('imagery')[0];
     if (imagery) {
@@ -609,27 +632,26 @@ export class OsmXMLParser {
   /**
    * _parseBounds
    * Parse the given `<bounds>` element.
-   * @param   {DOMNode}  xml - the DOM element
-   * @return  {Object}   Object of parsed properties
+   * @param   xml - the DOM element
+   * @return  Object of parsed properties
    */
-  _parseBounds(xml) {
-    return Object.assign({ type: 'bounds' }, getCleanAttributes(xml));
+  _parseBounds(xml: Element): ParsedBounds {
+    return Object.assign({ type: 'bounds' } as ParsedBounds, getCleanAttributes(xml));
   }
 
 
   /**
    * _getTags
    * Several functions call this to gather tag data.
-   * @param   {DOMNode}  xml - the containing DOM node
-   * @return  {Object}   Object of tag k-v pairs
+   * @param   xml - the containing DOM element
+   * @return  Object of tag k-v pairs
    */
-  _getTags(xml) {
+  _getTags(xml: Element): Tags {
     const elems = Array.from(xml.getElementsByTagName('tag'));
-    const tags = {};
+    const tags: Tags = {};
     for (const elem of elems) {
-      const attrs = getRawAttributes(elem);
-      const k = (attrs.k ?? '').trim();
-      const v = (attrs.v ?? '').trim();
+      const k = (elem.getAttribute('k') ?? '').trim();
+      const v = (elem.getAttribute('v') ?? '').trim();
       if (k) {
         tags[k] = v;
       }
@@ -652,11 +674,11 @@ export class OsmXMLParser {
  * This returns the attributes as a normal JavaScript Object.
  * "clean" means we will attempt to unstringify the attribute values.
  * @see     https://developer.mozilla.org/en-US/docs/Web/API/NamedNodeMap
- * @param   {DOMNamedNodeMap}  attributes - the attributes to convert
- * @return  {Object}           An Object containing the k-v attribute pairs
+ * @param   node - the DOM element
+ * @return  An Object containing the k-v attribute pairs
  */
-function getCleanAttributes(node) {
-  const result = {};
+function getCleanAttributes(node: Element): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
   if (!node?.attributes) return result;
 
   for (const attr of Array.from(node.attributes)) {
@@ -664,40 +686,22 @@ function getCleanAttributes(node) {
     if (k === 'id' || k === 'uid') {  // ids should remain strings
       result[attr.nodeName] = attr.nodeValue;
     } else {
-      result[attr.nodeName] = unstringify(attr.nodeValue);
+      result[attr.nodeName] = unstringify(attr.nodeValue || '');
     }
   }
   return result;
 }
 
-/**
- * getRawAttributes
- * Attributes are stored as a `NamedNodeMap` which is not iterable in a modern way.
- * This returns the attributes as a normal JavaScript Object.
- * "raw" means we will NOT attempt to unstringify the attribute values.
- * @see     https://developer.mozilla.org/en-US/docs/Web/API/NamedNodeMap
- * @param   {DOMNamedNodeMap}  attributes - the attributes to convert
- * @return  {Object}           An Object containing the k-v attribute pairs
- */
-function getRawAttributes(node) {
-  const result = {};
-  if (!node?.attributes) return result;
-
-  for (const attr of Array.from(node.attributes)) {
-    result[attr.nodeName] = attr.nodeValue;
-  }
-  return result;
-}
 
 /**
  * getChildNodes
  * ChildNodes are stored as a `NodeList` which is not iterable in a modern way.
  * This returns the childNodes as a normal JavaScript Array.
  * @see     https://developer.mozilla.org/en-US/docs/Web/API/NodeList
- * @param   {DOMNode}         node - the node to get childNodes for
- * @return  {Array<DOMNode>}  An Array of childnodes
+ * @param   node - the node to get childNodes for
+ * @return  An Array of childnodes
  */
-function getChildNodes(node) {
+function getChildNodes(node: Node): Node[] {
   if (!node?.childNodes) return [];
   return Array.from(node.childNodes);
 }
@@ -707,10 +711,10 @@ function getChildNodes(node) {
  * All the source xml data arrives as strings.
  * This will attempt to clean it up and cast it to a better type if possible.
  * We aren't going to overthink this, just handle a few simple cases.
- * @param   {string}  s - the source string
- * @return  {*}       result value
+ * @param   s - the source string
+ * @return  result value
  */
-function unstringify(s) {
+function unstringify(s: string): unknown {
   if (typeof s !== 'string') {
     return s;
   }
@@ -730,7 +734,7 @@ function unstringify(s) {
     return undefined;
   } else if (/^\d{4}/.test(s)) {   // starts with 4 digits
     const d = new Date(s);         // could it be a Date?
-    if (isFinite(d)) {
+    if (isFinite(d.getTime())) {
       return d;
     }
   }
