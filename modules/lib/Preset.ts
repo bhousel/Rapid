@@ -213,9 +213,11 @@ export class Preset {
 
     } else {
       // Some Presets may reference the values from another Preset.
+      /* eslint-disable @typescript-eslint/no-this-alias */
       const refName = this._resolveReference('name');
       const refTerms = this;     // Note that `terms` and `aliases` can't reference
       const refAliases = this;   // other Presets because they are Array properties.
+      /* eslint-enable @typescript-eslint/no-this-alias */
 
       // Pre-localize and store strings so that the Miniseach full-text search can index these.
       // `name` is a string, while `terms` and `aliases` are Arrays of strings.

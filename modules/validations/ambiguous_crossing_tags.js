@@ -274,8 +274,7 @@ export function validationAmbiguousCrossingTags(context) {
 
 
     function getIssueTitle() {
-      const issue = this;
-      const data = issue.data;
+      const data = this.data;
 
       if (data.isParentCrossing && !data.isParentChanged && data.isTagUpgrade) {
         return l10n.t('issues.ambiguous_crossing.message.candidate');
@@ -288,11 +287,11 @@ export function validationAmbiguousCrossingTags(context) {
 
 
     function renderIssueReference(selection) {
-      const issue = this;
+      const data = this.data;
 
       // convert `updates` Map to `data` Array for d3.data join
       const updateData = [];
-      for (const [entityID, update] of issue.data.updates) {
+      for (const [entityID, update] of data.updates) {
         updateData.push({
           entityID: entityID,
           name: update.name,
@@ -341,7 +340,7 @@ export function validationAmbiguousCrossingTags(context) {
               .append('div')
               .attr('class', 'tagDiff-message')
               .text(d => {
-                if (d.entityID === wayID && !issue.data.isParentCrossing) {
+                if (d.entityID === wayID && !data.isParentCrossing) {
                   return l10n.t('issues.ambiguous_crossing.not_a_crossing');
                 } else {
                   return l10n.t('issues.ambiguous_crossing.no_changes');

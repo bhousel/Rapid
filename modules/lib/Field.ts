@@ -184,9 +184,11 @@ export class Field {
     const l10n = (this.context.systems.l10n as any);
 
     // Some Fields may reference the values from another Field.
+    /* eslint-disable @typescript-eslint/no-this-alias */
     const labelRef = this._resolveReference('label');
     const termsRef = this;   // Note that `terms` can't reference another Field because it is an Array property.
     const placeholderRef = this._resolveReference('placeholder');
+    /* eslint-enable @typescript-eslint/no-this-alias */
 
     // Pre-localize and store strings (although there is no full-text search for now).
     // `name` and `placeholder` are strings, while `terms` is an Array of strings.
