@@ -100,11 +100,12 @@ export class UiAccount {
         .attr('target', '_blank');
 
       // Add user's image or placeholder
-      if (this.user.image_url) {
+      const href = this.user?.img?.href;
+      if (href) {
         $$userLink
           .append('img')
           .attr('class', 'icon pre-text user-icon')
-          .attr('src', this.user.image_url);
+          .attr('src', href);
       } else {
         $$userLink
           .call(uiIcon('#rapid-icon-avatar', 'pre-text light'));
