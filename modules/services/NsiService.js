@@ -58,7 +58,30 @@ export class NsiService extends AbstractSystem {
   initAsync() {
     if (this._initPromise) return this._initPromise;
 
+    const context = this.context;
+    const assets = context.systems.assets;
+
     return this._initPromise = super.initAsync()
+      .then(() => {
+        // Tell the AssetSystem what to load..
+        const latestPath = 'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist';
+        assets.setAsset('nsi_data',         `${latestPath}/nsi.min.json`, 'latest');
+        assets.setAsset('nsi_dissolved',    `${latestPath}/dissolved.min.json`, 'latest');
+        assets.setAsset('nsi_features',     `${latestPath}/featureCollection.min.json`, 'latest');
+        assets.setAsset('nsi_generics',     `${latestPath}/genericWords.min.json`, 'latest');
+        assets.setAsset('nsi_presets',      `${latestPath}/presets/nsi-id-presets.min.json`, 'latest');
+        assets.setAsset('nsi_replacements', `${latestPath}/replacements.min.json`, 'latest');
+        assets.setAsset('nsi_trees',        `${latestPath}/trees.min.json`, 'latest');
+
+        const localPath = 'data/modules/name-suggestion-index';
+        assets.setAsset('nsi_data',         `${localPath}/nsi.min.json`, 'local');
+        assets.setAsset('nsi_dissolved',    `${localPath}/dissolved.min.json`, 'local');
+        assets.setAsset('nsi_features',     `${localPath}/featureCollection.min.json`, 'local');
+        assets.setAsset('nsi_generics',     `${localPath}/genericWords.min.json`, 'local');
+        assets.setAsset('nsi_presets',      `${localPath}/presets/nsi-id-presets.min.json`, 'local');
+        assets.setAsset('nsi_replacements', `${localPath}/replacements.min.json`, 'local');
+        assets.setAsset('nsi_trees',        `${localPath}/trees.min.json`, 'local');
+      })
       .then(() => this._loadNsiPresetsAsync())
       .then(() => this._loadNsiDataAsync())
       .then(() => this.status = 'ok')

@@ -119,6 +119,30 @@ describe('AssetSystem', () => {
       return _assets.initAsync().then(() => _assets.startAsync());
     });
 
+    describe('setAsset / getAsset', () => {
+      it('throws if origin is invalid', () => {
+        assert.throws(() => _assets.setAsset('test_asset', '/data/test.json', 'NOPE'), /unknown origin/i);
+        assert.throws(() => _assets.getAsset('test_asset', 'NOPE'), /unknown origin/i);
+      });
+
+      it('sets/gets assets, origin specified', () => {
+        _assets.setAsset('test_asset1', 'foo', 'latest');
+        _assets.setAsset('test_asset1', 'bar', 'local');
+
+        assert.strictEqual(_assets.getAsset('test_asset1', 'latest'), 'foo');
+        assert.strictEqual(_assets.getAsset('test_asset1', 'local'), 'bar');
+      });
+
+      it('sets/gets assets, no origin specified', () => {
+        _assets.setAsset('test_asset2', 'baz');   // set both origins at once
+
+        assert.strictEqual(_assets.getAsset('test_asset2', 'latest'), 'baz');
+        assert.strictEqual(_assets.getAsset('test_asset2', 'local'), 'baz');
+        assert.strictEqual(_assets.getAsset('test_asset2'), 'baz');  // get current origin ('latest')
+      });
+    });
+
+
     describe('getFileURL', () => {
       const TESTMAP = { 'test/img/loader.gif': '/assets/test/img/loader-b66184b5c4afbccc25f.gif' };
 

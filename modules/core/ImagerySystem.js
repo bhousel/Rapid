@@ -71,7 +71,7 @@ export class ImagerySystem extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          assets?.initAsync(),
+          assets.initAsync(),
           gfx?.initAsync(),      // `gfx.scene` will exist after `initAsync`
           l10n?.initAsync(),
           storage?.initAsync(),
@@ -85,7 +85,11 @@ export class ImagerySystem extends AbstractSystem {
         gfx?.scene?.on('layerchange', this._imageryChanged);
         l10n?.on('localechange', this._localeChanged);
       })
-      .then(() => assets.loadAssetAsync('imagery'))
+      .then(() => {
+        // Tell the AssetSystem what to load..
+        assets.setAsset('imagery', 'data/imagery.min.json');
+        return assets.loadAssetAsync('imagery');
+      })
       .then(data => this._initImageryIndex(data));
   }
 

@@ -58,7 +58,11 @@ export class WaybackService extends AbstractSystem {
 
     return this._initPromise = super.initAsync()
       .then(() => this.resetAsync())
-      .then(() => assets.loadAssetAsync('wayback'))
+      .then(() => {
+        // Tell the AssetSystem what to load..
+        assets.setAsset('wayback', 'data/wayback.min.json');
+        return assets.loadAssetAsync('wayback');
+      })
       .then(data => {
         // example wayback release data:
         //    "10": {

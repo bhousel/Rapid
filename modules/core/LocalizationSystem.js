@@ -244,19 +244,12 @@ export class LocalizationSystem extends AbstractSystem {
       cache[locale] = {};
     }
 
-    // Add the language packs to the AssetSystem's list of sources
-    const origin = assets.origin;          // 'local' or 'latest'
-    const sources = assets.sources[origin];
-    if (!sources) {
-      return Promise.reject(`Unknown origin "${origin}"`);  // shouldn't happen
-    }
-
     const loadPromises = [];
-    for (const scope of this._scopes) {
+    for (const scope of this._scopes) {   // 'core', 'tagging', 'imagery', 'community'
       const key = `l10n_${scope}_${locale}`;
-      if (!sources[key]) {
-        sources[key] = `data/l10n/${scope}.${locale}.min.json`;
-      }
+      const path = `data/l10n/${scope}.${locale}.min.json`;
+      assets.setAsset(key, path);
+
       const prom = assets.loadAssetAsync(key)
         .then(data => {
           cache[locale][scope] = data[locale];

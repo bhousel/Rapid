@@ -32,7 +32,6 @@ export class AssetSystem extends AbstractSystem {
     this.sources = {
       latest: {
         'address_formats':           'data/address_formats.min.json',
-        'imagery':                   'data/imagery.min.json',
         'intro_graph':               'data/intro_graph.min.json',
         'intro_rapid_graph':         'data/intro_rapid_graph.min.json',
         'languages':                 'data/languages.min.json',
@@ -41,21 +40,12 @@ export class AssetSystem extends AbstractSystem {
         'qa_data':                   'data/qa_data.min.json',
         'shortcuts':                 'data/shortcuts.min.json',
         'territory_languages':       'data/territory_languages.min.json',
-        'wayback':                   'data/wayback.min.json',
 
         'mapillary_js':   'https://cdn.jsdelivr.net/npm/mapillary-js@4/dist/mapillary.min.js',   // CDN supports .min
         'mapillary_css':  'https://cdn.jsdelivr.net/npm/mapillary-js@4/dist/mapillary.min.css',  // CDN supports .min
 
         'maplibre_js':   'https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.min.js',   // CDN supports .min
         'maplibre_css':  'https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.min.css',  // CDN supports .min
-
-        'nsi_data':          'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist/nsi.min.json',
-        'nsi_dissolved':     'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist/dissolved.min.json',
-        'nsi_features':      'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist/featureCollection.min.json',
-        'nsi_generics':      'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist/genericWords.min.json',
-        'nsi_presets':       'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist/presets/nsi-id-presets.min.json',
-        'nsi_replacements':  'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist/replacements.min.json',
-        'nsi_trees':         'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist/trees.min.json',
 
         'oci_defaults':   'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/defaults.min.json',
         'oci_features':   'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/featureCollection.min.json',
@@ -77,7 +67,6 @@ export class AssetSystem extends AbstractSystem {
 
       local: {
         'address_formats':           'data/address_formats.min.json',
-        'imagery':                   'data/imagery.min.json',
         'intro_graph':               'data/intro_graph.min.json',
         'intro_rapid_graph':         'data/intro_rapid_graph.min.json',
         'languages':                 'data/languages.min.json',
@@ -86,21 +75,12 @@ export class AssetSystem extends AbstractSystem {
         'qa_data':                   'data/qa_data.min.json',
         'shortcuts':                 'data/shortcuts.min.json',
         'territory_languages':       'data/territory_languages.min.json',
-        'wayback':                   'data/wayback.min.json',
 
         'mapillary_js':   'data/modules/mapillary-js/mapillary.js',   // note no .min
         'mapillary_css':  'data/modules/mapillary-js/mapillary.css',  // note no .min
 
         'maplibre_js':   'data/modules/maplibre-gl/maplibre-gl.js',   // note no .min
         'maplibre_css':  'data/modules/maplibre-gl/maplibre-gl.css',  // note no .min
-
-        'nsi_data':          'data/modules/name-suggestion-index/nsi.min.json',
-        'nsi_dissolved':     'data/modules/name-suggestion-index/dissolved.min.json',
-        'nsi_features':      'data/modules/name-suggestion-index/featureCollection.min.json',
-        'nsi_generics':      'data/modules/name-suggestion-index/genericWords.min.json',
-        'nsi_presets':       'data/modules/name-suggestion-index/presets/nsi-id-presets.min.json',
-        'nsi_replacements':  'data/modules/name-suggestion-index/replacements.min.json',
-        'nsi_trees':         'data/modules/name-suggestion-index/trees.min.json',
 
         'oci_defaults':   'data/modules/osm-community-index/defaults.min.json',
         'oci_features':   'data/modules/osm-community-index/featureCollection.min.json',
@@ -165,10 +145,10 @@ export class AssetSystem extends AbstractSystem {
       c.tagging_preset_fields = {};
       c.tagging_preset_presets = {};
       c.tagging_preset_overrides = {};
-      c.l10n_core_en= {};
-      c.l10n_tagging_en= {};
-      c.l10n_imagery_en= {};
-      c.l10n_community_en= {};
+      c.l10n_core_en = {};
+      c.l10n_tagging_en = {};
+      c.l10n_imagery_en = {};
+      c.l10n_community_en = {};
       c.wmf_sitematrix = [ ['English', 'English', 'en'], ['German', 'Deutsch', 'de'] ];
     }
     /* c8 ignore end */
@@ -202,6 +182,46 @@ export class AssetSystem extends AbstractSystem {
    */
   resetAsync() {
     return super.resetAsync();
+  }
+
+
+  /**
+   * setAsset
+   * Set an asset in the list of sources.
+   * Other systems and services should call this to track the assets they need to load.
+   * @param  {string}  key
+   * @param  {string}  path
+   * @param  {string}  origin - optional, 'latest' or 'local' (if missing, sets both)
+   * @throws  Will throw if the given origin is invalid
+   */
+  setAsset(key, path, origin) {
+    if (origin) {
+      const sources = this.sources[origin];
+      if (!sources) {
+        throw new Error(`Unknown origin "${origin}"`);
+      }
+      sources[key] = path;
+
+    } else {
+      this.sources.latest[key] = path;
+      this.sources.local[key] = path;
+    }
+  }
+
+
+  /**
+   * getAsset
+   * Get an asset path from the list of sources.
+   * @param  {string}  key
+   * @param  {string}  origin - optional, 'latest' or 'local' (if missing, returns current origin)
+   * @throws  Will throw if the given origin is invalid
+   */
+  getAsset(key, origin = this.origin) {
+    const sources = this.sources[origin];
+    if (!sources) {
+      throw new Error(`Unknown origin "${this.origin}"`);
+    }
+    return sources[key];
   }
 
 
