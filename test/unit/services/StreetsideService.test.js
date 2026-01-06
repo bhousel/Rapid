@@ -9,7 +9,7 @@ describe('StreetsideService', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:  new Rapid.MockSystem(context),
+    assets:  new Rapid.AssetSystem(context),
     gfx:     new Rapid.MockGfxSystem(context),
     l10n:    new Rapid.MockSystem(context),
     photos:  new Rapid.MockSystem(context),

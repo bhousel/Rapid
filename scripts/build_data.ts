@@ -202,7 +202,7 @@ async function writeEnJson() {
   const imagery = Bun.YAML.parse(await Bun.file('./node_modules/editor-layer-index/i18n/en.yaml').text());
 
   // Gather strings for imagery overrides not included in the imagery index
-  const manualImagery = (await Bun.file('./data/manual_imagery.json').json()).manualImagery;
+  const manualImagery = (await Bun.file('./data/imagery_overrides.json').json()).manualImagery;
 
   for (const source of manualImagery) {
     if (!source) continue;
@@ -223,7 +223,7 @@ async function writeEnJson() {
   const tagging = await Bun.file(taggingFile).json();
 
   // Gather strings for tagging overrides not included in the tagging index
-  const taggingOverrides = await Bun.file('./data/preset_overrides.json').json();
+  const taggingOverrides = await Bun.file('./data/schema_overrides.json').json();
 
   // categories, presets
   for (const group of ['categories', 'presets']) {

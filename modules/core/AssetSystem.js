@@ -31,71 +31,37 @@ export class AssetSystem extends AbstractSystem {
     //
     this.sources = {
       latest: {
-        'address_formats':           'data/address_formats.min.json',
-        'intro_graph':               'data/intro_graph.min.json',
-        'intro_rapid_graph':         'data/intro_rapid_graph.min.json',
-        'languages':                 'data/languages.min.json',
-        'locales':                   'data/locales.min.json',
-        'phone_formats':             'data/phone_formats.min.json',
-        'qa_data':                   'data/qa_data.min.json',
-        'shortcuts':                 'data/shortcuts.min.json',
-        'territory_languages':       'data/territory_languages.min.json',
-
-        'mapillary_js':   'https://cdn.jsdelivr.net/npm/mapillary-js@4/dist/mapillary.min.js',   // CDN supports .min
-        'mapillary_css':  'https://cdn.jsdelivr.net/npm/mapillary-js@4/dist/mapillary.min.css',  // CDN supports .min
-
-        'maplibre_js':   'https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.min.js',   // CDN supports .min
-        'maplibre_css':  'https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.min.css',  // CDN supports .min
+        'address_formats':      'data/address_formats.min.json',
+        'intro_graph':          'data/intro_graph.min.json',
+        'intro_rapid_graph':    'data/intro_rapid_graph.min.json',
+        'languages':            'data/languages.min.json',
+        'locales':              'data/locales.min.json',
+        'phone_formats':        'data/phone_formats.min.json',
+        'qa_data':              'data/qa_data.min.json',
+        'shortcuts':            'data/shortcuts.min.json',
+        'territory_languages':  'data/territory_languages.min.json',
 
         'oci_defaults':   'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/defaults.min.json',
         'oci_features':   'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/featureCollection.min.json',
         'oci_resources':  'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/resources.min.json',
 
-        'pannellum_js':   'https://cdn.jsdelivr.net/npm/pannellum@2/build/pannellum.min.js',   // CDN supports .min
-        'pannellum_css':  'https://cdn.jsdelivr.net/npm/pannellum@2/build/pannellum.min.css',  // CDN supports .min
-
-        'tagging_deprecated':         'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist/deprecated.min.json',
-        'tagging_discarded':          'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist/discarded.min.json',
-        'tagging_preset_categories':  'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist/preset_categories.min.json',
-        'tagging_preset_defaults':    'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist/preset_defaults.min.json',
-        'tagging_preset_fields':      'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist/fields.min.json',
-        'tagging_preset_presets':     'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist/presets.min.json',
-        'tagging_preset_overrides':   'data/preset_overrides.min.json',
-
         'wmf_sitematrix':  'https://cdn.jsdelivr.net/npm/wmf-sitematrix@0.2/data/wikipedia.min.json'
       },
 
       local: {
-        'address_formats':           'data/address_formats.min.json',
-        'intro_graph':               'data/intro_graph.min.json',
-        'intro_rapid_graph':         'data/intro_rapid_graph.min.json',
-        'languages':                 'data/languages.min.json',
-        'locales':                   'data/locales.min.json',
-        'phone_formats':             'data/phone_formats.min.json',
-        'qa_data':                   'data/qa_data.min.json',
-        'shortcuts':                 'data/shortcuts.min.json',
-        'territory_languages':       'data/territory_languages.min.json',
-
-        'mapillary_js':   'data/modules/mapillary-js/mapillary.js',   // note no .min
-        'mapillary_css':  'data/modules/mapillary-js/mapillary.css',  // note no .min
-
-        'maplibre_js':   'data/modules/maplibre-gl/maplibre-gl.js',   // note no .min
-        'maplibre_css':  'data/modules/maplibre-gl/maplibre-gl.css',  // note no .min
+        'address_formats':      'data/address_formats.min.json',
+        'intro_graph':          'data/intro_graph.min.json',
+        'intro_rapid_graph':    'data/intro_rapid_graph.min.json',
+        'languages':            'data/languages.min.json',
+        'locales':              'data/locales.min.json',
+        'phone_formats':        'data/phone_formats.min.json',
+        'qa_data':              'data/qa_data.min.json',
+        'shortcuts':            'data/shortcuts.min.json',
+        'territory_languages':  'data/territory_languages.min.json',
 
         'oci_defaults':   'data/modules/osm-community-index/defaults.min.json',
         'oci_features':   'data/modules/osm-community-index/featureCollection.min.json',
         'oci_resources':  'data/modules/osm-community-index/resources.min.json',
-
-        'pannellum_js':   'data/modules/pannellum/pannellum.js',   // note no .min
-        'pannellum_css':  'data/modules/pannellum/pannellum.css',  // note no .min
-
-        'tagging_deprecated':         'data/modules/id-tagging-schema/deprecated.min.json',
-        'tagging_discarded':          'data/modules/id-tagging-schema/discarded.min.json',
-        'tagging_preset_categories':  'data/modules/id-tagging-schema/preset_categories.min.json',
-        'tagging_preset_defaults':    'data/modules/id-tagging-schema/preset_defaults.min.json',
-        'tagging_preset_fields':      'data/modules/id-tagging-schema/fields.min.json',
-        'tagging_preset_presets':     'data/modules/id-tagging-schema/presets.min.json',
-        'tagging_preset_overrides':   'data/preset_overrides.min.json',
 
         'wmf_sitematrix':  'data/modules/wmf-sitematrix/wikipedia.min.json'
       }
@@ -138,13 +104,13 @@ export class AssetSystem extends AbstractSystem {
       c.phone_formats = { phoneFormats: {} };
       c.shortcuts = { shortcuts: [] };
       c.territory_languages = { territoryLanguages: {} };
-      c.tagging_deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
-      c.tagging_discarded = {};
-      c.tagging_preset_categories = {};
-      c.tagging_preset_defaults = {};
-      c.tagging_preset_fields = {};
-      c.tagging_preset_presets = {};
-      c.tagging_preset_overrides = {};
+      c.iD_schema_deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
+      c.iD_schema_discarded = {};
+      c.iD_schema_categories = {};
+      c.iD_schema_defaults = {};
+      c.iD_schema_fields = {};
+      c.iD_schema_presets = {};
+      c.rapid_schema_overrides = {};
       c.l10n_core_en = {};
       c.l10n_tagging_en = {};
       c.l10n_imagery_en = {};

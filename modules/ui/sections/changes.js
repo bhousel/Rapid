@@ -17,7 +17,7 @@ export function uiSectionChanges(context) {
 
   let _discardTags = {};
 
-  assets.loadAssetAsync('tagging_discarded')
+  assets.loadAssetAsync('iD_schema_discarded')
     .then(d => _discardTags = d)
     .catch(() => { /* ignore */ });
 

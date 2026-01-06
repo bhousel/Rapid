@@ -5,7 +5,7 @@ import { styleText } from 'bun:util';
 await buildImagery();
 
 // This script processes files used to know what background imagery is available
-//  ./data/manual_imagery.json   - our customizations
+//  ./data/imagery_overrides.json   - our customizations
 //  ./data/imagery.json          - sourced from `editor-layer-index`
 //  ./data/wayback.json          - sourced from Esri's waybackconfig file in S3
 async function buildImagery() {
@@ -18,7 +18,7 @@ async function buildImagery() {
 
   // Load source data
   const imageryFile = './node_modules/editor-layer-index/imagery.json';
-  const manualFile = './data/manual_imagery.json';
+  const manualFile = './data/imagery_overrides.json';
   const imageryJSON = await Bun.file(imageryFile).json();
   const manualJSON = (await Bun.file(manualFile).json()).manualImagery;
 

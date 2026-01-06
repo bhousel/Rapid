@@ -80,7 +80,7 @@ export class UploaderSystem extends AbstractSystem {
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })
-      .then(() => assets.loadAssetAsync('tagging_discarded'))
+      .then(() => assets.loadAssetAsync('iD_schema_discarded'))
       .then(d => this._discardTags = d);
   }
 

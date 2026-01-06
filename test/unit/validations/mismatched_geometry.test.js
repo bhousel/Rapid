@@ -39,7 +39,7 @@ describe('validationMismatchedGeometry', () => {
         locationSet: { include: ['Q620634'] }
       }
     };
-    context.systems.assets._cache.tagging_preset_presets = testPresets;
+    context.systems.assets._cache.iD_schema_presets = testPresets;
 
     return Promise.all([
       context.systems.schema.initAsync()

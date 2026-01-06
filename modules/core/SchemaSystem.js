@@ -119,7 +119,7 @@ export class SchemaSystem extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          assets?.initAsync(),
+          assets.initAsync(),
           l10n?.initAsync(),
           locations?.initAsync(),
           urlhash?.initAsync(),
@@ -140,43 +140,65 @@ export class SchemaSystem extends AbstractSystem {
           this.addablePresetIDs = new Set(arr);
         }
 
-        // Fetch the preset data
+        // Tell the AssetSystem what to load..
+        const latestPath = 'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist';
+        assets.setAsset('iD_schema_deprecated', `${latestPath}/deprecated.min.json`,        'latest');
+        assets.setAsset('iD_schema_discarded',  `${latestPath}/discarded.min.json`,         'latest');
+        assets.setAsset('iD_schema_categories', `${latestPath}/preset_categories.min.json`, 'latest');
+        assets.setAsset('iD_schema_defaults',   `${latestPath}/preset_defaults.min.json`,   'latest');
+        assets.setAsset('iD_schema_presets',    `${latestPath}/presets.min.json`,           'latest');
+        assets.setAsset('iD_schema_fields',     `${latestPath}/fields.min.json`,            'latest');
+
+        const localPath = 'data/modules/id-tagging-schema';
+        assets.setAsset('iD_schema_deprecated', `${localPath}/deprecated.min.json`,         'local');
+        assets.setAsset('iD_schema_discarded',  `${localPath}/discarded.min.json`,          'local');
+        assets.setAsset('iD_schema_categories', `${localPath}/preset_categories.min.json`,  'local');
+        assets.setAsset('iD_schema_defaults',   `${localPath}/preset_defaults.min.json`,    'local');
+        assets.setAsset('iD_schema_presets',    `${localPath}/presets.min.json`,            'local');
+        assets.setAsset('iD_schema_fields',     `${localPath}/fields.min.json`,             'local');
+
+        // 'rapid_schema_overrides' = customizations to merge in after the id-tagging-schema
+        assets.setAsset('rapid_schema_overrides', 'data/schema_overrides.min.json');
+
+        // Fetch the schema data
         return Promise.all([
-          assets.loadAssetAsync('tagging_preset_categories'),
-          assets.loadAssetAsync('tagging_preset_defaults'),
-          assets.loadAssetAsync('tagging_preset_presets'),
-          assets.loadAssetAsync('tagging_preset_fields'),
-          assets.loadAssetAsync('tagging_preset_overrides'),   // customizations to merge in after the id-tagging-schema
-          assets.loadAssetAsync('tagging_deprecated')
+          assets.loadAssetAsync('iD_schema_deprecated'),
+          assets.loadAssetAsync('iD_schema_discarded'),
+          assets.loadAssetAsync('iD_schema_categories'),
+          assets.loadAssetAsync('iD_schema_defaults'),
+          assets.loadAssetAsync('iD_schema_presets'),
+          assets.loadAssetAsync('iD_schema_fields'),
+          assets.loadAssetAsync('rapid_schema_overrides')
         ]);
       })
       .then(vals => {
+        osmSetDeprecatedTags(vals[0]);
+        // osmSetDiscardedTags(vals[1]);  // TODO: should be here, but it isn't yet
+
         // Determine the version of id-tagging-schema
         // This might not be exact because the CDN can return a newer semver patch.
         // But it's close enough, and this string is informational only.
         // (It would be better if these files included some metadata like my other projects do).
-        let idTagSchemaVersion = 'unknown';
+        let idSchemaVersion = 'unknown';
         for (const [k, v] of Object.entries(rapidDependencies)) {
           if (/id-tagging-schema$/.test(k)) {
-            idTagSchemaVersion = v.replaceAll(/[\^~]/g, '');  // no carat/tilde
+            idSchemaVersion = v.replaceAll(/[\^~]/g, '');  // no carat/tilde
             break;
           }
         }
 
         // Merge id-tagging-schema...
         this.merge({
-          schemaID: `id-tagging-schema@${idTagSchemaVersion}`,
-          categories: vals[0],
-          defaults: vals[1],
-          presets: vals[2],
-          fields: vals[3]
+          schemaID: `id-tagging-schema@${idSchemaVersion}`,
+          categories: vals[2],
+          defaults: vals[3],
+          presets: vals[4],
+          fields: vals[5]
         });
 
-        // Merge rapid tagging_preset_overrides...
-        const rapidTagSchemaVersion = rapidVersion || 'unknown';
-        this.merge({ schemaID: `rapid-preset-overrides@${rapidTagSchemaVersion}`, ...vals[4] });
-
-        osmSetDeprecatedTags(vals[5]);
+        // Merge rapid_schema_overrides...
+        const rapidSchemaVersion = rapidVersion || 'unknown';
+        this.merge({ schemaID: `rapid-schema-overrides@${rapidSchemaVersion}`, ...vals[6] });
       });
   }
 

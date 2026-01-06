@@ -135,8 +135,8 @@ describe('SchemaSystem', () => {
         const keys = [..._schema.schemas];
         // merged 'id-tagging-schema' data at init...
         assert.isTrue(keys.some(key => /^id-tagging-schema@/.test(key)));
-        // merged 'rapid-preset-overrides' data at init...
-        assert.isTrue(keys.some(key => /^rapid-preset-overrides@/.test(key)));
+        // merged 'rapid-schema-overrides' data at init...
+        assert.isTrue(keys.some(key => /^rapid-schema-overrides@/.test(key)));
       });
 
       it('presets', () => {
@@ -1052,7 +1052,7 @@ describe('SchemaSystem', () => {
         residential: { tags: { highway: 'residential' }, geometry: ['line'] },
         park: { tags: { leisure: 'park' }, geometry: ['point', 'area'] }
       };
-      context.systems.assets._cache.tagging_preset_presets = testPresets;
+      context.systems.assets._cache.iD_schema_presets = testPresets;
     });
 
     it('returns a collection containing presets matching a geometry and tags', () => {
@@ -1111,7 +1111,7 @@ describe('SchemaSystem', () => {
         'natural/tree_row': { tags: { 'natural': 'tree_row' }, geometry: ['line'] },
         'natural/wood': { tags: { 'natural': 'wood' }, geometry: ['point', 'area'] }
       };
-      context.systems.assets._cache.tagging_preset_presets = testPresets;
+      context.systems.assets._cache.iD_schema_presets = testPresets;
     });
 
     it('includes keys for presets with area geometry', () => {
@@ -1193,7 +1193,7 @@ describe('SchemaSystem', () => {
           tags: { highway: 'pedestrian', area: 'yes' }
         }
       };
-      context.systems.assets._cache.tagging_preset_presets = testPresets;
+      context.systems.assets._cache.iD_schema_presets = testPresets;
     });
 
 
