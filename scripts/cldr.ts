@@ -11,7 +11,7 @@ import fs from 'node:fs/promises';
 
 const CLDR_ROOT = 'node_modules/cldr-localenames-full/main';
 
-const substitutions = {
+const substitutions: Record<string, string> = {
   'zh-CN': 'zh',
   'zh-HK': 'zh-Hant-HK',
   'zh-TW': 'zh-Hant',
@@ -50,7 +50,7 @@ export interface LangInfo {
  *  }
  * @return  {Map<LangCode, LangInfo>}  Language code, language info
  */
-export async function langNamesInNativeLang(): Map<LangCode, LangInfo> {
+export async function langNamesInNativeLang(): Promise<Map<LangCode, LangInfo>> {
   const results = new Map<LangCode, LangInfo>();
 
   // Manually add languages we want that aren't in CLDR.
@@ -77,7 +77,7 @@ export async function langNamesInNativeLang(): Map<LangCode, LangInfo> {
     // skip locale-specific languages
     if (identity.letiant || identity.territory) continue;
 
-    const info = {};
+    const info: LangInfo = {};
     const script = identity.script;
     if (script) {
       info.base = identity.language;
@@ -125,7 +125,7 @@ export async function langNamesInNativeLang(): Map<LangCode, LangInfo> {
  * @param   {LangCode}   code  - the language code to lookup
  * @return  {Map<LangCode, string>}  Language code -> language names for the given language code
  */
-export async function languageNamesInLanguageOf(code: LangCode): Map<LangCode, string> {
+export async function languageNamesInLanguageOf(code: LangCode): Promise<Map<LangCode, string>> {
   if (substitutions[code])  code = substitutions[code];
 
   const results = new Map<LangCode, string>();
@@ -143,7 +143,7 @@ export async function languageNamesInLanguageOf(code: LangCode): Map<LangCode, s
 
   const languages = languagesJSON.main[code].localeDisplayNames.languages;
 
-  for (const [code, name] of Object.entries(languages)) {
+  for (const [code, name] of Object.entries(languages) as [string, string][]) {
     if (skipLanguages.has(code)) continue;
 
     // Note: the codes are already sorted, so alternate forms will override standard forms
@@ -176,7 +176,7 @@ export async function languageNamesInLanguageOf(code: LangCode): Map<LangCode, s
  * @param   {LangCode}   code  - the language code to lookup
  * @return  {Map<ScriptCode, string>}  Script codes -> script names for the given language code
  */
-export async function scriptNamesInLanguageOf(code: LangCode): Map<ScriptCode, string> {
+export async function scriptNamesInLanguageOf(code: LangCode): Promise<Map<ScriptCode, string>> {
   if (substitutions[code])  code = substitutions[code];
 
   const results = new Map<ScriptCode, string>();
@@ -194,7 +194,7 @@ export async function scriptNamesInLanguageOf(code: LangCode): Map<ScriptCode, s
 
   const scripts = scriptsJSON.main[code].localeDisplayNames.scripts;
 
-  for (const [code, name] of Object.entries(scripts)) {
+  for (const [code, name] of Object.entries(scripts) as [string, string][]) {
     if (skipLanguages.has(code)) continue;
 
     // Note: the codes are already sorted, so alternate forms will override standard forms

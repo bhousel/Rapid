@@ -23,7 +23,7 @@
     "build:js": "bun ./scripts/build_js.ts",
     "build:svg": "run-p 'svg:*'",
     "clean": "bun ./scripts/clean.ts",
-    "imagery": "bun ./scripts/imagery.js",
+    "imagery": "bun ./scripts/build_imagery.js",
     "lint": "eslint ./modules ./test ./scripts",
     "start": "run-s build start:server",
     "start:server": "bun ./scripts/server.ts",

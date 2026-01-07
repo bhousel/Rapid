@@ -35,7 +35,7 @@ npm run build
 git add . && git commit -m  "$VERSION"
 
 # Update imagery
-rm -rf package-lock.json node_modules/editor-layer-index/
+rm -rf bun.lock node_modules/editor-layer-index/
 bun install
 bun run imagery
 bun run build

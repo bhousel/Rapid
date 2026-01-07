@@ -2,7 +2,7 @@ import { $, Glob } from 'bun';
 $.nothrow();  // If a shell command returns nonzero, keep going.
 
 import stringify from 'json-stringify-pretty-compact';
-import { styleText } from 'bun:util';
+import { styleText } from 'node:util';
 
 import * as CLDR from './cldr.ts';
 const localeCompare = new Intl.Collator('en').compare;
@@ -104,10 +104,10 @@ async function buildData() {
 }
 
 
-function gatherQAIssueIcons(icons) {
-  for (const service of Object.values(qaDataJSON)) {
+function gatherQAIssueIcons(icons: Set<string>): void {
+  for (const service of Object.values(qaDataJSON) as any[]) {
     if (!service.icons) continue;
-    for (const icon of Object.values(service.icons)) {
+    for (const icon of Object.values(service.icons) as string[]) {
       if (icon) {
         icons.add(icon);
       }
@@ -116,9 +116,9 @@ function gatherQAIssueIcons(icons) {
 }
 
 
-function gatherPresetIcons(icons) {
+function gatherPresetIcons(icons: Set<string>): void {
   for (const source of [presetsJSON, categoriesJSON, fieldsJSON]) {
-    for (const item of Object.values(source)) {
+    for (const item of Object.values(source) as any[]) {
       if (item.icon) {
         // fix: FontAwesome v7 no longer has 'fas-vector-square'
         // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
@@ -132,7 +132,7 @@ function gatherPresetIcons(icons) {
 }
 
 
-async function writeIcons(icons) {
+async function writeIcons(icons: Set<string>): Promise<void> {
   for (const icon of icons) {
     const [prefix, ...rest] = icon.split('-');
     const name = rest.join('-');
@@ -141,11 +141,12 @@ async function writeIcons(icons) {
       continue;  // These are expected to live in an existing spritesheet..
 
     } else if (['fas', 'far', 'fab'].includes(prefix)) {   // FontAwesome..
-      const folder = {
+      const folderMap: Record<string, string> = {
         fas: 'node_modules/@fortawesome/fontawesome-free/svgs/solid',
         far: 'node_modules/@fortawesome/fontawesome-free/svgs/regular',
         fab: 'node_modules/@fortawesome/fontawesome-free/svgs/brands'
-      }[prefix];
+      };
+      const folder = folderMap[prefix];
 
       try {
         // copy and remove the comments
@@ -162,11 +163,11 @@ async function writeIcons(icons) {
 }
 
 
-function gatherTerritoryLanguages() {
-  const allRawInfo = territoriesJSON.supplemental.territoryInfo;
-  const territoryLanguages = {};
+function gatherTerritoryLanguages(): Record<string, string[]> {
+  const allRawInfo = (territoriesJSON as any).supplemental.territoryInfo;
+  const territoryLanguages: Record<string, string[]> = {};
 
-  for (const [territoryCode, territoryData] of Object.entries(allRawInfo)) {
+  for (const [territoryCode, territoryData] of Object.entries(allRawInfo) as [string, any][]) {
     const territoryLangInfo = territoryData.languagePopulation;
     if (!territoryLangInfo) continue;
     const langCodes = Object.keys(territoryLangInfo);
@@ -187,9 +188,9 @@ function gatherTerritoryLanguages() {
 
 // writeEnJson
 // This generates the English language localization files
-async function writeEnJson() {
+async function writeEnJson(): Promise<void> {
   // core.yaml
-  const core = Bun.YAML.parse(await Bun.file('./data/core.yaml').text());
+  const core = Bun.YAML.parse(await Bun.file('./data/core.yaml').text()) as any;
   core.en.languageNames = Object.fromEntries(await CLDR.languageNamesInLanguageOf('en'));
   core.en.scriptNames = Object.fromEntries(await CLDR.scriptNamesInLanguageOf('en'));
   await Bun.write('./data/l10n/core.en.json', JSON.stringify(core, null, 2) + '\n');
@@ -199,20 +200,20 @@ async function writeEnJson() {
   await Bun.write('./data/l10n/community.en.json', JSON.stringify(community, null, 2) + '\n');
 
   // imagery
-  const imagery = Bun.YAML.parse(await Bun.file('./node_modules/editor-layer-index/i18n/en.yaml').text());
+  const imagery = Bun.YAML.parse(await Bun.file('./node_modules/editor-layer-index/i18n/en.yaml').text()) as any;
 
   // Gather strings for imagery overrides not included in the imagery index
-  const manualImagery = (await Bun.file('./data/imagery_overrides.json').json()).manualImagery;
+  const imageryOverrides = (await Bun.file('./data/imagery_overrides.json').json()).imagery;
 
-  for (const source of manualImagery) {
+  for (const [sourceID, source] of Object.entries(imageryOverrides) as [string, any][]) {
     if (!source) continue;
-    const target = {};
-    if (source.attribution?.text)  target.attribution = { text: source.attribution.text };
-    if (source.name)               target.name = source.name;
-    if (source.description)        target.description = source.description;
+    const target: any = {};
+    if (source.terms_text)   target.attribution = { text: source.terms_text };
+    if (source.name)         target.name = source.name;
+    if (source.description)  target.description = source.description;
 
     if (Object.keys(target).length) {
-      imagery.en.imagery[source.id] = target;
+      imagery.en.imagery[sourceID] = target;
     }
   }
 
@@ -227,23 +228,23 @@ async function writeEnJson() {
 
   // categories, presets
   for (const group of ['categories', 'presets']) {
-    for (const [key, source] of Object.entries(taggingOverrides[group])) {
+    for (const [key, source] of Object.entries((taggingOverrides as any)[group]) as [string, any][]) {
       if (!source) continue;
-      const target = {};
+      const target: any = {};
       if (source.name)                    target.name = source.name;
       if (Array.isArray(source.terms))    target.terms = source.terms.join(',');
       if (Array.isArray(source.aliases))  target.aliases = source.aliases.join('\n');
 
       if (Object.keys(target).length) {
-        tagging.en.presets[group][key] = target;
+        (tagging as any).en.presets[group][key] = target;
       }
     }
   }
 
   // fields
-  for (const [key, source] of Object.entries(taggingOverrides.fields)) {
+  for (const [key, source] of Object.entries((taggingOverrides as any).fields) as [string, any][]) {
     if (!source) continue;
-    const target = {};
+    const target: any = {};
     if (source.label && !source.label.startsWith('{')) {
       target.label = source.label;
     }
@@ -255,7 +256,7 @@ async function writeEnJson() {
     }
 
     if (Object.keys(target).length) {
-      tagging.en.presets.fields[key] = target;
+      (tagging as any).en.presets.fields[key] = target;
     }
   }
 
@@ -265,10 +266,10 @@ async function writeEnJson() {
 
 // Returns an object with sorted keys and sorted values.
 // (This is useful for file diffing)
-function sortObject(obj: Record<string, unknown>): Record<string, unknown> {
+function sortObject(obj: Record<string, unknown>): Record<string, unknown> | null {
   if (!obj) return null;
 
-  const sorted = {};
+  const sorted: Record<string, unknown> = {};
   const keys = Object.keys(obj).sort(localeCompare);
   for (const k of keys) {
     sorted[k] = obj[k];

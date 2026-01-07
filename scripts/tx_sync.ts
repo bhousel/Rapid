@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { styleText } from 'bun:util';
+import { styleText } from 'node:util';
 import { transifexApi as api } from '@transifex/api';
 
 //
@@ -40,15 +40,15 @@ const RAPID_PROJECT = 'o:rapid-editor:p:rapid-editor';
 const ID_RESOURCE = 'o:openstreetmap:p:id-editor:r:core';
 const RAPID_RESOURCE = 'o:rapid-editor:p:rapid-editor:r:core';
 
-let user;             // user: RapidEditor
-let project_id;       // project: id
-let project_rapid;    // project: rapid
-let core_id;          // resource: id core
-let core_rapid;       // resource: rapid core
+let user: any;             // user: RapidEditor
+let project_id: any;       // project: id
+let project_rapid: any;    // project: rapid
+let core_id: any;          // resource: id core
+let core_rapid: any;       // resource: rapid core
 
 const languages = new Map();           // All Transifex languages  Map<languageID, language>
-const languages_id = new Set();        // Set<languageIDs>
-const languages_rapid = new Set();     // Set<languageIDs>
+const languages_id = new Set<string>();        // Set<languageIDs>
+const languages_rapid = new Set<string>();     // Set<languageIDs>
 const keys_id = new Map();             // Index By Key     Map<key, stringID>
 const keys_rapid = new Map();          // Index By Key     Map<key, stringID>
 const sources_id = new Map();          // Source strings   Map<stringID, attributes object>
@@ -268,7 +268,7 @@ async function processLanguages() {
 // }
 
 //
-async function getiDTranslationsForLanguage(languageID) {
+async function getiDTranslationsForLanguage(languageID: string): Promise<void> {
   const translations = new Map();   //  Map<stringID, Object>
   translations_id.set(languageID, translations);
 
@@ -288,7 +288,7 @@ async function getiDTranslationsForLanguage(languageID) {
 
 // getRapidTranslationsForLanguage
 // Get all translated strings for the given language
-async function getRapidTranslationsForLanguage(languageID) {
+async function getRapidTranslationsForLanguage(languageID: string): Promise<void> {
   const translations = new Map();   //  Map<stringID, Object>
   translations_rapid.set(languageID, translations);
 
@@ -314,7 +314,7 @@ async function getRapidTranslationsForLanguage(languageID) {
 
 // updateRapidTranslationsForLanguage
 // update the translations where the source strings are the same
-async function updateRapidTranslationsForLanguage(languageID, showCount = true) {
+async function updateRapidTranslationsForLanguage(languageID: string, showCount = true): Promise<void> {
   const from_id = translations_id.get(languageID);        //  Map<stringID, Object>
   const to_rapid = translations_rapid.get(languageID);    //  Map<stringID, Object>
 
@@ -389,8 +389,8 @@ async function updateRapidTranslationsForLanguage(languageID, showCount = true) 
 // This just wraps a `for await` that gathers all values from the given iterable.
 // The iterables we are using here represent collections of stuff fetched lazily from Transifex.
 // (We expect that they must have an `.all()` method, and won't loop infinitely)
-async function getCollection(iterable, showCount = true) {
-  const results = [];
+async function getCollection(iterable: any, showCount = true): Promise<any[]> {
+  const results: any[] = [];
 
   if (!process.stdout.isTTY) showCount = false;
 
@@ -420,9 +420,9 @@ async function getCollection(iterable, showCount = true) {
 // saveWithRetry
 // This retries a `save` call if we get an error like:
 //  500 - Something went wrong, please try again
-function saveWithRetry(resource, arg1, arg2) {
+function saveWithRetry(resource: any, arg1: any, arg2?: any): Promise<any> {
   return resource.save(arg1, arg2)
-    .catch(err => {
+    .catch((err: any) => {
       console.error(err);
       if (err.statusCode === 500 || err.statusCode === 429 || err.code === 'ETIMEDOUT') {  // server error or rate limit
         return new Promise(resolve => { setTimeout(resolve, 10000); })  // wait 10 sec

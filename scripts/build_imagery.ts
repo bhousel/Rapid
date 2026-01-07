@@ -1,13 +1,17 @@
 import stringify from 'json-stringify-pretty-compact';
-import { styleText } from 'bun:util';
+import { stat } from 'node:fs/promises';
+import { styleText } from 'node:util';
+const localeCompare = new Intl.Collator('en').compare;
 
+// This script processes files related to the available imagery:
+//  ./data/imagery.json  - sourced from `editor-layer-index`
+//  ./data/wayback.json  - sourced from Esri's waybackconfig file in S3
 
 await buildImagery();
+await buildWayback();
 
-// This script processes files used to know what background imagery is available
-//  ./data/imagery_overrides.json   - our customizations
-//  ./data/imagery.json          - sourced from `editor-layer-index`
-//  ./data/wayback.json          - sourced from Esri's waybackconfig file in S3
+
+// Gather the available imagery sources from the editor-layer-index
 async function buildImagery() {
   const START = '🏗   ' + styleText('yellow', 'Building imagery…');
   const END = '👍  ' + styleText('green', 'imagery built');
@@ -18,23 +22,11 @@ async function buildImagery() {
 
   // Load source data
   const imageryFile = './node_modules/editor-layer-index/imagery.json';
-  const manualFile = './data/imagery_overrides.json';
   const imageryJSON = await Bun.file(imageryFile).json();
-  const manualJSON = (await Bun.file(manualFile).json()).manualImagery;
 
-  // Merge imagery sources - `manualJSON` will override `imageryJSON`
-  const sources = new Map();
-  for (const source of imageryJSON) {
-    if (!source.id) continue;
-    if (sources.has(source.id)) {
-      console.warn(`duplicate imagery id = ${source.id}`);
-    }
-    sources.set(source.id, source);
-  }
-  for (const source of manualJSON) {
-    if (!source.id) continue;
-    sources.set(source.id, source);
-  }
+  // Get the file's mtime - this is preserved from the git commit date
+  const imageryStats = await stat(imageryFile);
+  const imageryDate = imageryStats.mtime.toISOString().slice(0, 10);  // YYYY-MM-DD
 
   // Ignore imagery more than 30 years old..
   const cutoffDate = new Date();
@@ -71,8 +63,7 @@ async function buildImagery() {
     /^EOXAT/                     // EOX AT *  (iD#9807)
   ];
 
-
-  const supportedWMSProjections = [
+  const supportedWMSProjections = new Set([
     // Web Mercator
     'EPSG:3857',
     // alternate codes used for Web Mercator
@@ -85,10 +76,20 @@ async function buildImagery() {
     'EPSG:3785',
     // WGS 84 (Equirectangular)
     'EPSG:4326'
-  ];
+  ]);
 
-  const imagery = [];
-  for (const [sourceID, source] of sources) {
+  const imagery = {} as any;
+
+  // Gather the imagery sources
+  for (const source of imageryJSON) {
+    const sourceID = source.id;
+    if (!sourceID) continue;
+
+    if (imagery[sourceID]) {
+      console.warn(`duplicate imagery id = ${sourceID}`);
+      continue;
+    }
+
     if (source.type !== 'tms' && source.type !== 'wms' && source.type !== 'bing') {
       // console.log(`discarding ${sourceID}  (type ${source.type})`);
       continue;
@@ -103,7 +104,7 @@ async function buildImagery() {
       name: source.name,
       type: source.type,
       template: source.url
-    };
+    } as any;
 
     // Some sources support 512px tiles
     if (sourceID === 'mtbmap-no') {
@@ -112,7 +113,10 @@ async function buildImagery() {
 
     // Some WMS sources are supported, check projection
     if (source.type === 'wms') {
-      const projection = source.available_projections && supportedWMSProjections.find(p => source.available_projections.indexOf(p) !== -1);
+      let projection;
+      if (Array.isArray(source.available_projections)) {
+        projection = source.available_projections.find((p: string) => supportedWMSProjections.has(p));
+      }
       if (!projection) {
         // console.log(`discarding ${sourceID}  (no supported projection)`);
         continue;
@@ -157,15 +161,36 @@ async function buildImagery() {
     }
 
     if (extent.polygon) {
-      props.polygon = extent.polygon;
+      // Workaround for editor-layer-index weirdness..
+      // Add an extra array nest to each element in `extent.polygon`
+      // so the rings are not treated as a bunch of holes:
+      //   what we get:  [ [[outer],[hole],[hole]] ]
+      //   what we want: [ [[outer]],[[outer]],[[outer]] ]
+      const parts = extent.polygon.map((ring: unknown) => [ring]);
+      props.feature = {
+        type: 'Feature',
+        properties: { id: sourceID },
+        geometry: {
+          type: 'MultiPolygon',
+          coordinates: parts
+        }
+      };
+
     } else if (extent.bbox) {
-      props.polygon = [[
-        [extent.bbox.min_lon, extent.bbox.min_lat],
-        [extent.bbox.min_lon, extent.bbox.max_lat],
-        [extent.bbox.max_lon, extent.bbox.max_lat],
-        [extent.bbox.max_lon, extent.bbox.min_lat],
-        [extent.bbox.min_lon, extent.bbox.min_lat]
-      ]];
+      props.feature = {
+        type: 'Feature',
+        properties: { id: sourceID },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[    // outer, wound counterclockwise
+            [extent.bbox.min_lon, extent.bbox.min_lat],
+            [extent.bbox.max_lon, extent.bbox.min_lat],
+            [extent.bbox.max_lon, extent.bbox.max_lat],
+            [extent.bbox.min_lon, extent.bbox.max_lat],
+            [extent.bbox.min_lon, extent.bbox.min_lat]
+          ]]
+        }
+      };
     }
 
     const attribution = source.attribution || {};
@@ -185,15 +210,29 @@ async function buildImagery() {
       }
     }
 
-    imagery.push(props);
+    imagery[sourceID] = props;
   };
 
+  const bundle = {
+    bundleID: `editor-layer-index@${imageryDate}`,
+    imagery: sortObject(imagery)
+  };
 
-  imagery.sort((a, b) => a.name.localeCompare(b.name));
-  await Bun.write('./data/imagery.json', stringify({ imagery: imagery }) + '\n');
+  await Bun.write('./data/imagery.json', stringify(bundle) + '\n');
+  console.timeEnd(END);
+}
 
 
-  // We'll mirror the wayback config file, it's not available everywhere - see Rapid#1445
+// Fetch the wayback config file from Esri's S3 bucket.
+// We'll mirror the wayback config file, it's not available everywhere - see Rapid#1445
+async function buildWayback() {
+  const START = '🏗   ' + styleText('yellow', 'Building wayback');
+  const END = '👍  ' + styleText('green', 'wayback built');
+
+  console.log('');
+  console.log(START);
+  console.time(END);
+
   const WAYBACK_CONFIG_FILE_PROD = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
   // const WAYBACK_CONFIG_FILE_DEV = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/dev/waybackconfig.json';
 
@@ -207,6 +246,19 @@ async function buildImagery() {
       return Bun.write('./data/wayback.json', stringify({ wayback: data }) + '\n');
     });
 
-
   console.timeEnd(END);
+}
+
+
+// Returns an object with sorted keys and sorted values.
+// (This is useful for file diffing)
+function sortObject(obj: Record<string, unknown>): Record<string, unknown> | null {
+  if (!obj) return null;
+
+  const sorted: Record<string, unknown> = {};
+  const keys = Object.keys(obj).sort(localeCompare);
+  for (const k of keys) {
+    sorted[k] = obj[k];
+  }
+  return sorted;
 }

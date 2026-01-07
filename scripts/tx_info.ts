@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { parseArgs, styleText } from 'bun:util';
+import { parseArgs, styleText } from 'node:util';
 import { transifexApi as api } from '@transifex/api';
 
 const localeCompare = new Intl.Collator('en').compare;
@@ -36,10 +36,10 @@ console.log(styleText('yellow', `lookup key "${LOOKUP_KEY}"`));
 const RAPID_PROJECT = 'o:rapid-editor:p:rapid-editor';
 const CORE_RESOURCE = 'o:rapid-editor:p:rapid-editor:r:core';
 
-let project_rapid;     // Project
-let resource_core;     // Resource
-let source_string;     // ResrouceString
-let languageIDs;       // Array<languageID>
+let project_rapid: any;     // Project
+let resource_core: any;     // Resource
+let source_string: any;     // ResourceString
+let languageIDs: string[];  // Array<languageID>
 
 Promise.resolve()
   .then(getProjectDetails)
@@ -85,9 +85,9 @@ async function getProjectDetails() {
 // }
 
 // getResourceString
-async function getSourceString() {
+async function getSourceString(): Promise<void> {
   const opts = { resource: CORE_RESOURCE, key: LOOKUP_KEY };
-  const query = api.ResourceString.filter(opts);
+  const query = api.ResourceString.filter(opts) as any;
   await query.fetch();
 
   if (query.data.length === 0) {
@@ -146,7 +146,7 @@ async function getTranslationStrings() {
     if (languageID === 'l:en') continue;   // skip `l:en`, it's the source language
 
     const opts = { resource: CORE_RESOURCE, language: languageID, resource_string__key: LOOKUP_KEY, translated: true };
-    const query = api.ResourceTranslation.filter(opts);
+    const query = api.ResourceTranslation.filter(opts) as any;
     await query.fetch();
 
     if (query.data.length === 0) {
@@ -168,8 +168,8 @@ async function getTranslationStrings() {
 // getCollection
 // This just wraps a `for await` that gathers all values from the given iterable.
 // The iterables we are using here represent collections of stuff fetched lazily from Transifex.
-async function getCollection(iterable, showCount = true) {
-  const results = [];
+async function getCollection(iterable: AsyncIterable<any> | Iterable<any>, showCount = true): Promise<any[]> {
+  const results: any[] = [];
 
   if (!process.stdout.isTTY) showCount = false;
 

@@ -1,4 +1,6 @@
 
+export {};
+
 await Promise.all([
    Bun.build({
     entrypoints: ['./modules/main_prod.js'],

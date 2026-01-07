@@ -46,7 +46,7 @@ let resource_imagery;    // resource: id imagery
 let resource_tagging;    // resource: id tagging
 
 const languages = new Map();               // All Transifex languages  Map<languageID, language>
-let languages_rapid;                       // Array<languageID>  (we want to run through them sorted so fallback works)
+let languages_rapid: string[];             // Array<languageID>  (we want to run through them sorted so fallback works)
 const sources_core = new Map();            // Source strings   Map<stringID, attributes object>
 const sources_community = new Map();       // Source strings   Map<stringID, attributes object>
 const sources_imagery = new Map();         // Source strings   Map<stringID, attributes object>
@@ -165,13 +165,13 @@ async function getRapidLanguageStats() {
 async function writeLocalesFile() {
   console.log(styleText('yellow', `✏️   Writing 'locales.json'…`));
 
-  const locales = {};
+  const locales: Record<string, { rtl: boolean }> = {};
   for (const languageID of languages_rapid) {
     const language = languages.get(languageID);
     if (!language)  throw new Error(`Missing language '${languageID}'`);
 
     // Note: replace CLDR-style underscores with BCP47-style hypens to make things easier.
-    const code = language.attributes.code.replace(/_/g, '-');
+    const code: string = language.attributes.code.replace(/_/g, '-');
     let rtl = language.attributes.rtl;
     if (code === 'ku') {  // exception: Kurdish written in Latin script, see iD#4783
       rtl = false;
@@ -203,7 +203,7 @@ async function getCommunity() {
     try {
       await getTranslationStrings('community', COMMUNITY_RESOURCE, languageID, translations_community);
       await processTranslations('community', languageID, sources_community, translations_community);
-    } catch (err) {
+    } catch (err: any) {
       console.warn(err?.message);
     }
   }
@@ -217,7 +217,7 @@ async function getImagery() {
     try {
       await getTranslationStrings('imagery', IMAGERY_RESOURCE, languageID, translations_imagery);
       await processTranslations('imagery', languageID, sources_imagery, translations_imagery);
-    } catch (err) {
+    } catch (err: any) {
       console.warn(err?.message);
     }
   }
@@ -231,7 +231,7 @@ async function getTagging() {
     try {
       await getTranslationStrings('tagging', TAGGING_RESOURCE, languageID, translations_tagging);
       await processTranslations('tagging', languageID, sources_tagging, translations_tagging);
-    } catch (err) {
+    } catch (err: any) {
       console.warn(err?.message);
     }
   }
@@ -265,7 +265,7 @@ async function getTagging() {
 // }
 
 //
-async function getSourceStrings(resourceName, resourceID, collection) {
+async function getSourceStrings(resourceName: string, resourceID: string, collection: Map<string, any>): Promise<void> {
   console.log(styleText('yellow', `📥  Fetching '${resourceName}' source strings…`));
   const iter = api.ResourceString.filter({ resource: resourceID });
 
@@ -300,7 +300,7 @@ async function getSourceStrings(resourceName, resourceID, collection) {
 // }
 
 //
-async function getTranslationStrings(resourceName, resourceID, languageID, collection) {
+async function getTranslationStrings(resourceName: string, resourceID: string, languageID: string, collection: Map<string, any>): Promise<void> {
   const translations = new Map();   //  Map<stringID, ResourceTranslation>
   collection.set(languageID, translations);
 
@@ -321,7 +321,7 @@ async function getTranslationStrings(resourceName, resourceID, languageID, colle
 // processTranslations
 // Here we collect all of the translated strings and write them into JSON format.
 // We compare each translated string against the source English string and only write strings that are actually changed.
-async function processTranslations(resourceName, languageID, sourceCollection, translationCollection) {
+async function processTranslations(resourceName: string, languageID: string, sourceCollection: Map<string, any>, translationCollection: Map<string, any>): Promise<boolean> {
   // At this point in the script execution things shouldn't be missing
   const translations = translationCollection.get(languageID);  //  Map<stringID, ResourceTranslation>
   if (!translations)  throw new Error(`Missing translations for '${languageID}'`);
@@ -339,7 +339,7 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
     fallbacks = translationCollection.get(`l:${langCode}`);  //  Map<stringID, ResourceTranslation>
   }
 
-  const data = {};
+  const data: Record<string, any> = {};
   let count = 0;
 
   for (const [stringID, translation] of translations) {
@@ -355,13 +355,13 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
     if (!source)  throw new Error(`Missing source for '${stringID}'`);
     const sstrings = source.attributes.strings;
 
-    const key = source.attributes.key;
+    const key: string = source.attributes.key;
     if (!key)  throw new Error(`Missing key for '${stringID}'`);
 
     const fallback = fallbacks?.get(stringID);  // fallback is optional
     const fstrings = fallback?.attributes?.strings || {};
 
-    const path = key.split('.');
+    const path: string[] = key.split('.');
     let isRedundant = false;   // We'll remove redundant translations below
 
     if (hasPlurals) {
@@ -376,7 +376,7 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
       //   }
       // }
       //
-      for (let [pluralRule, tstring] of Object.entries(tstrings)) {  // eslint-disable-line prefer-const
+      for (let [pluralRule, tstring] of Object.entries(tstrings) as [string, string][]) {  // eslint-disable-line prefer-const
         if (!tstring)  throw new Error(`Missing plural string for '${stringID}' - '${pluralRule}'`);
 
         // Get diacritic marks into a consistent format, perfer them combined into fewer characters.
@@ -390,7 +390,7 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
 
         } else {  // Keep this translated string..
           // Walk to the leaf, extending the tree if necessary..
-          let branch = data;
+          let branch: Record<string, any> = data;
           for (const p of path) {
             if (!branch[p])  branch[p] = {};
             branch = branch[p];
@@ -411,7 +411,7 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
       // }
       // (We don't make a 'operations.merge.title.other', even though Transifex has it this way.)
       //
-      const leaf = path.pop();
+      const leaf = path.pop()!;
       const pluralRule = 'other';
       let tstring = tstrings[pluralRule];
       if (!tstring)  throw new Error(`Missing singular string for '${stringID}' - '${pluralRule}'`);
@@ -426,7 +426,7 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
 
       } else {  // Keep this translated string..
         // Walk to the leaf, extending the tree if necessary..
-        let branch = data;
+        let branch: Record<string, any> = data;
         for (const p of path) {
           if (!branch[p])  branch[p] = {};
           branch = branch[p];
@@ -484,7 +484,7 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
 
   if (count > 0) {
     console.log(styleText('yellow', `✏️   Writing '${resourceName}.${code}.json'…`));
-    const output = {};
+    const output: Record<string, any> = {};
     output[code] = data;
     await fs.writeFile(`./data/l10n/${resourceName}.${code}.json`, JSON.stringify(output, null, 2) + '\n');
     // await Bun.write(`./data/l10n/${resourceName}.${code}.json`, JSON.stringify(output, null, 2) + '\n');
@@ -501,8 +501,8 @@ async function processTranslations(resourceName, languageID, sourceCollection, t
 // This just wraps a `for await` that gathers all values from the given iterable.
 // The iterables we are using here represent collections of stuff fetched lazily from Transifex.
 // (We expect that they must have an `.all()` method, and won't loop infinitely)
-async function getCollection(iterable, showCount = true) {
-  const results = [];
+async function getCollection(iterable: any, showCount = true): Promise<any[]> {
+  const results: any[] = [];
 
   if (!process.stdout.isTTY) showCount = false;
 
@@ -532,9 +532,9 @@ async function getCollection(iterable, showCount = true) {
 // saveWithRetry
 // This retries a `save` call if we get an error like:
 //  500 - Something went wrong, please try again
-function saveWithRetry(resource, arg1, arg2) {
+function saveWithRetry(resource: any, arg1: any, arg2: any): Promise<any> {
   return resource.save(arg1, arg2)
-    .catch(err => {
+    .catch((err: any) => {
       console.error(err);
       if (err.statusCode === 500 || err.statusCode === 429 || err.code === 'ETIMEDOUT') {  // server error or rate limit
         return new Promise(resolve => { setTimeout(resolve, 10000); })  // wait 10 sec
@@ -547,10 +547,10 @@ function saveWithRetry(resource, arg1, arg2) {
 
 
 // Returns an object with sorted keys and sorted values.
-function sortObject(obj) {
+function sortObject(obj: Record<string, any> | null): Record<string, any> | null {
   if (!obj) return null;
 
-  const sorted = {};
+  const sorted: Record<string, any> = {};
   Object.keys(obj).sort(localeCompare).forEach(k => sorted[k] = obj[k]);
 
   return sorted;
