@@ -15,6 +15,8 @@ import { osmAreaKeys } from './tags.js';
 export interface PresetProps {
   /** Unique identifier for this Preset */
   id: string;
+  /** The bundle that this Preset came from (e.g. 'id-tagging-schema@6.13.0') */
+  bundleID: string;
   /** Display name */
   name: string;
   /** Alternate names that may be displayed in the UI */

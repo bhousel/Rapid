@@ -6,7 +6,7 @@ import { utilDateString } from '../util/date.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../core/types.ts';
-import type { Vec2 } from '../data/types.ts';
+import type { GeoJSONFeature, Vec2 } from '../lib/types.ts';
 
 // Cast utilAesDecrypt to allow optional key parameter (matches runtime behavior)
 const aesDecrypt = utilAesDecrypt as (cipherText: string | undefined, key?: number[]) => string;
@@ -40,12 +40,18 @@ export interface VintageRange {
 export interface ImagerySourceProps {
   /** Unique identifier for this imagery source (required) */
   id: string;
+  /** The bundle that this ImagerySource came from (e.g. 'editor-layer-index') */
+  bundleID: string;
   /** URL template for fetching tiles */
   template?: string;
+  /** Whether the imagery source is considered "best" in the area it is available */
+  best: boolean;
+  /** Whether the imagery source is an "overlay" (transparent tiles) */
+  overlay: boolean;
   /** Whether the template is encrypted */
-  encrypted?: boolean;
+  encrypted: boolean;
   /** Imagery type: 'tms', 'wms', or 'bing' */
-  type?: 'tms' | 'wms' | 'bing';
+  type: 'tms' | 'wms' | 'bing';
   /** Display name of the imagery source */
   name?: string;
   /** Description text for the imagery source */
@@ -62,8 +68,10 @@ export interface ImagerySourceProps {
   zoomExtent?: [number, number];
   /** Zoom range for the imagery source */
   zoomRange?: number;
-  /** Polygon defining the coverage area */
-  polygon?: number[][][];
+  /** Feature defining the coverage area */
+  feature?: GeoJSONFeature;
+  /** Icon url for the source */
+  icon?: string;
   /** Terms of service text */
   terms_text?: string;
   /** Terms of service URL */
@@ -117,6 +125,8 @@ export class ImagerySource {
     // Preserve properties and assign some defaults
     this.props = globalThis.structuredClone(props) as ImagerySourceProps;
     this.props.alpha ||= 1;
+    this.props.best ||= false;
+    this.props.overlay ||= false;
     this.props.tileSize ||= 256;
     this.props.zoomExtent ??= [0, 22];
     this.props.zoomRange ||= 5;
@@ -245,8 +255,8 @@ export class ImagerySource {
    * @readonly
    */
   get area(): number {
-    if (!this.props.polygon) return Number.MAX_VALUE;  // worldwide
-    const area = d3_geoArea({ type: 'MultiPolygon', coordinates: [ this.props.polygon ] });
+    if (!this.props.feature) return Number.MAX_VALUE;  // worldwide
+    const area = d3_geoArea(this.props.feature as any);
     return isNaN(area) ? 0 : area;
   }
 
@@ -801,9 +811,21 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
-    props.nameStringID = 'background.wayback.name';
-    props.descriptionStringID = 'background.wayback.description';
+  constructor(context: Context) {
+    const props = {
+      id: 'EsriWayback',
+      name: 'Esri Wayback',
+      description: 'Esri Wayback contains archived snapshots of Esri World Imagery created over time.',
+      nameStringID: 'background.wayback.name',
+      descriptionStringID: 'background.wayback.description',
+      type: 'tms',
+      template: '',
+      zoomExtent: [0, 22],
+      terms_url: 'https://wiki.openstreetmap.org/wiki/Esri',
+      terms_text: 'Terms & Feedback',
+      icon: "https://osmlab.github.io/editor-layer-index/sources/world/EsriImageryClarity.png"
+    } as ImagerySourceProps;
+
     super(context, props);
   }
 

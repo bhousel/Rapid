@@ -129,10 +129,10 @@ describe('SchemaSystem', () => {
         ]);
       });
 
-      it('schemas', () => {
-        assert.instanceOf(_schema.schemas, Set);
+      it('bundles', () => {
+        assert.instanceOf(_schema.bundles, Set);
 
-        const keys = [..._schema.schemas];
+        const keys = [..._schema.bundles];
         // merged 'id-tagging-schema' data at init...
         assert.isTrue(keys.some(key => /^id-tagging-schema@/.test(key)));
         // merged 'rapid-schema-overrides' data at init...
@@ -168,16 +168,16 @@ describe('SchemaSystem', () => {
 
 
     describe('merge', () => {
-      it('throws if schemaID is missing', () => {
+      it('throws if bundleID is missing', () => {
         const schemaData = {};
-        assert.throws(() => _schema.merge(schemaData), /missing schemaID/i);
+        assert.throws(() => _schema.merge(schemaData), /missing bundleID/i);
       });
 
-      it('throws if schemaID has already been merged', () => {
-        const schemaData = { schemaID: 'test1' };
-        assert.doesNotHaveAnyKeys(_schema.schemas, ['test1']);
+      it('throws if bundleID has already been merged', () => {
+        const schemaData = { bundleID: 'test1' };
+        assert.doesNotHaveAnyKeys(_schema.bundles, ['test1']);
         assert.doesNotThrow(() => _schema.merge(schemaData));
-        assert.containsAllKeys(_schema.schemas, ['test1']);
+        assert.containsAllKeys(_schema.bundles, ['test1']);
         assert.throws(() => _schema.merge(schemaData), /already merged/i);
       });
 
@@ -198,8 +198,8 @@ describe('SchemaSystem', () => {
           assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
         });
 
-        it('adds the merged schemaID to the schemas Set', () => {
-          assert.containsAllKeys(_schema.schemas, ['add-surf-data']);
+        it('adds the merged bundleID to the bundles Set', () => {
+          assert.containsAllKeys(_schema.bundles, ['add-surf-data']);
         });
 
         describe('fields', () => {
@@ -207,7 +207,7 @@ describe('SchemaSystem', () => {
             const surfField = _schema.fields.get('surf/type');
             assert.instanceOf(surfField, Rapid.Field);
             assert.deepInclude(surfField.props, {
-              schemaID: 'add-surf-data',
+              bundleID: 'add-surf-data',
               id: 'surf/type',
               label: 'Surf Type',
               key: 'surf:type',
@@ -225,7 +225,7 @@ describe('SchemaSystem', () => {
             const surfPreset = _schema.presets.get('amenity/shop/surf');
             assert.instanceOf(surfPreset, Rapid.Preset);
             assert.deepInclude(surfPreset.props, {
-              schemaID: 'add-surf-data',
+              bundleID: 'add-surf-data',
               id: 'amenity/shop/surf',
               name: 'Surf Shop'
             });
@@ -254,7 +254,7 @@ describe('SchemaSystem', () => {
             const surfCategory = _schema.categories.get('category-surfing');
             assert.instanceOf(surfCategory, Rapid.Category);
             assert.deepInclude(surfCategory.props, {
-              schemaID: 'add-surf-data',
+              bundleID: 'add-surf-data',
               id: 'category-surfing',
               name: 'Surf Features'
             });
@@ -317,8 +317,8 @@ describe('SchemaSystem', () => {
           assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
         });
 
-        it('adds the merged schemaID to the schemas Set', () => {
-          assert.containsAllKeys(_schema.schemas, ['add-surf-data', 'update-surf-data']);
+        it('adds the merged bundleID to the bundles Set', () => {
+          assert.containsAllKeys(_schema.bundles, ['add-surf-data', 'update-surf-data']);
         });
 
         describe('fields', () => {
@@ -326,7 +326,7 @@ describe('SchemaSystem', () => {
             const surfField = _schema.fields.get('surf/type');
             assert.instanceOf(surfField, Rapid.Field);
             assert.deepInclude(surfField.props, {
-              schemaID: 'update-surf-data',  // new schemaID
+              bundleID: 'update-surf-data',  // new bundleID
               id: 'surf/type',
               label: 'Surfing Type',  // new name
               key: 'surf:type',
@@ -340,7 +340,7 @@ describe('SchemaSystem', () => {
             const surfPreset = _schema.presets.get('amenity/shop/surf');
             assert.instanceOf(surfPreset, Rapid.Preset);
             assert.deepInclude(surfPreset.props, {
-              schemaID: 'update-surf-data',  // new schemaID
+              bundleID: 'update-surf-data',  // new bundleID
               id: 'amenity/shop/surf',
               name: 'Surfing Shop'   // new name
             });
@@ -352,7 +352,7 @@ describe('SchemaSystem', () => {
             const surfCategory = _schema.categories.get('category-surfing');
             assert.instanceOf(surfCategory, Rapid.Category);
             assert.deepInclude(surfCategory.props, {
-              schemaID: 'update-surf-data',   // new schemaID
+              bundleID: 'update-surf-data',   // new bundleID
               id: 'category-surfing',
               name: 'Surfing Features'  // new name
             });
@@ -401,8 +401,8 @@ describe('SchemaSystem', () => {
           assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
         });
 
-        it('adds the merged schemaID to the schemas Set', () => {
-          assert.containsAllKeys(_schema.schemas, ['add-surf-data', 'update-surf-data', 'delete-surf-data']);
+        it('adds the merged bundleID to the bundles Set', () => {
+          assert.containsAllKeys(_schema.bundles, ['add-surf-data', 'update-surf-data', 'delete-surf-data']);
         });
 
         describe('fields', () => {
@@ -1003,9 +1003,9 @@ describe('SchemaSystem', () => {
         _schema._resetAll();
       });
 
-      it('resets schemas', () => {
-        assert.instanceOf(_schema.schemas, Set);
-        assert.isEmpty(_schema.schemas);
+      it('resets bundles', () => {
+        assert.instanceOf(_schema.bundles, Set);
+        assert.isEmpty(_schema.bundles);
       });
 
       it('resets fields', () => {

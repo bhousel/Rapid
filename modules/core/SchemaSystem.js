@@ -41,7 +41,7 @@ const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
  * Properties available:
  *   `geometryTypes`  {Set<string>}                 The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
  *   `fieldTypes`     {Set<string>}                 The supported field types (see also `ui/fields/index.js`)
- *   `merged`         {Set<schemaID>}               Names of schemas that have been merged in
+ *   `bundles`        {Set<bundleID>}               Names of schema bundles that have been merged in
  *   `fields`         {Map<fieldID, Field>}         The Fields
  *   `presets`        {Map<presetID, Preset>}       The Presets
  *   `categories`     {Map<categoryID, Category>}   The Categories
@@ -79,7 +79,7 @@ export class SchemaSystem extends AbstractSystem {
     // Set of presetIDs that the user can add (if `null`, all are normally addable)
     this.addablePresetIDs = null;
 
-    this.schemas = new Set();      // Set<string>
+    this.bundles = new Set();      // Set<bundleID> - track merged schema bundles
     this.categories = new Map();   // Map<categoryID, Category>
     this.presets = new Map();      // Map<presetID, Preset>
     this.fields = new Map();       // Map<fieldID, Field>
@@ -140,65 +140,7 @@ export class SchemaSystem extends AbstractSystem {
           this.addablePresetIDs = new Set(arr);
         }
 
-        // Tell the AssetSystem what to load..
-        const latestPath = 'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist';
-        assets.setAsset('iD_schema_deprecated', `${latestPath}/deprecated.min.json`,        'latest');
-        assets.setAsset('iD_schema_discarded',  `${latestPath}/discarded.min.json`,         'latest');
-        assets.setAsset('iD_schema_categories', `${latestPath}/preset_categories.min.json`, 'latest');
-        assets.setAsset('iD_schema_defaults',   `${latestPath}/preset_defaults.min.json`,   'latest');
-        assets.setAsset('iD_schema_presets',    `${latestPath}/presets.min.json`,           'latest');
-        assets.setAsset('iD_schema_fields',     `${latestPath}/fields.min.json`,            'latest');
-
-        const localPath = 'data/modules/id-tagging-schema';
-        assets.setAsset('iD_schema_deprecated', `${localPath}/deprecated.min.json`,         'local');
-        assets.setAsset('iD_schema_discarded',  `${localPath}/discarded.min.json`,          'local');
-        assets.setAsset('iD_schema_categories', `${localPath}/preset_categories.min.json`,  'local');
-        assets.setAsset('iD_schema_defaults',   `${localPath}/preset_defaults.min.json`,    'local');
-        assets.setAsset('iD_schema_presets',    `${localPath}/presets.min.json`,            'local');
-        assets.setAsset('iD_schema_fields',     `${localPath}/fields.min.json`,             'local');
-
-        // 'rapid_schema_overrides' = customizations to merge in after the id-tagging-schema
-        assets.setAsset('rapid_schema_overrides', 'data/schema_overrides.min.json');
-
-        // Fetch the schema data
-        return Promise.all([
-          assets.loadAssetAsync('iD_schema_deprecated'),
-          assets.loadAssetAsync('iD_schema_discarded'),
-          assets.loadAssetAsync('iD_schema_categories'),
-          assets.loadAssetAsync('iD_schema_defaults'),
-          assets.loadAssetAsync('iD_schema_presets'),
-          assets.loadAssetAsync('iD_schema_fields'),
-          assets.loadAssetAsync('rapid_schema_overrides')
-        ]);
-      })
-      .then(vals => {
-        osmSetDeprecatedTags(vals[0]);
-        // osmSetDiscardedTags(vals[1]);  // TODO: should be here, but it isn't yet
-
-        // Determine the version of id-tagging-schema
-        // This might not be exact because the CDN can return a newer semver patch.
-        // But it's close enough, and this string is informational only.
-        // (It would be better if these files included some metadata like my other projects do).
-        let idSchemaVersion = 'unknown';
-        for (const [k, v] of Object.entries(rapidDependencies)) {
-          if (/id-tagging-schema$/.test(k)) {
-            idSchemaVersion = v.replaceAll(/[\^~]/g, '');  // no carat/tilde
-            break;
-          }
-        }
-
-        // Merge id-tagging-schema...
-        this.merge({
-          schemaID: `id-tagging-schema@${idSchemaVersion}`,
-          categories: vals[2],
-          defaults: vals[3],
-          presets: vals[4],
-          fields: vals[5]
-        });
-
-        // Merge rapid_schema_overrides...
-        const rapidSchemaVersion = rapidVersion || 'unknown';
-        this.merge({ schemaID: `rapid-schema-overrides@${rapidSchemaVersion}`, ...vals[6] });
+        return this._loadDefaultSchemaAsync();
       });
   }
 
@@ -251,7 +193,7 @@ export class SchemaSystem extends AbstractSystem {
    * merge
    * Accepts an object containing new schema data (all properties except 'id' are optional):
    * {
-   *   schemaID: '',           // A string schema identifier, e.g. 'id-tagging-schema@6.13.0'
+   *   bundleID: '',           // A string bundle identifier, e.g. 'id-tagging-schema@6.13.0'
    *   fields: {},             // Object<fieldID, fieldData>
    *   presets: {},            // Object<presetID, presetData>
    *   categories: {},         // Object<categoryID, categoryData>
@@ -271,19 +213,19 @@ export class SchemaSystem extends AbstractSystem {
    *     `"barrier/*": null,`                           <-- all `barrier/*` presets deleted
    *
    * @param  {Object}  src - preset data to merge into the caches
-   * @throws  Will throw if given data does not contain a `schemaID`, or if the `schemaID` has already been merged
+   * @throws  Will throw if given data does not contain a `bundleID`, or if the `bundleID` has already been merged
    */
   merge(src = {}) {
-    const schemaID = src.schemaID;
+    const bundleID = src.bundleID;
 
-    if (!schemaID) {
-      throw new Error('Schema missing schemaID property');
+    if (!bundleID) {
+      throw new Error('Schema missing bundleID property');
     }
-    if (this.schemas.has(schemaID)) {
-      throw new Error(`Schema "${schemaID}" already merged`);
+    if (this.bundles.has(bundleID)) {
+      throw new Error(`Schema "${bundleID}" already merged`);
     }
 
-    this.schemas.add(schemaID);
+    this.bundles.add(bundleID);
 
     const checkLocationSets = [];
     const context = this.context;
@@ -297,7 +239,7 @@ export class SchemaSystem extends AbstractSystem {
             if (VERBOSE) console.warn(`"${f.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
             continue;
           }
-          const field = new Field(context, { id: fieldID, schemaID: schemaID, ...f });
+          const field = new Field(context, { id: fieldID, bundleID: bundleID, ...f });
           if (field.props.locationSet) {
             checkLocationSets.push(field.props);
           }
@@ -337,7 +279,7 @@ export class SchemaSystem extends AbstractSystem {
           // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
           if (p.icon === 'fas-vector-square')            p.icon = 'temaki-portrait_framed';
 
-          const preset = new Preset(context, { id: presetID, schemaID: schemaID, ...p });
+          const preset = new Preset(context, { id: presetID, bundleID: bundleID, ...p });
           if (preset.props.locationSet) {
             checkLocationSets.push(preset.props);
           }
@@ -365,7 +307,7 @@ export class SchemaSystem extends AbstractSystem {
           // Rename icon identifiers to match the rapid spritesheet
           if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
 
-          const category = new Category(context, { id: categoryID, schemaID: schemaID, ...c });
+          const category = new Category(context, { id: categoryID, bundleID: bundleID, ...c });
           if (category.props.locationSet) {
             checkLocationSets.push(category.props);
           }
@@ -850,6 +792,82 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
+   * _loadDefaultSchemaAsync
+   * This loads the default schema for Rapid:
+   *  - iD-tagging-schema
+   *  - rapid schema overrides
+   * @return  {Promise}  Promise fulfilled when the default schema has been downloaded and merged into Rapid.
+   */
+  _loadDefaultSchemaAsync() {
+    const context = this.context;
+    const assets = context.systems.assets;
+
+    // Tell the AssetSystem what to load..
+    const latestPath = 'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist';
+    assets.setAsset('iD_schema_deprecated', `${latestPath}/deprecated.min.json`, 'latest');
+    assets.setAsset('iD_schema_discarded', `${latestPath}/discarded.min.json`, 'latest');
+    assets.setAsset('iD_schema_categories', `${latestPath}/preset_categories.min.json`, 'latest');
+    assets.setAsset('iD_schema_defaults', `${latestPath}/preset_defaults.min.json`, 'latest');
+    assets.setAsset('iD_schema_presets', `${latestPath}/presets.min.json`, 'latest');
+    assets.setAsset('iD_schema_fields', `${latestPath}/fields.min.json`, 'latest');
+
+    const localPath = 'data/modules/id-tagging-schema';
+    assets.setAsset('iD_schema_deprecated', `${localPath}/deprecated.min.json`, 'local');
+    assets.setAsset('iD_schema_discarded', `${localPath}/discarded.min.json`, 'local');
+    assets.setAsset('iD_schema_categories', `${localPath}/preset_categories.min.json`, 'local');
+    assets.setAsset('iD_schema_defaults', `${localPath}/preset_defaults.min.json`, 'local');
+    assets.setAsset('iD_schema_presets', `${localPath}/presets.min.json`, 'local');
+    assets.setAsset('iD_schema_fields', `${localPath}/fields.min.json`, 'local');
+
+    // 'rapid_schema_overrides' = customizations to merge in after the id-tagging-schema
+    assets.setAsset('rapid_schema_overrides', 'data/schema_overrides.min.json');
+
+    // Fetch the schema data
+    return Promise.all([
+      assets.loadAssetAsync('iD_schema_deprecated'),
+      assets.loadAssetAsync('iD_schema_discarded'),
+      assets.loadAssetAsync('iD_schema_categories'),
+      assets.loadAssetAsync('iD_schema_defaults'),
+      assets.loadAssetAsync('iD_schema_presets'),
+      assets.loadAssetAsync('iD_schema_fields'),
+      assets.loadAssetAsync('rapid_schema_overrides')
+    ])
+    .then(vals => {
+      osmSetDeprecatedTags(vals[0]);
+      // osmSetDiscardedTags(vals[1]);  // TODO: should be here, but it isn't yet
+
+      // Determine the version of id-tagging-schema
+      // This might not be exact because the CDN can return a newer semver patch.
+      // But it's close enough, and this string is informational only.
+      // (It would be better if these files included some metadata like my other projects do).
+      let idSchemaVersion = 'unknown';
+      for (const [k, v] of Object.entries(rapidDependencies)) {
+        if (/id-tagging-schema$/.test(k)) {
+          idSchemaVersion = v.replaceAll(/[\^~]/g, '');  // no carat/tilde
+          break;
+        }
+      }
+
+      // Merge id-tagging-schema...
+      this.merge({
+        bundleID: `id-tagging-schema@${idSchemaVersion}`,
+        categories: vals[2],
+        defaults: vals[3],
+        presets: vals[4],
+        fields: vals[5]
+      });
+
+      // Merge rapid_schema_overrides...
+      const rapidSchemaVersion = rapidVersion || 'unknown';
+      this.merge({
+        bundleID: `rapid-schema-overrides@${rapidSchemaVersion}`,
+        ...vals[6]
+      });
+    });
+  }
+
+
+  /**
    * _localeChanged
    * Call this whenever the locale changes.
    * It will lock in the new locale and prepare a search index for that locale.
@@ -1005,7 +1023,7 @@ export class SchemaSystem extends AbstractSystem {
   _resetAll() {
     const context = this.context;
 
-    this.schemas.clear();
+    this.bundles.clear();
     this.presets.clear();
     this.fields.clear();
     this.categories.clear();
@@ -1044,5 +1062,5 @@ export class SchemaSystem extends AbstractSystem {
  *  @typedef  {string}  presetID
  *  @typedef  {string}  fieldID
  *  @typedef  {string}  geometryID
- *  @typedef  {string}  schemaID
+ *  @typedef  {string}  bundleID
  */

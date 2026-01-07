@@ -16,7 +16,7 @@ describe('Category', () => {
   beforeAll(() => {
     return schema.initAsync().then(() => {
       const presetData = {
-        schemaID: 'test',
+        bundleID: 'test',
         presets: {
           'highway/residential': {
             tags: { highway: 'residential' },

@@ -10,6 +10,8 @@ import type { Context } from '../core/types.ts';
 export interface FieldProps {
   /** Unique identifier for this Field */
   id: string;
+  /** The bundle that this Field came from (e.g. 'id-tagging-schema@6.13.0') */
+  bundleID: string;
   /** Type of field (e.g., 'text', 'combo', 'check', 'number', etc.) */
   type: string;
   /** English label for the field caption */

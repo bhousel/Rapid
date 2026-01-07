@@ -34,10 +34,17 @@ export const njProps = {
   terms_text: 'NJ Office of Information Technology (NJOIT), Office of Geographic Information Systems (OGIS)',
   description: 'Digital orthophotography of New Jersey, Natural Color, 1 foot resolution',
   icon: 'https://njgin.nj.gov/njgin/assets/slices/njgin_logo.png',
-  polygon: [[
-    [-74.897, 38.835], [-74.0882, 39.649], [-73.860, 40.479], [-74.078, 40.535], [-73.828, 40.989],
-    [-74.769, 41.413], [-75.410, 40.716], [-74.891, 40.175], [-75.789, 39.597], [-74.897, 38.835]
-  ]]
+  feature: {
+    type: 'Feature',
+    properties: { id: 'test nj imagery' },
+    geometry: {
+      type: 'Polygon',
+      coordinates: [[
+        [-74.897, 38.835], [-74.0882, 39.649], [-73.860, 40.479], [-74.078, 40.535], [-73.828, 40.989],
+        [-74.769, 41.413], [-75.410, 40.716], [-74.891, 40.175], [-75.789, 39.597], [-74.897, 38.835]
+      ]]
+    }
+  }
 };
 
 export const bingStrings = {

@@ -6,12 +6,23 @@ import {
   ImagerySource, ImagerySourceBing, ImagerySourceCustom,
   ImagerySourceEsri, ImagerySourceEsriWayback, ImagerySourceNone
 } from '../lib/ImagerySource.ts';
+import { utilWildcard } from '../util/string.ts';
+
+// Make very sure this resolves to Rapid's `package.json`
+// If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
+import { version as rapidVersion } from '../../package.json' with { type: 'json' };
 
 
 /**
  * `ImagerySystem` maintains the state of the tiled background and overlay imagery.
  *
+ * At init time, Rapid will load the default imagery data from the bundled imagery index,
+ * but additional imagery data can be merged in to supplement or override the defaults.
+ *
  * Properties available:
+ *   `bundles`         {Set<bundleID>}               Names of imagery bundles that have been merged in
+ *   `features`        {Map<sourceID, GeoJSON>}      GeoJSON features for spatial queries
+ *   `sources`         {Map<sourceID, ImagerySource>} The imagery sources
  *   `offset`
  *   `brightness`
  *   `contrast`
@@ -34,11 +45,15 @@ export class ImagerySystem extends AbstractSystem {
     this.requiredDependencies = new Set(['assets']);
     this.optionalDependencies = new Set(['gfx', 'l10n', 'storage', 'urlhash']);
 
-    this._imageryIndex = null;
+    this.bundles = new Set();    // Set<bundleID> - track merged imagery bundles
+    this.features = new Map();   // Map<sourceID, GeoJSON feature>
+    this.sources = new Map();    // Map<sourceID, ImagerySource>
+
     this._baseLayer = null;
     this._overlayLayers = new Map();   // Map<sourceID, ImagerySource>
     this._checkedBlocklists = [];
     this._isValid = true;    // todo, find a new way to check this, no d3 enter/update render anymore
+    this._whichPolygon = null;    // which-polygon index
 
     this._brightness = 1;
     this._contrast = 1;
@@ -85,12 +100,7 @@ export class ImagerySystem extends AbstractSystem {
         gfx?.scene?.on('layerchange', this._imageryChanged);
         l10n?.on('localechange', this._localeChanged);
       })
-      .then(() => {
-        // Tell the AssetSystem what to load..
-        assets.setAsset('imagery', 'data/imagery.min.json');
-        return assets.loadAssetAsync('imagery');
-      })
-      .then(data => this._initImageryIndex(data));
+      .then(() => this._loadDefaultImageryAsync());
   }
 
 
@@ -115,29 +125,116 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
+   * merge
+   * Accepts an object containing new imagery data (all properties except 'bundleID' are optional):
+   * {
+   *   bundleID: '',    // A string identifier, e.g. 'editor-layer-index@2025'
+   *   imagery: {},     // Object<sourceID, imageryData>
+   * }
+   *
+   * When merging:
+   *  - Items are processed in the order they appear.
+   *  - New items will replace existing items that have the same `id`.
+   *     `"Bing": { name: 'My Bing', … }`    <-- `Bing` source replaced
+   *  - If no new data supplied (null), this is treated as a delete.
+   *     `"Bing": null`                      <-- `Bing` source deleted
+   *  - Wildcard characters '*' and '?' are allowed when deleting.
+   *     `"US-TIGER*": null`                 <-- all `US-TIGER*` sources deleted
+   *
+   * @param  {Object}  src - imagery data to merge
+   * @throws  Will throw if given data does not contain a `bundleID`, or if the `bundleID` has already been merged
+   */
+  merge(src = {}) {
+    const context = this.context;
+
+    const bundleID = src.bundleID;
+    if (!bundleID) {
+      throw new Error('Imagery missing bundleID property');
+    }
+    if (this.bundles.has(bundleID)) {
+      throw new Error(`Imagery "${bundleID}" already merged`);
+    }
+
+    this.bundles.add(bundleID);
+
+    // Merge Imagery Sources
+    if (src.imagery) {
+      for (const [sourceID, props] of Object.entries(src.imagery)) {
+        const sourceKey = sourceID.toLowerCase();
+
+        if (props) {   // add or replace
+          // Instantiate the appropriate `ImagerySource` class
+          let source;
+          if (props.type === 'bing') {
+            source = new ImagerySourceBing(context, { bundleID: bundleID, ...props });
+          } else if (/^EsriWorldImagery/.test(sourceID)) {
+            source = new ImagerySourceEsri(context, { bundleID: bundleID, ...props });
+          } else {
+            source = new ImagerySource(context, { bundleID: bundleID, ...props });
+          }
+          this.sources.set(sourceKey, source);
+
+          // Save the GeoJSON feature too, if there is one.
+          if (props.feature) {
+            this.features.set(sourceKey, props.feature);
+          }
+
+        } else {   // remove
+          const wildcard = utilWildcard(sourceID);
+          if (wildcard) {
+            for (const k of this.sources.keys()) {
+              if (wildcard.test(k)) {
+                this.sources.delete(k);
+                this.features.delete(k);
+              }
+            }
+          } else {
+            this.sources.delete(sourceKey);
+            this.features.delete(sourceKey);
+          }
+        }
+      }
+    }
+
+    this._rebuildIndex();
+  }
+
+
+  /**
+   * source
+   * Returns the ImagerySource with the given id.
+   * @param   {string}        sourceID - a source id
+   * @return  {ImagerySource} The ImagerySource, or `undefined` if not found
+   */
+  source(sourceID) {
+    return this.sources.get(sourceID?.toLowerCase());
+  }
+
+
+  /**
    * imageryUsed
    * Called by the EditSystem to gather the sources being used to make an edit.
    * We return the English name of any active imagery layers, it will be included in the user's changeset.
    * @return  {Array<string>}  Array of the names of imagery layers currently visible
    */
   imageryUsed() {
-    const result = new Set();
+    const results = new Set();
 
     // Gather info about enabled base imagery
     const baseUsed = this._baseLayer?.imageryUsed;
     if (baseUsed && this._isValid) {
-      result.add(baseUsed);
+      results.add(baseUsed);
     }
 
     // Gather info about enabled overlay imagery (ignore locator)
     for (const overlay of this._overlayLayers.values()) {
       if (overlay.isLocatorOverlay()) continue;
       if (overlay.imageryUsed) {
-        result.add(overlay.imageryUsed);
+        results.add(overlay.imageryUsed);
       }
     }
 
-    return Array.from(result);
+    return [...results];
   }
 
 
@@ -147,7 +244,7 @@ export class ImagerySystem extends AbstractSystem {
    *  @return {Array<ImagerySource>}  Visible imagery sources
    */
   visibleSources() {
-    if (!this._imageryIndex) return [];   // called before init()?
+    if (!this.sources.size || !this._whichPolygon) return [];   // called too soon?
 
     const context = this.context;
     const viewport = context.viewport;
@@ -155,11 +252,11 @@ export class ImagerySystem extends AbstractSystem {
     const zoom = viewport.transform.zoom;
 
     const visible = new Set();
-    (this._imageryIndex.query.bbox(extent.rectangle(), true) || [])
+    (this._whichPolygon.bbox(extent.rectangle(), true) || [])
       .forEach(d => visible.add(d.id));
 
     const currSource = this._baseLayer;
-    const sources = [...this._imageryIndex.sources.values()];
+    const sources = [...this.sources.values()];
 
     // Recheck blocked sources only if we detect new blocklists pulled from the OSM API.
     const osm = context.services.osm;
@@ -177,7 +274,7 @@ export class ImagerySystem extends AbstractSystem {
     return sources.filter(source => {
       if (currSource === source) return true;    // always include the current imagery
       if (source.props.isBlocked) return false;  // even bundled sources may be blocked - iD#7905
-      if (!source.props.polygon) return true;    // always include imagery with worldwide coverage
+      if (!source.props.feature) return true;    // always include imagery with worldwide coverage
       if (zoom && zoom < 6) return false;        // optionally exclude local imagery at low zooms
       return visible.has(source.id);             // include imagery visible in given extent
     });
@@ -250,13 +347,11 @@ export class ImagerySystem extends AbstractSystem {
    * @param   {string}  sourceID -  The sourceID to get
    * @return  {ImagerySource?}  The `ImagerySource` with the given ID, or `null` if not found
    */
-  getSourceByID(sourceID) {
-    if (!this._imageryIndex) return null;   // called before init()?
-
+  getSourceByID(sourceID = '') {
     if (/^EsriWayback/i.test(sourceID)) {   // ignore start date, if any
       sourceID = 'EsriWayback';
     }
-    return this._imageryIndex.sources.get(sourceID.toLowerCase());
+    return this.sources.get(sourceID.toLowerCase());
   }
 
 
@@ -265,11 +360,8 @@ export class ImagerySystem extends AbstractSystem {
    * Activates the base layer with the given `sourceID`
    * This function will correctly handle IDs like `EsriWayback_<DATE>`.
    * @param   {string}  sourceID -  The sourceID to activate
-   * @return  {ImagerySource?}  The `ImagerySource` with the given ID, or `null` if not found
    */
-  setSourceByID(sourceID) {
-    if (!this._imageryIndex) return null;   // called before init()?
-
+  setSourceByID(sourceID = '') {
     let date;
     const match = sourceID.match(/^EsriWayback\_?(.*)$/i);   // get start date, if any
     if (match) {
@@ -455,99 +547,104 @@ export class ImagerySystem extends AbstractSystem {
   }
 
 
+  /**
+   * _loadDefaultImageryAsync
+   * This loads the default imagery for Rapid:
+   *  - edior-layer-index
+   *  - rapid imagery overrides
+   */
+  _loadDefaultImageryAsync() {
+    const context = this.context;
+    const assets = context.systems.assets;
+
+    // Tell the AssetSystem what to load..
+    assets.setAsset('editor_layer_index', 'data/imagery.min.json');
+    // 'rapid_imagery_overrides' = customizations to merge in after the editor-layer-index
+    assets.setAsset('rapid_imagery_overrides', 'data/imagery_overrides.min.json');
+
+    // Fetch the imagery data
+    return Promise.all([
+      assets.loadAssetAsync('editor_layer_index'),
+      assets.loadAssetAsync('rapid_imagery_overrides')
+    ])
+    .then(vals => {
+      // Merge editor-layer-index bundle..
+      this.merge(vals[0]);
+
+      // Merge rapid_imagery_overrides..
+      const rapidSchemaVersion = rapidVersion || 'unknown';
+      this.merge({
+        bundleID: `rapid-imagery-overrides@${rapidSchemaVersion}`,
+        ...vals[1]
+      });
+
+      // Add built-in sources (None, Custom) that don't come from data files
+      this._addBuiltinSources();
+
+      // Default the locator overlay to "on"..
+      const locator = this.sources.get('mapbox_locator_overlay');
+      if (locator) {
+        this.toggleOverlayLayer(locator);
+      }
+    });
+  }
+
 
   /**
-   * _initImageryIndex
-   * Set up the imagery index after it has been downloaded
-   * It contains these properties:
-   *   {
-   *     features:  Map<id, GeoJSON feature>
-   *     sources:   Map<id, ImagerySource>
-   *     query:     A which-polygon index to perform spatial queries against
-   *   }
-   *  @param  data  {Object}  imagery index data
+   * _addBuiltinSources
+   * Add the built-in imagery sources that don't come from data files.
+   * These are 'None', 'Custom', and 'EsriWayback'.
    */
-  _initImageryIndex(data) {
+  _addBuiltinSources() {
     const context = this.context;
     const storage = context.systems.storage;
     const wayback = context.services.wayback;
 
-    const arr = data.imagery || [];
-
-    this._imageryIndex = {
-      features: new Map(),   // Map<id, GeoJSON feature>
-      sources: new Map(),    // Map<id, ImagerySource>
-      query: null            // which-polygon index
-    };
-
-    // Extract a GeoJSON feature for each imagery item.
-    const features = arr.map(d => {
-      if (!d.polygon) return null;
-
-      // Workaround for editor-layer-index weirdness..
-      // Add an extra array nest to each element in `d.polygon`
-      // so the rings are not treated as a bunch of holes:
-      //   what we get:  [ [[outer],[hole],[hole]] ]
-      //   what we want: [ [[outer]],[[outer]],[[outer]] ]
-      const rings = d.polygon.map(ring => [ring]);
-
-      const feature = {
-        type: 'Feature',
-        properties: { id: d.id },
-        geometry: { type: 'MultiPolygon', coordinates: rings }
-      };
-
-      this._imageryIndex.features.set(d.id.toLowerCase(), feature);
-      return feature;
-    }).filter(Boolean);
-
-    // Create a which-polygon index to support efficient spatial querying.
-    this._imageryIndex.query = whichPolygon({ type: 'FeatureCollection', features: features });
-
-    // Instantiate `ImagerySource` objects for each imagery item.
-    for (const d of arr) {
-      let source;
-      if (d.type === 'bing') {
-        source = new ImagerySourceBing(context, d);
-      } else if (/^EsriWorldImagery/.test(d.id)) {
-        source = new ImagerySourceEsri(context, d);
-      } else {
-        source = new ImagerySource(context, d);
-      }
-      this._imageryIndex.sources.set(d.id.toLowerCase(), source);
-
-      // When we add 'Esri World Imagery', add an additional source for 'Esri Wayback', if supported.
-      if (wayback && d.id === 'EsriWorldImagery') {
-        const props = Object.assign({}, d);  // copy
-        props.id = 'EsriWayback';
-        props.name = 'Esri Wayback';
-        props.description = 'Esri Wayback contains archived snapshots of Esri World Imagery created over time.';
-        props.startDate = null;  // user will choose
-        props.endDate = null;    // user will choose
-        source = new ImagerySourceEsriWayback(context, props);
-        this._imageryIndex.sources.set(props.id.toLowerCase(), source);
-      }
-    }
-
     // Add 'None'
     const none = new ImagerySourceNone(context);
-    this._imageryIndex.sources.set(none.id.toLowerCase(), none);
+    this.sources.set(none.id.toLowerCase(), none);
 
     // Add 'Custom' - seed it with whatever template the user has used previously
     const custom = new ImagerySourceCustom(context);
     custom.template = storage?.getItem('background-custom-template') || '';
-    this._imageryIndex.sources.set(custom.id.toLowerCase(), custom);
+    this.sources.set(custom.id.toLowerCase(), custom);
 
-    // Default the locator overlay to "on"..
-    const locator = this._imageryIndex.sources.get('mapbox_locator_overlay');
-    if (locator) {
-      this.toggleOverlayLayer(locator);
+    // Add 'Esri Wayback', if the WaybackService exists.
+    if (wayback) {
+      const waybackSource = new ImagerySourceEsriWayback(context, props);
+      this.sources.set(props.id.toLowerCase(), waybackSource);
+
+      // Copy the feature for Wayback too (for spatial queries)
+      const esriFeature = this.features.get('esriworldimagery');
+      if (esriFeature) {
+        const waybackFeature = JSON.parse(JSON.stringify(esriFeature));
+        waybackFeature.properties.id = props.id;
+        this.features.set(props.id.toLowerCase(), waybackFeature);
+      }
     }
+  }
 
+
+  /**
+   * _rebuildIndex
+   * Rebuild the whichPolygon spatial index.
+   * This should be called after merging new imagery data.
+   */
+  _rebuildIndex() {
     // Reset and localize the ImagerySources
-    for (const source of this._imageryIndex.sources.values()) {
+    for (const source of this.sources.values()) {
       source.reset();
     }
+
+    // Reset and rebuild the whichPolygon index
+    const features = [...this.features.values()];
+    this._whichPolygon = whichPolygon({ type: 'FeatureCollection', features: features });
+
+    // Reset the blocklist check so it re-runs
+    this._checkedBlocklists = [];
+
+    // Emit the imagerychange event
+    this._imageryChanged();
   }
 
 
@@ -655,7 +752,7 @@ export class ImagerySystem extends AbstractSystem {
     localeCode ||= l10n?.localeCode() || 'en-US';
 
     // Reset and localize the ImagerySources
-    for (const source of this._imageryIndex.sources.values()) {
+    for (const source of this.sources.values()) {
       source.setLocale(localeCode);
     }
   }
@@ -665,5 +762,5 @@ export class ImagerySystem extends AbstractSystem {
 
 /**
  *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
- *  @typedef  {string}  imageryID
+ *  @typedef  {string}  bundleID
  */

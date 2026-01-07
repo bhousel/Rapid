@@ -74,39 +74,38 @@ of Rapid (e.g. `https://mapwith.ai/rapid`), the following parameters are availab
 Rapid may be used to edit maps in a non-OpenStreetMap environment.  This requires
 certain parts of the Rapid code to be replaced at runtime by custom code or data.
 
-Rapid is written in a modular style and bundled with [rollup.js](http://rollupjs.org/),
-which makes hot code replacement tricky.  (ES6 module exports are
-[immutable live bindings](http://www.2ality.com/2015/07/es6-module-exports.html)).
-Because of this, the parts of Rapid which are designed for customization are exported
-as live bound objects that can be overridden at runtime _before initializing the Rapid context_.
+Rapid uses a highly modular architecture.  Core components called `Systems` each have
+different areas of responsibility.  When Rapid starts up, the available systems are constructed
+automatically. At that time, you can make customizations.
+
+Then, your code must call `rapidContext.initAsync()`, which will initialize all of the components
+and complete the startup process.
+
+```javascript
+const context = new Rapid.Context();
+window.rapidContext = context;
+
+// customizations may happen here…
+
+context.initAsync()
+  .then(() => console.log('Rapid is running'));
+```
 
 
 ### Background Imagery
 
-Rapid's background imagery database is stored in the `Rapid.fileFetcher.cache().imagery` array and can be
-overridden or modified prior to creating the Rapid context.
+Rapid's background imagery is managed by the `ImagerySystem`.
+Default imagery bundles are loaded at init time, but customizations and overrides can be
+made to the imagery by calling `ImagerySystem.merge(…)` with new data to merge in.
 
 Note that the "None" and "Custom" options will always be shown in the list.
 
-To remove all imagery from Rapid:
-```js
-Rapid.fileFetcher.cache().imagery = [];
-```
-
-To replace all imagery with a single source:
-```js
-Rapid.fileFetcher.cache().imagery = [{
-    "id": "ExampleImagery",
-    "name": "My Imagery",
-    "type": "tms",
-    "template": "http://{switch:a,b,c}.tiles.example.com/{z}/{x}/{y}.png"
-}];
-```
+TODO: document merging sceneraios.
 
 Each imagery source should have the following properties:
 * `id` - Unique identifier for this source (also used as a url parameter)
 * `name` - Display name for the source
-* `type` - Source type, currently only `tms` is supported
+* `type` - Source type, 'wms', 'tms', or 'bing'.
 * `template` - Url template, valid replacement tokens include:
   * `{z}`, `{x}`, `{y}` - for Z/X/Y scheme
   * `{-y}` or `{ty}` - for flipped Y
@@ -117,131 +116,18 @@ Optional properties:
 * `description` - A longer source description which, if included, will be displayed in a popup when viewing the background imagery list
 * `overlay` - If `true`, this is an overlay layer (a transparent layer rendered above base imagery layer). Defaults to `false`
 * `zoomExtent` - Allowable min and max zoom levels, defaults to `[0, 22]`
-* `polygon` - Array of coordinate rings within which imagery is valid.  If omitted, imagery is assumed to be valid worldwide
+* `feature` - A GeoJSON 'Polygon' or 'MultiPolygon' within which imagery is valid.  If omitted, imagery is assumed to be valid worldwide
 * `terms_url` - Url to link to when displaying the imagery terms
 * `terms_html` - Html content to display in the imagery terms
 * `terms_text` - Text content to display in the imagery terms
 * `best` - If set to `true`, this imagery is considered "better than Bing" and may be chosen by default when Rapid starts.  Will display with a star in the background imagery list.  Defaults to `false`
 
-For more details about the `Rapid.fileFetcher.cache().imagery` structure, see
-[`update_imagery.js`](https://github.com/facebook/rapid/blob/main/scripts/update_imagery.js).
 
+### Tagging Schema (aka "Presets")
 
-<!--
-Everything in here has changed and needs to be rewritten
+Rapid's tagging schema is managed by the `SchemaSystem`.
+Default schema bundles are loaded at init time, but customizations and overrides can be
+made to the schema by calling `SchemaSystem.merge(…)` with new data to merge in.
 
-### Presets
+TODO: document merging sceneraios.
 
-Rapid supports presets that conform to the [iD tagging schema](https://github.com/openstreetmap/id-tagging-schema).
-
-Rapid's preset database is stored in the `Rapid.fileFetcher.cache().presets` object and can be overridden
-or modified prior to creating the Rapid context.
-
-To add a new preset to Rapid's existing preset database.
-```js
-Rapid.fileFetcher.cache().presets.presets["aerialway/zipline"] = {
-    geometry: ["line"],
-    fields: ["incline"],
-    tags: { "aerialway": "zip_line" },
-    name: "Zipline"
-};
-```
-
-To completely replace Rapid's default presets with your own:
-```js
-Rapid.fileFetcher.cache().presets = myPresets;
-```
-
-To run Rapid with the minimal set of presets that only match basic geometry types:
-```js
-Rapid.fileFetcher.cache().presets = {
-    presets: {
-        "area": {
-            "name": "Area",
-            "tags": {},
-            "geometry": ["area"]
-        },
-        "line": {
-            "name": "Line",
-            "tags": {},
-            "geometry": ["line"]
-        },
-        "point": {
-            "name": "Point",
-            "tags": {},
-            "geometry": ["point"]
-        },
-        "vertex": {
-            "name": "Vertex",
-            "tags": {},
-            "geometry": ["vertex"]
-        },
-        "relation": {
-            "name": "Relation",
-            "tags": {},
-            "geometry": ["relation"]
-        }
-    }
-};
-```
-
-
-### Custom Presets
-
-Rapid supports deployments which use a custom set of presets. You can supply presets via
-the `presets` accessor:
-
-```js
-var id = Rapid.coreContext().presets({
-    presets: { ... },
-    fields: { ... },
-    defaults: { ... },
-    categories: { ... }
-});
-```
-
-All four parts (presets, fields, defaults, and categories) must be supplied. In addition,
-several base presets and fields must be included.
-
-Basic geometric presets must be included so that every feature matches at least one preset.
-For example:
-
-```js
-"area": {
-    "name": "Area",
-    "tags": {},
-    "geometry": ["area"],
-    "matchScore": 0.1
-},
-"line": {
-    "name": "Line",
-    "tags": {},
-    "geometry": ["line"],
-    "matchScore": 0.1
-},
-"point": {
-    "name": "Point",
-    "tags": {},
-    "geometry": ["point", "vertex"],
-    "matchScore": 0.1
-},
-"relation": {
-    "name": "Relation",
-    "tags": {},
-    "geometry": ["relation"],
-    "matchScore": 0.1
-}
-```
-
-A "name" field must be included:
-
-```js
-"name": {
-    "key": "name",
-    "type": "localized",
-    "label": "Name",
-    "placeholder": "Common name (if any)"
-}
-```
-
--->

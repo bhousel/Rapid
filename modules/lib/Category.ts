@@ -12,6 +12,8 @@ import { utilGatherTokens } from '../util/string.ts';
 export interface CategoryProps {
   /** Unique identifier for this Category */
   id: string;
+  /** The bundle that this Category came from (e.g. 'id-tagging-schema@6.13.0') */
+  bundleID: string;
   /** Display name (fallback if localization unavailable) */
   name: string;
   /** Array of preset IDs that belong to this Category */
