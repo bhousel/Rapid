@@ -99,8 +99,12 @@ export class ImagerySystem extends AbstractSystem {
         urlhash?.on('hashchange', this._hashchange);
         gfx?.scene?.on('layerchange', this._imageryChanged);
         l10n?.on('localechange', this._localeChanged);
-      })
-      .then(() => this._loadDefaultImageryAsync());
+
+        // Clear data and create the builtin imagery sources..
+        this._resetAll();
+
+        this._loadDefaultImageryAsync();
+      });
   }
 
 
@@ -128,7 +132,7 @@ export class ImagerySystem extends AbstractSystem {
    * merge
    * Accepts an object containing new imagery data (all properties except 'bundleID' are optional):
    * {
-   *   bundleID: '',    // A string identifier, e.g. 'editor-layer-index@2025'
+   *   bundleID: '',    // A string identifier, e.g. 'editor-layer-index@2026-01-01'
    *   imagery: {},     // Object<sourceID, imageryData>
    * }
    *
@@ -161,6 +165,8 @@ export class ImagerySystem extends AbstractSystem {
     if (src.imagery) {
       for (const [sourceID, props] of Object.entries(src.imagery)) {
         const sourceKey = sourceID.toLowerCase();
+        const existing = this.sources.get(sourceKey);
+        if (existing?.isBuiltin()) continue;  // don't override a builtin ImagerySource
 
         if (props) {   // add or replace
           // Instantiate the appropriate `ImagerySource` class
@@ -196,7 +202,7 @@ export class ImagerySystem extends AbstractSystem {
       }
     }
 
-    this._rebuildIndex();
+    this._rebuildIndex();   // also calls _imageryChanged()
   }
 
 
@@ -578,9 +584,6 @@ export class ImagerySystem extends AbstractSystem {
         ...vals[1]
       });
 
-      // Add built-in sources (None, Custom) that don't come from data files
-      this._addBuiltinSources();
-
       // Default the locator overlay to "on"..
       const locator = this.sources.get('mapbox_locator_overlay');
       if (locator) {
@@ -591,43 +594,8 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * _addBuiltinSources
-   * Add the built-in imagery sources that don't come from data files.
-   * These are 'None', 'Custom', and 'EsriWayback'.
-   */
-  _addBuiltinSources() {
-    const context = this.context;
-    const storage = context.systems.storage;
-    const wayback = context.services.wayback;
-
-    // Add 'None'
-    const none = new ImagerySourceNone(context);
-    this.sources.set(none.id.toLowerCase(), none);
-
-    // Add 'Custom' - seed it with whatever template the user has used previously
-    const custom = new ImagerySourceCustom(context);
-    custom.template = storage?.getItem('background-custom-template') || '';
-    this.sources.set(custom.id.toLowerCase(), custom);
-
-    // Add 'Esri Wayback', if the WaybackService exists.
-    if (wayback) {
-      const waybackSource = new ImagerySourceEsriWayback(context, props);
-      this.sources.set(props.id.toLowerCase(), waybackSource);
-
-      // Copy the feature for Wayback too (for spatial queries)
-      const esriFeature = this.features.get('esriworldimagery');
-      if (esriFeature) {
-        const waybackFeature = JSON.parse(JSON.stringify(esriFeature));
-        waybackFeature.properties.id = props.id;
-        this.features.set(props.id.toLowerCase(), waybackFeature);
-      }
-    }
-  }
-
-
-  /**
    * _rebuildIndex
-   * Rebuild the whichPolygon spatial index.
+   * Reset all sources and rebuild the whichPolygon spatial index.
    * This should be called after merging new imagery data.
    */
   _rebuildIndex() {
@@ -694,6 +662,41 @@ export class ImagerySystem extends AbstractSystem {
       if (isNaN(y) || !isFinite(y)) y = 0;
       this.offset = geoMetersToOffset([x, y]);
     }
+  }
+
+
+  /**
+   * _resetAll
+   * This puts ImagerySystem internal data back to its initial state.
+   * i.e. nothing loaded, only default imagery sources.
+   * This would probably only be useful for testing, or setting up a special non-OSM Rapid.
+   */
+  _resetAll() {
+    const context = this.context;
+    const storage = context.systems.storage;
+    const wayback = context.services.wayback;
+
+    this.bundles = new Set();    // Set<bundleID> - track merged imagery bundles
+    this.features = new Map();   // Map<sourceID, GeoJSON feature>
+    this.sources = new Map();    // Map<sourceID, ImagerySource>
+
+
+    // Add 'None'
+    const none = new ImagerySourceNone(context);
+    this.sources.set(none.id.toLowerCase(), none);
+
+    // Add 'Custom' - seed it with whatever template the user has used previously
+    const custom = new ImagerySourceCustom(context);
+    custom.template = storage?.getItem('background-custom-template') || '';
+    this.sources.set(custom.id.toLowerCase(), custom);
+
+    // Add 'Esri Wayback', if the WaybackService exists.
+    if (wayback) {
+      const waybackSource = new ImagerySourceEsriWayback(context);
+      this.sources.set(waybackSource.id.toLowerCase(), waybackSource);
+    }
+
+    this._rebuildIndex();    // also calls _imageryChanged()
   }
 
 

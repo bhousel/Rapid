@@ -130,7 +130,7 @@ export class SchemaSystem extends AbstractSystem {
         // Setup Event Handlers..
         l10n?.on('localechange', this._localeChanged);
 
-        // Clear data and create the fallback Presets
+        // Clear data and create the fallback Presets..
         this._resetAll();
 
         // If we received a subset of addable presetIDs specified in the url hash, save them.
@@ -234,6 +234,9 @@ export class SchemaSystem extends AbstractSystem {
     // Merge Fields
     if (src.fields) {
       for (const [fieldID, f] of Object.entries(src.fields)) {
+        const existing = this.fields.get(fieldID);
+        if (existing?.isBuiltin()) continue;  // don't override a builtin Field
+
         if (f) {   // add or replace
           if (!this.fieldTypes.has(f.type)) {
             if (VERBOSE) console.warn(`"${f.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
@@ -264,7 +267,7 @@ export class SchemaSystem extends AbstractSystem {
     if (src.presets) {
       for (const [presetID, p] of Object.entries(src.presets)) {
         const existing = this.presets.get(presetID);
-        if (existing?.isFallback()) continue;  // never override these
+        if (existing?.isBuiltin()) continue;  // don't override a builtin Preset
 
         if (p) {   // add or replace
           // Rename icon identifiers to match the rapid spritesheet
@@ -303,6 +306,9 @@ export class SchemaSystem extends AbstractSystem {
     // Merge Categories
     if (src.categories) {
       for (const [categoryID, c] of Object.entries(src.categories)) {
+        const existing = this.categories.get(categoryID);
+        if (existing?.isBuiltin()) continue;  // don't override a builtin Category
+
         if (c) {   // add or replace
           // Rename icon identifiers to match the rapid spritesheet
           if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');

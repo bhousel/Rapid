@@ -115,7 +115,18 @@ describe('Category', () => {
         assert.isFalse(_category.isFallback());   // always false for Categories
       });
     });
+  });
 
+  describe('isBuiltin', () => {
+    it('returns true for Categories with no bundleID', () => {
+      const category = new Rapid.Category(context, { id: 'test' });
+      assert.isTrue(category.isBuiltin());
+    });
+
+    it('returns false for Categories with a bundleID', () => {
+      const category = new Rapid.Category(context, { id: 'test', bundleID: 'hello' });
+      assert.isFalse(category.isBuiltin());
+    });
   });
 
 });

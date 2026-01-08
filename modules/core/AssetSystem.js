@@ -98,8 +98,8 @@ export class AssetSystem extends AbstractSystem {
     if (isTestEnvironment) {
       const c = this._cache;
       c.address_formats = { addressFormats: [{ format: [['housenumber', 'street'], ['city', 'postcode'] ] }] };
-      c.imagery = { bundleID: 'test-imagery' };
-      c.rapid_imagery_overrides = { bundleID: 'test-imagery-overrides' };
+      c.editor_layer_index = { bundleID: 'editor_layer_index' };
+      c.rapid_imagery_overrides = { bundleID: 'rapid_imagery_overrides' };
       c.languages = { languages: { de: { nativeName: 'Deutsch' }, en: { nativeName: 'English' } } };
       c.locales = { locales: { en: { rtl: false } } };
       c.phone_formats = { phoneFormats: {} };

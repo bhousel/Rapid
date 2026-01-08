@@ -225,4 +225,16 @@ export class Category {
   isFallback(): boolean {
     return false;
   }
+
+  /**
+   * isBuiltin
+   * Is this one of the builtin objects?
+   * We consider it "builtin" if it doesn't have a `bundleID` (i.e. added via a merge).
+   * (There are not builtin categories at this time, only the fallback presets are builtin).
+   * @return  Returns `true` if this is a builtin Category, `false` if not
+   */
+  isBuiltin(): boolean {
+    return !this.props.bundleID;
+  }
+
 }

@@ -366,6 +366,15 @@ describe('ImagerySource', () => {
     });
   });
 
+  describe('isBuiltin', () => {
+    it('returns true only for sources with no bundleID', () => {
+      const source1 = new Rapid.ImagerySource(context, { id: 'anyid1', bundleID: 'editor-layer-index' });
+      const source2 = new Rapid.ImagerySource(context, { id: 'anyid2' });
+      assert.isFalse(source1.isBuiltin());
+      assert.isTrue(source2.isBuiltin());
+    });
+  });
+
 
   describe('_vintageRange', () => {
     it('returns undefined if the input does not have a start or end', () => {

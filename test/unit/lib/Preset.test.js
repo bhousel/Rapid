@@ -360,6 +360,18 @@ describe('Preset', () => {
     });
   });
 
+  describe('isBuiltin', () => {
+    it('returns true for Presets with no bundleID', () => {
+      const preset = new Rapid.Preset(context, { id: 'test' });
+      assert.isTrue(preset.isBuiltin());
+    });
+
+    it('returns false for Presets with a bundleID', () => {
+      const preset = new Rapid.Preset(context, { id: 'test', bundleID: 'hello' });
+      assert.isFalse(preset.isBuiltin());
+    });
+  });
+
 
   describe('setTags', () => {
     let _savedAreaKeys;

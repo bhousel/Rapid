@@ -141,6 +141,19 @@ describe('Field', () => {
         assert.match(spyWarn.mock.lastCall[0], /^unable to resolve/i);
       });
     });
-
   });
+
+
+  describe('isBuiltin', () => {
+    it('returns true for Fields with no bundleID', () => {
+      const field = new Rapid.Field(context, { id: 'test' });
+      assert.isTrue(field.isBuiltin());
+    });
+
+    it('returns false for Fields with a bundleID', () => {
+      const field = new Rapid.Field(context, { id: 'test', bundleID: 'hello' });
+      assert.isFalse(field.isBuiltin());
+    });
+  });
+
 });

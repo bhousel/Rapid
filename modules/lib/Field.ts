@@ -253,6 +253,17 @@ export class Field {
     return this._currStrings.placeholder;
   }
 
+  /**
+   * isBuiltin
+   * Is this one of the builtin objects?
+   * We consider it "builtin" if it doesn't have a `bundleID` (i.e. added via a merge).
+   * (There are not builtin fields at this time, only the fallback presets are builtin).
+   * @return  Returns `true` if this is a builtin Field, `false` if not
+   */
+  isBuiltin(): boolean {
+    return !this.props.bundleID;
+  }
+
 
   /**
    * _resolveReference

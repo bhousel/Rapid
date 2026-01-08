@@ -280,6 +280,17 @@ export class ImagerySource {
     return this.id === 'mapbox_locator_overlay';
   }
 
+  /**
+   * isBuiltin
+   * Is this one of the builtin objects?
+   * We consider it "builtin" if it doesn't have a `bundleID` (i.e. added via a merge).
+   * These include the 'none', 'custom' and possibly 'EsriWayback' sources.
+   * @return `true` if the imagery is a builtin ImagerySource, `false` if not
+   */
+  isBuiltin(): boolean {
+    return !this.props.bundleID;
+  }
+
 
   /**
    * getMetadata
@@ -823,7 +834,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
       zoomExtent: [0, 22],
       terms_url: 'https://wiki.openstreetmap.org/wiki/Esri',
       terms_text: 'Terms & Feedback',
-      icon: "https://osmlab.github.io/editor-layer-index/sources/world/EsriImageryClarity.png"
+      icon: 'https://osmlab.github.io/editor-layer-index/sources/world/EsriImageryClarity.png'
     } as ImagerySourceProps;
 
     super(context, props);

@@ -390,6 +390,17 @@ export class Preset {
     return ['point', 'line', 'area', 'relation'].includes(this.id);
   }
 
+  /**
+   * isBuiltin
+   * Is this one of the builtin objects?
+   * We consider it "builtin" if it doesn't have a `bundleID` (i.e. added via a merge).
+   * (At this time, only the fallback presets are builtin).
+   * @return  Returns `true` if this is a builtin Preset, `false` if not
+   */
+  isBuiltin(): boolean {
+    return !this.props.bundleID;
+  }
+
 
   /**
    * reference

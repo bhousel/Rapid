@@ -1,6 +1,7 @@
 
 export const field1Props = {
   id: 'first',
+  bundleID: 'test',
   label: 'A Field',
   key: 'first',
   type: 'text',

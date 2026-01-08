@@ -270,8 +270,8 @@ export function uiSectionBackgroundList(context) {
   function sortSources(a, b) {
     return _favoriteIDs.has(a.id) && !_favoriteIDs.has(b.id) ? -1
       : _favoriteIDs.has(b.id) && !_favoriteIDs.has(a.id) ? 1
-      : a.best && !b.best ? -1
-      : b.best && !a.best ? 1
+      : a.props.best && !b.props.best ? -1
+      : b.props.best && !a.props.best ? 1
       : (b.area !== a.area) ? b.area - a.area   // descending
       : a.name.localeCompare(b.name);
   }

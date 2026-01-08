@@ -29,7 +29,7 @@ export function uiSectionOverlayList(context) {
 
 
   function isOverlay(d) {
-    return !!d.overlay;
+    return !!d.props.overlay;
   }
 
   /* renderIfVisible
