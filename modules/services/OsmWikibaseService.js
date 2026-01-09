@@ -280,7 +280,7 @@ export class OsmWikibaseService extends AbstractSystem {
    */
   getDocs(params, callback) {
     const l10n = this.context.systems.l10n;
-    const langCodes = l10n?.localeCodes() || ['en-US', 'en'];
+    const langCodes = l10n?.localeCodes || ['en-US', 'en'];
     params.langCodes = langCodes.map(code => code.toLowerCase());
 
     this.getEntity(params, (err, data) => {

@@ -159,11 +159,11 @@ export class ImagerySource {
    * You must add the ImagerySource to the ImagerySystem and call `reset` before using the ImagerySource.
    */
   reset(): void {
-    const l10n = (this.context.systems.l10n as any);
+    const l10n = this.context.systems.l10n;
 
     // Invalidate any cached string localizations and redo for the current locale.
     this._strings.clear();
-    this.setLocale(l10n?.localeCode() || 'en-US');
+    this.setLocale(l10n?.localeCode || 'en-US');
   }
 
 
@@ -177,13 +177,13 @@ export class ImagerySource {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
-    const l10n = (this.context.systems.l10n as any);
+    const l10n = this.context.systems.l10n;
 
     // Pre-localize and store strings
     const fallbackName = this.props.name || this.id;
     const fallbackDesc = this.props.description || '';
-    const nameStr = l10n?.t(this.props.nameStringID, { default: '' }) || fallbackName;
-    const descStr = l10n?.t(this.props.descriptionStringID, { default: '' }) || fallbackDesc;
+    const nameStr = (this.props.nameStringID && l10n?.t(this.props.nameStringID, { default: '' })) || fallbackName;
+    const descStr = (this.props.descriptionStringID && l10n?.t(this.props.descriptionStringID, { default: '' })) || fallbackDesc;
 
     this._currStrings = {
       id: this.id,
@@ -685,7 +685,7 @@ export class ImagerySourceEsri extends ImagerySource {
    */
   override getMetadata(tile: any, callback?: (err: string | null, metadata?: any) => void): void {
     const context = this.context;
-    const l10n = (context.systems.l10n as any);
+    const l10n = context.systems.l10n;
 
     const loc = tile.wgs84Extent.center();
     const tileID = tile.xyz.join('/');
@@ -907,7 +907,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    */
   override getMetadata(tile: any, callback?: (err: any, metadata?: any) => void): void {
     const context = this.context;
-    const l10n = (context.systems.l10n as any);
+    const l10n = context.systems.l10n;
     const wayback = (context.services as any).wayback;
     const unknown = l10n?.t('inspector.unknown') || 'unknown';
 

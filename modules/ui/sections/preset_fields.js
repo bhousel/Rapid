@@ -28,7 +28,7 @@ export function uiSectionPresetFields(context) {
   function renderDisclosureContent($selection) {
     if (!_uifields) {
       const graph = editor.staging.graph;
-      const localeCode = l10n.localeCode();
+      const localeCode = l10n.localeCode;
 
       const allGeometries = new Set();
       for (const entityID of _entityIDs) {

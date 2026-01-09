@@ -669,7 +669,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // Prefer placements that are more "visually attached" to the pin (right,bottom,left,top)
     // over placements that are further away (corners)
     let attempts;
-    const isRTL = this.context.systems.l10n.isRTL();
+    const isRTL = this.context.systems.l10n.isRTL;
 
     if (isRTL) {   // right to left
       attempts = [

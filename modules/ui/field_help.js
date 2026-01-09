@@ -178,7 +178,7 @@
 //        _wrap = selection.selectAll('.form-field-input-wrap');
 //        if (_wrap.empty()) return;
 //
-//        const isRTL = context.systems.l10n.isRTL();
+//        const isRTL = context.systems.l10n.isRTL;
 //        // absolute position relative to the inspector, so it "floats" above the fields
 //        _inspector = context.container().select('.sidebar .entity-editor-pane .inspector-body');
 //        if (_inspector.empty()) return;

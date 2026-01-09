@@ -190,7 +190,7 @@ export function uiMapRouletteMenu(context) {
      * @return {boolean} True if the menu should be displayed on the left, false otherwise.
      */
     function displayOnLeft(surfaceRect) {
-      const isRTL = l10n.isRTL();
+      const isRTL = l10n.isRTL;
       if (isRTL) {  // right to left
         if ((anchor[0] - MENU_SIDE_MARGIN - _menuWidth) < VIEW_SIDE_MARGIN) {
           return false;  // left menu would be too close to the left viewport edge, go right

@@ -186,7 +186,7 @@ export class UiAccount {
     const osm = context.services.osm;
     if (!osm) return;
 
-    const locale = l10n.localeCode();
+    const locale = l10n.localeCode;
     const url = osm.wwwroot + `/logout?locale=${locale}&referer=` + encodeURIComponent(`/login?locale=${locale}`);
 
     // Create a 600x550 popup window in the center of the screen

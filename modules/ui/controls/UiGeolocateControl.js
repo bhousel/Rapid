@@ -87,7 +87,7 @@ export class UiGeolocateControl {
 
     // Update localization
     this.Tooltip
-      .placement(l10n.isRTL() ? 'right' : 'left')
+      .placement(l10n.isRTL ? 'right' : 'left')
       .title(l10n.t('geolocate.title'));
 
     this.Loading

@@ -124,7 +124,7 @@ export class UiSidebar {
     const l10n = context.systems.l10n;
     const storage = context.systems.storage;
 
-    const dir = l10n.textDirection();
+    const dir = l10n.textDirection;
     const preferCollapsed = (storage.getItem('inspector.collapsed') === 'true');
     const storedWidth = +(storage.getItem('inspector.width') || DEFAULT_WIDTH);
     this._expandWidth = Math.max(MIN_WIDTH, storedWidth);
@@ -620,7 +620,7 @@ export class UiSidebar {
     const l10n = context.systems.l10n;
     const ui = context.systems.ui;
 
-    const scaleX = l10n.isRTL() ? -1 : 1;
+    const scaleX = l10n.isRTL ? -1 : 1;
     const dx = (e.clientX - this._lastCoord[0]) * scaleX;
     const setWidth = this._lastWidth + dx;
 

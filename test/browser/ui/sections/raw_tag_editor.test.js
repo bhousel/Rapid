@@ -2,7 +2,7 @@ describe('uiSectionRawTagEditor', () => {
 
   class MockLocalizationSystem {
     constructor() { }
-    isRTL()       { return false; }
+    get isRTL()   { return false; }
     t(id)         { return id; }
     tHtml(id)     { return id; }
   }

@@ -248,7 +248,7 @@ export class UiField {
           .append('button')
           .attr('class', 'modified-icon')
           .attr('title', l10n.t('icons.undo'))
-          .call(uiIcon(l10n.isRTL() ? '#rapid-icon-redo' : '#rapid-icon-undo'));
+          .call(uiIcon(l10n.isRTL ? '#rapid-icon-redo' : '#rapid-icon-undo'));
       }
     }
 

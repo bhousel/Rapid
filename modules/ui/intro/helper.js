@@ -32,7 +32,7 @@ export function eventCancel(d3_event) {
 let helpStringReplacements;
 export function helpHtml(context, stringID, replacements) {
   const l10n = context.systems.l10n;
-  const isRTL = l10n.isRTL();
+  const isRTL = l10n.isRTL;
 
   // only load these the first time
   if (!helpStringReplacements) {

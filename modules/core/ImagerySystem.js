@@ -752,7 +752,7 @@ export class ImagerySystem extends AbstractSystem {
     const l10n = this.context.systems.l10n;
 
     // Ensure that we have a current locale code.
-    localeCode ||= l10n?.localeCode() || 'en-US';
+    localeCode ||= l10n?.localeCode || 'en-US';
 
     // Reset and localize the ImagerySources
     for (const source of this.sources.values()) {

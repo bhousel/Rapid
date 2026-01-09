@@ -68,7 +68,7 @@ export class UiRapidTool {
 
     const isPowerUser = urlhash.getParam('poweruser') === 'true';
     const isNarrow = $container.selectAll('.map-toolbar.narrow').size();
-    const rtl = l10n.isRTL() ? '-rtl' : '';
+    const rtl = l10n.isRTL ? '-rtl' : '';
 
     // Localize tooltips
     this.RapidTooltip

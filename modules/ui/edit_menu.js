@@ -259,7 +259,7 @@ export function uiEditMenu(context) {
 
 
     function displayOnLeft(surfaceRect) {
-      const isRTL = l10n.isRTL();
+      const isRTL = l10n.isRTL;
       if (isRTL) {  // right to left
         if ((anchor[0] - MENU_SIDE_MARGIN - _menuWidth) < VIEW_SIDE_MARGIN) {
           return false;  // left menu would be too close to the left viewport edge, go right
@@ -277,7 +277,7 @@ export function uiEditMenu(context) {
 
 
     function tooltipPosition(surfaceRect, menuLeft) {
-      const isRTL = l10n.isRTL();
+      const isRTL = l10n.isRTL;
       if (isRTL) {  // right to left
         if (!menuLeft) {
           return 'right';

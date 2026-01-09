@@ -89,7 +89,7 @@ export function uiSectionBackgroundDisplayOptions(context) {
         if (d3_event.button !== 0) return;  // left click only
         updateValue(d, 1);
       })
-      .call(uiIcon('#rapid-icon-' + (l10n.isRTL() ? 'redo' : 'undo')));
+      .call(uiIcon('#rapid-icon-' + (l10n.isRTL ? 'redo' : 'undo')));
 
     // reset all button
     containerEnter

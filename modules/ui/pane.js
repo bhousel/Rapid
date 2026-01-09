@@ -76,7 +76,7 @@ export function uiPane(context, id) {
 
   pane.renderToggleButton = function(selection) {
     if (!_paneTooltip) {
-      const isRTL = l10n.isRTL();
+      const isRTL = l10n.isRTL;
       _paneTooltip = uiTooltip(context)
         .placement(isRTL ? 'right' : 'left')
         .title(_description)

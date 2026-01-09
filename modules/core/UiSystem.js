@@ -243,8 +243,8 @@ export class UiSystem extends AbstractSystem {
     const $container = context.container();
 
     $container
-      .attr('lang', l10n.localeCode())
-      .attr('dir', l10n.textDirection())
+      .attr('lang', l10n.localeCode)
+      .attr('dir', l10n.textDirection)
       .call(this.Fullscreen.render)
       .call(this.Defs.render)
       .call(this.Sidebar.render);
@@ -381,7 +381,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
     const container = context.container();
 
     const $hidepanes = container.selectAll('.map-pane.shown');
-    const side = l10n.isRTL() ? 'left' : 'right';
+    const side = l10n.isRTL ? 'left' : 'right';
 
     $hidepanes
       .classed('shown', false)

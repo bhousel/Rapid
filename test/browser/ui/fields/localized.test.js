@@ -11,10 +11,10 @@ describe('uiFieldLocalized', () => {
 
   class MockLocalizationSystem {
     constructor() { }
-    localeCode()     { return 'en-US'; }
-    languageCode()   { return 'en'; }
-    t(id)            { return id; }
-    tHtml(id)        { return id; }
+    get localeCode()   { return 'en-US'; }
+    get languageCode() { return 'en'; }
+    t(id)              { return id; }
+    tHtml(id)          { return id; }
     languageName(code) {
       const langs = {
         de: { nativeName: 'Deutsch' },

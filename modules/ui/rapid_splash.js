@@ -17,7 +17,7 @@ export function uiRapidSplash(context) {
     storage.setItem('sawRapidSplash', true);
 
     const modalSelection = uiModal(selection);
-    const rtl = l10n.isRTL() ? '-rtl' : '';
+    const rtl = l10n.isRTL ? '-rtl' : '';
 
     modalSelection.select('.modal')
       .attr('class', 'modal rapid-modal modal-splash');   // Rapid styling

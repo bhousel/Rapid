@@ -72,7 +72,7 @@ export function uiRapidColorpicker(context, parentModal) {
 
 
   function renderPopup(selection, forNode) {
-    const isRTL = context.systems.l10n.isRTL();
+    const isRTL = context.systems.l10n.isRTL;
     const dataset = forNode.__data__;
     const rect = forNode.getBoundingClientRect();
     const popWidth = 180;

@@ -4,7 +4,7 @@ import { EditSystem } from './EditSystem.js';
 import { FilterSystem } from './FilterSystem.ts';
 import { GraphicsSystem } from './GraphicsSystem.js';
 import { ImagerySystem } from './ImagerySystem.js';
-import { LocalizationSystem } from './LocalizationSystem.js';
+import { LocalizationSystem } from './LocalizationSystem.ts';
 import { LocationSystem } from './LocationSystem.ts';
 import { Map3dSystem } from './Map3dSystem.js';
 import { MapSystem } from './MapSystem.js';

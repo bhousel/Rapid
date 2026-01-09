@@ -110,7 +110,7 @@ export class UiZoomControl {
 
     // Update tooltip
     this.Tooltip
-      .placement(l10n.isRTL() ? 'right' : 'left')
+      .placement(l10n.isRTL ? 'right' : 'left')
       .title(d => d.isDisabled() ? d.getDisabledTitle() : d.getTitle())
       .shortcut(d => d.key);
 

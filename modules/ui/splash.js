@@ -20,7 +20,7 @@ export function uiSplash(context) {
 
 
   return function render(selection) {
-    const rtl = l10n.isRTL() ? '-rtl' : '';
+    const rtl = l10n.isRTL ? '-rtl' : '';
     storage.setItem('sawPrivacyVersion', context.privacyVersion);
 
     let version;

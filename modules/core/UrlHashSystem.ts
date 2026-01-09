@@ -319,7 +319,7 @@ export class UrlHashSystem extends AbstractSystem {
 
     const context = this.context;
     const editor = context.systems.editor as any;
-    const l10n = context.systems.l10n as any;
+    const l10n = context.systems.l10n;
     const graph = editor?.staging?.graph;
     if (!editor || !l10n || !graph) return;
 

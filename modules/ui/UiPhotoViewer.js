@@ -88,7 +88,7 @@ export class UiPhotoViewer extends EventEmitter {
     const context = this.context;
     const l10n = context.systems.l10n;
     const photos = context.systems.photos;
-    const isRTL = l10n.isRTL();
+    const isRTL = l10n.isRTL;
 
     // add .photoviewer
     let $viewer = $parent.selectAll('.photoviewer')

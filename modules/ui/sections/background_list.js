@@ -343,7 +343,7 @@ export function uiSectionBackgroundList(context) {
             .attr('class', 'layer-browse')
             .call(uiTooltip(context)
               .title(l10n.t('settings.custom_background.tooltip'))
-              .placement(l10n.isRTL() ? 'right' : 'left')
+              .placement(l10n.isRTL ? 'right' : 'left')
             )
             .on('click', clickCustom)
             .call(uiIcon('#rapid-icon-more'));

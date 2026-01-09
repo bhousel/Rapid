@@ -207,7 +207,7 @@ export class UiInspector {
 
     const context = this.context;
     const l10n = context.systems.l10n;
-    const isRTL = l10n.isRTL();
+    const isRTL = l10n.isRTL;
     const prop = isRTL ? 'margin-right' : 'margin-left';
 
     if (animate) {
@@ -241,7 +241,7 @@ export class UiInspector {
 
     const context = this.context;
     const l10n = context.systems.l10n;
-    const isRTL = l10n.isRTL();
+    const isRTL = l10n.isRTL;
     const prop = isRTL ? 'margin-right' : 'margin-left';
 
     if (animate) {

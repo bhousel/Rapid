@@ -159,7 +159,7 @@ export function uiSectionBackgroundOffset(context) {
         d3_event.preventDefault();
         resetOffset();
       })
-      .call(uiIcon('#rapid-icon-' + (l10n.isRTL() ? 'redo' : 'undo')));
+      .call(uiIcon('#rapid-icon-' + (l10n.isRTL ? 'redo' : 'undo')));
 
     updateValue();
   }

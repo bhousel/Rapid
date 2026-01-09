@@ -884,7 +884,7 @@ export class SchemaSystem extends AbstractSystem {
     const l10n = this.context.systems.l10n;
 
     // Ensure that we have a current locale code.
-    localeCode ||= l10n?.localeCode() || 'en-US';
+    localeCode ||= l10n?.localeCode || 'en-US';
     this._currLocaleCode = localeCode;
 
     // Re-localize the Category, Preset, Field strings, if needed.
@@ -911,7 +911,7 @@ export class SchemaSystem extends AbstractSystem {
     const l10n = this.context.systems.l10n;
 
     // Ensure that we have a current locale code.
-    this._currLocaleCode ||= l10n?.localeCode() || 'en-US';
+    this._currLocaleCode ||= l10n?.localeCode || 'en-US';
 
     // Switch the search index, create a new one if needed.
     this._currSearchIndex = this._searchIndexes.get(this._currLocaleCode);

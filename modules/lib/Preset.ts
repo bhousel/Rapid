@@ -174,13 +174,13 @@ export class Preset {
    * You must add the Preset to the SchemaSystem and call `reset` before using the Preset.
    */
   reset(): void {
-    const l10n = (this.context.systems.l10n as any);
+    const l10n = this.context.systems.l10n;
 
     this._resolved = { fields: null, moreFields: null };
 
     // Invalidate any cached string localizations and redo for the current locale.
     this._strings.clear();
-    this.setLocale(l10n?.localeCode() || 'en-US');
+    this.setLocale(l10n?.localeCode || 'en-US');
   }
 
 
@@ -195,7 +195,7 @@ export class Preset {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
-    const l10n = (this.context.systems.l10n as any);
+    const l10n = this.context.systems.l10n;
 
     const primary = new Set<string>();
     const alternate = new Set<string>();

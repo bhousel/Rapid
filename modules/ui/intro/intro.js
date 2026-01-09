@@ -201,7 +201,7 @@ export function uiIntro(context, skipToRapid) {
     _buttons
       .append('span')
       .attr('class', 'status')
-      .call(uiIcon(l10n.isRTL() ? '#rapid-icon-backward' : '#rapid-icon-forward', 'inline'));
+      .call(uiIcon(l10n.isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward', 'inline'));
 
 
     // Reset, then load the data into the editor and start.

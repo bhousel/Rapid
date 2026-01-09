@@ -500,7 +500,7 @@ export function uiSectionRawMembershipEditor(context) {
         addRelationButton
             .call(uiTooltip(context)
               .title(l10n.t('inspector.add_to_relation'))
-              .placement(l10n.isRTL() ? 'left' : 'right')
+              .placement(l10n.isRTL ? 'left' : 'right')
              );
 
         addRowEnter

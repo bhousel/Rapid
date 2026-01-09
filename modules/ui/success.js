@@ -361,7 +361,7 @@ export function uiSuccess(context) {
             options.hour = 'numeric';
             options.minute = 'numeric';
           }
-          const localeCode = l10n.localeCode();
+          const localeCode = l10n.localeCode;
           return d.date.toLocaleString(localeCode, options);
         });
 

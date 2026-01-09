@@ -8,7 +8,7 @@ export function uiRapidFirstEditDialog(context) {
 
   return function(selection) {
     const modal = uiModal(selection);
-    const rtl = l10n.isRTL() ? '-rtl' : '';
+    const rtl = l10n.isRTL ? '-rtl' : '';
 
     modal.select('.modal')
       .attr('class', 'modal rapid-modal');

@@ -68,7 +68,7 @@ export function uiCommit(context) {
   // Creates an initial changeset
   //
   function initChangeset() {
-    const localeCode = l10n.localeCode();
+    const localeCode = l10n.localeCode;
 
     // Expire stored comment, hashtags, source after cutoff datetime - iD#3947 iD#4899
     const commentDate = +storage.getItem('commentDate') || 0;

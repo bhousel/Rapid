@@ -140,7 +140,7 @@ export class WikidataService extends AbstractSystem {
    */
   languagesToQuery() {
     const l10n = this.context.systems.l10n;
-    const localeCodes = l10n?.localeCodes() || ['en'];
+    const localeCodes = l10n?.localeCodes || ['en'];
 
     return localeCodes
       .map(code => code.toLowerCase())
@@ -261,7 +261,7 @@ export class WikidataService extends AbstractSystem {
       // add wiki sitelink
       if (entity.sitelinks) {
         const l10n = this.context.systems.l10n;
-        const languageCode = l10n?.languageCode() || 'en';
+        const languageCode = l10n?.languageCode || 'en';
         const isEn = languageCode.toLowerCase() === 'en';
 
         // must be one of these that we requested..

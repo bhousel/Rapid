@@ -123,7 +123,7 @@ export class Category {
 
     // Invalidate any cached string localizations and redo for the current locale.
     this._strings.clear();
-    this.setLocale((l10n as any)?.localeCode() || 'en-US');
+    this.setLocale(l10n?.localeCode || 'en-US');
   }
 
 
@@ -138,7 +138,7 @@ export class Category {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
-    const l10n = this.context.systems.l10n as any;
+    const l10n = this.context.systems.l10n;
 
     // Pre-localize and store strings so that the Miniseach full-text search can index these.
     // Categories are simple because they are just a `name` as a string.

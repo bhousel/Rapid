@@ -110,7 +110,7 @@ export class NominatimService extends AbstractSystem {
 
     const context = this.context;
     const l10n = context.systems.l10n;
-    const localeCodes = l10n?.localeCodes() || ['en-US', 'en'];
+    const localeCodes = l10n?.localeCodes || ['en-US', 'en'];
 
     const opts = {
       signal: controller.signal,
@@ -152,7 +152,7 @@ export class NominatimService extends AbstractSystem {
 
     const context = this.context;
     const l10n = context.systems.l10n;
-    const localeCodes = l10n?.localeCodes() || ['en-US', 'en'];
+    const localeCodes = l10n?.localeCodes || ['en-US', 'en'];
 
     const opts = {
       signal: controller.signal,

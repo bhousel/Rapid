@@ -101,7 +101,7 @@ export function uiFieldText(context, uifield) {
 
       const inc = +(presetField.props.increment || 1);
       let buttons = wrap.selectAll('.increment, .decrement')
-        .data(l10n.isRTL() ? [inc, -inc] : [-inc, inc]);
+        .data(l10n.isRTL ? [inc, -inc] : [-inc, inc]);
 
       buttons.enter()
         .append('button')

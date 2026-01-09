@@ -18,7 +18,7 @@ export function uiWhatsNew(context) {
 
   return function render(selection) {
     const $modal = uiModal(selection);
-    const rtl = l10n.isRTL() ? '-rtl' : '';
+    const rtl = l10n.isRTL ? '-rtl' : '';
 
     let version;
     const match = context.version.match(/(\d+\.\d+)/);  // first match should be major,minor

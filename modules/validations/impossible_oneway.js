@@ -215,7 +215,7 @@ export function validationImpossibleOneway(context) {
             }));
           }
           if (node.tags.noexit !== 'yes') {
-            const isRTL = l10n.isRTL();
+            const isRTL = l10n.isRTL;
             const useLeftContinue = (isHead && !isRTL) || (!isHead && isRTL);
             fixes.push(new ValidationFix({
               icon: 'rapid-operation-continue' + (useLeftContinue ? '-left' : ''),

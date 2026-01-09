@@ -340,7 +340,7 @@ export class UiCurtain {
     if (!this.$tooltip) return;   // called too early
 
     const context = this.context;
-    const isRTL = context.systems.l10n.isRTL();
+    const isRTL = context.systems.l10n.isRTL;
 
     const $container = context.container();
     const containerNode = $container.node();

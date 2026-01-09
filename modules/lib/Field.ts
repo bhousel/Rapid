@@ -163,11 +163,11 @@ export class Field {
    * You must add the Field to the SchemaSystem and call `reset` before using the Field.
    */
   reset(): void {
-    const l10n = (this.context.systems.l10n as any);
+    const l10n = this.context.systems.l10n;
 
     // Invalidate any cached string localizations and redo for the current locale.
     this._strings.clear();
-    this.setLocale(l10n?.localeCode() || 'en-US');
+    this.setLocale(l10n?.localeCode || 'en-US');
   }
 
 
@@ -183,7 +183,7 @@ export class Field {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
-    const l10n = (this.context.systems.l10n as any);
+    const l10n = this.context.systems.l10n;
 
     // Some Fields may reference the values from another Field.
     /* eslint-disable @typescript-eslint/no-this-alias */

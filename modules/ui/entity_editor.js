@@ -60,7 +60,7 @@ export function uiEntityEditor(context) {
     _selection = selection;
 
     const combinedTags = _getCombinedTags(_entityIDs, editor.staging.graph);
-    const isRTL = l10n.isRTL();
+    const isRTL = l10n.isRTL;
 
     // Header
     let header = selection.selectAll('.header')

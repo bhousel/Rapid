@@ -130,11 +130,11 @@ export class ValidationIssue {
 
     // For minor issues, create an "ignore" option
     if (this.severity !== 'error') {
-      const l10n = (this.context.systems.l10n as any);
+      const l10n = this.context.systems.l10n;
       const validator = (this.context.systems.validator as any);
 
       fixes.push(new ValidationFix({
-        title: l10n.t('issues.fix.ignore_issue.title'),
+        title: l10n?.t('issues.fix.ignore_issue.title') ?? 'Ignore this issue',
         icon: 'rapid-icon-close',
         onClick: () => {
           validator.ignoreIssue(this.id);

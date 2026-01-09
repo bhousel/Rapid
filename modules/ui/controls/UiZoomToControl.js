@@ -78,7 +78,7 @@ export class UiZoomToControl {
 
     // Update tooltip
     this.Tooltip
-      .placement(l10n.isRTL() ? 'right' : 'left')
+      .placement(l10n.isRTL ? 'right' : 'left')
       .title(() => this.isDisabled() ? l10n.t('inspector.zoom_to.no_selection') : l10n.t('inspector.zoom_to.title'))
       .shortcut(l10n.t('shortcuts.command.zoom_to.key'));
   }

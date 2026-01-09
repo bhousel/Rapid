@@ -147,7 +147,7 @@ export function uiFieldWikipedia(context, uifield) {
 
 
   function defaultLanguageInfo(skipEnglishFallback) {
-    const langCode = l10n.languageCode().toLowerCase();
+    const langCode = l10n.languageCode.toLowerCase();
 
     for (let i in _dataWikipedia) {
       let d = _dataWikipedia[i];

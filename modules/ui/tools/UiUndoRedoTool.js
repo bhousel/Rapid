@@ -46,13 +46,13 @@ export class UiUndoRedoTool {
       key: utilCmd('⌘Z'),
       action: () => editor.undo(),
       annotation: () => editor.getUndoAnnotation(),
-      getIcon: () => (l10n.isRTL() ? 'redo' : 'undo')
+      getIcon: () => (l10n.isRTL ? 'redo' : 'undo')
     }, {
       id: 'redo',
       key: utilCmd('⌘⇧Z'),
       action: () => editor.redo(),
       annotation: () => editor.getRedoAnnotation(),
-      getIcon: () => (l10n.isRTL() ? 'undo' : 'redo')
+      getIcon: () => (l10n.isRTL ? 'undo' : 'redo')
     }];
 
 

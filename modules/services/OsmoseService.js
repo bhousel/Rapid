@@ -233,7 +233,7 @@ export class OsmoseService extends AbstractSystem {
     if (issue.props.elems !== undefined) return Promise.resolve(issue);
 
     const l10n = this.context.systems.l10n;
-    const localeCode = l10n?.localeCode() || 'en-US';
+    const localeCode = l10n?.localeCode || 'en-US';
 
     const url = `${OSMOSE_API}/issue/${issue.id}?langs=${localeCode}`;
 
@@ -263,7 +263,7 @@ export class OsmoseService extends AbstractSystem {
    */
   getStrings(itemType, locale) {
     const l10n = this.context.systems.l10n;
-    locale = locale || l10n?.localeCode() || 'en-US';
+    locale = locale || l10n?.localeCode || 'en-US';
 
     const stringData = this._osmoseStrings.get(locale) ?? {};
     return stringData[itemType] ?? {};
@@ -414,7 +414,7 @@ export class OsmoseService extends AbstractSystem {
     let stringData = {};
 
     const l10n = this.context.systems.l10n;
-    const localeCode = l10n?.localeCode() || 'en-US';
+    const localeCode = l10n?.localeCode || 'en-US';
     this._osmoseStrings.set(localeCode, stringData);
 
     // Using multiple individual item + class requests to reduce fetched data size

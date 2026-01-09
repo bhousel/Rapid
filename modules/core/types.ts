@@ -14,6 +14,7 @@ import type { Graph } from '../lib/Graph.ts';
 // Using `import type` avoids runtime circular dependencies.
 import type { AssetSystem } from './AssetSystem.ts';
 import type { FilterSystem } from './FilterSystem.ts';
+import type { LocalizationSystem } from './LocalizationSystem.ts';
 import type { LocationSystem } from './LocationSystem.ts';
 import type { RapidSystem } from './RapidSystem.ts';
 import type { SpatialSystem } from './SpatialSystem.ts';
@@ -79,6 +80,7 @@ export interface System {
 type AnySystem =
   | AssetSystem
   | FilterSystem
+  | LocalizationSystem
   | LocationSystem
   | RapidSystem
   | SpatialSystem
@@ -100,6 +102,7 @@ export interface Systems {
   // Converted to TypeScript - use specific types:
   assets?: AssetSystem;
   filters?: FilterSystem;
+  l10n?: LocalizationSystem;
   locations?: LocationSystem;
   rapid?: RapidSystem;
   spatial?: SpatialSystem;
@@ -111,7 +114,6 @@ export interface Systems {
   editor?: System;
   gfx?: System;
   imagery?: System;
-  l10n?: System;
   map?: System;
   map3d?: System;
   photos?: System;

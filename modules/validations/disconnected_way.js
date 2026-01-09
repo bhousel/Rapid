@@ -175,7 +175,7 @@ export function validationDisconnectedWay(context) {
       const vertex = graph.hasEntity(vertexID);
       if (!vertex || vertex.tags.noexit === 'yes') return null;
 
-      const isRTL = l10n.isRTL();
+      const isRTL = l10n.isRTL;
       const useLeftContinue = (whichEnd === 'start' && !isRTL) || (whichEnd === 'end' && isRTL);
 
       return new ValidationFix({

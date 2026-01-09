@@ -250,7 +250,7 @@ Track TypeScript conversion progress here:
 | `EditSystem.js` | ❌ Not started |
 | `GraphicsSystem.js` | ❌ Not started |
 | `ImagerySystem.js` | ❌ Not started |
-| `LocalizationSystem.js` | ❌ Not started |
+| `LocalizationSystem.ts` | ✅ Converted |
 | `Map3dSystem.js` | ❌ Not started |
 | `MapSystem.js` | ❌ Not started |
 | `PhotoSystem.js` | ❌ Not started |

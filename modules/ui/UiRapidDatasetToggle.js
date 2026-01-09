@@ -100,7 +100,7 @@ export class UiRapidDatasetToggle {
     const context = this.context;
     const l10n = context.systems.l10n;
     const scene = context.systems.gfx.scene;
-    const rtl = l10n.isRTL() ? '-rtl' : '';
+    const rtl = l10n.isRTL ? '-rtl' : '';
     const isRapidEnabled = scene.layers.get('rapid')?.enabled;
     const $content = this.$modal.select('.content');
 
@@ -207,7 +207,7 @@ export class UiRapidDatasetToggle {
       .text(l10n.t('rapid_menu.add_manage_datasets'));
 
     $manageDatasets.selectAll('.rapid-checkbox-label use')
-      .attr('xlink:href', l10n.isRTL() ? '#rapid-icon-backward' : '#rapid-icon-forward');
+      .attr('xlink:href', l10n.isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward');
 
 
     /* OK Button */

@@ -276,7 +276,7 @@ export function uiSectionDataLayers(context) {
 
   function drawCustomDataItems(selection) {
     const customLayer = scene.layers.get('custom-data');
-    const isRTL = l10n.isRTL();
+    const isRTL = l10n.isRTL;
 
     let ul = selection
       .selectAll('.layer-list-data')

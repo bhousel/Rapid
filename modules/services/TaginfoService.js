@@ -98,7 +98,7 @@ export class TaginfoService extends AbstractSystem {
     if (this._startPromise) return this._startPromise;
 
     const l10n = this.context.systems.l10n;
-    const langCode = l10n?.languageCode() || 'en';
+    const langCode = l10n?.languageCode || 'en';
 
     // Fetch popular keys.  We'll exclude these from `values`
     // lookups because they stress taginfo, and they aren't likely
@@ -154,7 +154,7 @@ export class TaginfoService extends AbstractSystem {
    */
   keys(params, callback) {
     const l10n = this.context.systems.l10n;
-    const langCode = l10n?.languageCode() || 'en';
+    const langCode = l10n?.languageCode || 'en';
 
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
     params = this._clean(this._setSort(params));
@@ -187,7 +187,7 @@ export class TaginfoService extends AbstractSystem {
    */
   multikeys(params, callback) {
     const l10n = this.context.systems.l10n;
-    const langCode = l10n?.languageCode() || 'en';
+    const langCode = l10n?.languageCode || 'en';
 
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
     params = this._clean(this._setSort(params));
@@ -228,7 +228,7 @@ export class TaginfoService extends AbstractSystem {
     }
 
     const l10n = this.context.systems.l10n;
-    const langCode = l10n?.languageCode() || 'en';
+    const langCode = l10n?.languageCode || 'en';
 
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
     params = this._clean(this._setSort(this._setFilter(params)));
@@ -268,7 +268,7 @@ export class TaginfoService extends AbstractSystem {
    */
   roles(params, callback) {
     const l10n = this.context.systems.l10n;
-    const langCode = l10n?.languageCode() || 'en';
+    const langCode = l10n?.languageCode || 'en';
 
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
     const geometry = params.geometry;

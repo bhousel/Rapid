@@ -1531,7 +1531,7 @@ export class OsmService extends AbstractSystem {
     };
 
     // Ensure the locale is correctly set before opening the popup
-    const localeCode = l10n?.localeCode() || 'en-US';
+    const localeCode = l10n?.localeCode || 'en-US';
 
     this._oauth.options({
       ...this._oauth.options(),

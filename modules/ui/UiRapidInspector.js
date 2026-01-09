@@ -86,7 +86,7 @@ export class UiRapidInspector {
 
     const context = this.context;
     const l10n = context.systems.l10n;
-    const rtl = l10n.isRTL() ? '-rtl' : '';
+    const rtl = l10n.isRTL ? '-rtl' : '';
 
     let $inspector = $parent.selectAll('.rapid-inspector')
       .data([0]);

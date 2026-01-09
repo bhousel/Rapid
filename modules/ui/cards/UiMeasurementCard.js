@@ -54,7 +54,7 @@ export class UiMeasurementCard extends AbstractUiCard {
     const l10n = context.systems.l10n;
     const map = context.systems.map;
 
-    this._isImperial = !l10n.isMetric();
+    this._isImperial = !l10n.isMetric;
     this._keys = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -90,7 +90,7 @@ export class UiMeasurementCard extends AbstractUiCard {
     const context = this.context;
     const l10n = context.systems.l10n;
     const graph = context.systems.editor.staging.graph;
-    const localeCode = l10n.localeCode();
+    const localeCode = l10n.localeCode;
 
     // .card-container
     let $wrap = $parent.selectAll('.card-container')

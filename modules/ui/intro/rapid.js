@@ -70,7 +70,7 @@ export function uiIntroRapid(context, curtain) {
       .then(() => new Promise((resolve, reject) => {
         _rejectStep = reject;
 
-        const rtl = l10n.isRTL() ? '-rtl' : '';
+        const rtl = l10n.isRTL ? '-rtl' : '';
         curtain.reveal({
           revealSelector: '.intro-nav-wrap .chapter-rapid',
           tipHtml: helpHtml(context, 'intro.rapid.start', {
@@ -89,7 +89,7 @@ export function uiIntroRapid(context, curtain) {
     return new Promise((resolve, reject) => {
       _rejectStep = reject;
 
-      const rtl = l10n.isRTL() ? '-rtl' : '';
+      const rtl = l10n.isRTL ? '-rtl' : '';
       curtain.reveal({
         revealSelector: 'button.rapid-features',
         tipHtml: helpHtml(context, 'intro.rapid.ai_roads', {
@@ -169,7 +169,7 @@ export function uiIntroRapid(context, curtain) {
 
         _onModeChange = reject;   // disallow mode change
 
-        const rtl = l10n.isRTL() ? '-rtl' : '';
+        const rtl = l10n.isRTL ? '-rtl' : '';
         curtain.reveal({
           revealExtent: tulipLaneExtent,
           tipHtml: helpHtml(context, 'intro.rapid.add_road_not_saved_yet', {

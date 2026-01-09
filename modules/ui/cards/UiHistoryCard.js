@@ -292,7 +292,7 @@ export class UiHistoryCard extends AbstractUiCard {
     const d = new Date(timestamp);
     if (isNaN(d.getTime())) return l10n.t('inspector.unknown');
 
-    const localeCode = context.systems.l10n.localeCode();
+    const localeCode = context.systems.l10n.localeCode;
     return d.toLocaleString(localeCode, options);
   }
 

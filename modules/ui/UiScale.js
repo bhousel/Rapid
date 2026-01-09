@@ -22,7 +22,7 @@ export class UiScale {
     const l10n = context.systems.l10n;
     const gfx = context.systems.gfx;
 
-    this._isImperial = !l10n.isMetric();
+    this._isImperial = !l10n.isMetric;
 
     // D3 selections
     this.$parent = null;

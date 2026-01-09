@@ -75,7 +75,7 @@ export class UiBearingControl {
 
     // Update tooltip
     this.Tooltip
-      .placement(l10n.isRTL() ? 'right' : 'left')
+      .placement(l10n.isRTL ? 'right' : 'left')
       .title(l10n.t('bearing.reset_bearing'));
 
     // Insert a better keyhint

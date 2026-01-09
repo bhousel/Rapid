@@ -156,7 +156,7 @@ export class RapidDataset {
    * @return Localized label string
    */
   getLabel(): string {
-    const l10n = (this.context.systems.l10n as any);
+    const l10n = this.context.systems.l10n;
     return (l10n && this.labelStringID) ? l10n.t(this.labelStringID) : (this._label || this.id);
   }
 
@@ -167,7 +167,7 @@ export class RapidDataset {
    * @return Localized description string
    */
   getDescription(): string {
-    const l10n = (this.context.systems.l10n as any);
+    const l10n = this.context.systems.l10n;
     return (l10n && this.descriptionStringID) ? l10n.t(this.descriptionStringID) : (this._description || '');
   }
 }

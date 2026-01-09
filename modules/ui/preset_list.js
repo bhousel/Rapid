@@ -42,7 +42,7 @@ export function uiPresetList(context) {
 
     if (!_entityIDs.length) return;
 
-    const isRTL = l10n.isRTL();
+    const isRTL = l10n.isRTL;
 
     // Header
     const $header = $selection.selectAll('.header')
@@ -265,7 +265,7 @@ export function uiPresetList(context) {
     const node = $item.node();
     const $parentItem = d3_select(node.parentNode.closest('.preset-list-item'));
     const parentNode = $parentItem.node();
-    const isRTL = l10n.isRTL();
+    const isRTL = l10n.isRTL;
 
     // arrow down, move focus to the next, lower item
     if (e.keyCode === utilKeybinding.keyCodes['↓']) {
@@ -351,7 +351,7 @@ export function uiPresetList(context) {
 
     render($selection) {
       const category = this.item;
-      const isRTL = l10n.isRTL();
+      const isRTL = l10n.isRTL;
 
       const $$wrap = $selection.selectAll(':scope > .preset-list-button-wrap')
         .data([this], d => d.item.id)
@@ -398,7 +398,7 @@ export function uiPresetList(context) {
     }
 
     _keydown(e) {
-      const isRTL = l10n.isRTL();
+      const isRTL = l10n.isRTL;
       const target = e.currentTarget;
       const $selection = d3_select(target);
       if (e.keyCode === utilKeybinding.keyCodes[isRTL ? '←' : '→']) {  // right arrow, expand the focused item
@@ -419,7 +419,7 @@ export function uiPresetList(context) {
     }
 
     _click(e) {
-      const isRTL = l10n.isRTL();
+      const isRTL = l10n.isRTL;
       const target = e.currentTarget;
       const $selection = d3_select(target);
       const isExpanded = $selection.classed('expanded');

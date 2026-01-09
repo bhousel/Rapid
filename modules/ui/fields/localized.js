@@ -230,7 +230,7 @@ export function uiFieldLocalized(context, uifield) {
             d3_event.preventDefault();
             if (uifield.locked()) return;
 
-            var defaultLang = l10n.languageCode().toLowerCase();
+            var defaultLang = l10n.languageCode.toLowerCase();
             var langExists = _multilingual.find(function(datum) { return datum.lang === defaultLang; });
             var isLangEn = defaultLang.indexOf('en') > -1;
             if (isLangEn || langExists) {
@@ -325,7 +325,7 @@ export function uiFieldLocalized(context, uifield) {
         var v = value.toLowerCase();
 
         // show the user's language first
-        var langCodes = [l10n.localeCode(), l10n.languageCode()];
+        var langCodes = [l10n.localeCode, l10n.languageCode];
 
         if (_countryCode && _territoryLanguages[_countryCode]) {
             langCodes = langCodes.concat(_territoryLanguages[_countryCode]);
