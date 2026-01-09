@@ -1,12 +1,12 @@
 import { Extent } from '@rapid-sdk/math';
 import type { Context, D3Selection, Nullable } from '../core/types.ts';
 import type { OsmEntity, EntityID } from '../data/types.ts';
-import type { GeoJSONFeature, GeoJSONFeatureCollection, GeoJSONGeometry, Vec2 } from '../lib/types.ts';
+import type { Vec2 } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 
 
 /** GeoJSON input - either a Feature or FeatureCollection */
-type GeoJSONInput = GeoJSONFeature | GeoJSONFeatureCollection;
+type GeoJSONInput = GeoJSON.Feature | GeoJSON.FeatureCollection;
 
 
 /**
@@ -38,7 +38,7 @@ export function utilTotalExtent(vals: Iterable<OsmEntity | EntityID>, graph: Gra
  * @param geojson - A GeoJSON Feature or FeatureCollection
  * @returns Array of GeoJSON Features
  */
-export function geojsonFeatures(geojson: Nullable<GeoJSONInput>): GeoJSONFeature[] {
+export function geojsonFeatures(geojson: Nullable<GeoJSONInput>): GeoJSON.Feature[] {
   if (!geojson) return [];
   return (geojson.type === 'FeatureCollection') ? (geojson.features ?? []) : [geojson];
 }
@@ -59,7 +59,7 @@ export function geojsonExtent(geojson: Nullable<GeoJSONInput>): Extent {
     if (!geometry) continue;
 
     const type = geometry.type;
-    const coords = (geometry as GeoJSONGeometry & { coordinates?: unknown }).coordinates;
+    const coords = (geometry as GeoJSON.Geometry & { coordinates?: unknown }).coordinates;
     if (!coords) continue;
 
     // Treat single types as multi types to keep the code simple

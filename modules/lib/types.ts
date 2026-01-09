@@ -30,83 +30,29 @@ export type Action = (graph: Graph) => Graph;
 // ============================================================================
 // GeoJSON Types
 // ============================================================================
+//
+// We use the global `GeoJSON.*` namespace from `@types/geojson` for most types.
+// This is available globally via UMD declaration (`export as namespace GeoJSON`).
+//
+// The type aliases below define a few concepts not in the standard types
+// (like SingularGeometry) and provide convenient pre-configured generics.
+// ============================================================================
 
-/** GeoJSON geometry type for singular geometries */
+/** GeoJSON geometry type for singular geometries (not Multi* or GeometryCollection) */
 export type SingularGeometryType = 'Point' | 'LineString' | 'Polygon';
 
-/** GeoJSON Point geometry */
-export interface PointGeometry {
-  type: 'Point';
-  coordinates: Vec2;
-}
+/** Singular GeoJSON geometry types (Point, LineString, Polygon) - excludes Multi* and GeometryCollection */
+export type SingularGeometry = GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon;
 
-/** GeoJSON LineString geometry */
-export interface LineStringGeometry {
-  type: 'LineString';
-  coordinates: Vec2[];
-}
-
-/** GeoJSON Polygon geometry */
-export interface PolygonGeometry {
-  type: 'Polygon';
-  coordinates: Vec2[][];
-}
-
-/** Singular GeoJSON geometry types (Point, LineString, Polygon) */
-export type SingularGeometry = PointGeometry | LineStringGeometry | PolygonGeometry;
-
-/** GeoJSON MultiPoint geometry */
-export interface MultiPointGeometry {
-  type: 'MultiPoint';
-  coordinates?: Vec2[];
-}
-
-/** GeoJSON MultiLineString geometry */
-export interface MultiLineStringGeometry {
-  type: 'MultiLineString';
-  coordinates?: Vec2[][];
-}
-
-/** GeoJSON MultiPolygon geometry */
-export interface MultiPolygonGeometry {
-  type: 'MultiPolygon';
-  coordinates?: Vec2[][][];
-}
-
-/** GeoJSON GeometryCollection */
-export interface GeoJSONGeometryCollection {
-  type: 'GeometryCollection';
-  geometries?: GeoJSONGeometry[];
-}
-
-/** Any GeoJSON geometry type */
-export type GeoJSONGeometry =
-  | SingularGeometry
-  | MultiPointGeometry
-  | MultiLineStringGeometry
-  | MultiPolygonGeometry
-  | GeoJSONGeometryCollection;
-
-
-/** GeoJSON Properties */
-export type GeoJSONProperties = Record<string, unknown>;
-
-/** GeoJSON Feature */
-export interface GeoJSONFeature {
-  type: 'Feature';
-  id?: string | number;
-  geometry?: GeoJSONGeometry | null;
-  properties?: GeoJSONProperties | null;
-}
-
-/** GeoJSON FeatureCollection */
-export interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection';
-  features?: GeoJSONFeature[];
-}
-
-/** Any GeoJSON object (Feature, FeatureCollection, or Geometry) */
-export type GeoJSONObject = GeoJSONFeature | GeoJSONFeatureCollection | GeoJSONGeometry;
+/**
+ * Any GeoJSON object (Feature, FeatureCollection, or Geometry).
+ * Features allow null geometry for unlocated entities (e.g., changesets).
+ * This union type allows TypeScript to narrow based on `type` property.
+ */
+export type GeoJSONObject =
+  | GeoJSON.Feature<GeoJSON.Geometry | null>
+  | GeoJSON.FeatureCollection<GeoJSON.Geometry | null>
+  | GeoJSON.Geometry;
 
 
 // ============================================================================
@@ -122,7 +68,7 @@ export interface SSRData {
 /** Original coordinate data in WGS84 for GeometryPart */
 export interface GeometryPartOrigData {
   geojson: SingularGeometry;
-  coords: Vec2 | Vec2[] | Vec2[][];
+  coords: GeoJSON.Position | GeoJSON.Position[] | GeoJSON.Position[][];
   extent: Extent;
 }
 

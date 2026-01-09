@@ -6,7 +6,7 @@ import { utilDateString } from '../util/date.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../core/types.ts';
-import type { GeoJSONFeature, Vec2 } from '../lib/types.ts';
+import type { Vec2 } from '../lib/types.ts';
 
 // Cast utilAesDecrypt to allow optional key parameter (matches runtime behavior)
 const aesDecrypt = utilAesDecrypt as (cipherText: string | undefined, key?: number[]) => string;
@@ -69,7 +69,7 @@ export interface ImagerySourceProps {
   /** Zoom range for the imagery source */
   zoomRange?: number;
   /** Feature defining the coverage area */
-  feature?: GeoJSONFeature;
+  feature?: GeoJSON.Feature;
   /** Icon url for the source */
   icon?: string;
   /** Terms of service text */

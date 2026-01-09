@@ -150,6 +150,20 @@ export class Category {
 - **Ambient module declarations** (no @types package available): Add to `modules/types/*.d.ts` without export
 - Example: `global.d.ts` has the fix for `d3-geo`'s `geoMercatorRaw` return type
 
+### GeoJSON Types
+- **`@types/geojson`** is installed as a dev dependency and exposes a global `GeoJSON` namespace via UMD declaration
+- Use the global `GeoJSON.*` types directly without importing:
+  ```typescript
+  // No import needed - uses global namespace from @types/geojson
+  function processData(fc: GeoJSON.FeatureCollection): void { ... }
+  const geom = feature.geometry as GeoJSON.LineString;
+  ```
+- **Type aliases** in `lib/types.ts` provide convenient names and define concepts not in the standard types:
+  - `SingularGeometry` = `GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon` (excludes Multi* and GeometryCollection)
+  - `SingularGeometryType` = `'Point' | 'LineString' | 'Polygon'`
+  - `GeoJSONFeature`, `GeoJSONObject` - slightly looser versions that allow optional `geometry` for easier construction
+- **Note**: The `data/GeoJSON.ts` class wraps arbitrary GeoJSON - be aware of the naming collision with the global namespace.
+
 ### Working with Untyped Systems
 - It's OK to assert `as any` for parts of the codebase that haven't been converted to TypeScript yet
 - This is especially common for `context.systems.*` which are typed as `System | undefined`
@@ -163,6 +177,34 @@ export class Category {
   const graph = editor?.staging?.graph;
   ```
 - This pattern keeps code readable while allowing gradual TypeScript adoption
+
+### Updating the Systems Interface
+When a system is converted to TypeScript, update `modules/core/types.ts` to provide proper typing:
+
+1. **Add the import** at the top of types.ts:
+   ```typescript
+   import type { FooSystem } from './FooSystem.ts';
+   ```
+
+2. **Add to the `AnySystem` union**:
+   ```typescript
+   type AnySystem =
+     | AssetSystem
+     | FooSystem  // add here
+     | ...
+     | System;
+   ```
+
+3. **Update the property** in the `Systems` interface:
+   ```typescript
+   export interface Systems {
+     // Converted to TypeScript - use specific types:
+     foo?: FooSystem;  // move from "not converted" section
+     ...
+   }
+   ```
+
+Using `import type` avoids runtime circular dependencies. Once updated, code can access `context.systems.foo` with full type checking instead of `as any` casts.
 - As systems get properly typed, these `as any` casts can be removed
 
 ### Browser Globals
@@ -183,7 +225,7 @@ Track TypeScript conversion progress here:
 | `modules/util/` | ✅ Complete | All 14 files converted |
 | `modules/lib/` | 🔄 Partial | `Tree.js`, `tag_classes.js` remain |
 | `modules/pixi/lib/` | 🔄 Partial | `DashLine.js`, `AtlasAllocator.js` remain |
-| `modules/core/` | 🔄 Partial | `types.ts` exists; systems still JS |
+| `modules/core/` | 🔄 Partial | 8 systems converted (see below) |
 | `modules/actions/` | ❌ Not started | |
 | `modules/behaviors/` | ❌ Not started | |
 | `modules/modes/` | ❌ Not started | |
@@ -191,6 +233,31 @@ Track TypeScript conversion progress here:
 | `modules/services/` | ❌ Not started | |
 | `modules/ui/` | ❌ Not started | |
 | `modules/validations/` | ❌ Not started | |
+
+### modules/core/ Systems
+
+| System | Status |
+|--------|--------|
+| `AbstractSystem.ts` | ✅ Converted |
+| `AssetSystem.ts` | ✅ Converted |
+| `FilterSystem.ts` | ✅ Converted |
+| `LocationSystem.ts` | ✅ Converted |
+| `RapidSystem.ts` | ✅ Converted |
+| `SpatialSystem.ts` | ✅ Converted |
+| `StorageSystem.ts` | ✅ Converted |
+| `StyleSystem.ts` | ✅ Converted |
+| `UrlHashSystem.ts` | ✅ Converted |
+| `EditSystem.js` | ❌ Not started |
+| `GraphicsSystem.js` | ❌ Not started |
+| `ImagerySystem.js` | ❌ Not started |
+| `LocalizationSystem.js` | ❌ Not started |
+| `Map3dSystem.js` | ❌ Not started |
+| `MapSystem.js` | ❌ Not started |
+| `PhotoSystem.js` | ❌ Not started |
+| `SchemaSystem.js` | ❌ Not started |
+| `UiSystem.js` | ❌ Not started |
+| `UploaderSystem.js` | ❌ Not started |
+| `ValidationSystem.js` | ❌ Not started |
 
 ## Testing
 

@@ -1,5 +1,7 @@
 import { EventEmitter } from 'tseep';
 
+import type { Context, SystemID } from './types.ts';
+
 
 /**
  * `AbstractSystem` is the base class from which all systems and services inherit.
@@ -52,12 +54,27 @@ import { EventEmitter } from 'tseep';
  *   `autoStart`  `Boolean`  True to start automatically when initializing the Context
  */
 export class AbstractSystem extends EventEmitter {
+  /** Identifier for the system (e.g. 'l10n') */
+  id: string;
+  /** Global shared application context */
+  context: Context;
+  /** Dependencies that must be met before init */
+  requiredDependencies: Set<SystemID>;
+  /** Dependencies that are nice to have but not required */
+  optionalDependencies: Set<SystemID>;
+  /** True to start automatically when initializing the Context */
+  autoStart: boolean;
+
+  protected _initPromise: Promise<void> | null;
+  protected _startPromise: Promise<void> | null;
+  protected _started: boolean;
+  protected _paused: boolean;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super();
     this.id = '';
     this.context = context;
@@ -76,10 +93,9 @@ export class AbstractSystem extends EventEmitter {
   /**
    * systemID
    * Unique string to identify this System.
-   * @return  {string}  This system's unique id
    * @readonly
    */
-  get systemID() {
+  get systemID(): string {
     return this.id;
   }
 
@@ -89,10 +105,9 @@ export class AbstractSystem extends EventEmitter {
    * Because services also inherit from 'AbstractSystem',
    *  we will offer a convenience getter named `serviceID` too.
    * They all just return `id` anyway.
-   * @return  {string}   This service's unique id
    * @readonly
    */
-  get serviceID() {
+  get serviceID(): string {
     return this.id;
   }
 
@@ -101,7 +116,7 @@ export class AbstractSystem extends EventEmitter {
    * started
    * @readonly
    */
-  get started() {
+  get started(): boolean {
     return this._started;
   }
 
@@ -110,7 +125,7 @@ export class AbstractSystem extends EventEmitter {
    * paused
    * @readonly
    */
-  get paused() {
+  get paused(): boolean {
     return this._paused;
   }
 
@@ -119,10 +134,10 @@ export class AbstractSystem extends EventEmitter {
    * initAsync
    * Called after all core objects have been constructed.
    * Will return a rejected promise if any required system is not available.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    * @abstract
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     for (const requiredID of this.requiredDependencies) {
@@ -137,24 +152,24 @@ export class AbstractSystem extends EventEmitter {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    * @abstract
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     this._started = true;
-    return this.startPromise = Promise.resolve();
+    return this._startPromise = Promise.resolve();
   }
 
 
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state.
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    * @abstract
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -165,7 +180,7 @@ export class AbstractSystem extends EventEmitter {
    * The meaning of "pause" / "resume" is dependent on the system - they may not be used at all.
    * It may be used to prevent network fetches, background work, or rendering.
    */
-  pause() {
+  pause(): void {
     this._paused = true;
   }
 
@@ -176,7 +191,7 @@ export class AbstractSystem extends EventEmitter {
    * The meaning of "pause" / "resume" is dependent on the system - they may not be used at all.
    * It may be used to prevent network fetches, background work, or rendering.
    */
-  resume() {
+  resume(): void {
     this._paused = false;
   }
 

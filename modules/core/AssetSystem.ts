@@ -1,5 +1,25 @@
-import { AbstractSystem } from './AbstractSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
+
+import type { Context } from './types.ts';
+
+
+/**
+ * Map of asset keys to their file paths or URLs.
+ * Keys are identifiers like 'address_formats', 'languages', 'oci_defaults'.
+ * Values are either relative paths (e.g. 'data/languages.min.json')
+ * or absolute URLs (e.g. 'https://cdn.jsdelivr.net/npm/...').
+ */
+type AssetMap = Record<string, string>;
+
+/** Origin types for asset loading */
+type AssetOrigin = 'latest' | 'local';
+
+/** Sources object containing asset maps for each origin */
+interface AssetSources {
+  latest: AssetMap;
+  local: AssetMap;
+}
 
 
 /**
@@ -10,12 +30,25 @@ import { utilFetchResponse } from '../util/fetch_response.ts';
  *   `origin`    'local' (all files fetched from dist) or 'latest' (newer files may be fetched from CDN)
  */
 export class AssetSystem extends AbstractSystem {
+  /** Asset maps organized by origin ('latest' and 'local') */
+  sources: AssetSources;
+  /** Current origin for asset loading - 'latest' or 'local' */
+  origin: AssetOrigin;
+  /** Root folder path for assets, with trailing slash (e.g. 'dist/') */
+  filePath: string;
+  /** Custom filename replacements, e.g. from Rails asset pipeline */
+  fileReplacements: Record<string, string>;
+
+  /** Cache of loaded asset data, keyed by asset identifier */
+  private _cache: Record<string, unknown>;
+  /** In-flight fetch promises, keyed by URL */
+  private _inflight: Record<string, Promise<unknown>>;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'assets';
 
@@ -87,7 +120,6 @@ export class AssetSystem extends AbstractSystem {
     // (This must set before init, and should not be changed later)
     this.fileReplacements = {};
 
-
     this._cache = {};
     this._inflight = {};
 
@@ -125,9 +157,9 @@ export class AssetSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -135,9 +167,9 @@ export class AssetSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -145,9 +177,9 @@ export class AssetSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     return super.resetAsync();
   }
 
@@ -156,12 +188,12 @@ export class AssetSystem extends AbstractSystem {
    * setAsset
    * Set an asset in the list of sources.
    * Other systems and services should call this to track the assets they need to load.
-   * @param  {string}  key
-   * @param  {string}  path
-   * @param  {string}  origin - optional, 'latest' or 'local' (if missing, sets both)
-   * @throws  Will throw if the given origin is invalid
+   * @param key - asset identifier
+   * @param path - file path or URL
+   * @param origin - optional, 'latest' or 'local' (if missing, sets both)
+   * @throws Will throw if the given origin is invalid
    */
-  setAsset(key, path, origin) {
+  setAsset(key: string, path: string, origin?: AssetOrigin): void {
     if (origin) {
       const sources = this.sources[origin];
       if (!sources) {
@@ -179,11 +211,12 @@ export class AssetSystem extends AbstractSystem {
   /**
    * getAsset
    * Get an asset path from the list of sources.
-   * @param  {string}  key
-   * @param  {string}  origin - optional, 'latest' or 'local' (if missing, returns current origin)
-   * @throws  Will throw if the given origin is invalid
+   * @param key - asset identifier
+   * @param origin - optional, 'latest' or 'local' (if missing, returns current origin)
+   * @return The asset path or undefined if not found
+   * @throws Will throw if the given origin is invalid
    */
-  getAsset(key, origin = this.origin) {
+  getAsset(key: string, origin: AssetOrigin = this.origin): string | undefined {
     const sources = this.sources[origin];
     if (!sources) {
       throw new Error(`Unknown origin "${this.origin}"`);
@@ -197,25 +230,25 @@ export class AssetSystem extends AbstractSystem {
    * Returns the URL for the given filename.
    *   If the given value is already a URL, it's returned
    *   If the given value is a relative path, return the real location of that file.
-   * @param  {string}  val - asset path
-   * @return {string}  The real URL pointing to that filename
+   * @param val - asset path
+   * @return The real URL pointing to that filename
    */
-  getFileURL(val) {
+  getFileURL(val: string): string {
     if (/^http(s)?:\/\//i.test(val)) return val; // already a url
 
     const filename = `${this.filePath}${val}`;
-    return this.fileReplacements[filename] || filename;
+    return this.fileReplacements[filename] ?? filename;
   }
 
 
   /**
    * getAssetURL
    * Returns the URL for the given asset key.
-   * @param   {string}  key - identifier for the asset, should be found in the asset map.
-   * @return  {string}  URL of the asset
-   * @throws  Will throw if the asset key is not found, or the current origin is invalid
+   * @param key - identifier for the asset, should be found in the asset map.
+   * @return URL of the asset
+   * @throws Will throw if the asset key is not found, or the current origin is invalid
    */
-  getAssetURL(key) {
+  getAssetURL(key: string): string {
     if (/^http(s)?:\/\//i.test(key)) return key; // already a url
 
     const sources = this.sources[this.origin];
@@ -234,19 +267,19 @@ export class AssetSystem extends AbstractSystem {
   /**
    * loadAssetAsync
    * Returns a Promise to fetch the data identified by the key.
-   * @param   {string}   key - identifier for the data, should be found in the asset map.
-   * @return  {Promise}  Promise resolved with the data
+   * @param key - identifier for the data, should be found in the asset map.
+   * @return Promise resolved with the data
    */
-  loadAssetAsync(key) {
+  loadAssetAsync(key: string): Promise<unknown> {
     if (this._cache[key]) {
       return Promise.resolve(this._cache[key]);
     }
 
-    let url;
+    let url: string;
     try {
       url = this.getAssetURL(key);
     } catch (err) {
-      return Promise.reject(err.message);
+      return Promise.reject((err as Error).message);
     }
 
     let loadPromise = this._inflight[url];

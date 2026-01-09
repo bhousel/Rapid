@@ -1,6 +1,6 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
 import type { Context } from '../core/types.ts';
-import type { GeoJSONObject, GeoJSONProperties, PointGeometry } from '../lib/types.ts';
+import type { GeoJSONObject } from '../lib/types.ts';
 import type { Vec2 } from './types.ts';
 
 
@@ -66,7 +66,7 @@ export class Marker extends AbstractData<MarkerProps> {
    * @returns GeoJSON representation of the Marker
    */
   asGeoJSON(): GeoJSONObject {
-    let geometry: PointGeometry | null = null;
+    let geometry: GeoJSON.Point | null = null;
 
     const coords = this.loc;
     if (Array.isArray(coords) && coords.length >= 2) {
@@ -79,7 +79,7 @@ export class Marker extends AbstractData<MarkerProps> {
     return {
       type: 'Feature',
       id: this.id,
-      properties: this.props as GeoJSONProperties,
+      properties: this.props,
       geometry: geometry
     };
   }

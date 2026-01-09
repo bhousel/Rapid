@@ -1,5 +1,100 @@
-import { AbstractSystem } from './AbstractSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
 import { osmPavedTags } from '../lib/tags.ts';
+
+import type { Context } from './types.ts';
+import type { Tags } from '../data/types.ts';
+
+
+/** Line cap style */
+type LineCap = 'butt' | 'round' | 'square';
+
+/** Line join style */
+type LineJoin = 'bevel' | 'miter' | 'round';
+
+
+/**
+ * Properties for fill styling.
+ */
+interface FillProps {
+  /** Line width in pixels (for fills, this is the width of the outline) */
+  width?: number;
+  /** The color as a hex number */
+  color?: number;
+  /** 0 = transparent/invisible, 1 = filled */
+  alpha?: number;
+  /** Pattern ID for fill patterns */
+  pattern?: string;
+}
+
+
+/**
+ * Properties for casing/stroke styling.
+ */
+interface LineProps {
+  /** Line width in pixels */
+  width?: number;
+  /** The color as a hex number */
+  color?: number;
+  /** 0 = transparent/invisible, 1 = filled */
+  alpha?: number;
+  /** Line cap style */
+  cap?: LineCap;
+  /** Line join style */
+  join?: LineJoin;
+  /** Array of pixels on/off - e.g. `[20, 5, 5, 5]` */
+  dash?: number[];
+}
+
+
+/**
+ * A style declaration containing fill, casing, and stroke properties.
+ */
+interface StyleDeclaration {
+  fill?: FillProps;
+  casing?: LineProps;
+  stroke?: LineProps;
+}
+
+
+/**
+ * Resolved fill style properties.
+ */
+interface ResolvedFillProps {
+  width: number;
+  color: number;
+  alpha: number;
+  pattern?: string;
+}
+
+
+/**
+ * Resolved line style properties.
+ */
+interface ResolvedLineProps {
+  width: number;
+  color: number;
+  alpha: number;
+  cap: LineCap;
+  join: LineJoin;
+  dash?: number[];
+}
+
+
+/**
+ * The resolved style object returned by styleMatch.
+ */
+export interface Style {
+  fill: ResolvedFillProps;
+  casing: ResolvedLineProps;
+  stroke: ResolvedLineProps;
+}
+
+
+/** Style selector mapping OSM values to style IDs */
+type StyleSelector = Record<string, string>;
+
+/** Pattern selector mapping OSM values to pattern IDs */
+type PatternSelector = Record<string, string>;
 
 
 const roadVals = new Set([
@@ -24,12 +119,28 @@ const lifecycleRegex = new RegExp('^(' + Array.from(lifecycleVals).join('|') + '
  *   `stylechange`  Fires on any change in style
  */
 export class StyleSystem extends AbstractSystem {
+  /** Protanopia color blindness simulation matrix */
+  protanopiaMatrix: number[];
+  /** Deuteranopia color blindness simulation matrix */
+  deuteranopiaMatrix: number[];
+  /** Tritanopia color blindness simulation matrix */
+  tritanopiaMatrix: number[];
+
+  /** Map of styleID to StyleDeclaration */
+  STYLE_DECLARATIONS: Record<string, StyleDeclaration>;
+  /** Map of OSM key to StyleSelector */
+  STYLE_SELECTORS: Record<string, StyleSelector>;
+  /** List of supported pattern IDs */
+  PATTERN_DECLARATIONS: string[];
+  /** Map of OSM key to PatternSelector */
+  PATTERN_SELECTORS: Record<string, PatternSelector>;
+
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'styles';
     this.context = context;
@@ -563,18 +674,18 @@ export class StyleSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     return super.initAsync();
   }
 
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -582,26 +693,26 @@ export class StyleSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
 
   /**
    * styleMatch
-   * @param  {Object}  tags - OSM tags to match to a display style
-   * @return {Object}  Styling info for the given tags
+   * @param tags - OSM tags to match to a display style
+   * @return Styling info for the given tags
    */
-  styleMatch(tags) {
+  styleMatch(tags: Tags): Style {
     const defaults = this.STYLE_DECLARATIONS.DEFAULTS;
 
-    let matched = defaults;
+    let matched: StyleDeclaration = defaults;
     let styleScore = 999;   // lower numbers are better
 // eventually expose this to the caller?
 // it may be useful to know what `k=v` pair matched
-    let styleKey;           // the key controlling the styling, if any
+    let styleKey: string | undefined;           // the key controlling the styling, if any
 //    let styleVal;           // the value controlling the styling, if any
 
     // First, match the tags to the best matching `styleID`..
@@ -659,17 +770,26 @@ export class StyleSystem extends AbstractSystem {
 
 
     // Copy style properties from the matched style declaration, fallback to defaults as needed..
-    const style = {};   // this will be our return value
-    for (const group of ['fill', 'casing', 'stroke']) {
-      style[group] = {};
-      for (const prop of ['width', 'color', 'alpha', 'cap', 'dash']) {
-        const value = matched[group] && matched[group][prop];
+    // We use type assertions here since we're building the style object dynamically
+    const style: Style = {
+      fill: {} as ResolvedFillProps,
+      casing: {} as ResolvedLineProps,
+      stroke: {} as ResolvedLineProps
+    };
+
+    for (const group of ['fill', 'casing', 'stroke'] as const) {
+      const styleGroup = style[group] as unknown as Record<string, unknown>;
+      const matchedGroup = matched[group] as Record<string, unknown> | undefined;
+      const defaultGroup = defaults[group] as Record<string, unknown> | undefined;
+
+      for (const prop of ['width', 'color', 'alpha', 'cap', 'join', 'dash']) {
+        const value = matchedGroup?.[prop];
         if (value !== undefined) {
-          style[group][prop] = value;
+          styleGroup[prop] = value;
         } else {
-          const fallback = defaults[group] && defaults[group][prop];
+          const fallback = defaultGroup?.[prop];
           if (fallback !== undefined) {
-            style[group][prop] = fallback;
+            styleGroup[prop] = fallback;
           }
         }
       }
@@ -701,7 +821,7 @@ export class StyleSystem extends AbstractSystem {
     }
 
     // Bumpy casing for roads with unpaved surface
-    if (surface && roadVals.has(highway) && !osmPavedTags.surface[surface]) {
+    if (surface && highway && roadVals.has(highway) && !osmPavedTags.surface[surface]) {
       if (!bridge) style.casing.color = 0xcccccc;
       style.casing.cap = 'butt';
       style.casing.dash = [4, 4];
@@ -711,11 +831,12 @@ export class StyleSystem extends AbstractSystem {
     // (This is for features that are not really existing - "abandoned", "proposed", etc.)
     if (hasLifecycleTag) {
       const lifecycle = this.STYLE_DECLARATIONS.LIFECYCLE;
-      for (const group of ['fill', 'casing', 'stroke']) {
-        for (const prop of ['width', 'color', 'alpha', 'cap', 'dash']) {
-          const value = lifecycle[group] && lifecycle[group][prop];
+      for (const group of ['fill', 'casing', 'stroke'] as const) {
+        for (const prop of ['width', 'color', 'alpha', 'cap', 'dash'] as const) {
+          const lifecycleGroup = lifecycle[group] as Record<string, unknown> | undefined;
+          const value = lifecycleGroup?.[prop];
           if (value !== undefined) {
-            style[group][prop] = value;
+            (style[group] as unknown as Record<string, unknown>)[prop] = value;
           }
         }
       }
@@ -728,7 +849,7 @@ export class StyleSystem extends AbstractSystem {
     // If the style declaration already contains a valid pattern, we can stop here
     if (style.fill.pattern) {
       if (!this.PATTERN_DECLARATIONS.includes(style.fill.pattern)) {
-        console.error(`invalid patternID: ${patternID}`);  // eslint-disable-line
+        console.error(`invalid patternID: ${style.fill.pattern}`);  // eslint-disable-line
       } else {
         return style;
       }
@@ -759,7 +880,7 @@ export class StyleSystem extends AbstractSystem {
 
 
     // This just returns the value of the tag, but ignores 'no' values
-    function getTag(tags, key) {
+    function getTag(tags: Tags, key: string): string | undefined {
       return tags[key] === 'no' ? undefined : tags[key];
     }
   }
@@ -771,8 +892,8 @@ export class StyleSystem extends AbstractSystem {
    * Called whenever the style changes.
    * This will trigger a redraw and emit a 'stylechange' event.
    */
-  _styleChanged() {
-    const gfx = this.context.systems.gfx;
+  _styleChanged(): void {
+    const gfx = this.context.systems.gfx as any;
 
     gfx?.immediateRedraw();
     this.emit('stylechange');

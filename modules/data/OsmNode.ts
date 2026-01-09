@@ -2,8 +2,9 @@ import { RAD2DEG, vecAngle } from '@rapid-sdk/math';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
+
 import type { Context } from '../core/types.ts';
-import type { GeoJSONFeature, GeoJSONObject, PointGeometry } from '../lib/types.ts';
+import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Vec2 } from './types.ts';
 
@@ -68,7 +69,7 @@ export class OsmNode extends OsmEntity {
    * @returns GeoJSON representation of the OsmNode
    */
   asGeoJSON(_graph?: Graph): GeoJSONObject {
-    let geometry: PointGeometry | null = null;
+    let geometry: GeoJSON.Point | null = null;
 
     const coords = this.loc;
     if (Array.isArray(coords) && coords.length >= 2) {
@@ -83,7 +84,7 @@ export class OsmNode extends OsmEntity {
       id: this.id,
       properties: this.tags,
       geometry: geometry
-    } as GeoJSONFeature;
+    };
   }
 
   /**
@@ -120,7 +121,7 @@ export class OsmNode extends OsmEntity {
    */
   geometry(graph: Graph): string {
     return this.transient('geometry', () => {
-      const parents = graph.parentWays(this as any);
+      const parents = graph.parentWays(this);
       return parents.length === 0 ? 'point' : 'vertex';
     });
   }
@@ -132,7 +133,7 @@ export class OsmNode extends OsmEntity {
    * @returns A new Node copied from this Node, but with the updated location
    */
   move(loc: Vec2): this {
-    return this.update({ loc: loc } as any);
+    return this.update({ loc: loc });
   }
 
   /**
@@ -221,7 +222,7 @@ export class OsmNode extends OsmEntity {
 
       // Gather nodes to look at
       const nodeIDs = new Set<string>();
-      for (const parent of graph.parentWays(this as any)) {
+      for (const parent of graph.parentWays(this)) {
         if (parent.geometry(graph) !== 'line') continue;
         if (!(parent.tags.highway || parent.tags.railway || parent.tags.waterway || parent.tags.aeroway)) continue;  // not routable?
 
@@ -259,7 +260,7 @@ export class OsmNode extends OsmEntity {
   isEndpoint(graph: Graph): boolean {
     return this.transient('isEndpoint', () => {
       const id = this.id;
-      return graph.parentWays(this as any).filter((parent: any) => {
+      return graph.parentWays(this).filter(parent => {
         return !parent.isClosed() && !!parent.affix(id);
       }).length > 0;
     });
@@ -273,16 +274,18 @@ export class OsmNode extends OsmEntity {
    */
   isConnected(graph: Graph): boolean {
     return this.transient('isConnected', () => {
-      const parents = graph.parentWays(this as any);
+      const parents = graph.parentWays(this);
 
       if (parents.length > 1) {  // vertex is connected to multiple parent ways
-        for (const i in parents) {
-          if (parents[i].geometry(graph) === 'line' && parents[i].hasInterestingTags()) return true;
+        for (const parent of parents) {
+          if (parent.geometry(graph) === 'line' && parent.hasInterestingTags()) return true;
         }
       } else if (parents.length === 1) {
-        const way = parents[0] as any;
+        const way = parents[0];
         const nodes = way.nodes.slice();
-        if (way.isClosed()) { nodes.pop(); }  // ignore connecting node if closed
+        if (way.isClosed()) {
+          nodes.pop();  // ignore connecting node if closed
+        }
 
         // return true if vertex appears multiple times (way is self intersecting)
         return nodes.indexOf(this.id) !== nodes.lastIndexOf(this.id);
@@ -302,13 +305,13 @@ export class OsmNode extends OsmEntity {
    */
   isShared(graph: Graph): boolean {
     return this.transient('isShared', () => {
-      const parents = graph.parentWays(this as any);
+      const parents = graph.parentWays(this);
 
       if (parents.length === 0) return false;  // no parents
       if (parents.length > 1) return true;     // multiple parents
 
       // single parent
-      const parent = parents[0] as any;
+      const parent = parents[0];
 
       // If parent is a closed loop, don't count the last node in the nodelist as doubly connected
       const end = parent.isClosed() ? parent.nodes.length - 1 : parent.nodes.length;
@@ -329,7 +332,7 @@ export class OsmNode extends OsmEntity {
    */
   parentIntersectionWays(graph: Graph): unknown[] {
     return this.transient('parentIntersectionWays', () => {
-      return graph.parentWays(this as any).filter(parent => {
+      return graph.parentWays(this).filter(parent => {
         return (parent.tags.highway ||
           parent.tags.waterway ||
           parent.tags.railway ||
@@ -358,7 +361,7 @@ export class OsmNode extends OsmEntity {
   isHighwayIntersection(graph?: Graph): boolean {
     if (!graph) return false;
     return this.transient('isHighwayIntersection', () => {
-      return graph.parentWays(this as any).filter(parent => {
+      return graph.parentWays(this).filter(parent => {
         return parent.tags.highway && parent.geometry(graph) === 'line';
       }).length > 1;
     });
@@ -372,7 +375,7 @@ export class OsmNode extends OsmEntity {
    */
   isOnAddressLine(graph: Graph): boolean {
     return this.transient('isOnAddressLine', () => {
-      return graph.parentWays(this as any).filter(parent => {
+      return graph.parentWays(this).filter(parent => {
         return parent.tags.hasOwnProperty('addr:interpolation') && parent.geometry(graph) === 'line';
       }).length > 0;
     });

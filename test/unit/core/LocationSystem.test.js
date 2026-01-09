@@ -198,6 +198,40 @@ describe('LocationSystem', () => {
           });
       });
     });
+
+
+    describe('isBlockedAt', () => {
+      it('returns true for locations in blocked regions (Ukraine)', () => {
+        const kyiv = [30.5234, 50.4501];
+        assert.isTrue(_locations.isBlockedAt(kyiv));
+      });
+
+      it('returns false for locations outside blocked regions', () => {
+        const usa = [-74.481, 40.797];   // New Jersey, USA
+        assert.isFalse(_locations.isBlockedAt(usa));
+      });
+    });
+
+
+    describe('getBlocks', () => {
+      it('returns blocked regions when extent overlaps a blocked area', () => {
+        // Extent covering part of Ukraine (around Kyiv)
+        const extent = new Rapid.sdk.Extent([29, 49], [32, 52]);
+        const blocks = _locations.getBlocks(extent);
+        assert.isArray(blocks);
+        assert.isAtLeast(blocks.length, 1);
+        for (const block of blocks) {
+          assert.instanceOf(block, Rapid.GeoJSON);
+        }
+      });
+
+      it('returns empty array when extent does not overlap blocked areas', () => {
+        // Extent covering New Jersey, USA
+        const extent = new Rapid.sdk.Extent([-75, 40], [-74, 41]);
+        const results = _locations.getBlocks(extent);
+        assert.deepEqual(results, []);
+      });
+    });
   });
 
 });

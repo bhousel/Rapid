@@ -1,6 +1,7 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+
 import type { Context } from '../core/types.ts';
-import type { GeoJSONObject, GeoJSONProperties } from '../lib/types.ts';
+import type { GeoJSONObject } from '../lib/types.ts';
 
 
 /**
@@ -69,7 +70,7 @@ export class GeoJSON extends AbstractData<GeoJSONProps> {
       return {
         type: 'Feature',
         id: this.id,
-        properties: this.props as GeoJSONProperties,
+        properties: this.props,
         geometry: null
       };
     }

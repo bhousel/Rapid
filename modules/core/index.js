@@ -1,22 +1,22 @@
-import { AbstractSystem } from './AbstractSystem.js';
-import { AssetSystem } from './AssetSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
+import { AssetSystem } from './AssetSystem.ts';
 import { EditSystem } from './EditSystem.js';
-import { FilterSystem } from './FilterSystem.js';
+import { FilterSystem } from './FilterSystem.ts';
 import { GraphicsSystem } from './GraphicsSystem.js';
 import { ImagerySystem } from './ImagerySystem.js';
 import { LocalizationSystem } from './LocalizationSystem.js';
-import { LocationSystem } from './LocationSystem.js';
+import { LocationSystem } from './LocationSystem.ts';
 import { Map3dSystem } from './Map3dSystem.js';
 import { MapSystem } from './MapSystem.js';
 import { PhotoSystem } from './PhotoSystem.js';
-import { RapidSystem } from './RapidSystem.js';
+import { RapidSystem } from './RapidSystem.ts';
 import { SchemaSystem } from './SchemaSystem.js';
-import { SpatialSystem } from './SpatialSystem.js';
-import { StorageSystem } from './StorageSystem.js';
-import { StyleSystem } from './StyleSystem.js';
+import { SpatialSystem } from './SpatialSystem.ts';
+import { StorageSystem } from './StorageSystem.ts';
+import { StyleSystem } from './StyleSystem.ts';
 import { UiSystem } from './UiSystem.js';
 import { UploaderSystem } from './UploaderSystem.js';
-import { UrlHashSystem } from './UrlHashSystem.js';
+import { UrlHashSystem } from './UrlHashSystem.ts';
 import { ValidationSystem } from './ValidationSystem.js';
 
 export {

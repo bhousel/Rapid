@@ -4,10 +4,11 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmLanes } from '../lib/lanes.ts';
 import { osmTagSuggestingArea, osmOneWayTags, osmRightSideIsInsideTags, osmRemoveLifecyclePrefix } from '../lib/tags.ts';
+
 import type { Context } from '../core/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { GeoJSONFeature, GeoJSONGeometry } from '../lib/types.ts';
-import type { EntityID, Vec2 } from './types.ts';
+import type { EntityID, OsmNode, Vec2 } from './types.ts';
+import type { GeoJSONObject } from '../lib/types.ts';
 
 
 // Filter function to eliminate consecutive duplicates.
@@ -23,7 +24,6 @@ export interface OsmWayProps extends OsmEntityProps {
   /** Ordered array of node IDs that make up this way */
   nodes: EntityID[];
 }
-
 
 /**
  * Segment data for a way.
@@ -88,13 +88,13 @@ export class OsmWay extends OsmEntity {
    * @param graph - the Graph that holds the topology needed
    * @return GeoJSON representation of the OsmWay
    */
-  asGeoJSON(graph: Graph): GeoJSONFeature {
+  asGeoJSON(graph: Graph): GeoJSONObject {
     return this.transient('geojson', () => {
 
-      let geometry: GeoJSONGeometry | null = null;
+      let geometry: GeoJSON.Geometry | null = null;
       const coords: Vec2[] = [];
       for (const nodeID of this.nodes) {
-        const node = graph.hasEntity(nodeID) as any;
+        const node = graph.hasEntity(nodeID) as OsmNode | null;
         if (node?.loc) {
           coords.push(node.loc);
         }
@@ -119,8 +119,7 @@ export class OsmWay extends OsmEntity {
         id: this.id,
         properties: this.tags,
         geometry: geometry
-      } as GeoJSONFeature;
-
+      };
     });
   }
 
@@ -168,13 +167,13 @@ export class OsmWay extends OsmEntity {
     }
 
     // copy self
-    const copy = new OsmWay(this, { id: undefined, user: undefined, version: undefined, v: undefined } as any);
+    const copy = new OsmWay(this, { id: undefined, user: undefined, version: undefined, v: undefined });
     memo[this.id] = copy;
 
     // copy nodes too
     const nodes: EntityID[] = [];
     for (const nodeID of this.nodes) {
-      const source = fromGraph.entity(nodeID) as any;
+      const source = fromGraph.entity(nodeID) as OsmNode;
       const result = source.copy(fromGraph, memo);
       nodes.push(result.id);
     }
@@ -371,7 +370,7 @@ export class OsmWay extends OsmEntity {
    * @return An object containing the lane details for this way
    */
   lanes(): object | null {
-    return osmLanes(this as any);
+    return osmLanes(this);
   }
 
   /**
@@ -392,7 +391,7 @@ export class OsmWay extends OsmEntity {
   isConvex(graph: Graph): boolean | null {
     if (!this.isClosed() || this.isDegenerate()) return null;
 
-    const nodes = utilArrayUniq(graph.childNodes(this as any));
+    const nodes = utilArrayUniq(graph.childNodes(this));
     const coords = nodes.map((node: any) => node.loc);
     let curr = 0;
     let prev = 0;

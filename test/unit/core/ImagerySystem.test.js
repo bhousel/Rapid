@@ -655,10 +655,7 @@ describe('ImagerySystem', () => {
 
 
     describe('_resetAll', () => {
-      let savedBundles;
-
       beforeAll(() => {
-        savedBundles = new Set(_imagery.bundles);
         _imagery._resetAll();
       });
 

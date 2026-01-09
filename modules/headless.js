@@ -8,20 +8,20 @@ export * from './util/index.ts';
 export * from './validations/index.js';
 
 // These Systems and Services can work without browser and UI.
-export { AbstractSystem } from './core/AbstractSystem.js';
-export { AssetSystem } from './core/AssetSystem.js';
+export { AbstractSystem } from './core/AbstractSystem.ts';
+export { AssetSystem } from './core/AssetSystem.ts';
 export { EditSystem } from './core/EditSystem.js';
 export { FilterSystem } from './core/FilterSystem.js';
 export { ImagerySystem } from './core/ImagerySystem.js';
 export { LocalizationSystem } from './core/LocalizationSystem.js';
-export { LocationSystem } from './core/LocationSystem.js';
+export { LocationSystem } from './core/LocationSystem.ts';
 export { MapSystem } from './core/MapSystem.js';
 export { PhotoSystem } from './core/PhotoSystem.js';
 export { RapidSystem } from './core/RapidSystem.js';
 export { SchemaSystem } from './core/SchemaSystem.js';
-export { SpatialSystem } from './core/SpatialSystem.js';
-export { StorageSystem } from './core/StorageSystem.js';
-export { StyleSystem } from './core/StyleSystem.js';
+export { SpatialSystem } from './core/SpatialSystem.ts';
+export { StorageSystem } from './core/StorageSystem.ts';
+export { StyleSystem } from './core/StyleSystem.ts';
 export { UploaderSystem } from './core/UploaderSystem.js';
 export { UrlHashSystem } from './core/UrlHashSystem.js';
 export { ValidationSystem } from './core/ValidationSystem.js';

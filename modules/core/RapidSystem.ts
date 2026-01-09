@@ -1,12 +1,16 @@
 import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
 
-import { AbstractSystem } from './AbstractSystem.js';
-import { utilIterable } from '../util/iterable.ts';
+import { AbstractSystem } from './AbstractSystem.ts';
+import { type OneOrMore, utilIterable } from '../util/iterable.ts';
+
+import type { Context, SystemID } from './types.ts';
+import type { RapidDataset } from '../lib/RapidDataset.ts';
+
 
 const RAPID_MAGENTA = '#da26d3';
 const OVERTURE_CYAN = '#00ffff';
-const RAPID_COLORS = [
+const RAPID_COLORS: readonly string[] = [
   '#ff0000',  // red
   '#ffa500',  // orange
   '#ffd700',  // gold
@@ -28,31 +32,31 @@ const RAPID_COLORS = [
  *  `taskchanged`
  */
 export class RapidSystem extends AbstractSystem {
+  /** Map<datasetID, RapidDataset> - all the datasets we know about */
+  readonly catalog = new Map<string, RapidDataset>();
+  /** Set<string> - all the dataset 'categories' we know about */
+  readonly categories = new Set<string>();
+  /** Set<dataID> - features accepted by the user */
+  readonly acceptIDs = new Set<string>();
+  /** Set<dataID> - features ignored by the user */
+  readonly ignoreIDs = new Set<string>();
+
+  private _addedDatasetIDs = new Set<string>();
+  private _enabledDatasetIDs = new Set<string>();
+  private _nextColorIndex: number = 2;  // see note in _datasetsChanged()
+  private _taskExtent: Extent | null = null;
+  private _isTaskBoundsRect: boolean | null = null;
+  private _hadPoweruser: boolean = false;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
-    this.id = 'rapid';
+    this.id = 'rapid' as SystemID;
     this.requiredDependencies = new Set();
-    this.optionalDependencies = new Set(['editor', 'gfx', 'urlhash']);
-
-    this.catalog = new Map();             // Map<datasetID, RapidDataset> - all the datasets we know about
-    this.categories = new Set();          // Set<string> - all the dataset 'categories' we know about
-    this._addedDatasetIDs = new Set();    // Set<datasetID> - currently "added" datasets - is it on the menu?
-    this._enabledDatasetIDs = new Set();  // Set<datasetID> - currently "enabled" datasets - is it checked?
-
-    // Watch edit history to keep track of which features have been accepted by the user.
-    // These features will be filtered out when drawing
-    this.acceptIDs = new Set();    // Set<dataID>
-    this.ignoreIDs = new Set();    // Set<dataID>
-
-    this._nextColorIndex = 2;  // see note in _datasetsChanged()
-    this._taskExtent = null;
-    this._isTaskBoundsRect = null;
-    this._hadPoweruser = false;   // true if the user had poweruser mode at any point in their editing
+    this.optionalDependencies = new Set(['editor', 'gfx', 'urlhash'] as SystemID[]);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashchange = this._hashchange.bind(this);
@@ -64,14 +68,14 @@ export class RapidSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
-    const editor = context.systems.editor;
-    const urlhash = context.systems.urlhash;
+    const editor = context.systems.editor as any;
+    const urlhash = context.systems.urlhash as any;
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -91,22 +95,22 @@ export class RapidSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     // We wait until startAsync to create the dataset catalog because the services need to be initialized.
     const context = this.context;
-    const urlhash = context.systems.urlhash;
+    const urlhash = context.systems.urlhash as any;
 
-    const esri = context.services.esri;
-    const mapwithai = context.services.mapwithai;
-    const overture = context.services.overture;
+    const esri = context.services.esri as any;
+    const mapwithai = context.services.mapwithai as any;
+    const overture = context.services.overture as any;
 
     // This code is written in a way that we can work with whatever
     // data-providing services are installed.
-    const services = [];
+    const services: any[] = [];
     if (esri)      services.push(esri);
     if (mapwithai) services.push(mapwithai);
     if (overture)  services.push(overture);
@@ -141,9 +145,9 @@ export class RapidSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     this.acceptIDs.clear();
     this.ignoreIDs.clear();
     return Promise.resolve();
@@ -153,9 +157,9 @@ export class RapidSystem extends AbstractSystem {
   /**
    * addDatasets
    * Add datasets to the menu.  (Does not set their checked 'enabled' state)
-   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to add
+   * @param datasetIDs - datasetIDs to add
    */
-  addDatasets(datasetIDs) {
+  addDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.add(datasetID);
     }
@@ -166,9 +170,9 @@ export class RapidSystem extends AbstractSystem {
   /**
    * removeDatasets
    * Remove datasets from the menu. (Also unchecks their 'enabled' state)
-   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to remove
+   * @param datasetIDs - datasetIDs to remove
    */
-  removeDatasets(datasetIDs) {
+  removeDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.delete(datasetID);
       this._enabledDatasetIDs.delete(datasetID);
@@ -180,9 +184,9 @@ export class RapidSystem extends AbstractSystem {
   /**
    * enableDatasets
    * Checks the dataset as enabled. (Also ensures that the dataset is 'added' to the menu).
-   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to enable
+   * @param datasetIDs - datasetIDs to enable
    */
-  enableDatasets(datasetIDs) {
+  enableDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.add(datasetID);
       this._enabledDatasetIDs.add(datasetID);
@@ -194,9 +198,9 @@ export class RapidSystem extends AbstractSystem {
   /**
    * disableDatasets
    * Unchecks the dataset as disabled. (Does not affect whether the dataset is 'added' to the menu)
-   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to disable
+   * @param datasetIDs - datasetIDs to disable
    */
-  disableDatasets(datasetIDs) {
+  disableDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._enabledDatasetIDs.delete(datasetID);
     }
@@ -207,9 +211,9 @@ export class RapidSystem extends AbstractSystem {
   /**
    * toggleDatasets
    * Toggles the given datasets enabled state, does not affect any other datasets.
-   * @param  {OneOrMore<string>}  datasetIDs - datasetIDs to toggle
+   * @param datasetIDs - datasetIDs to toggle
    */
-  toggleDatasets(datasetIDs) {
+  toggleDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.add(datasetID);  // it needs to be added to the menu
       if (this._enabledDatasetIDs.has(datasetID)) {
@@ -222,26 +226,43 @@ export class RapidSystem extends AbstractSystem {
   }
 
 
-  // return just the added ones
-  get datasets() {
-    const results = new Map();
+  /**
+   * datasets
+   * @return The currently added datasets
+   */
+  get datasets(): Map<string, RapidDataset> {
+    const results = new Map<string, RapidDataset>();
     for (const datasetID of this._addedDatasetIDs) {
       const dataset = this.catalog.get(datasetID);
-      results.set(datasetID, dataset);
+      if (dataset) {
+        results.set(datasetID, dataset);
+      }
     }
     return results;
   }
 
-  get colors() {
+  /**
+   * colors
+   * @return Array of available colors for datasets
+   */
+  get colors(): readonly string[] {
     return RAPID_COLORS;
   }
 
-  get taskExtent() {
+  /**
+   * taskExtent
+   * @return The current task extent, or null
+   */
+  get taskExtent(): Extent | null {
     return this._taskExtent;
   }
 
-  isTaskRectangular() {
-    return (!!this._taskExtent && this._isTaskBoundsRect);
+  /**
+   * isTaskRectangular
+   * @return true if the task bounds form a rectangle
+   */
+  isTaskRectangular(): boolean {
+    return (!!this._taskExtent && !!this._isTaskBoundsRect);
   }
 
 
@@ -250,25 +271,29 @@ export class RapidSystem extends AbstractSystem {
    * true if the user had poweruser mode at any point in their editing
    * @readonly
    */
-  get hadPoweruser() {
+  get hadPoweruser(): boolean {
     return this._hadPoweruser;
   }
 
 
   /**
    * setTaskExtentByGpxData
+   * @param gpxDomData - GPX DOM document
    */
-  setTaskExtentByGpxData(gpxDomData) {
+  setTaskExtentByGpxData(gpxDomData: Document): void {
     const gj = gpx(gpxDomData);
     const lineStringCount = gj.features.reduce((accumulator, currentValue) =>  {
-      return accumulator + (currentValue.geometry.type === 'LineString' ? 1 : 0);
+      return accumulator + (currentValue.geometry?.type === 'LineString' ? 1 : 0);
     }, 0);
 
     if (gj.type === 'FeatureCollection') {
-      let minlat, minlon, maxlat, maxlon;
+      let minlat: number | undefined;
+      let minlon: number | undefined;
+      let maxlat: number | undefined;
+      let maxlon: number | undefined;
 
       gj.features.forEach(f => {
-        if (f.geometry.type === 'Point') {
+        if (f.geometry?.type === 'Point') {
           const lon = f.geometry.coordinates[0];
           const lat = f.geometry.coordinates[1];
           if (minlat === undefined || lat < minlat) minlat = lat;
@@ -276,15 +301,15 @@ export class RapidSystem extends AbstractSystem {
           if (maxlat === undefined || lat > maxlat) maxlat = lat;
           if (maxlon === undefined || lon > maxlon) maxlon = lon;
 
-        } else if (f.geometry.type === 'LineString' && lineStringCount === 1) {
-          const lats = f.geometry.coordinates.map(f => f[0]);
-          const lngs = f.geometry.coordinates.map(f => f[1]);
+        } else if (f.geometry?.type === 'LineString' && lineStringCount === 1) {
+          const lats = f.geometry.coordinates.map(c => c[0]);
+          const lngs = f.geometry.coordinates.map(c => c[1]);
           const uniqueLats = lats.filter(distinct);
           const uniqueLngs = lngs.filter(distinct);
           let eachLatHas2Lngs = true;
 
           uniqueLats.forEach(lat => {
-            const lngsForThisLat = f.geometry.coordinates
+            const lngsForThisLat = (f.geometry as GeoJSON.LineString).coordinates
               .filter(coord => coord[0] === lat)   // Filter the coords to the ones with this lat
               .map(coord => coord[1])              // Make an array of lngs that associate with that lat
               .filter(distinct);                   // Finally, filter for uniqueness
@@ -303,11 +328,13 @@ export class RapidSystem extends AbstractSystem {
         }
       });
 
-      this._taskExtent = new Extent([minlon, minlat], [maxlon, maxlat]);
+      if (minlon !== undefined && minlat !== undefined && maxlon !== undefined && maxlat !== undefined) {
+        this._taskExtent = new Extent([minlon, minlat], [maxlon, maxlat]);
+      }
       this.emit('taskchanged');
     }
 
-    function distinct(value, index, self) {
+    function distinct<T>(value: T, index: number, self: T[]): boolean {
       return self.indexOf(value) === index;
     }
   }
@@ -318,9 +345,9 @@ export class RapidSystem extends AbstractSystem {
    * This is called anytime the history changes, we recompute the accepted/ignored sets.
    * This can run on history change, undo, redo, or history restore.
    */
-  _stablechange() {
+  _stablechange(): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     if (!editor) return;
 
     this.acceptIDs.clear();
@@ -347,10 +374,10 @@ export class RapidSystem extends AbstractSystem {
   /**
    * _hashchange
    * Respond to any changes appearing in the url hash
-   * @param  {Map<string, string>}  currParams - The current hash parameters
-   * @param  {Map<string, string>}  prevParams - The previous hash parameters
+   * @param currParams - The current hash parameters
+   * @param prevParams - The previous hash parameters
    */
-  _hashchange(currParams, prevParams) {
+  _hashchange(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // poweruser
     // remember if the user had poweruser on at any point in their editing
     if (currParams.get('poweruser') === 'true') {
@@ -377,12 +404,12 @@ export class RapidSystem extends AbstractSystem {
    * Called whenever the datasets change.
    * This will update the urlhash, trigger a redraw, and emit a 'datasetchange' event.
    */
-  _datasetsChanged() {
+  _datasetsChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
-    const urlhash = context.systems.urlhash;
+    const gfx = context.systems.gfx as any;
+    const urlhash = context.systems.urlhash as any;
 
-    const enabledIDs = [];
+    const enabledIDs: string[] = [];
     for (const [datasetID, dataset] of this.catalog) {
       // This code is a bit weird - I don't like it and we should change it...
       // I'm trying to match the legacy color-choosing behavior from before Rapid#1642 (which changed a bunch of things)

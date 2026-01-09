@@ -1,6 +1,7 @@
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
+
 import type { Context } from '../core/types.ts';
-import type { GeoJSONFeature } from '../lib/types.ts';
+import { GeoJSONObject } from '../lib/types.ts';
 
 
 /**
@@ -57,7 +58,7 @@ export class OsmChangeset extends OsmEntity {
    * (This currently returns an unlocated Feature, but we could return a bounding box or something)
    * @return An empty object
    */
-  asGeoJSON(): GeoJSONFeature {
+  asGeoJSON(): GeoJSONObject {
     return {
       type: 'Feature',
       id: this.id,

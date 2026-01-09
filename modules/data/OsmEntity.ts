@@ -2,8 +2,9 @@ import { utilArrayUnion, utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
 import { osmIsInterestingTag } from '../lib/tags.ts';
+
 import type { Context } from '../core/types.ts';
-import type { GeoJSONFeature, GeoJSONObject } from '../lib/types.ts';
+import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Tags, EntityID } from './types.ts';
 
@@ -126,7 +127,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
       id: this.id,
       properties: this.tags,
       geometry: null
-    } as GeoJSONFeature;
+    };
   }
 
   /**
@@ -350,7 +351,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @returns `true` if this Entity has parent Relations, `false` if not
    */
   hasParentRelations(graph: Graph): boolean {
-    return graph.parentRelations(this as any).length > 0;
+    return graph.parentRelations(this).length > 0;
   }
 
   /**

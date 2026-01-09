@@ -1,10 +1,36 @@
 import { utilObjectOmit, utilQsString, utilStringQs } from '@rapid-sdk/util';
 import throttle from 'lodash-es/throttle.js';
 
-import { AbstractSystem } from './AbstractSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
 
-let _window;
-let _document;
+import type { DebouncedFunc } from 'lodash-es';
+import type { Context, Nullable, SystemID } from './types.ts';
+
+
+/** Mock window type for non-browser environments */
+interface MockWindow {
+  isMocked: true;
+  location: { hash: string };
+  history: { replaceState: () => boolean };
+  document: MockDocument;
+  addEventListener: () => boolean;
+  removeEventListener: () => boolean;
+}
+
+/** Mock document type for non-browser environments */
+interface MockDocument {
+  isMocked: true;
+  title: string;
+}
+
+/** Union of real Window or mocked window */
+type WindowLike = Window | MockWindow;
+/** Union of real Document or mocked document */
+type DocumentLike = Document | MockDocument;
+
+let _window: WindowLike;
+let _document: DocumentLike;
+
 
 /**
  * `UrlHashSystem` is responsible for managing the url hash and query parameters.
@@ -56,15 +82,34 @@ export class UrlHashSystem extends AbstractSystem {
 * __`offset`__ - Background imagery alignment offset in meters, formatted as `east,north`.
 **/
 
+  /** Whether to update the document title */
+  doUpdateTitle: boolean;
+  /** The base document title to use */
+  titleBase: string;
+  /** Deferred hash update function (throttled) */
+  deferredUpdateHash: DebouncedFunc<() => void>;
+  /** Deferred title update function (throttled) */
+  deferredUpdateTitle: DebouncedFunc<() => void>;
+
+  /** Initial URL hash parameters at startup */
+  private _initParams: Map<string, string>;
+  /** Current URL hash parameters */
+  private _currParams: Map<string, string>;
+  /** Cached window.location.hash */
+  private _currHash: string | null;
+  /** Previous URL hash parameters */
+  private _prevParams: Map<string, string> | null;
+
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'urlhash';
-    this.requiredDependencies = new Set(['l10n']);
-    this.optionalDependencies = new Set(['editor', 'map']);
+    this.requiredDependencies = new Set<SystemID>(['l10n']);
+    this.optionalDependencies = new Set<SystemID>(['editor', 'map']);
 
     this.doUpdateTitle = true;
     this.titleBase = 'Rapid';
@@ -114,8 +159,8 @@ export class UrlHashSystem extends AbstractSystem {
     this._updateTitle = this._updateTitle.bind(this);
 
     // `leading: false` means that we wait a bit for more updates to sneak in.
-    this.deferredUpdateHash = throttle(this._updateHash, 500, { leading: false });
-    this.deferredUpdateTitle = throttle(this._updateTitle, 500, { leading: false });
+    this.deferredUpdateHash = throttle(this._updateHash, 500, { leading: false }) as DebouncedFunc<() => void>;
+    this.deferredUpdateTitle = throttle(this._updateTitle, 500, { leading: false }) as DebouncedFunc<() => void>;
 
     // Start paused, we will resume after all other components
     // are started and ready to receive the hashchange event.
@@ -126,25 +171,25 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
 
     return this._initPromise = super.initAsync()
       .then(() => {
         // Register event handlers here
         editor?.on('stablechange', this.deferredUpdateTitle);
         context.on('modechange', this.deferredUpdateTitle);
-        _window.addEventListener('hashchange', this._hashchange);
+        (_window as Window).addEventListener('hashchange', this._hashchange);
 
         // A lot of things will start happening when urlhash emits its
         // first hashchange event.  Chain off Context's initAsync Promise
         // to know when everything has started up and it is ok to do this.
-        context.initAsync()
+        (context as any).initAsync()
           .then(() => this.resume());  // Emits 'hashchange'
       });
   }
@@ -153,9 +198,9 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -163,9 +208,9 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -175,7 +220,7 @@ export class UrlHashSystem extends AbstractSystem {
    * Pauses this system
    * When paused, the UrlHashSystem will not respond to changes or emit events.
    */
-  pause() {
+  pause(): void {
     this._paused = true;
     this._currHash = null;
     this.deferredUpdateHash.cancel();
@@ -189,7 +234,7 @@ export class UrlHashSystem extends AbstractSystem {
    * When paused, the UrlHashSystem will not respond to changes or emit events.
    * Calling `resume()` updates the hash and title, and will emit a `hashchange` event.
    */
-  resume() {
+  resume(): void {
     this._paused = false;
     this._currHash = null;
 
@@ -205,7 +250,7 @@ export class UrlHashSystem extends AbstractSystem {
    * This were the values that were present when Rapid initally started up.
    * @readonly
    */
-  get initialHashParams() {
+  get initialHashParams(): Map<string, string> {
     return this._initParams;
   }
 
@@ -213,10 +258,10 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * getParam
    * Gets the current parameter value for a given key.
-   * @param  {string}  k - The parameter key to get
-   * @return {string}  The parameter's current value, or `undefined`
+   * @param k - The parameter key to get
+   * @return The parameter's current value, or `undefined`
    */
-  getParam(k) {
+  getParam(k: string): string | undefined {
     return this._currParams.get(k);
   }
 
@@ -226,10 +271,10 @@ export class UrlHashSystem extends AbstractSystem {
    * Sets a `key=value` pair that will be added to the urlhash params.
    * Values passed as `undefined` or `null` will be deleted from the query params
    * Values passed as empty string '' will remain in the query params
-   * @param  {string}  k - The parameter key to set
-   * @param  {string}  v - The parameter value to set, pass `undefined` to delete the value
+   * @param k - The parameter key to set
+   * @param v - The parameter value to set, pass `undefined` to delete the value
    */
-  setParam(k, v) {
+  setParam(k: string, v: Nullable<string>): void {
     if (typeof k !== 'string') return;
 
     if (v === undefined || v === null || v === 'undefined' || v === 'null') {
@@ -249,16 +294,16 @@ export class UrlHashSystem extends AbstractSystem {
    * Updates the hash (by calling `window.history.replaceState()`) to match _currParams;
    * This updates the URL hash without affecting the browser navigation stack.
    */
-  _updateHash() {
+  _updateHash(): void {
     if (!this._started || this._paused) return;
 
     // Remove some of the initial-only params that only clutter up the hash
     const toOmit = ['comment', 'source', 'hashtags', 'walkthrough', 'data', 'gpx'];
-    let params = utilObjectOmit(Object.fromEntries(this._currParams), toOmit);
+    const params = utilObjectOmit(Object.fromEntries(this._currParams), toOmit);
 
     const newHash = '#' + utilQsString(params, true);
     if (newHash !== this._currHash) {
-      _window.history.replaceState(null, this.titleBase, newHash);
+      (_window as Window).history.replaceState(null, this.titleBase, newHash);
       this._currHash = newHash;
     }
   }
@@ -268,23 +313,23 @@ export class UrlHashSystem extends AbstractSystem {
    * _updateTitle
    * Updates the title of the tab (by setting `document.title`)
    */
-  _updateTitle() {
+  _updateTitle(): void {
     if (!this._started || this._paused) return;
     if (!this.doUpdateTitle) return;
 
     const context = this.context;
-    const editor = context.systems.editor;
-    const l10n = context.systems.l10n;
+    const editor = context.systems.editor as any;
+    const l10n = context.systems.l10n as any;
     const graph = editor?.staging?.graph;
     if (!editor || !l10n || !graph) return;
 
-    const changeCount = editor.difference().summary().size;
+    const changeCount: number = editor.difference().summary().size;
 
     // Currently only support OSM ids
-    let selected;
-    const selectedIDs = context.selectedIDs().filter(id => graph.hasEntity(id));
+    let selected: string | undefined;
+    const selectedIDs: string[] = (context as any).selectedIDs().filter((id: string) => graph.hasEntity(id));
     if (selectedIDs.length) {
-      const firstLabel = l10n.displayLabel(graph.entity(selectedIDs[0]), graph);
+      const firstLabel: string = l10n.displayLabel(graph.entity(selectedIDs[0]), graph);
       if (selectedIDs.length > 1) {
         selected = l10n.t('title.labeled_and_more', { labeled: firstLabel, count: selectedIDs.length - 1 });
       } else {
@@ -292,7 +337,7 @@ export class UrlHashSystem extends AbstractSystem {
       }
     }
 
-    let format;
+    let format: string | undefined;
     if (changeCount && selected) {
       format = 'title.format.changes_context';
     } else if (changeCount && !selected) {
@@ -301,7 +346,7 @@ export class UrlHashSystem extends AbstractSystem {
       format = 'title.format.context';
     }
 
-    let title;
+    let title: string;
     if (format) {
       title = l10n.t(format, { changes: changeCount, base: this.titleBase, context: selected });
     } else {
@@ -319,7 +364,7 @@ export class UrlHashSystem extends AbstractSystem {
    * Called on hashchange event (user changes url manually), and when enabling the hash behavior
    * Receiving code will receive copies of both the current and previous parameters.
    */
-  _hashchange() {
+  _hashchange(): void {
     if (!this._started || this._paused) return;
 
     this._currHash = _window.location.hash;

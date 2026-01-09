@@ -112,7 +112,8 @@ export default [
     files: [ 'modules/**' ],
     languageOptions: {
       globals: {
-        ...globals.browser
+        ...globals.browser,
+        GeoJSON: false  // Global namespace from @types/geojson (UMD declaration)
       }
     },
     rules: {

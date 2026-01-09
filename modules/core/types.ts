@@ -10,6 +10,17 @@ import type { Selection } from 'd3-selection';
 
 import type { Graph } from '../lib/Graph.ts';
 
+// Import converted system types for use in Systems interface.
+// Using `import type` avoids runtime circular dependencies.
+import type { AssetSystem } from './AssetSystem.ts';
+import type { FilterSystem } from './FilterSystem.ts';
+import type { LocationSystem } from './LocationSystem.ts';
+import type { RapidSystem } from './RapidSystem.ts';
+import type { SpatialSystem } from './SpatialSystem.ts';
+import type { StorageSystem } from './StorageSystem.ts';
+import type { StyleSystem } from './StyleSystem.ts';
+import type { UrlHashSystem } from './UrlHashSystem.ts';
+
 /** Permissive D3 selection type - accepts any selection without strict type checking */
 export type D3Selection = Selection<any, any, any, any>;
 /** A type that can be T, null, or undefined */
@@ -39,10 +50,6 @@ export type SystemID =
   | 'validator';
 
 
-/** System lifecycle status */
-export type SystemStatus = 'idle' | 'loading' | 'ready' | 'error';
-
-
 /**
  * Minimal interface for a System.
  * All systems extend AbstractSystem which implements this interface.
@@ -68,37 +75,49 @@ export interface System {
 }
 
 
+/** Union of all system types (converted and unconverted) */
+type AnySystem =
+  | AssetSystem
+  | FilterSystem
+  | LocationSystem
+  | RapidSystem
+  | SpatialSystem
+  | StorageSystem
+  | StyleSystem
+  | UrlHashSystem
+  | System;
+
 /**
  * Container for all system instances.
  * Systems are accessed via context.systems[systemID].
  *
- * Note: We use a flexible index signature here because the actual
- * system classes are defined in JavaScript. As systems are converted
- * to TypeScript, we can add more specific type information.
+ * As systems are converted to TypeScript, we add their specific types here.
+ * Systems not yet converted use the base `System` type.
  */
 export interface Systems {
-  [key: string]: System | undefined;
+  [key: string]: AnySystem | undefined;
 
-  // Common systems accessed frequently in lib/ code:
-  // These provide better autocomplete while we migrate.
-  assets?: System;
+  // Converted to TypeScript - use specific types:
+  assets?: AssetSystem;
+  filters?: FilterSystem;
+  locations?: LocationSystem;
+  rapid?: RapidSystem;
+  spatial?: SpatialSystem;
+  storage?: StorageSystem;
+  styles?: StyleSystem;
+  urlhash?: UrlHashSystem;
+
+  // Not yet converted - use base System type:
   editor?: System;
-  filters?: System;
   gfx?: System;
   imagery?: System;
   l10n?: System;
-  locations?: System;
   map?: System;
   map3d?: System;
   photos?: System;
-  rapid?: System;
   schema?: System;
-  spatial?: System;
-  storage?: System;
-  styles?: System;
   ui?: System;
   uploader?: System;
-  urlhash?: System;
   validator?: System;
 }
 

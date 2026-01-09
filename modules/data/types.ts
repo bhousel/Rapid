@@ -4,9 +4,9 @@
  * @module
  */
 
-import type { Context } from '../core/types.ts';
 
 // Re-export Context for convenience (used by almost every class)
+import type { Context } from '../core/types.ts';
 export type { Context } from '../core/types.ts';
 
 // Re-export entity classes as types
@@ -17,6 +17,10 @@ export type { OsmWay } from './OsmWay.ts';
 
 /** 2D vector as [x, y], typically [longitude, latitude] in WGS84 for geographic coordinates */
 export type Vec2 = [number, number];
+/** 3D vector as [x, y, z] */
+export type Vec3 = [number, number, number];
+/** 4D vector as [x, y, z, w], also used for bounding boxes [minX, minY, maxX, maxY] */
+export type Vec4 = [number, number, number, number];
 /** OSM tags as key-value string pairs */
 export type Tags = Record<string, string>;
 

@@ -3,9 +3,10 @@ import { geomPolygonContainsPolygon, geomPolygonIntersectsPolygon } from '@rapid
 
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
+
 import type { Context } from '../core/types.ts';
+import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { GeoJSONFeature, GeoJSONFeatureCollection, GeoJSONObject } from '../lib/types.ts';
 import type { EntityID, EntityType, Vec2 } from './types.ts';
 
 
@@ -103,7 +104,7 @@ export class OsmRelation extends OsmEntity {
             type: 'MultiPolygon',
             coordinates: this.multipolygon(graph)
           }
-        } as GeoJSONFeature;
+        };
 
       } else {  // Gather children into a FeatureCollection
 
@@ -133,9 +134,8 @@ export class OsmRelation extends OsmEntity {
           id: this.id,
           properties: this.tags,  // `properties` here is not GeoJSON spec
           features: features
-        } as GeoJSONFeatureCollection;
+        };
       }
-
     });
   }
 
@@ -311,7 +311,7 @@ export class OsmRelation extends OsmEntity {
   addMember(member: OsmRelationMember, index?: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index === undefined ? members.length : index, 0, member);
-    return this.update({ members: members } as any) as OsmRelation;
+    return this.update({ members: members }) as OsmRelation;
   }
 
   /**
@@ -324,7 +324,7 @@ export class OsmRelation extends OsmEntity {
   updateMember(member: Partial<OsmRelationMember>, index: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index, 1, { ...members[index], ...member });
-    return this.update({ members: members } as any) as OsmRelation;
+    return this.update({ members: members }) as OsmRelation;
   }
 
   /**
@@ -336,7 +336,7 @@ export class OsmRelation extends OsmEntity {
   removeMember(index: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index, 1);
-    return this.update({ members: members } as any) as OsmRelation;
+    return this.update({ members: members }) as OsmRelation;
   }
 
   /**
@@ -347,7 +347,7 @@ export class OsmRelation extends OsmEntity {
    */
   removeMembersWithID(id: EntityID): OsmRelation {
     const members = this.members.filter(m => m.id !== id);
-    return this.update({ members: members } as any) as OsmRelation;
+    return this.update({ members: members }) as OsmRelation;
   }
 
   /**
@@ -360,7 +360,7 @@ export class OsmRelation extends OsmEntity {
   moveMember(fromIndex: number, toIndex: number): OsmRelation {
     const members = this.members.slice();
     members.splice(toIndex, 0, members.splice(fromIndex, 1)[0]);
-    return this.update({ members: members } as any) as OsmRelation;
+    return this.update({ members: members }) as OsmRelation;
   }
 
   /**
@@ -386,7 +386,7 @@ export class OsmRelation extends OsmEntity {
       }
     }
 
-    return this.update({ members: members } as any) as OsmRelation;
+    return this.update({ members: members }) as OsmRelation;
   }
 
   /**
