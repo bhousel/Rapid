@@ -36,6 +36,34 @@ Rapid is an AI-enhanced editor for OpenStreetMap, built with JavaScript/TypeScri
 - Use `git mv` to rename `.js` → `.ts` (preserves git history)
 - Update barrel `index.js` to export from `.ts` file
 
+### Class Property Initialization
+- **Initialize class properties inside the constructor**, not as field initializers
+- This keeps initialization in one place and matches the original JavaScript patterns
+- Field initializers run after `super()` returns but before constructor body code, which can cause subtle ordering issues
+- Example - prefer this:
+  ```typescript
+  class FooSystem extends AbstractSystem {
+    constructor(context: Context) {
+      super(context);
+      this.id = 'foo';
+      this.requiredDependencies = new Set(['assets']);
+      this.optionalDependencies = new Set(['gfx', 'storage']);
+    }
+  }
+  ```
+  Over this:
+  ```typescript
+  class FooSystem extends AbstractSystem {
+    readonly id = 'foo';  // avoid field initializers
+    requiredDependencies = new Set(['assets']);
+    optionalDependencies = new Set(['gfx', 'storage']);
+    
+    constructor(context: Context) {
+      super(context);
+    }
+  }
+  ```
+
 ### Props Interfaces
 - Define `FooProps` interface in the same file as the `Foo` class (not in a shared `types.ts`)
 - `FooProps` should have **all required properties**
@@ -225,7 +253,7 @@ Track TypeScript conversion progress here:
 | `modules/util/` | ✅ Complete | All 14 files converted |
 | `modules/lib/` | 🔄 Partial | `Tree.js`, `tag_classes.js` remain |
 | `modules/pixi/lib/` | 🔄 Partial | `DashLine.js`, `AtlasAllocator.js` remain |
-| `modules/core/` | 🔄 Partial | 8 systems converted (see below) |
+| `modules/core/` | 🔄 Partial | 13 systems converted (see below) |
 | `modules/actions/` | ❌ Not started | |
 | `modules/behaviors/` | ❌ Not started | |
 | `modules/modes/` | ❌ Not started | |
@@ -249,12 +277,12 @@ Track TypeScript conversion progress here:
 | `UrlHashSystem.ts` | ✅ Converted |
 | `EditSystem.js` | ❌ Not started |
 | `GraphicsSystem.js` | ❌ Not started |
-| `ImagerySystem.js` | ❌ Not started |
+| `ImagerySystem.ts` | ✅ Converted |
 | `LocalizationSystem.ts` | ✅ Converted |
 | `Map3dSystem.js` | ❌ Not started |
 | `MapSystem.js` | ❌ Not started |
-| `PhotoSystem.js` | ❌ Not started |
-| `SchemaSystem.js` | ❌ Not started |
+| `PhotoSystem.ts` | ✅ Converted |
+| `SchemaSystem.ts` | ✅ Converted |
 | `UiSystem.js` | ❌ Not started |
 | `UploaderSystem.js` | ❌ Not started |
 | `ValidationSystem.js` | ❌ Not started |

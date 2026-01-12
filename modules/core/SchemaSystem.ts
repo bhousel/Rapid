@@ -1,11 +1,19 @@
 import { utilArrayUniq } from '@rapid-sdk/util';
 import MiniSearch from 'minisearch';
 
-import { AbstractSystem } from './AbstractSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.ts';
 import { Category, Field, Preset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilWildcard } from '../util/string.ts';
+
+import type { Context, SystemID } from './types.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { CategoryProps } from '../lib/Category.ts';
+import type { FieldProps } from '../lib/Field.ts';
+import type { PresetProps } from '../lib/Preset.ts';
+import type { Tags } from '../data/types.ts';
+import type { OsmEntity } from '../data/OsmEntity.ts';
 
 
 // Make very sure this resolves to Rapid's `package.json`
@@ -18,6 +26,58 @@ import {
 const VERBOSE = true;        // warn about 'id-tagging-schema' features we don't support currently
 const MAXRECENTS = 30;       // how many recents to store in localstorage
 const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
+
+
+/** Geometry types supported by the schema system */
+export type GeometryType = 'point' | 'vertex' | 'line' | 'area' | 'relation';
+
+/** Field types supported by Rapid's UI */
+export type FieldType =
+  | 'access' | 'address' | 'check' | 'combo' | 'cycleway' | 'defaultCheck' | 'email'
+  | 'identifier' | 'lanes' | 'localized' | 'roadspeed' | 'roadheight' | 'manyCombo'
+  | 'multiCombo' | 'networkCombo' | 'number' | 'onewayCheck' | 'radio' | 'restrictions'
+  | 'semiCombo' | 'structureRadio' | 'tel' | 'text' | 'textarea' | 'typeCombo' | 'url'
+  | 'wikidata' | 'wikipedia';
+
+
+/** Raw field data as it comes from the schema files (before processing) */
+type RawFieldData = Partial<FieldProps> & Record<string, unknown>;
+
+/** Raw preset data as it comes from the schema files (before processing) */
+type RawPresetData = Partial<PresetProps> & Record<string, unknown>;
+
+/** Raw category data as it comes from the schema files (before processing) */
+type RawCategoryData = Partial<CategoryProps> & { icon?: string } & Record<string, unknown>;
+
+/**
+ * Schema bundle data to merge into the system.
+ * Contains categories, presets, fields, and defaults.
+ */
+export interface SchemaBundle {
+  /** A string bundle identifier, e.g. 'id-tagging-schema@6.13.0' (required) */
+  bundleID: string;
+  /** Object mapping fieldID to field data (or null to delete) */
+  fields?: Record<string, RawFieldData | null>;
+  /** Object mapping presetID to preset data (or null to delete) */
+  presets?: Record<string, RawPresetData | null>;
+  /** Object mapping categoryID to category data (or null to delete) */
+  categories?: Record<string, RawCategoryData | null>;
+  /** Object mapping geometry type to array of default preset/category IDs */
+  defaults?: Record<string, string[]>;
+  /** Custom GeoJSON features for locationSets */
+  featureCollection?: GeoJSON.FeatureCollection;
+}
+
+
+/** MiniSearch search result */
+interface SearchResult {
+  id: string;
+  match: Record<string, string[]>;
+  queryTerms: string[];
+  score: number;
+  terms: string[];
+  [key: string]: any;
+}
 
 
 /**
@@ -39,31 +99,60 @@ const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
  * For the default schema data, see: https://github.com/openstreetmap/id-tagging-schema
  *
  * Properties available:
- *   `geometryTypes`  {Set<string>}                 The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
- *   `fieldTypes`     {Set<string>}                 The supported field types (see also `ui/fields/index.js`)
- *   `bundles`        {Set<bundleID>}               Names of schema bundles that have been merged in
- *   `fields`         {Map<fieldID, Field>}         The Fields
- *   `presets`        {Map<presetID, Preset>}       The Presets
- *   `categories`     {Map<categoryID, Category>}   The Categories
- *   `universal`      {Map<fieldID, Field>}         The "universal" fields (fields that can go with any Preset)
- *   `defaults`       {Map<string, Set<string>>}    Default items that are suggested for each geometry
+ *   `geometryTypes`  The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
+ *   `fieldTypes`     The supported field types (see also `ui/fields/index.js`)
+ *   `bundles`        Names of schema bundles that have been merged in
+ *   `fields`         The Fields
+ *   `presets`        The Presets
+ *   `categories`     The Categories
+ *   `universal`      The "universal" fields (fields that can go with any Preset)
+ *   `defaults`       Default items that are suggested for each geometry
  *
  * Events available:
  *   `schemachange`    Fires on any change in the available schemas
  */
 export class SchemaSystem extends AbstractSystem {
+  /** The supported geometry types */
+  readonly geometryTypes: Set<GeometryType>;
+  /** The supported field types */
+  readonly fieldTypes: Set<FieldType>;
+
+  /** Set of presetIDs that the user can add (if `null`, all are normally addable) */
+  addablePresetIDs: Set<string> | null;
+
+  /** Names of schema bundles that have been merged in */
+  bundles: Set<string>;
+  /** The Categories, keyed by categoryID */
+  categories: Map<string, Category>;
+  /** The Presets, keyed by presetID */
+  presets: Map<string, Preset>;
+  /** The Fields, keyed by fieldID */
+  fields: Map<string, Field>;
+  /** The "universal" fields that can go with any Preset */
+  universal: Map<string, Field>;
+  /** Default preset/category IDs for each geometry type */
+  defaults: Map<GeometryType, Set<string>>;
+
+  private _matchIndex: Map<string, Record<string, Record<string, Preset[]>>>;
+  private _recentIDs: string[] | null;
+
+  // MiniSearch fulltext search indexes, one per locale
+  private _searchIndexes: Map<string, MiniSearch>;
+  private _currLocaleCode: string | null;
+  private _currSearchIndex: MiniSearch | null;
+
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'schema';
     this.requiredDependencies = new Set(['assets']);
     this.optionalDependencies = new Set(['gfx', 'l10n', 'locations', 'storage', 'urlhash']);
 
-    this.geometryTypes = new Set(['point', 'vertex', 'line', 'area', 'relation']);
+    this.geometryTypes = new Set(['point', 'vertex', 'line', 'area', 'relation'] as GeometryType[]);
 
     // The field types here must match the field types listed in `ui/fields/index.js`.
     // Other field types may be found in a tagging schema, but these are the ones Rapid currently supports.
@@ -74,7 +163,7 @@ export class SchemaSystem extends AbstractSystem {
       'multiCombo', 'networkCombo', 'number', 'onewayCheck', 'radio', 'restrictions',
       'semiCombo', 'structureRadio', 'tel', 'text', 'textarea', 'typeCombo', 'url',
       'wikidata', 'wikipedia'
-    ]);
+    ] as FieldType[]);
 
     // Set of presetIDs that the user can add (if `null`, all are normally addable)
     this.addablePresetIDs = null;
@@ -105,9 +194,9 @@ export class SchemaSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  override initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -119,12 +208,12 @@ export class SchemaSystem extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          assets.initAsync(),
+          assets?.initAsync(),
           l10n?.initAsync(),
           locations?.initAsync(),
           urlhash?.initAsync(),
         ];
-        return Promise.all(prerequisites.filter(Boolean));
+        return Promise.all(prerequisites.filter(Boolean) as Promise<void>[]);
       })
       .then(() => {
         // Setup Event Handlers..
@@ -148,9 +237,9 @@ export class SchemaSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  override startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -158,9 +247,9 @@ export class SchemaSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  override resetAsync(): Promise<void> {
     // Note: We don't reset the SchemaSystem here.
     // This method is called when the user starts a new session.
     return Promise.resolve();
@@ -170,10 +259,10 @@ export class SchemaSystem extends AbstractSystem {
   /**
    * item
    * Returns the Preset or Catetory with the given id.
-   * @param   {string}           id - a Preset or Category id
-   * @return  {Preset|Category}  The Preset or Catetory, or `undefined` if not found
+   * @param   id - a Preset or Category id
+   * @return  The Preset or Catetory, or `undefined` if not found
    */
-  item(id) {
+  item(id: string): Preset | Category | undefined {
     return this.presets.get(id) || this.categories.get(id);
   }
 
@@ -181,10 +270,10 @@ export class SchemaSystem extends AbstractSystem {
   /**
    * field
    * Returns the Field with the given id.
-   * @param   {string}  id - a Field id
-   * @return  {Field}   The Field, or `undefined` if not found
+   * @param   id - a Field id
+   * @return  The Field, or `undefined` if not found
    */
-  field(id) {
+  field(id: string): Field | undefined {
     return this.fields.get(id);
   }
 
@@ -212,10 +301,10 @@ export class SchemaSystem extends AbstractSystem {
    *  - Wildcard characters '*' and '?' are allowed when deleting.
    *     `"barrier/*": null,`                           <-- all `barrier/*` presets deleted
    *
-   * @param  {Object}  src - preset data to merge into the caches
+   * @param  src - preset data to merge into the caches
    * @throws  Will throw if given data does not contain a `bundleID`, or if the `bundleID` has already been merged
    */
-  merge(src = {}) {
+  merge(src: SchemaBundle): void {
     const bundleID = src.bundleID;
 
     if (!bundleID) {
@@ -227,7 +316,7 @@ export class SchemaSystem extends AbstractSystem {
 
     this.bundles.add(bundleID);
 
-    const checkLocationSets = [];
+    const checkLocationSets: Array<{ locationSet?: object; locationSetID?: string }> = [];
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -238,7 +327,7 @@ export class SchemaSystem extends AbstractSystem {
         if (existing?.isBuiltin()) continue;  // don't override a builtin Field
 
         if (f) {   // add or replace
-          if (!this.fieldTypes.has(f.type)) {
+          if (!this.fieldTypes.has(f.type as FieldType)) {
             if (VERBOSE) console.warn(`"${f.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
             continue;
           }
@@ -337,15 +426,15 @@ export class SchemaSystem extends AbstractSystem {
     // Merge Defaults
     if (src.defaults) {
       for (const [geometry, itemIDs] of Object.entries(src.defaults)) {
-        const currIDs = this.defaults.get(geometry);
+        const currIDs = this.defaults.get(geometry as GeometryType);
         if (!currIDs) continue;   // not a valid geometry type?
 
         const newIDs = Array.isArray(itemIDs) ? itemIDs : [];
         for (const newID of newIDs) {
-          if (!newID || this.geometryTypes.has(newID)) continue;  // skip if empty or fallback
+          if (!newID || this.geometryTypes.has(newID as GeometryType)) continue;  // skip if empty or fallback
           currIDs.add(newID);
         }
-        this.defaults.set(geometry, currIDs);
+        this.defaults.set(geometry as GeometryType, currIDs);
       }
     }
 
@@ -379,13 +468,13 @@ export class SchemaSystem extends AbstractSystem {
    *  }
    * @see https://lucaong.github.io/minisearch/index.html
    *
-   * @param   {string}             query - the value to search
-   * @param   {OneOrMore<string>}  geometries - geometries to include in the results
-   * @param   {Array<number>}      loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
-   * @return  {SearchResult}       A Minisearch `SearchResult`, containing the score and information about the match
+   * @param   query - the value to search
+   * @param   geometries - geometries to include in the results
+   * @param   loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
+   * @return  A Minisearch `SearchResult`, containing the score and information about the match
    * @throws  Will throw if the search index is not ready
    */
-  search(query = '', geometries = [], loc = null) {
+  search(query: string = '', geometries: GeometryType | GeometryType[] = [], loc: [number, number] | null = null): SearchResult[] {
     if (!this._currSearchIndex) {   // shouldn't happen
       throw new Error('Search index not ready');
     }
@@ -402,21 +491,21 @@ export class SchemaSystem extends AbstractSystem {
     const filterGeometries = new Set(utilIterable(geometries));
     const filterLocationSets = Array.isArray(loc) ? locations?.locationSetsAt(loc) : null;
 
-    const _filter = (result) => {
+    const _filter = (result: SearchResult): boolean => {
       const item = this.item(result.id);
       if (!item) return false;
       if (!filterGeometries.isSubsetOf(item.geometries)) return false;
 
       if (filterLocationSets) {
-        const locID = item.props.locationSetID;
+        const locID = (item.props as any).locationSetID as string | undefined;
         if (locID && !filterLocationSets[locID]) return false;   // if !locID, item is valid everywhere
       }
       return true;
     };
 
-    const _boostDocument = (documentID, term, stored) => {
-      if (stored.suggestion) return 0.5;            // rank suggestion presets lower than normal presets
-      if (stored.type === 'category') return 0.5;   // rank categories lower than presets
+    const _boostDocument = (documentID: any, term: string, stored?: Record<string, unknown>): number => {
+      if (stored?.suggestion) return 0.5;            // rank suggestion presets lower than normal presets
+      if (stored?.type === 'category') return 0.5;   // rank categories lower than presets
       return 1;
     };
 
@@ -433,7 +522,7 @@ export class SchemaSystem extends AbstractSystem {
       filter: _filter,
       fuzzy: false,   // no fuzzy (match strings with nearby edit distance)
       prefix: false   // no prefix (partial match beginning of a string)
-    });
+    }) as SearchResult[];
 
     const fuzzyResults = this._currSearchIndex.search(query, {
       boost: { primary: 2, alternate: 1 },
@@ -446,9 +535,9 @@ export class SchemaSystem extends AbstractSystem {
         fuzzy: 0.2,
         prefix: 0.3
       }
-    });
+    }) as SearchResult[];
 
-    const results = new Map();   // Map<docID, SearchResult>
+    const results = new Map<string, SearchResult>();   // Map<docID, SearchResult>
 
     for (const hit of exactResults) {
       results.set(hit.id, hit);
@@ -465,18 +554,18 @@ export class SchemaSystem extends AbstractSystem {
 
   /**
    * match
-   * @param   {Entity}  entity  - the Entity to test
-   * @param   {Graph}   graph   - the Graph containing this Entity
-   * @return  {Preset}  Preset that best matches
+   * @param   entity  - the Entity to test
+   * @param   graph   - the Graph containing this Entity
+   * @return  Preset that best matches
    */
-  match(entity, graph) {
+  match(entity: OsmEntity, graph: Graph): Preset | null {
     return entity.transient('presetMatch', () => {
-      let geometry = entity.geometry(graph);
+      let geometry = entity.geometry(graph) as GeometryType;
       // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
-      if (geometry === 'vertex' && entity.isOnAddressLine(graph)) {
+      if (geometry === 'vertex' && (entity as any).isOnAddressLine?.(graph)) {
         geometry = 'point';
       }
-      const entityExtent = entity.extent(graph);
+      const entityExtent = (entity as any).extent?.(graph);
       return this.matchTags(entity.tags, geometry, entityExtent?.center());
     });
   }
@@ -484,12 +573,12 @@ export class SchemaSystem extends AbstractSystem {
 
   /**
    * matchTags
-   * @param   {Object}         tags
-   * @param   {string}         geometry
-   * @param   {Array<number>}  loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
-   * @return  {Preset}         Preset that best matches
+   * @param   tags
+   * @param   geometry
+   * @param   loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
+   * @return  Preset that best matches
    */
-  matchTags(tags, geometry, loc) {
+  matchTags(tags: Tags, geometry: GeometryType, loc?: [number, number]): Preset | null {
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -500,10 +589,10 @@ export class SchemaSystem extends AbstractSystem {
     const validHere = Array.isArray(loc) ? locations?.locationSetsAt(loc) : null;
 
     let bestScore = -1;
-    let bestMatch = null;
-    let matchCandidates = [];
+    let bestMatch: Preset | null = null;
+    const matchCandidates: Array<{ score: number; candidate: Preset }> = [];
 
-    for (let k in tags) {
+    for (const k in tags) {
       const valueIndex = keyIndex[k];
       if (!valueIndex) continue;
 
@@ -534,7 +623,7 @@ export class SchemaSystem extends AbstractSystem {
 
     // If any part of an address is present, allow fallback to "Address" preset - iD#4353
     if (!bestMatch || bestMatch.isFallback()) {
-      for (let k in tags) {
+      for (const k in tags) {
         if (/^addr:/.test(k) && keyIndex['addr:*'] && keyIndex['addr:*']['*']) {
           bestMatch = keyIndex['addr:*']['*'][0];
           break;
@@ -542,23 +631,23 @@ export class SchemaSystem extends AbstractSystem {
       }
     }
 
-    return bestMatch || this.getFallback(geometry);
+    return bestMatch || this.getFallback(geometry) || null;
   }
 
 
   /**
    * allowsVertex
-   * @param   {Entity}  entity  - the Entity to test
-   * @param   {Graph}   graph   - the Graph containing this Entity
-   * @return  {boolean} `true` if this entity can be a vertex, `false` if not
+   * @param   entity  - the Entity to test
+   * @param   graph   - the Graph containing this Entity
+   * @return  `true` if this entity can be a vertex, `false` if not
    */
-  allowsVertex(entity, graph) {
+  allowsVertex(entity: OsmEntity, graph: Graph): boolean {
     if (entity.type !== 'node') return false;
     if (Object.keys(entity.tags).length === 0) return true;
 
     return entity.transient('vertexMatch', () => {
       // address lines allow vertices to act as standalone points
-      if (entity.isOnAddressLine(graph)) return true;
+      if ((entity as any).isOnAddressLine?.(graph)) return true;
 
       const geometries = osmNodeGeometriesForTags(entity.tags);
       if (geometries.vertex) return true;
@@ -583,12 +672,12 @@ export class SchemaSystem extends AbstractSystem {
    * (see `Way#isArea()`). In other words, the keys of L form the keeplist,
    * and the subkeys form the discardlist.
    *
-   * @returns {Object}  areaKeys Object
+   * @returns  areaKeys Object
    */
-  areaKeys() {
+  areaKeys(): Record<string, Record<string, boolean>> {
     // The ignore list is for keys that imply lines. (We always add `area=yes` for exceptions)
     const ignore = new Set(['barrier', 'highway', 'footway', 'railway', 'junction', 'type']);
-    let areaKeys = {};
+    const areaKeys: Record<string, Record<string, boolean>> = {};
 
     // ignore name-suggestion-index and deprecated presets
     const presets = [...this.presets.values()]
@@ -621,8 +710,8 @@ export class SchemaSystem extends AbstractSystem {
   }
 
 
-  pointTags() {
-    let pointTags = {};
+  pointTags(): Record<string, Record<string, boolean>> {
+    const pointTags: Record<string, Record<string, boolean>> = {};
 
     // ignore name-suggestion-index and deprecated presets
     const presets = [...this.presets.values()]
@@ -643,8 +732,8 @@ export class SchemaSystem extends AbstractSystem {
   }
 
 
-  vertexTags() {
-    let vertexTags = {};
+  vertexTags(): Record<string, Record<string, boolean>> {
+    const vertexTags: Record<string, Record<string, boolean>> = {};
 
     // ignore name-suggestion-index and deprecated presets
     const presets = [...this.presets.values()]
@@ -669,10 +758,10 @@ export class SchemaSystem extends AbstractSystem {
    * getFallback
    * Gets the fallback preset for the given geometry.
    * For most geometries we just return the Preset with that `id`, but for `vertex' we return 'point'.
-   * @param   {geometryType}  geometry - 'point', 'vertex', 'line', 'area', or 'relation'
-   * @return  {Preset}        The fallback preset, or `undefined` if not found
+   * @param   geometry - 'point', 'vertex', 'line', 'area', or 'relation'
+   * @return  The fallback preset, or `undefined` if not found
    */
-  getFallback(geometry) {
+  getFallback(geometry: GeometryType): Preset | undefined {
     if (geometry === 'vertex')  geometry = 'point';
     return this.presets.get(geometry);
   }
@@ -683,18 +772,18 @@ export class SchemaSystem extends AbstractSystem {
    * Defaults are the Presets and Categories offered to the user when adding a new feature.
    * Each geometry type has its own set of defaults.
    * The fallback preset for the given geometry is appended to the list automatically.
-   * @param   {string}          geometry
-   * @param   {boolean}         includeRecents - `true` to start with recently used presets
-   * @param   {Array<number>}   loc - WGS84 [lon,lat] where we are editing
-   * @return  {Array<Category|Preset>}  Array of Categories and Presets
+   * @param   geometry
+   * @param   includeRecents - `true` to start with recently used presets
+   * @param   loc - WGS84 [lon,lat] where we are editing
+   * @return  Array of Categories and Presets
    */
-  getDefaults(geometry, includeRecents = true, loc = null) {
+  getDefaults(geometry: GeometryType, includeRecents: boolean = true, loc: [number, number] | null = null): Array<Category | Preset> {
     if (!geometry) return [];
 
     const context = this.context;
     const locations = context.systems.locations;
 
-    const results = new Map();   // Map<itemID, item>  (may be a Preset or a Category)
+    const results = new Map<string, Category | Preset>();   // Map<itemID, item>  (may be a Preset or a Category)
 
     if (includeRecents) {
       for (const preset of this.getRecents()) {
@@ -714,10 +803,12 @@ export class SchemaSystem extends AbstractSystem {
       }
     } else {
       const itemIDs = this.defaults.get(geometry);
-      for (const itemID of itemIDs) {
-        const item = this.item(itemID);
-        if (item?.geometries.has(geometry)) {
-          results.set(itemID, item);
+      if (itemIDs) {
+        for (const itemID of itemIDs) {
+          const item = this.item(itemID);
+          if (item?.geometries.has(geometry)) {
+            results.set(itemID, item);
+          }
         }
       }
     }
@@ -733,7 +824,7 @@ export class SchemaSystem extends AbstractSystem {
     if (locations && Array.isArray(loc)) {
       const validHere = locations.locationSetsAt(loc);
       arr = arr.filter(item => {
-        const locID = item.props.locationSetID;
+        const locID = (item.props as any).locationSetID as string | undefined;
         return !locID || validHere[locID];   // if !locID, item is valid everywhere
       });
     }
@@ -746,27 +837,27 @@ export class SchemaSystem extends AbstractSystem {
    * getRecents
    * Returns the recently used presets.
    * If this._recentIDs is unset, try to load them from localStorage
-   * @return  {Array<Preset>}  An Array of recent presets
+   * @return  An Array of recent presets
    */
-  getRecents() {
+  getRecents(): Preset[] {
     const context = this.context;
     const storage = context.systems.storage;
 
     let itemIDs = this._recentIDs;
     if (!Array.isArray(itemIDs)) {  // first time, try to get them from localStorage
       if (storage) {
-        itemIDs = JSON.parse(storage.getItem('preset_recents')) || [];
+        itemIDs = JSON.parse(storage.getItem('preset_recents') ?? '[]') || [];
       } else {
         itemIDs = [];
       }
     }
 
-    const presets = itemIDs
+    const presets = (itemIDs ?? [])
       .map(item => {
-        const id = item?.id || item;  // previously we stored preset, now we just store presetID
+        const id = (item as any)?.id || item;  // previously we stored preset, now we just store presetID
         return this.presets.get(id);
       })
-      .filter(Boolean);
+      .filter(Boolean) as Preset[];
 
     if (!this._recentIDs) {
       this._recentIDs = presets.map(item => item.id);
@@ -779,9 +870,9 @@ export class SchemaSystem extends AbstractSystem {
   /**
    * setMostRecent
    * Prepends a preset to the recently used Presets array.
-   * @param  {Preset}  A preset to add
+   * @param  preset - A preset to add
    */
-  setMostRecent(preset) {
+  setMostRecent(preset: Preset): void {
     if (!preset?.props?.searchable) return;
 
     const storage = this.context.systems.storage;
@@ -802,11 +893,15 @@ export class SchemaSystem extends AbstractSystem {
    * This loads the default schema for Rapid:
    *  - iD-tagging-schema
    *  - rapid schema overrides
-   * @return  {Promise}  Promise fulfilled when the default schema has been downloaded and merged into Rapid.
+   * @return  Promise fulfilled when the default schema has been downloaded and merged into Rapid.
    */
-  _loadDefaultSchemaAsync() {
+  private _loadDefaultSchemaAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets;
+
+    if (!assets) {
+      return Promise.reject(new Error('AssetSystem not available'));
+    }
 
     // Tell the AssetSystem what to load..
     const latestPath = 'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist';
@@ -839,7 +934,7 @@ export class SchemaSystem extends AbstractSystem {
       assets.loadAssetAsync('rapid_schema_overrides')
     ])
     .then(vals => {
-      osmSetDeprecatedTags(vals[0]);
+      osmSetDeprecatedTags(vals[0] as any);
       // osmSetDiscardedTags(vals[1]);  // TODO: should be here, but it isn't yet
 
       // Determine the version of id-tagging-schema
@@ -857,17 +952,18 @@ export class SchemaSystem extends AbstractSystem {
       // Merge id-tagging-schema...
       this.merge({
         bundleID: `id-tagging-schema@${idSchemaVersion}`,
-        categories: vals[2],
-        defaults: vals[3],
-        presets: vals[4],
-        fields: vals[5]
+        categories: vals[2] as any,
+        defaults: vals[3] as any,
+        presets: vals[4] as any,
+        fields: vals[5] as any
       });
 
       // Merge rapid_schema_overrides...
       const rapidSchemaVersion = rapidVersion || 'unknown';
+      const overrides = vals[6] as Partial<SchemaBundle>;
       this.merge({
         bundleID: `rapid-schema-overrides@${rapidSchemaVersion}`,
-        ...vals[6]
+        ...overrides
       });
     });
   }
@@ -878,9 +974,9 @@ export class SchemaSystem extends AbstractSystem {
    * Call this whenever the locale changes.
    * It will lock in the new locale and prepare a search index for that locale.
    * These are cached, so switching back to an already-seen locale should be fast.
-   * @param  {string}  localeCode - optional new locale code (fallback to getting it from LocalizationSystem, or en-US)
+   * @param  localeCode - optional new locale code (fallback to getting it from LocalizationSystem, or en-US)
    */
-  _localeChanged(localeCode) {
+  private _localeChanged(localeCode?: string): void {
     const l10n = this.context.systems.l10n;
 
     // Ensure that we have a current locale code.
@@ -907,14 +1003,14 @@ export class SchemaSystem extends AbstractSystem {
    * This prepares a MiniSearch index for the current locale code.
    * These are cached, so switching back to an already-seen locale should be fast.
    */
-  _prepareSearchIndex() {
+  private _prepareSearchIndex(): void {
     const l10n = this.context.systems.l10n;
 
     // Ensure that we have a current locale code.
     this._currLocaleCode ||= l10n?.localeCode || 'en-US';
 
     // Switch the search index, create a new one if needed.
-    this._currSearchIndex = this._searchIndexes.get(this._currLocaleCode);
+    this._currSearchIndex = this._searchIndexes.get(this._currLocaleCode) ?? null;
 
     if (!this._currSearchIndex) {
       this._currSearchIndex = new MiniSearch({
@@ -922,7 +1018,7 @@ export class SchemaSystem extends AbstractSystem {
         idField: 'id',
         fields: ['primary', 'alternate'],
         storeFields: ['type', 'suggestion'],
-        extractField: (item, fieldName) => item._currStrings[fieldName]
+        extractField: (item: any, fieldName: string) => item._currStrings[fieldName]
       });
 
       this._searchIndexes.set(this._currLocaleCode, this._currSearchIndex);
@@ -937,22 +1033,22 @@ export class SchemaSystem extends AbstractSystem {
    * This happens when we switch to a new search index for the first time.
    * This may be a bit slow, so consider making this async.
    */
-  _rebuildSearchIndex() {
+  private _rebuildSearchIndex(): void {
     // Ensure that we have a current serach index.
     if (!this._currSearchIndex) {
       this._prepareSearchIndex();
     }
 
     // Gather "searchable" Presets and Categories..
-    this._currSearchIndex.removeAll();
+    this._currSearchIndex!.removeAll();
 
     for (const preset of this.presets.values()) {
       if (!preset.props.searchable) continue;
-      this._currSearchIndex.add(preset);
+      this._currSearchIndex!.add(preset);
     }
     for (const category of this.categories.values()) {
       if (!category.props.searchable) continue;
-      this._currSearchIndex.add(category);
+      this._currSearchIndex!.add(category);
     }
   }
 
@@ -965,9 +1061,9 @@ export class SchemaSystem extends AbstractSystem {
    * (The new schema may have different presets with different strings)
    * This will trigger a redraw, and emit a 'schemachange' event.
    */
-  _schemaChanged() {
+  private _schemaChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
 
     // Reset the Category, Preset, Field cached data
     for (const field of this.fields.values()) {
@@ -1003,6 +1099,7 @@ export class SchemaSystem extends AbstractSystem {
 
       for (const geometry of preset.geometries) {
         const obj = this._matchIndex.get(geometry);
+        if (!obj) continue;
         const tags = preset.tags || {};
         for (const [k, v] of Object.entries(tags)) {
           obj[k] ||= {};
@@ -1026,7 +1123,7 @@ export class SchemaSystem extends AbstractSystem {
    * i.e. nothing loaded, only fallback presets.
    * This would probably only be useful for testing, or setting up a special non-OSM Rapid.
    */
-  _resetAll() {
+  private _resetAll(): void {
     const context = this.context;
 
     this.bundles.clear();
@@ -1057,16 +1154,3 @@ export class SchemaSystem extends AbstractSystem {
   }
 
 }
-
-
-/**
- *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
- *  (I don't know whether this really matters much - we don't actually parse the JSDoc.)
- *  @typedef  {string}  geometryType
- *  @typedef  {string}  fieldType
- *  @typedef  {string}  categoryID
- *  @typedef  {string}  presetID
- *  @typedef  {string}  fieldID
- *  @typedef  {string}  geometryID
- *  @typedef  {string}  bundleID
- */

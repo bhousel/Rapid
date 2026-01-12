@@ -1,16 +1,32 @@
 import { geoMetersToOffset, geoOffsetToMeters } from '@rapid-sdk/math';
 import whichPolygon from 'which-polygon';
 
-import { AbstractSystem } from './AbstractSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
 import {
   ImagerySource, ImagerySourceBing, ImagerySourceCustom,
-  ImagerySourceEsri, ImagerySourceEsriWayback, ImagerySourceNone
+  ImagerySourceEsri, ImagerySourceEsriWayback, ImagerySourceNone,
+  type ImagerySourceProps
 } from '../lib/ImagerySource.ts';
 import { utilWildcard } from '../util/string.ts';
+
+import type { Context, SystemID } from './types.ts';
+import type { Vec2, Vec4 } from '../data/types.ts';
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
 import { version as rapidVersion } from '../../package.json' with { type: 'json' };
+
+
+/**
+ * Data to merge into the imagery system.
+ * Contains imagery sources to add, replace, or remove.
+ */
+export interface ImageryBundle {
+  /** A string identifier, e.g. 'editor-layer-index@2026-01-01' (required) */
+  bundleID: string;
+  /** Object mapping sourceID to imagery data (or null to delete) */
+  imagery?: Record<string, Partial<ImagerySourceProps> | null>;
+}
 
 
 /**
@@ -20,9 +36,9 @@ import { version as rapidVersion } from '../../package.json' with { type: 'json'
  * but additional imagery data can be merged in to supplement or override the defaults.
  *
  * Properties available:
- *   `bundles`         {Set<bundleID>}               Names of imagery bundles that have been merged in
- *   `features`        {Map<sourceID, GeoJSON>}      GeoJSON features for spatial queries
- *   `sources`         {Map<sourceID, ImagerySource>} The imagery sources
+ *   `bundles`         Names of imagery bundles that have been merged in
+ *   `features`        GeoJSON features for spatial queries
+ *   `sources`         The imagery sources
  *   `offset`
  *   `brightness`
  *   `contrast`
@@ -34,12 +50,31 @@ import { version as rapidVersion } from '../../package.json' with { type: 'json'
  *   `imagerychange`     Fires on any change in imagery or display options
  */
 export class ImagerySystem extends AbstractSystem {
+  /** Names of imagery bundles that have been merged in */
+  bundles: Set<string>;
+  /** GeoJSON features for spatial queries, keyed by sourceID */
+  features: Map<string, GeoJSON.Feature>;
+  /** The imagery sources, keyed by sourceID (lowercase) */
+  sources: Map<string, ImagerySource>;
+
+  private _baseLayer: ImagerySource | null;
+  private _overlayLayers: Map<string, ImagerySource>;
+  private _checkedBlocklists: string[];
+  private _isValid: boolean;  // todo, find a new way to check this, no d3 enter/update render anymore
+  private _whichPolygon: ReturnType<typeof whichPolygon> | null;
+
+  private _brightness: number;
+  private _contrast: number;
+  private _saturation: number;
+  private _sharpness: number;
+  private _numGridSplits: number;
+
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'imagery';
     this.requiredDependencies = new Set(['assets']);
@@ -52,8 +87,8 @@ export class ImagerySystem extends AbstractSystem {
     this._baseLayer = null;
     this._overlayLayers = new Map();   // Map<sourceID, ImagerySource>
     this._checkedBlocklists = [];
-    this._isValid = true;    // todo, find a new way to check this, no d3 enter/update render anymore
-    this._whichPolygon = null;    // which-polygon index
+    this._isValid = true;
+    this._whichPolygon = null;
 
     this._brightness = 1;
     this._contrast = 1;
@@ -62,7 +97,7 @@ export class ImagerySystem extends AbstractSystem {
     this._numGridSplits = 0; // No grid by default.
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._hashchange = this._hashchange.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._imageryChanged = this._imageryChanged.bind(this);
     this._localeChanged = this._localeChanged.bind(this);
   }
@@ -71,14 +106,14 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
     const assets = context.systems.assets;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const l10n = context.systems.l10n;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
@@ -86,7 +121,7 @@ export class ImagerySystem extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          assets.initAsync(),
+          assets!.initAsync(),
           gfx?.initAsync(),      // `gfx.scene` will exist after `initAsync`
           l10n?.initAsync(),
           storage?.initAsync(),
@@ -96,7 +131,7 @@ export class ImagerySystem extends AbstractSystem {
       })
       .then(() => {
         // Setup event handlers..
-        urlhash?.on('hashchange', this._hashchange);
+        urlhash?.on('hashchange', this._hashChanged);
         gfx?.scene?.on('layerchange', this._imageryChanged);
         l10n?.on('localechange', this._localeChanged);
 
@@ -111,9 +146,9 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -121,9 +156,9 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -145,10 +180,10 @@ export class ImagerySystem extends AbstractSystem {
    *  - Wildcard characters '*' and '?' are allowed when deleting.
    *     `"US-TIGER*": null`                 <-- all `US-TIGER*` sources deleted
    *
-   * @param  {Object}  src - imagery data to merge
-   * @throws  Will throw if given data does not contain a `bundleID`, or if the `bundleID` has already been merged
+   * @param src - imagery data to merge
+   * @throws Will throw if given data does not contain a `bundleID`, or if the `bundleID` has already been merged
    */
-  merge(src = {}) {
+  merge(src: ImageryBundle): void {
     const context = this.context;
 
     const bundleID = src.bundleID;
@@ -170,13 +205,13 @@ export class ImagerySystem extends AbstractSystem {
 
         if (props) {   // add or replace
           // Instantiate the appropriate `ImagerySource` class
-          let source;
+          let source: ImagerySource;
           if (props.type === 'bing') {
-            source = new ImagerySourceBing(context, { bundleID: bundleID, ...props });
+            source = new ImagerySourceBing(context, { bundleID: bundleID, ...props } as Partial<ImagerySourceProps>);
           } else if (/^EsriWorldImagery/.test(sourceID)) {
-            source = new ImagerySourceEsri(context, { bundleID: bundleID, ...props });
+            source = new ImagerySourceEsri(context, { bundleID: bundleID, ...props } as Partial<ImagerySourceProps>);
           } else {
-            source = new ImagerySource(context, { bundleID: bundleID, ...props });
+            source = new ImagerySource(context, { bundleID: bundleID, ...props } as Partial<ImagerySourceProps>);
           }
           this.sources.set(sourceKey, source);
 
@@ -209,11 +244,12 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * source
    * Returns the ImagerySource with the given id.
-   * @param   {string}        sourceID - a source id
-   * @return  {ImagerySource} The ImagerySource, or `undefined` if not found
+   * @param sourceID - a source id
+   * @return The ImagerySource, or `undefined` if not found
    */
-  source(sourceID) {
-    return this.sources.get(sourceID?.toLowerCase());
+  source(sourceID?: string): ImagerySource | undefined {
+    if (!sourceID) return undefined;
+    return this.sources.get(sourceID.toLowerCase());
   }
 
 
@@ -221,10 +257,10 @@ export class ImagerySystem extends AbstractSystem {
    * imageryUsed
    * Called by the EditSystem to gather the sources being used to make an edit.
    * We return the English name of any active imagery layers, it will be included in the user's changeset.
-   * @return  {Array<string>}  Array of the names of imagery layers currently visible
+   * @return Array of the names of imagery layers currently visible
    */
-  imageryUsed() {
-    const results = new Set();
+  imageryUsed(): string[] {
+    const results = new Set<string>();
 
     // Gather info about enabled base imagery
     const baseUsed = this._baseLayer?.imageryUsed;
@@ -245,11 +281,11 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   *  visibleSources
-   *  Returns array of known imagery sources that are valid at the given extent and zoom
-   *  @return {Array<ImagerySource>}  Visible imagery sources
+   * visibleSources
+   * Returns array of known imagery sources that are valid at the given extent and zoom
+   * @return Visible imagery sources
    */
-  visibleSources() {
+  visibleSources(): ImagerySource[] {
     if (!this.sources.size || !this._whichPolygon) return [];   // called too soon?
 
     const context = this.context;
@@ -257,16 +293,17 @@ export class ImagerySystem extends AbstractSystem {
     const extent = viewport.visibleExtent();
     const zoom = viewport.transform.zoom;
 
-    const visible = new Set();
-    (this._whichPolygon.bbox(extent.rectangle(), true) || [])
-      .forEach(d => visible.add(d.id));
+    const visible = new Set<string>();
+    const bbox = extent.rectangle() as Vec4;
+    (this._whichPolygon.bbox(bbox, true) || [])
+      .forEach((d: { id: string }) => visible.add(d.id));
 
     const currSource = this._baseLayer;
     const sources = [...this.sources.values()];
 
     // Recheck blocked sources only if we detect new blocklists pulled from the OSM API.
-    const osm = context.services.osm;
-    const blocklists = osm?.imageryBlocklists ?? [];
+    const osm = context.services.osm as any;
+    const blocklists: RegExp[] = osm?.imageryBlocklists ?? [];
     const blocklistChanged = (blocklists.length !== this._checkedBlocklists.length) ||
       blocklists.some((regex, index) => String(regex) !== this._checkedBlocklists[index]);
 
@@ -288,20 +325,23 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   *
+   * baseLayerSource
+   * Gets or sets the base layer source.
+   * @param source - optional ImagerySource to set as base layer
+   * @return The current base layer source when getting, or `this` when setting
    */
-  baseLayerSource(source) {
+  baseLayerSource(source?: ImagerySource): ImagerySource | null | this {
     if (!arguments.length) return this._baseLayer;
 
     // test source against OSM imagery blocklists..
-    const osm = this.context.services.osm;
+    const osm = this.context.services.osm as any;
     if (!osm) return this;
 
-    const blocklists = osm?.imageryBlocklists ?? [];
-    const template = source.template;
+    const blocklists: RegExp[] = osm?.imageryBlocklists ?? [];
+    const template = source!.template;
     let fail = false;
     let tested = 0;
-    let regex;
+    let regex: RegExp;
 
     for (regex of blocklists) {
       fail = regex.test(template);
@@ -315,7 +355,7 @@ export class ImagerySystem extends AbstractSystem {
       fail = regex.test(template);
     }
 
-    this._baseLayer = (!fail ? source : this.getSourceByID('none'));
+    this._baseLayer = (!fail ? source! : this.getSourceByID('none')!);
 
     this._imageryChanged();
     return this;
@@ -326,8 +366,9 @@ export class ImagerySystem extends AbstractSystem {
    * chooseDefaultSource
    * When we haven't been told to use a specific background imagery,
    * this tries several options to pick an appropriate imagery to use.
+   * @return The chosen default ImagerySource
    */
-  chooseDefaultSource() {
+  chooseDefaultSource(): ImagerySource {
     const context = this.context;
     const storage = context.systems.storage;
 
@@ -336,24 +377,24 @@ export class ImagerySystem extends AbstractSystem {
     const best = available.find(s => s.props.best);
 
     // Consider previously chosen imagery unless it was 'none'
-    let previousID = storage?.getItem('background-last-used') || 'none';
+    const previousID = storage?.getItem('background-last-used') || 'none';
     const previous = (previousID !== 'none') && this.getSourceByID(previousID);
 
     return best ||
       previous ||
       this.getSourceByID('Bing') ||
       first ||    // maybe this is a custom Rapid that doesn't include Bing?
-      this.getSourceByID('none');
+      this.getSourceByID('none')!;
   }
 
 
   /**
-   * getSource
+   * getSourceByID
    * Returns an ImagerySource for the given `sourceID`
-   * @param   {string}  sourceID -  The sourceID to get
-   * @return  {ImagerySource?}  The `ImagerySource` with the given ID, or `null` if not found
+   * @param sourceID - The sourceID to get
+   * @return The `ImagerySource` with the given ID, or `undefined` if not found
    */
-  getSourceByID(sourceID = '') {
+  getSourceByID(sourceID: string = ''): ImagerySource | undefined {
     if (/^EsriWayback/i.test(sourceID)) {   // ignore start date, if any
       sourceID = 'EsriWayback';
     }
@@ -365,10 +406,10 @@ export class ImagerySystem extends AbstractSystem {
    * setSourceByID
    * Activates the base layer with the given `sourceID`
    * This function will correctly handle IDs like `EsriWayback_<DATE>`.
-   * @param   {string}  sourceID -  The sourceID to activate
+   * @param sourceID - The sourceID to activate
    */
-  setSourceByID(sourceID = '') {
-    let date;
+  setSourceByID(sourceID: string = ''): void {
+    let date: string | undefined;
     const match = sourceID.match(/^EsriWayback\_?(.*)$/i);   // get start date, if any
     if (match) {
       sourceID = 'EsriWayback';
@@ -378,7 +419,7 @@ export class ImagerySystem extends AbstractSystem {
     const source = this.getSourceByID(sourceID);
     if (source) {
       if (date) {
-        source.date = date;
+        (source as ImagerySourceEsriWayback).date = date;
       }
       this.baseLayerSource(source);
     }
@@ -386,9 +427,12 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   *
+   * showsLayer
+   * Checks if the given source is currently being shown (as base or overlay)
+   * @param source - The imagery source to check
+   * @return `true` if the source is currently visible
    */
-  showsLayer(source) {
+  showsLayer(source?: ImagerySource): boolean {
     const currSource = this._baseLayer;
     if (!source || !currSource) return false;
     return source.id === currSource.id || this._overlayLayers.has(source.id);
@@ -396,17 +440,21 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   *
+   * overlayLayerSources
+   * Returns the current overlay imagery sources
+   * @return Array of overlay ImagerySource objects
    */
-  overlayLayerSources() {
+  overlayLayerSources(): ImagerySource[] {
     return [...this._overlayLayers.values()];
   }
 
 
   /**
-   *
+   * toggleOverlayLayer
+   * Toggles an overlay layer on or off
+   * @param source - The imagery source to toggle
    */
-  toggleOverlayLayer(source) {
+  toggleOverlayLayer(source: ImagerySource): void {
     if (this._overlayLayers.has(source.id)) {
       this._overlayLayers.delete(source.id);
     } else {
@@ -419,10 +467,10 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * enableOverlayLayers
    * This makes sure that only the overlays identified by `enableIDs` are in the list
-   *  ignoring the "locator overlay"
-   * @param  {Set|Array}  enableIDs  Iterable Set or Array of sourceIDs to enable
+   * ignoring the "locator overlay"
+   * @param enableIDs - Iterable Set or Array of sourceIDs to enable
    */
-  enableOverlayLayers(enableIDs) {
+  enableOverlayLayers(enableIDs: Iterable<string>): void {
     for (const [sourceID, source] of this._overlayLayers) {
       if (source.isLocatorOverlay()) continue;  // ignore this one
       this._overlayLayers.delete(sourceID);     // remove all others
@@ -441,11 +489,11 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * nudge
-   * nudge offset, in delta pixels [dx,dy]
-   * @param  delta  pixels to nudge, as [dx, dy]
-   * @param  zoom   the current zoom
+   * Nudge offset, in delta pixels [dx,dy]
+   * @param delta - pixels to nudge, as [dx, dy]
+   * @param _zoom - the current zoom (unused, obtained from viewport)
    */
-  nudge(delta, zoom) {
+  nudge(delta: Vec2, _zoom?: number): void {
     if (this._baseLayer) {
       const zoom = this.context.viewport.transform.zoom;
       this._baseLayer.nudge(delta, zoom);
@@ -456,13 +504,18 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * offset
-   * set/get offset, in pixels [x,y]
+   * Gets the current imagery offset in pixels [x, y]
    */
-  get offset() {
-    return this._baseLayer?.offset || [0, 0];
+  get offset(): Vec2 {
+    return this._baseLayer?.offset ?? [0, 0];
   }
-  set offset([setX, setY] = [0, 0]) {
-    const [currX, currY] = this._baseLayer?.offset || [0, 0];
+
+  /**
+   * offset
+   * Sets the imagery offset in pixels [x, y]
+   */
+  set offset([setX, setY]: Vec2) {
+    const [currX, currY] = this._baseLayer?.offset ?? [0, 0];
     if (setX === currX && setY === currY) return;  // no change
 
     if (this._baseLayer) {
@@ -473,80 +526,105 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * brightness
-   * set/get brightness
+   * Gets the current brightness value (default 1)
    */
-  get brightness() {
+  get brightness(): number {
     return this._brightness;
   }
-  set brightness(val = 1) {
+
+  /**
+   * brightness
+   * Sets the brightness value
+   */
+  set brightness(val: number) {
     if (val === this._brightness) return;  // no change
     this._brightness = val;
 
     const context = this.context;
-    const layer = context.systems.gfx?.scene?.layers?.get('background');
+    const layer = (context.systems.gfx as any)?.scene?.layers?.get('background');
     layer?.setBrightness(val);
     this._imageryChanged();
   }
 
   /**
    * contrast
-   * set/get contrast
+   * Gets the current contrast value (default 1)
    */
-  get contrast() {
+  get contrast(): number {
     return this._contrast;
   }
-  set contrast(val = 1) {
+
+  /**
+   * contrast
+   * Sets the contrast value
+   */
+  set contrast(val: number) {
     if (val === this._contrast) return;  // no change
     this._contrast = val;
 
     const context = this.context;
-    const layer = context.systems.gfx?.scene?.layers?.get('background');
+    const layer = (context.systems.gfx as any)?.scene?.layers?.get('background');
     layer?.setContrast(val);
     this._imageryChanged();
   }
 
   /**
    * saturation
-   * set/get saturation
+   * Gets the current saturation value (default 1)
    */
-  get saturation() {
+  get saturation(): number {
     return this._saturation;
   }
-  set saturation(val = 1) {
+
+  /**
+   * saturation
+   * Sets the saturation value
+   */
+  set saturation(val: number) {
     if (val === this._saturation) return;  // no change
     this._saturation = val;
 
     const context = this.context;
-    const layer = context.systems.gfx?.scene?.layers?.get('background');
+    const layer = (context.systems.gfx as any)?.scene?.layers?.get('background');
     layer?.setSaturation(val);
     this._imageryChanged();
   }
 
   /**
    * sharpness
-   * set/get sharpness
+   * Gets the current sharpness value (default 1)
    */
-  get sharpness() {
+  get sharpness(): number {
     return this._sharpness;
   }
-  set sharpness(val = 1) {
+
+  /**
+   * sharpness
+   * Sets the sharpness value
+   */
+  set sharpness(val: number) {
     if (val === this._sharpness) return;  // no change
     this._sharpness = val;
 
     const context = this.context;
-    const layer = context.systems.gfx?.scene?.layers?.get('background');
+    const layer = (context.systems.gfx as any)?.scene?.layers?.get('background');
     layer?.setSharpness(val);
     this._imageryChanged();
   }
 
   /**
    * numGridSplits
-   * set/get numGridSplits  (unused?)
+   * Gets the current number of grid splits (default 0)
    */
-  get numGridSplits() {
+  get numGridSplits(): number {
     return this._numGridSplits;
   }
-  set numGridSplits(val = 0) {
+
+  /**
+   * numGridSplits
+   * Sets the number of grid splits
+   */
+  set numGridSplits(val: number) {
     if (val === this._numGridSplits) return;  // no change
     this._numGridSplits = val;
     this._imageryChanged();
@@ -556,12 +634,12 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * _loadDefaultImageryAsync
    * This loads the default imagery for Rapid:
-   *  - edior-layer-index
+   *  - editor-layer-index
    *  - rapid imagery overrides
    */
-  _loadDefaultImageryAsync() {
+  private _loadDefaultImageryAsync(): Promise<void> {
     const context = this.context;
-    const assets = context.systems.assets;
+    const assets = context.systems.assets!;
 
     // Tell the AssetSystem what to load..
     assets.setAsset('editor_layer_index', 'data/imagery.min.json');
@@ -573,15 +651,21 @@ export class ImagerySystem extends AbstractSystem {
       assets.loadAssetAsync('editor_layer_index'),
       assets.loadAssetAsync('rapid_imagery_overrides')
     ])
-    .then(vals => {
+    .then((vals) => {
       // Merge editor-layer-index bundle..
-      this.merge(vals[0]);
+      const eli = vals[0] as Partial<ImageryBundle>;
+      this.merge({
+        bundleID: eli.bundleID ?? 'editor-layer-index',
+        imagery: eli.imagery
+      });
 
       // Merge rapid_imagery_overrides..
+      // Use the bundleID from the data if present, otherwise generate one
+      const overrides = vals[1] as Partial<ImageryBundle>;
       const rapidSchemaVersion = rapidVersion || 'unknown';
       this.merge({
-        bundleID: `rapid-imagery-overrides@${rapidSchemaVersion}`,
-        ...vals[1]
+        bundleID: overrides.bundleID ?? `rapid-imagery-overrides@${rapidSchemaVersion}`,
+        imagery: overrides.imagery
       });
 
       // Default the locator overlay to "on"..
@@ -598,7 +682,7 @@ export class ImagerySystem extends AbstractSystem {
    * Reset all sources and rebuild the whichPolygon spatial index.
    * This should be called after merging new imagery data.
    */
-  _rebuildIndex() {
+  private _rebuildIndex(): void {
     // Reset and localize the ImagerySources
     for (const source of this.sources.values()) {
       source.reset();
@@ -617,22 +701,22 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * _hashchange
+   * _hashChanged
    * Respond to any changes appearing in the url hash
-   * @param  {Map<string, string>}  currParams - The current hash parameters
-   * @param  {Map<string, string>}  prevParams - The previous hash parameters
+   * @param currParams - The current hash parameters
+   * @param prevParams - The previous hash parameters
    */
-  _hashchange(currParams, prevParams) {
+  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // background
     const newBackground = currParams.get('background');
     const oldBackground = prevParams.get('background');
     if (!newBackground || newBackground !== oldBackground) {
-      let foundSource;
+      let foundSource: ImagerySource | undefined;
       if (typeof newBackground === 'string') {
         foundSource = this.getSourceByID(newBackground);
       }
       if (foundSource) {
-        this.setSourceByID(newBackground);
+        this.setSourceByID(newBackground!);
       } else {
         this.baseLayerSource(this.chooseDefaultSource());
       }
@@ -642,7 +726,7 @@ export class ImagerySystem extends AbstractSystem {
     const newOverlays = currParams.get('overlays');
     const oldOverlays = prevParams.get('overlays');
     if (newOverlays !== oldOverlays) {
-      let toEnableIDs = new Set();
+      let toEnableIDs = new Set<string>();
       if (typeof newOverlays === 'string') {
         const vals = newOverlays.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
         toEnableIDs = new Set(vals);
@@ -654,13 +738,17 @@ export class ImagerySystem extends AbstractSystem {
     const newOffset = currParams.get('offset');
     const oldOffset = prevParams.get('offset');
     if (newOffset !== oldOffset) {
-      let x, y;
+      let x: number;
+      let y: number;
       if (typeof newOffset === 'string') {
         [x, y] = newOffset.replace(/;/g, ',').split(',').map(s => s.trim()).map(Number);
+      } else {
+        x = 0;
+        y = 0;
       }
       if (isNaN(x) || !isFinite(x)) x = 0;
       if (isNaN(y) || !isFinite(y)) y = 0;
-      this.offset = geoMetersToOffset([x, y]);
+      this.offset = geoMetersToOffset([x, y]) as Vec2;
     }
   }
 
@@ -671,7 +759,7 @@ export class ImagerySystem extends AbstractSystem {
    * i.e. nothing loaded, only default imagery sources.
    * This would probably only be useful for testing, or setting up a special non-OSM Rapid.
    */
-  _resetAll() {
+  private _resetAll(): void {
     const context = this.context;
     const storage = context.systems.storage;
     const wayback = context.services.wayback;
@@ -687,7 +775,7 @@ export class ImagerySystem extends AbstractSystem {
 
     // Add 'Custom' - seed it with whatever template the user has used previously
     const custom = new ImagerySourceCustom(context);
-    custom.template = storage?.getItem('background-custom-template') || '';
+    custom.template = storage?.getItem('background-custom-template') ?? '';
     this.sources.set(custom.id.toLowerCase(), custom);
 
     // Add 'Esri Wayback', if the WaybackService exists.
@@ -705,9 +793,9 @@ export class ImagerySystem extends AbstractSystem {
    * Called whenever the imagery changes.
    * This will update the urlhash, trigger a redraw, and emit an 'imagerychange' event.
    */
-  _imageryChanged() {
+  private _imageryChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const urlhash = context.systems.urlhash;
 
     const baseLayer = this._baseLayer;
@@ -719,7 +807,7 @@ export class ImagerySystem extends AbstractSystem {
       }
 
       // Gather info about enabled overlay imagery (ignore locator)
-      let overlayIDs = [];
+      const overlayIDs: string[] = [];
       for (const overlay of this._overlayLayers.values()) {
         if (overlay.isLocatorOverlay()) continue;
         overlayIDs.push(overlay.id);
@@ -746,13 +834,13 @@ export class ImagerySystem extends AbstractSystem {
    * Call this whenever the locale changes.
    * It will lock in the new locale and relocalize all the imagery sources.
    * These are cached, so switching back to an already-seen locale should be fast.
-   * @param  {string}  localeCode - optional new locale code (fallback to getting it from LocalizationSystem, or en-US)
+   * @param localeCode - optional new locale code (fallback to getting it from LocalizationSystem, or en-US)
    */
-  _localeChanged(localeCode) {
+  private _localeChanged(localeCode?: string): void {
     const l10n = this.context.systems.l10n;
 
     // Ensure that we have a current locale code.
-    localeCode ||= l10n?.localeCode || 'en-US';
+    localeCode ||= l10n?.localeCode ?? 'en-US';
 
     // Reset and localize the ImagerySources
     for (const source of this.sources.values()) {
@@ -761,9 +849,3 @@ export class ImagerySystem extends AbstractSystem {
   }
 
 }
-
-
-/**
- *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
- *  @typedef  {string}  bundleID
- */

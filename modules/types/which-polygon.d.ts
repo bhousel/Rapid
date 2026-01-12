@@ -7,7 +7,7 @@ declare module 'which-polygon' {
   export interface WhichPolygonQuery {
     (point: [number, number], multi?: false): WhichPolygonResult | null;
     (point: [number, number], multi: true): WhichPolygonResult[];
-    bbox(bbox: [number, number, number, number]): WhichPolygonResult[];
+    bbox(bbox: [number, number, number, number], multi?: boolean): WhichPolygonResult[];
   }
 
   // Use a loose type for FeatureCollection to accept both internal GeoJSONObject types

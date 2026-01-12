@@ -104,8 +104,9 @@ describe('ImagerySystem', () => {
       it('bundles', () => {
         assert.instanceOf(_imagery.bundles, Set);
         // Should have the default bundles merged
-        assert.isTrue(_imagery.bundles.has('editor_layer_index'));
-        assert.isTrue(_imagery.bundles.has('rapid_imagery_overrides'));
+        const keys = [..._imagery.bundles];
+        assert.match(keys[0], /^editor_layer_index/);
+        assert.match(keys[1], /^rapid_imagery_overrides/);
       });
 
       it('sources', () => {

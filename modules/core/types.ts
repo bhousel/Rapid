@@ -14,9 +14,12 @@ import type { Graph } from '../lib/Graph.ts';
 // Using `import type` avoids runtime circular dependencies.
 import type { AssetSystem } from './AssetSystem.ts';
 import type { FilterSystem } from './FilterSystem.ts';
+import type { ImagerySystem } from './ImagerySystem.ts';
 import type { LocalizationSystem } from './LocalizationSystem.ts';
 import type { LocationSystem } from './LocationSystem.ts';
+import type { PhotoSystem } from './PhotoSystem.ts';
 import type { RapidSystem } from './RapidSystem.ts';
+import type { SchemaSystem } from './SchemaSystem.ts';
 import type { SpatialSystem } from './SpatialSystem.ts';
 import type { StorageSystem } from './StorageSystem.ts';
 import type { StyleSystem } from './StyleSystem.ts';
@@ -80,9 +83,12 @@ export interface System {
 type AnySystem =
   | AssetSystem
   | FilterSystem
+  | ImagerySystem
   | LocalizationSystem
   | LocationSystem
+  | PhotoSystem
   | RapidSystem
+  | SchemaSystem
   | SpatialSystem
   | StorageSystem
   | StyleSystem
@@ -102,9 +108,12 @@ export interface Systems {
   // Converted to TypeScript - use specific types:
   assets?: AssetSystem;
   filters?: FilterSystem;
+  imagery?: ImagerySystem;
   l10n?: LocalizationSystem;
   locations?: LocationSystem;
+  photos?: PhotoSystem;
   rapid?: RapidSystem;
+  schema?: SchemaSystem;
   spatial?: SpatialSystem;
   storage?: StorageSystem;
   styles?: StyleSystem;
@@ -113,11 +122,8 @@ export interface Systems {
   // Not yet converted - use base System type:
   editor?: System;
   gfx?: System;
-  imagery?: System;
   map?: System;
   map3d?: System;
-  photos?: System;
-  schema?: System;
   ui?: System;
   uploader?: System;
   validator?: System;

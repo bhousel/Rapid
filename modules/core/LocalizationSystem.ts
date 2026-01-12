@@ -163,7 +163,7 @@ export class LocalizationSystem extends AbstractSystem {
     this._cache = {} as LocaleCache;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._hashchange = this._hashchange.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._localeChanged = this._localeChanged.bind(this);
     this.t = this.t.bind(this);
     this.tHtml = this.tHtml.bind(this);
@@ -287,7 +287,7 @@ export class LocalizationSystem extends AbstractSystem {
         this._locales = localeResult.locales;
 
         // Setup event handlers..
-        urlhash?.on('hashchange', this._hashchange);
+        urlhash?.on('hashchange', this._hashChanged);
 
         return this.selectLocaleAsync();
       });
@@ -394,12 +394,12 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * _hashchange
+   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  private _hashchange(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const context = this.context;
     const urlhash = context.systems.urlhash;
 

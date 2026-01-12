@@ -51,7 +51,7 @@ export class MapSystem extends AbstractSystem {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
-    this._hashchange = this._hashchange.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._updateHash = this._updateHash.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
     this.render = this.render.bind(this);
@@ -95,7 +95,7 @@ export class MapSystem extends AbstractSystem {
         // Setup Event Handlers..
         // Note: We want MapSystem's hashchange listener registered as early as possible
         // because so many other parts of Rapid rely on the map location being set correctly.
-        urlhash?.prependListener('hashchange', this._hashchange);
+        urlhash?.prependListener('hashchange', this._hashChanged);
 
         // Forward the 'move' and 'draw' events from the GraphicsSystem
         gfx
@@ -289,12 +289,12 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * _hashchange
+   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param  {Map<string, string>}  currParams - The current hash parameters
    * @param  {Map<string, string>}  prevParams - The previous hash parameters
    */
-  _hashchange(currParams, prevParams) {
+  _hashChanged(currParams, prevParams) {
     const context = this.context;
     const scene = context.systems.gfx.scene;
 

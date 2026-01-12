@@ -37,7 +37,7 @@ export class Map3dSystem extends AbstractSystem {
     this._lastv = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._hashchange = this._hashchange.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._map3dmoved = this._map3dmoved.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
     this.redraw = this.redraw.bind(this);
@@ -74,7 +74,7 @@ export class Map3dSystem extends AbstractSystem {
       })
       .then(() => {
         // Setup event handlers..
-        urlhash?.on('hashchange', this._hashchange);
+        urlhash?.on('hashchange', this._hashChanged);
         l10n?.on('localechange', this._setupKeybinding);
         this._setupKeybinding();
       });
@@ -337,12 +337,12 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _hashchange
+   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param  {Map<string, string>}  currParams - The current hash parameters
    * @param  {Map<string, string>}  prevParams - The previous hash parameters
    */
-  _hashchange(currParams, prevParams) {
+  _hashChanged(currParams, prevParams) {
     // map3d
     const newMap3d = currParams.get('map3d');
     const oldMap3d = prevParams.get('map3d');

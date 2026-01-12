@@ -108,8 +108,8 @@ export class UrlHashSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'urlhash';
-    this.requiredDependencies = new Set<SystemID>(['l10n']);
-    this.optionalDependencies = new Set<SystemID>(['editor', 'map']);
+    this.requiredDependencies = new Set(['l10n']);
+    this.optionalDependencies = new Set(['editor', 'map']);
 
     this.doUpdateTitle = true;
     this.titleBase = 'Rapid';
@@ -154,7 +154,7 @@ export class UrlHashSystem extends AbstractSystem {
     this._prevParams = null;
 
     // Make sure the event handlers have `this` bound correctly
-    this._hashchange = this._hashchange.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._updateHash = this._updateHash.bind(this);
     this._updateTitle = this._updateTitle.bind(this);
 
@@ -184,7 +184,7 @@ export class UrlHashSystem extends AbstractSystem {
         // Register event handlers here
         editor?.on('stablechange', this.deferredUpdateTitle);
         context.on('modechange', this.deferredUpdateTitle);
-        (_window as Window).addEventListener('hashchange', this._hashchange);
+        (_window as Window).addEventListener('hashchange', this._hashChanged);
 
         // A lot of things will start happening when urlhash emits its
         // first hashchange event.  Chain off Context's initAsync Promise
@@ -238,7 +238,7 @@ export class UrlHashSystem extends AbstractSystem {
     this._paused = false;
     this._currHash = null;
 
-    this._hashchange();   // emit 'hashchange' so other code knows what the hash contains
+    this._hashChanged();   // emit 'hashchange' so other code knows what the hash contains
     this._updateHash();   // make sure hash matches the _currParams
     this._updateTitle();
   }
@@ -360,11 +360,11 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * _hashchange
+   * _hashChanged
    * Called on hashchange event (user changes url manually), and when enabling the hash behavior
    * Receiving code will receive copies of both the current and previous parameters.
    */
-  _hashchange(): void {
+  _hashChanged(): void {
     if (!this._started || this._paused) return;
 
     this._currHash = _window.location.hash;

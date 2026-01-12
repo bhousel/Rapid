@@ -129,7 +129,7 @@ export class FilterSystem extends AbstractSystem {
 //    this._deferred = new Set();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._hashchange = this._hashchange.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._filterChanged = this._filterChanged.bind(this);
 
     // hardcode the filters for now
@@ -170,7 +170,7 @@ export class FilterSystem extends AbstractSystem {
       })
       .then(() => {
         // Setup event handlers..
-        urlhash?.on('hashchange', this._hashchange);
+        urlhash?.on('hashchange', this._hashChanged);
       });
 
 //    // warm up the feature matching cache upon merging fetched data
@@ -710,12 +710,12 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * _hashchange
+   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  _hashchange(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // disable_features
     const newDisable = currParams.get('disable_features');
     const oldDisable = prevParams.get('disable_features');

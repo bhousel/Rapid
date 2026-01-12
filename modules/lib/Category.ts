@@ -22,6 +22,10 @@ export interface CategoryProps {
   searchable: boolean;
   /** Match score for ranking search results (always -1 for Categories) */
   matchScore: number;
+  /** Region IDs where this category is or isn't valid. See: https://github.com/ideditor/location-conflation */
+  locationSet?: { include?: string[]; exclude?: string[] };
+  /** Resolved locationSet ID (added by SchemaSystem after processing locationSet) */
+  locationSetID?: string;
 }
 
 

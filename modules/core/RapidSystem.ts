@@ -54,12 +54,12 @@ export class RapidSystem extends AbstractSystem {
    */
   constructor(context: Context) {
     super(context);
-    this.id = 'rapid' as SystemID;
+    this.id = 'rapid';
     this.requiredDependencies = new Set();
-    this.optionalDependencies = new Set(['editor', 'gfx', 'urlhash'] as SystemID[]);
+    this.optionalDependencies = new Set(['editor', 'gfx', 'urlhash']);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._hashchange = this._hashchange.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._stablechange = this._stablechange.bind(this);
     this._datasetsChanged = this._datasetsChanged.bind(this);
   }
@@ -86,7 +86,7 @@ export class RapidSystem extends AbstractSystem {
         return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => {
-        urlhash?.on('hashchange', this._hashchange);
+        urlhash?.on('hashchange', this._hashChanged);
         editor?.on('stablechange', this._stablechange);
      });
   }
@@ -372,12 +372,12 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * _hashchange
+   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  _hashchange(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // poweruser
     // remember if the user had poweruser on at any point in their editing
     if (currParams.get('poweruser') === 'true') {
