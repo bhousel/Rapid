@@ -8,8 +8,6 @@ import type { Viewport } from '@rapid-sdk/math';
 import type { EventEmitter } from 'tseep';
 import type { Selection } from 'd3-selection';
 
-import type { Graph } from '../lib/Graph.ts';
-
 // Import converted system types for use in Systems interface.
 // Using `import type` avoids runtime circular dependencies.
 import type { AssetSystem } from './AssetSystem.ts';
@@ -17,6 +15,7 @@ import type { FilterSystem } from './FilterSystem.ts';
 import type { ImagerySystem } from './ImagerySystem.ts';
 import type { LocalizationSystem } from './LocalizationSystem.ts';
 import type { LocationSystem } from './LocationSystem.ts';
+import type { Map3dSystem } from './Map3dSystem.ts';
 import type { PhotoSystem } from './PhotoSystem.ts';
 import type { RapidSystem } from './RapidSystem.ts';
 import type { SchemaSystem } from './SchemaSystem.ts';
@@ -61,19 +60,15 @@ export type SystemID =
 export interface System {
   /** Unique identifier for this system */
   readonly id: SystemID;
-
   /** Dependencies that must be initialized before this system */
   readonly dependencies: Set<SystemID>;
-
   /** Whether this system has started */
   readonly started: boolean;
 
   /** Initialize the system */
   initAsync(): Promise<void>;
-
   /** Start the system after initialization */
   startAsync(): Promise<void>;
-
   /** Reset the system state */
   resetAsync(): Promise<void>;
 }
@@ -86,6 +81,7 @@ type AnySystem =
   | ImagerySystem
   | LocalizationSystem
   | LocationSystem
+  | Map3dSystem
   | PhotoSystem
   | RapidSystem
   | SchemaSystem
@@ -111,6 +107,7 @@ export interface Systems {
   imagery?: ImagerySystem;
   l10n?: LocalizationSystem;
   locations?: LocationSystem;
+  map3d?: Map3dSystem;
   photos?: PhotoSystem;
   rapid?: RapidSystem;
   schema?: SchemaSystem;
@@ -123,7 +120,6 @@ export interface Systems {
   editor?: System;
   gfx?: System;
   map?: System;
-  map3d?: System;
   ui?: System;
   uploader?: System;
   validator?: System;
@@ -140,19 +136,14 @@ export interface Systems {
 export interface Context extends EventEmitter {
   /** Application version string */
   readonly version: string;
-
   /** All initialized systems */
   systems: Systems;
-
   /** All initialized services (external data sources, APIs) */
   services: Record<string, any>;
-
   /** The map viewport (projection, pan, zoom) */
   viewport: Viewport;
-
   /** Whether the app is in the intro walkthrough */
   inIntro: boolean;
-
   /** Sequence counters for generating unique IDs */
   sequences: Record<string, number>;
 
@@ -162,10 +153,4 @@ export interface Context extends EventEmitter {
    * @returns The next number in the sequence for this prefix
    */
   next(prefix: string): number;
-
-  /**
-   * Get the current stable graph from the editor.
-   * Shortcut for context.systems.editor.stable.graph
-   */
-  graph(): Graph;
 }

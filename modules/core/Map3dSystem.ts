@@ -1,10 +1,20 @@
 import { select as d3_select } from 'd3-selection';
-import { RAD2DEG, numWrap, geomPolygonContainsPolygon, vecEqual } from '@rapid-sdk/math';
+import { RAD2DEG, numWrap, geomPolygonContainsPolygon, vecEqual, Vec2 } from '@rapid-sdk/math';
 import { Color } from 'pixi.js';
 import throttle from 'lodash-es/throttle.js';
 
-import { AbstractSystem } from './AbstractSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
 import { utilCmd } from '../util/cmd.ts';
+
+import type { Context } from './types.ts';
+import type { OsmEntity } from '../data/OsmEntity.ts';
+import type {
+  Map as MapLibreMap,
+  GeoJSONSource,
+  LayerSpecification,
+  DataDrivenPropertyValueSpecification
+} from 'maplibre-gl';
+
 
 const SELECTION_COLOR = '#01d4fa';
 
@@ -14,27 +24,33 @@ const SELECTION_COLOR = '#01d4fa';
  *  and maintains the map state and style specification.
  */
 export class Map3dSystem extends AbstractSystem {
+  /** The MapLibre map instance */
+  maplibre: MapLibreMap | null = null;
+  /** The DOM container ID for the 3D map */
+  readonly containerID: string = 'map3d_container';
+
+  /** A throttled version of redraw() */
+  deferredRedraw: ReturnType<typeof throttle>;
+
+  private _loadPromise: Promise<void> | null = null;
+  private _keys: string[] | null = null;
+
+  // The 3d Map will stay close to the main map, but with an offset zoom and rotation
+  private _zDiff = 3;     // by default, 3dmap will be at main zoom - 3
+  private _bDiff = 0;     // by default, 3dmap bearing will match main map bearing
+  private _lastv: number | null = null;
+
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'map3d';
     this.autoStart = false;
     this.requiredDependencies = new Set(['editor', 'gfx', 'map', 'styles', 'ui', 'urlhash']);
     this.optionalDependencies = new Set(['l10n']);
-    this.maplibre = null;
-    this.containerID = 'map3d_container';
-
-    this._loadPromise = null;
-    this._keys = null;
-
-    // The 3d Map will stay close to the main map, but with an offset zoom and rotation
-    this._zDiff = 3;     // by default, 3dmap will be at main zoom - 3
-    this._bDiff = 0;     // by default, 3dmap bearing will match main map bearing
-    this._lastv = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -55,9 +71,9 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -84,14 +100,14 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
-    const ui = context.systems.ui;
+    const gfx = context.systems.gfx as any;
+    const ui = context.systems.ui as any;
 
     const prerequisites = Promise.all([
       ui.startAsync(),    // wait for UI to be started, so the container will exist
@@ -99,8 +115,8 @@ export class Map3dSystem extends AbstractSystem {
     ]);
 
     return this._startPromise = prerequisites
-      .then(() => {
-        const maplibregl = window.maplibregl;
+      .then((): Promise<void> => {
+        const maplibregl = (globalThis as any).maplibregl;
         if (!maplibregl) throw new Error('maplibre-gl not loaded');
 
         const maplibre = this.maplibre = new maplibregl.Map({
@@ -118,7 +134,7 @@ export class Map3dSystem extends AbstractSystem {
               paint: { 'background-color': 'white' }
             }]
           }
-          });
+        });
 
         // Setup event handlers..
         gfx.on('draw', this.deferredRedraw);  // respond to changes in the main map
@@ -130,7 +146,7 @@ export class Map3dSystem extends AbstractSystem {
         const navOptions = { showCompass: true, showZoom: true, visualizePitch: false };
         maplibre.addControl(new maplibregl.NavigationControl(navOptions));
 
-        return new Promise(resolve => {
+        return new Promise<void>(resolve => {
           maplibre.on('load', () => {
             maplibre.setLight({
               anchor: 'viewport',
@@ -154,7 +170,7 @@ export class Map3dSystem extends AbstractSystem {
 
             this._started = true;
             this.redraw();
-            resolve();
+            resolve(undefined);
           });
         });
       })
@@ -168,9 +184,9 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     this.deferredRedraw.cancel();
     return Promise.resolve();
   }
@@ -181,21 +197,21 @@ export class Map3dSystem extends AbstractSystem {
    * For now, just store this state in the url hash
    * set/get whether the 3d viewer is visible
    */
-  get visible() {
+  get visible(): boolean {
     const urlhash = this.context.systems.urlhash;
-    return !!urlhash.getParam('map3d');
+    return !!urlhash?.getParam('map3d');
   }
 
-  set visible(val) {
+  set visible(val: boolean) {
     const context = this.context;
     const urlhash = context.systems.urlhash;
 
     if (val) {   // show it
-      urlhash.setParam('map3d', 'true');
+      urlhash?.setParam('map3d', 'true');
 
       this.startAsync()  // start it up, if we haven't already
         .then(() => {
-          context.container().select(`#${this.containerID}`)
+          (context as any).container().select(`#${this.containerID}`)
             .style('display', 'block')
             .style('opacity', '0')
             .transition()
@@ -204,11 +220,11 @@ export class Map3dSystem extends AbstractSystem {
         });
 
     } else {   // hide it
-      urlhash.setParam('map3d', null);
+      urlhash?.setParam('map3d', null);
 
       // Expect the MapLibre container to exist already, it's created by `UiMap3dViewer.js`
       // If it doesn't exist, this will return a null selection, and that's ok too.
-      const $mlcontainer = context.container().select(`#${this.containerID}`);
+      const $mlcontainer = (context as any).container().select(`#${this.containerID}`);
       $mlcontainer
         .transition()
         .duration(200)
@@ -221,9 +237,9 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * toggle
    * If visible, make invisible.  If invisible, make visible.
-   * @param  {Event}  e - triggering event (if any)
+   * @param  e - triggering event (if any)
    */
-  toggle(e) {
+  toggle(e?: Event): void {
     if (e) e.preventDefault();
     this.visible = !this.visible;
   }
@@ -233,16 +249,16 @@ export class Map3dSystem extends AbstractSystem {
    * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
-  _setupKeybinding() {
-    const context = this.context;
+  private _setupKeybinding(): void {
+    const context = this.context as any;
     const keybinding = context.keybinding();
-    const l10n = context.systems.l10n;
+    const l10n = this.context.systems.l10n;
 
     if (Array.isArray(this._keys)) {
       keybinding.off(this._keys);
     }
 
-    this._keys = [utilCmd('⌘' + l10n.t('shortcuts.command.toggle_3dmap.key'))];
+    this._keys = [utilCmd('⌘' + l10n?.t('shortcuts.command.toggle_3dmap.key'))];
     context.keybinding().on(this._keys, this.toggle);
   }
 
@@ -250,21 +266,21 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _loadMapLibreAsync
    * Load the MapLibre JS and CSS files into the document head
-   * @return  {Promise}  Promise resolved when both files have been loaded
+   * @return  Promise resolved when both files have been loaded
    */
-  _loadMapLibreAsync() {
+  private _loadMapLibreAsync(): Promise<void> {
     if (this._loadPromise) return this._loadPromise;
 
-    const assets = this.context.systems.assets;
+    const assets = this.context.systems.assets!;
 
     // Tell the AssetSystem what to load..
-    const latestPath = 'https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist';
-    assets.setAsset('mapillary_css', `${latestPath}/maplibre-gl.min.css`, 'latest');
-    assets.setAsset('mapillary_js',  `${latestPath}/maplibre-gl.min.js`,  'latest');
+    const latestPath = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.15/dist';
+    assets.setAsset('maplibre_css', `${latestPath}/maplibre-gl.min.css`, 'latest');
+    assets.setAsset('maplibre_js',  `${latestPath}/maplibre-gl.min.js`,  'latest');
 
     const localPath = 'data/modules/maplibre-gl';
-    assets.setAsset('mapillary_css', `${localPath}/maplibre-gl.css`, 'local');  // note no .min
-    assets.setAsset('mapillary_js',  `${localPath}/maplibre-gl.js`,  'local');  // note no .min
+    assets.setAsset('maplibre_css', `${localPath}/maplibre-gl.css`, 'local');  // note no .min
+    assets.setAsset('maplibre_js',  `${localPath}/maplibre-gl.js`,  'local');  // note no .min
 
     return this._loadPromise = new Promise((resolve, reject) => {
       let count = 0;
@@ -302,7 +318,7 @@ export class Map3dSystem extends AbstractSystem {
    * redraw
    * Redraw the 3d map
    */
-  redraw() {
+  redraw(): void {
     if (!this.visible) return;
     this.updateViewport();
     this.updateData();
@@ -313,7 +329,7 @@ export class Map3dSystem extends AbstractSystem {
    * updateViewport
    * Adjust the 3d map to follow the main map, applying any zoom and rotation offsets.
    */
-  updateViewport() {
+  updateViewport(): void {
     const context = this.context;
     const maplibre = this.maplibre;
     const viewport = context.viewport;
@@ -339,10 +355,10 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _hashChanged
    * Respond to any changes appearing in the url hash
-   * @param  {Map<string, string>}  currParams - The current hash parameters
-   * @param  {Map<string, string>}  prevParams - The previous hash parameters
+   * @param currParams - The current hash parameters
+   * @param prevParams - The previous hash parameters
    */
-  _hashChanged(currParams, prevParams) {
+  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // map3d
     const newMap3d = currParams.get('map3d');
     const oldMap3d = prevParams.get('map3d');
@@ -353,7 +369,6 @@ export class Map3dSystem extends AbstractSystem {
       } else {
         this.visible = false;
       }
-
     }
   }
 
@@ -363,10 +378,10 @@ export class Map3dSystem extends AbstractSystem {
    * Respond to changes in the 3d map, for example if the user interacts with it.
    * Update zoom and bearing offsets from main map, and recenter the main map if needed.
    */
-  _map3dmoved() {
+  private _map3dmoved(): void {
     const context = this.context;
     const maplibre = this.maplibre;
-    const map = context.systems.map;
+    const map = context.systems.map as any;
     const viewport = context.viewport;
     const transform = viewport.transform;
 
@@ -374,7 +389,7 @@ export class Map3dSystem extends AbstractSystem {
     if (!this._lastv) return;   // haven't positioned the map yet (it may be at null island), Rapid#1441
 
     const mlCenter = maplibre.getCenter();
-    const mlCenterLoc = [mlCenter.lng, mlCenter.lat];
+    const mlCenterLoc: Vec2 = [mlCenter.lng, mlCenter.lat];
     const mlZoom = maplibre.getZoom();
     const mlBearing = maplibre.getBearing();
 
@@ -398,28 +413,28 @@ export class Map3dSystem extends AbstractSystem {
    * Collect features in view, filter them according to what we want to show,
    * then update the data in the 3d map.
    */
-  updateData() {
+  updateData(): void {
     if (!this.visible) return;
     if (!this.maplibre) return;   // called too soon?
 
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     const viewport = context.viewport;
 
     const entities = editor.intersects(viewport.visibleExtent());
-    const noRelationEnts = entities.filter(entity => !entity.id.startsWith('r'));
+    const noRelationEnts = entities.filter((entity: OsmEntity) => !entity.id.startsWith('r'));
 
-    const highways = noRelationEnts.filter(entity => {
+    const highways = noRelationEnts.filter((entity: OsmEntity) => {
       const tags = Object.keys(entity.tags).filter(tagname => tagname.startsWith('highway'));
       return tags.length > 0;
     });
 
-    const buildings = noRelationEnts.filter(entity => {
+    const buildings = noRelationEnts.filter((entity: OsmEntity) => {
       const tags = Object.keys(entity.tags).filter(tagname => tagname.startsWith('building'));
       return tags.length > 0;
     });
 
-    const areas = noRelationEnts.filter(entity => {
+    const areas = noRelationEnts.filter((entity: OsmEntity) => {
       const tags = Object.keys(entity.tags).filter(tagname =>
         tagname.startsWith('landuse') ||
         tagname.startsWith('leisure') ||
@@ -438,16 +453,18 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _updateBuildingData
    */
-  _updateBuildingData(entities) {
+  private _updateBuildingData(entities: OsmEntity[]): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     const graph = editor.staging.graph;
-    const selectedIDs = context.selectedIDs();
+    const selectedIDs = (context as any).selectedIDs();
 
-    let buildingFeatures = [];
+    const buildingFeatures = [];
     for (const entity of entities) {
-      const gj = entity.asGeoJSON(graph);
-      if (gj.type !== 'Polygon' && gj.type !== 'MultiPolygon') continue;
+      const geoJSON = entity.asGeoJSON(graph);
+      if (geoJSON?.type !== 'Feature') continue;
+      const geom = geoJSON.geometry;
+      if (geom?.type !== 'Polygon' && geom?.type !== 'MultiPolygon') continue;
 
       // If the building isn't a 'part', check its nodes.
       // If any of THEM have a 'building part' as a way, and if that part is
@@ -457,11 +474,12 @@ export class Map3dSystem extends AbstractSystem {
       // as this is a very expensive algorithm to run
       if (!entity.tags['building:part'] && entities.length < 250) {
         let touchesBuildingPart = false;
+        const wayEntity = entity as any;  // Buildings are OsmWays with nodes property
 
-        for (let node of entity.nodes) {
+        for (const node of wayEntity.nodes) {
           const parents = graph.parentWays(graph.hasEntity(node));
-          for (let way of parents) {
-            if (way.tags['building:part'] && geomPolygonContainsPolygon(entity.nodes.map(n => graph.hasEntity(n).loc), way.nodes.map(n => graph.hasEntity(n).loc))) {
+          for (const way of parents) {
+            if (way.tags['building:part'] && geomPolygonContainsPolygon(wayEntity.nodes.map((n: string) => graph.hasEntity(n).loc), way.nodes.map((n: string) => graph.hasEntity(n).loc))) {
               touchesBuildingPart = true;
               break;
             }
@@ -473,21 +491,21 @@ export class Map3dSystem extends AbstractSystem {
         }
       }
 
-      const newFeature = {
+      const newFeature: GeoJSON.Feature = {
         type: 'Feature',
         properties: {
           extrude: true,
           selected: selectedIDs.includes(entity.id).toString(),
-          min_height: entity.tags.min_height ? parseFloat(entity.tags.min_height) : 0,
-          height: parseFloat(entity.tags.height || entity.tags['building:levels'] * 3 || 0)
+          min_height: entity.tags.min_height ? parseFloat(String(entity.tags.min_height)) : 0,
+          height: parseFloat(String(entity.tags.height || (Number(entity.tags['building:levels']) * 3) || 0))
         },
-        geometry: gj
+        geometry: geom
       };
 
       buildingFeatures.push(newFeature);
     }
 
-    const buildingSource = this.maplibre.getSource('osmbuildings');
+    const buildingSource = this.maplibre?.getSource('osmbuildings') as GeoJSONSource | undefined;
     if (buildingSource) {
       buildingSource.setData({
         type: 'FeatureCollection',
@@ -500,36 +518,38 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _updateAreaData
    */
-  _updateAreaData(entities) {
+  private _updateAreaData(entities: OsmEntity[]): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     const graph = editor.staging.graph;
-    const styles = context.systems.styles;
-    const selectedIDs = context.selectedIDs();
+    const styles = context.systems.styles!;
+    const selectedIDs = (context as any).selectedIDs();
 
-    let areaFeatures = [];
+    const areaFeatures = [];
     for (const entity of entities) {
-      let gj = entity.asGeoJSON(graph);
-      if (gj.type !== 'Polygon' && gj.type !== 'MultiPolygon') continue;
+      const geoJSON = entity.asGeoJSON(graph);
+      if (geoJSON?.type !== 'Feature') continue;
+      const geom = geoJSON.geometry;
+      if (geom?.type !== 'Polygon' && geom?.type !== 'MultiPolygon') continue;
 
       const style = styles.styleMatch(entity.tags);
       const fillColor = new Color(style.fill.color).toHex();
       const strokeColor = new Color(style.stroke.color).toHex();
 
-      const newFeature = {
+      const newFeature: GeoJSON.Feature = {
         type: 'Feature',
         properties: {
           selected: selectedIDs.includes(entity.id).toString(),
           fillcolor: fillColor,
           strokecolor: strokeColor
         },
-        geometry: gj
+        geometry: geom
       };
 
       areaFeatures.push(newFeature);
     }
 
-    const areaSource = this.maplibre.getSource('osmareas');
+    const areaSource = this.maplibre?.getSource('osmareas') as GeoJSONSource | undefined;
     if (areaSource) {
       areaSource.setData({
         type: 'FeatureCollection',
@@ -542,23 +562,25 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _updateRoadData
    */
-  _updateRoadData(entities) {
+  private _updateRoadData(entities: OsmEntity[]): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     const graph = editor.staging.graph;
-    const styles = context.systems.styles;
-    const selectedIDs = context.selectedIDs();
+    const styles = context.systems.styles!;
+    const selectedIDs = (context as any).selectedIDs();
 
-    let roadFeatures = [];
+    const roadFeatures = [];
     for (const entity of entities) {
-      const gj = entity.asGeoJSON(graph);
-      if (gj.type !== 'LineString') continue;
+      const geoJSON = entity.asGeoJSON(graph);
+      if (geoJSON?.type !== 'Feature') continue;
+      const geom = geoJSON.geometry;
+      if (geom?.type !== 'LineString') continue;
 
       const style = styles.styleMatch(entity.tags);
       const casingColor = new Color(style.casing.color).toHex();
       const strokeColor = new Color(style.stroke.color).toHex();
 
-      const newFeature = {
+      const newFeature: GeoJSON.Feature = {
         type: 'Feature',
         properties: {
           selected: selectedIDs.includes(entity.id).toString(),
@@ -566,13 +588,13 @@ export class Map3dSystem extends AbstractSystem {
           casingColor: casingColor,
           strokeColor: strokeColor
         },
-        geometry: gj
+        geometry: geom
       };
 
       roadFeatures.push(newFeature);
     }
 
-    const roadSource = this.maplibre.getSource('osmroads');
+    const roadSource = this.maplibre?.getSource('osmroads') as GeoJSONSource | undefined;
     if (roadSource) {
       roadSource.setData({
         type: 'FeatureCollection',
@@ -586,9 +608,8 @@ export class Map3dSystem extends AbstractSystem {
    * _getBuildingLayer
    * Returns a maplibre layer style specification that appropriately styles 3D buildings using
    * data-driven styling for selected features. Features with no height data are drawn as flat polygons.
-   * @returns {Object}
    */
-  _getBuildingLayer() {
+  private _getBuildingLayer(): LayerSpecification {
     return {
       id: 'building-layer',
       type: 'fill-extrusion',
@@ -613,9 +634,8 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _getAreaLayer
    * Returns a maplibre layer style specification that appropriately styles areas.
-   * @returns {Object}
    */
-  _getAreaLayer() {
+  private _getAreaLayer(): LayerSpecification {
     return {
       id: 'area-layer',
       type: 'fill',
@@ -633,9 +653,8 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _getRoadCasingLayer
    * Returns a maplibre layer style specification that widens the road casing to be just above the stroke.
-   * @returns {Object}
    */
-  _getRoadCasingLayer() {
+  private _getRoadCasingLayer(): LayerSpecification {
     return {
       id: 'road-casing-layer',
       type: 'line',
@@ -657,9 +676,8 @@ export class Map3dSystem extends AbstractSystem {
    * _getRoadSelectedLayer
    * Returns a maplibre layer style specification that appropriately styles a wide extra casing around any selected roads.
    * Also uses the same 'selected' color as the building layer.
-   * @returns {Object}
    */
-  _getRoadSelectedLayer() {
+  private _getRoadSelectedLayer(): LayerSpecification {
     return {
       id: 'road-selected-layer',
       type: 'line',
@@ -682,9 +700,8 @@ export class Map3dSystem extends AbstractSystem {
    * _getRoadStrokeLayer
    * Returns a maplibre layer style specification that appropriately styles the road stroke to be just thinner than the casing.
    * Also uses the same stroke color as the main OSM styling.
-   * @returns {Object}
    */
-  _getRoadStrokeLayer() {
+  private _getRoadStrokeLayer(): LayerSpecification {
     return {
       id: 'road-stroke-layer',
       type: 'line',
@@ -714,13 +731,12 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * _getLineWidth
    * Returns a line width interpolator, to scale the line width based on zoom.
-   * @param   {number} baseWidth - the base width in pixels
-   * @returns {Object}
+   * @param  baseWidth - the base width in pixels
    */
-  _getLineWidth(baseWidth) {
+  private _getLineWidth(baseWidth: number): DataDrivenPropertyValueSpecification<number> {
     return [
       'interpolate',
-      ['linear', 2],
+      ['exponential', 2],
       ['zoom'],
       5,
       0.5,

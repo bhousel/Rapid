@@ -6,7 +6,7 @@ import { GraphicsSystem } from './GraphicsSystem.js';
 import { ImagerySystem } from './ImagerySystem.ts';
 import { LocalizationSystem } from './LocalizationSystem.ts';
 import { LocationSystem } from './LocationSystem.ts';
-import { Map3dSystem } from './Map3dSystem.js';
+import { Map3dSystem } from './Map3dSystem.ts';
 import { MapSystem } from './MapSystem.js';
 import { PhotoSystem } from './PhotoSystem.ts';
 import { RapidSystem } from './RapidSystem.ts';

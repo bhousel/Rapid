@@ -65,7 +65,7 @@
     "fast-json-stable-stringify": "^2.1.0",
     "lodash-es": "^4.17.21",
     "mapillary-js": "^4.1.2",
-    "maplibre-gl": "^3.6.2",
+    "maplibre-gl": "^5.15.0",
     "marked": "^16.4.1",
     "minisearch": "^7.2.0",
     "name-suggestion-index": "~7.0.20251101",
