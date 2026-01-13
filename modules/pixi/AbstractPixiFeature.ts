@@ -3,11 +3,12 @@ import * as PIXI from 'pixi.js';
 import type { Viewport } from '@rapid-sdk/math';
 import type { Context, SingularGeometryType } from '../lib/types.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
+
+import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { PixiScene } from './PixiScene.ts';
 import { PixiGeometryPart } from './PixiGeometryPart.ts';
 
 // Forward declarations for types not yet converted to TypeScript
-type AbstractPixiLayer = any;
-type PixiScene = any;
 type GraphicsSystem = any;
 
 /** Extended PIXI.Container with feature reference */

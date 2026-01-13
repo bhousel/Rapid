@@ -1,8 +1,9 @@
 import * as PIXI from 'pixi.js';
-import { geoMetersToLon, vecEqual } from '@rapid-sdk/math';
+import { geoMetersToLon, vecEqual, type Viewport, type Vec2 } from '@rapid-sdk/math';
 
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { DashLine } from './lib/DashLine.ts';
+import type { PixiScene } from './PixiScene.ts';
 
 
 /**
@@ -19,12 +20,25 @@ import { DashLine } from './lib/DashLine.ts';
  * @class
  */
 export class PixiLayerMapUI extends AbstractPixiLayer {
+  private _oldz: number;
+  private _geolocationData: GeolocationCoordinates | null;
+  private _geolocationDirty: boolean;
+  private _lassoData: Vec2[] | null;
+  private _lassoDirty: boolean;
+  private _lassoLine: PIXI.Graphics | null;
+  private _lassoFill: PIXI.Graphics | null;
+
+  geolocation: PIXI.Container | null;
+  tileDebug: PIXI.Container | null;
+  selected: PIXI.Container | null;
+  halo: PIXI.Container | null;
+  lasso: PIXI.Container | null;
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'map-ui';
     this.enabled = true;   // this layer should always be enabled
@@ -36,6 +50,8 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
     this._lassoData = null;
     this._lassoDirty = false;
+    this._lassoLine = null;
+    this._lassoFill = null;
 
     this.geolocation = null;
     this.tileDebug = null;
@@ -49,7 +65,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  reset(): void {
     super.reset();
 
     this._oldz = 0;
@@ -118,10 +134,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * enabled
    * This layer should always be enabled - it contains important UI stuff
    */
-  get enabled() {
+  get enabled(): boolean {
     return true;
   }
-  set enabled(val) {
+  set enabled(val: boolean) {
     this._enabled = true;
   }
 
@@ -130,10 +146,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * geolocationData
    * see:  https://developer.mozilla.org/en-US/docs/Web/API/GeolocationPosition
    */
-  get geolocationData() {
+  get geolocationData(): GeolocationCoordinates | null {
     return this._geolocationData;
   }
-  set geolocationData(val) {
+  set geolocationData(val: GeolocationCoordinates | null) {
     this._geolocationData = val;
     this._geolocationDirty = true;
   }
@@ -143,10 +159,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * lassoData
    * Pass an array of coordinate data that grows at the user draws the lasso
    */
-  get lassoData() {
+  get lassoData(): Vec2[] | null {
     return this._lassoData;
   }
-  set lassoData(val) {
+  set lassoData(val: Vec2[] | null) {
     this._lassoData = val;
     this._lassoDirty = true;
   }
@@ -155,11 +171,11 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * render
    * Render any of the child containers for UI that should float over the map.
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame, viewport) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     // redraw if zoom changes - note: use true zoom here, not "effective" zoom.
     const z = viewport.transform.zoom;
     if (z !== this._oldz) {
@@ -181,18 +197,19 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * renderLasso
    * Render the lasso polygon
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
    */
-  renderLasso(frame, viewport) {
+  renderLasso(frame: number, viewport: Viewport): void {
     if (!this._lassoDirty) return;
 
     const container = this.lasso;
+    if (!container) return;
     const line = this._lassoLine;
     const fill = this._lassoFill;
     const data = this._lassoData;
 
-    if (Array.isArray(data) && data.length > 1) {  // should show lasso
+    if (line && fill && Array.isArray(data) && data.length > 1) {  // should show lasso
       container.visible = true;
       if (!container.children.length) {
         container.addChild(line, fill);
@@ -202,7 +219,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       const coords = data.slice();  // shallow copy
       const start = coords.at(0);
       const end = coords.at(-1);
-      if (!vecEqual(start, end)) {
+      if (start && end && !vecEqual(start, end)) {
         coords.push(start);
       }
 
@@ -231,26 +248,27 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * renderGeolocation
    * Render the geoloation data
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
    */
-  renderGeolocation(frame, viewport) {
+  renderGeolocation(frame: number, viewport: Viewport): void {
     if (!this._geolocationDirty) return;
 
     const container = this.geolocation;
+    if (!container) return;
 
     container.removeChildren();
 
-    if (this.geolocationData && this.geolocationData.coords) {
+    if (this.geolocationData) {
       container.visible = true;
 
-      const d = this.geolocationData.coords;
-      const coord = [d.longitude, d.latitude];
+      const d = this.geolocationData;
+      const coord: Vec2 = [d.longitude, d.latitude];
       const [x, y] = viewport.project(coord);
 
       // Calculate the radius of the accuracy aura (convert meters -> pixels)
       const dLon = geoMetersToLon(d.accuracy, coord[1]);  // coord[1] = at this latitude
-      const edge = [d.longitude + dLon, d.latitude];
+      const edge: Vec2 = [d.longitude + dLon, d.latitude];
       const x2 = viewport.project(edge)[0];
       const r = Math.max(Math.abs(x2 - x), 15);
       const BLUE = 0xe60ff;
@@ -274,7 +292,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
       const position = new PIXI.Graphics()
         .circle(x, y, 6.5)
-        .stroke(1.5, 0xffffff, 1.0)
+        .stroke({ width: 1.5, color: 0xffffff, alpha: 1.0 })
         .fill({ color: BLUE, alpha: 1.0 });
       position.label = 'position';
       container.addChild(position);

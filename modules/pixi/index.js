@@ -10,8 +10,8 @@ export { PixiTextures } from './PixiTextures.ts';
 
 export { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.js';
 export { PixiLayerCustomData } from './PixiLayerCustomData.js';
-export { PixiLayerDebug } from './PixiLayerDebug.js';
-export { PixiLayerEditBlocks } from './PixiLayerEditBlocks.js';
+export { PixiLayerDebug } from './PixiLayerDebug.ts';
+export { PixiLayerEditBlocks } from './PixiLayerEditBlocks.ts';
 export { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
 export { PixiLayerKartaPhotos } from './PixiLayerKartaPhotos.js';
 export { PixiLayerKeepRight } from './PixiLayerKeepRight.js';
@@ -20,7 +20,7 @@ export { PixiLayerMapillaryDetections } from './PixiLayerMapillaryDetections.js'
 export { PixiLayerMapillaryPhotos } from './PixiLayerMapillaryPhotos.js';
 export { PixiLayerMapillarySigns } from './PixiLayerMapillarySigns.js';
 export { PixiLayerMapRoulette } from './PixiLayerMapRoulette.js';
-export { PixiLayerMapUI } from './PixiLayerMapUI.js';
+export { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 export { PixiLayerOsm } from './PixiLayerOsm.js';
 export { PixiLayerOsmNotes } from './PixiLayerOsmNotes.js';
 export { PixiLayerOsmose } from './PixiLayerOsmose.js';

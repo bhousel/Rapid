@@ -1,5 +1,9 @@
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeaturePolygon } from './PixiFeaturePolygon.js';
+import type { Viewport } from '@rapid-sdk/math';
+
+import type { GeoJSON } from '../data/GeoJSON.ts';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+import type { PixiScene } from './PixiScene.ts';
 
 const MINZOOM = 4;
 
@@ -12,9 +16,9 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'edit-blocks';
     this.enabled = true;   // this layer should always be enabled
@@ -25,10 +29,10 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * enabled
    * This layer should always be enabled
    */
-  get enabled() {
+  get enabled(): boolean {
     return true;
   }
-  set enabled(val) {
+  set enabled(val: boolean) {
     this._enabled = true;
   }
 
@@ -37,7 +41,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  reset(): void {
     super.reset();
   }
 
@@ -45,18 +49,18 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
   /**
    * render
    * Render any edit blocking polygons that are visible in the viewport
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param _zoom - Effective zoom level (unused, we use real zoom from context viewport)
    */
-  render(frame, viewport) {
-    const context = this.context;
+  render(frame: number, viewport: Viewport, _zoom: number): void {
+    const context = this.context as any;
     const l10n = context.systems.l10n;
     const locations = context.systems.locations;
     const mapViewport = context.viewport;  // context viewport !== pixi viewport (they are offset)
     const zoom = mapViewport.transform.zoom;   // use real zoom for this, not "effective" zoom
 
-    let blocks = [];
+    let blocks: GeoJSON[] = [];
     if (zoom >= MINZOOM) {
       blocks = locations.getBlocks(mapViewport.visibleExtent());
       this.renderEditBlocks(frame, viewport, zoom, blocks);
@@ -64,9 +68,9 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
     // setup the explanation
     // add a special 'api-status' line to the map footer explain the block
-    let $explanationRow = context.container().select('.main-content > .map-footer')
+    const $explanationRow = context.container().select('.main-content > .map-footer')
       .selectAll('.api-status.blocks')
-      .data(blocks, d => d.id);
+      .data(blocks, (d: GeoJSON) => d.id);
 
     $explanationRow.exit()
       .remove();
@@ -79,24 +83,24 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
     $$explanationRow
       .append('span')
       .attr('class', 'explanation-item')
-      .text(d => d.props.text);
+      .text((d: GeoJSON) => d.properties.text as string);
 
     $$explanationRow
       .append('a')
       .attr('target', '_blank')
-      .attr('href', d => d.props.url)
+      .attr('href', (d: GeoJSON) => d.properties.url as string)
       .text(l10n.t('rapid_menu.more_info'));
   }
 
 
   /**
    * renderEditBlocks
-   * @param  {number}          frame    -  Integer frame being rendered
-   * @param  {Viewport}        viewport -  Pixi viewport to use for rendering
-   * @param  {number}          zoom     -  Effective zoom to use for rendering
-   * @param  {Array<GeoJSON>}  blocks   -  Array of block data visible in the view
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
+   * @param blocks - Array of block data visible in the view
    */
-  renderEditBlocks(frame, viewport, zoom, blocks) {
+  renderEditBlocks(frame: number, viewport: Viewport, zoom: number, blocks: GeoJSON[]): void {
     const parentContainer = this.scene.groups.get('blocks');
     const blockStyle = {
       requireFill: true,    // no partial fill option - must fill fully
