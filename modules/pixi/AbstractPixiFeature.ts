@@ -1,5 +1,19 @@
 import * as PIXI from 'pixi.js';
-import { PixiGeometryPart } from './PixiGeometryPart.js';
+
+import type { Viewport } from '@rapid-sdk/math';
+import type { Context, SingularGeometryType } from '../lib/types.ts';
+import type { GeometryPart } from '../lib/GeometryPart.ts';
+import { PixiGeometryPart } from './PixiGeometryPart.ts';
+
+// Forward declarations for types not yet converted to TypeScript
+type AbstractPixiLayer = any;
+type PixiScene = any;
+type GraphicsSystem = any;
+
+/** Extended PIXI.Container with feature reference */
+interface FeatureContainer extends PIXI.Container {
+  __feature__: AbstractPixiFeature | null;
+}
 
 
 /**
@@ -24,13 +38,50 @@ import { PixiGeometryPart } from './PixiGeometryPart.js';
  *   `halo`                 A PIXI.DisplayObject() that contains the graphics for the Feature's halo (if it has one)
  */
 export class AbstractPixiFeature {
+  /** Unique string identifier for this Feature */
+  id: string;
+  /** The Layer that owns this Feature */
+  layer: AbstractPixiLayer;
+  /** The PixiScene that contains this Feature */
+  scene: PixiScene;
+  /** Reference to the GraphicsSystem */
+  gfx: GraphicsSystem;
+  /** Global shared application context */
+  context: Context;
+  /** PIXI.Container that contains all the graphics needed to draw the Feature */
+  container: FeatureContainer;
+  /** Version of the Feature, can be used to detect changes */
+  v: number;
+  /** Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full) */
+  lod: number;
+  /** A PIXI.Container that contains the graphics for the Feature's halo (if it has one) */
+  halo: PIXI.Container | null;
+  /** PixiGeometryPart containing all the information about the geometry */
+  geom: PixiGeometryPart;
+
+  /** Whether the Feature is allowed to be interactive */
+  protected _allowInteraction: boolean;
+  /** Style object (contents depends on the Feature type) */
+  protected _style: object | null;
+  /** Whether the style needs to be reapplied */
+  protected _styleDirty: boolean;
+  /** Label string for this feature */
+  protected _label: string | null;
+  /** Whether the label needs to be reapplied */
+  protected _labelDirty: boolean;
+  /** Identifier for the data bound to this Feature */
+  protected _dataID: string | null;
+  /** Data bound to this Feature */
+  protected _data: unknown;
+  /** Pseudoclasses for styling */
+  protected _classes: Set<string>;
 
   /**
    * @constructor
-   * @param  {Layer}   layer     - The Layer that owns this Feature
-   * @param  {string}  featureID - Unique string to use for the identifier of this Feature
+   * @param layer - The Layer that owns this Feature
+   * @param featureID - Unique string to use for the identifier of this Feature
    */
-  constructor(layer, featureID) {
+  constructor(layer: AbstractPixiLayer, featureID: string) {
     this.id = featureID;  // put this first so debug inspect shows it first
 
     this.layer = layer;
@@ -38,7 +89,7 @@ export class AbstractPixiFeature {
     this.gfx = layer.gfx;
     this.context = layer.context;
 
-    const container = new PIXI.Container();
+    const container = new PIXI.Container() as FeatureContainer;
     this.container = container;
 
     container.__feature__ = this;   // Link the container back to `this`
@@ -54,7 +105,7 @@ export class AbstractPixiFeature {
     this.lod = 2;   // full detail
     this.halo = null;
 
-    this.geom = new PixiGeometryPart();
+    this.geom = new PixiGeometryPart(this.context);
     this._style = null;
     this._styleDirty = true;
     this._label = null;
@@ -76,21 +127,21 @@ export class AbstractPixiFeature {
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
-  destroy() {
+  destroy(): void {
     this.layer.removeFeature(this);
     this.scene.removeFeature(this);
 
     // Destroying a container removes it from its parent container automatically
     // We also remove the children too
-    this.container.filters = null;
+    this.container.filters = null!;
     this.container.__feature__ = null;
     this.container.destroy({ children: true });
-    this.container = null;
+    this.container = null!;
 
-    this.layer = null;
-    this.scene = null;
-    this.gfx = null;
-    this.context = null;
+    this.layer = null!;
+    this.scene = null!;
+    this.gfx = null!;
+    this.context = null!;
 
     if (this.halo) {
       this.halo.destroy();
@@ -98,7 +149,7 @@ export class AbstractPixiFeature {
     }
 
     this.geom.destroy();
-    this.geom = null;
+    this.geom = null!;
     this._style = null;
     this._label = null;
 
@@ -112,14 +163,14 @@ export class AbstractPixiFeature {
    * Every Feature should have an `update()` function that redraws the Feature at the given viewport and zoom.
    * When the Feature is updated, its `dirty` flags should be set to `false`.
    * Override in a subclass with needed logic. It will be passed:
-   * @param  {Viewport}  viewport - Pixi viewport to use for rendering
-   * @param  {number}    zoom     - Effective zoom to use for rendering
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
    * @abstract
    */
-  update(viewport, zoom) {
+  update(viewport: Viewport, zoom: number): void {
     if (!this.dirty) return;  // nothing to do
 
-    this.geom.update(viewport, zoom);
+    this.geom.update(viewport);
     this._styleDirty = false;
     // The labeling code will decide what to do with the `_labelDirty` flag
   }
@@ -131,38 +182,38 @@ export class AbstractPixiFeature {
    * Override in a subclass with needed logic.
    * @abstract
    */
-  updateHalo() {
+  updateHalo(): void {
   }
 
 
   /**
    * featureID
    * Unique string to identify this render Feature.
-   * @return  {string}  This feature's unique id
+   * @return This feature's unique id
    * @readonly
    */
-  get featureID() {
+  get featureID(): string {
     return this.id;
   }
 
   /**
    * Feature type
    * The type of feature, this is taken from the GeometryPart.
-   * @return  {string}  This feature's type, one of 'Point', 'LineString', or 'Polygon'
+   * @return This feature's type, one of 'Point', 'LineString', or 'Polygon'
    * @readonly
    */
-  get type() {
+  get type(): SingularGeometryType | undefined {
     return this.geom.type;
   }
 
   /**
    * parentContainer
-   * @param  {PIXI.Container}  val - container for the parent, this Feature's container will be added to it.
+   * @param val - container for the parent, this Feature's container will be added to it.
    */
-  get parentContainer() {
+  get parentContainer(): PIXI.Container | null {
     return this.container.parent;
   }
-  set parentContainer(val) {
+  set parentContainer(val: PIXI.Container | null) {
     const currParent = this.container.parent;
     if (val && val !== currParent) {   // put this feature under a different parent container
       val.addChild(this.container);
@@ -175,12 +226,12 @@ export class AbstractPixiFeature {
   /**
    * visible
    * Whether the Feature is currently visible
-   * @return  {boolean}  `true` if the feature is currently visible
+   * @return `true` if the feature is currently visible
    */
-  get visible() {
+  get visible(): boolean {
     return this.container.visible;
   }
-  set visible(val) {
+  set visible(val: boolean) {
     if (val === this.container.visible) return;  // no change
     this.container.visible = val;
     this.updateHalo();
@@ -191,13 +242,13 @@ export class AbstractPixiFeature {
   /**
    * dirty
    * Whether the Feature needs to be rebuilt
-   * @return  {boolean}  `true` if the feature needs to be rebuilt
+   * @return `true` if the feature needs to be rebuilt
    */
-  get dirty() {
+  get dirty(): boolean {
     // The labeling code will decide what to do with the `_labelDirty` flag
     return this.geom.dirty || this._styleDirty;
   }
-  set dirty(val) {
+  set dirty(val: boolean) {
     this.geom.dirty = val;
     this._styleDirty = val;
     this._labelDirty = val;
@@ -207,12 +258,12 @@ export class AbstractPixiFeature {
   /**
    * allowInteraction
    * Whether the Feature is allowed to be interactive
-   * @return  {boolean}  `true` if the feature is currently interactive, `false` if not
+   * @return `true` if the feature is currently interactive, `false` if not
    */
-  get allowInteraction() {
+  get allowInteraction(): boolean {
     return this._allowInteraction;
   }
-  set allowInteraction(val) {
+  set allowInteraction(val: boolean) {
     if (val === this._allowInteraction) return;  // no change
     this._allowInteraction = val;
 
@@ -224,15 +275,15 @@ export class AbstractPixiFeature {
 
   /**
    * style
-   * @param {Object} obj - Style `Object` (contents depends on the Feature type)
+   * @param obj - Style `Object` (contents depends on the Feature type)
    *
    * 'point' - @see PixiFeaturePoint.js
    * 'line'/'polygon' - @see styles.js
    */
-  get style() {
+  get style(): object | null {
     return this._style;
   }
-  set style(obj) {
+  set style(obj: object | null) {
     this._style = obj;
     this._styleDirty = true;
   }
@@ -240,12 +291,12 @@ export class AbstractPixiFeature {
 
   /**
    * label
-   * @param {string}  str - the label to use
+   * @param str - the label to use
    */
-  get label() {
+  get label(): string | null {
     return this._label;
   }
-  set label(str) {
+  set label(str: string | null) {
     if (str === this._label) return;  // no change
     this._label = str;
     this._labelDirty = true;
@@ -258,7 +309,7 @@ export class AbstractPixiFeature {
    * (because we need to know an id/key to identify the data by, and these can be anything)
    * @readonly
    */
-  get data() {
+  get data(): unknown {
     return this._data;
   }
 
@@ -268,7 +319,7 @@ export class AbstractPixiFeature {
    * (because we need to know an id/key to identify the data by, and these can be anything)
    * @readonly
    */
-  get dataID() {
+  get dataID(): string | null {
     return this._dataID;
   }
 
@@ -279,9 +330,9 @@ export class AbstractPixiFeature {
    * Pseudoclasses are special values that can affecct the styling of a feature.
    * (They do the same thing that CSS classes do).
    * When changing the value of the class we'll also dirty the feature so that it gets redrawn on the next pass.
-   * @param  {string}  classID - the pseudoclass to set
+   * @param classID - the pseudoclass to set
    */
-  setClass(classID) {
+  setClass(classID: string): void {
     const hasClass = this._classes.has(classID);
     if (hasClass) return;  // nothing to do
 
@@ -297,9 +348,9 @@ export class AbstractPixiFeature {
    * Pseudoclasses are special values that can affecct the styling of a feature.
    * (They do the same thing that CSS classes do).
    * When changing the value of the class we'll also dirty the feature so that it gets redrawn on the next pass.
-   * @param  {string}  classID - the pseudoclass to remove
+   * @param classID - the pseudoclass to remove
    */
-  unsetClass(classID) {
+  unsetClass(classID: string): void {
     const hasClass = this._classes.has(classID);
     if (!hasClass) return;  // nothing to do
 
@@ -311,20 +362,28 @@ export class AbstractPixiFeature {
 
   /**
    * hasClass
-   * @param  {string}  classID - the class to check
-   * @return {boolean} `true` if the feature has this class, `false` if not
+   * @param classID - the class to check
+   * @return `true` if the feature has this class, `false` if not
    */
-  hasClass(classID) {
+  hasClass(classID: string): boolean {
     return this._classes.has(classID);
+  }
+
+  /**
+   * classes
+   * Returns a read-only view of the feature's pseudoclasses
+   */
+  get classes(): ReadonlySet<string> {
+    return this._classes;
   }
 
   /**
    * setData
    * This binds the data element to the feature, also lets the layer know about it.
-   * @param  {string}  dataID - Identifer for this data element (e.g. 'n123')
-   * @param  {*}       data   - data to bind to the feature (e.g. an OSM Node)
+   * @param dataID - Identifer for this data element (e.g. 'n123')
+   * @param data - data to bind to the feature (e.g. an OSM Node)
    */
-  setData(dataID, data) {
+  setData(dataID: string, data: unknown): void {
     this._dataID = dataID;
     this._data = data;
     this.layer.bindData(this.id, dataID);
@@ -334,19 +393,19 @@ export class AbstractPixiFeature {
   /**
    * setCoords
    * This sets the coordinate data to be rendered.
-   * @param  {GeometryPart|Object}  source - A GeometryPart, or something that can be turned into one.
+   * @param source - A GeometryPart, or something that can be turned into one.
    */
-  setCoords(source) {
+  setCoords(source: GeometryPart | GeoJSON.Geometry): void {
     this.geom.setData(source);
   }
 
   /**
    * addChildData
    * Adds a mapping from parent data to child data.
-   * @param  {string}  parentID - dataID of the parent (e.g. 'r123')
-   * @param  {string}  childID  - dataID of the child (e.g. 'w123')
+   * @param parentID - dataID of the parent (e.g. 'r123')
+   * @param childID - dataID of the child (e.g. 'w123')
    */
-  addChildData(parentID, childID) {
+  addChildData(parentID: string, childID: string): void {
     this.layer.addChildData(parentID, childID);
     this.dirty = true;
   }
@@ -354,9 +413,9 @@ export class AbstractPixiFeature {
   /**
    * clearChildData
    * Removes all child dataIDs for the given parent dataID
-   * @param  {string}  parentID - dataID of the parent (e.g. 'r123')
+   * @param parentID - dataID of the parent (e.g. 'r123')
    */
-  clearChildData(parentID) {
+  clearChildData(parentID: string): void {
     this.layer.clearChildData(parentID);
     this.dirty = true;
   }

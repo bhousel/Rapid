@@ -1,8 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { numClamp } from '@rapid-sdk/math';
 
-import type { AllocatedRect } from './GuilloteneAllocator.ts';
-import { GuilloteneAllocator } from './GuilloteneAllocator.ts';
+import { GuilloteneAllocator, type AllocatedRect } from './GuilloteneAllocator.ts';
 
 
 /** Extended PIXI.Texture with bin allocation info */

@@ -164,6 +164,19 @@ export class Category {
 - Use `import type { ... }` for type-only imports
 - This prevents circular dependencies and improves tree-shaking
 
+### No Inline Imports
+- **Keep all imports at the top of the file** - don't use inline `import()` syntax in type annotations
+- Example - avoid this:
+  ```typescript
+  setCoords(source: import('../lib/GeometryPart.ts').GeometryPart): void { ... }
+  ```
+- Prefer this:
+  ```typescript
+  import type { GeometryPart } from '../lib/GeometryPart.ts';
+  // ...
+  setCoords(source: GeometryPart): void { ... }
+  ```
+
 ### Import Extensions
 - This is a **Bun project** - use `.ts` extensions for TypeScript file imports
 - For files that have been converted to TypeScript, import with `.ts`:

@@ -1,6 +1,27 @@
-import { Extent } from '@rapid-sdk/math';
-
+import { Extent, type Viewport, type Vec2 } from '@rapid-sdk/math';
+import type { Context, GeometryPartWorldData, SingularGeometry, SingularGeometryType, SSRData } from '../lib/types.ts';
 import { GeometryPart } from '../lib/GeometryPart.ts';
+
+
+/** Screen coordinate data for PixiGeometryPart */
+export interface PixiGeometryPartScreenData {
+  /** Screen coordinates */
+  coords?: Vec2 | Vec2[] | Vec2[][];
+  /** Flat screen coordinates how Pixi wants them [ x,y, x,y, … ] */
+  flatCoords?: number[] | number[][];
+  /** Screen extent bounding box */
+  extent?: Extent;
+  /** Screen centroid */
+  centroid?: Vec2;
+  /** Smallest surrounding rectangle data (angle, poly) */
+  ssr?: SSRData;
+  /** Width of projected shape, in pixels */
+  width?: number;
+  /** Height of projected shape, in pixels */
+  height?: number;
+  /** Level of detail for the geometry (0 = off, 1 = simplified, 2 = full) */
+  lod?: number;
+}
 
 
 /**
@@ -21,14 +42,27 @@ import { GeometryPart } from '../lib/GeometryPart.ts';
  *   `screen.lod`         Level of detail for the geometry (0 = off, 1 = simplified, 2 = full)
  */
 export class PixiGeometryPart {
+  /** Global shared application context */
+  context: Context;
+  /** If true, the screen coordinates need recomputation */
+  dirty: boolean;
+  /** The source GeometryPart */
+  private _source: GeometryPart | null;
+  /** Projected data in world coordinates ([0,0] is the top left corner of a 256x256 Web Mercator world) */
+  world: GeometryPartWorldData | null;
+  /** Projected data in screen coordinates ([0,0] is the origin of the Pixi scene) */
+  screen: PixiGeometryPartScreenData | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     this.context = context;
-    this.reset();
+    this.dirty = true;
+    this._source = null;
+    this.world = null;
+    this.screen = null;
   }
 
 
@@ -37,7 +71,7 @@ export class PixiGeometryPart {
    * Release memory.
    * Do not use the geometry after calling `destroy()`.
    */
-  destroy() {
+  destroy(): void {
     this.reset();
   }
 
@@ -46,35 +80,30 @@ export class PixiGeometryPart {
    * reset
    * Remove all stored data
    */
-  reset() {
-    this.dirty = true;  // if `true`, the screen coordinates need recomputation.
-    this._source = null;  // the source GeometryPart
-
-    // Projected data in world coordinates
-    // ([0,0] is the top left corner of a 256x256 Web Mercator world)
+  reset(): void {
+    this.dirty = true;
+    this._source = null;
     this.world = null;
-
-    // Projected data in screen coordinates
-    // ([0,0] is the origin of the Pixi scene)
     this.screen = null;
   }
 
 
   /**
    * update
-   * @param  {Viewport}  viewport - Pixi viewport to use for rendering
+   * @param viewport - Pixi viewport to use for rendering
    */
-  update(viewport) {
+  update(viewport: Viewport): void {
     if (!this.dirty || !this.world) return;  // nothing to do
 
     this.dirty = false;
     const type = this.type;
     const world = this.world;
-    const screen = this.screen = {};
+    const screen: PixiGeometryPartScreenData = {};
+    this.screen = screen;
 
     // Points are simple, just project once.
     if (type === 'Point') {
-      screen.coords = viewport.worldToScreen(world.coords);
+      screen.coords = viewport.worldToScreen(world.coords as Vec2);
       screen.extent = new Extent(screen.coords);
       screen.centroid = screen.coords;
       screen.width = 0;
@@ -105,14 +134,14 @@ export class PixiGeometryPart {
     // Reproject the coordinate data..
     // Generate both normal coordinate rings and flattened rings at the same time to avoid extra iterations.
     // Preallocate Arrays to avoid garbage collection formerly caused by excessive Array.push()
-    const rings = (type === 'LineString') ? [world.coords] : world.coords;
-    const projRings = new Array(rings.length);
-    const projFlatRings = new Array(rings.length);
+    const rings = (type === 'LineString') ? [world.coords as Vec2[]] : world.coords as Vec2[][];
+    const projRings: Vec2[][] = new Array(rings.length);
+    const projFlatRings: number[][] = new Array(rings.length);
 
     for (let i = 0; i < rings.length; ++i) {
       const ring = rings[i];
-      projRings[i] = new Array(ring.length);
-      projFlatRings[i] = new Array(ring.length * 2);
+      projRings[i] = new Array(ring.length) as Vec2[];
+      projFlatRings[i] = new Array(ring.length * 2) as number[];
 
       for (let j = 0; j < ring.length; ++j) {
         const xy = viewport.worldToScreen(ring[j]);
@@ -145,10 +174,10 @@ export class PixiGeometryPart {
   /**
    * type
    * The original data format lives in the source GeometryPart, this is just a convenience getter.
-   * @return  {string}  One of 'Point', 'LineString', 'Polygon'
+   * @return One of 'Point', 'LineString', 'Polygon'
    * @readonly
    */
-  get type() {
+  get type(): SingularGeometryType | undefined {
     return this._source?.type;
   }
 
@@ -159,17 +188,19 @@ export class PixiGeometryPart {
    * - A GeometryPart (or something like one, with a `type` and `world` props)
    * - A GeoJSON singular geometry that can be turned into a GeometryPart.
    * If there is any existing data, it is first removed.
-   * @param  {GeometryPart|Object}  source - A GeometryPart, or something that can be turned into one.
+   * @param source - A GeometryPart, or something that can be turned into one.
    */
-  setData(source = {}) {
+  setData(source: GeometryPart | GeoJSON.Geometry = {} as GeoJSON.Geometry): void {
     this.destroy();
 
-    if (source.world && source.type) {   // A GeometryPart, or something that looks like one.
-      this._source = source;
-      this.world = source.world;
+    if ((source as GeometryPart).world && (source as GeometryPart).type) {   // A GeometryPart, or something that looks like one.
+      this._source = source as GeometryPart;
+      this.world = (source as GeometryPart).world;
     } else {    // Can this source be turned into a GeometryPart?
       const part = new GeometryPart(this.context);
-      part.setData(source);
+      // GeometryPart.setData accepts only singular geometries (Point, LineString, Polygon).
+      // If passed a Multi* or GeometryCollection, it returns early and does nothing.
+      part.setData(source as Partial<SingularGeometry>);
       if (part.world) {
         this._source = part;
         this.world = part.world;

@@ -1,7 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { vecAdd, vecAngle, vecEqual, vecLength } from '@rapid-sdk/math';
-
-import type { Vec2 } from '@rapid-sdk/math';
+import { vecAdd, vecAngle, vecEqual, vecLength, type Vec2 } from '@rapid-sdk/math';
 
 
 /** Line style options for lineToPoly */

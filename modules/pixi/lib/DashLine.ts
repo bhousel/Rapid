@@ -1,7 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { vecLength } from '@rapid-sdk/math';
-
-import type { Vec2 } from '@rapid-sdk/math';
+import { vecLength, type Vec2 } from '@rapid-sdk/math';
 
 
 /** Define the dash: [dash length, gap size, dash size, gap size, ...] */
@@ -209,7 +207,7 @@ export class DashLine {
       let remaining = length;
       while (remaining > 1) {   // stop if we are within 1 pixel
         const dashSize = (this.dash[dashIndex] * this.scale) - dashStart;
-        let dist = (remaining > dashSize) ? dashSize : remaining;
+        const dist = (remaining > dashSize) ? dashSize : remaining;
 
         if (final) {
           const remainingDistance = vecLength([x0 + cos * dist, y0 + sin * dist] as Vec2, [this.start!.x, this.start!.y] as Vec2);
