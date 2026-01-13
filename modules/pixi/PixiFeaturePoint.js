@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
 
 import { AbstractPixiFeature } from './AbstractPixiFeature.js';
-import { DashLine } from './lib/DashLine.js';
+import { DashLine } from './lib/DashLine.ts';
 
 
 /**

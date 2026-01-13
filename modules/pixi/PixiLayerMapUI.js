@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 import { geoMetersToLon, vecEqual } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { DashLine } from './lib/DashLine.js';
+import { DashLine } from './lib/DashLine.ts';
 
 
 /**

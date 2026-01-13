@@ -120,7 +120,10 @@ export class Category {
 
 ### Avoid Unnecessary Casts
 - Don't add type casts that TypeScript can already infer
+- Before adding `as Type`, check if the expression already has that type (hover over it or check the type definition)
 - Common unnecessary casts to avoid:
+  - `as ReturnType` on function calls when the function already returns that type
+    (e.g., `vecAdd(a, b) as Vec2` is unnecessary when `vecAdd` already returns `Vec2`)
   - `as SystemID` on string literals that already match the union type
   - `as Graph` or similar when accessing properties on an `any` typed variable (already returns `any`)
   - `as SomeType[]` on array literals passed to `new Set()` when TypeScript can infer the type

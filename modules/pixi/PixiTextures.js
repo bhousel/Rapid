@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 
-import { AtlasAllocator, registerAtlasUploader } from './lib/AtlasAllocator.js';
+import { AtlasAllocator, registerAtlasUploader } from './lib/AtlasAllocator.ts';
 
 
 /**

@@ -3,8 +3,8 @@ import { GlowFilter } from 'pixi-filters';
 import { vecEqual, vecLength } from '@rapid-sdk/math';
 
 import { AbstractPixiFeature } from './AbstractPixiFeature.js';
-import { DashLine } from './lib/DashLine.js';
-import { lineToPoly } from './helpers.js';
+import { DashLine } from './lib/DashLine.ts';
+import { lineToPoly } from './helpers.ts';
 
 const PARTIALFILLWIDTH = 32;
 

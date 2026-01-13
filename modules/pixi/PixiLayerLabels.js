@@ -3,7 +3,7 @@ import RBush from 'rbush';
 import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotatePoints } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.js';
+import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
 
 
 const MINZOOM = 12;

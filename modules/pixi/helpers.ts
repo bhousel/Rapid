@@ -1,16 +1,45 @@
 import * as PIXI from 'pixi.js';
 import { vecAdd, vecAngle, vecEqual, vecLength } from '@rapid-sdk/math';
 
+import type { Vec2 } from '@rapid-sdk/math';
+
+
+/** Line style options for lineToPoly */
+export interface LineStyle {
+  alignment?: number;
+  width?: number;
+  native?: boolean;
+  [key: string]: any;
+}
+
+/** Result from lineToPoly containing paths for hit areas */
+export interface LineToPolyResult {
+  /** Flattened [x,y,x,y,...] coordinates for perimeter */
+  perimeter: number[];
+  /** Flattened outer path (for closed lines only) */
+  outer?: number[];
+  /** Flattened inner path (for closed lines only) */
+  inner?: number[];
+}
+
+/** Segment returned by getLineSegments */
+export interface LineSegment {
+  /** Array of [x,y] coordinates along the segment */
+  coords: Vec2[];
+  /** Heading angle in radians */
+  angle: number;
+}
+
 
 /**
  * lineToPolygon
  * Generates a polygon from a line. Intended for use to create custom hit areas for our ways.
  * @see https://jsfiddle.net/bigtimebuddy/xspmq8au/
- * @param   {number}        width  - Width of the polygon in pixels (deviation from either side of the line)
- * @param   {Array<Vec2>}   points - Array of [x,y] coordinates that make up the line.
- * @return  {PIXI.Polygon}  The polygon encasing the line with specified width.
+ * @param   width  - Width of the polygon in pixels (deviation from either side of the line)
+ * @param   points - Flat array of [x,y,x,y,...] coordinates that make up the line.
+ * @return  The polygon encasing the line with specified width.
  */
-export function lineToPolygon(width, points) {
+export function lineToPolygon(width: number, points: number[]): PIXI.Polygon {
   const numPoints = points.length / 2;
   const output = new Array(points.length * 2);
   for (let i = 0; i < numPoints; i++) {
@@ -52,18 +81,17 @@ export function lineToPolygon(width, points) {
  * lineToPoly
  * Use Pixi's built-in line builder to convert a line with some width into a polygon.
  * @see https://github.com/pixijs/pixijs/blob/dev/packages/graphics/src/utils/buildLine.ts
- * @param  {Array<number>}  flatPoints - `Array` of [ x,y, x,y, … ] points that make up the line
- * @param  {Object}         lineStyle  - `Object` suitable to use as a lineStyle (important options are alignment and width)
+ * @param  flatPoints - Flat array of [x,y,x,y,...] points that make up the line
+ * @param  lineStyle  - Object suitable to use as a lineStyle (important options are alignment and width)
+ * @return Result containing perimeter and optionally outer/inner paths
  */
-export function lineToPoly(flatPoints, lineStyle = {}) {
+export function lineToPoly(flatPoints: number[], lineStyle: LineStyle = {}): LineToPolyResult {
   const EPSILON = 1e-4;
-  const first = [flatPoints[0], flatPoints[1]];
-  const last = [flatPoints[flatPoints.length - 2], flatPoints[flatPoints.length - 1]];
+  const first: Vec2 = [flatPoints[0], flatPoints[1]];
+  const last: Vec2 = [flatPoints[flatPoints.length - 2], flatPoints[flatPoints.length - 1]];
   const isClosed = vecEqual(first, last, EPSILON);
-  const sourceShape = new PIXI.Polygon(flatPoints);
 
   lineStyle.native = false;  // we want the non-native line builder
-  sourceShape.closeStroke = false;  // don't make an extra segment from end to start
 
   // Make some fake graphicsData and graphicsGeometry.
   // (I'm avoiding using a real PIXI.Graphic because I dont want to affect the batch system)
@@ -111,27 +139,31 @@ export function lineToPoly(flatPoints, lineStyle = {}) {
   const verts = graphicsGeometry.verts;
   const indices = graphicsGeometry.indices;
 
-  let sides = new Map();  // Map(index -> what side it's on) (`true` if left, `false` if right)
-  let pathL = [];
-  let pathR = [];
-  let lastL;
-  let lastR;
+  const sides = new Map<number, boolean>();  // Map(index -> what side it's on) (`true` if left, `false` if right)
+  const pathL: Vec2[] = [];
+  const pathR: Vec2[] = [];
+  let lastL: Vec2 | undefined;
+  let lastR: Vec2 | undefined;
   let lenL = 0;
   let lenR = 0;
 
   // Sometimes `buildLine` skips triangles if they are too small, so keep track
   // of the previous triangle's verts and indices in case we need them.
-  let vp0, vp1, vp2;
-  let ip0, ip1, ip2;
+  let vp0: Vec2 | undefined;
+  let vp1: Vec2 | undefined;
+  let vp2: Vec2 | undefined;
+  let ip0: number | undefined;
+  let ip1: number | undefined;
+  let ip2: number | undefined;
 
   // Inspect each triangle in the strip.
   for (let j = 0; j < indices.length; j += 3) {
     const i0 = indices[j];
     const i1 = indices[j + 1];
     const i2 = indices[j + 2];
-    const v0 = [ verts[(i0 * 2)], verts[(i0 * 2) + 1] ];
-    const v1 = [ verts[(i1 * 2)], verts[(i1 * 2) + 1] ];
-    const v2 = [ verts[(i2 * 2)], verts[(i2 * 2) + 1] ];
+    const v0: Vec2 = [ verts[(i0 * 2)], verts[(i0 * 2) + 1] ];
+    const v1: Vec2 = [ verts[(i1 * 2)], verts[(i1 * 2) + 1] ];
+    const v2: Vec2 = [ verts[(i2 * 2)], verts[(i2 * 2) + 1] ];
 
     // First triangle
     // Pick index 0 as the "left side" and index 1 as the "right side"
@@ -157,17 +189,17 @@ export function lineToPoly(flatPoints, lineStyle = {}) {
 
       // Sometimes `buildLine` skips triangles - (their verts appear in the vertex array but not the index array)
       // So first - check if any of the "new" verts in this triangle happen to match the previous triangle's verts
-      if (s0 === undefined && vecEqual(v0, vp0, EPSILON)) {  // v0 and vp0 are the same point
-        s0 = sides.get(ip0);
-        sides.set(i0, s0);
+      if (s0 === undefined && vecEqual(v0, vp0!, EPSILON)) {  // v0 and vp0 are the same point
+        s0 = sides.get(ip0!);
+        sides.set(i0, s0!);
       }
-      if (s1 === undefined && vecEqual(v1, vp1, EPSILON)) {  // v1 and vp1 are the same point
-        s1 = sides.get(ip1);
-        sides.set(i1, s1);
+      if (s1 === undefined && vecEqual(v1, vp1!, EPSILON)) {  // v1 and vp1 are the same point
+        s1 = sides.get(ip1!);
+        sides.set(i1, s1!);
       }
-      if (s2 === undefined && vecEqual(v2, vp2, EPSILON)) {  // v2 and vp2 are the same point
-        s2 = sides.get(ip2);
-        sides.set(i2, s2);
+      if (s2 === undefined && vecEqual(v2, vp2!, EPSILON)) {  // v2 and vp2 are the same point
+        s2 = sides.get(ip2!);
+        sides.set(i2, s2!);
       }
 
       // Given 2 "seen" vertex sides, what side would the third vertex be on?
@@ -176,7 +208,9 @@ export function lineToPoly(flatPoints, lineStyle = {}) {
       // (round caps and joins aren't always this way, so this code doesn't support them!)
 
       // One of these should be the "new" vertex..
-      let inew, vnew, snew;
+      let inew: number | undefined;
+      let vnew: Vec2 | undefined;
+      let snew: boolean | undefined;
       if (s0 === undefined) {
         inew = i0;
         vnew = v0;
@@ -194,15 +228,15 @@ export function lineToPoly(flatPoints, lineStyle = {}) {
       }
 
       // Append the new vertex to either the left or right side path
-      if (inew !== undefined) {
+      if (inew !== undefined && vnew !== undefined && snew !== undefined) {
         sides.set(inew, snew);  // snew = `true` if left, `false` if right
         if (snew === true) {
           pathL.push(vnew);
-          lenL += vecLength(lastL, vnew);
+          if (lastL) lenL += vecLength(lastL, vnew);
           lastL = vnew;
         } else {
           pathR.push(vnew);
-          lenR += vecLength(lastR, vnew);
+          if (lastR) lenR += vecLength(lastR, vnew);
           lastR = vnew;
         }
       }  // else we've seen all these vertices before - shouldnt happen?
@@ -214,12 +248,14 @@ export function lineToPoly(flatPoints, lineStyle = {}) {
   }
 
 
-  const result = {};
+  const result: LineToPolyResult = {
+    perimeter: []
+  };
 
   // This path can be used as an array of points for the hitArea.
   // Go out on one side and back on the other, then close it off.
   const len = pathL.length + pathR.length + 1;
-  const perimeter = new Array(len * 2);
+  const perimeter: number[] = new Array(len * 2);
   let i = 0;
   for (let j = 0; j < pathL.length; ++i, ++j) {   // flatten coords
     perimeter[i * 2] = pathL[j][0];
@@ -239,7 +275,7 @@ export function lineToPoly(flatPoints, lineStyle = {}) {
 
   // If the line was closed, determine which path is longer (outer) and shorter (inner)
   if (isClosed) {
-    const pointsL = new Array((pathL.length + 1) * 2);
+    const pointsL: number[] = new Array((pathL.length + 1) * 2);
     for (let j = 0; j < pathL.length; ++j) {   // flatten coords
       pointsL[j * 2] = pathL[j][0];
       pointsL[j * 2 + 1] = pathL[j][1];
@@ -248,7 +284,7 @@ export function lineToPoly(flatPoints, lineStyle = {}) {
     pointsL[pointsL.length - 2] = pathL[0][0];
     pointsL[pointsL.length - 1] = pathL[0][1];
 
-    const pointsR = new Array((pathR.length + 1) * 2);
+    const pointsR: number[] = new Array((pathR.length + 1) * 2);
     for (let j = 0; j < pathR.length; ++j) {   // flatten coords
       pointsR[j * 2] = pathR[j][0];
       pointsR[j * 2 + 1] = pathR[j][1];
@@ -280,19 +316,19 @@ export function lineToPoly(flatPoints, lineStyle = {}) {
  *         |   ->   { coords: [v,v],     angle: -PI/2 },
  *   d --- c        { coords: [<,<,<,<], angle: PI    }]
  *
- * @param   {Array<Vec2>}  points    - Array of [x,y] coordinates that make up the line.
- * @param   {number}       spacing   - Distance between segments in pixels (arrows, sided arrows, etc)
- * @param   {boolean?}     isSided   - If applying a 'sided' style to the line, arrows will be drawn perpendicular to the line segments.
- * @param   {boolean?}     isLimited - Whether to limit the number (temporary, see below)
- * @return  {Array<*>}     Array of segment Objects in the format { coords: Array<Vec2>, angle: number }
+ * @param   points    - Array of [x,y] coordinates that make up the line.
+ * @param   spacing   - Distance between segments in pixels (arrows, sided arrows, etc)
+ * @param   isSided   - If applying a 'sided' style to the line, arrows will be drawn perpendicular to the line segments.
+ * @param   isLimited - Whether to limit the number (temporary, see below)
+ * @return  Array of segment Objects in the format { coords: Array<Vec2>, angle: number }
  */
-export function getLineSegments(points, spacing, isSided = false, isLimited = false) {
+export function getLineSegments(points: Vec2[], spacing: number, isSided: boolean = false, isLimited: boolean = false): LineSegment[] {
   const SIDEDOFFSET = 7;
 
   let offset = spacing;
-  let a;
+  let a: Vec2 | undefined;
 
-  let segments = [];
+  const segments: LineSegment[] = [];
   for (const b of points) {
     if (a) {
       let span = vecLength(a, b) - offset;
@@ -310,13 +346,13 @@ export function getLineSegments(points, spacing, isSided = false, isLimited = fa
           sided_dy = SIDEDOFFSET * Math.sin(heading + Math.PI / 2);
         }
 
-        let p = [
+        let p: Vec2 = [
           a[0] + offset * Math.cos(heading) + sided_dx,
           a[1] + offset * Math.sin(heading) + sided_dy
         ];
 
         // generate coordinates between `a` and `b`, spaced `spacing` apart
-        let coords = [a, p];
+        const coords: Vec2[] = [a, p];
 
 // temporary, see https://github.com/facebook/Rapid/issues/544
 // If we are going to generate more than 100 line segments,
@@ -351,16 +387,24 @@ if (isLimited && (span >= spacing * 100)) {
 /**
  * getDebugBBox
  * Returns a PIXI.Sprite that covers the given box, used for debugging.
- * @param   {number}       x  - left of the box
- * @param   {number}       y  - top of the box
- * @param   {number}       w  - width of the box
- * @param   {number}       h  - height of the box
- * @param   {number}       tint - tint of the box (number, or something Pixi accepts as a color)
- * @param   {number?}      alpha - alpha of the box
- * @param   {string?}      label - name of the box, optional
- * @return  {PIXI.Sprite}  Sprite for the box
+ * @param   x      - left of the box
+ * @param   y      - top of the box
+ * @param   w      - width of the box
+ * @param   h      - height of the box
+ * @param   tint   - tint of the box (number, or something Pixi accepts as a color)
+ * @param   alpha  - alpha of the box
+ * @param   label  - name of the box, optional
+ * @return  Sprite for the box
  */
-export function getDebugBBox(x, y, w, h, tint, alpha, label) {
+export function getDebugBBox(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  tint?: number,
+  alpha?: number,
+  label?: string
+): PIXI.Sprite {
   const sprite = new PIXI.Sprite({ texture: PIXI.Texture.WHITE });
   sprite.eventMode = 'none';
   sprite.anchor.set(0, 0);   // left, top

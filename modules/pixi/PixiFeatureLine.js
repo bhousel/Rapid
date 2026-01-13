@@ -2,8 +2,8 @@ import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
 
 import { AbstractPixiFeature } from './AbstractPixiFeature.js';
-import { DashLine } from './lib/DashLine.js';
-import { getLineSegments, lineToPoly } from './helpers.js';
+import { DashLine } from './lib/DashLine.ts';
+import { getLineSegments, lineToPoly } from './helpers.ts';
 
 const ONEWAY_SPACING = 35;
 const SIDED_SPACING = 30;
