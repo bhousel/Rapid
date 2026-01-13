@@ -22,6 +22,7 @@ import type { SchemaSystem } from './SchemaSystem.ts';
 import type { SpatialSystem } from './SpatialSystem.ts';
 import type { StorageSystem } from './StorageSystem.ts';
 import type { StyleSystem } from './StyleSystem.ts';
+import type { UploaderSystem } from './UploaderSystem.ts';
 import type { UrlHashSystem } from './UrlHashSystem.ts';
 
 /** Permissive D3 selection type - accepts any selection without strict type checking */
@@ -88,6 +89,7 @@ type AnySystem =
   | SpatialSystem
   | StorageSystem
   | StyleSystem
+  | UploaderSystem
   | UrlHashSystem
   | System;
 
@@ -114,6 +116,7 @@ export interface Systems {
   spatial?: SpatialSystem;
   storage?: StorageSystem;
   styles?: StyleSystem;
+  uploader?: UploaderSystem;
   urlhash?: UrlHashSystem;
 
   // Not yet converted - use base System type:
@@ -121,7 +124,6 @@ export interface Systems {
   gfx?: System;
   map?: System;
   ui?: System;
-  uploader?: System;
   validator?: System;
 }
 

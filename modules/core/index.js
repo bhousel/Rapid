@@ -15,7 +15,7 @@ import { SpatialSystem } from './SpatialSystem.ts';
 import { StorageSystem } from './StorageSystem.ts';
 import { StyleSystem } from './StyleSystem.ts';
 import { UiSystem } from './UiSystem.js';
-import { UploaderSystem } from './UploaderSystem.js';
+import { UploaderSystem } from './UploaderSystem.ts';
 import { UrlHashSystem } from './UrlHashSystem.ts';
 import { ValidationSystem } from './ValidationSystem.js';
 

@@ -1,12 +1,59 @@
 import { utilArrayUnion, utilArrayUniq } from '@rapid-sdk/util';
 
-import { AbstractSystem } from './AbstractSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
 import { actionDiscardTags } from '../actions/discard_tags.js';
 import { actionMergeRemoteChanges } from '../actions/merge_remote_changes.js';
 import { actionRevert } from '../actions/revert.js';
 import { createOsmEntity } from '../data/index.js';
 import { Graph } from '../lib/Graph.ts';
 
+import type { Context } from './types.ts';
+import type { EntityID } from '../data/types.ts';
+import type { OsmChangeset } from '../data/OsmChangeset.ts';
+import type { OsmEntity } from '../data/OsmEntity.ts';
+
+
+/** Represents an error that occurred during the upload process */
+export interface UploadError {
+  /** Error message */
+  msg: string;
+  /** Additional details about the error */
+  details?: string[];
+}
+
+/** Represents a choice option for resolving a conflict */
+export interface ConflictChoice {
+  /** Entity ID this choice applies to */
+  id: string;
+  /** Display text for this choice */
+  text: string;
+  /** Action to perform when this choice is selected */
+  action: () => void;
+}
+
+/** Represents a conflict that occurred during the upload process */
+export interface UploadConflict {
+  /** Entity ID of the conflicting entity */
+  id: string;
+  /** Display name of the entity */
+  name: string;
+  /** Details about the conflict */
+  details: any[];
+  /** Index of the currently chosen resolution (0 or 1) */
+  chosen: number;
+  /** Available choices for resolving the conflict */
+  choices: ConflictChoice[];
+}
+
+/** Represents the changes to be uploaded */
+export interface UploadChanges {
+  /** Entities that were modified */
+  modified: OsmEntity[];
+  /** Entities that were created */
+  created: OsmEntity[];
+  /** Entities that were deleted */
+  deleted: OsmEntity[];
+}
 
 
 /**
@@ -27,12 +74,27 @@ import { Graph } from '../lib/Graph.ts';
  *   'resultSuccess'     // upload completed without errors
  */
 export class UploaderSystem extends AbstractSystem {
+  /** The current changeset being uploaded (created by uiCommit) */
+  changeset: OsmChangeset | null;
+
+  private _origChanges: UploadChanges | null;
+  private _discardTags: Record<string, boolean>;
+  private _isSaving: boolean;
+
+  // Variables for conflict checking
+  private _localGraph: Graph | null;
+  private _remoteGraph: Graph | null;
+  private _toCheckIDs: Set<EntityID>;
+  private _toLoadIDs: Set<EntityID>;
+  private _loadedIDs: Set<EntityID>;
+  private _conflicts: UploadConflict[];
+  private _errors: UploadError[];
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'uploader';
     this.requiredDependencies = new Set(['assets', 'editor', 'l10n']);
@@ -61,36 +123,36 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
     const assets = context.systems.assets;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     const l10n = context.systems.l10n;
 
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          assets?.initAsync(),
+          assets!.initAsync(),
           editor?.initAsync(),
           l10n?.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })
-      .then(() => assets.loadAssetAsync('iD_schema_discarded'))
-      .then(d => this._discardTags = d);
+      .then(() => assets!.loadAssetAsync('iD_schema_discarded'))
+      .then(d => { this._discardTags = d as Record<string, boolean>; });
   }
 
 
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -98,9 +160,9 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     this.changeset = null;
     return Promise.resolve();
   }
@@ -108,27 +170,31 @@ export class UploaderSystem extends AbstractSystem {
 
   /**
    * isSaving
+   * @return `true` if a save operation is in progress, `false` otherwise
    */
-  isSaving() {
+  isSaving(): boolean {
     return this._isSaving;
   }
 
 
   /**
    * save
+   * Begin the save process to upload changes to OSM
+   * @param tryAgain - Whether this is a retry attempt after a conflict
+   * @param checkConflicts - Whether to check for conflicts before uploading
    */
-  save(tryAgain, checkConflicts) {
+  save(tryAgain?: boolean, checkConflicts?: boolean): void {
     // Guard against accidentally entering save code twice - iD#4641
     if (this._isSaving && !tryAgain) return;
 
     const context = this.context;
-    const osm = context.services.osm;
+    const osm = context.services.osm as any;
     if (!osm) return;
 
     // If user somehow got logged out mid-save, try to reauthenticate..
     // This can happen if they were logged in from before, but the tokens are no longer valid.
     if (!osm.authenticated()) {
-      osm.authenticate(err => {
+      osm.authenticate((err: any) => {
         if (!err) {
           this.save(tryAgain, checkConflicts);  // continue where we left off..
         }
@@ -151,7 +217,7 @@ export class UploaderSystem extends AbstractSystem {
     this._errors = [];
 
     // Store original changes, in case user wants to download them as an .osc file
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     this._origChanges = editor.changes(actionDiscardTags(editor.difference(), this._discardTags));
 
     // Attempt a fast upload first.. If there are conflicts, re-enter with `checkConflicts = true`
@@ -165,11 +231,12 @@ export class UploaderSystem extends AbstractSystem {
 
   /**
    * _startConflictCheck
+   * Start the conflict checking process before upload
    */
-  _startConflictCheck() {
+  private _startConflictCheck(): void {
     const context = this.context;
-    const osm = context.services.osm;
-    const editor = context.systems.editor;
+    const osm = context.services.osm as any;
+    const editor = context.systems.editor as any;
     const summary = editor.difference().summary();
     const graph = editor.staging.graph;
 
@@ -199,22 +266,27 @@ export class UploaderSystem extends AbstractSystem {
     if (osm && this._toLoadIDs.size) {
       this.emit('progressChanged', this._loadedIDs.size, this._toCheckIDs.size);
       osm.loadMultipleAsync(Array.from(this._toLoadIDs))
-        .then(results => this._loadedSome(null, results))
-        .catch(err => this._loadedSome(err));
+        .then((results: any) => this._loadedSome(null, results))
+        .catch((err: any) => this._loadedSome(err));
     } else {
       this._tryUpload();
     }
   }
 
 
-  // `loadedSome` callback may be called multiple times.
-  // Here we load a batch of remote entities into `remoteGraph`,
-  // then expand the search set if needed and schedule more loading.
-  _loadedSome(err, results) {
+  /**
+   * _loadedSome
+   * Errback-style callback that may be called multiple times.
+   * Here we load a batch of remote entities into `remoteGraph`,
+   * then expand the search set if needed and schedule more loading.
+   * @param  err - Error returned by the `loadMultipleAsync` call
+   * @param  results - Data returned by the `loadMultipleAsync` call
+   */
+  private _loadedSome(err: any, results?: any): void {
     if (this._errors.length) return;   // give up if there are errors
 
-    const l10n = this.context.systems.l10n;
-    const osm = this.context.services.osm;
+    const l10n = this.context.systems.l10n!;
+    const osm = this.context.services.osm as any;
 
     if (err) {
       this._errors.push({
@@ -225,11 +297,11 @@ export class UploaderSystem extends AbstractSystem {
       return;
     }
 
-    let loadMoreIDs = new Set();
+    const loadMoreIDs = new Set<EntityID>();
 
-    for (const props of (results.data || [])) {
-      const entity = createOsmEntity(props);
-      this._remoteGraph.replace(entity);
+    for (const props of (results?.data || [])) {
+      const entity = createOsmEntity(props) as any;
+      this._remoteGraph!.replace(entity);
       this._loadedIDs.add(entity.id);
       this._toLoadIDs.delete(entity.id);
 
@@ -260,8 +332,8 @@ export class UploaderSystem extends AbstractSystem {
 
     if (osm && loadMoreIDs.size) {
       osm.loadMultipleAsync(Array.from(loadMoreIDs))
-        .then(results => this._loadedSome(null, results))
-        .catch(err => this._loadedSome(err));
+        .then((results: any) => this._loadedSome(null, results))
+        .catch((err: any) => this._loadedSome(err));
 
 
     } else if (!this._toLoadIDs.size) {  // we have loaded everything, continue to the next step
@@ -271,16 +343,19 @@ export class UploaderSystem extends AbstractSystem {
   }
 
 
-  // Test everything in `_toCheckIDs` for conflicts
-  _detectConflicts() {
+  /**
+   * _detectConflicts
+   * Test everything in `_toCheckIDs` for conflicts
+   */
+  private _detectConflicts(): void {
     const context = this.context;
-    const l10n = context.systems.l10n;
-    const editor = context.systems.editor;
-    const osm = context.services.osm;
+    const l10n = context.systems.l10n!;
+    const editor = context.systems.editor as any;
+    const osm = context.services.osm as any;
     if (!osm) return;
 
-    const localGraph = this._localGraph;
-    const remoteGraph = this._remoteGraph;
+    const localGraph = this._localGraph!;
+    const remoteGraph = this._remoteGraph!;
 
     for (const entityID of this._toCheckIDs) {
       const local = localGraph.entity(entityID);
@@ -338,18 +413,18 @@ export class UploaderSystem extends AbstractSystem {
     }
 
 
-    function formatUser(d) {
+    function formatUser(d: string): string {
       return '<a href="' + osm.userURL(d) + '" target="_blank">' + d + '</a>';
     }
 
-    function entityName(entity) {
+    function entityName(entity: any): string {
       return l10n.displayName(entity.tags) || (l10n.displayType(entity.id) + ' ' + entity.id);
     }
 
-    function sameVersions(local, remote) {
+    function sameVersions(local: any, remote: any): boolean {
       if (local.version !== remote.version) return false;
       if (local.type === 'way') {
-        for (const childID of utilArrayUnion(local.nodes, remote.nodes)) {
+        for (const childID of utilArrayUnion(local.nodes, remote.nodes) as string[]) {
           const a = localGraph.hasEntity(childID);
           const b = remoteGraph.hasEntity(childID);
           if (a && b && a.version !== b.version) return false;
@@ -357,15 +432,17 @@ export class UploaderSystem extends AbstractSystem {
       }
       return true;
     }
-
   }
 
 
-  // This is called when we are ready to attempt a changeset upload.
-  // If conflicts or errors exist, present them to the user instead.
-  _tryUpload() {
+  /**
+   * _tryUpload
+   * This is called when we are ready to attempt a changeset upload.
+   * If conflicts or errors exist, present them to the user instead.
+   */
+  private _tryUpload(): void {
     const context = this.context;
-    const osm = context.services.osm;
+    const osm = context.services.osm as any;
     if (!osm) {
       this._errors.push({ msg: 'No OSM Service' });
     }
@@ -380,7 +457,7 @@ export class UploaderSystem extends AbstractSystem {
       this._didResultInErrors();
 
     } else {
-      const editor = context.systems.editor;
+      const editor = context.systems.editor as any;
       const changes = editor.changes(actionDiscardTags(editor.difference(), this._discardTags));
       if (changes.modified.length || changes.created.length || changes.deleted.length) {
         this.emit('willAttemptUpload');
@@ -393,7 +470,11 @@ export class UploaderSystem extends AbstractSystem {
   }
 
 
-  _uploadCallback(err, updatedChangeset) {
+  /**
+   * _uploadCallback
+   * Callback for the changeset upload attempt
+   */
+  private _uploadCallback(err: any, updatedChangeset?: any): void {
     if (updatedChangeset) {
       this.changeset = updatedChangeset;  // it may have a changeset id now
     }
@@ -402,7 +483,7 @@ export class UploaderSystem extends AbstractSystem {
       if (err.status === 409) {  // 409 Conflict
         this.save(true, true);   // tryAgain = true, checkConflicts = true
       } else {
-        const l10n = this.context.systems.l10n;
+        const l10n = this.context.systems.l10n!;
         this._errors.push({
           msg: err.message || err.responseText,
           details: [ l10n.t('save.status_code', { code: err.status }) ]
@@ -416,49 +497,77 @@ export class UploaderSystem extends AbstractSystem {
   }
 
 
-  _didResultInNoChanges() {
+  /**
+   * _didResultInNoChanges
+   * Called when there were no changes to upload
+   */
+  private _didResultInNoChanges(): void {
     this.emit('resultNoChanges');
     this._endSave();
   }
 
 
-  _didResultInErrors() {
+  /**
+   * _didResultInErrors
+   * Called when the upload failed due to errors
+   */
+  private _didResultInErrors(): void {
     // this.context.systems.editor.pop();
-    const editor = this.context.systems.editor;
+    const editor = this.context.systems.editor as any;
     editor.revert();
     this.emit('resultErrors', this._errors);
     this._endSave();
   }
 
 
-  _didResultInConflicts() {
+  /**
+   * _didResultInConflicts
+   * Called when the upload failed due to data conflicts
+   */
+  private _didResultInConflicts(): void {
     this._conflicts.sort((a, b) => b.id.localeCompare(a.id));
     this.emit('resultConflicts', this.changeset, this._conflicts, this._origChanges);
     this._endSave();
   }
 
 
-  _didResultInSuccess() {
+  /**
+   * _didResultInSuccess
+   * Called when the upload completed successfully
+   */
+  private _didResultInSuccess(): void {
     this.emit('resultSuccess', this.changeset);
     this._endSave();
   }
 
 
-  _endSave() {
+  /**
+   * _endSave
+   * Called to clean up after a save attempt
+   */
+  private _endSave(): void {
     this._isSaving = false;
     this.emit('saveEnded');
   }
 
 
-  cancelConflictResolution() {
+  /**
+   * cancelConflictResolution
+   * Cancel the conflict resolution process and revert changes
+   */
+  cancelConflictResolution(): void {
     // this.context.systems.editor.pop();
-    const editor = this.context.systems.editor;
+    const editor = this.context.systems.editor as any;
     editor.revert();
   }
 
 
-  processResolvedConflicts() {
-    const editor = this.context.systems.editor;
+  /**
+   * processResolvedConflicts
+   * Process conflicts that have been resolved by the user and retry the upload
+   */
+  processResolvedConflicts(): void {
+    const editor = this.context.systems.editor as any;
 
     for (const conflict of this._conflicts) {
       if (conflict.chosen === 1) {   // user chose "use theirs"

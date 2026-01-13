@@ -57,7 +57,7 @@ Rapid is an AI-enhanced editor for OpenStreetMap, built with JavaScript/TypeScri
     readonly id = 'foo';  // avoid field initializers
     requiredDependencies = new Set(['assets']);
     optionalDependencies = new Set(['gfx', 'storage']);
-    
+
     constructor(context: Context) {
       super(context);
     }
@@ -253,7 +253,7 @@ Track TypeScript conversion progress here:
 | `modules/util/` | ✅ Complete | All 14 files converted |
 | `modules/lib/` | 🔄 Partial | `Tree.js`, `tag_classes.js` remain |
 | `modules/pixi/lib/` | 🔄 Partial | `DashLine.js`, `AtlasAllocator.js` remain |
-| `modules/core/` | 🔄 Partial | 14 systems converted (see below) |
+| `modules/core/` | 🔄 Partial | 15 systems converted (see below) |
 | `modules/actions/` | ❌ Not started | |
 | `modules/behaviors/` | ❌ Not started | |
 | `modules/modes/` | ❌ Not started | |
@@ -269,22 +269,22 @@ Track TypeScript conversion progress here:
 | `AbstractSystem.ts` | ✅ Converted |
 | `AssetSystem.ts` | ✅ Converted |
 | `FilterSystem.ts` | ✅ Converted |
+| `ImagerySystem.ts` | ✅ Converted |
+| `LocalizationSystem.ts` | ✅ Converted |
 | `LocationSystem.ts` | ✅ Converted |
+| `Map3dSystem.ts` | ✅ Converted |
+| `PhotoSystem.ts` | ✅ Converted |
 | `RapidSystem.ts` | ✅ Converted |
+| `SchemaSystem.ts` | ✅ Converted |
 | `SpatialSystem.ts` | ✅ Converted |
 | `StorageSystem.ts` | ✅ Converted |
 | `StyleSystem.ts` | ✅ Converted |
+| `UploaderSystem.ts` | ✅ Converted |
 | `UrlHashSystem.ts` | ✅ Converted |
 | `EditSystem.js` | ❌ Not started |
 | `GraphicsSystem.js` | ❌ Not started |
-| `ImagerySystem.ts` | ✅ Converted |
-| `LocalizationSystem.ts` | ✅ Converted |
-| `Map3dSystem.ts` | ✅ Converted |
 | `MapSystem.js` | ❌ Not started |
-| `PhotoSystem.ts` | ✅ Converted |
-| `SchemaSystem.ts` | ✅ Converted |
 | `UiSystem.js` | ❌ Not started |
-| `UploaderSystem.js` | ❌ Not started |
 | `ValidationSystem.js` | ❌ Not started |
 
 ## Testing
