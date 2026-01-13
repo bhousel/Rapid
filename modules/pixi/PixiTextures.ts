@@ -1,6 +1,26 @@
 import * as PIXI from 'pixi.js';
 
+import type { Context } from '../core/types.ts';
 import { AtlasAllocator, registerAtlasUploader } from './lib/AtlasAllocator.ts';
+
+// Forward declarations for types not yet converted
+type GraphicsSystem = any;
+
+/** Atlas collection containing symbol, text, and tile atlases */
+interface AtlasCollection {
+  symbol: AtlasAllocator;
+  text: AtlasAllocator;
+  tile: AtlasAllocator;
+}
+
+/** Tracked texture data with refcount */
+interface TextureData {
+  texture: PIXI.Texture;
+  refcount: number;
+}
+
+/** DashLine texture cache */
+type DashTextureCache = Record<string, PIXI.Texture>;
 
 
 /**
@@ -13,12 +33,20 @@ import { AtlasAllocator, registerAtlasUploader } from './lib/AtlasAllocator.ts';
  *   `loaded`   `true` after the patterns have finished loading
  */
 export class PixiTextures {
+  gfx: GraphicsSystem;
+  context: Context;
+  loaded: boolean;
+
+  private _atlas: AtlasCollection | null;
+  private _textureData: Map<string, TextureData>;
+  private _svgIcons: Map<string, SVGSymbolElement | null>;
+  private _dashTextureCache: DashTextureCache;
 
   /**
    * @constructor
-   * @param  {GraphicsSystem}  gfx -  The GraphicsSystem that owns the texture manager
+   * @param gfx - The GraphicsSystem that owns the texture manager
    */
-  constructor(gfx) {
+  constructor(gfx: GraphicsSystem) {
     this.gfx = gfx;
     this.context = gfx.context;
 
@@ -42,14 +70,14 @@ export class PixiTextures {
     this._dashTextureCache = {};
 
     // Prepare a "bundle" to load the pattern textures
-    const assets = this.context.systems.assets;
+    const assets = this.context.systems.assets as any;
     const filenames = [
       'bushes', 'cemetery', 'cemetery_buddhist', 'cemetery_christian', 'cemetery_jewish', 'cemetery_muslim',
       'construction', 'dots', 'farmland', 'farmyard', 'forest', 'forest_broadleaved', 'forest_leafless',
       'forest_needleleaved', 'grass', 'landfill', 'lines', 'orchard', 'pond', 'quarry', 'vineyard',
       'waves', 'wetland', 'wetland_bog', 'wetland_marsh', 'wetland_reedbed', 'wetland_swamp'
     ];
-    const bundle = {};
+    const bundle: Record<string, string> = {};
     for (const k of filenames) {
       bundle[k] = assets.getFileURL(`img/pattern/${k}.png`);
     }
@@ -64,7 +92,7 @@ export class PixiTextures {
    * reset
    * Replace any Pixi objects and internal state.
    */
-  reset() {
+  reset(): void {
     const gfx = this.gfx;
 
     // Before using the atlases, we need to register the upload function with the renderer.
@@ -114,9 +142,9 @@ export class PixiTextures {
       })
       .then(() => PIXI.Assets.loadBundle(['patterns']))
       .then(result => {
-        // note that we can't pack patterns into an atlas yet - see PixiFeaturePolygon.js
+        // note that we can't pack patterns into an atlas yet - see PixiFeaturePolygon.ts
         for (const [textureID, texture] of Object.entries(result.patterns)) {
-          this._textureData.set(textureID, { texture: texture, refcount: 1 });
+          this._textureData.set(textureID, { texture: texture as PIXI.Texture, refcount: 1 });
         }
 //        // if we could...
 //        for (const [textureID, texture] of Object.entries(result.patterns)) {
@@ -137,21 +165,21 @@ export class PixiTextures {
    * a legacy accessor - we used to just expose the Map publicly
    * and other code would just call map.get(textureID) to get what they need
    *
-   * @param   {string}        textureID
-   * @return  {PIXI.Texture?} The texture (or `null` if not found)
+   * @param textureID - Texture identifier
+   * @returns The texture (or `null` if not found)
    */
-  get(textureID) {
+  get(textureID: string): PIXI.Texture | null {
     return this.getTexture('symbol', textureID);
   }
 
 
   /**
    * getTexture
-   * @param   {string}  atlasID     One of 'symbol', 'text', or 'tile'
-   * @param   {string}  textureID   e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
-   * @return  {PIXI.Texture?} The texture (or `null` if not found)
+   * @param atlasID - One of 'symbol', 'text', or 'tile'
+   * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
+   * @returns The texture (or `null` if not found)
    */
-  getTexture(atlasID, textureID) {
+  getTexture(atlasID: string, textureID: string): PIXI.Texture | null {
     const key = `${atlasID}-${textureID}`;
     const tdata = this._textureData.get(key);
 
@@ -170,11 +198,11 @@ export class PixiTextures {
   /**
    * getPatternTexture
    * These are just like any other texture except that they can't live in an atlas.
-   * PixiFeaturePolygon.js as some comments on it, maybe a Pixi bug or limitation.
-   * @param   {string}        textureID   e.g. 'bushes'
-   * @return  {PIXI.Texture?} The texture (or `null` if not found)
+   * PixiFeaturePolygon.ts has some comments on it, maybe a Pixi bug or limitation.
+   * @param textureID - e.g. 'bushes'
+   * @returns The texture (or `undefined` if not found)
    */
-  getPatternTexture(textureID) {
+  getPatternTexture(textureID: string): PIXI.Texture | undefined {
     const tdata = this._textureData.get(textureID);
     return tdata?.texture;
   }
@@ -182,10 +210,11 @@ export class PixiTextures {
 
   /**
    * getDebugTexture
-   * @param   {string}         atlasID     One of 'symbol', 'text', or 'tile'
-   * @return  {PIXI.Textures}  Texture for the specified atlas
+   * @param atlasID - One of 'symbol', 'text', or 'tile'
+   * @returns Texture for the specified atlas
    */
-  getDebugTexture(atlasID) {
+  getDebugTexture(atlasID: keyof AtlasCollection): PIXI.Texture | null {
+    if (!this._atlas) return null;
     const atlas = this._atlas[atlasID];
     if (!atlas) return null;
 
@@ -200,14 +229,21 @@ export class PixiTextures {
    * allocate
    * This packs an asset into one of the atlases and tracks it in the textureData map
    * The asset must be one of:  ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement
-   * @param   {string}  atlasID     One of 'symbol', 'text', or 'tile'
-   * @param   {string}  textureID   e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
-   * @param   {number}  width       width in pixels
-   * @param   {number}  height      height in pixels
-   * @param   (*)       asset       The thing to pack
-   * @return  {PIXI.Textures}       The newly allocated texture (or `null` if it couldn't be packed)
+   * @param atlasID - One of 'symbol', 'text', or 'tile'
+   * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
+   * @param width - width in pixels
+   * @param height - height in pixels
+   * @param asset - The thing to pack
+   * @returns The newly allocated texture (or `null` if it couldn't be packed)
    */
-  allocate(atlasID, textureID, width, height, asset) {
+  allocate(
+    atlasID: keyof AtlasCollection,
+    textureID: string,
+    width: number,
+    height: number,
+    asset: ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement
+  ): PIXI.Texture | null {
+    if (!this._atlas) return null;
     const atlas = this._atlas[atlasID];
     if (!atlas) return null;
 
@@ -222,16 +258,17 @@ export class PixiTextures {
     }
 
     // To simplify the atlas code, get everything into an `ImageData` before packing
-    let imageData;
+    let imageData: ImageData;
     if (asset instanceof ImageData) {
       imageData = asset;
 
     } else if (asset instanceof Uint8ClampedArray) {
-      imageData = new ImageData(asset, width, height);
+      // Cast needed because TypeScript thinks buffer could be SharedArrayBuffer
+      imageData = new ImageData(asset as Uint8ClampedArray<ArrayBuffer>, width, height);
 
     } else if (asset instanceof HTMLCanvasElement) {
       // note that the canvas dimensions may be larger than the passed-in dimensions
-      const ctx = asset.getContext('2d');
+      const ctx = asset.getContext('2d')!;
       imageData = ctx.getImageData(0, 0, width, height);  // not the canvas width/height
 
     } else if (asset instanceof HTMLImageElement) {
@@ -239,7 +276,7 @@ export class PixiTextures {
       const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d')!;
       ctx.drawImage(asset, 0, 0);
       imageData = ctx.getImageData(0, 0, w, h);
 
@@ -264,10 +301,11 @@ export class PixiTextures {
   /**
    * free
    * Unpacks a texture from the atlas and frees its resources
-   * @param  {string}  atlasID     One of 'symbol', 'text', or 'tile'
-   * @param  {string}  textureID   e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
+   * @param atlasID - One of 'symbol', 'text', or 'tile'
+   * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
    */
-  free(atlasID, textureID) {
+  free(atlasID: keyof AtlasCollection, textureID: string): void {
+    if (!this._atlas) return;
     const atlas = this._atlas[atlasID];
     if (!atlas) return;
 
@@ -280,7 +318,7 @@ export class PixiTextures {
     if (tdata.refcount === 0) {
       atlas.free(tdata.texture);
       tdata.texture.destroy(false);   // false = don't destroy textureSource
-      tdata.texture = null;
+      tdata.texture = null!;
       this._textureData.delete(key);
     }
   }
@@ -292,29 +330,34 @@ export class PixiTextures {
    * https://stackoverflow.com/questions/50940737/how-to-convert-a-graphic-to-a-sprite-in-pixijs
    *
    * For example, rather than drawing a pin, we draw a square with a pin texture on it.
-   * This is much more performant than drawing the graphcs.
+   * This is much more performant than drawing the graphics.
    *
    * We also pack these graphics into a "texture atlas" so that they all live in the same
    * TextureSource.  This texture gets sent to the GPU once then reused, so WebGL isn't constantly
    * swapping between textures as it draws things.
    *
-   * @param    {string}        textureID   Texture identifier (e.g. 'boldPin')
-   * @param    {PIXI.Graphic}  graphic     A PIXI.Graphic to convert to a texture (will be destroyed)
-   * @param    {Object}        options     Options passed to `renderer.generateTexture`
-   * @returns  {PIXI.Texture}  Texture allocated from the text atlas
+   * @param textureID - Texture identifier (e.g. 'boldPin')
+   * @param graphic - A PIXI.Graphics to convert to a texture (will be destroyed)
+   * @param options - Options passed to `renderer.generateTexture`
+   * @returns Texture allocated from the symbol atlas
    */
-  graphicToTexture(textureID, graphic, options = {}) {
-    options.antialias = false;
-    options.target = graphic;
+  graphicToTexture(textureID: string, graphic: PIXI.Graphics, options: Partial<PIXI.GenerateTextureOptions> = {}): PIXI.Texture | null {
+    const fullOptions: PIXI.GenerateTextureOptions = {
+      ...options,
+      antialias: false,
+      target: graphic
+    };
 
     const renderer = this.gfx.pixi.renderer;
-    const temp = renderer.generateTexture(options);
+    const temp = renderer.generateTexture(fullOptions);
     const { pixels, width, height } = renderer.texture.getPixels(temp);   // a Uint8ClampedArray
     const texture = this.allocate('symbol', textureID, width, height, pixels);
 
-    // These textures are overscaled, but `orig` Rectangle stores the original width/height
-    // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
-    texture.orig = temp.orig.clone();
+    if (texture) {
+      // These textures are overscaled, but `orig` Rectangle stores the original width/height
+      // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
+      (texture as { orig: PIXI.Rectangle }).orig = temp.orig.clone();
+    }
     temp.destroy();
     graphic.destroy({ context: true });
     return texture;
@@ -324,12 +367,12 @@ export class PixiTextures {
   /**
    * textToTexture
    * Convert frequently used text to textures/sprites for performance
-   * @param    {string}          textureID   e.g. 'Main Street-normal'
-   * @param    {string}          str         the string
-   * @param    {PIXI.TextStyle}  textStyle
-   * @returns  {PIXI.Texture}    Texture allocated from the text atlas
+   * @param textureID - e.g. 'Main Street-normal'
+   * @param str - the string
+   * @param textStyle - PIXI text style
+   * @returns Texture allocated from the text atlas
    */
-  textToTexture(textureID, str, textStyle) {
+  textToTexture(textureID: string, str: string, textStyle: PIXI.TextStyle): PIXI.Texture | null {
     const options = {
       text: str,
       style: textStyle,
@@ -344,9 +387,11 @@ export class PixiTextures {
     const h = temp.frame.height * temp.source.resolution;
     const texture = this.allocate('text', textureID, w, h, canvas);
 
-    // These textures are overscaled, but `orig` Rectangle stores the original width/height
-    // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
-    texture.orig = temp.orig.clone();
+    if (texture) {
+      // These textures are overscaled, but `orig` Rectangle stores the original width/height
+      // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
+      (texture as { orig: PIXI.Rectangle }).orig = temp.orig.clone();
+    }
 
     temp.destroy();
     return texture;
@@ -356,19 +401,19 @@ export class PixiTextures {
   /**
    * registerSvgIcon
    * Because SVGs take some time to rasterize, store a placeholder and only rasterize when needed
-   * @param  {string}            textureID   Icon identifier (e.g. 'temaki-school')
-   * @param  {SVGSymbolElement}  symbol      The SVG Symbol element for the icon
+   * @param textureID - Icon identifier (e.g. 'temaki-school')
+   * @param symbol - The SVG Symbol element for the icon
    */
-  registerSvgIcon(textureID, symbol) {
+  registerSvgIcon(textureID: string, symbol: SVGSymbolElement): void {
     this._svgIcons.set(textureID, symbol);
   }
 
 
   /**
    * _svgIconToTexture
-   * @param  textureID  Icon identifier (e.g. 'temaki-school')
+   * @param textureID - Icon identifier (e.g. 'temaki-school')
    */
-  _svgIconToTexture(textureID) {
+  private _svgIconToTexture(textureID: string): void {
     const symbol = this._svgIcons.get(textureID);
     if (!symbol) return;
 
@@ -384,12 +429,14 @@ export class PixiTextures {
     const size = this.gfx.highQuality ? 64 : 32;
 
     // Make a new <svg> container
-    let svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    let svg: SVGSVGElement | null = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-    svg.setAttribute('width', size);
-    svg.setAttribute('height', size);
+    svg.setAttribute('width', String(size));
+    svg.setAttribute('height', String(size));
     svg.setAttribute('color', '#fff');   // white so we can tint them
-    svg.setAttribute('viewBox', viewBox);
+    if (viewBox) {
+      svg.setAttribute('viewBox', viewBox);
+    }
 
     // Clone children (this is essentially what <use> does)
     for (const child of symbol.childNodes) {
@@ -407,7 +454,7 @@ export class PixiTextures {
       this.allocate('symbol', textureID, w, h, image);
       this._svgIcons.delete(textureID);
       this.gfx.deferredRedraw();
-      image = null;
+      image = null!;
     };
 
 // various approaches using the new Pixi SVG Parser and texture generation:
@@ -443,9 +490,9 @@ export class PixiTextures {
    * Convert frequently used graphics to textures/sprites for performance
    * https://stackoverflow.com/questions/50940737/how-to-convert-a-graphic-to-a-sprite-in-pixijs
    * For example, rather than drawing a pin, we draw a square with a pin texture on it.
-   * This is much more performant than drawing the graphcs.
+   * This is much more performant than drawing the graphics.
    */
-  _cacheGraphics() {
+  private _cacheGraphics(): void {
 
     //
     // Viewfields

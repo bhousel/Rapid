@@ -1,7 +1,29 @@
+import * as PIXI from 'pixi.js';
 import { EventEmitter } from 'tseep';
-import { vecRotate } from '@rapid-sdk/math';
+import { vecRotate, type Vec2 } from '@rapid-sdk/math';
 
+import type { Context } from '../core/types.ts';
 import { utilDetect } from '../util/detect.ts';
+
+// Forward declarations for types not yet converted
+type GraphicsSystem = any;
+
+
+/** Coordinate data containing screen and map positions */
+export interface CoordData {
+  /** Screen coordinates where [0,0] is top-left of the screen */
+  screen: Vec2;
+  /** Map coordinates where [0,0] is the origin of the viewport (rotation removed) */
+  map: Vec2;
+}
+
+/** Extended WheelEvent with normalized delta values */
+export interface NormalizedWheelEvent extends WheelEvent {
+  _gesture?: 'zoom' | 'pan';
+  _normalizedDeltaX?: number;
+  _normalizedDeltaY?: number;
+  _coord?: CoordData;
+}
 
 
 /**
@@ -28,12 +50,20 @@ import { utilDetect } from '../util/detect.ts';
  *   `wheel`             Fires on supersurface.wheel, receives a DOM WheelEvent + some properties containing normalized wheel delta values
  */
 export class PixiEvents extends EventEmitter {
+  gfx: GraphicsSystem;
+  context: Context;
+  pointerOverRenderer: boolean;
+  modifierKeys: Set<string>;
+  coord: CoordData;
+
+  private _enabled: boolean;
+  private _wheelDefault: 'auto' | 'zoom';
 
   /**
    * @constructor
-   * @param  {GraphicsSystem}  gfx -  The GraphicsSystem that owns this event manager
+   * @param gfx - The GraphicsSystem that owns this event manager
    */
-  constructor(gfx) {
+  constructor(gfx: GraphicsSystem) {
     super();
     this._enabled = false;
 
@@ -43,8 +73,8 @@ export class PixiEvents extends EventEmitter {
     this.pointerOverRenderer = false;
     this.modifierKeys = new Set();
     this.coord = {
-      screen: [0,0],  // [0,0] is top,left of the screen
-      map: [0,0]      // [0,0] is the origin of the viewport (rotation removed)
+      screen: [0, 0],  // [0,0] is top,left of the screen
+      map: [0, 0]      // [0,0] is the origin of the viewport (rotation removed)
     };
 
     this._wheelDefault = utilDetect().os === 'mac' ? 'auto' : 'zoom';
@@ -70,7 +100,7 @@ export class PixiEvents extends EventEmitter {
    * Whether the events are enabled
    * @readonly
    */
-  get enabled() {
+  get enabled(): boolean {
     return this._enabled;
   }
 
@@ -79,7 +109,7 @@ export class PixiEvents extends EventEmitter {
    * enable
    * Bind event handlers
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
     this._enabled = true;
 
@@ -114,7 +144,7 @@ export class PixiEvents extends EventEmitter {
    * disable
    * Unbind event handlers
    */
-  disable() {
+  disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
 
@@ -148,9 +178,9 @@ export class PixiEvents extends EventEmitter {
    * Sets the cursor to the given style.
    * Pixi EventSystem uses the CSS cursor styles, but also allows for custom cursors in the EventSystem
    * see: https://pixijs.download/release/docs/PIXI.EventSystem.html#setCursor
-   * @param  `style` String for one of the given CSS cursor styles (pass 'inherit' to reset)
+   * @param style - String for one of the given CSS cursor styles (pass 'inherit' to reset)
    */
-  setCursor(style) {
+  setCursor(style: string): void {
     // Pixi doesn't make this easy
     // On next pointerover event, the root event boundary will reset its perferred cursor
     // to whatever the .cursor property of the target is. (see EventBoundary.ts line 703)
@@ -205,9 +235,9 @@ export class PixiEvents extends EventEmitter {
    * It's possible to miss a modifier key if it changed when the window was out of focus
    *   but we will know its state once the pointer events occur on the canvas again.
    *
-   * @param  {Event}  e - A Pixi FederatedPointerEvent or DOM KeyboardEvent
+   * @param e - A Pixi FederatedPointerEvent or DOM KeyboardEvent
    */
-  _observeModifierKeys(e) {
+  private _observeModifierKeys(e: PIXI.FederatedPointerEvent | KeyboardEvent): void {
     const modifiers = this.modifierKeys;
     const toCheck = [
       'Alt',      // ALT key, on Mac: ⌥ (option)
@@ -239,16 +269,16 @@ export class PixiEvents extends EventEmitter {
   /**
    * _observeCoordinate
    * Gather the coordinate data from the event.
-   * @param {number}  x - The x coordinate
-   * @param {number}  y - The y coordinate
+   * @param x - The x coordinate
+   * @param y - The y coordinate
    */
-  _observeCoordinate(x, y) {
+  private _observeCoordinate(x: number, y: number): void {
     this.coord = {
       screen: [x, y],  // [0,0] is top,left of the screen
       map: [x, y]      // [0,0] is the origin of the viewport (rotation removed)
     };
 
-    const viewport = this.context.viewport;
+    const viewport = (this.context as any).viewport;
     const r = viewport.transform.r;
     if (r) {
       this.coord.map = vecRotate(this.coord.screen, -r, viewport.center());  // remove rotation
@@ -261,9 +291,9 @@ export class PixiEvents extends EventEmitter {
    * On Mac, consider a control-left-click as a right-click - Rapid#920
    * https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
    * https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param e - A Pixi FederatedPointerEvent
    */
-  _checkButtons(e) {
+  private _checkButtons(e: PIXI.FederatedPointerEvent): void {
     if (e.ctrlKey && utilDetect().os === 'mac') {
       if (e.button === 0) {   // left button
         e.button = 2;         // right button
@@ -278,9 +308,9 @@ export class PixiEvents extends EventEmitter {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  {Event}  e - A DOM KeyboardEvent
+   * @param e - A DOM KeyboardEvent
    */
-  _keydown(e) {
+  private _keydown(e: KeyboardEvent): void {
     this._observeModifierKeys(e);
     this.emit('keydown', e);
   }
@@ -288,9 +318,9 @@ export class PixiEvents extends EventEmitter {
   /**
    * _keyup
    * Handler for keyup events on the window.
-   * @param  {Event}  e - A DOM KeyboardEvent
+   * @param e - A DOM KeyboardEvent
    */
-  _keyup(e) {
+  private _keyup(e: KeyboardEvent): void {
     this._observeModifierKeys(e);
     this.emit('keyup', e);
   }
@@ -298,10 +328,10 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointerover
    * Handler for pointerover events on the canvas.
-   * @param  {Event}  e - A DOM PointerEvent
+   * @param e - A DOM PointerEvent
    */
-  _pointerover(e) {
-    this._observeModifierKeys(e);
+  private _pointerover(e: PointerEvent): void {
+    this._observeModifierKeys(e as any);
     // Don't call `_checkButtons(e)` here.
     // The DOM PointerEvent button properties are readonly.
     // and we don't really need to remap control-left-click to right-click in this situation.
@@ -312,10 +342,10 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointerout
    * Handler for pointerout events on the canvas.
-   * @param  {Event}  e - A DOM PointerEvent
+   * @param e - A DOM PointerEvent
    */
-  _pointerout(e) {
-    this._observeModifierKeys(e);
+  private _pointerout(e: PointerEvent): void {
+    this._observeModifierKeys(e as any);
     // Don't call `_checkButtons(e)` here.
     // The DOM PointerEvent button properties are readonly.
     // and we don't really need to remap control-left-click to right-click in this situation.
@@ -326,9 +356,9 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointerdown
    * Handler for pointerdown events on the stage.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e) {
+  private _pointerdown(e: PIXI.FederatedPointerEvent): void {
     this._observeModifierKeys(e);
     this._observeCoordinate(e.global.x, e.global.y);
     this._checkButtons(e);
@@ -338,9 +368,9 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointermove
    * Handler for pointermove events on the stage.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e) {
+  private _pointermove(e: PIXI.FederatedPointerEvent): void {
     this._observeModifierKeys(e);
     this._observeCoordinate(e.global.x, e.global.y);
     this._checkButtons(e);
@@ -350,9 +380,9 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointerup
    * Handler for pointerup events on the stage.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e) {
+  private _pointerup(e: PIXI.FederatedPointerEvent): void {
     this._observeModifierKeys(e);
     this._observeCoordinate(e.global.x, e.global.y);
     this._checkButtons(e);
@@ -362,18 +392,18 @@ export class PixiEvents extends EventEmitter {
   /**
    * _pointercancel
    * Handler for pointercancel events on the stage.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param e - A Pixi FederatedPointerEvent
    */
-  _pointercancel(e) {
+  private _pointercancel(e: PIXI.FederatedPointerEvent): void {
     this.emit('pointercancel', e);
   }
 
   /**
    * _click
    * Handler for click events on the stage.
-   * @param  {Event}  e - A DOM PointerEvent
+   * @param e - A Pixi FederatedPointerEvent
    */
-  _click(e) {
+  private _click(e: PIXI.FederatedPointerEvent): void {
     // no need to _observeModifierKeys here, 'click' fires immediately after 'pointerup'
     this._checkButtons(e);
     this.emit('click', e);
@@ -383,9 +413,9 @@ export class PixiEvents extends EventEmitter {
   /**
    * _wheel
    * Handler for wheel events on the supersurface.
-   * @param  {Event}  e - A DOM WheelEvent
+   * @param e - A DOM WheelEvent
    */
-  _wheel(e) {
+  private _wheel(e: WheelEvent): void {
     e.preventDefault();             // don't scroll supersurface contents
     e.stopImmediatePropagation();   // don't scroll page contents either
 
@@ -393,7 +423,7 @@ export class PixiEvents extends EventEmitter {
     const storage = context.systems.storage;
 
     this._observeCoordinate(e.offsetX, e.offsetY);
-    let [dX, dY] = this._normalizeWheelDelta(e);
+    const [dX, dY] = this._normalizeWheelDelta(e);
 
     // There is some code in here to try to detect when the user is 2-finger scrolling
     // on a trackpad, and if so allow this gesture to 'pan' the map instead of zooming it.
@@ -413,7 +443,7 @@ export class PixiEvents extends EventEmitter {
     // (NB: We observe modifier keys elsewhere and can know whether the user really did press ctrlKey)
     const isPinchZoom = !isRoundNumber && e.ctrlKey && !this.modifierKeys.has('Control');
 
-    let gesture = 'zoom';  // Detect this wheel event as 'zoom' or 'pan'
+    let gesture: 'zoom' | 'pan' = 'zoom';  // Detect this wheel event as 'zoom' or 'pan'
     let speed = 3;         // Multiplier to adjust the zoom speed
 
     if (isPinchZoom) {   // A pinch-zoom gesture on a trackpad...
@@ -425,7 +455,7 @@ export class PixiEvents extends EventEmitter {
       speed = 3;
 
     } else {  // consider user mouse_wheel preference
-      const wheelPref = storage.getItem('prefs.mouse_wheel.interaction') ?? this._wheelDefault;
+      const wheelPref = storage?.getItem('prefs.mouse_wheel.interaction') ?? this._wheelDefault;
 
       // User wants to 'pan' by default OR
       // We autodetect - either horizontal scroll present or vertical scroll is a round number...
@@ -442,12 +472,13 @@ export class PixiEvents extends EventEmitter {
     }
 
     // Decorate the wheel event with whatever we detected.
-    e._gesture = gesture;
-    e._normalizedDeltaX = dX * speed;
-    e._normalizedDeltaY = dY * speed;
-    e._coord = this.coord;
+    const wheelEvent = e as NormalizedWheelEvent;
+    wheelEvent._gesture = gesture;
+    wheelEvent._normalizedDeltaX = dX * speed;
+    wheelEvent._normalizedDeltaY = dY * speed;
+    wheelEvent._coord = this.coord;
 
-    this.emit('wheel', e);
+    this.emit('wheel', wheelEvent);
   }
 
 
@@ -473,17 +504,17 @@ export class PixiEvents extends EventEmitter {
    * And this great page for testing what events your browser generates:
    *   https://domeventviewer.com/
    *
-   * @param   {Event}          e - A native DOM WheelEvent
-   * @returns {Array<number>}  Normalized `[deltaX, deltaY]` in pixels
+   * @param e - A native DOM WheelEvent
+   * @returns Normalized `[deltaX, deltaY]` in pixels
    */
-  _normalizeWheelDelta(e) {
+  private _normalizeWheelDelta(e: WheelEvent): Vec2 {
     let [dX, dY] = [e.deltaX, e.deltaY];  // raw delta values
 
     if (dY === 0 && e.shiftKey) {         // Some browsers treat skiftKey as horizontal scroll
       [dX, dY] = [e.deltaY, e.deltaX];    // swap dx/dy values to undo it.
     }
 
-    let [sX, sY] = [Math.sign(dX), Math.sign(dY)];    // signs
+    const [sX, sY] = [Math.sign(dX), Math.sign(dY)];    // signs
     let [mX, mY] = [Math.abs(dX), Math.abs(dY)];      // magnitudes
 
     // Fractional numbers are generated from wheel events on many mouse types, but notably by
@@ -498,7 +529,7 @@ export class PixiEvents extends EventEmitter {
     // (These days only Firefox will _sometimes_ report wheel delta in LINE units).
     // https://bugzilla.mozilla.org/show_bug.cgi?id=1392460#c33
     if (e.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) {
-      let pixels;
+      let pixels: number;
       if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
         pixels = 8;
       } else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {

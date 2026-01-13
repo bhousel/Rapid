@@ -1,6 +1,10 @@
 import * as PIXI from 'pixi.js';
 import { EventEmitter } from 'tseep';
+import type { Viewport } from '@rapid-sdk/math';
 
+import type { Context } from '../core/types.ts';
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.js';
 import { PixiLayerCustomData } from './PixiLayerCustomData.js';
 import { PixiLayerDebug } from './PixiLayerDebug.js';
@@ -20,7 +24,10 @@ import { PixiLayerRapid } from './PixiLayerRapid.js';
 import { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.js';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.js';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
-import { utilIterable } from '../util/iterable.ts';
+import { utilIterable, type OneOrMore } from '../util/iterable.ts';
+
+// Forward declaration for type not yet converted
+type GraphicsSystem = any;
 
 
 /**
@@ -47,12 +54,17 @@ import { utilIterable } from '../util/iterable.ts';
  *   `layerchange`   Fires when layers are toggled from enabled/disabled
  */
 export class PixiScene extends EventEmitter {
+  gfx: GraphicsSystem;
+  context: Context;
+  groups: Map<string, PIXI.Container>;
+  layers: Map<string, AbstractPixiLayer>;
+  features: Map<string, AbstractPixiFeature>;
 
   /**
    * @constructor
-   * @param  {GraphicsSystem}  gfx -  The GraphicsSystem that owns this Scene
+   * @param gfx - The GraphicsSystem that owns this Scene
    */
-  constructor(gfx) {
+  constructor(gfx: GraphicsSystem) {
     super();
     this.gfx = gfx;
     this.context = gfx.context;
@@ -101,7 +113,7 @@ export class PixiScene extends EventEmitter {
    * Replace any Pixi objects and internal state.
    * Also calls each Layer's `reset' method to do the same for that layer.
    */
-  reset() {
+  reset(): void {
     const gfx = this.gfx;
     const origin = gfx.origin;
     if (!origin) return;   // need the `origin` container to exist first
@@ -156,11 +168,11 @@ export class PixiScene extends EventEmitter {
    * - For proper label placement, we really need to cull the feature layers
    *   before we render the label layer, so we do these calls in layer order.
    *
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     for (const layer of this.layers.values()) {
       layer.render(frame, viewport, zoom);
       layer.cull(frame);
@@ -171,9 +183,9 @@ export class PixiScene extends EventEmitter {
   /**
    * enableLayers
    * Enables the layers with the given layerIDs, other layers will not be affected
-   * @param  {OneOrMore<string>}  layerIDs - layerIDs to enable
+   * @param layerIDs - layerIDs to enable
    */
-  enableLayers(layerIDs) {
+  enableLayers(layerIDs: OneOrMore<string>): void {
     for (const layerID of utilIterable(layerIDs)) {
       const layer = this.layers.get(layerID);
       if (layer) {
@@ -187,9 +199,9 @@ export class PixiScene extends EventEmitter {
   /**
    * disableLayers
    * Disables the layers with the given layerIDs, other layers will not be affected
-   * @param  {OneOrMore<string>}  layerIDs - layerIDs to disable
+   * @param layerIDs - layerIDs to disable
    */
-  disableLayers(layerIDs) {
+  disableLayers(layerIDs: OneOrMore<string>): void {
     for (const layerID of utilIterable(layerIDs)) {
       const layer = this.layers.get(layerID);
       if (layer) {
@@ -203,9 +215,9 @@ export class PixiScene extends EventEmitter {
   /**
    * toggleLayers
    * Toggles the layers with the given layerIDs, other layers will not be affected
-   * @param  {OneOrMore<string>}  layerIDs - layerIDs to toggle
+   * @param layerIDs - layerIDs to toggle
    */
-  toggleLayers(layerIDs) {
+  toggleLayers(layerIDs: OneOrMore<string>): void {
     for (const layerID of utilIterable(layerIDs)) {
       const layer = this.layers.get(layerID);
       if (layer) {
@@ -219,9 +231,9 @@ export class PixiScene extends EventEmitter {
   /**
    * onlyLayers
    * LayerIDs in the given list will be enabled, all others will be disabled
-   * @param  {OneOrMore<string>}  layerIDs - layerIDs to keep enabled
+   * @param layerIDs - layerIDs to keep enabled
    */
-  onlyLayers(layerIDs) {
+  onlyLayers(layerIDs: OneOrMore<string>): void {
     const toEnable = new Set(utilIterable(layerIDs));
     for (const layer of this.layers.values()) {
       layer.enabled = toEnable.has(layer.id);
@@ -233,9 +245,9 @@ export class PixiScene extends EventEmitter {
   /**
    * addFeature
    * Add a feature to the scene feature cache.
-   * @param  {Feature}  feature - A render feature (point, line, multipolygon)
+   * @param feature - A render feature (point, line, multipolygon)
    */
-  addFeature(feature) {
+  addFeature(feature: AbstractPixiFeature): void {
     this.features.set(feature.id, feature);
   }
 
@@ -243,9 +255,9 @@ export class PixiScene extends EventEmitter {
   /**
    * removeFeature
    * Remove a Feature from the scene feature cache.
-   * @param  {Feature}  feature - A render feature (point, line, multipolygon)
+   * @param feature - A render feature (point, line, multipolygon)
    */
-  removeFeature(feature) {
+  removeFeature(feature: AbstractPixiFeature): void {
     this.features.delete(feature.id);
   }
 
@@ -253,11 +265,11 @@ export class PixiScene extends EventEmitter {
   /**
    * setClass
    * Sets a dataID as being classed a certain way (e.g. 'hover')
-   * @param  {string}  classID - classID (e.g. 'hover')
-   * @param  {string}  layerID - layerID (e.g. 'osm')
-   * @param  {string}  dataID  - dataID (e.g. 'r123')
+   * @param classID - classID (e.g. 'hover')
+   * @param layerID - layerID (e.g. 'osm')
+   * @param dataID - dataID (e.g. 'r123')
    */
-  setClass(classID, layerID, dataID) {
+  setClass(classID: string, layerID: string, dataID: string): void {
     this.layers.get(layerID)?.setClass(classID, dataID);
   }
 
@@ -265,11 +277,11 @@ export class PixiScene extends EventEmitter {
   /**
    * unsetClass
    * Unsets a dataID from being classed a certain way (e.g. 'hover')
-   * @param  {string}  classID - classID (e.g. 'hover')
-   * @param  {string}  layerID - layerID (e.g. 'osm')
-   * @param  {string}  dataID  - dataID (e.g. 'r123')
+   * @param classID - classID (e.g. 'hover')
+   * @param layerID - layerID (e.g. 'osm')
+   * @param dataID - dataID (e.g. 'r123')
    */
-  unsetClass(classID, layerID, dataID) {
+  unsetClass(classID: string, layerID: string, dataID: string): void {
     this.layers.get(layerID)?.unsetClass(classID, dataID);
   }
 
@@ -277,9 +289,9 @@ export class PixiScene extends EventEmitter {
   /**
    * clearClass
    * Clear out all uses of the given classID across all layers.
-   * @param  {string}  classID - classID (e.g. 'hover')
+   * @param classID - classID (e.g. 'hover')
    */
-  clearClass(classID) {
+  clearClass(classID: string): void {
     for (const layer of this.layers.values()) {
       layer.clearClass(classID);
     }
@@ -291,7 +303,7 @@ export class PixiScene extends EventEmitter {
    * Mark the whole scene as `dirty`, for example when changing zooms.
    * During the next "APP" pass, dirty features will be rebuilt.
    */
-  dirtyScene() {
+  dirtyScene(): void {
     for (const feature of this.features.values()) {
       feature.dirty = true;
     }
@@ -301,9 +313,9 @@ export class PixiScene extends EventEmitter {
   /**
    * dirtyLayers
    * Mark all features on a given layer as `dirty`
-   * @param  {OneOrMore<string>}  layerIDs - layerIDs to flag as 'dirty'
+   * @param layerIDs - layerIDs to flag as 'dirty'
    */
-  dirtyLayers(layerIDs) {
+  dirtyLayers(layerIDs: OneOrMore<string>): void {
     for (const layerID of utilIterable(layerIDs)) {
       this.layers.get(layerID)?.dirtyLayer();
     }
@@ -314,9 +326,9 @@ export class PixiScene extends EventEmitter {
    * dirtyFeatures
    * Mark specific features features as `dirty`
    * During the next "APP" pass, dirty features will be rebuilt.
-   * @param  {OneOrMore<string>}  featureIDs - featureIDs to flag as 'dirty'
+   * @param featureIDs - featureIDs to flag as 'dirty'
    */
-  dirtyFeatures(featureIDs) {
+  dirtyFeatures(featureIDs: OneOrMore<string>): void {
     for (const featureID of utilIterable(featureIDs)) {
       const feature = this.features.get(featureID);
       if (feature) {
@@ -330,10 +342,10 @@ export class PixiScene extends EventEmitter {
    * dirtyData
    * Mark any features bound to a given dataID as `dirty`
    * DataIDs are only consistent within a Layer, therefore the layerID is required here.
-   * @param  {string}             layerID - layerID that is rendering the data
-   * @param  {OneOrMore<string>}  dataIDs - dataIDs to flag as 'dirty'
+   * @param layerID - layerID that is rendering the data
+   * @param dataIDs - dataIDs to flag as 'dirty'
    */
-  dirtyData(layerID, dataIDs) {
+  dirtyData(layerID: string, dataIDs: OneOrMore<string>): void {
     this.layers.get(layerID)?.dirtyData(dataIDs);
   }
 
@@ -343,7 +355,7 @@ export class PixiScene extends EventEmitter {
    * Called whenever the enabled layers change.
    * This will trigger a redraw and emit a 'layerchange' event.
    */
-  _layerChanged() {
+  private _layerChanged(): void {
     this.gfx.immediateRedraw();
     this.emit('layerchange');
   }

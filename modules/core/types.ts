@@ -142,6 +142,8 @@ export interface Systems {
 export interface Context extends EventEmitter {
   /** Application version string */
   readonly version: string;
+  /** Base path for loading assets (images, data files, etc.) */
+  assetPath: string | null;
   /** All initialized systems */
   systems: Systems;
   /** All initialized services (external data sources, APIs) */

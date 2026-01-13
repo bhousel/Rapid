@@ -1,12 +1,12 @@
 export { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 export { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-export { PixiEvents } from './PixiEvents.js';
+export { PixiEvents } from './PixiEvents.ts';
 export { PixiFeatureLine } from './PixiFeatureLine.ts';
 export { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 export { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 export { PixiGeometryPart } from './PixiGeometryPart.ts';
-export { PixiScene } from './PixiScene.js';
-export { PixiTextures } from './PixiTextures.js';
+export { PixiScene } from './PixiScene.ts';
+export { PixiTextures } from './PixiTextures.ts';
 
 export { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.js';
 export { PixiLayerCustomData } from './PixiLayerCustomData.js';
