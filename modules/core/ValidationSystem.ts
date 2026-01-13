@@ -1,12 +1,59 @@
 import { Extent } from '@rapid-sdk/math';
 import { utilArrayChunk, utilArrayGroupBy } from '@rapid-sdk/util';
-import RBush from 'rbush';
 
-import { AbstractSystem } from './AbstractSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference } from '../lib/Difference.ts';
+import { ValidationCache } from '../lib/ValidationCache.ts';
 import * as Validations from '../validations/index.js';
 
-const RETRY = 5000;    // wait 5 sec before revalidating provisional entities
+import type { Context, SystemID } from './types.ts';
+import type { OsmEntity, EntityID } from '../data/types.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { ValidationIssue, ValidationSeverity } from '../lib/ValidationIssue.ts';
+
+/** Wait 5 sec before revalidating provisional entities */
+const RETRY = 5000;
+
+
+/**
+ * A validation rule function that checks for issues.
+ * Returns an array of ValidationIssue, possibly with a `provisional` flag.
+ */
+interface ValidatorFunction {
+  (entity: OsmEntity, graph: Graph): ValidationIssue[] & { provisional?: boolean };
+  type: string;
+}
+
+/** Override rule for adjusting issue severity */
+interface SeverityOverride {
+  type: RegExp;
+  subtype: RegExp;
+}
+
+/** Options for getIssues and related methods */
+export interface GetIssuesOptions {
+  /** 'all' to include all issues, 'edited' for only user-edited features */
+  what?: 'all' | 'edited';
+  /** 'all' for all issues, 'visible' for only issues in the visible extent */
+  where?: 'all' | 'visible';
+  /** true to include ignored issues, 'only' for only ignored issues */
+  includeIgnored?: boolean | 'only';
+  /** true to include disabled rule issues, 'only' for only disabled rule issues */
+  includeDisabledRules?: boolean | 'only';
+}
+
+/** Result from getIssuesBySeverity */
+export interface IssuesBySeverity {
+  error: ValidationIssue[];
+  warning: ValidationIssue[];
+  suggestion: ValidationIssue[];
+}
+
+/** Result from _validateEntity */
+interface ValidateEntityResult {
+  issues: ValidationIssue[];
+  provisional: boolean;
+}
 
 
 /**
@@ -28,32 +75,58 @@ const RETRY = 5000;    // wait 5 sec before revalidating provisional entities
  *   `focusedIssue`    Fires after an issue has received focus, receives the issue
  */
 export class ValidationSystem extends AbstractSystem {
+  /** Map of rule ID to validator function */
+  private _rules: Map<string, ValidatorFunction>;
+  /** Validation cache for base graph (before user edits) */
+  private _base: ValidationCache;
+  /** Validation cache for head graph (with user edits) */
+  private _head: ValidationCache;
+  /** Disabled rule IDs */
+  private _disabledRuleIDs: Set<string>;
+  /** Ignored issue IDs */
+  private _ignoredIssueIDs: Set<string>;
+  /** Resolved issue IDs */
+  private _resolvedIssueIDs: Set<string>;
+  /** Complete diff base -> head of what the user changed */
+  private _completeDiff: Map<EntityID, OsmEntity | undefined>;
+  /** Deferred `requestIdleCallback` - Map<handle, Promise.reject> */
+  private _deferredRIC: Map<number, () => void>;
+  /** Deferred `setTimeout` - Set<handles> */
+  private _deferredST: Set<ReturnType<typeof setTimeout>>;
+  /** Override rules that force issues to be errors */
+  private _errorOverrides: SeverityOverride[];
+  /** Override rules that force issues to be warnings */
+  private _warningOverrides: SeverityOverride[];
+  /** Override rules that disable issues */
+  private _disableOverrides: SeverityOverride[];
+  /** Promise fulfilled when validation caught up to `stable` snapshot */
+  private _validationPromise: Promise<void> | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'validator';
     this.requiredDependencies = new Set(['editor', 'schema', 'spatial']);
     this.optionalDependencies = new Set(['map', 'storage', 'urlhash']);
 
-    this._rules = new Map();    // Map<ruleID, validator>
-    this._base = new ValidationCache('base');   // issues before any user edits
-    this._head = new ValidationCache('head');   // issues after all user edits
+    this._rules = new Map();
+    this._base = new ValidationCache('base');
+    this._head = new ValidationCache('head');
 
     this._disabledRuleIDs = new Set();
     this._ignoredIssueIDs = new Set();
     this._resolvedIssueIDs = new Set();
-    this._completeDiff = new Map();  // complete diff base -> head of what the user changed
-    this._deferredRIC = new Map();   // Deferred `requestIdleCallback` - Map<handle, Promise.reject>
-    this._deferredST = new Set();    // Deferred `setTimeout` - Set<handles>
+    this._completeDiff = new Map();
+    this._deferredRIC = new Map();
+    this._deferredST = new Set();
     this._errorOverrides = [];
     this._warningOverrides = [];
     this._disableOverrides = [];
 
-    this._validationPromise = null;    // Promise fulfilled when validation caught up to `stable` snapshot
+    this._validationPromise = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.validateAsync = this.validateAsync.bind(this);
@@ -63,20 +136,20 @@ export class ValidationSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     // Create the validation rules
     const context = this.context;
-    Object.values(Validations).forEach(validation => {
+    Object.values(Validations).forEach((validation: unknown) => {
       if (typeof validation !== 'function') return;
-      const fn = validation(context);
+      const fn = (validation as (ctx: Context) => ValidatorFunction)(context);
       this._rules.set(fn.type, fn);
     });
 
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     const schema = context.systems.schema;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
@@ -91,7 +164,7 @@ export class ValidationSystem extends AbstractSystem {
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })
-      .then(() =>  {
+      .then(() => {
         // Allow validation severity to be overridden by url queryparams...
         // See: https://github.com/openstreetmap/iD/pull/8243
         //
@@ -109,7 +182,7 @@ export class ValidationSystem extends AbstractSystem {
 
         const disabledRules = storage?.getItem('validate-disabledRules');
         if (disabledRules) {
-          const ruleIDs = disabledRules.split(',').map(s => s.trim()).filter(Boolean);
+          const ruleIDs = disabledRules.split(',').map((s: string) => s.trim()).filter(Boolean);
           this._disabledRuleIDs = new Set(ruleIDs);
         }
 
@@ -117,7 +190,7 @@ export class ValidationSystem extends AbstractSystem {
         // When to run validation:
         editor
           .on('stablechange', () => this.validateAsync())
-          .on('merge', entityIDs => this._validateBaseEntitiesAsync(entityIDs));
+          .on('merge', (entityIDs: EntityID[]) => this._validateBaseEntitiesAsync(entityIDs));
       });
   }
 
@@ -125,9 +198,9 @@ export class ValidationSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -135,9 +208,9 @@ export class ValidationSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     // empty queues
     this._base.queue = [];
     this._head.queue = [];
@@ -167,11 +240,11 @@ export class ValidationSystem extends AbstractSystem {
   /**
    * _parseHashParam
    * Converts hash parameters for severity overrides to regex matchers
-   * @param   {String}    val  - The value retrieved, e.g. `crossing_ways/bridge*,crossing_ways/tunnel*`
-   * @return  {Array<*>}  Array of Objects like { type: RegExp, subtype: RegExp }
+   * @param val - The value retrieved, e.g. `crossing_ways/bridge*,crossing_ways/tunnel*`
+   * @return Array of Objects like { type: RegExp, subtype: RegExp }
    */
-  _parseHashParam(val = '') {
-    let result = [];
+  private _parseHashParam(val: string = ''): SeverityOverride[] {
+    const result: SeverityOverride[] = [];
     const rules = val.split(',').map(s => s.trim()).filter(Boolean);
     for (const rule of rules) {
       const parts = rule.split('/', 2);  // "type/subtype"
@@ -182,7 +255,7 @@ export class ValidationSystem extends AbstractSystem {
     }
     return result;
 
-    function makeRegExp(str) {
+    function makeRegExp(str: string): RegExp {
       const escaped = str
         .replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&')   // escape all reserved chars except for the '*'
         .replace(/\*/g, '.*');                      // treat a '*' like '.*'
@@ -195,7 +268,7 @@ export class ValidationSystem extends AbstractSystem {
    * resetIgnoredIssues
    * Clears out the `_ignoredIssueIDs` Set
    */
-  resetIgnoredIssues() {
+  resetIgnoredIssues(): void {
     this._ignoredIssueIDs.clear();
     this.emit('validated');   // redraw UI
   }
@@ -206,19 +279,19 @@ export class ValidationSystem extends AbstractSystem {
    * Called whenever the user changes the unsquare threshold
    * It reruns just the "unsquare_way" validation on all buildings.
    */
-  revalidateUnsquare() {
+  revalidateUnsquare(): void {
     const checkUnsquareWay = this._rules.get('unsquare_way');
     if (typeof checkUnsquareWay !== 'function') return;
 
-    const revalidate = (cache) => {
+    const revalidate = (cache: ValidationCache): void => {
       if (!cache.graph) return;
 
       cache.uncacheIssuesOfType('unsquare_way');   // uncache existing
 
       // rerun for all buildings
-      const tree = this.context.systems.editor.tree;
+      const tree = (this.context.systems.editor as any).tree;
       const buildings = tree.intersects(new Extent([-180,-90],[180, 90]), cache.graph)  // everywhere
-        .filter(entity => (entity.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
+        .filter((entity: OsmEntity) => (entity.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
 
       for (const entity of buildings) {
         const detected = checkUnsquareWay(entity, cache.graph);
@@ -238,27 +311,27 @@ export class ValidationSystem extends AbstractSystem {
    * Gets all issues that match the given options
    * This is called by many other places
    *
-   * @param {Object} options - Object containing:
+   * @param options - Object containing:
    *   {
    *     what: 'all',                  // 'all' or 'edited'
    *     where: 'all',                 // 'all' or 'visible'
    *     includeIgnored: false,        // true, false, or 'only'
    *     includeDisabledRules: false   // true, false, or 'only'
    *   }
-   * @return  {Array<VaidationIssue>}  An Array containing the issues
+   * @return An Array containing the issues
    */
-  getIssues(options) {
+  getIssues(options?: GetIssuesOptions): ValidationIssue[] {
     // Note that we use `staging.graph` here, not `cache.graph` or `stable.graph`,
     // because that is the Graph that the calling code will be using.
-    const opts = Object.assign({ what: 'all', where: 'all', includeIgnored: false, includeDisabledRules: false }, options);
+    const opts: GetIssuesOptions = Object.assign({ what: 'all', where: 'all', includeIgnored: false, includeDisabledRules: false }, options);
     const context = this.context;
     const visibleExtent = context.viewport.visibleExtent();
-    const graph = context.systems.editor.staging.graph;
-    let seen = new Set();
-    let results = [];
+    const graph: Graph = (context.systems.editor as any).staging.graph;
+    const seen = new Set<string>();
+    const results: ValidationIssue[] = [];
 
     // Filter the issue set to include only what the calling code wants to see.
-    const filter = (issue) => {
+    const filter = (issue: ValidationIssue | undefined): boolean => {
       if (!issue) return false;
       if (seen.has(issue.id)) return false;
       if (this._resolvedIssueIDs.has(issue.id)) return false;
@@ -274,7 +347,7 @@ export class ValidationSystem extends AbstractSystem {
 
       if (opts.where === 'visible') {
         const extent = issue.extent(graph);
-        if (!visibleExtent.intersects(extent)) return false;
+        if (!extent || !visibleExtent.intersects(extent)) return false;
       }
 
       return true;
@@ -314,12 +387,12 @@ export class ValidationSystem extends AbstractSystem {
    * Gets the issues that have been fixed by the user.
    * Resolved issues are tracked in the `_resolvedIssueIDs` Set,
    *  and they should all be issues that exist in the base cache.
-   * @return  {Array<VaidationIssue>}  An Array containing the issues
+   * @return An Array containing the issues
    */
-  getResolvedIssues() {
+  getResolvedIssues(): ValidationIssue[] {
     return Array.from(this._resolvedIssueIDs)
       .map(issueID => this._base.issues.get(issueID))
-      .filter(Boolean);
+      .filter((issue): issue is ValidationIssue => issue !== undefined);
   }
 
 
@@ -327,11 +400,11 @@ export class ValidationSystem extends AbstractSystem {
    * focusIssue
    * Adjusts the map to focus on the given issue.
    * (requires the issue to have a reasonable extent defined)
-   * @param  {ValidationIssue}  The Issue to focus on
+   * @param issue - The Issue to focus on
    */
-  focusIssue(issue) {
+  focusIssue(issue: ValidationIssue): void {
     const context = this.context;
-    const map = context.systems.map;
+    const map = context.systems.map as any;
 
     const entityIDs = issue.entityIds ?? [];
     const selectID = entityIDs[0];
@@ -346,7 +419,7 @@ export class ValidationSystem extends AbstractSystem {
 
     // Select the first entity in the issue.
     globalThis.setTimeout(() => {
-      context.enter('select-osm', { selection: { osm: [selectID] }} );
+      (context as any).enter('select-osm', { selection: { osm: [selectID] }} );
       this.emit('focusedIssue', issue);
     }, 250);  // after ease
   }
@@ -357,16 +430,16 @@ export class ValidationSystem extends AbstractSystem {
    * Gets the issues then groups them by error/warning
    * (This just calls `getIssues`, then puts issues in groups)
    *
-   * @param   {Object}  options - see `getIssues`
-   * @return  {Object}  result like:
+   * @param options - see `getIssues`
+   * @return result like:
    *   {
    *     error:       Array<ValidationIssue>,
    *     warning:     Array<ValidationIssue>,
    *     suggestion:  Array<ValidationIssue>
    *   }
    */
-  getIssuesBySeverity(options) {
-    const groups = utilArrayGroupBy(this.getIssues(options), 'severity');
+  getIssuesBySeverity(options?: GetIssuesOptions): IssuesBySeverity {
+    const groups = utilArrayGroupBy(this.getIssues(options), 'severity') as Record<ValidationSeverity, ValidationIssue[] | undefined>;
     return {       // note, we want them in this order
       error:       groups.error ?? [],
       warning:     groups.warning ?? [],
@@ -377,11 +450,11 @@ export class ValidationSystem extends AbstractSystem {
 
   /**
    * getSeverityIcon
-   * @param   {string}  severity - one of 'error', 'warning', 'suggestion', or 'resolved'
-   * @return  {string}  The name of the icon to use
+   * @param severity - one of 'error', 'warning', 'suggestion', or 'resolved'
+   * @return The name of the icon to use
    */
-  getSeverityIcon(severity) {
-    const icons = {
+  getSeverityIcon(severity: ValidationSeverity | 'resolved'): string {
+    const icons: Record<string, string> = {
       error: '#rapid-icon-error',
       warning: '#fas-triangle-exclamation',
       suggestion: '#fas-circle-arrow-up',
@@ -397,11 +470,11 @@ export class ValidationSystem extends AbstractSystem {
    * (This just calls `getIssues`, then filters for the given entity IDs)
    * The issues are sorted for relevance
    *
-   * @param   {Array|Set}  entityIDs - Array or Set of entityIDs to get issues for
-   * @param   {Object}     options   - See `getIssues`
-   * @return  {Array<VaidationIssue>}  An Array containing the issues
+   * @param entityIDs - Array or Set of entityIDs to get issues for
+   * @param options   - See `getIssues`
+   * @return An Array containing the issues
    */
-  getSharedEntityIssues(entityIDs, options) {
+  getSharedEntityIssues(entityIDs: Iterable<EntityID>, options?: GetIssuesOptions): ValidationIssue[] {
     const orderedIssueTypes = [                 // Show some issue types in a particular order:
       'missing_tag', 'missing_role',            // - missing data first
       'outdated_tags', 'mismatched_geometry',   // - identity issues
@@ -435,30 +508,30 @@ export class ValidationSystem extends AbstractSystem {
    * getEntityIssues
    * This just calls `getSharedEntityIssues` for the given entityID
    *
-   * @param   {string}  entityID - The entityID to get issues for
-   * @param   {Object}  options  - See `getIssues`
-   * @return  {Array<VaidationIssue>}  An Array containing the issues
+   * @param entityID - The entityID to get issues for
+   * @param options  - See `getIssues`
+   * @return An Array containing the issues
    */
-  getEntityIssues(entityID, options) {
+  getEntityIssues(entityID: EntityID, options?: GetIssuesOptions): ValidationIssue[] {
     return this.getSharedEntityIssues([entityID], options);
   }
 
 
   /**
    * getRuleKeys
-   * @return  {Array<string>}  An Array containing the rule keys
+   * @return An Array containing the rule keys
    */
-  getRuleKeys() {
+  getRuleKeys(): string[] {
     return [...this._rules.keys()];
   }
 
 
   /**
    * isRuleEnabled
-   * @param   {string}   ruleID  - The ruleID (e.g. 'crossing_ways')
-   * @return  {boolean}  true/false
+   * @param ruleID - The ruleID (e.g. 'crossing_ways')
+   * @return true/false
    */
-  isRuleEnabled(ruleID) {
+  isRuleEnabled(ruleID: string): boolean {
     return !this._disabledRuleIDs.has(ruleID);
   }
 
@@ -467,9 +540,9 @@ export class ValidationSystem extends AbstractSystem {
    * toggleRule
    * Toggles a single validation rule,
    * then reruns the validation so that the user sees something happen in the UI
-   * @param  {string}  ruleID - The rule to toggle (e.g. 'crossing_ways')
+   * @param ruleID - The rule to toggle (e.g. 'crossing_ways')
    */
-  toggleRule(ruleID) {
+  toggleRule(ruleID: string): void {
     if (this._disabledRuleIDs.has(ruleID)) {
       this._disabledRuleIDs.delete(ruleID);
     } else {
@@ -486,9 +559,9 @@ export class ValidationSystem extends AbstractSystem {
    * disableRules
    * Disables given validation rules,
    * then reruns the validation so that the user sees something happen in the UI
-   * @param  {Array<string>}  ruleIDs - Complete set of rules that should be disabled
+   * @param ruleIDs - Complete set of rules that should be disabled
    */
-  disableRules(ruleIDs = []) {
+  disableRules(ruleIDs: string[] = []): void {
     this._disabledRuleIDs = new Set(ruleIDs);
 
     const storage = this.context.systems.storage;
@@ -500,9 +573,9 @@ export class ValidationSystem extends AbstractSystem {
   /**
    * ignoreIssue
    * Don't show the given issue in lists
-   * @param  {string}  issueID - The issueID to ignore
+   * @param issueID - The issueID to ignore
    */
-  ignoreIssue(issueID) {
+  ignoreIssue(issueID: string): void {
     this._ignoredIssueIDs.add(issueID);
     this.emit('validated');   // emit an event to redraw various UI things
   }
@@ -514,11 +587,11 @@ export class ValidationSystem extends AbstractSystem {
    * (head graph contains user's edits)
    * Returns a Promise fulfilled when the validation has completed and then emits a `validated` event.
    * This may take time but happen in the background during browser idle time.
-   * @return  {Promise}  Promise fulfilled when validation is completed.
+   * @return Promise fulfilled when validation is completed.
    */
-  validateAsync() {
+  validateAsync(): Promise<void> {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     this._completeDiff = editor.difference().complete();
 
     if (editor.canRestoreBackup) return Promise.resolve();   // Wait to see if the user wants to restore their backup
@@ -546,8 +619,8 @@ export class ValidationSystem extends AbstractSystem {
     // If we get here, stable !== previous, so it's time to validate the stable graph..
     this._head.graph = stableGraph;   // take snapshot
     const incrementalDiff = new Difference(previousGraph, stableGraph);
-    let entityIDs = [ ...incrementalDiff.complete().keys() ];
-    entityIDs = this._head.withAllRelatedEntities(entityIDs);  // expand set
+    const diffKeys = [ ...incrementalDiff.complete().keys() ];
+    const entityIDs = this._head.withAllRelatedEntities(diffKeys);  // expand set
 
     if (!entityIDs.size) {    // nothing to do - committed a no-op edit?
       this.emit('validated');
@@ -557,7 +630,7 @@ export class ValidationSystem extends AbstractSystem {
     this._validationPromise = this._validateEntitiesAsync(this._head, entityIDs)
       .then(() => this._updateResolvedIssues(entityIDs))
       .then(() => this.emit('validated'))
-      .catch(e => console.error(e))  // eslint-disable-line
+      .catch((e: Error) => console.error(e))  // eslint-disable-line
       .then(() => {
         this._validationPromise = null;
 
@@ -578,12 +651,12 @@ export class ValidationSystem extends AbstractSystem {
    * Validates new entities being merged into the base graph.
    * (base graph contains original map state, before user's edits)
    * This may take time but happen in the background during browser idle time.
-   * @param   {Array|Set}  entityIDs - The entityIDs to validate
-   * @return  {Promise}    Promise fulfilled when validation is completed.
+   * @param entityIDs - The entityIDs to validate
+   * @return Promise fulfilled when validation is completed.
    */
-  _validateBaseEntitiesAsync(entityIDs) {
+  private _validateBaseEntitiesAsync(entityIDs: Iterable<EntityID>): Promise<void> {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor as any;
     if (!entityIDs) return Promise.resolve();
 
     // Make sure base cache has a graph assigned to it.
@@ -592,12 +665,12 @@ export class ValidationSystem extends AbstractSystem {
       this._base.graph = editor.base.graph;
     }
 
-    entityIDs = this._base.withAllRelatedEntities(entityIDs);  // expand set
+    const expandedEntityIDs = this._base.withAllRelatedEntities(entityIDs);  // expand set
 
-    return this._validateEntitiesAsync(this._base, entityIDs)
-      .then(() => this._updateResolvedIssues(entityIDs))
-      .then(() => this.emit('validated'))
-      .catch(e => console.error(e));  // eslint-disable-line
+    return this._validateEntitiesAsync(this._base, expandedEntityIDs)
+      .then(() => this._updateResolvedIssues(expandedEntityIDs))
+      .then(() => { this.emit('validated'); })
+      .catch((e: Error) => console.error(e));  // eslint-disable-line
   }
 
 
@@ -611,19 +684,19 @@ export class ValidationSystem extends AbstractSystem {
    *  - Validator functions may still be waiting on something and return a "provisional" result.
    *    In this situation, we will schedule to revalidate the entity sometime later.
    *
-   * @param  {Entity}  entity - The entity to validate
-   * @param  {Graph}   graph  - The Graph containing the Entity
-   * @return {Object}  Result like:
+   * @param entity - The entity to validate
+   * @param graph  - The Graph containing the Entity
+   * @return Result like:
    *   {
    *     issues:       Array of detected issues
    *     provisional:  `true` if provisional result, `false` if final result
    *   }
    */
-  _validateEntity(entity, graph) {
+  private _validateEntity(entity: OsmEntity, graph: Graph): ValidateEntityResult {
 
     // If there are any override rules that match the issue type/subtype,
     // adjust severity (or disable it) and keep/discard as quickly as possible.
-    const applySeverityOverrides = (issue) => {
+    const applySeverityOverrides = (issue: ValidationIssue): boolean => {
       const type = issue.type;
       const subtype = issue.subtype ?? '';
 
@@ -648,19 +721,19 @@ export class ValidationSystem extends AbstractSystem {
     };
 
 
-    const result = { issues: [], provisional: false };
+    const result: ValidateEntityResult = { issues: [], provisional: false };
     for (const [key, rule] of this._rules) {   // run all validators
       if (typeof rule !== 'function') {
         console.error(`no such validation rule = ${key}`);  // eslint-disable-line no-console
         continue;
       }
-      let detected = rule(entity, graph);
+      const detected = rule(entity, graph);
       if (detected.provisional) {   // this validation should be run again later
         result.provisional = true;
       }
 
-      detected = detected.filter(applySeverityOverrides);
-      result.issues = result.issues.concat(detected);
+      const filtered = detected.filter(applySeverityOverrides);
+      result.issues = result.issues.concat(filtered);
     }
 
     return result;
@@ -677,16 +750,16 @@ export class ValidationSystem extends AbstractSystem {
    * - the issue is not in the head cache
    * - the user did something to one of the entities involved in the issue
    *
-   * @param  {Array|Set}  entityIDs - Array or Set containing entity IDs.
+   * @param entityIDs - Array or Set containing entity IDs.
    */
-  _updateResolvedIssues(entityIDs = []) {
+  private _updateResolvedIssues(entityIDs: Iterable<EntityID> = []): void {
     for (const entityID of entityIDs) {
       const issues = this._base.entityIssueIDs.get(entityID) ?? [];
       for (const issueID of issues) {
         // Check if the user did something to one of the entities involved in this issue.
         // (This issue could involve multiple entities, e.g. disconnected routable features)
         const issue = this._base.issues.get(issueID);
-        const userModified = (issue?.entityIds || []).some(entityID => this._completeDiff.has(entityID));
+        const userModified = (issue?.entityIds || []).some(id => this._completeDiff.has(id));
 
         if (userModified && !this._head.issues.has(issueID)) {  // issue seems fixed
           this._resolvedIssueIDs.add(issueID);
@@ -702,11 +775,11 @@ export class ValidationSystem extends AbstractSystem {
    * _validateEntitiesAsync
    * Schedule validation for many entities.
    * This may take time but happen in the background during browser idle time.
-   * @param  {ValidationCache}  cache     - The cache to store results in (`_head` or `_base`)
-   * @param  {Array|Set}        entityIDs - The entityIDs to validate
-   * @return {Promise}  Promise fulfilled when the validation has completed.
+   * @param cache     - The cache to store results in (`_head` or `_base`)
+   * @param entityIDs - The entityIDs to validate
+   * @return Promise fulfilled when the validation has completed.
    */
-  _validateEntitiesAsync(cache, entityIDs) {
+  private _validateEntitiesAsync(cache: ValidationCache, entityIDs: Iterable<EntityID>): Promise<void> {
     // Enqueue the work
     const jobs = Array.from(entityIDs).map(entityID => {
       if (cache.queuedEntityIDs.has(entityID)) return null;  // queued already
@@ -733,7 +806,7 @@ export class ValidationSystem extends AbstractSystem {
         cache.cacheIssues(result.issues);   // update cache
       };
 
-    }).filter(Boolean);
+    }).filter(Boolean) as (() => void)[];
 
     // Perform the work in chunks.
     // Because this will happen during idle callbacks, we want to choose a chunk size
@@ -744,7 +817,7 @@ export class ValidationSystem extends AbstractSystem {
     if (!cache.queuePromise) {
       cache.queuePromise = this._processQueue(cache)
         .then(() => this._revalidateProvisionalEntities(cache))
-        .catch(e => console.error(e))  // eslint-disable-line
+        .catch((e: Error) => console.error(e))  // eslint-disable-line
         .finally(() => cache.queuePromise = null);
     }
 
@@ -757,9 +830,9 @@ export class ValidationSystem extends AbstractSystem {
    * Sometimes a validator will return a "provisional" result.
    * In this situation, we'll need to revalidate the entity later.
    * This function waits a delay, then places them back into the validation queue.
-   * @param  {ValidationCache}  cache - The cache to revalidate (`_head` or `_base`)
+   * @param cache - The cache to revalidate (`_head` or `_base`)
    */
-  _revalidateProvisionalEntities(cache) {
+  private _revalidateProvisionalEntities(cache: ValidationCache): void {
     if (!cache.provisionalEntityIDs.size) return;  // nothing to do
 
     const handle = globalThis.setTimeout(() => {
@@ -776,16 +849,16 @@ export class ValidationSystem extends AbstractSystem {
    * _processQueue
    * Process the next chunk of deferred validation work
    * This may take time but happen in the background during browser idle time.
-   * @param  {ValidationCache}  cache - The cache to process (`_head` or `_base`)
-   * @return {Promise}  Promise fulfilled when the validation has completed.
+   * @param cache - The cache to process (`_head` or `_base`)
+   * @return Promise fulfilled when the validation has completed.
    */
-  _processQueue(cache) {
+  private _processQueue(cache: ValidationCache): Promise<void> {
     // console.log(`${cache.which} queue length ${cache.queue.length}`);
 
     if (!cache.queue.length) return Promise.resolve();  // we're done
-    const chunk = cache.queue.pop();
+    const chunk = cache.queue.pop()!;
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
         const handle = globalThis.requestIdleCallback(() => {
           this._deferredRIC.delete(handle);
           // const t0 = performance.now();
@@ -805,173 +878,3 @@ export class ValidationSystem extends AbstractSystem {
   }
 }
 
-
-
-/**
- * `ValidationCache`
- * Creates a cache to store validation state
- * We create 2 of these:
- *   `base` for validation on the base graph (unedited)
- *   `head` for validation on the head graph (user edits applied)
- */
-class ValidationCache {
-
-  /**
-   * @constructor
-   * @param  {string}  which - 'base' or 'head' (to identify it)
-   */
-  constructor(which) {
-    this.which = which;   // 'base' or 'head'
-    this.graph = null;
-    this.queue = [];      // Array(jobs)
-    this.queuePromise = null;
-    this.queuedEntityIDs = new Set();
-    this.provisionalEntityIDs = new Set();
-    this.issues = new Map();          // Map<issueID, ValidationIssue>
-    this.entityIssueIDs = new Map();  // Map<entityID, Set<issueID>>
-
-    // A RBush spatial index that stores 'boxes'.
-    // The boxes mark regions where the involved entities may need to be rechecked
-    // by being part of a impossible oneway or disconnected way routing island.
-    this.recheckRBush = new RBush();
-    this.recheckBoxes = new Map();   // Map<issueID, Box>
-  }
-
-
-  cacheIssue(issue) {
-    if (this.issues.has(issue.id)) {
-      this.uncacheIssue(issue);
-    }
-
-    if (issue.type === 'disconnected_way' || issue.type === 'impossible_oneway') {
-      const extent = issue.extent(this.graph);
-      const box = Object.assign({ issueID: issue.id }, extent.bbox());
-      this.recheckRBush.insert(box);
-      this.recheckBoxes.set(issue.id, box);
-    }
-
-    for (const entityID of issue.entityIds ?? []) {
-      let issueIDs = this.entityIssueIDs.get(entityID);
-      if (!issueIDs) {
-        issueIDs = new Set();
-        this.entityIssueIDs.set(entityID, issueIDs);
-      }
-      issueIDs.add(issue.id);
-    }
-    this.issues.set(issue.id, issue);
-  }
-
-
-  uncacheIssue(issue) {
-    const box = this.recheckBoxes.get(issue.id);
-    if (box) {
-      this.recheckRBush.remove(box);
-      this.recheckBoxes.delete(issue.id);
-    }
-
-    for (const entityID of issue.entityIds ?? []) {
-      let issueIDs = this.entityIssueIDs.get(entityID);
-      if (issueIDs) {
-        issueIDs.delete(issue.id);
-        if (!issueIDs.size) {
-          this.entityIssueIDs.delete(entityID);
-        }
-      }
-    }
-    this.issues.delete(issue.id);
-  }
-
-
-  cacheIssues(issues = []) {
-    for (const issue of issues) {
-      this.cacheIssue(issue);
-    }
-  }
-
-
-  uncacheIssues(issues = []) {
-    for (const issue of issues) {
-      this.uncacheIssue(issue);
-    }
-  }
-
-
-  uncacheIssuesOfType(type) {
-    const issues = [ ...this.issues.values() ];
-    const issuesOfType = issues.filter(issue => issue.type === type);
-    this.uncacheIssues(issuesOfType);
-  }
-
-
-  // Remove a single entity and all its related issues from the caches
-  uncacheEntityID(entityID) {
-    const issueIDs = this.entityIssueIDs.get(entityID) ?? [];
-    for (const issueID of issueIDs) {
-      const issue = this.issues.get(issueID);
-      if (issue) {
-        this.uncacheIssue(issue);
-      }
-    }
-
-    this.entityIssueIDs.delete(entityID);
-    this.provisionalEntityIDs.delete(entityID);
-  }
-
-
-  /**
-   * withAllRelatedEntities
-   * Returns an expanded set of `entityIDs` that need to also be validated alongside the given `entityIDs`
-   * - Entities involved in the same issues
-   * - Entities connected to the given entities
-   * - Entities involved in nearby connectivity issues (impossible oneway, disconnected way)
-   *
-   * @param   {Array|Set}  entityIDs - Array or Set containing entityIDs.
-   * @return  {Set}        entityIDs related to the given entityIDs
-   */
-  withAllRelatedEntities(entityIDs = []) {
-    const graph = this.graph;
-    const results = new Set(entityIDs);            // include original entityIDs
-    if (!graph || !results.size) return results;   // nothing to do
-
-    const relatedIssueIDs = new Set();
-
-    for (const entityID of entityIDs) {
-      const entity = graph.hasEntity(entityID);
-      if (!entity) continue;
-
-      // Gather Issues this Entity is involved in..
-      const issueIDs = this.entityIssueIDs.get(entityID) ?? [];
-      for (const issueID of issueIDs) {
-        relatedIssueIDs.add(issueID);
-      }
-
-      if (entity.type === 'way' || entity.type === 'node') {
-        // Gather nearby connectivity Issues (impossible oneway, disconnected way)
-        const extent = entity.extent(graph);
-        const boxes = this.recheckRBush.search(extent.bbox()) ?? [];
-        for (const box of boxes) {
-          relatedIssueIDs.add(box.issueID);
-        }
-
-        // Gather other Entities connected to this Entity..
-        const checkNodes = entity.type === 'way' ? graph.childNodes(entity) : entity.type === 'node' ? [entity] : [];
-        for (const node of checkNodes) {
-          for (const parentWay of graph.parentWays(node)) {
-            results.add(parentWay.id);
-          }
-        }
-      }
-    }
-
-    for (const issueID of relatedIssueIDs) {
-      const issue = this.issues.get(issueID);
-      const relatedEntityIDs = issue?.entityIds ?? [];
-      for (const relatedEntityID of relatedEntityIDs) {
-        results.add(relatedEntityID);
-      }
-    }
-
-    return results;
-  }
-
-}

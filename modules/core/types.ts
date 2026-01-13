@@ -24,6 +24,7 @@ import type { StorageSystem } from './StorageSystem.ts';
 import type { StyleSystem } from './StyleSystem.ts';
 import type { UploaderSystem } from './UploaderSystem.ts';
 import type { UrlHashSystem } from './UrlHashSystem.ts';
+import type { ValidationSystem } from './ValidationSystem.ts';
 
 /** Permissive D3 selection type - accepts any selection without strict type checking */
 export type D3Selection = Selection<any, any, any, any>;
@@ -91,6 +92,7 @@ type AnySystem =
   | StyleSystem
   | UploaderSystem
   | UrlHashSystem
+  | ValidationSystem
   | System;
 
 /**
@@ -118,13 +120,13 @@ export interface Systems {
   styles?: StyleSystem;
   uploader?: UploaderSystem;
   urlhash?: UrlHashSystem;
+  validator?: ValidationSystem;
 
   // Not yet converted - use base System type:
   editor?: System;
   gfx?: System;
   map?: System;
   ui?: System;
-  validator?: System;
 }
 
 

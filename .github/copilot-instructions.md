@@ -118,6 +118,25 @@ export class Category {
   }
   ```
 
+### Avoid Unnecessary Casts
+- Don't add type casts that TypeScript can already infer
+- Common unnecessary casts to avoid:
+  - `as SystemID` on string literals that already match the union type
+  - `as Graph` or similar when accessing properties on an `any` typed variable (already returns `any`)
+  - `as SomeType[]` on array literals passed to `new Set()` when TypeScript can infer the type
+- Example - avoid this:
+  ```typescript
+  this.id = 'validator' as SystemID;  // unnecessary - 'validator' is already a valid string
+  this.requiredDependencies = new Set(['editor', 'schema'] as SystemID[]);  // unnecessary
+  const graph = editor.base.graph as Graph;  // unnecessary if editor is `any`
+  ```
+- Prefer this:
+  ```typescript
+  this.id = 'validator';
+  this.requiredDependencies = new Set(['editor', 'schema']);
+  const graph = editor.base.graph;  // already `any`, assignable to Graph
+  ```
+
 ### Interface Formatting
 - Use concise formatting for interface properties (no blank lines between properties)
 - Each property should have a JSDoc comment on the line directly above it
@@ -281,11 +300,11 @@ Track TypeScript conversion progress here:
 | `StyleSystem.ts` | ✅ Converted |
 | `UploaderSystem.ts` | ✅ Converted |
 | `UrlHashSystem.ts` | ✅ Converted |
+| `ValidationSystem.ts` | ✅ Converted |
 | `EditSystem.js` | ❌ Not started |
 | `GraphicsSystem.js` | ❌ Not started |
 | `MapSystem.js` | ❌ Not started |
 | `UiSystem.js` | ❌ Not started |
-| `ValidationSystem.js` | ❌ Not started |
 
 ## Testing
 

@@ -17,7 +17,7 @@ import { StyleSystem } from './StyleSystem.ts';
 import { UiSystem } from './UiSystem.js';
 import { UploaderSystem } from './UploaderSystem.ts';
 import { UrlHashSystem } from './UrlHashSystem.ts';
-import { ValidationSystem } from './ValidationSystem.js';
+import { ValidationSystem } from './ValidationSystem.ts';
 
 export {
   AbstractSystem,
