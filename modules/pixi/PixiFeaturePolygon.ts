@@ -1,12 +1,69 @@
 import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
-import { vecEqual, vecLength } from '@rapid-sdk/math';
+import { vecEqual, vecLength, type Viewport, type Vec2 } from '@rapid-sdk/math';
 
-import { AbstractPixiFeature } from './AbstractPixiFeature.js';
+import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
-import { lineToPoly } from './helpers.ts';
+import { lineToPoly, type LineToPolyResult } from './helpers.ts';
 
 const PARTIALFILLWIDTH = 32;
+
+
+/** Style properties for polygon fill */
+export interface PolygonFillStyle {
+  /** Fill width for strokes */
+  width?: number;
+  /** Fill color */
+  color?: number;
+  /** Alpha/opacity (0-1) */
+  alpha?: number;
+  /** Pattern name */
+  pattern?: string;
+}
+
+/** Style properties for polygon stroke */
+export interface PolygonStrokeStyle {
+  /** Stroke width in pixels */
+  width?: number;
+  /** Stroke color */
+  color?: number;
+  /** Alpha/opacity (0-1) */
+  alpha?: number;
+  /** Dash pattern [dash, gap] */
+  dash?: number[];
+  /** Line cap style */
+  cap?: 'butt' | 'round' | 'square';
+  /** Line join style */
+  join?: 'bevel' | 'miter' | 'round';
+}
+
+/** Style properties for polygon features */
+export interface PolygonStyle {
+  /** If true, always use full fill (not partial) */
+  requireFill?: boolean;
+  /** Texture name for line markers */
+  lineMarkerName?: string;
+  /** Line marker tint color */
+  lineMarkerTint?: number;
+  /** Label tint color */
+  labelTint?: number;
+  /** Fill style */
+  fill?: PolygonFillStyle;
+  /** Casing style */
+  casing?: PolygonStrokeStyle;
+  /** Stroke style */
+  stroke?: PolygonStrokeStyle;
+}
+
+/** SSR (smallest surrounding rectangle) data for a polygon */
+interface SSRData {
+  screenSSR: any;
+  worldSSR: any;
+  worldAxis1: Vec2[];
+  worldAxis2: Vec2[];
+  worldCenter: Vec2;
+  shapeType: 'square' | 'circle';
+}
 
 
 /**
@@ -24,13 +81,32 @@ const PARTIALFILLWIDTH = 32;
  *   (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeaturePolygon extends AbstractPixiFeature {
+  /** PIXI.Sprite for low resolution representation */
+  lowRes: PIXI.Sprite | null;
+  /** PIXI.Graphics for the fill (below) */
+  fill: PIXI.Graphics | null;
+  /** PIXI.Mesh for the mask (applied to fill) */
+  mask: PIXI.Mesh | null;
+  /** Source graphics for generating mask geometry */
+  maskSource: PIXI.Graphics | null;
+  /** Container for stroke graphics */
+  strokes: PIXI.Container | null;
+  /** Debug SSR graphics (optional) */
+  debugSSR?: PIXI.Graphics | null;
+
+  /** SSR data for low-res rendering */
+  private _ssrdata: SSRData | null;
+  /** Buffer polygon data for hit testing and halo */
+  private _bufferdata: LineToPolyResult | null;
+  /** Vertex count for Rapid#1636 workaround */
+  private _vertexCount: number;
 
   /**
    * @constructor
-   * @param  {Layer}   layer     - The Layer that owns this Feature
-   * @param  {string}  featureID - Unique string to use for the name of this Feature
+   * @param layer - The Layer that owns this Feature
+   * @param featureID - Unique string to use for the name of this Feature
    */
-  constructor(layer, featureID) {
+  constructor(layer: any, featureID: string) {
     super(layer, featureID);
 
     this._ssrdata = null;
@@ -58,7 +134,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     // (note: in pixi v8 they now do, but they don't yet respect the `alignment` property)
     // So we'll create the mask graphic and then copy its attributes into a mesh
     // which _does_ hit test properly.
-    const mask = new PIXI.Mesh({ geometry: new PIXI.MeshGeometry() });
+    const mask = new PIXI.Mesh({ geometry: new PIXI.MeshGeometry({}) });
     mask.label = 'mask';
     mask.eventMode = 'static';
     mask.visible = false;
@@ -89,7 +165,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
-  destroy() {
+  destroy(): void {
     if (this.lowRes) {
       this.lowRes.destroy();
       this.lowRes = null;
@@ -124,24 +200,25 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
   /**
    * update
-   * @param  {Viewport}  viewport - Pixi viewport to use for rendering
-   * @param  {number}    zoom     - Effective zoom to use for rendering
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
    */
-  update(viewport, zoom) {
+  update(viewport: Viewport, zoom: number): void {
     if (!this.dirty) return;  // nothing to do
 
     const context = this.context;
-    const storage = context.systems.storage;
-    const isWireframeMode = context.systems.map.wireframeMode;
-    const bearing = context.viewport.transform.rotation;
+    const storage = context.systems.storage as any;
+    const map = context.systems.map as any;
+    const isWireframeMode = map?.wireframeMode;
+    const bearing = (context as any).viewport.transform.rotation;
     const geom = this.geom;
-    let screen;
+    let screen = geom.screen;
 
     //
     // GEOMETRY
     //
     if (geom.dirty) {
-      geom.update(viewport, zoom);
+      geom.update(viewport);
 
       screen = geom.screen;
       if (!screen) return;  // can't render anything without screen coords
@@ -164,20 +241,23 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         //        3
 
         const poly = screen.ssr.poly;
-        const p1 = [(poly[0][0] + poly[1][0]) / 2, (poly[0][1] + poly[1][1]) / 2 ];
-        const q1 = [(poly[2][0] + poly[3][0]) / 2, (poly[2][1] + poly[3][1]) / 2 ];
-        const p2 = [(poly[3][0] + poly[0][0]) / 2, (poly[3][1] + poly[0][1]) / 2 ];
-        const q2 = [(poly[1][0] + poly[2][0]) / 2, (poly[1][1] + poly[2][1]) / 2 ];
+        const p1: Vec2 = [(poly[0][0] + poly[1][0]) / 2, (poly[0][1] + poly[1][1]) / 2 ];
+        const q1: Vec2 = [(poly[2][0] + poly[3][0]) / 2, (poly[2][1] + poly[3][1]) / 2 ];
+        const p2: Vec2 = [(poly[3][0] + poly[0][0]) / 2, (poly[3][1] + poly[0][1]) / 2 ];
+        const q2: Vec2 = [(poly[1][0] + poly[2][0]) / 2, (poly[1][1] + poly[2][1]) / 2 ];
         const axis1 = [p1, q1];
         const axis2 = [p2, q2];
-        const center = [ (p1[0] + q1[0]) / 2, (p1[1] + q1[1]) / 2 ];
+        const center: Vec2 = [ (p1[0] + q1[0]) / 2, (p1[1] + q1[1]) / 2 ];
 
         // Pick an appropriate lowRes sprite for this shape
         // Are the SSR corners part of the shape?
         const EPSILON = 0.1;
-        let c0in, c1in, c2in, c3in;
-        const outer = screen.coords[0];
-        outer.forEach(point => {
+        let c0in: boolean | undefined;
+        let c1in: boolean | undefined;
+        let c2in: boolean | undefined;
+        let c3in: boolean | undefined;
+        const outer = (screen.coords as Vec2[][])[0];
+        outer.forEach((point: Vec2) => {
           if (!c0in) c0in = vecEqual(point, poly[0], EPSILON);
           if (!c1in) c1in = vecEqual(point, poly[1], EPSILON);
           if (!c2in) c2in = vecEqual(point, poly[2], EPSILON);
@@ -186,10 +266,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         const cornersInSSR = c0in || c1in || c2in || c3in;
 
         this._ssrdata = {
-          screenSSR: geom.screen.ssr,
-          worldSSR: geom.world.ssr,
-          worldAxis1: axis1.map(coord => viewport.screenToWorld(coord)),
-          worldAxis2: axis2.map(coord => viewport.screenToWorld(coord)),
+          screenSSR: geom.screen!.ssr,
+          worldSSR: geom.world!.ssr,
+          worldAxis1: axis1.map(coord => viewport.screenToWorld(coord as Vec2)),
+          worldAxis2: axis2.map(coord => viewport.screenToWorld(coord as Vec2)),
           worldCenter: viewport.screenToWorld(center),
           shapeType: (cornersInSSR ? 'square' : 'circle')
         };
@@ -203,21 +283,21 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     screen = geom.screen;
     if (!screen) return;  // can't render anything without screen coords
 
-    const w = screen.width;
-    const h = screen.height;
+    const w = screen.width ?? 0;
+    const h = screen.height ?? 0;
 
-    const style = this._style;
+    const style = this._style as PolygonStyle;
     const textureManager = this.gfx.textures;
-    const color = style.fill.color ?? 0xaaaaaa;
-    const alpha = style.fill.alpha ?? 0.3;
-    const pattern = style.fill.pattern;
-    const dash = style.stroke.dash || null;
+    const color = style.fill?.color ?? 0xaaaaaa;
+    const alpha = style.fill?.alpha ?? 0.3;
+    const pattern = style.fill?.pattern;
+    const dash = style.stroke?.dash ?? null;
 
-    const lowRes = this.lowRes;
-    const fill = this.fill;
-    let mask = this.mask;   // Rapid#1636, see below - we may need to replace the mask
-    const maskSource = this.maskSource;
-    const strokes = this.strokes;
+    const lowRes = this.lowRes!;
+    const fill = this.fill!;
+    let mask = this.mask!;   // Rapid#1636, see below - we may need to replace the mask
+    const maskSource = this.maskSource!;
+    const strokes = this.strokes!;
 
     let texture = pattern && textureManager.getPatternTexture(pattern) || PIXI.Texture.WHITE;    // WHITE turns off the texture
     const textureMatrix = new PIXI.Matrix().rotate(-bearing);  // keep patterns face up
@@ -289,7 +369,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     //
     // redraw the shapes
     //
-    const rings = screen.flatCoords || [];  // outer, followed by holes if any
+    const rings = (screen.flatCoords || []) as number[][];  // outer, followed by holes if any
     this._bufferdata = null;
 
     // STROKES
@@ -297,8 +377,16 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     if (strokes.visible && rings.length) {
       strokes.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
 
-      const lineWidth = isWireframeMode ? 1 : style.fill.width || 2;
-      const strokeStyle = {
+      const lineWidth = isWireframeMode ? 1 : style.fill?.width || 2;
+      const strokeStyle: {
+        alpha: number;
+        alignment: number;
+        color: number;
+        width: number;
+        cap: PIXI.LineCap;
+        join: PIXI.LineJoin;
+        dash?: number[];
+      } = {
         alpha: 1,
         alignment: 0.5,  // middle of line
         color: color,
@@ -311,8 +399,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         alignment: 0.5,  // middle of line
         color: 0x000000,
         width: lineWidth + 10,
-        cap: 'butt',
-        join: 'bevel'
+        cap: 'butt' as PIXI.LineCap,
+        join: 'bevel' as PIXI.LineJoin
       };
 
       for (let i = 0; i < rings.length; i++) {
@@ -370,7 +458,14 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         fill.mask = null;
 
       } else {  // partial fill
-        const maskStyle = {
+        const maskStyle: {
+          alpha: number;
+          color: number;
+          width: number;
+          cap: PIXI.LineCap;
+          join: PIXI.LineJoin;
+          alignment?: number;
+        } = {
           alpha: 1,
           color: 0xff0000,
           width: PARTIALFILLWIDTH,
@@ -419,7 +514,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
           mask.destroy();
 
           // console.log('REPLACING THE MASK');
-          mask = new PIXI.Mesh({ geometry: new PIXI.MeshGeometry() });
+          mask = new PIXI.Mesh({ geometry: new PIXI.MeshGeometry({}) });
           mask.label = 'mask';
           mask.eventMode = 'static';
           this.container.addChild(mask);
@@ -463,8 +558,9 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * updateHalo
    * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
    */
-  updateHalo() {
-    const wireframeMode = this.context.systems.map.wireframeMode;
+  updateHalo(): void {
+    const map = this.context.systems.map as any;
+    const wireframeMode = map?.wireframeMode;
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select'));
     const showHighlight = (this.visible && this._classes.has('highlight'));
@@ -484,7 +580,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       }
     } else {
       if (this.container.filters) {
-        this.container.filters = null;
+        this.container.filters = null!;
       }
     }
 
@@ -493,7 +589,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       if (!this.halo) {
         this.halo = new PIXI.Graphics();
         this.halo.label = `${this.id}-halo`;
-        const haloContainer = this.scene.layers.get('map-ui').halo;
+        const haloContainer = (this.scene.layers.get('map-ui') as any).halo;
         haloContainer.addChild(this.halo);
       }
 
@@ -504,12 +600,13 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         color: 0xffff00
       };
 
-      this.halo.clear();
-      const dl = new DashLine(this.gfx, this.halo, HALO_STYLE);
+      const haloGraphics = this.halo as PIXI.Graphics;
+      haloGraphics.clear();
+      const dl = new DashLine(this.gfx, haloGraphics, HALO_STYLE);
       if (this._bufferdata) {
-        dl.poly(this._bufferdata.outer);
+        dl.poly(this._bufferdata.outer!);
         if (wireframeMode) {
-          dl.poly(this._bufferdata.inner);
+          dl.poly(this._bufferdata.inner!);
         }
       }
 
@@ -524,23 +621,24 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
   /**
    * style
-   * @param  {Object}  obj - Style `Object` (contents depends on the Feature type)
+   * @param obj - Style `Object` (contents depends on the Feature type)
    *
-   * 'point' - @see `PixiFeaturePoint.js`
-   * 'line'/'polygon' - @see `StyleSystem.js`
+   * 'point' - @see `PixiFeaturePoint.ts`
+   * 'line'/'polygon' - @see `StyleSystem.ts`
    */
-  get style() {
-    return this._style;
+  get style(): PolygonStyle {
+    return this._style as PolygonStyle;
   }
-  set style(obj) {
-    this._style = Object.assign({}, STYLE_DEFAULTS, obj);
+  set style(obj: Partial<PolygonStyle>) {
+    this._style = Object.assign({}, STYLE_DEFAULTS, obj) as PolygonStyle;
     this._styleDirty = true;
   }
 
 }
 
 
-const STYLE_DEFAULTS = {
+/** Default style for polygons */
+const STYLE_DEFAULTS: PolygonStyle = {
   requireFill: false,      // allow partial fill or wireframe styles
   lineMarkerName: '',
   lineMarkerTint: 0x000000,

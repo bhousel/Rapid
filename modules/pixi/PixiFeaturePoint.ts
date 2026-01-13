@@ -1,8 +1,52 @@
 import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
 
-import { AbstractPixiFeature } from './AbstractPixiFeature.js';
+import type { Viewport, Vec2 } from '@rapid-sdk/math';
+import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
+
+
+/** Style properties for point features */
+export interface PointStyle {
+  /** Anchor position for icon { x, y } (0.5,0.5 = centered) */
+  anchor?: { x: number; y: number };
+  /** Field of view length multiplier */
+  fovLength?: number;
+  /** Field of view width multiplier */
+  fovWidth?: number;
+  /** Icon alpha/opacity (0-1) */
+  iconAlpha?: number;
+  /** Icon texture name to load */
+  iconName?: string;
+  /** Icon size in pixels */
+  iconSize?: number;
+  /** Custom icon texture */
+  iconTexture?: PIXI.Texture;
+  /** Icon tint color */
+  iconTint?: number;
+  /** Label tint color */
+  labelTint?: number;
+  /** Marker alpha/opacity (0-1) */
+  markerAlpha?: number;
+  /** Marker texture name to load */
+  markerName?: string;
+  /** Custom marker texture */
+  markerTexture?: PIXI.Texture;
+  /** Marker tint color */
+  markerTint?: number;
+  /** Scale multiplier */
+  scale?: number;
+  /** Viewfield alpha/opacity (0-1) */
+  viewfieldAlpha?: number;
+  /** Array of viewfield angles in degrees */
+  viewfieldAngles?: number[];
+  /** Viewfield texture name to load */
+  viewfieldName?: string;
+  /** Custom viewfield texture */
+  viewfieldTexture?: PIXI.Texture;
+  /** Viewfield tint color */
+  viewfieldTint?: number;
+}
 
 
 /**
@@ -19,13 +63,26 @@ import { DashLine } from './lib/DashLine.ts';
  *   (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeaturePoint extends AbstractPixiFeature {
+  /** PIXI.Sprite for the marker */
+  marker: PIXI.Sprite | null;
+  /** PIXI.Sprite for the icon */
+  icon: PIXI.Sprite | null;
+  /** PIXI.Container containing the viewfields (or null if none) */
+  viewfields: PIXI.Container | null;
+
+  /** Count of viewfield sprites (to detect changes) */
+  private _viewfieldCount: number;
+  /** Name of viewfield texture (to detect changes) */
+  private _viewfieldName: string | null;
+  /** Set true to use a circular halo and hit area */
+  private _isCircular: boolean;
 
   /**
    * @constructor
-   * @param  {Layer}   layer     - The Layer that owns this Feature
-   * @param  {string}  featureID - Unique string to use for the name of this Feature
+   * @param layer - The Layer that owns this Feature
+   * @param featureID - Unique string to use for the name of this Feature
    */
-  constructor(layer, featureID) {
+  constructor(layer: any, featureID: string) {
     super(layer, featureID);
 
     this._viewfieldCount = 0;     // to watch for change in # of viewfield sprites
@@ -58,7 +115,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
-  destroy() {
+  destroy(): void {
     if (this.marker) {
       this.marker.destroy();
       this.marker = null;
@@ -78,10 +135,10 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * update
-   * @param  {Viewport}  viewport - Pixi viewport to use for rendering
-   * @param  {number}    zoom     - Effective zoom to use for rendering
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
    */
-  update(viewport, zoom) {
+  update(viewport: Viewport, zoom: number): void {
     if (!this.dirty) return;  // nothing to do
 
     this.updateGeometry(viewport, zoom);
@@ -93,18 +150,18 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * updateGeometry
-   * @param  {Viewport}  viewport - Pixi viewport to use for rendering
-   * @param  {number}    zoom     - Effective zoom to use for rendering
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
    */
-  updateGeometry(viewport, zoom) {
+  updateGeometry(viewport: Viewport, zoom: number): void {
     if (!this.geom.dirty) return;
 
     // Reproject
-    this.geom.update(viewport, zoom);
+    this.geom.update(viewport);
     const screen = this.geom.screen;
-    if (!screen) return;  // can't render anything without screen coords
+    if (!screen?.coords) return;  // can't render anything without screen coords
 
-    const [x, y] = screen.coords;
+    const [x, y] = screen.coords as Vec2;
     this.container.position.set(x, y);
 
     // sort markers by latitude ascending
@@ -116,24 +173,25 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * updateStyle
-   * @param  {Viewport}  viewport - Pixi viewport to use for rendering
-   * @param  {number}    zoom     - Effective zoom to use for rendering
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
    */
-  updateStyle(viewport, zoom) {
+  updateStyle(viewport: Viewport, zoom: number): void {
     if (!this._styleDirty) return;
 
     const screen = this.geom.screen;
-    if (!screen) return;  // can't render anything without screen coords
+    if (!screen?.coords) return;  // can't render anything without screen coords
 
     const context = this.context;
-    const wireframeMode = context.systems.map.wireframeMode;
+    const map = context.systems.map as any;
+    const wireframeMode = map?.wireframeMode;
     const textureManager = this.gfx.textures;
-    const style = this._style;
-    const isPin = ['pin', 'boldPin', 'osmose'].includes(style.markerName);
+    const style = this._style as PointStyle;
+    const isPin = ['pin', 'boldPin', 'osmose'].includes(style.markerName ?? '');
 
-    const marker = this.marker;
-    const icon = this.icon;
-    const z = screen.coords[1];  // use y coord as the z-index
+    const marker = this.marker!;
+    const icon = this.icon!;
+    const z = (screen.coords as Vec2)[1];  // use y coord as the z-index
 
     // Apply anti-rotation to keep the icons and markers facing up.
     // (However viewfields container _should_ include the bearing, and will below)
@@ -144,7 +202,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     if (style.markerTexture || style.markerName) {
       // note - marker.texture gets set below in the effective zoom block
       marker.alpha = style.markerAlpha ?? 1;
-      marker.tint = style.markerTint;
+      marker.tint = style.markerTint ?? 0xffffff;
       marker.visible = true;
     } else {  // No marker
       marker.visible = false;
@@ -152,13 +210,13 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     // Show icon, if any..
     if (style.iconTexture || style.iconName) {
-      icon.texture = style.iconTexture || textureManager.get(style.iconName);
+      icon.texture = style.iconTexture || textureManager.get(style.iconName!);
       icon.anchor.set(style.anchor?.x || 0.5, style.anchor?.y || 0.5);   // middle, middle by default, can be overridden in layer code
       const iconSize = style.iconSize || 11;
       icon.width = iconSize;
       icon.height = iconSize;
       icon.alpha = style.iconAlpha ?? 1;
-      icon.tint = style.iconTint;
+      icon.tint = style.iconTint ?? 0x111111;
       icon.visible = true;
     } else {  // No icon
       icon.visible = false;
@@ -243,7 +301,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
 
       // Replace pinlike markers with circles at lower zoom
-      const markerID = isPin ? 'largeCircle' : style.markerName;
+      const markerID = isPin ? 'largeCircle' : (style.markerName ?? 'smallCircle');
       this._isCircular = (!style.markerTexture && /(circle|midpoint)$/i.test(markerID));
       marker.texture = style.markerTexture || textureManager.get(markerID);
       marker.anchor.set(0.5, 0.5);  // middle, middle
@@ -258,7 +316,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
 
       // Replace pinlike markers with circles if viewfields are present
-      const markerID = (isPin && vfAngles.length) ? 'largeCircle' : style.markerName;
+      const markerID = (isPin && vfAngles.length) ? 'largeCircle' : (style.markerName ?? 'smallCircle');
       this._isCircular = (!style.markerTexture && /(circle|midpoint)$/i.test(markerID));
       marker.texture = style.markerTexture || textureManager.get(markerID);
       if (isPin && !this._isCircular) {
@@ -274,12 +332,12 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const missingMarker = marker.visible && marker.texture === PIXI.Texture.EMPTY;
     const missingIcon = icon.visible && icon.texture === PIXI.Texture.EMPTY;
     const missingViewfields = this.viewfields && vfTexture === PIXI.Texture.EMPTY;
-    this._styleDirty = (missingMarker || missingIcon || missingViewfields);
+    this._styleDirty = !!(missingMarker || missingIcon || missingViewfields);
   }
 
 
 // experiment
-  updateHitArea() {
+  updateHitArea(): void {
     if (!this.visible) return;
 
     if (this._classes.has('drawing')) {  // Rapid#648 - If drawing, `hitArea = null`
@@ -289,12 +347,12 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     // In v8, getLocalBounds now returns a Bounds, not a Rectangle.
     // The Rectangle is wrapped within the bounds object.
-    const rect = this.marker.getLocalBounds().rectangle.clone();
+    const rect = this.marker!.getLocalBounds().rectangle.clone();
 
     // getLocalBounds apparently doesn't take scale into account?
     // This only seems to matter when we adjust the marker size manually
     // (The Mapillary Signs layer does this)
-    const scale = this.marker.scale;
+    const scale = this.marker!.scale;
     if (scale.x !== 1) {
       rect.width *= scale.x;
       rect.x *= scale.x;
@@ -321,9 +379,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * updateHalo
    * Show/Hide halo (requires `this.container.hitArea` to be already set up by `updateHitArea` as a supported shape)
    */
-  updateHalo() {
+  updateHalo(): void {
     const showHover = (this.visible && this._classes.has('hover'));
-    const showSelect = (this.visible && this._classes.has('select') && !this.virtual);
+    const showSelect = (this.visible && this._classes.has('select') && !(this as any).virtual);
     const showHighlight = (this.visible && this._classes.has('highlight'));
 
     // Hover
@@ -341,7 +399,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
     } else {
       if (this.container.filters) {
-        this.container.filters = null;
+        this.container.filters = null!;
       }
     }
 
@@ -350,7 +408,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       if (!this.halo) {
         this.halo = new PIXI.Graphics();
         this.halo.label = `${this.id}-halo`;
-        const haloContainer = this.scene.layers.get('map-ui').halo;
+        const haloContainer = (this.scene as any).layers.get('map-ui').halo;
         haloContainer.addChild(this.halo);
       }
 
@@ -361,10 +419,10 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         color: 0xffff00
       };
 
-      this.halo.clear();
+      (this.halo as PIXI.Graphics).clear();
 
       const shape = this.container.hitArea;
-      const dl = new DashLine(this.gfx, this.halo, HALO_STYLE);
+      const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
       if (shape instanceof PIXI.Circle) {
         dl.circle(shape.x, shape.y, shape.radius, 20);
       } else if (shape instanceof PIXI.Rectangle) {
@@ -385,15 +443,15 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * style
-   * @param  {Object}  obj - Style `Object` (contents depends on the Feature type)
+   * @param obj - Style `Object` (contents depends on the Feature type)
    *
-   * 'point' - @see `PixiFeaturePoint.js`
-   * 'line'/'polygon' - @see `StyleSystem.js`
+   * 'point' - @see `PixiFeaturePoint.ts`
+   * 'line'/'polygon' - @see `StyleSystem.ts`
    */
-  get style() {
-    return this._style;
+  get style(): PointStyle {
+    return this._style as PointStyle;
   }
-  set style(obj) {
+  set style(obj: Partial<PointStyle>) {
     this._style = Object.assign({}, STYLE_DEFAULTS, obj);
     this._styleDirty = true;
   }
@@ -401,7 +459,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 }
 
 
-const STYLE_DEFAULTS = {
+const STYLE_DEFAULTS: PointStyle = {
   iconAlpha: 1,
   iconName: '',
   iconTint: 0x111111,
