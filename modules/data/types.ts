@@ -10,10 +10,10 @@ import type { Context } from '../core/types.ts';
 export type { Context } from '../core/types.ts';
 
 // Re-export entity classes as types
-export type { OsmEntity } from './OsmEntity.ts';
-export type { OsmNode } from './OsmNode.ts';
-export type { OsmRelation, OsmRelationMember } from './OsmRelation.ts';
-export type { OsmWay } from './OsmWay.ts';
+export type { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
+export type { OsmNode, OsmNodeProps } from './OsmNode.ts';
+export type { OsmRelation, OsmRelationProps, OsmRelationMember } from './OsmRelation.ts';
+export type { OsmWay, OsmWayProps } from './OsmWay.ts';
 
 /** 2D vector as [x, y], typically [longitude, latitude] in WGS84 for geographic coordinates */
 export type Vec2 = [number, number];

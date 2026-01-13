@@ -1,6 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { AssetSystem } from './AssetSystem.ts';
-import { EditSystem } from './EditSystem.js';
+import { EditSystem } from './EditSystem.ts';
 import { FilterSystem } from './FilterSystem.ts';
 import { GraphicsSystem } from './GraphicsSystem.js';
 import { ImagerySystem } from './ImagerySystem.ts';

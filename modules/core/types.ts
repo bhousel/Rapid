@@ -11,6 +11,7 @@ import type { Selection } from 'd3-selection';
 // Import converted system types for use in Systems interface.
 // Using `import type` avoids runtime circular dependencies.
 import type { AssetSystem } from './AssetSystem.ts';
+import type { EditSystem } from './EditSystem.ts';
 import type { FilterSystem } from './FilterSystem.ts';
 import type { ImagerySystem } from './ImagerySystem.ts';
 import type { LocalizationSystem } from './LocalizationSystem.ts';
@@ -79,6 +80,7 @@ export interface System {
 /** Union of all system types (converted and unconverted) */
 type AnySystem =
   | AssetSystem
+  | EditSystem
   | FilterSystem
   | ImagerySystem
   | LocalizationSystem
@@ -107,6 +109,7 @@ export interface Systems {
 
   // Converted to TypeScript - use specific types:
   assets?: AssetSystem;
+  editor?: EditSystem;
   filters?: FilterSystem;
   imagery?: ImagerySystem;
   l10n?: LocalizationSystem;
@@ -123,7 +126,6 @@ export interface Systems {
   validator?: ValidationSystem;
 
   // Not yet converted - use base System type:
-  editor?: System;
   gfx?: System;
   map?: System;
   ui?: System;

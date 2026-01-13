@@ -1,7 +1,7 @@
 // Core components to support a headless (no browser) Rapid for testing.
 export * from './actions/index.js';
-export * from './data/index.js';
-export * from './geo/index.js';
+export * from './data/index.ts';
+export * from './geo/index.ts';
 export * from './lib/index.ts';
 export * from './services/index.js';
 export * from './util/index.ts';
@@ -10,21 +10,21 @@ export * from './validations/index.js';
 // These Systems and Services can work without browser and UI.
 export { AbstractSystem } from './core/AbstractSystem.ts';
 export { AssetSystem } from './core/AssetSystem.ts';
-export { EditSystem } from './core/EditSystem.js';
-export { FilterSystem } from './core/FilterSystem.js';
-export { ImagerySystem } from './core/ImagerySystem.js';
-export { LocalizationSystem } from './core/LocalizationSystem.js';
+export { EditSystem } from './core/EditSystem.ts';
+export { FilterSystem } from './core/FilterSystem.ts';
+export { ImagerySystem } from './core/ImagerySystem.ts';
+export { LocalizationSystem } from './core/LocalizationSystem.ts';
 export { LocationSystem } from './core/LocationSystem.ts';
 export { MapSystem } from './core/MapSystem.js';
-export { PhotoSystem } from './core/PhotoSystem.js';
-export { RapidSystem } from './core/RapidSystem.js';
-export { SchemaSystem } from './core/SchemaSystem.js';
+export { PhotoSystem } from './core/PhotoSystem.ts';
+export { RapidSystem } from './core/RapidSystem.ts';
+export { SchemaSystem } from './core/SchemaSystem.ts';
 export { SpatialSystem } from './core/SpatialSystem.ts';
 export { StorageSystem } from './core/StorageSystem.ts';
 export { StyleSystem } from './core/StyleSystem.ts';
-export { UploaderSystem } from './core/UploaderSystem.js';
-export { UrlHashSystem } from './core/UrlHashSystem.js';
-export { ValidationSystem } from './core/ValidationSystem.js';
+export { UploaderSystem } from './core/UploaderSystem.ts';
+export { UrlHashSystem } from './core/UrlHashSystem.ts';
+export { ValidationSystem } from './core/ValidationSystem.ts';
 
 
 // Reexport only what our tests use, see iD#4379

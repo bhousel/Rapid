@@ -287,6 +287,7 @@ Track TypeScript conversion progress here:
 |--------|--------|
 | `AbstractSystem.ts` | ✅ Converted |
 | `AssetSystem.ts` | ✅ Converted |
+| `EditSystem.ts` | ✅ Converted |
 | `FilterSystem.ts` | ✅ Converted |
 | `ImagerySystem.ts` | ✅ Converted |
 | `LocalizationSystem.ts` | ✅ Converted |
@@ -301,7 +302,6 @@ Track TypeScript conversion progress here:
 | `UploaderSystem.ts` | ✅ Converted |
 | `UrlHashSystem.ts` | ✅ Converted |
 | `ValidationSystem.ts` | ✅ Converted |
-| `EditSystem.js` | ❌ Not started |
 | `GraphicsSystem.js` | ❌ Not started |
 | `MapSystem.js` | ❌ Not started |
 | `UiSystem.js` | ❌ Not started |
