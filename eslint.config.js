@@ -1,8 +1,12 @@
 import js from '@eslint/js';
 import ts from 'typescript-eslint';
+import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
 const rules = {
+  plugins: {
+    import: importPlugin
+  },
   rules: {
     "accessor-pairs": "error",
     "array-callback-return": "warn",
@@ -26,7 +30,7 @@ const rules = {
     "no-catch-shadow": "error",
     "no-constructor-return": "error",
     "no-div-regex": "error",
-    "no-duplicate-imports": "warn",
+    "no-duplicate-imports": "off",   // using 'import/no-duplicates' instead
     "no-eq-null": "error",
     "no-eval": "error",
     "no-extend-native": "error",
@@ -70,7 +74,7 @@ const rules = {
     "no-unreachable": "warn",
     "no-unreachable-loop": "warn",
     "no-unused-expressions": "error",
-    "no-unused-vars": "off", // typescript-eslint will check it
+    "no-unused-vars": "off",   // 'typescript-eslint' will check it
     "no-use-before-define": ["off", "nofunc"],
     "no-useless-backreference": "warn",
     "no-useless-call": "warn",
@@ -98,7 +102,9 @@ const rules = {
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-inferrable-types": ["warn", { "ignoreParameters": true }],
     "@typescript-eslint/no-this-alias": "warn",
-    "@typescript-eslint/no-unused-vars": ["warn", { "vars": "all", "args": "none", "varsIgnorePattern": "^_", "caughtErrors": "none"  }]
+    "@typescript-eslint/no-unused-vars": ["warn", { "vars": "all", "args": "none", "varsIgnorePattern": "^_", "caughtErrors": "none"  }],
+
+    "import/no-duplicates": ["warn", { "prefer-inline": false }]
   }
 };
 
@@ -139,8 +145,7 @@ export default [
         Rapid: false,
         d3: false,
         assert: false,   // used by chai
-        fetchMock: false,
-        sinon: false
+        fetchMock: false
       }
     }
   },

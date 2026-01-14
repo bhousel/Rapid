@@ -2,29 +2,83 @@ import * as PIXI from 'pixi.js';
 import RBush from 'rbush';
 import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotatePoints } from '@rapid-sdk/math';
 
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
+
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { PixiGeometryPartScreenData } from './PixiGeometryPart.ts';
+import type { PixiFeatureLine } from './PixiFeatureLine.ts';
+import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
+import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+import type { PixiScene } from './PixiScene.ts';
+import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 const MINZOOM = 12;
 
-const TEXTSTYLE_NORMAL = {
+const TEXTSTYLE_NORMAL: PIXI.TextStyleOptions = {
   fill: { color: 0x333333 },
   fontFamily: 'Arial, Helvetica, sans-serif',
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: '600',
   stroke: { color: 0xffffff, width: 3, join: 'round' }
 };
 
-const TEXTSTYLE_ITALIC = {
+const TEXTSTYLE_ITALIC: PIXI.TextStyleOptions = {
   fill: { color: 0x333333 },
   fontFamily: 'Arial, Helvetica, sans-serif',
   fontSize: 12,
   fontStyle: 'italic',
-  fontWeight: 600,
+  fontWeight: '600',
   stroke: { color: 0xffffff, width: 3, join: 'round' }
 };
 
+
+/** Properties for text labels (used on points) */
+interface TextLabelProps {
+  str: string;
+  labelObj: PIXI.Sprite | PIXI.Text | PIXI.BitmapText;
+  x: number;
+  y: number;
+  tint: number;
+}
+
+/** Properties for rope labels (used on lines and polygons) */
+interface RopeLabelProps {
+  str: string;
+  coords: number[][];
+  labelObj: PIXI.Sprite | PIXI.Text;
+  tint: number;
+}
+
+/** Box used in RBush for collision detection */
+interface LabelBox {
+  type: 'label' | 'avoid' | 'debug';
+  id: string;
+  featureID: string;
+  labelID?: string | null;
+  objectID?: string | null;
+  tint?: number;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** Type for placement IDs */
+type PlacementID =
+  't1' | 't2' | 't3' | 't4' | 't5' |
+  'r1' | 'r2' | 'r3' | 'r4' | 'r5' |
+  'b1' | 'b2' | 'b3' | 'b4' | 'b5' |
+  'l1' | 'l2' | 'l3' | 'l4' | 'l5';
+
+/** Chain link for rope label placement */
+interface ChainLink {
+  labelBox: LabelBox;
+  debugBox: LabelBox;
+  coord: [number, number];
+  angle: number;
+}
 
 
 /**
@@ -33,7 +87,12 @@ const TEXTSTYLE_ITALIC = {
  *  has scrolled the placement box into view - see `renderObjects()`
  */
 class Label {
-  constructor(id, type, props) {
+  id: string;
+  type: 'text' | 'rope';
+  props: TextLabelProps | RopeLabelProps;
+  objectID: string | null;
+
+  constructor(id: string, type: 'text' | 'rope', props: TextLabelProps | RopeLabelProps) {
     this.id = id;
     this.type = type;
     this.props = props;
@@ -47,12 +106,29 @@ class Label {
  * @class
  */
 export class PixiLayerLabels extends AbstractPixiLayer {
+  labelOriginContainer: PIXI.Container | null;
+  debugContainer: PIXI.Container | null;
+  labelContainer: PIXI.Container | null;
+
+  private _labelRBush: RBush<LabelBox>;
+  private _debugRBush: RBush<LabelBox>;
+  private _avoided: Set<string>;
+  private _labeled: Set<string>;
+  private _labels: Map<string, Label>;
+  private _objects: Map<string, PIXI.Container>;
+  private _boxes: Map<string, LabelBox>;
+  private _featureHasBoxes: Map<string, Set<string>>;
+  private _textureIDs: Map<string, string>;
+  private _tPrev: { x: number; y: number; z: number; r: number };
+  private _labelOffset: PIXI.Point;
+  private _textStyleNormal: PIXI.TextStyle;
+  private _textStyleItalic: PIXI.TextStyle;
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'labels';
     this.enabled = true;   // labels should be enabled by default
@@ -140,7 +216,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const debugContainer = new PIXI.Container();  //PIXI.ParticleContainer(50000);
     debugContainer.label = 'debug';
     debugContainer.eventMode = 'none';
-    debugContainer.roundPixels = false;
     debugContainer.sortableChildren = false;
     this.debugContainer = debugContainer;
 
@@ -163,14 +238,14 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * resetFeature
    * Remove data from labeling caches for the given feature.
    * This will force the feature to be relabeled.
-   * @param  {string}  featureID - The feature ID to reset
+   * @param featureID - The feature ID to reset
    */
-  resetFeature(featureID) {
+  resetFeature(featureID: string): void {
     this._avoided.delete(featureID);
     this._labeled.delete(featureID);
 
-    const labelIDs = new Set();
-    const objectIDs = new Set();
+    const labelIDs = new Set<string>();
+    const objectIDs = new Set<string>();
 
     // Gather `labelIDs` and `objectIDs` from the boxes
     // Then remove the boxes.
@@ -227,14 +302,14 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * - label placement - do the math of figuring out where labels should be
    * - label rendering - show or hide labels based on their visibility
    *
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     if (!this.enabled || zoom < MINZOOM) {
-      this.labelContainer.visible = false;
-      this.debugContainer.visible = false;
+      this.labelContainer!.visible = false;
+      this.debugContainer!.visible = false;
       return;
     }
 
@@ -267,11 +342,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const labelOffset = this._labelOffset;
     this.gfx.origin.toGlobal({ x: 0, y: 0 }, labelOffset);
 
-    const groupContainer = this.scene.groups.get('labels');
+    const groupContainer = this.scene.groups.get('labels')!;
     groupContainer.position.set(-origin.x, -origin.y);     // undo origin - [0,0] is now center
     groupContainer.rotation = -bearing;                    // undo rotation
 
-    const labelOriginContainer = this.labelOriginContainer;
+    const labelOriginContainer = this.labelOriginContainer!;
     labelOriginContainer.position.set(-stage.x + labelOffset.x, -stage.y + labelOffset.y);  // replace origin
 
     // Collect features to avoid.
@@ -299,25 +374,25 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this.labelLines(lines);
     this.labelPolygons(polygons);
 
-    this.labelContainer.visible = true;
+    this.labelContainer!.visible = true;
     this.renderObjects();
 
-    const showDebug = this.context.getDebug('label');
+    const showDebug = (this.context as any).getDebug('label');
     if (showDebug) {
-      this.debugContainer.visible = true;
+      this.debugContainer!.visible = true;
       this.renderDebug();
     } else {
-      this.debugContainer.visible = false;
+      this.debugContainer!.visible = false;
     }
   }
 
 
   /**
    * getLabelSprite
-   * @param  {string}  str   - String for the label
-   * @param  {string}  style - 'normal' or 'italic'
+   * @param str - String for the label
+   * @param style - 'normal' or 'italic'
    */
-  getLabelSprite(str, style = 'normal') {
+  getLabelSprite(str: string, style: 'normal' | 'italic' = 'normal'): PIXI.Sprite {
     const textureID = `${str}-${style}`;
     const textureManager = this.gfx.textures;
 
@@ -355,13 +430,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * If a new avoidance collides with an already placed label,
    *  destroy the label and flag the feature as labeldirty for relabeling
    */
-  gatherAvoids() {
-    const showDebug = this.context.getDebug('label');
+  gatherAvoids(): void {
+    const showDebug = (this.context as any).getDebug('label');
 
     // Gather the containers that have avoidable stuff on them.
-    const avoidContainers = [];
+    const avoidContainers: PIXI.Container[] = [];
 
-    const selectedContainer = this.scene.layers.get('map-ui').selected;
+    const selectedContainer = this.scene.layers.get('map-ui')?.selected;
     if (selectedContainer) {
       avoidContainers.push(selectedContainer);
     }
@@ -371,27 +446,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     }
 
     // For each container, gather the things to avoid.
-    const avoidObject = _avoidObject.bind(this);
-    const labelBoxes = [];
-    const debugBoxes = [];
-    for (const container of avoidContainers) {
-      for (const child of container.children) {
-        avoidObject(child);
-      }
-    }
+    const labelBoxes: LabelBox[] = [];
+    const debugBoxes: LabelBox[] = [];
 
-    // Bulk insert any boxes we collected..
-    if (labelBoxes.length) {
-      this._labelRBush.load(labelBoxes);
-    }
-    if (showDebug && debugBoxes.length) {
-      this._debugRBush.load(debugBoxes);
-    }
-
-
-    // Adds the given display object as an avoidance
-    // @param {PIXI.Container}  sourceObject - a Pixi Display object
-    function _avoidObject(sourceObject) {
+    const avoidObject = (sourceObject: PIXI.Container): void => {
       if (!sourceObject.visible || !sourceObject.renderable) return;
       const featureID = sourceObject.label;
 
@@ -408,7 +466,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
       const EPSILON = 0.01;
 
-      const avoidBox = {
+      const avoidBox: LabelBox = {
         type: 'avoid',
         id: `${featureID}-avoid`,
         featureID: featureID,
@@ -423,7 +481,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       labelBoxes.push(avoidBox);
 
       if (showDebug) {
-        const debugBox = {
+        const debugBox: LabelBox = {
           type: 'debug',
           id: avoidBox.id + '-debug',
           featureID: featureID,
@@ -448,7 +506,20 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           this.resetFeature(hit.featureID);
         }
       }
+    };
 
+    for (const container of avoidContainers) {
+      for (const child of container.children) {
+        avoidObject(child as PIXI.Container);
+      }
+    }
+
+    // Bulk insert any boxes we collected..
+    if (labelBoxes.length) {
+      this._labelRBush.load(labelBoxes);
+    }
+    if (showDebug && debugBoxes.length) {
+      this._debugRBush.load(debugBoxes);
     }
   }
 
@@ -457,9 +528,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * _cacheBox
    * Add the given box to the caches.
    * The box should have `id` and `featureID` properties.
-   * @param  {Object}  box - the box to cache
+   * @param box - the box to cache
    */
-  _cacheBox(box) {
+  _cacheBox(box: LabelBox): void {
     const boxID = box.id;
     const featureID = box.featureID;
     if (!boxID || !featureID) return;
@@ -478,10 +549,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /**
    * labelPoints
    * This calculates the placement, but does not actually add the label to the scene.
-   * @param {Array<PixiFeaturePoint>}  features - The features to place point labels on
+   * @param features - The features to place point labels on
    */
-  labelPoints(features) {
-    features.sort((a, b) => a.geom.screen.coords[1] - b.geom.screen.coords[1]);
+  labelPoints(features: PixiFeaturePoint[]): void {
+    features.sort((a, b) => (a.geom as any).screen.coords[1] - (b.geom as any).screen.coords[1]);
 
     for (const feature of features) {
       const featureID = feature.id;
@@ -518,13 +589,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * labelLines
    * Lines are labeled with `PIXI.SimpleRope` that run along the line.
    * This calculates the placement, but does not actually add the rope label to the scene.
-   * @param  {Array<PixiFeatureLine>}  features - The features to place point labels on
+   * @param features - The features to place point labels on
    */
-  labelLines(features) {
+  labelLines(features: PixiFeatureLine[]): void {
     // This is hacky, but we can sort the line labels by their parent container name.
     // It might be a level container with a name like "1", "-1", or just a name like "lines"
     // If `parseInt` fails, just sort the label above everything.
-    function level(feature) {
+    function level(feature: PixiFeatureLine): number {
       const lvl = parseInt(feature.container.parent.label, 10);
       return isNaN(lvl) ? 999 : lvl;
     }
@@ -533,18 +604,18 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     for (const feature of features) {
       const featureID = feature.id;
-      const screen = feature.geom.screen;
+      const screen = feature.geom.screen as PixiGeometryPartScreenData | null;
 
       if (this._labeled.has(featureID)) continue;  // processed it already
       this._labeled.add(featureID);
 
       if (!feature.label) continue;   // no label needed
-      if (!screen.coords) continue;   // no points
+      if (!screen?.coords) continue;   // no points
       if (!feature.container.visible || !feature.container.renderable) continue; // not visible
-      if (screen.width < 40 && screen.height < 40) continue;    // too small
+      if ((screen.width ?? 0) < 40 && (screen.height ?? 0) < 40) continue;    // too small
 
       const labelObj = this.getLabelSprite(feature.label, 'normal');
-      this.placeRopeLabel(feature, labelObj, screen.coords);
+      this.placeRopeLabel(feature, labelObj, screen.coords as Vec2[]);
     }
   }
 
@@ -553,20 +624,20 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * labelPolygons
    * Polygons are labeled with `PIXI.SimpleRope` that run along the inside of the perimeter.
    * This calculates the placement, but does not actually add the rope label to the scene.
-   * @param  {Array<PixiFeaturePolygon>}  features - The features to place point labels on
+   * @param features - The features to place point labels on
    */
-  labelPolygons(features) {
+  labelPolygons(features: PixiFeaturePolygon[]): void {
     for (const feature of features) {
       const featureID = feature.id;
-      const screen = feature.geom.screen;
+      const screen = feature.geom.screen as PixiGeometryPartScreenData | null;
 
       if (this._labeled.has(featureID)) continue;  // processed it already
       this._labeled.add(featureID);
 
       if (!feature.label) continue;      // no label needed
-      if (!screen.flatCoords) continue;  // no points
+      if (!screen?.flatCoords) continue;  // no points
       if (!feature.container.visible || !feature.container.renderable) continue;  // not visible
-      if (screen.width < 600 && screen.height < 600) continue;  // too small
+      if ((screen.width ?? 0) < 600 && (screen.height ?? 0) < 600) continue;  // too small
 
       const labelObj = this.getLabelSprite(feature.label, 'italic');
 
@@ -579,10 +650,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         join: 'bevel',
         cap: 'butt'
       };
-      const outerRing = screen.flatCoords[0];
+      const outerRing = screen.flatCoords[0] as number[];
       const bufferdata = lineToPoly(outerRing, hitStyle);
       if (!bufferdata.inner) continue;
-      const coords = new Array(bufferdata.inner.length / 2);  // un-flatten :(
+      const coords: Vec2[] = new Array(bufferdata.inner.length / 2);  // un-flatten :(
       for (let i = 0; i < bufferdata.inner.length / 2; ++i) {
         coords[i] = [ bufferdata.inner[(i * 2)], bufferdata.inner[(i * 2) + 1] ];
       }
@@ -597,13 +668,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * Text labels are used to label point features like map pins.
    * We generate several placement regions around the marker,
    *  try them until we find one that doesn't collide with something.
-   * @param  {AbstractPixiFeature}  feature  - The feature to place point labels on
-   * @param  {*}                    labelObj - a PIXI.Sprite, PIXI.Text, or PIXI.BitmapText to use as the label
+   * @param feature - The feature to place point labels on
+   * @param labelObj - a PIXI.Sprite, PIXI.Text, or PIXI.BitmapText to use as the label
    */
-  placeTextLabel(feature, labelObj) {
+  placeTextLabel(feature: AbstractPixiFeature, labelObj: PIXI.Sprite | PIXI.Text | PIXI.BitmapText): void {
     if (!feature) return;
 
-    const showDebug = this.context.getDebug('label');
+    const showDebug = (this.context as any).getDebug('label');
     const featureID = feature.id;
     const container = feature.container;
     if (!container.visible || !container.renderable) return;
@@ -624,7 +695,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const fRight = fRect.x + fWidth;
     const fMidX = fRect.x + (fWidth * 0.5);
     const fBottom = fRect.y + fHeight;
-    const fMidY = (feature.type === 'point') ? (fRect.y + fHeight - 14)  // next to marker
+    const fMidY = (feature.type === 'Point') ? (fRect.y + fHeight - 14)  // next to marker
       : (fRect.y + (fHeight * 0.5));
 
     // `l` = label, these bounds are in "local" coordinates to the label,
@@ -639,7 +710,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const lHeightHalf = lHeight * 0.5;
 
     // Attempt several placements (these are calculated in "global" coordinates)
-    const placements = {
+    const placements: Record<PlacementID, number[]> = {
       t1: [fMidX - more,  fTop - lHeightHalf],       //    t1 t2 t3 t4 t5
       t2: [fMidX - some,  fTop - lHeightHalf],       //      +---+---+
       t3: [fMidX,         fTop - lHeightHalf],       //      |       |
@@ -668,8 +739,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // In order of preference (If left-to-right language, prefer the right of the pin)
     // Prefer placements that are more "visually attached" to the pin (right,bottom,left,top)
     // over placements that are further away (corners)
-    let attempts;
-    const isRTL = this.context.systems.l10n.isRTL;
+    let attempts: PlacementID[];
+    const isRTL = this.context.systems.l10n?.isRTL;
 
     if (isRTL) {   // right to left
       attempts = [
@@ -695,7 +766,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     for (const placementID of attempts) {
       const [x, y] = placements[placementID];
       const EPSILON = 0.01;
-      const labelBox = {
+      const labelBox: LabelBox = {
         type: 'label',
         id: `${featureID}-${placementID}`,
         featureID: featureID,
@@ -711,12 +782,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       // into the rbush so nothing else gets placed there.
       if (!this._labelRBush.collides(labelBox)) {
 //        picked = placementID;
+        const style = feature.style as any;
         const label = new Label(featureID, 'text', {
-          str: feature.label,
+          str: feature.label!,
           labelObj: labelObj,
           x: x,
           y: y,
-          tint: feature.style.labelTint || 0xeeeeee
+          tint: style?.labelTint || 0xeeeeee
         });
 
         this._labels.set(featureID, label);
@@ -725,7 +797,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         this._labelRBush.insert(labelBox);
 
         if (showDebug) {
-          const debugBox = {
+          const debugBox: LabelBox = {
             type: 'debug',
             id: labelBox.id + '-debug',
             featureID: featureID,
@@ -755,15 +827,15 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * Rope labels are placed along a string of coordinates.
    * We generate chains of bounding boxes along the line,
    *  then add the labels in spaces along the line wherever they fit.
-   * @param  {AbstractPixiFeature}  feature  - The feature to place rope labels on
-   * @param  {PIXI.Sprite}          labelObj - A PIXI.Sprite to use as the label
-   * @param  {Array<*>}             screenCoords - The coordinates to place a rope on (these are coords relative to 'origin' container)
+   * @param feature - The feature to place rope labels on
+   * @param labelObj - A PIXI.Sprite to use as the label
+   * @param screenCoords - The coordinates to place a rope on (these are coords relative to 'origin' container)
    */
-  placeRopeLabel(feature, labelObj, screenCoords) {
+  placeRopeLabel(feature: AbstractPixiFeature, labelObj: PIXI.Sprite, screenCoords: Vec2[]): void {
     if (!feature || !labelObj || !screenCoords) return;
     if (!feature.container.visible || !feature.container.renderable) return;
 
-    const showDebug = this.context.getDebug('label');
+    const showDebug = (this.context as any).getDebug('label');
     const featureID = feature.id;
 
     // `l` = label, these bounds are in "local" coordinates to the label,
@@ -789,7 +861,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const origin = this.gfx.origin;
     const labelOffset = this._labelOffset;
     const temp = new PIXI.Point();
-    const coords = screenCoords.map(([x, y]) => {
+    const coords: Vec2[] = screenCoords.map(([x, y]) => {
       origin.toGlobal({x: x, y: y}, temp);
       return [temp.x - labelOffset.x, temp.y - labelOffset.y];
     });
@@ -797,16 +869,16 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // Cover the line in bounding boxes
     const segments = getLineSegments(coords, boxsize);
 
-    const labelBoxes = [];
-    const debugBoxes = [];
-    const candidates = [];
-    let currChain = [];
-    let prevAngle = null;
+    const labelBoxes: LabelBox[] = [];
+    const debugBoxes: LabelBox[] = [];
+    const candidates: ChainLink[][] = [];
+    let currChain: ChainLink[] = [];
+    let prevAngle: number | null = null;
 
     // Finish current chain of bounding boxes, if any.
     // It will be saved as a label candidate if it is long enough.
     // Each chain link has:  { box: box, coord: coord, angle: currAngle }
-    function finishChain() {
+    const finishChain = (): void => {
       const isCandidate = (currChain.length >= numBoxes);
       if (isCandidate) {
         candidates.push(currChain);
@@ -816,7 +888,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         }
       }
       currChain = [];   // reset chain
-    }
+    };
 
 
     // Walk the line, creating chains of bounding boxes,
@@ -827,7 +899,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       segment.coords.forEach((coord, coordIndex) => {
         const [x, y] = coord;
         const EPSILON = 0.01;
-        const labelBox = {
+        const labelBox: LabelBox = {
           type: 'label',
           id: `${featureID}-${segmentIndex}-${coordIndex}`,
           featureID: featureID,
@@ -838,7 +910,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           maxY: y + boxhalf - EPSILON
         };
 
-        const debugBox = {
+        const debugBox: LabelBox = {
           type: 'debug',
           id: labelBox.id + '-debug',
           featureID: featureID,
@@ -898,40 +970,41 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       const startIndex = Math.floor((chain.length - numBoxes) / 2);
       const labelID = `${featureID}-rope-${chainIndex}`;
 
-      let coords = [];
+      const ropeCoords: Vec2[] = [];
       for (let i = startIndex; i < startIndex + numBoxes; i++) {
-        coords.push(chain[i].coord);
+        ropeCoords.push(chain[i].coord);
         const labelBox = chain[i].labelBox;
         labelBox.labelID = labelID;
         this._cacheBox(labelBox);
         labelBoxes.push(labelBox);
       }
 
-      if (!coords.length) return;  // shouldn't happen, min numBoxes is 2 boxes
+      if (!ropeCoords.length) return;  // shouldn't happen, min numBoxes is 2 boxes
 
-      const sum = coords.reduce((acc, coord) => vecAdd(acc, coord), [0,0]);
-      const origin = vecScale(sum, 1 / coords.length);  // pick local origin as the average of the points
-      let angle = vecAngle(coords.at(0), coords.at(-1));
+      const sum = ropeCoords.reduce((acc, coord) => vecAdd(acc, coord), [0, 0]);
+      const ropeOrigin = vecScale(sum, 1 / ropeCoords.length);  // pick local origin as the average of the points
+      let angle = vecAngle(ropeCoords.at(0)!, ropeCoords.at(-1)!);
       angle = numWrap(angle, 0, TAU);  // angle from x-axis, normalize to 0…2π
       if (angle > HALF_PI && angle < (3 * HALF_PI)) {  // rope is upside down, flip it
         angle -= Math.PI;
-        coords.reverse();
+        ropeCoords.reverse();
       }
 
-      // The `coords` array follows our bounding box chain, however it will be a little
+      // The `ropeCoords` array follows our bounding box chain, however it will be a little
       // longer than the label needs to be, which can cause stretching of small labels.
       // Here we will scale the points down to the desired label width.
-      coords = coords.map(coord => vecSubtract(coord, origin));  // to local coords
-      coords = geomRotatePoints(coords, -angle, [0,0]);          // rotate to x axis
-      coords = coords.map(([x,y]) => [x * scaleX, y]);           // apply `scaleX`
-      coords = geomRotatePoints(coords, angle, [0,0]);           // rotate back
-      coords = coords.map(coord => vecAdd(coord, origin));       // back to global coords
+      let scaledCoords = ropeCoords.map(coord => vecSubtract(coord, ropeOrigin));  // to local coords
+      scaledCoords = geomRotatePoints(scaledCoords, -angle, [0,0]);          // rotate to x axis
+      scaledCoords = scaledCoords.map(([x,y]) => [x * scaleX, y]);           // apply `scaleX`
+      scaledCoords = geomRotatePoints(scaledCoords, angle, [0,0]);           // rotate back
+      scaledCoords = scaledCoords.map(coord => vecAdd(coord, ropeOrigin));   // back to global coords
 
+      const style = feature.style as any;
       const label = new Label(labelID, 'rope', {
-        str: feature.label,
-        coords: coords,
+        str: feature.label!,
+        coords: scaledCoords,
         labelObj: labelObj,
-        tint: feature.style.labelTint || 0xeeeeee
+        tint: style?.labelTint || 0xeeeeee
       });
       this._labels.set(labelID, label);
     });
@@ -953,7 +1026,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * renderObjects
    * This renders any of the Label objects in the view
    */
-  renderObjects() {
+  renderObjects(): void {
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi.screen;
     const labelOffset = this._labelOffset;
@@ -965,8 +1038,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     };
 
     // Collect Labels in view
-    const labelIDs = new Set();
-    const seenTextures = new Set();
+    const labelIDs = new Set<string>();
+    const seenTextures = new Set<string>();
     const hits = this._labelRBush.search(screenBounds);
     for (const box of hits) {
       if (box.labelID) {
@@ -986,26 +1059,28 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       const objectID = labelID;
 
       if (label.type === 'text') {
-        const labelObj = props.labelObj;  // a PIXI.Sprite, PIXI.Text, or PIXI.BitmapText
-        labelObj.tint = props.tint || 0xffffff;
-        labelObj.position.set(props.x, props.y);
+        const textProps = props as TextLabelProps;
+        const labelObj = textProps.labelObj;  // a PIXI.Sprite, PIXI.Text, or PIXI.BitmapText
+        labelObj.tint = textProps.tint || 0xffffff;
+        labelObj.position.set(textProps.x, textProps.y);
 
         this._objects.set(objectID, labelObj);
         label.objectID = objectID;
-        this.labelContainer.addChild(labelObj);
+        this.labelContainer!.addChild(labelObj);
 
       } else if (label.type === 'rope') {
-        const labelObj = props.labelObj;  // a PIXI.Sprite, or PIXI.Text
-        const points = props.coords.map(([x,y]) => new PIXI.Point(x, y));
+        const ropeProps = props as RopeLabelProps;
+        const labelObj = ropeProps.labelObj as PIXI.Sprite;  // a PIXI.Sprite
+        const points = ropeProps.coords.map(([x,y]) => new PIXI.Point(x, y));
         const rope = new PIXI.MeshRope({ texture: labelObj.texture, points: points });
         rope.label = labelID;
         rope.autoUpdate = false;
         rope.sortableChildren = false;
-        rope.tint = props.tint || 0xffffff;
+        rope.tint = ropeProps.tint || 0xffffff;
 
         this._objects.set(objectID, rope);
         label.objectID = objectID;
-        this.labelContainer.addChild(rope);
+        this.labelContainer!.addChild(rope);
       }
     }
 
@@ -1025,7 +1100,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * renderDebug
    * This renders any of the debug sprites in the view
    */
-  renderDebug() {
+  renderDebug(): void {
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi.screen;
     const labelOffset = this._labelOffset;
@@ -1046,7 +1121,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
         this._objects.set(objectID, sprite);
         box.objectID = objectID;
-        this.debugContainer.addChild(sprite);
+        this.debugContainer!.addChild(sprite);
       }
     }
   }

@@ -15,7 +15,7 @@ export { PixiLayerEditBlocks } from './PixiLayerEditBlocks.ts';
 export { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
 export { PixiLayerKartaPhotos } from './PixiLayerKartaPhotos.ts';
 export { PixiLayerKeepRight } from './PixiLayerKeepRight.ts';
-export { PixiLayerLabels } from './PixiLayerLabels.js';
+export { PixiLayerLabels } from './PixiLayerLabels.ts';
 export { PixiLayerMapillaryDetections } from './PixiLayerMapillaryDetections.ts';
 export { PixiLayerMapillaryPhotos } from './PixiLayerMapillaryPhotos.ts';
 export { PixiLayerMapillarySigns } from './PixiLayerMapillarySigns.ts';

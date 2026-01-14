@@ -107,6 +107,7 @@
     "cldr-localenames-full": "^48.0.0",
     "cloc": "^2.6.0-cloc",
     "eslint": "^9.39.1",
+    "eslint-plugin-import": "^2.32.0",
     "fetch-mock": "^12.6.0",
     "geojson-vt": "^4.0.2",
     "globals": "^16.5.0",
