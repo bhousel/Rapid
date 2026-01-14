@@ -455,7 +455,7 @@ export class MapSystem extends AbstractSystem {
    */
   mouse() {
     const gfx = this.context.systems.gfx;
-    return gfx.events?.coord?.map || this.centerPoint();
+    return gfx.eventManager?.coord?.map || this.centerPoint();
   }
 
 

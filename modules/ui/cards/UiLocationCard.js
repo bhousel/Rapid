@@ -19,7 +19,7 @@ export class UiLocationCard extends AbstractUiCard {
     super(context);
     this.id = 'location';
 
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx.eventManager;
     const l10n = context.systems.l10n;
 
     this._currLocation = null;

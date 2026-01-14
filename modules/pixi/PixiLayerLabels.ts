@@ -394,7 +394,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   getLabelSprite(str: string, style: 'normal' | 'italic' = 'normal'): PIXI.Sprite {
     const textureID = `${str}-${style}`;
-    const textureManager = this.gfx.textures;
+    const textureManager = this.gfx.textureManager;
 
     let texture = textureManager.getTexture('text', textureID);
     if (!texture) {
@@ -1086,7 +1086,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // Cleanup label textures not visible in the scene anymore.
     // (Otherwise the text atlas will just keep growing)
-    const textureManager = this.gfx.textures;
+    const textureManager = this.gfx.textureManager;
     for (const [str, textureID] of this._textureIDs) {
       if (!seenTextures.has(str)) {
         textureManager.free('text', textureID);

@@ -291,7 +291,7 @@ Track TypeScript conversion progress here:
 | `modules/util/` | ✅ Complete | All 14 files converted |
 | `modules/lib/` | 🔄 Partial | `Tree.js`, `tag_classes.js` remain |
 | `modules/pixi/lib/` | 🔄 Partial | `DashLine.js`, `AtlasAllocator.js` remain |
-| `modules/core/` | 🔄 Partial | 15 systems converted (see below) |
+| `modules/core/` | 🔄 Partial | 16 systems converted (see below) |
 | `modules/actions/` | ❌ Not started | |
 | `modules/behaviors/` | ❌ Not started | |
 | `modules/modes/` | ❌ Not started | |
@@ -321,7 +321,7 @@ Track TypeScript conversion progress here:
 | `UploaderSystem.ts` | ✅ Converted |
 | `UrlHashSystem.ts` | ✅ Converted |
 | `ValidationSystem.ts` | ✅ Converted |
-| `GraphicsSystem.js` | ❌ Not started |
+| `GraphicsSystem.ts` | ✅ Converted |
 | `MapSystem.js` | ❌ Not started |
 | `UiSystem.js` | ❌ Not started |
 

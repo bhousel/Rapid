@@ -44,7 +44,7 @@ export class AddPointMode extends AbstractMode {
     this._active = true;
     const context = this.context;
 
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx.eventManager;
     eventManager.setCursor('crosshair');
 
     context.enableBehaviors(['hover', 'draw', 'mapInteraction']);
@@ -70,7 +70,7 @@ export class AddPointMode extends AbstractMode {
 
     const context = this.context;
 
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx.eventManager;
     eventManager.setCursor('grab');
 
     context.behaviors.draw

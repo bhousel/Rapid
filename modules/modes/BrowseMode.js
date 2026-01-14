@@ -90,7 +90,7 @@ export class BrowseMode extends AbstractMode {
     const context = this.context;
     const editor = context.systems.editor;
     const graph = editor.staging.graph;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx.eventManager;
 
     const target = eventData.target;
     const datum = target?.data;

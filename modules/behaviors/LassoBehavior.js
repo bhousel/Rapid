@@ -42,7 +42,7 @@ export class LassoBehavior extends AbstractBehavior {
     this._lassoing = false;
     this._extent = null;
 
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     eventManager.on('pointerdown', this._pointerdown);
     eventManager.on('pointermove', this._pointermove);
     eventManager.on('pointerup', this._pointerup);
@@ -60,7 +60,7 @@ export class LassoBehavior extends AbstractBehavior {
     this._lassoing = false;
     this._extent = null;
 
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     eventManager.off('pointerdown', this._pointerdown);
     eventManager.off('pointermove', this._pointermove);
     eventManager.off('pointerup', this._pointerup);
@@ -78,7 +78,7 @@ export class LassoBehavior extends AbstractBehavior {
     const context = this.context;
     const gfx = context.systems.gfx;
     const map = context.systems.map;
-    const eventManager = gfx.events;
+    const eventManager = gfx.eventManager;
     if (!eventManager.pointerOverRenderer) return;
 
     const modifiers = eventManager.modifierKeys;
@@ -104,7 +104,7 @@ export class LassoBehavior extends AbstractBehavior {
     const context = this.context;
     const gfx = context.systems.gfx;
     const map = context.systems.map;
-    const eventManager = gfx.events;
+    const eventManager = gfx.eventManager;
     if (!eventManager.pointerOverRenderer) return;
 
     const coord = map.mouseLoc();

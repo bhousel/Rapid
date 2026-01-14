@@ -65,7 +65,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._lastPoint = null;
     this._lastAngle = null;
 
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     eventManager.on('click', this._click);
     eventManager.on('keydown', this._keydown);
     eventManager.on('pointerdown', this._pointerdown);
@@ -90,7 +90,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._lastPoint = null;
     this._lastAngle = null;
 
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     eventManager.off('click', this._click);
     eventManager.off('keydown', this._keydown);
     eventManager.off('pointerdown', this._pointerdown);
@@ -243,7 +243,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._updatePinchState();
 
     const context = this.context;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx.eventManager;
 
     // If shift is pressed it's a lasso, not a map drag
     if (eventManager.modifierKeys.has('Shift')) return;
@@ -281,7 +281,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
     const context = this.context;
     const gfx = context.systems.gfx;
     const map = context.systems.map;
-    const eventManager = gfx.events;
+    const eventManager = gfx.eventManager;
     const viewport = context.viewport;
 
     this.activeTouches[e.pointerId] = { x: e.global.x, y: e.global.y, clientX: e.clientX, clientY: e.clientY };
@@ -373,7 +373,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._lastPoint = null;
     this._lastAngle = null;
 
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     const mode = this.context.mode.id;
     if (mode === 'draw-area' || mode === 'draw-line') {
       eventManager.setCursor('crosshair');

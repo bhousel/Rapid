@@ -438,7 +438,7 @@ export class DashLine {
    * @return The texture for the dash pattern, or null on error
    */
   private _getTexture(options: ResolvedDashLineOptions, dashSize: number): PIXI.Texture | null {
-    const dashTextureCache = this.gfx.textures?._dashTextureCache;
+    const dashTextureCache = this.gfx.textureManager?._dashTextureCache;
     if (!dashTextureCache) {    // called too early?
       console.error('No DashTextureCache found');   // eslint-disable-line no-console
       return null;

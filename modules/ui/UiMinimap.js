@@ -141,7 +141,7 @@ return;
     if (this._isHidden) return;
 
     const gfx = this.context.systems.gfx;
-    if (!gfx.pixi || !gfx.textures?.loaded) return;  // called too early?
+    if (!gfx.pixi || !gfx.textureManager?.loaded) return;  // called too early?
 
     this._updateTransform();
     this._updateBoundingBox();
@@ -270,7 +270,7 @@ return;
 
     const context = this.context;
     const gfx = context.systems.gfx;
-    if (!gfx.pixi || !gfx.textures?.loaded) return;  // called too early?
+    if (!gfx.pixi || !gfx.textureManager?.loaded) return;  // called too early?
 
     const stage = this.stage;
     const viewMain = context.viewport;
@@ -317,7 +317,7 @@ return;
 
       // We're repurposing the 'sided' arrow, so we need to turn it -90°
       const sprite = new PIXI.Sprite();
-      sprite.texture = gfx.textures.get('sided');
+      sprite.texture = gfx.textureManager.get('sided');
       sprite.tint = 0xffff00;
       sprite.anchor.set(0, 0.5); // left, middle
       sprite.scale.set(2, 2);
@@ -399,7 +399,7 @@ return;
     if (this._isHidden) return;
 
     const gfx = this.context.systems.gfx;
-    if (!gfx.pixi || !gfx.textures?.loaded) return;  // called too early?
+    if (!gfx.pixi || !gfx.textureManager?.loaded) return;  // called too early?
 
     window.performance.mark('minimap-start');
 
@@ -447,7 +447,7 @@ renderer.view.canvas = mainCanvas;  // restore main canvas
     // Use the same Pixi Application managed by the Graphics System.
     // As of Pixi v8, we can not create multiple Pixi Applications.
     // Instead, a single application can render to multiple canvases.
-    if (!gfx.pixi || !gfx.textures)  return Promise.reject();  // called too early?
+    if (!gfx.pixi || !gfx.textureManager)  return Promise.reject();  // called too early?
 
     // event handlers
     gfx.on('draw', this._update);
@@ -469,7 +469,7 @@ renderer.view.canvas = mainCanvas;  // restore main canvas
       stage: stage,
       origin: stage,
       pixi: gfx.pixi,
-      textures: gfx.textures,
+      textures: gfx.textureManager,
       deferredRedraw: gfx.deferredRedraw,
       immediateRedraw: gfx.immediateRedraw
     };

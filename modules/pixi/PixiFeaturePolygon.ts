@@ -287,7 +287,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const h = screen.height ?? 0;
 
     const style = this._style as PolygonStyle;
-    const textureManager = this.gfx.textures;
+    const textureManager = this.gfx.textureManager;
     const color = style.fill?.color ?? 0xaaaaaa;
     const alpha = style.fill?.alpha ?? 0.3;
     const pattern = style.fill?.pattern;

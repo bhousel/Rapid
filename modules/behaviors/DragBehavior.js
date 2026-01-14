@@ -58,7 +58,7 @@ export class DragBehavior extends AbstractBehavior {
     this.lastMove = null;
     this.dragTarget = null;
 
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     eventManager.on('modifierchange', this._doMove);
     eventManager.on('pointerover', this._doMove);
     eventManager.on('pointerout', this._doMove);
@@ -91,7 +91,7 @@ export class DragBehavior extends AbstractBehavior {
     this.lastMove = null;
     this.dragTarget = null;
 
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     eventManager.off('modifierchange', this._doMove);
     eventManager.off('pointerover', this._doMove);
     eventManager.off('pointerout', this._doMove);
@@ -150,7 +150,7 @@ export class DragBehavior extends AbstractBehavior {
 
     // Ignore it if we are not over the canvas
     // (e.g. sidebar, out of browser window, over a button, toolbar, modal)
-    const eventManager = gfx.events;
+    const eventManager = gfx.eventManager;
     if (!eventManager.pointerOverRenderer) return;
 
     const down = this.lastDown;
@@ -284,7 +284,7 @@ export class DragBehavior extends AbstractBehavior {
   _snappingDisabled() {
     // Ignore it if we are not over the canvas
     // (e.g. sidebar, out of browser window, over a button, toolbar, modal)
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     if (!eventManager.pointerOverRenderer) return false;
 
     const modifiers = eventManager.modifierKeys;

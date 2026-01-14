@@ -176,7 +176,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    */
   renderSource(timestamp: number, viewport: Viewport, source: any, sourceContainer: PIXI.Container, tileMap: Map<string, CachedTile>): void {
     const context = this.context;
-    const textureManager = this.gfx.textures;
+    const textureManager = this.gfx.textureManager;
     const osm = context.services.osm as any;
     const t = viewport.transform.props;
     const sourceID = source.key;   // note: use `key` here, for Wayback it will include the date
@@ -410,7 +410,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * @param tile - Tile object
    */
   destroyTile(tile: CachedTile): void {
-    const textureManager = this.gfx.textures;
+    const textureManager = this.gfx.textureManager;
 
     if (tile.sprite) {
       if (tile.loaded) {

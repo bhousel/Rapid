@@ -75,7 +75,7 @@ export class SelectBehavior extends AbstractBehavior {
     this.lastSpace = null;
     this.lastClick = null;
 
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     eventManager.on('keydown', this._keydown);
     eventManager.on('keyup', this._keyup);
     eventManager.on('pointerdown', this._pointerdown);
@@ -107,7 +107,7 @@ export class SelectBehavior extends AbstractBehavior {
 
     this._cancelLongPress();
 
-    const eventManager = this.context.systems.gfx.events;
+    const eventManager = this.context.systems.gfx.eventManager;
     eventManager.off('keydown', this._keydown);
     eventManager.off('keyup', this._keyup);
     eventManager.off('pointerdown', this._pointerdown);
@@ -318,7 +318,7 @@ export class SelectBehavior extends AbstractBehavior {
     const context = this.context;
     const gfx = context.systems.gfx;
     const photos = context.systems.photos;
-    const eventManager = gfx.events;
+    const eventManager = gfx.eventManager;
 
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
@@ -485,7 +485,7 @@ export class SelectBehavior extends AbstractBehavior {
     if (!this._enabled || !this.lastClick) return;  // nothing to do
 
     const context = this.context;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx.eventManager;
     const ui = context.systems.ui;
 
     const modifiers = eventManager.modifierKeys;

@@ -2,7 +2,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { AssetSystem } from './AssetSystem.ts';
 import { EditSystem } from './EditSystem.ts';
 import { FilterSystem } from './FilterSystem.ts';
-import { GraphicsSystem } from './GraphicsSystem.js';
+import { GraphicsSystem } from './GraphicsSystem.ts';
 import { ImagerySystem } from './ImagerySystem.ts';
 import { LocalizationSystem } from './LocalizationSystem.ts';
 import { LocationSystem } from './LocationSystem.ts';

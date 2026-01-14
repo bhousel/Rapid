@@ -72,7 +72,7 @@ export class SelectOsmMode extends AbstractMode {
     const scene = gfx.scene;
     const ui = context.systems.ui;
     const urlhash = context.systems.urlhash;
-    const eventManager = gfx.events;
+    const eventManager = gfx.eventManager;
 
     const selection = options.selection ?? {};
     let entityIDs = selection.osm ?? [];
@@ -155,7 +155,7 @@ export class SelectOsmMode extends AbstractMode {
     const scene = gfx.scene;
     const ui = context.systems.ui;
     const urlhash = context.systems.urlhash;
-    const eventManager = gfx.events;
+    const eventManager = gfx.eventManager;
 
     // If the user added an empty relation, we should clean it up.
     const graph = editor.staging.graph;
@@ -659,7 +659,7 @@ export class SelectOsmMode extends AbstractMode {
     const context = this.context;
     const editor = context.systems.editor;
     const graph = editor.staging.graph;
-    const eventManager = context.systems.gfx.events;
+    const eventManager = context.systems.gfx.eventManager;
 
     const target = eventData.target;
     const datum = target?.data;

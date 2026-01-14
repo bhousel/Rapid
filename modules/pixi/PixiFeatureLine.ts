@@ -128,7 +128,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
     const map = this.context.systems.map as any;
     const isWireframe = map?.wireframeMode;
-    const textureManager = this.gfx.textures;
+    const textureManager = this.gfx.textureManager;
     const container = this.container;
     const geom = this.geom;
     const style = this._style as LineStyle;
