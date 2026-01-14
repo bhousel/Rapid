@@ -1,15 +1,17 @@
 import { DOMParser } from '@xmldom/xmldom';
-import { Extent } from '@rapid-sdk/math';
+import { Extent, type Viewport } from '@rapid-sdk/math';
 import { gpx, kml } from '@tmcw/togeojson';
 import { parse as wktParse } from 'wkt';
 
 import { geojsonFeatures } from '../util/util.ts';
-import { GeoJSON } from '../data/GeoJSON.js';
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeatureLine } from './PixiFeatureLine.js';
-import { PixiFeaturePoint } from './PixiFeaturePoint.js';
-import { PixiFeaturePolygon } from './PixiFeaturePolygon.js';
+import { GeoJSON } from '../data/GeoJSON.ts';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePolygon, type PolygonStyle } from './PixiFeaturePolygon.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
+
+import type { PixiScene } from './PixiScene.ts';
 
 const CUSTOM_COLOR = 0x00ffff;
 
@@ -21,46 +23,61 @@ const CUSTOM_COLOR = 0x00ffff;
  * @class
  */
 export class PixiLayerCustomData extends AbstractPixiLayer {
+  private _dataUsed: string | null;
+  private _fileList: FileList | null;
+  private _fileReader: FileReader;
+  private _template: string | null;
+  private _wkt: string | null;
+  private _url: string | null;
+  private _geoData: GeoJSON[] | null;
+  private _geoDataExtent: Extent | null;
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'custom-data';
 
-    this._clear();
+    this._dataUsed = null;
+    this._fileList = null;
+    this._template = null;
+    this._wkt = null;
+    this._url = null;
+    this._geoData = null;
+    this._geoDataExtent = null;
     this._fileReader = new FileReader();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._hashchange = this._hashchange.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._updateHash = this._updateHash.bind(this);
     this._setFile = this._setFile.bind(this);
     this.setFileList = this.setFileList.bind(this);
 
     // Setup event handlers..
     // drag and drop
-    function over(d3_event) {
+    function over(d3_event: DragEvent): void {
       d3_event.stopPropagation();
       d3_event.preventDefault();
-      d3_event.dataTransfer.dropEffect = 'copy';
+      d3_event.dataTransfer!.dropEffect = 'copy';
     }
 
-    this.context.container()
+    const context = this.context as any;
+    context.container()
       .attr('dropzone', 'copy')
       .on('dragenter.draganddrop', over)
       .on('dragexit.draganddrop', over)
       .on('dragover.draganddrop', over)
-      .on('drop.draganddrop', d3_event => {
+      .on('drop.draganddrop', (d3_event: DragEvent) => {
         d3_event.stopPropagation();
         d3_event.preventDefault();
-        this.setFileList(d3_event.dataTransfer.files);
+        this.setFileList(d3_event.dataTransfer!.files);
       });
 
     // hashchange - pick out the 'gpx' param
-    this.context.systems.urlhash
-      .on('hashchange', this._hashchange);
+    this.context.systems.urlhash!
+      .on('hashchange', this._hashChanged);
 
     // layerchange - update the url hash
     scene.on('layerchange', this._updateHash);
@@ -81,22 +98,22 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * render
    * Render the GeoJSON custom data
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     if (!this.enabled || !(this.hasData())) return;
 
     const vtService = this.context.services.vectortile;
-    let geoData = [];
+    let geoData: GeoJSON[] = [];
     if (this._template && vtService) {   // fetch data from vector tile service
       if (zoom >= 13) {  // avoid firing off too many API requests
         vtService.loadTiles(this._template);
       }
       geoData = vtService.getData(this._template);
     } else {
-      geoData = this._geoData;  //geojsonFeatures(this._geojson);
+      geoData = this._geoData ?? [];  //geojsonFeatures(this._geojson);
     }
 
     // Determine which renderer(s) to use for each feature
@@ -108,91 +125,97 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     this.renderLines(frame, viewport, zoom, lines);
     this.renderPoints(frame, viewport, zoom, points);
 
-    // Now render any extras, like gridlines in square bounding boxes or arbitrary WKT polygons/multipolys.
-    const gridLines = this.createGridLines(lines);
-    const gridStyle = { stroke: { width: 0.5, color: 0x0ffff, alpha: 0.5, cap: 'round' }};
-    this.renderLines(frame, viewport, zoom, gridLines, gridStyle);
+//    // Now render any extras, like gridlines in square bounding boxes or arbitrary WKT polygons/multipolys.
+//    const gridLines = this.createGridLines(lines);
+//    const gridStyle = { stroke: { width: 0.5, color: 0x0ffff, alpha: 0.5, cap: 'round' }} as LineStyle;
+//    this.renderGridLines(frame, viewport, zoom, gridLines, gridStyle);
   }
 
-
-  /**
-   * createGridLines
-   * creates interstitial grid lines inside the rectangular bounding box, if specified.
-   * @param lines - the line string(s) that may contain a rectangular bounding box
-   * @returns a list of linestrings to draw as gridlines.
-  */
-  createGridLines(lines) {
-    const context = this.context;
-    const imagery = context.systems.imagery;
-    const rapid = context.systems.rapid;
-
-    const numSplits = imagery.numGridSplits;
-    let gridLines = [];
-
-    // 'isTaskRectangular' implies one and only one rectangular linestring.
-    if (rapid.isTaskRectangular && numSplits > 0) {
-      const box = lines[0];
-
-      const lats = box.geometry.coordinates.map((f) => f[0]);
-      const lons = box.geometry.coordinates.map((f) => f[1]);
-
-      const minLat = Math.min(...lats);
-      const minLon = Math.min(...lons);
-      const maxLat = Math.max(...lats);
-      const maxLon = Math.max(...lons);
-
-      let latIncrement = (maxLat - minLat) / numSplits;
-      let lonIncrement = (maxLon - minLon) / numSplits;
-
-      // num splits is a grid specificer, so 2 => 2x2 grid, 3 => 3x3 grid, all the way up to 6 => 6x6 grid.
-      for (let i = 1; i < numSplits; i++) {
-        let thisLat = minLat + latIncrement * i;
-        let thisLon = minLon + lonIncrement * i;
-
-        gridLines.push({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: [
-              [minLat, thisLon],
-              [maxLat, thisLon],
-            ],
-          },
-          id: numSplits + 'gridcol' + i,
-        });
-        gridLines.push({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: [
-              [thisLat, minLon],
-              [thisLat, maxLon],
-            ],
-          },
-          id: numSplits + 'gridrow' + i,
-        });
-      }
-    }
-    return gridLines;
-  }
+//
+//  /**
+//   * createGridLines
+//   * Creates grid lines inside the rectangular bounding box, if specified.
+//   * @param lines - the line string(s) that may contain a rectangular bounding box
+//   * @returns a list of linestrings to draw as gridlines.
+//   */
+//  createGridLines(lines: GeoJSON[]): GeoJSON.Feature[] {
+//    const context = this.context;
+//    const imagery = context.systems.imagery!;
+//    const rapid = context.systems.rapid!;
+//
+//    const numSplits = imagery.numGridSplits;
+//    const gridLines: GeoJSON.Feature[] = [];
+//
+//    // 'isTaskRectangular' implies one and only one rectangular linestring.
+//    if (rapid.isTaskRectangular() && numSplits > 0) {
+//      const box = lines[0];
+//      const geojson = box.props.geojson as GeoJSON.Feature | undefined;
+//      const geometry = geojson?.geometry as GeoJSON.LineString | undefined;
+//      if (!geometry?.coordinates) return gridLines;
+//
+//      const coords = geometry.coordinates;
+//      const lats = coords.map((f: GeoJSON.Position) => f[0]);
+//      const lons = coords.map((f: GeoJSON.Position) => f[1]);
+//
+//      const minLat = Math.min(...lats);
+//      const minLon = Math.min(...lons);
+//      const maxLat = Math.max(...lats);
+//      const maxLon = Math.max(...lons);
+//
+//      const latIncrement = (maxLat - minLat) / numSplits;
+//      const lonIncrement = (maxLon - minLon) / numSplits;
+//
+//      // num splits is a grid specificer, so 2 => 2x2 grid, 3 => 3x3 grid, all the way up to 6 => 6x6 grid.
+//      for (let i = 1; i < numSplits; i++) {
+//        const thisLat = minLat + latIncrement * i;
+//        const thisLon = minLon + lonIncrement * i;
+//
+//        gridLines.push({
+//          type: 'Feature',
+//          properties: {},
+//          geometry: {
+//            type: 'LineString',
+//            coordinates: [
+//              [minLat, thisLon],
+//              [maxLat, thisLon],
+//            ],
+//          },
+//          id: numSplits + 'gridcol' + i,
+//        });
+//        gridLines.push({
+//          type: 'Feature',
+//          properties: {},
+//          geometry: {
+//            type: 'LineString',
+//            coordinates: [
+//              [thisLat, minLon],
+//              [thisLat, maxLon],
+//            ],
+//          },
+//          id: numSplits + 'gridrow' + i,
+//        });
+//      }
+//    }
+//    return gridLines;
+//  }
 
 
   /**
    * renderPolygons
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  polygons   Array of polygon data
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
+   * @param polygons - Array of polygon data
    */
-  renderPolygons(frame, viewport, zoom, polygons) {
-    const l10n = this.context.systems.l10n;
+  renderPolygons(frame: number, viewport: Viewport, zoom: number, polygons: GeoJSON[]): void {
+    const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('basemap');
 
     const polygonStyle = {
       fill: { color: CUSTOM_COLOR, alpha: 0.3, },
       stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
       labelTint: CUSTOM_COLOR
-    };
+    } as PolygonStyle;
 
     for (const d of polygons) {
       const dataID = d.id;
@@ -205,12 +228,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         if (!part.world || part.type !== 'Polygon') continue;
 
         const featureID = `${this.layerID}-${dataID}-${i}`;
-        let feature = this.features.get(featureID);
+        let feature = this.features.get(featureID) as PixiFeaturePolygon | undefined;
 
         // If feature existed before as a different type, recreate it.
         if (feature && feature.type !== 'Polygon') {
           feature.destroy();
-          feature = null;
+          feature = undefined;
         }
 
         if (!feature) {
@@ -222,7 +245,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.label = l10n.displayName(d.properties);
+          feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.setCoords(part);
           feature.setData(dataID, d);
         }
@@ -237,20 +260,20 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
   /**
    * renderLines
-   * @param  frame          Integer frame being rendered
-   * @param  viewport       Pixi viewport to use for rendering
-   * @param  zoom           Effective zoom to use for rendering
-   * @param  lines          Array of line data
-   * @param  styleOverride  Custom style
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
+   * @param lines - Array of line data
+   * @param styleOverride - Custom style
    */
-  renderLines(frame, viewport, zoom, lines, styleOverride) {
-    const l10n = this.context.systems.l10n;
+  renderLines(frame: number, viewport: Viewport, zoom: number, lines: GeoJSON[], styleOverride?: LineStyle): void {
+    const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('basemap');
 
-    const lineStyle = styleOverride || {
+    const lineStyle = styleOverride ?? {
       stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
       labelTint: CUSTOM_COLOR
-    };
+    } as LineStyle;
 
     for (const d of lines) {
       const dataID = d.id;
@@ -263,12 +286,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         if (!part.world || part.type !== 'LineString') continue;
 
         const featureID = `${this.layerID}-${dataID}-${i}`;
-        let feature = this.features.get(featureID);
+        let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
 
         // If feature existed before as a different type, recreate it.
         if (feature && feature.type !== 'LineString') {
           feature.destroy();
-          feature = null;
+          feature = undefined;
         }
 
         if (!feature) {
@@ -280,7 +303,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.label = l10n.displayName(d.properties);
+          feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.setCoords(part);
           feature.setData(dataID, d);
         }
@@ -293,15 +316,57 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   }
 
 
+//  /**
+//   * renderGridLines
+//   * Render grid lines from raw GeoJSON features (not wrapped GeoJSON class instances)
+//   * @param frame - Integer frame being rendered
+//   * @param viewport - Pixi viewport to use for rendering
+//   * @param zoom - Effective zoom to use for rendering
+//   * @param features - Array of GeoJSON Feature objects
+//   * @param lineStyle - The line style to use
+//   */
+//  renderGridLines(frame: number, viewport: Viewport, zoom: number, features: GeoJSON.Feature[], lineStyle: LineStyle): void {
+//    const parentContainer = this.scene.groups.get('basemap');
+//
+//    for (const d of features) {
+//      const dataID = d.id as string;
+//      const geometry = d.geometry as GeoJSON.LineString;
+//      if (!geometry?.coordinates) continue;
+//
+//      const featureID = `${this.layerID}-${dataID}`;
+//      let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
+//
+//      // If feature existed before as a different type, recreate it.
+//      if (feature && feature.type !== 'LineString') {
+//        feature.destroy();
+//        feature = undefined;
+//      }
+//
+//      if (!feature) {
+//        feature = new PixiFeatureLine(this, featureID);
+//        feature.style = lineStyle;
+//        feature.parentContainer = parentContainer;
+//      }
+//
+//      // Grid lines don't have versions, always update geometry
+//      (feature as any).setCoords({ world: geometry.coordinates });
+//
+//      this.syncFeatureClasses(feature);
+//      feature.update(viewport, zoom);
+//      this.retainFeature(feature, frame);
+//    }
+//  }
+
+
   /**
    * renderPoints
-   * @param  frame      Integer frame being rendered
-   * @param  viewport   Pixi viewport to use for rendering
-   * @param  zoom       Effective zoom to use for rendering
-   * @param  lines      Array of point data
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
+   * @param points - Array of point data
    */
-  renderPoints(frame, viewport, zoom, points) {
-    const l10n = this.context.systems.l10n;
+  renderPoints(frame: number, viewport: Viewport, zoom: number, points: GeoJSON[]): void {
+    const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('points');
 
     const pointStyle = {
@@ -309,7 +374,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       markerTint: CUSTOM_COLOR,
       iconName: 'maki-circle-stroked',
       labelTint: CUSTOM_COLOR
-    };
+    } as PointStyle;
 
     for (const d of points) {
       const dataID = d.id;
@@ -322,12 +387,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         if (!part.world || part.type !== 'Point') continue;
 
         const featureID = `${this.layerID}-${dataID}-${i}`;
-        let feature = this.features.get(featureID);
+        let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
         // If feature existed before as a different type, recreate it.
         if (feature && feature.type !== 'Point') {
           feature.destroy();
-          feature = null;
+          feature = undefined;
         }
 
         if (!feature) {
@@ -339,7 +404,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.label = l10n.displayName(d.properties);
+          feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.setCoords(part);
           feature.setData(dataID, d);
         }
@@ -355,17 +420,17 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * hasData
    * Return true if there is custom data to display
-   * @return {boolean}  `true` if there is a vector tile template or file data to display
+   * @return `true` if there is a vector tile template or file data to display
    */
-  hasData() {
+  hasData(): boolean {
     return !!(this._template || Array.isArray(this._geoData));
   }
 
   /**
    * dataUsed
-   * @return  {Array}  Array of single element for the data layer currently enabled
+   * @return Array of single element for the data layer currently enabled
    */
-  dataUsed() {
+  dataUsed(): string[] {
     return this._dataUsed ? [ this._dataUsed ] : [];
   }
 
@@ -374,20 +439,20 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * fitZoom
    * Fits the map view to show the extent of the loaded file data
    */
-  fitZoom() {
+  fitZoom(): void {
     const extent = this._geoDataExtent;
     if (!extent) return;
 
-    this.context.systems.map.trimmedExtent(extent);
+    (this.context.systems.map as any).trimmedExtent(extent);
   }
 
 
   /**
    * getFileList
    * This returns any FileList which we have stored
-   * @return {FileList|null}  Files, or null if none
+   * @return Files, or null if none
    */
-  getFileList() {
+  getFileList(): FileList | null {
     return this._fileList;
   }
 
@@ -400,9 +465,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * https://developer.mozilla.org/en-US/docs/Web/API/FileList
    * https://developer.mozilla.org/en-US/docs/Web/API/File
    * https://developer.mozilla.org/en-US/docs/Web/API/FileReader
-   * @param  {FileList|null} fileList  Files to process (only first one is used), or null to reset
+   * @param fileList - Files to process (only first one is used), or null to reset
    */
-  setFileList(fileList) {
+  setFileList(fileList: FileList | null): void {
     this._clear();
     this._fileList = fileList;
     this.scene.disableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
@@ -412,9 +477,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const file = fileList[0];
     const extension = this._getExtension(file.name);
 
-    this._fileReader.onload = (e) => {
+    this._fileReader.onload = (e: ProgressEvent<FileReader>) => {
       this._fileReader.onload = null;
-      this._setFile(e.target.result, extension);
+      this._setFile(e.target!.result as string, extension);
     };
     this._fileReader.readAsText(file);
   }
@@ -424,9 +489,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * setUrl
    * This checks a url that we got from either the custom data screen or the `data=` or `gpx=` url parameter
    * It decides whether the url looks like a single file to load or a vector tile template url.
-   * @param  {string}  url
+   * @param url - The URL to load
    */
-  setUrl(url) {
+  setUrl(url: string): void {
     this._clear();
     this._url = url;
     this.scene.disableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
@@ -445,7 +510,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
           this._setFile(data, extension);
           if (isTask) {
             this._dataUsed = null;    // A task boundary is not really a data source
-            this.context.systems.rapid.setTaskExtentByGpxData(data);
+            this.context.systems.rapid?.setTaskExtentByGpxData(data);
           }
         })
         .catch(e => console.error(e));  // eslint-disable-line
@@ -461,9 +526,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * A url template is something we can pass to the Vector Tile service. It can be:
    *   - Mapbox Vector Tiles (MVT) made available from a z/x/y tileserver
    *   - Protomaps .pmtiles single-file archive containing MVT
-   * @param  {string}  url
+   * @param url - The URL template
    */
-  _setUrlTemplate(url) {
+  private _setUrlTemplate(url: string): void {
     // Test source against OSM imagery blocklists..
     const osm = this.context.services.osm;
     if (osm) {
@@ -501,28 +566,28 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    *  - a `Document` parsed by `xmldom.DOMParser` (like we would receive from `utilFetchResponse`),
    *  - an `Object`, in the case of JSON/GeoJSON.
    * All files get converted to GeoJSON.
-   * @param  {string|Object|Document}   data        The file data
-   * @param  {string}                   extension   The file extension
+   * @param data - The file data
+   * @param extension - The file extension
    */
-  _setFile(data, extension) {
+  private _setFile(data: string | Document | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
     if (!data) return;
 
     const isString = (typeof data === 'string');
-    let geojson;
+    let geojson: GeoJSON.GeoJsonObject | undefined;
     switch (extension) {
       case '.gpx':
-        geojson = gpx(isString ? _parseXML(data) : data);
+        geojson = gpx(isString ? _parseXML(data as string) : data as Document);
         break;
       case '.kml':
-        geojson = kml(isString ? _parseXML(data) : data);
+        geojson = kml(isString ? _parseXML(data as string) : data as Document);
         break;
       case '.geojson':
       case '.json':
-        geojson = isString ? JSON.parse(data) : data;
+        geojson = isString ? JSON.parse(data as string) : data as GeoJSON.GeoJsonObject;
         break;
     }
 
-    geojson = geojson || {};
+    geojson = geojson || {} as GeoJSON.GeoJsonObject;
 
     if (Object.keys(geojson).length) {
       this._dataUsed = `${extension} data file`;
@@ -530,7 +595,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       this._geoDataExtent = new Extent();
 
       // We may have a Feature or a FeatureCollection, coax it to an array of Features.
-      const features = geojsonFeatures(geojson);
+      const features = geojsonFeatures(geojson as GeoJSON.Feature | GeoJSON.FeatureCollection);
       for (const feature of features) {
         const d = new GeoJSON(this.context, { geojson: feature });
         this._geoData.push(d);
@@ -544,7 +609,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
     }
 
-    function _parseXML(text) {
+    function _parseXML(text: string): Document {
       return (new DOMParser()).parseFromString(text, 'text/xml');
     }
   }
@@ -555,24 +620,24 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * Return the extension at the end of a filename or url.
    * This only returns the extension if it one of the recognized file types:
    *   '.gpx', '.kml', '.json', '.geojson'
-   * @param  {string}       name - A filename or url
-   * @return {string|null}  The extension including the dot '.'
+   * @param name - A filename or url
+   * @return The extension including the dot '.'
    */
-  _getExtension(name) {
-    if (!name) return;
+  private _getExtension(name: string): string | null {
+    if (!name) return null;
     const regex = /\.(gpx|kml|(geo)?json)$/i;
     const match = name.match(regex);
-    return match && match.length && match[0];
+    return match?.[0] ?? null;
   }
 
 
   /**
-   * _hashchange
+   * _hashChanged
    * Respond to any changes appearing in the url hash
-   * @param  {Map<string, string>}  currParams - The current hash parameters
-   * @param  {Map<string, string>}  prevParams - The previous hash parameters
+   * @param currParams - The current hash parameters
+   * @param prevParams - The previous hash parameters
    */
-  _hashchange(currParams, prevParams) {
+  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // 'data' (or 'gpx', legacy)
     const newData = currParams.get('data') || currParams.get('gpx');
     const oldData = prevParams.get('data') || prevParams.get('gpx');
@@ -598,8 +663,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * _updateHash
    * Push changes in custom data url to the urlhash
    */
-  _updateHash() {
-    const urlhash = this.context.systems.urlhash;
+  private _updateHash(): void {
+    const urlhash = this.context.systems.urlhash!;
 
     if (!this.enabled) return;
 
@@ -628,7 +693,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    *   ((-1.5 1.3, -1.5 1.3, -1.5 1.3, -1.4 1.3, -1.5 1.3)))'
    * @returns a list containing polygons to draw as a custom shape, or null
    */
-  _parseAsWkt(wktString) {
+  private _parseAsWkt(wktString: string): GeoJSON.Feature | null {
     const parsedWkt = wktParse(wktString);
 
     // If it couldn't be parsed, or if it isn't a poly/multipoly, we can't render it.
@@ -638,10 +703,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     return {
       type: 'Feature',
-      geometry: {
-        type: parsedWkt.type,
-        coordinates: parsedWkt.coordinates,
-      },
+      geometry: parsedWkt as GeoJSON.Polygon | GeoJSON.MultiPolygon,
       id: 'customWktPoly',
       properties: {}
     };
@@ -652,7 +714,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * _clear
    * Clear state to prepare for new custom data
    */
-  _clear() {
+  private _clear(): void {
     this._dataUsed = null;
     this._fileList = null;
     this._template = null;

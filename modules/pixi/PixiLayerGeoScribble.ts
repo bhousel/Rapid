@@ -1,8 +1,12 @@
 import * as PIXI from 'pixi.js';
 
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeatureLine } from './PixiFeatureLine.js';
-import { PixiFeaturePoint } from './PixiFeaturePoint.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+
+import type { GeoJSON } from '../data/GeoJSON.ts';
+import type { PixiScene } from './PixiScene.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 const CUSTOM_COLOR = 0x2eff2e;
 
@@ -15,12 +19,13 @@ const CUSTOM_COLOR = 0x2eff2e;
  * @class
  */
 export class PixiLayerGeoScribble extends AbstractPixiLayer {
+  scribblesContainer: PIXI.Container | null;
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'geoscribble';
 
@@ -45,7 +50,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   get enabled() {
     return this._enabled;
   }
-  set enabled(val) {
+  set enabled(val: boolean) {
     if (!this.supported) {
       val = false;
     }
@@ -54,11 +59,11 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const service = context.services.geoscribble;
     if (val && service) {
       service.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => gfx?.immediateRedraw());
     }
   }
 
@@ -93,17 +98,17 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   /**
    * render
    * Render the geojson custom data
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     if (!this.enabled) return;
 
     const service = this.context.services.geoscribble;
     service.loadTiles();
 
-    const geoData = service.getData();
+    const geoData: GeoJSON[] = service.getData();
 
     // Determine which renderer(s) to use for each feature
     // No polygons will be returned by the service, so we don't need to consider those types.
@@ -117,30 +122,30 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
   /**
    * getLineStyle
-   * @param  props - The GeoJSON properties object, may contain:
+   * @param props - The GeoJSON properties object, may contain:
    * `thin`   (boolean)
    * `dashed` (boolean)
    * `color`  (hex code string like `#FFEECC`)
    * `style`  One of: "scribble", "eraser", "road", "track", "footway", "path", "cycleway", "cycleway_shared",
-   *          "wall", "fence", "power","stream", "drain", etc.
+   *          "wall", "fence", "power", "stream", "drain", etc.
    * @return  A style object that can be given to the pixi renderer
    */
-  getLineStyle(props) {
+  getLineStyle(props: Record<string, unknown>): LineStyle {
     const lineStyle = {
       stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
       labelTint: CUSTOM_COLOR
-    };
+    } as LineStyle;
 
-    const color = props.color ? new PIXI.Color(props.color) : CUSTOM_COLOR;
+    const color = props.color ? new PIXI.Color(props.color as string).toNumber() : CUSTOM_COLOR;
     const thin = props.thin;
     const dashed = props.dashed;
 
     // Modify the alpha down a bit to add to 'scribble' factor.
-    lineStyle.stroke.alpha = 0.70;
-    lineStyle.stroke.color = color;
-    lineStyle.stroke.width =  thin ? 4 : 8;
+    lineStyle.stroke!.alpha = 0.70;
+    lineStyle.stroke!.color = color;
+    lineStyle.stroke!.width = thin ? 4 : 8;
     if (dashed) {
-      lineStyle.stroke.dash = thin ? [12, 6] : [24, 12]; // Thinner lines get shorter dashes
+      lineStyle.stroke!.dash = thin ? [12, 6] : [24, 12]; // Thinner lines get shorter dashes
     }
 
     return lineStyle;
@@ -149,12 +154,12 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
   /**
    * renderLines
-   * @param  frame     Integer frame being rendered
-   * @param  viewport  Pixi viewport to use for rendering
-   * @param  zoom      Effective zoom to use for rendering
-   * @param  lines     Array of line data
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
+   * @param lines - Array of line data
    */
-  renderLines(frame, viewport, zoom, lines) {
+  renderLines(frame: number, viewport: Viewport, zoom: number, lines: GeoJSON[]): void {
     const parentContainer = this.scribblesContainer;
 
     for (const d of lines) {
@@ -169,12 +174,12 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (!part.world || part.type !== 'LineString') continue;
 
         const featureID = `${this.layerID}-${dataID}-${i}`;
-        let feature = this.features.get(featureID);
+        let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
 
         // If feature existed before as a different type, recreate it.
         if (feature && feature.type !== 'LineString') {
           feature.destroy();
-          feature = null;
+          feature = undefined;
         }
 
         if (!feature) {
@@ -186,7 +191,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.label = d.properties.text;
+          feature.label = (d.properties.text as string) || null;
           feature.setCoords(part);
           feature.setData(dataID, d);
         }
@@ -201,12 +206,12 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
   /**
    * renderPoints
-   * @param  frame     Integer frame being rendered
-   * @param  viewport  Pixi viewport to use for rendering
-   * @param  zoom      Effective zoom to use for rendering
-   * @param  points    Array of point data
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
+   * @param points - Array of point data
    */
-  renderPoints(frame, viewport, zoom, points) {
+  renderPoints(frame: number, viewport: Viewport, zoom: number, points: GeoJSON[]): void {
     const parentContainer = this.scribblesContainer;
 
     const pointStyle = {
@@ -214,7 +219,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
       markerTint: CUSTOM_COLOR,
       iconName: 'maki-circle-stroked',
       labelTint: CUSTOM_COLOR
-    };
+    } as PointStyle;
 
     for (const d of points) {
       const dataID = d.id;
@@ -227,12 +232,12 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (!part.world || part.type !== 'Point') continue;
 
         const featureID = `${this.layerID}-${dataID}-${i}`;
-        let feature = this.features.get(featureID);
+        let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
         // If feature existed before as a different type, recreate it.
         if (feature && feature.type !== 'Point') {
           feature.destroy();
-          feature = null;
+          feature = undefined;
         }
 
         if (!feature) {
@@ -244,7 +249,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         // If data has changed.. Replace it.
         if (feature.v !== version) {
           feature.v = version;
-          feature.label = d.properties.text;
+          feature.label = (d.properties.text as string) || null;
           feature.setCoords(part);
           feature.setData(dataID, d);
         }

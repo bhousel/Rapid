@@ -9,10 +9,10 @@ export { PixiScene } from './PixiScene.ts';
 export { PixiTextures } from './PixiTextures.ts';
 
 export { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.js';
-export { PixiLayerCustomData } from './PixiLayerCustomData.js';
+export { PixiLayerCustomData } from './PixiLayerCustomData.ts';
 export { PixiLayerDebug } from './PixiLayerDebug.ts';
 export { PixiLayerEditBlocks } from './PixiLayerEditBlocks.ts';
-export { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
+export { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
 export { PixiLayerKartaPhotos } from './PixiLayerKartaPhotos.ts';
 export { PixiLayerKeepRight } from './PixiLayerKeepRight.ts';
 export { PixiLayerLabels } from './PixiLayerLabels.js';
