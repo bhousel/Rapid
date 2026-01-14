@@ -1,8 +1,11 @@
-import { scaleLinear } from 'd3-scale';
+import { scaleLinear, type ScaleLinear } from 'd3-scale';
 
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeatureLine } from './PixiFeatureLine.js';
-import { PixiFeaturePoint } from './PixiFeaturePoint.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeatureLine } from './PixiFeatureLine.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+
+import type { PixiScene } from './PixiScene.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
 const MAPILLARY_GREEN = 0x05cb63;
@@ -25,8 +28,8 @@ const MARKERSTYLE = {
   fovLength:       1
 };
 
-const fovWidthInterp = scaleLinear([90, 10], [1.3, 0.7]);
-const fovLengthInterp = scaleLinear([90, 10], [0.7, 1.5]);
+const fovWidthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [1.3, 0.7]);
+const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7, 1.5]);
 
 
 
@@ -35,12 +38,14 @@ const fovLengthInterp = scaleLinear([90, 10], [0.7, 1.5]);
  * @class
  */
 export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
+  private _viewerBearing: number | null;
+  private _viewerFov: number;
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'mapillary';
 
@@ -74,9 +79,9 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   /**
    * _bearingchanged
    * Called whenever the viewer's compass bearing has changed (user pans around)
-   * @param {number}  bearing - the new bearing value in degrees
+   * @param bearing - the new bearing value in degrees
    */
-  _bearingchanged(bearing) {
+  private _bearingchanged(bearing: number): void {
     this._viewerBearing = bearing;
     this._dirtyCurrentPhoto();
   }
@@ -85,9 +90,9 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   /**
    * _fovchanged
    * Called whenever the viewer's field of view has changed (user zooms/unzooms)
-   * @param {number}  fov - the new field of view value in degrees
+   * @param fov - the new field of view value in degrees
    */
-  _fovchanged(fov) {
+  private _fovchanged(fov: number): void {
     this._viewerFov = fov;
     this._dirtyCurrentPhoto();
   }
@@ -98,22 +103,22 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * If we are interacting with the viewer (zooming / panning),
    * dirty the current photo so its view cone gets redrawn
    */
-  _dirtyCurrentPhoto() {
+  private _dirtyCurrentPhoto(): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const photos = context.systems.photos;
 
-    const currPhotoID = photos.currPhotoID;
+    const currPhotoID = photos?.currPhotoID;
     if (!currPhotoID) return;  // shouldn't happen, the user is zooming/panning an image
 
     // Dirty the feature(s) for this image so they will be redrawn.
     const featureIDs = this._dataHasFeature.get(currPhotoID) ?? new Set();
     for (const featureID of featureIDs) {
-      const feature = this.features.get(featureID);
+      const feature = this.features.get(featureID) as any;
       if (!feature) continue;
       feature._styleDirty = true;
     }
-    gfx.immediateRedraw();
+    gfx!.immediateRedraw();
   }
 
 
@@ -143,22 +148,22 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const mapillary = context.services.mapillary;
     if (val && mapillary) {
       mapillary.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => gfx!.immediateRedraw());
     }
   }
 
 
   /**
    * filterMarkers
-   * @param  {Array<Marker>}  markers - all markers
-   * @return {Array<Marker>}  markers with filtering applied
+   * @param markers - all markers
+   * @return markers with filtering applied
    */
-  filterMarkers(markers) {
-    const photos = this.context.systems.photos;
+  filterMarkers(markers: any[]): any[] {
+    const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
     const toDate = photos.toDate;
@@ -190,11 +195,11 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * Note - a 'sequence' is now a FeatureCollection containing a LineString or MultiLineString, post Rapid#776
    * This is because we can get multiple linestrings for sequences that cross a vector tile boundary.
    * We just look at the first item in the features Array to determine whether to keep/filter the sequence.
-   * @param  {Array<GeoJSON>}  sequences - all sequences
-   * @return {Array<GeoJSON>}  sequences with filtering applied
+   * @param sequences - all sequences
+   * @return sequences with filtering applied
    */
-  filterSequences(sequences) {
-    const photos = this.context.systems.photos;
+  filterSequences(sequences: any[]): any[] {
+    const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
     const toDate = photos.toDate;
@@ -224,11 +229,11 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
   /**
    * renderMarkers
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  renderMarkers(frame, viewport, zoom) {
+  renderMarkers(frame: number, viewport: Viewport, zoom: number): void {
     const mapillary = this.context.services.mapillary;
     if (!mapillary?.started) return;
 
@@ -302,7 +307,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style = Object.assign({}, MARKERSTYLE);
+        const style: PointStyle = Object.assign({}, MARKERSTYLE);
 
         if (feature.hasClass('selectphoto')) {  // selected photo style
           style.viewfieldAngles = [this._viewerBearing ?? d.props.ca];
@@ -338,11 +343,11 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     const mapillary = this.context.services.mapillary;
     if (!this.enabled || !mapillary?.started || zoom < MINZOOM) return;
 

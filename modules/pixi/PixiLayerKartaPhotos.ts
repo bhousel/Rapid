@@ -1,6 +1,9 @@
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeatureLine } from './PixiFeatureLine.js';
-import { PixiFeaturePoint } from './PixiFeaturePoint.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeatureLine } from './PixiFeatureLine.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+
+import type { PixiScene } from './PixiScene.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
 const KARTAVIEW_BLUE = 0x20c4ff;
@@ -32,9 +35,9 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'kartaview';
   }
@@ -66,11 +69,11 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const kartaview = context.services.kartaview;
     if (val && kartaview) {
       kartaview.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => gfx!.immediateRedraw());
     }
   }
 
@@ -86,11 +89,11 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
   /**
    * filterMarkers
-   * @param  {Array<Marker>}  markers - all markers
-   * @return {Array<Marker>}  markers with filtering applied
+   * @param markers - all markers
+   * @return markers with filtering applied
    */
-  filterMarkers(markers) {
-    const photos = this.context.systems.photos;
+  filterMarkers(markers: any[]): any[] {
+    const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
     const toDate = photos.toDate;
@@ -120,11 +123,11 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
   /**
    * filterSequences
    * Each sequence is represented as a GeoJSON LineString.
-   * @param  {Array<GeoJSON>}  sequences - all sequences
-   * @return {Array<GeoJSON>}  sequences with filtering applied
+   * @param sequences - all sequences
+   * @return sequences with filtering applied
    */
-  filterSequences(sequences) {
-    const photos = this.context.systems.photos;
+  filterSequences(sequences: any[]): any[] {
+    const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
     const toDate = photos.toDate;
@@ -151,11 +154,11 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
   /**
    * renderMarkers
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  renderMarkers(frame, viewport, zoom) {
+  renderMarkers(frame: number, viewport: Viewport, zoom: number): void {
     const kartaview = this.context.services.kartaview;
     if (!kartaview?.started) return;
 
@@ -223,7 +226,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style = Object.assign({}, MARKERSTYLE);
+        const style: PointStyle = Object.assign({}, MARKERSTYLE);
 
 // todo handle pano
         if (feature.hasClass('selectphoto')) {  // selected photo style
@@ -260,11 +263,11 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  frame     Integer frame being rendered
-   * @param  viewport  Pixi viewport to use for rendering
-   * @param  zoom      Effective zoom to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     const kartaview = this.context.services.kartaview;
     if (!this.enabled || !kartaview?.started || zoom < MINZOOM) return;
 

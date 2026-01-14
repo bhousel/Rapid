@@ -13,11 +13,11 @@ export { PixiLayerCustomData } from './PixiLayerCustomData.js';
 export { PixiLayerDebug } from './PixiLayerDebug.ts';
 export { PixiLayerEditBlocks } from './PixiLayerEditBlocks.ts';
 export { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
-export { PixiLayerKartaPhotos } from './PixiLayerKartaPhotos.js';
+export { PixiLayerKartaPhotos } from './PixiLayerKartaPhotos.ts';
 export { PixiLayerKeepRight } from './PixiLayerKeepRight.js';
 export { PixiLayerLabels } from './PixiLayerLabels.js';
 export { PixiLayerMapillaryDetections } from './PixiLayerMapillaryDetections.js';
-export { PixiLayerMapillaryPhotos } from './PixiLayerMapillaryPhotos.js';
+export { PixiLayerMapillaryPhotos } from './PixiLayerMapillaryPhotos.ts';
 export { PixiLayerMapillarySigns } from './PixiLayerMapillarySigns.js';
 export { PixiLayerMapRoulette } from './PixiLayerMapRoulette.js';
 export { PixiLayerMapUI } from './PixiLayerMapUI.ts';
@@ -26,7 +26,7 @@ export { PixiLayerOsmNotes } from './PixiLayerOsmNotes.js';
 export { PixiLayerOsmose } from './PixiLayerOsmose.js';
 export { PixiLayerRapid } from './PixiLayerRapid.js';
 export { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.js';
-export { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.js';
+export { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 
 /**
  *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
