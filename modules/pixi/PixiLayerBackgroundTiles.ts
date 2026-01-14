@@ -3,7 +3,31 @@ import { interpolateNumber } from 'd3-interpolate';
 import { AdjustmentFilter, ConvolutionFilter } from 'pixi-filters';
 import { Tiler, vecScale } from '@rapid-sdk/math';
 
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+
+import type { PixiScene } from './PixiScene.ts';
+import type { Tile as TilerTile, Viewport } from '@rapid-sdk/math';
+import { ImagerySource } from '../headless.js';
+
+
+/** Filter settings for background imagery */
+interface FilterSettings {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  sharpness: number;
+}
+
+/** Tile object with sprite, image, and debug info (extends TilerTile from @rapid-sdk/math) */
+interface CachedTile extends TilerTile {
+  url: string;
+  sprite: PIXI.Sprite | null;
+  image: HTMLImageElement | null;
+  loaded: boolean;
+  timestamp: number;
+  debug: PIXI.Graphics | null;
+  text: PIXI.BitmapText | null;
+}
 
 const DEBUGCOLOR = 0xffff00;
 
@@ -24,15 +48,31 @@ const sharpenMatrix = [
  * @class
  */
 export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
+  /** Whether this is a minimap background layer */
+  isMinimap: boolean;
+  /** Filter settings for brightness/contrast/saturation/sharpness */
+  filters: FilterSettings;
+  /** Blur filter applied when sharpness < 1 */
+  blurFilter: PIXI.BlurFilter | null;
+  /** Convolution filter applied when sharpness > 1 */
+  convolutionFilter: ConvolutionFilter | null;
+
+  private _tileMaps: Map<string, Map<string, CachedTile>>;
+  private _failed: Set<string>;
+  private _tiler: Tiler;
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'background';
     this.enabled = true;   // background imagery should be enabled by default
+
+    this.isMinimap = false;
+    this.blurFilter = null;
+    this.convolutionFilter = null;
 
     this.filters = {
       brightness: 1,
@@ -51,11 +91,11 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  reset(): void {
     super.reset();
 
     // Items in this layer don't need to be interactive
-    const groupContainer = this.scene.groups.get('background');
+    const groupContainer = this.scene.groups.get('background')!;
     groupContainer.eventMode = 'none';
 
     this.destroyAll();
@@ -66,20 +106,22 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
   /**
    * render
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame, viewport) {
+  render(frame: number, viewport: Viewport): void {
     const imagery = this.context.systems.imagery;
-    const groupContainer = this.scene.groups.get('background');
+    if (!imagery) return;
+
+    const groupContainer = this.scene.groups.get('background')!;
 
     // Collect tile sources - baselayer and overlays
-    const showSources = new Map();   // Map<sourceID, source>
+    const showSources = new Map<string, any>();   // Map<sourceID, source>
 
-    const base = imagery.baseLayerSource();
+    const base = imagery.baseLayerSource() as ImagerySource | null;
     const baseID = base?.key;   // note: use `key` here - for Wayback it will include the date
-    if (base && baseID !== 'none') {
+    if (base && baseID && baseID !== 'none') {
       showSources.set(baseID, base);
     }
 
@@ -110,7 +152,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
     // Remove any sourceContainers and data not needed anymore
     // Doing this in 2 passes to avoid affecting `.children` while iterating over it.
-    const toDestroy = new Set();
+    const toDestroy = new Set<string>();
     for (const sourceContainer of groupContainer.children) {
       const sourceID = sourceContainer.label;
       if (!showSources.has(sourceID)) {
@@ -126,16 +168,16 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
   /**
    * renderSource
-   * @param  {number}            timestamp       - Timestamp in milliseconds
-   * @param  {Viewport}          viewport        - Pixi viewport to use for rendering
-   * @param  {ImagerySource}     source          - Imagery source Object
-   * @param  {PIXI.Container}    sourceContainer - PIXI.Container to render the tiles to
-   * @param  {Map<tileID,Tile>}  tileMap         - Tiles needed for this tile source
+   * @param timestamp - Timestamp in milliseconds
+   * @param viewport - Pixi viewport to use for rendering
+   * @param source - Imagery source Object
+   * @param sourceContainer - PIXI.Container to render the tiles to
+   * @param tileMap - Tiles needed for this tile source
    */
-  renderSource(timestamp, viewport, source, sourceContainer, tileMap) {
+  renderSource(timestamp: number, viewport: Viewport, source: any, sourceContainer: PIXI.Container, tileMap: Map<string, CachedTile>): void {
     const context = this.context;
     const textureManager = this.gfx.textures;
-    const osm = context.services.osm;
+    const osm = context.services.osm as any;
     const t = viewport.transform.props;
     const sourceID = source.key;   // note: use `key` here, for Wayback it will include the date
 
@@ -146,16 +188,17 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
     // The tile debug container lives on the `map-ui` layer so it is drawn over everything
     let showDebug = false;
-    let debugContainer;
+    let debugContainer: PIXI.Container | undefined;
     if (!this.isMinimap) {
-      showDebug = context.getDebug('tile');
-      debugContainer = this.scene.layers.get('map-ui').tileDebug;
-      debugContainer.visible = showDebug;
+      showDebug = (context as any).getDebug('tile');
+      const mapUI = this.scene.layers.get('map-ui') as any;
+      debugContainer = mapUI?.tileDebug;
+      if (debugContainer) {
+        debugContainer.visible = showDebug;
+      }
     }
 
-// worldcoordinates
     const tileSize = source.props.tileSize || 256;
-//    const z = geoScaleToZoom(t.k, tileSize);  // Use actual zoom for this, not effective zoom
     const log2ts = Math.log2(tileSize);
     const z = t.z - (log2ts - 8);   // adjust zoom for tile sizes not 256px (log2(256) = 8)
 
@@ -165,7 +208,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
     // Determine tiles needed to cover the view at the zoom we want,
     // including any zoomed out tiles if this field contains any holes
-    const needTiles = new Map();   // Map<tileID, Tile>
+    const needTiles = new Map<string, CachedTile>();   // Map<tileID, CachedTile>
 
     // Make sure the min zoom is at least 1.
     // z=0 causes a bug for Mapbox layers to disappear, these use very large tile size.
@@ -178,11 +221,11 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
       if (!source.isValidZoom(tryZoom)) continue;  // not valid here, zoom out
       if (source.isLocatorOverlay() && maxZoom > 17) continue;   // overlay is blurry if zoomed in this far
 
-      const result = this._tiler
-        .tileSize(tileSize)
-        .skipNullIsland(!!source.props.overlay)
-        .zoomRange(tryZoom)
-        .getTiles(this.isMinimap ? viewport : context.viewport);  // minimap passes in its own viewport
+      const tiler = ((this._tiler
+        .tileSize(tileSize) as Tiler)
+        .skipNullIsland(!!source.props.overlay) as Tiler)
+        .zoomRange(tryZoom) as Tiler;
+      const result = tiler.getTiles(this.isMinimap ? viewport : (context as any).viewport);  // minimap passes in its own viewport
 
       let hasHoles = false;
       for (const tile of result.tiles) {
@@ -192,16 +235,26 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
           if (osm.isDataLoaded(loc)) continue;
         }
 
-        tile.url = source.url(tile.xyz);
-        if (!tile.url || this._failed.has(tile.url)) {
+        const url = source.url(tile.xyz);
+        if (!url || this._failed.has(url)) {
           hasHoles = true;   // url invalid or has failed in the past
         } else {
-          needTiles.set(tile.id, tile);
+          // Create a CachedTile that extends the base tile with our extra properties
+          const cachedTile: CachedTile = {
+            ...tile,
+            url: url,
+            sprite: null,
+            image: null,
+            loaded: false,
+            timestamp: timestamp,
+            debug: null,
+            text: null
+          };
+          needTiles.set(tile.id, cachedTile);
         }
       }
       covered = !hasHoles;
     }
-
 
     // Create a Sprite for each tile
     for (const [tileID, tile] of needTiles) {
@@ -211,9 +264,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
       const sprite = new PIXI.Sprite();
       sprite.label = tileName;
 
-// worldcoordinates
-//      sprite.anchor.set(0, 1);    // left, bottom
-sprite.anchor.set(0, 0);  // left, top
+      sprite.anchor.set(0, 0);  // left, top
       sprite.zIndex = tile.xyz[2];   // draw zoomed tiles above unzoomed tiles
       sprite.alpha = source.props.alpha;
       sourceContainer.addChild(sprite);
@@ -248,7 +299,6 @@ sprite.anchor.set(0, 0);  // left, top
       };
     }
 
-
     // Update or remove the existing tiles
     for (const [tileID, tile] of tileMap) {
       let keepTile = false;
@@ -265,14 +315,11 @@ sprite.anchor.set(0, 0);  // left, top
       }
 
       if (keepTile) {   // Tile may be visible - update position and scale
-// worldcoordinates
-        // const [x, y] = viewport.project(tile.wgs84Extent.min);   // left, bottom
-const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
-
-        tile.sprite.position.set(x, y);
+        const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
+        tile.sprite!.position.set(x, y);
         const size = tileSize * Math.pow(2, z - tile.xyz[2]);
-        tile.sprite.width = size;
-        tile.sprite.height = size;
+        tile.sprite!.width = size;
+        tile.sprite!.height = size;
 
         if (showDebug && debugContainer && !source.props.overlay) {
           // Display debug tile info
@@ -311,7 +358,6 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
         tileMap.delete(tileID);
       }
     }
-
   }
 
 
@@ -319,11 +365,11 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
    * destroyAll
    * Frees all the resources used by all sources
    */
-  destroyAll() {
-    const groupContainer = this.scene.groups.get('background');
+  destroyAll(): void {
+    const groupContainer = this.scene.groups.get('background')!;
 
     // Doing this in 2 passes to avoid affecting `.children` while iterating over it.
-    const toDestroy = new Set();
+    const toDestroy = new Set<string>();
     for (const sourceContainer of groupContainer.children) {
       const sourceID = sourceContainer.label;
       toDestroy.add(sourceID);
@@ -338,18 +384,20 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
   /**
    * destroySource
    * Frees all the resources used by a source
-   * @param  {string}  sourceID - the sourceID to free
+   * @param sourceID - the sourceID to free
    */
-  destroySource(sourceID) {
+  destroySource(sourceID: string): void {
     const tileMap = this._tileMaps.get(sourceID);
-    for (const [tileID, tile] of tileMap) {
-      this.destroyTile(tile);
-      tileMap.delete(tileID);
+    if (tileMap) {
+      for (const [tileID, tile] of tileMap) {
+        this.destroyTile(tile);
+        tileMap.delete(tileID);
+      }
     }
     this._tileMaps.delete(sourceID);
 
-    const groupContainer = this.scene.groups.get('background');
-    let sourceContainer = groupContainer.getChildByLabel(sourceID);
+    const groupContainer = this.scene.groups.get('background')!;
+    const sourceContainer = groupContainer.getChildByLabel(sourceID);
     if (sourceContainer) {
       sourceContainer.destroy({ children: true });
     }
@@ -359,9 +407,9 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
   /**
    * destroyTile
    * Frees all the resources used by a tile
-   * @param  {Tile}  tile - Tile object
+   * @param tile - Tile object
    */
-  destroyTile(tile) {
+  destroyTile(tile: CachedTile): void {
     const textureManager = this.gfx.textures;
 
     if (tile.sprite) {
@@ -388,11 +436,11 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
   /**
    * getSourceContainer
    * Gets a PIXI.Container to hold the tiles for the given sourceID, creating one if needed
-   * @param   {string}           sourceID - the sourceID get a container for
-   * @return  {PIXI.Container}   A PIXI.Container to render tiles into
+   * @param sourceID - the sourceID get a container for
+   * @return A PIXI.Container to render tiles into
    */
-  getSourceContainer(sourceID) {
-    const groupContainer = this.scene.groups.get('background');
+  getSourceContainer(sourceID: string): PIXI.Container {
+    const groupContainer = this.scene.groups.get('background')!;
     let sourceContainer = groupContainer.getChildByLabel(sourceID);
     if (!sourceContainer) {
       sourceContainer = new PIXI.Container();
@@ -409,9 +457,9 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
    * applyFilters
    * Adds an adjustment filter for brightness/contrast/saturation and
    * a sharpen/blur filter, depending on the UI slider settings.
-   * @param  {PIXI.Container}  sourceContainer - The PIXI.Container that contains the tiles
+   * @param sourceContainer - The PIXI.Container that contains the tiles
    */
-  applyFilters(sourceContainer) {
+  applyFilters(sourceContainer: PIXI.Container): void {
     const adjustmentFilter = new AdjustmentFilter({
       brightness: this.filters.brightness,
       contrast: this.filters.contrast,
@@ -449,33 +497,33 @@ const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
 
   /**
    * setBrightness
-   * @param  {number}  val - the brightness value
+   * @param val - the brightness value
    */
-  setBrightness(val) {
+  setBrightness(val: number): void {
     this.filters.brightness = val;
   }
 
   /**
    * setContrast
-   * @param  {number}  val - the contrast value
+   * @param val - the contrast value
    */
-  setContrast(val) {
+  setContrast(val: number): void {
     this.filters.contrast = val;
   }
 
   /**
    * setSaturation
-   * @param  {number}  val - the saturation value
+   * @param val - the saturation value
    */
-  setSaturation(val) {
+  setSaturation(val: number): void {
     this.filters.saturation = val;
   }
 
   /**
    * setSharpness
-   * @param  {number}  val - the sharpness value
+   * @param val - the sharpness value
    */
-  setSharpness(val) {
+  setSharpness(val: number): void {
     this.filters.sharpness = val;
   }
 

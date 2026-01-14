@@ -7,7 +7,6 @@ import type { Tags } from '../data/types.ts';
 
 /** Line cap style */
 type LineCap = 'butt' | 'round' | 'square';
-
 /** Line join style */
 type LineJoin = 'bevel' | 'miter' | 'round';
 
@@ -87,6 +86,8 @@ export interface Style {
   fill: ResolvedFillProps;
   casing: ResolvedLineProps;
   stroke: ResolvedLineProps;
+  /** Extra properties are allowed */
+  [key: string]: unknown;
 }
 
 

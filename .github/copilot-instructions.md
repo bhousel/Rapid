@@ -127,17 +127,20 @@ export class Category {
   - `as SystemID` on string literals that already match the union type
   - `as Graph` or similar when accessing properties on an `any` typed variable (already returns `any`)
   - `as SomeType[]` on array literals passed to `new Set()` when TypeScript can infer the type
+  - `as const` on literals - TypeScript infers literal types for `const` declarations automatically
 - Example - avoid this:
   ```typescript
   this.id = 'validator' as SystemID;  // unnecessary - 'validator' is already a valid string
   this.requiredDependencies = new Set(['editor', 'schema'] as SystemID[]);  // unnecessary
   const graph = editor.base.graph as Graph;  // unnecessary if editor is `any`
+  const name = 'foo' as const;  // unnecessary - const declarations already have literal types
   ```
 - Prefer this:
   ```typescript
   this.id = 'validator';
   this.requiredDependencies = new Set(['editor', 'schema']);
   const graph = editor.base.graph;  // already `any`, assignable to Graph
+  const name = 'foo';  // type is already 'foo', not string
   ```
 
 ### Interface Formatting

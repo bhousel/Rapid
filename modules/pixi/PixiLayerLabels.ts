@@ -76,7 +76,7 @@ type PlacementID =
 interface ChainLink {
   labelBox: LabelBox;
   debugBox: LabelBox;
-  coord: [number, number];
+  coord: Vec2;
   angle: number;
 }
 

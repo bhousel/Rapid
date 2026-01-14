@@ -10,6 +10,7 @@ import type { Context } from '../core/types.ts';
 export type { Context } from '../core/types.ts';
 
 // Re-export entity classes as types
+export type { AbstractData } from './AbstractData.ts';
 export type { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 export type { OsmNode, OsmNodeProps } from './OsmNode.ts';
 export type { OsmRelation, OsmRelationProps, OsmRelationMember } from './OsmRelation.ts';

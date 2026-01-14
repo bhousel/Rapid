@@ -1,28 +1,112 @@
 import * as PIXI from 'pixi.js';
 import { vecAngle, vecLength, vecInterp } from '@rapid-sdk/math';
 
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeatureLine } from './PixiFeatureLine.js';
-import { PixiFeaturePoint } from './PixiFeaturePoint.js';
-import { PixiFeaturePolygon } from './PixiFeaturePolygon.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeatureLine } from './PixiFeatureLine.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
+import type { Vec2, Viewport } from '@rapid-sdk/math';
+import type { EntityID, OsmEntity, OsmNode, OsmRelation, OsmRelationMember, Tags } from '../data/types.ts';
+import type { Style } from '../core/StyleSystem.ts';
+import type { PixiScene } from './PixiScene.ts';
+
+/** Minimum zoom level where OSM data is rendered */
 const MINZOOM = 12;
+
+/** Highway type z-index stacking order (motorway on top, footway on bottom) */
+const HIGHWAYSTACK: Record<string, number> = {
+  motorway: 0,
+  motorway_link: -1,
+  trunk: -2,
+  trunk_link: -3,
+  primary: -4,
+  primary_link: -5,
+  secondary: -6,
+  tertiary: -7,
+  unclassified: -8,
+  residential: -9,
+  service: -10,
+  busway: -11,
+  track: -12,
+  footway: -20
+};
+
+/** Visible OSM data sorted by geometry type */
+interface OsmData {
+  polygons: Map<EntityID, any>;
+  lines: Map<EntityID, any>;
+  points: Map<EntityID, any>;
+  vertices: Map<EntityID, any>;
+}
+
+/** Related entity IDs for selection/hover/drawing */
+interface RelatedIDs {
+  descendantIDs: Set<EntityID>;
+  siblingIDs: Set<EntityID>;
+}
+
+/** Midpoint data for adding nodes to ways */
+interface MidpointData {
+  type: 'midpoint';
+  id: string;
+  a: { id: string; point: Vec2 };
+  b: { id: string; point: Vec2 };
+  way: any;
+  world: Vec2;
+  loc: Vec2;
+  rot: number;
+}
+
+
+/**
+ * getzIndex
+ * Returns z-index for highway tags (for drawing order)
+ * @param tags - Entity tags
+ * @returns z-index value
+ */
+function getzIndex(tags: Tags): number {
+  return HIGHWAYSTACK[tags.highway] || 0;
+}
+
+
+/**
+ * hasWikidata
+ * Checks if entity has any wikidata tags (deserves special styling)
+ * @param entity - OSM entity to check
+ * @returns true if entity has wikidata tags
+ */
+function hasWikidata(entity: OsmEntity): boolean {
+  const tags = entity.tags as Tags;
+  return !!(
+    tags.wikidata ||
+    tags['flag:wikidata'] ||
+    tags['brand:wikidata'] ||
+    tags['network:wikidata'] ||
+    tags['operator:wikidata']
+  );
+}
 
 
 /**
  * PixiLayerOsm
+ * Renders OpenStreetMap entities (points, vertices, lines, polygons)
  * @class
  */
 export class PixiLayerOsm extends AbstractPixiLayer {
+  /** Container for area/polygon features */
+  areaContainer: PIXI.Container | null;
+  /** Container for line features */
+  lineContainer: PIXI.Container | null;
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'osm';
-    this.enabled = true;   // OSM layers should be enabled by default
+    this._enabled = true;   // OSM layers should be enabled by default
 
     this.areaContainer = null;
     this.lineContainer = null;
@@ -33,7 +117,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * supported
    * Whether the Layer's service exists
    */
-  get supported() {
+  get supported(): boolean {
     return !!this.context.services.osm;
   }
 
@@ -43,10 +127,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
-  get enabled() {
+  get enabled(): boolean {
     return this._enabled;
   }
-  set enabled(val) {
+  set enabled(val: boolean) {
     if (!this.supported) {
       val = false;
     }
@@ -55,11 +139,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const osm = context.services.osm;
     if (val && osm) {
       osm.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => gfx!.immediateRedraw());
     }
   }
 
@@ -68,10 +152,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  reset(): void {
     super.reset();
 
-    const groupContainer = this.scene.groups.get('basemap');
+    const groupContainer = this.scene.groups.get('basemap')!;
 
     // Remove any existing containers
     for (const child of groupContainer.children) {
@@ -99,25 +183,25 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     const context = this.context;
     const osm = context.services.osm;
     if (!this.enabled || !osm?.started || zoom < MINZOOM) return;
 
-    const editor = context.systems.editor;
-    const filters = context.systems.filters;
+    const editor = context.systems.editor as any;
+    const filters = context.systems.filters!;
     const graph = editor.staging.graph;
 
-    context.loadTiles();  // Load tiles of OSM data to cover the view
+    (context as any).loadTiles();  // Load tiles of OSM data to cover the view
 
-    let entities = editor.intersects(context.viewport.visibleExtent());   // Gather data in view
+    let entities = editor.intersects((context as any).viewport.visibleExtent());   // Gather data in view
     entities = filters.filterScene(entities, graph);   // Apply feature filters
 
-    const data = {
+    const data: OsmData = {
       polygons: new Map(),
       lines: new Map(),
       points: new Map(),
@@ -148,7 +232,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const selectedIDs = this.getDataWithClass('select');
     const hoveredIDs = this.getDataWithClass('hover');
     const drawingIDs = this.getDataWithClass('drawing');
-    const dataIDs = new Set([...selectedIDs, ...hoveredIDs, ...drawingIDs]);
+    const dataIDs = new Set<EntityID>([...selectedIDs, ...hoveredIDs, ...drawingIDs]);
 
     // Experiment: avoid showing child vertices/midpoints for too small parents
     for (const dataID of dataIDs) {
@@ -160,7 +244,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       for (const featureID of renderedFeatureIDs) {
         const geom = this.features.get(featureID)?.geom;
         if (!geom || geom.type === 'Point') continue;  // lines, polygons only (i.e. ignore virtual poi if any)
-        if (geom.width < 25 && geom.height < 25) {
+        const screen = geom.screen;
+        const w = screen?.width ?? 0;
+        const h = screen?.height ?? 0;
+        if (w < 25 && h < 25) {
           tooSmall = true;
           break;
         }
@@ -171,7 +258,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     }
 
     // Expand set to include parent ways for selected/hovered/drawing nodes too..
-    const interestingIDs = new Set(dataIDs);
+    const interestingIDs = new Set<EntityID>(dataIDs);
     for (const dataID of dataIDs) {
       const entity = graph.hasEntity(dataID);
       if (entity?.type !== 'node') continue;   // nodes only
@@ -182,7 +269,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     // Create collections of the sibling and descendant IDs,
     // These will determine which vertices and midpoints get drawn.
-    const related = {
+    const related: RelatedIDs = {
       descendantIDs: new Set(),
       siblingIDs: new Set()
     };
@@ -193,7 +280,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     this.renderVertices(frame, viewport, zoom, data, related);
 
-    if (context.mode?.id === 'select-osm') {
+    if ((context as any).mode?.id === 'select-osm') {
       this.renderMidpoints(frame, viewport, zoom, data, related);
     }
   }
@@ -201,25 +288,25 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * renderPolygons
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
-   * @param  {*}         data     -  Visible OSM data to render, sorted by type
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
+   * @param data - Visible OSM data to render, sorted by type
    */
-  renderPolygons(frame, viewport, zoom, data) {
+  renderPolygons(frame: number, viewport: Viewport, zoom: number, data: OsmData): void {
     const context = this.context;
-    const graph = context.systems.editor.staging.graph;
-    const filters = context.systems.filters;
-    const l10n = context.systems.l10n;
-    const schema = context.systems.schema;
-    const styles = context.systems.styles;
+    const graph = (context.systems.editor as any).staging.graph;
+    const filters = context.systems.filters!;
+    const l10n = context.systems.l10n!;
+    const schema = context.systems.schema!;
+    const styles = context.systems.styles!;
 
-    const pointsContainer = this.scene.groups.get('points');
+    const pointsContainer = this.scene.groups.get('points')!;
     const showPoints = filters.isEnabled('points');
 
     // For deciding if an unlabeled polygon feature is interesting enough to show a virtual pin.
     // Note that labeled polygon features will always get a virtual pin.
-    function isInterestingPreset(preset) {
+    const isInterestingPreset = (preset: any): boolean => {
       if (!preset || preset.isFallback()) return false;
 
       // These presets probably are not POIs
@@ -232,7 +319,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (/^leisure\/(?!garden|firepit|picnic_table|pitch|swimming_pool)/.test(preset.id)) return true;
 
       return false;   // not sure, just ignore it
-    }
+    };
 
     const entities = data.polygons;
     for (const [entityID, entity] of entities) {
@@ -244,12 +331,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         if (!part.world || part.type !== 'Polygon') continue;  // invalid?
 
         const featureID = `${this.layerID}-${entityID}-${i}`;
-        let feature = this.features.get(featureID);
+        let feature = this.features.get(featureID) as PixiFeaturePolygon | undefined;
 
         // If feature existed before as a different type, recreate it.
         if (feature && feature.type !== 'Polygon') {
           feature.destroy();
-          feature = null;
+          feature = undefined;
         }
 
         if (!feature) {
@@ -267,7 +354,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           feature.setData(entityID, entity);
           feature.clearChildData(entityID);
           if (entity.type === 'relation') {
-            feature.addChildData(entityID, entity.members.map(member => member.id));
+            feature.addChildData(entityID, entity.members.map((member: OsmRelationMember) => member.id));
           }
           if (entity.type === 'way') {
             feature.addChildData(entityID, entity.nodes);
@@ -279,7 +366,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         if (feature.dirty) {
           const preset = schema.match(entity, graph);
 
-          const style = styles.styleMatch(entity.tags);
+          const style = styles.styleMatch(entity.tags) as Style;
           style.labelTint = style.fill.color ?? style.stroke.color ?? 0xeeeeee;
           feature.style = style;
 
@@ -290,11 +377,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           // For POIs mapped as polygons, we can create a virtual point feature at the pole of inaccessability.
           // Try to show a virtual pin if there is a label or if the preset is interesting enough..
           if (showPoints && (label || isInterestingPreset(preset))) {
-            feature.poiFeatureID = `${this.layerID}-${entityID}-poi-${i}`;
-            feature.poiPreset = preset;
+            (feature as any).poiFeatureID = `${this.layerID}-${entityID}-poi-${i}`;
+            (feature as any).poiPreset = preset;
           } else {
-            feature.poiFeatureID = null;
-            feature.poiPreset = null;
+            (feature as any).poiFeatureID = null;
+            (feature as any).poiPreset = null;
           }
         }
 
@@ -302,27 +389,27 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         this.retainFeature(feature, frame);
 
         // Same as above, but for the virtual POI, if any
-        if (feature.poiFeatureID && feature.poiPreset) {
-          let poiFeature = this.features.get(feature.poiFeatureID);
+        if ((feature as any).poiFeatureID && (feature as any).poiPreset) {
+          let poiFeature = this.features.get((feature as any).poiFeatureID) as PixiFeaturePoint | undefined;
 
           if (!poiFeature) {
-            poiFeature = new PixiFeaturePoint(this, feature.poiFeatureID);
-            poiFeature.virtual = true;
+            poiFeature = new PixiFeaturePoint(this, (feature as any).poiFeatureID);
+            (poiFeature as any).virtual = true;
             poiFeature.parentContainer = pointsContainer;
           }
 
           if (poiFeature.v !== version) {
             poiFeature.v = version;
             const source = { type: 'Point', world: { coords: part.world.poi } };
-            poiFeature.setCoords(source);
+            poiFeature.setCoords(source as any);
             poiFeature.setData(entityID, entity);
           }
 
           this.syncFeatureClasses(poiFeature);
 
           if (poiFeature.dirty) {
-            let markerStyle = {
-              iconName: feature.poiPreset?.props?.icon,
+            const markerStyle: PointStyle = {
+              iconName: (feature as any).poiPreset?.props?.icon,
               iconTint: 0x111111,
               markerName: 'pin',
               markerTint: 0xffffff
@@ -349,17 +436,29 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * renderLines
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
-   * @param  {*}         data     -  Visible OSM data to render, sorted by type
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
+   * @param data - Visible OSM data to render, sorted by type
    */
-  renderLines(frame, viewport, zoom, data) {
+  renderLines(frame: number, viewport: Viewport, zoom: number, data: OsmData): void {
     const context = this.context;
-    const graph = context.systems.editor.staging.graph;
-    const l10n = context.systems.l10n;
-    const styles = context.systems.styles;
-    const lineContainer = this.lineContainer;
+    const graph = (context.systems.editor as any).staging.graph;
+    const l10n = context.systems.l10n!;
+    const styles = context.systems.styles!;
+    const lineContainer = this.lineContainer!;
+
+    const _getLevelContainer = (level: string): PIXI.Container => {
+      let levelContainer = lineContainer.getChildByLabel(level);
+      if (!levelContainer) {
+        levelContainer = new PIXI.Container();
+        levelContainer.label = level.toString();
+        levelContainer.sortableChildren = true;
+        (levelContainer as PIXI.Container).zIndex = parseInt(level, 10);
+        lineContainer.addChild(levelContainer);
+      }
+      return levelContainer as PIXI.Container;
+    };
 
     const entities = data.lines;
     for (const [entityID, entity] of entities) {
@@ -380,12 +479,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         for (let j = 0; j < rings.length; ++j) {
           const featureID = `${this.layerID}-${entityID}-${i}-${j}`;
-          let feature = this.features.get(featureID);
+          let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
 
           // If feature existed before as a different type, recreate it.
           if (feature && feature.type !== 'LineString') {
             feature.destroy();
-            feature = null;
+            feature = undefined;
           }
 
           if (!feature) {
@@ -403,7 +502,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             feature.clearChildData(entityID);
 
             if (entity.type === 'relation') {
-              feature.addChildData(entityID, entity.members.map(member => member.id));
+              feature.addChildData(entityID, entity.members.map((member: OsmRelationMember) => member.id));
             }
             if (entity.type === 'way') {
               feature.addChildData(entityID, entity.nodes);
@@ -418,14 +517,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
             // a line no tags - try to style match the tags of its parent relation
             if (!entity.hasInterestingTags()) {
-              const parent = graph.parentRelations(entity).find(relation => relation.isMultipolygon());
+              const parent = graph.parentRelations(entity).find((relation: OsmRelation) => relation.isMultipolygon());
               if (parent) {
                 tags = parent.tags;
                 geom = 'area';
               }
             }
 
-            const style = styles.styleMatch(tags);
+            const style = styles.styleMatch(tags) as Style;
             // Todo: handle alternating/two-way case too
             if (geom === 'line') {
               style.lineMarkerName = entity.isOneWay() ? 'oneway' : '';
@@ -447,52 +546,39 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
     }
 
-
-    function _getLevelContainer(level) {
-      let levelContainer = lineContainer.getChildByLabel(level);
-      if (!levelContainer) {
-        levelContainer = new PIXI.Container();
-        levelContainer.label= level.toString();
-        levelContainer.sortableChildren = true;
-        levelContainer.zIndex = level;
-        lineContainer.addChild(levelContainer);
-      }
-      return levelContainer;
-    }
-
   }
 
 
   /**
    * renderVertices
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
-   * @param  {*}         data     -  Visible OSM data to render, sorted by type
-   * @param  {*}         realated -  Collections of related OSM IDs
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
+   * @param data - Visible OSM data to render, sorted by type
+   * @param related - Collections of related OSM IDs
    */
-  renderVertices(frame, viewport, zoom, data, related) {
+  renderVertices(frame: number, viewport: Viewport, zoom: number, data: OsmData, related: RelatedIDs): void {
     const context = this.context;
-    const graph = context.systems.editor.staging.graph;
-    const l10n = context.systems.l10n;
-    const schema = context.systems.schema;
+    const graph = (context.systems.editor as any).staging.graph;
+    const l10n = context.systems.l10n!;
+    const schema = context.systems.schema!;
 
     // Vertices related to the selection/hover should be drawn above everything
     const selectedContainer = this.scene.layers.get('map-ui').selected;
-    const pointsContainer = this.scene.groups.get('points');
+    const pointsContainer = this.scene.groups.get('points')!;
 
-    function isInterestingVertex(node) {
+    const isInterestingVertex = (node: OsmNode): boolean => {
       return node.hasInterestingTags() || node.isEndpoint(graph) || node.isIntersection(graph);
-    }
+    };
 
-    function isRelatedVertex(entityID) {
+    const isRelatedVertex = (entityID: EntityID): boolean => {
       return related.descendantIDs.has(entityID) || related.siblingIDs.has(entityID);
-    }
+    };
 
 
     const entities = data.vertices;
     for (const [nodeID, node] of entities) {
-      let parentContainer = null;
+      let parentContainer: PIXI.Container | null = null;
 
       if (zoom >= 16 && isInterestingVertex(node) ) {  // minor importance
         parentContainer = pointsContainer;
@@ -505,12 +591,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       const featureID = `${this.layerID}-${nodeID}`;
       const version = node.v || 0;
-      let feature = this.features.get(featureID);
+      let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       // If feature existed before as a different type, recreate it.
       if (feature && feature.type !== 'Point') {
         feature.destroy();
-        feature = null;
+        feature = undefined;
       }
 
       if (!feature) {
@@ -531,10 +617,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (feature.dirty) {
         const preset = schema.match(node, graph);
         const iconName = preset?.props?.icon;
-        const directions = node.directions(graph, context.viewport);
+        const directions = node.directions(graph, (context as any).viewport);
 
         // set marker style
-        let markerStyle = {
+        const markerStyle: PointStyle = {
           iconName: iconName,
           iconTint: 0x111111,
           labelTint: 0xeeeeee,
@@ -575,28 +661,28 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * renderPoints
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
-   * @param  {*}         data     -  Visible OSM data to render, sorted by type
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
+   * @param data - Visible OSM data to render, sorted by type
    */
-  renderPoints(frame, viewport, zoom, data) {
+  renderPoints(frame: number, viewport: Viewport, zoom: number, data: OsmData): void {
     const context = this.context;
-    const graph = context.systems.editor.staging.graph;
-    const l10n = context.systems.l10n;
-    const schema = context.systems.schema;
-    const pointsContainer = this.scene.groups.get('points');
+    const graph = (context.systems.editor as any).staging.graph;
+    const l10n = context.systems.l10n!;
+    const schema = context.systems.schema!;
+    const pointsContainer = this.scene.groups.get('points')!;
 
     const entities = data.points;
     for (const [nodeID, node] of entities) {
       const featureID = `${this.layerID}-${nodeID}`;
       const version = node.v || 0;
-      let feature = this.features.get(featureID);
+      let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       // If feature existed before as a different type, recreate it.
       if (feature && feature.type !== 'Point') {
         feature.destroy();
-        feature = null;
+        feature = undefined;
       }
 
       if (!feature) {
@@ -625,10 +711,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           iconName = preset?.props?.icon;
         }
 
-        const directions = node.directions(graph, context.viewport);
+        const directions = node.directions(graph, (context as any).viewport);
 
         // set marker style
-        let markerStyle = {
+        const markerStyle: PointStyle = {
           iconName: iconName,
           iconTint: 0x111111,
           markerName: 'pin',
@@ -637,14 +723,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           viewfieldName: 'viewfieldDark',
           viewfieldTint: 0xffffff
         };
-
         if (hasWikidata(node)) {
           markerStyle.iconTint = 0x444444;
           markerStyle.labelTint = 0xdddddd;
           markerStyle.markerName = 'boldPin';
           markerStyle.markerTint = 0xdddddd;
         }
-        if (preset.id === 'address') {
+        if (preset?.id === 'address') {
           markerStyle.iconName = 'maki-circle-stroked';
           markerStyle.markerName = 'largeCircle';
         }
@@ -661,16 +746,16 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * renderMidpoints
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
-   * @param  {*}         data     -  Visible OSM data to render, sorted by type
-   * @param  {*}         related  -  Collections of related OSM IDs
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
+   * @param data - Visible OSM data to render, sorted by type
+   * @param related - Collections of related OSM IDs
    */
-  renderMidpoints(frame, viewport, zoom, data, related) {
+  renderMidpoints(frame: number, viewport: Viewport, zoom: number, data: OsmData, related: RelatedIDs): void {
     const MIN_MIDPOINT_DIST = 40;   // distance in pixels
     const context = this.context;
-    const graph = context.systems.editor.staging.graph;
+    const graph = (context.systems.editor as any).staging.graph;
 
     // Need to consider both lines and polygons for drawing our midpoints
     const entities = new Map([...data.lines, ...data.polygons]);
@@ -678,8 +763,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // Midpoints should be drawn above everything
     const selectedContainer = this.scene.layers.get('map-ui').selected;
 
+    // If any of these change, the midpoint needs to be redrawn.
+    // (This can happen if a sibling node has moved, the midpoint moves too)
+    const _midpointVersion = (d: MidpointData): number => {
+      return d.loc[0] + d.loc[1] + d.rot;
+    };
+
     // Generate midpoints from all the highlighted ways
-    let midpoints = new Map();
+    const midpoints = new Map<string, MidpointData>();
     const MIDPOINT_STYLE = { markerName: 'midpoint' };
     for (const [wayID, way] of entities) {
       // Include only ways that are selected, or descended from a relation that is selected
@@ -691,13 +782,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       // Compute midpoints in projected screen coordinates
       // We do this so that we can skip midpoints that are closer than the minimum distance.
-      let nodeData = nodes.map(node => {
+      const nodeData = nodes.map((node: OsmNode) => {
+        if (!node.loc) return null;
         return {
           id: node.id,
           point: viewport.project(node.loc)
         };
-      });
-
+      }).filter(Boolean);
       if (way.tags.oneway === '-1') {
         nodeData.reverse();
       }
@@ -713,14 +804,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const rot = vecAngle(a.point, b.point) + viewport.transform.rotation;
         const world = viewport.screenToWorld(point);
         const loc = viewport.worldToWgs84(world);  // store as wgs84 lon/lat
-        const midpoint = {
+        const midpoint: MidpointData = {
           type: 'midpoint',
           id: midpointID,
           a: a,
           b: b,
           way: way,
-          world: world,
-          loc: loc,
+          world: world as Vec2,
+          loc: loc as Vec2,
           rot: rot
         };
 
@@ -732,7 +823,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     for (const [midpointID, midpoint] of midpoints) {
       const featureID = `${this.layerID}-${midpointID}`;
-      let feature = this.features.get(featureID);
+      let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
@@ -745,11 +836,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (feature.v !== v) {
         feature.v = v;
         const source = { type: 'Point', world: { coords: midpoint.world } };
-        feature.setCoords(source);
+        feature.setCoords(source as any);
 
         // Remember to apply rotation - it needs to go on the marker,
         // because the container automatically rotates to be face up.
-        feature.marker.rotation = midpoint.rot;
+        feature.marker!.rotation = midpoint.rot;
 
         feature.setData(midpointID, midpoint);
         feature.addChildData(midpoint.way.id, midpointID);
@@ -759,48 +850,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       feature.update(viewport, zoom);
       this.retainFeature(feature, frame);
     }
-
-
-    // If any of these change, the midpoint needs to be redrawn.
-    // (This can happen if a sibling node has moved, the midpoint moves too)
-    function _midpointVersion(d) {
-      return d.loc[0] + d.loc[1] + d.rot;
-    }
   }
 
-}
-
-
-
-const HIGHWAYSTACK = {
-  motorway: 0,
-  motorway_link: -1,
-  trunk: -2,
-  trunk_link: -3,
-  primary: -4,
-  primary_link: -5,
-  secondary: -6,
-  tertiary: -7,
-  unclassified: -8,
-  residential: -9,
-  service: -10,
-  busway: -11,
-  track: -12,
-  footway: -20
-};
-
-
-function getzIndex(tags) {
-  return HIGHWAYSTACK[tags.highway] || 0;
-}
-
-// Special style for Wikidata-tagged items
-function hasWikidata(entity) {
-  return (
-    entity.tags.wikidata ||
-    entity.tags['flag:wikidata'] ||
-    entity.tags['brand:wikidata'] ||
-    entity.tags['network:wikidata'] ||
-    entity.tags['operator:wikidata']
-  );
 }

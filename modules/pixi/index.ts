@@ -8,7 +8,7 @@ export { PixiGeometryPart } from './PixiGeometryPart.ts';
 export { PixiScene } from './PixiScene.ts';
 export { PixiTextures } from './PixiTextures.ts';
 
-export { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.js';
+export { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.ts';
 export { PixiLayerCustomData } from './PixiLayerCustomData.ts';
 export { PixiLayerDebug } from './PixiLayerDebug.ts';
 export { PixiLayerEditBlocks } from './PixiLayerEditBlocks.ts';
@@ -21,20 +21,15 @@ export { PixiLayerMapillaryPhotos } from './PixiLayerMapillaryPhotos.ts';
 export { PixiLayerMapillarySigns } from './PixiLayerMapillarySigns.ts';
 export { PixiLayerMapRoulette } from './PixiLayerMapRoulette.ts';
 export { PixiLayerMapUI } from './PixiLayerMapUI.ts';
-export { PixiLayerOsm } from './PixiLayerOsm.js';
+export { PixiLayerOsm } from './PixiLayerOsm.ts';
 export { PixiLayerOsmNotes } from './PixiLayerOsmNotes.ts';
 export { PixiLayerOsmose } from './PixiLayerOsmose.ts';
-export { PixiLayerRapid } from './PixiLayerRapid.js';
-export { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.js';
+export { PixiLayerRapid } from './PixiLayerRapid.ts';
+export { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.ts';
 export { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 
-/**
- *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
- *
- *  @typedef  {string}               featureID
- *  @typedef  {string}               layerID
- *  @typedef  {string}               groupID
- *  @typedef  {string}               classID
- *  @typedef  {AbstractPixiFeature}  Feature
- *  @typedef  {AbstractPixiLayer}    Layer
- */
+// Type aliases - these are commonly used throughout the pixi module
+export type FeatureID = string;
+export type LayerID = string;
+export type GroupID = string;
+export type ClassID = string;

@@ -1,6 +1,9 @@
 import * as PIXI from 'pixi.js';
 
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+
+import type { Viewport } from '@rapid-sdk/math';
+import type { PixiScene } from './PixiScene.ts';
 
 
 /**
@@ -10,12 +13,14 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.js';
  * @class
  */
 export class PixiLayerRapidOverlay extends AbstractPixiLayer {
+  _overlaysDefined: boolean | null;
+  overlaysContainer: PIXI.Container | null;
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param  scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'rapidoverlay';
 
@@ -29,10 +34,10 @@ export class PixiLayerRapidOverlay extends AbstractPixiLayer {
    * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  reset(): void {
     super.reset();
 
-    const groupContainer = this.scene.groups.get('basemap');
+    const groupContainer = this.scene.groups.get('basemap')!;
 
     // Remove any existing containers
     for (const child of groupContainer.children) {
@@ -57,17 +62,18 @@ export class PixiLayerRapidOverlay extends AbstractPixiLayer {
   /**
    * render
    * Render the GeoJSON custom data
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  frame    -  Integer frame being rendered
+   * @param  viewport -  Pixi viewport to use for rendering
+   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
 return; // not yet
     if (!this.enabled || !(this.hasData())) return;
 
     const vtService = this.context.services.vectortile;
-    const datasets = this.context.systems.rapid.datasets;
-    const parentContainer = this.overlaysContainer;
+    const rapid = this.context.systems.rapid!;
+    const datasets = rapid.datasets;
+    const parentContainer = this.overlaysContainer!;
 
     // Extremely inefficient but we're not drawing anything else at this zoom
     parentContainer.removeChildren();
@@ -75,13 +81,13 @@ return; // not yet
     for (const dataset of datasets.values()) {
       if (dataset.overlay && dataset.enabled) {
         const customColor = new PIXI.Color(dataset.color);
-        const overlay = dataset.overlay;
+        const overlay = dataset.overlay as any;  // this code is dead (see return above), overlay type may change
         if (vtService) {
           if ((zoom >= overlay.minZoom ) && (zoom <= overlay.maxZoom)) {  // avoid firing off too many API requests
             vtService.loadTiles(overlay.url);
           }
-          const overlayData = vtService.getData(overlay.url).map(d => d.geojson);
-          const points = overlayData.filter(d => d.geometry.type === 'Point' || d.geometry.type === 'MultiPoint');
+          const overlayData = vtService.getData(overlay.url).map((d: any) => d.geojson);
+          const points = overlayData.filter((d: any) => d.geometry.type === 'Point' || d.geometry.type === 'MultiPoint');
           this.renderPoints(frame, viewport, zoom, points, customColor);
         }
       }
@@ -91,14 +97,14 @@ return; // not yet
 
   /**
    * renderPoints
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
-   * @param  {*}         points   -  Array of feature data
-   * @param  {*}         color    -  The color to use
+   * @param  frame    -  Integer frame being rendered
+   * @param  viewport -  Pixi viewport to use for rendering
+   * @param  zoom     -  Effective zoom level to use for rendering
+   * @param  points   -  Array of feature data
+   * @param  color    -  The color to use
    */
-  renderPoints(frame, viewport, zoom, points, color) {
-    const parentContainer = this.overlaysContainer;
+  renderPoints(frame: number, viewport: Viewport, zoom: number, points: any[], color: PIXI.Color): void {
+    const parentContainer = this.overlaysContainer!;
     for (const d of points) {
       const coords = (d.geometry.type === 'Point') ? [d.geometry.coordinates]
         : (d.geometry.type === 'MultiPoint') ? d.geometry.coordinates : [];
@@ -120,11 +126,12 @@ return; // not yet
   /**
    * hasData
    * Return true if there is any overlay endpoint URLs defined in the rapid datasets.
-   * @return  {boolean} `true` if there is a vector tile template or geojson to display
+   * @return  `true` if there is a vector tile template or geojson to display
    */
-  hasData() {
+  hasData(): boolean {
     if (this._overlaysDefined === null) {
-      const datasets = this.context.systems.rapid.datasets;
+      const rapid = this.context.systems.rapid!;
+      const datasets = rapid.datasets;
       this._overlaysDefined = false;
       for (const dataset of datasets.values()) {
         if (dataset.overlay) {

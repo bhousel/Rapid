@@ -1,27 +1,42 @@
 import * as PIXI from 'pixi.js';
 
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeatureLine } from './PixiFeatureLine.js';
-import { PixiFeaturePoint } from './PixiFeaturePoint.js';
-import { PixiFeaturePolygon } from './PixiFeaturePolygon.js';
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePolygon, type PolygonStyle } from './PixiFeaturePolygon.ts';
 
+import type { Viewport } from '@rapid-sdk/math';
+import type { PixiScene } from './PixiScene.ts';
+import type { AbstractData, OsmEntity, OsmWay } from '../data/types.ts';
+
+
+/** Minimum zoom level where Rapid data is rendered */
 const MINZOOM = 12;
+
+/** Collected data from services, sorted by geometry type */
+interface RapidData {
+  points: OsmEntity[];
+  vertices: Set<OsmEntity>;
+  lines: OsmWay[];
+  polygons: OsmEntity[];
+}
 
 
 /**
  * PixiLayerRapid
+ * Renders suggested features supplied by Rapid datasets (MapWithAI, ESRI, Overture)
  * @class
  */
 export class PixiLayerRapid extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'rapid';
-    this.enabled = true;     // Rapid features should be enabled by default
+    this._enabled = true;     // Rapid features should be enabled by default
 
 //// shader experiment:
 //this._uniforms = {
@@ -105,7 +120,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * supported
    * Whether the Layer's service exists
    */
-  get supported() {
+  get supported(): boolean {
     // return true if any of these are installed
     const services = this.context.services;
     return !!(services.mapwithai || services.esri || services.overture);
@@ -117,10 +132,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * Whether the user has chosen to see the Layer
    * Make sure to start the services first.
    */
-  get enabled() {
+  get enabled(): boolean {
     return this._enabled;
   }
-  set enabled(val) {
+  set enabled(val: boolean) {
     if (!this.supported) {
       val = false;
     }
@@ -129,21 +144,21 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const esri = context.services.esri;
     const mapwithai = context.services.mapwithai;
     const overture = context.services.overture;
 
     // This code is written in a way that we can work with whatever
     // data-providing services are installed.
-    const services = [];
+    const services: any[] = [];
     if (esri)      services.push(esri);
     if (mapwithai) services.push(mapwithai);
     if (overture)  services.push(overture);
 
     if (val && services.length) {
       Promise.all(services.map(service => service.startAsync()))
-        .then(() => gfx.immediateRedraw());
+        .then(() => gfx!.immediateRedraw());
     }
   }
 
@@ -152,10 +167,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  reset(): void {
     super.reset();
 
-    const groupContainer = this.scene.groups.get('basemap');
+    const groupContainer = this.scene.groups.get('basemap')!;
 
     // Remove any existing containers
     for (const child of groupContainer.children) {
@@ -172,12 +187,12 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
-    const rapid = this.context.systems.rapid;
+  render(frame: number, viewport: Viewport, zoom: number): void {
+    const rapid = this.context.systems.rapid!;
     if (!this.enabled || !rapid.datasets.size || zoom < MINZOOM) return;
 
 // shader experiment
@@ -195,14 +210,14 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * renderDataset
    * Render any data we have, and schedule fetching more of it to cover the view.
-   * @param  {RapidDataset}  dataset  -  Dataset Object
-   * @param  {number}        frame    -  Integer frame being rendered
-   * @param  {Viewport}      viewport -  Pixi viewport to use for rendering
-   * @param  {number}        zoom     -  Effective zoom level to use for rendering
+   * @param dataset - Dataset Object
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom level to use for rendering
    */
-  renderDataset(dataset, frame, viewport, zoom) {
+  renderDataset(dataset: any, frame: number, viewport: Viewport, zoom: number): void {
     const context = this.context;
-    const rapid = context.systems.rapid;
+    const rapid = context.systems.rapid!;
 
     const dsEnabled = (dataset.added && dataset.enabled);
     if (!dsEnabled) return;
@@ -210,7 +225,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const service = context.services[dataset.serviceID];  // 'mapwithai', 'esri', 'overture'
     if (!service?.started) return;
 
-    let useConflation = dataset.conflated;
+    const useConflation = dataset.conflated;
 //    const conflationOverride = utilStringQs(window.location.hash).conflation;
 //    if (conflationOverride === 'false' || conflationOverride === 'no') {
 //      useConflation = false;
@@ -226,12 +241,12 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     }
 
     // Filter out features that have already been accepted or ignored by the user.
-    function isAcceptedOrIgnored(entity) {
+    const isAcceptedOrIgnored = (entity: any): boolean => {
       return rapid.acceptIDs.has(entity.id) || rapid.ignoreIDs.has(entity.id);
-    }
+    };
 
     // Gather data
-    const data = { points: [], vertices: new Set(), lines: [], polygons: [] };
+    const data: RapidData = { points: [], vertices: new Set(), lines: [], polygons: [] };
 
     /* Facebook AI/ML */
     if (dataset.serviceID === 'mapwithai') {
@@ -241,7 +256,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       // Skip features already accepted/ignored by the user
       const entities = service.getData(datasetID)
-        .filter(entity => entity.type === 'way' && !isAcceptedOrIgnored(entity));
+        .filter((entity: OsmEntity) => entity.type === 'way' && !isAcceptedOrIgnored(entity)) as OsmWay[];
 
       // MapWithAIService gives us roads and buildings together,
       // so filter further according to which dataset we're drawing
@@ -250,7 +265,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         || dataset.id === 'metaSyntheticFootways'
         || dataset.id === 'rapid_intro_graph'
       ) {
-        data.lines = entities.filter(d => d.geometry(dsGraph) === 'line' && !!d.tags.highway);
+        data.lines = entities.filter((d: OsmWay) => d.geometry(dsGraph) === 'line' && !!d.tags.highway) as OsmWay[];
 
         // Gather endpoint vertices, we will render these also
         for (const way of data.lines) {
@@ -261,7 +276,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         }
 
       } else {  // ms buildings or esri buildings through conflation service
-        data.polygons = entities.filter(d => d.geometry(dsGraph) === 'area');
+        data.polygons = entities.filter((d: OsmEntity) => d.geometry(dsGraph) === 'area');
       }
 
     /* ESRI ArcGIS */
@@ -297,23 +312,23 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       }
     }
 
-    const pointsContainer = this.scene.groups.get('points');
-    const basemapContainer = this.scene.groups.get('basemap');
+    const pointsContainer = this.scene.groups.get('points')!;
+    const basemapContainer = this.scene.groups.get('basemap')!;
     const areasID = `${this.layerID}-${dataset.id}-areas`;
     const linesID = `${this.layerID}-${dataset.id}-lines`;
 
-    let areasContainer = basemapContainer.getChildByLabel(areasID);
+    let areasContainer = basemapContainer.getChildByLabel(areasID) as PIXI.Container | undefined;
     if (!areasContainer) {
       areasContainer = new PIXI.Container();
-      areasContainer.label= areasID;
+      areasContainer.label = areasID;
       areasContainer.sortableChildren = true;
       basemapContainer.addChild(areasContainer);
     }
 
-    let linesContainer = basemapContainer.getChildByLabel(linesID);
+    let linesContainer = basemapContainer.getChildByLabel(linesID) as PIXI.Container | undefined;
     if (!linesContainer) {
       linesContainer = new PIXI.Container();
-      linesContainer.label= linesID;
+      linesContainer.label = linesID;
       linesContainer.sortableChildren = true;
       basemapContainer.addChild(linesContainer);
     }
@@ -327,9 +342,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * renderPolygons
    */
-  renderPolygons(parentContainer, dataset, graph, frame, viewport, zoom, data) {
+  renderPolygons(
+    parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, zoom: number, data: RapidData): void {
     const color = new PIXI.Color(dataset.color);
-    const l10n = this.context.systems.l10n;
+    const l10n = this.context.systems.l10n!;
 
     for (const entity of data.polygons) {
       for (let i = 0; i < entity.geoms.parts.length; ++i) {
@@ -346,16 +362,17 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
           feature.parentContainer = parentContainer;
-          feature.rapidFeature = true;
+          (feature as any).rapidFeature = true;
           feature.setData(entity.id, entity);
         }
 
         this.syncFeatureClasses(feature);
 
         if (feature.dirty) {
-          const style = {
-            labelTint: color,
-            fill: { width: 2, color: color, alpha: 0.3 },
+          const colorNum = color.toNumber();
+          const style: PolygonStyle = {
+            labelTint: colorNum,
+            fill: { width: 2, color: colorNum, alpha: 0.3 },
           };
           feature.style = style;
           feature.label = l10n.displayName(entity.tags);
@@ -371,15 +388,15 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * renderLines
    */
-  renderLines(parentContainer, dataset, graph, frame, viewport, zoom, data) {
+  renderLines(parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, zoom: number, data: RapidData): void {
     const color = new PIXI.Color(dataset.color);
-    const l10n = this.context.systems.l10n;
+    const l10n = this.context.systems.l10n!;
 
     for (const entity of data.lines) {
-      for (let i = 0; i < entity.geoms.parts; i++) {
+      for (let i = 0; i < entity.geoms.parts.length; i++) {
         const part = entity.geoms.parts[i];
         const featureID = `${this.layerID}-${dataset.id}-${entity.id}-${i}`;
-        let feature = this.features.get(featureID);
+        let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
 
         if (!feature) {
           if (!part.world) continue;  // invalid?
@@ -387,17 +404,18 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature = new PixiFeatureLine(this, featureID);
           feature.setCoords(part);
           feature.parentContainer = parentContainer;
-          feature.rapidFeature = true;
+          (feature as any).rapidFeature = true;
           feature.setData(entity.id, entity);
         }
 
         this.syncFeatureClasses(feature);
 
         if (feature.dirty) {
-          const style = {
-            labelTint: color,
+          const colorNum = color.toNumber();
+          const style: LineStyle = {
+            labelTint: colorNum,
             casing: { width: 5, color: 0x444444 },
-            stroke: { width: 3, color: color },
+            stroke: { width: 3, color: colorNum },
           };
           style.lineMarkerName = entity.isOneWay() ? 'oneway' : '';
           feature.style = style;
@@ -414,25 +432,26 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * renderPoints
    */
-  renderPoints(parentContainer, dataset, graph, frame, viewport, zoom, data) {
+  renderPoints(parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, zoom: number, data: RapidData): void {
     const color = new PIXI.Color(dataset.color);
-    const l10n = this.context.systems.l10n;
+    const l10n = this.context.systems.l10n!;
 
-    const pointStyle = {
+    const colorNum = color.toNumber();
+    const pointStyle: PointStyle = {
       markerName: 'largeCircle',
-      markerTint: color,
+      markerTint: colorNum,
       iconName: 'maki-circle-stroked',
-      labelTint: color
+      labelTint: colorNum
     };
-    const vertexStyle = {
+    const vertexStyle: PointStyle = {
       markerName: 'smallCircle',
-      markerTint: color,
-      labelTint: color
+      markerTint: colorNum,
+      labelTint: colorNum
     };
 
     for (const entity of data.points) {
       const featureID = `${this.layerID}-${dataset.id}-${entity.id}`;
-      let feature = this.features.get(featureID);
+      let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
         const part = entity.geoms.parts[0];
@@ -441,7 +460,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.setCoords(part);
         feature.parentContainer = parentContainer;
-        feature.rapidFeature = true;
+        (feature as any).rapidFeature = true;
         feature.setData(entity.id, entity);
       }
 
@@ -450,8 +469,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       if (feature.dirty) {
         feature.style = pointStyle;
 
-        if (entity.geojson){
-          feature.label = entity.geojson.properties['@name'];
+        const geojson = (entity as any).geojson;
+        if (geojson) {
+          feature.label = geojson.properties['@name'];
         } else {
           feature.label = l10n.displayName(entity.tags);
 
@@ -461,17 +481,15 @@ export class PixiLayerRapid extends AbstractPixiLayer {
             feature.label = housenumber;
           }
         }
-
         feature.update(viewport, zoom);
       }
 
       this.retainFeature(feature, frame);
     }
 
-
     for (const entity of data.vertices) {
       const featureID = `${this.layerID}-${entity.id}`;
-      let feature = this.features.get(featureID);
+      let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
         const part = entity.geoms.parts[0];
@@ -480,7 +498,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.setCoords(part);
         feature.parentContainer = parentContainer;
-        feature.rapidFeature = true;
+        (feature as any).rapidFeature = true;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive
         feature.setData(entity.id, entity);
       }
@@ -500,7 +518,5 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       this.retainFeature(feature, frame);
     }
-
   }
-
 }
