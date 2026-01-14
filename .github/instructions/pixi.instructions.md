@@ -32,17 +32,61 @@ import type { Viewport } from '@rapid-sdk/math';
 
 ## Style Objects
 
-Use the proper style type from the feature class:
-- `PixiFeaturePoint` → `PointStyle`
-- `PixiFeatureLine` → `LineStyle`
-- `PixiFeaturePolygon` → `PolygonStyle`
+All style properties are **optional**. Use type assertions (`as`) when defining constant style objects:
 
 ```typescript
+import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
 
+const LINESTYLE = {
+  casing: { alpha: 0 },
+  stroke: { alpha: 0.7, width: 4, color: 0x0fffc4 }
+} as LineStyle;
+
+const MARKERSTYLE = {
+  markerAlpha: 0.8,
+  markerName: 'mediumCircle',
+  markerTint: 0x0fffc4
+} as PointStyle;
+```
+
+When creating dynamic styles, use `Object.assign()` with spread or mutation:
+```typescript
 const style: PointStyle = Object.assign({}, MARKERSTYLE);
 style.viewfieldAngles = [bearing];
 ```
+
+## Type-Only Imports
+
+When importing data classes (`GeoJSON`, `Marker`) only for type annotations, use `import type`:
+```typescript
+import type { GeoJSON } from '../data/GeoJSON.ts';
+import type { Marker } from '../data/Marker.ts';
+```
+
+## Filtering Data (Marker, GeoJSON, etc.)
+
+When filtering `Marker` or `GeoJSON` data, always access `.props` for filterable data (not `.properties`):
+
+```typescript
+filterMarkers(markers: Marker[]): Marker[] {
+  return markers.filter(marker => {
+    const props = marker.props;
+    // Check types before using values
+    const capturedAt = props.captured_at;
+    if (typeof capturedAt === 'number' || typeof capturedAt === 'string') {
+      const timestamp = new Date(capturedAt).getTime();
+      if (fromTimestamp && fromTimestamp > timestamp) return false;
+    }
+    return true;
+  });
+}
+```
+
+Key points:
+- Use `marker.props` or `sequence.props` (not `.properties`)
+- Extract values into variables and check their types before using
+- Cast when needed: `props.captured_by as string`
 
 ## D3 Selection Callbacks
 
@@ -51,14 +95,6 @@ D3's `.data()` and other selection methods have complex generic signatures. Type
 .data(blocks, (d: GeoJSON) => d.id)
 .text((d: GeoJSON) => d.properties.text as string)
 ```
-
-## GeoJSON Class vs GeoJSON Feature Properties
-
-The `GeoJSON` class from `../data/GeoJSON.ts` wraps GeoJSON data:
-- `d.props` → `GeoJSONProps` (class properties: `id`, `geojson`, `serviceID`, etc.)
-- `d.properties` → `Record<string, unknown>` (the wrapped GeoJSON feature's properties)
-
-Use `.properties` to access feature-level data like `text`, `url`, `captured_at`, etc.
 
 ## ScaleLinear Import
 
@@ -71,3 +107,4 @@ Not:
 import { scaleLinear } from 'd3-scale';
 import type { ScaleLinear } from 'd3-scale';  // duplicate!
 ```
+

@@ -1,7 +1,9 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeatureLine } from './PixiFeatureLine.ts';
+import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
 
+import type { GeoJSON } from '../data/GeoJSON.ts';
+import type { Marker } from '../data/Marker.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -12,7 +14,7 @@ const SELECTED = 0xffee00;
 const LINESTYLE = {
   casing: { alpha: 0 },  // disable
   stroke: { alpha: 0.7, width: 4, color: KARTAVIEW_BLUE }
-};
+} as LineStyle;
 
 const MARKERSTYLE = {
   markerAlpha:     0.8,
@@ -24,7 +26,7 @@ const MARKERSTYLE = {
   scale:           1.0,
   fovWidth:        1,
   fovLength:       1
-};
+} as PointStyle;
 
 
 /**
@@ -92,7 +94,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
    * @param markers - all markers
    * @return markers with filtering applied
    */
-  filterMarkers(markers: any[]): any[] {
+  filterMarkers(markers: Marker[]): Marker[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -106,14 +108,18 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       const props = marker.props;
       if (marker.id === photos.currPhotoID) return true;  // always show current image - Rapid#1512
 
-      if (!showFlatPhotos && !props.isPano) return false;
-      if (!showPanoramicPhotos && props.isPano) return false;
+      const isPano = !!props.isPano;
+      if (!showFlatPhotos && !isPano) return false;
+      if (!showPanoramicPhotos && isPano) return false;
 
-      const timestamp = new Date(props.captured_at).getTime();
-      if (fromTimestamp && fromTimestamp > timestamp) return false;
-      if (toTimestamp && toTimestamp < timestamp) return false;
+      const capturedAt = props.captured_at;
+      if (typeof capturedAt === 'number' || typeof capturedAt === 'string') {
+        const timestamp = new Date(capturedAt).getTime();
+        if (fromTimestamp && fromTimestamp > timestamp) return false;
+        if (toTimestamp && toTimestamp < timestamp) return false;
+      }
 
-      if (usernames && !usernames.includes(props.captured_by)) return false;
+      if (usernames && !usernames.includes(props.captured_by as string)) return false;
 
       return true;
     });
@@ -126,7 +132,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
    * @param sequences - all sequences
    * @return sequences with filtering applied
    */
-  filterSequences(sequences: any[]): any[] {
+  filterSequences(sequences: GeoJSON[]): GeoJSON[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -138,14 +144,22 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
     return sequences.filter(sequence => {
       const props = sequence.props;
-      if (!showFlatPhotos && !props.isPano) return false;
-      if (!showPanoramicPhotos && props.isPano) return false;
 
-      const timestamp = new Date(props.captured_at).getTime();
-      if (fromTimestamp && fromTimestamp > timestamp) return false;
-      if (toTimestamp && toTimestamp < timestamp) return false;
+      const isPano = !!props.isPano;
+      if (!showFlatPhotos && isPano) return false;
+      if (!showPanoramicPhotos && isPano) return false;
 
-      if (usernames && !usernames.includes(props.captured_by)) return false;
+      const capturedAt = props.captured_at;
+      if (typeof capturedAt === 'number' || typeof capturedAt === 'string') {
+        const timestamp = new Date(capturedAt).getTime();
+        if (fromTimestamp && fromTimestamp > timestamp) return false;
+        if (toTimestamp && toTimestamp < timestamp) return false;
+      }
+
+      const capturedBy = props.captured_by;
+      if (typeof capturedBy === 'string') {
+        if (usernames && !usernames.includes(capturedBy)) return false;
+      }
 
       return true;
     });

@@ -25,8 +25,6 @@ export interface OsmEntityProps extends AbstractDataProps {
   changeset: string;
   /** Timestamp of last edit */
   timestamp: string;
-  /** Allow extra properties (e.g. __via, __oneWay for intersection analysis) */
-  [key: string]: unknown;
 }
 
 

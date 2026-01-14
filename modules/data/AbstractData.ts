@@ -18,6 +18,8 @@ export interface AbstractDataProps {
   type: string;
   /** Internal version number, used to detect changes */
   v: number;
+  /** Extra properties are allowed */
+  [key: string]: unknown;
 }
 
 

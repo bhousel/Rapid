@@ -13,11 +13,11 @@ const SIDED_SPACING = 30;
 /** Style properties for line stroke/casing */
 export interface LinePartStyle {
   /** Line width in pixels */
-  width: number;
+  width?: number;
   /** Line color */
-  color: number;
+  color?: number;
   /** Alpha/opacity (0-1) */
-  alpha: number;
+  alpha?: number;
   /** Line cap style */
   cap?: 'butt' | 'round' | 'square';
   /** Line join style */
@@ -298,7 +298,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     if (!partStyle) return;
 
     const minwidth = which === 'casing' ? 3 : 2;
-    let width = partStyle.width;
+    let width = partStyle.width || 3;
 
     // Apply effectiveZoom style adjustments
     if (zoom < 16) {

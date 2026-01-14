@@ -1,22 +1,26 @@
-import { AbstractPixiLayer } from './AbstractPixiLayer';
-import { PixiFeaturePoint } from './PixiFeaturePoint';
+import type { Viewport } from '@rapid-sdk/math';
+
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+
+import type { PixiScene } from './PixiScene.ts';
 
 const MINZOOM = 12;
 
 
 /**
- * PixiLayerOsmose
+ * PixiLayerKeepRight
  * @class
  */
-export class PixiLayerMapRoulette extends AbstractPixiLayer {
+export class PixiLayerKeepRight extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param  scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
-    this.id = 'maproulette';
+    this.id = 'keepright';
   }
 
 
@@ -25,7 +29,7 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
    * Whether the Layer's service exists
    */
   get supported() {
-    return !!this.context.services.maproulette;
+    return !!this.context.services.keepright;
   }
 
 
@@ -46,11 +50,11 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
-    const maproulette = context.services.maproulette;
-    if (val && maproulette) {
-      maproulette.startAsync()
-        .then(() => gfx.immediateRedraw());
+    const gfx = context.systems.gfx as any;
+    const keepRight = context.services.keepright;
+    if (val && keepRight) {
+      keepRight.startAsync()
+        .then(() => gfx!.immediateRedraw());
     }
   }
 
@@ -67,20 +71,18 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  frame    -  Integer frame being rendered
+   * @param  viewport -  Pixi viewport to use for rendering
+   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  render(frame, projection, zoom) {
-    const maproulette = this.context.services.maproulette;
-    if (!this.enabled || !maproulette?.started || zoom < MINZOOM) return;
+  render(frame: number, viewport: Viewport, zoom: number): void {
+    const keepRight = this.context.services.keepright;
+    if (!this.enabled || !keepRight?.started || zoom < MINZOOM) return;
 
-    // Fetch new data, if needed..
-    maproulette.loadTiles();
+    keepRight.loadTiles();
 
-    // Render the data that we have..
     const parentContainer = this.scene.groups.get('qa');
-    const data = maproulette.getData();
+    const data = keepRight.getData();
 
     for (const d of data) {
       const part = d.geoms.parts[0];
@@ -90,10 +92,12 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
       let feature = this.features.get(featureID);
 
       if (!feature) {
-        const style = {
-          markerName: 'osmose',
-          markerTint: 0x00ff00,
-          iconName: d.icon
+        const style: PointStyle = {
+          markerName: 'xlargeCircle',
+          markerTint: 0x000000,
+          iconName: 'keepright',
+          iconSize: 16,
+          iconTint: keepRight.getColor(d.props.parentIssueType)
         };
 
         feature = new PixiFeaturePoint(this, featureID);
@@ -104,14 +108,9 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(projection, zoom);
-      if (!feature._isCircular) {  // offset the icon to fit better in the "osmose" pin
-        feature.icon.position.set(0, -17);
-      }
-
+      feature.update(viewport, zoom);
       this.retainFeature(feature, frame);
     }
-
   }
 
 }

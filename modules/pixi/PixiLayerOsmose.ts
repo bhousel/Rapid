@@ -1,5 +1,9 @@
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeaturePoint } from './PixiFeaturePoint.js';
+import type { Viewport } from '@rapid-sdk/math';
+
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+
+import type { PixiScene } from './PixiScene.ts';
 
 const MINZOOM = 12;
 
@@ -12,9 +16,9 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param  scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'osmose';
   }
@@ -46,11 +50,11 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const osmose = context.services.osmose;
     if (val && osmose) {
       osmose.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => gfx!.immediateRedraw());
     }
   }
 
@@ -67,11 +71,11 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  frame    -  Integer frame being rendered
+   * @param  viewport -  Pixi viewport to use for rendering
+   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     const osmose = this.context.services.osmose;
     if (!this.enabled || !osmose?.started || zoom < MINZOOM) return;
 
@@ -87,10 +91,10 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
       if (!part?.world || part?.type !== 'Point') continue;
 
       const featureID = `${this.layerID}-${d.id}`;
-      let feature = this.features.get(featureID);
+      let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
-        const style = {
+        const style: PointStyle = {
           markerName: 'osmose',
           markerTint: osmose.getColor(d.props.item),
           iconName: d.props.iconID
@@ -105,14 +109,12 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
       this.syncFeatureClasses(feature);
       feature.update(viewport, zoom);
-      if (!feature._isCircular) {  // offset the icon to fit better in the "osmose" pin
-        feature.icon.position.set(0, -17);
+      if (!(feature as any)._isCircular) {  // offset the icon to fit better in the "osmose" pin
+        feature.icon?.position.set(0, -17);
       }
 
       this.retainFeature(feature, frame);
     }
-
-    this.renderMarkers(frame, viewport, zoom);
   }
 
 }

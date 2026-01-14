@@ -1,9 +1,11 @@
 import { scaleLinear, type ScaleLinear } from 'd3-scale';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeatureLine } from './PixiFeatureLine.ts';
+import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
 
+import type { GeoJSON } from '../data/GeoJSON.ts';
+import type { Marker } from '../data/Marker.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -14,7 +16,7 @@ const SELECTED = 0xffee00;
 const LINESTYLE = {
   casing: { alpha: 0 },  // disable
   stroke: { alpha: 0.7, width: 4, color: MAPILLARY_GREEN }
-};
+} as LineStyle;
 
 const MARKERSTYLE = {
   markerAlpha:     0.8,
@@ -26,7 +28,7 @@ const MARKERSTYLE = {
   scale:           1.0,
   fovWidth:        1,
   fovLength:       1
-};
+} as PointStyle;
 
 const fovWidthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [1.3, 0.7]);
 const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7, 1.5]);
@@ -162,7 +164,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * @param markers - all markers
    * @return markers with filtering applied
    */
-  filterMarkers(markers: any[]): any[] {
+  filterMarkers(markers: Marker[]): Marker[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -179,11 +181,14 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
       if (!showFlatPhotos && !props.isPano) return false;
       if (!showPanoramicPhotos && props.isPano) return false;
 
-      const timestamp = new Date(props.captured_at).getTime();
-      if (fromTimestamp && fromTimestamp > timestamp) return false;
-      if (toTimestamp && toTimestamp < timestamp) return false;
+      const capturedAt = props.captured_at;
+      if (typeof capturedAt === 'number' || typeof capturedAt === 'string') {
+        const timestamp = new Date(capturedAt).getTime();
+        if (fromTimestamp && fromTimestamp > timestamp) return false;
+        if (toTimestamp && toTimestamp < timestamp) return false;
+      }
 
-      if (usernames && !usernames.includes(props.captured_by)) return false;
+      if (usernames && !usernames.includes(props.captured_by as string)) return false;
 
       return true;
     });
@@ -198,7 +203,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * @param sequences - all sequences
    * @return sequences with filtering applied
    */
-  filterSequences(sequences: any[]): any[] {
+  filterSequences(sequences: GeoJSON[]): GeoJSON[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -209,10 +214,12 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     const showPanoramicPhotos = photos.showsPhotoType('panoramic');
 
     return sequences.filter(sequence => {
-      const first = sequence.props.geojson.features[0];  // Expect a FeatureCollection, use the first feature
+      const geojson = sequence.props.geojson as GeoJSON.FeatureCollection | undefined;
+      const first = geojson?.features?.[0];  // Expect a FeatureCollection, use the first feature
       if (!first) return false;
 
       const props = first.properties;
+      if (!props) return false;
       if (!showFlatPhotos && !props.is_pano) return false;
       if (!showPanoramicPhotos && props.is_pano) return false;
 

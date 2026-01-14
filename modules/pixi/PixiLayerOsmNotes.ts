@@ -1,5 +1,9 @@
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeaturePoint } from './PixiFeaturePoint.js';
+import type { Viewport } from '@rapid-sdk/math';
+
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+
+import type { PixiScene } from './PixiScene.ts';
 
 const MINZOOM = 12;
 
@@ -12,9 +16,9 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param  scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
     this.id = 'notes';
   }
@@ -46,11 +50,11 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const osm = context.services.osm;
     if (val && osm) {
       osm.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => gfx!.immediateRedraw());
     }
   }
 
@@ -66,11 +70,11 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
 
   /**
    * renderMarkers
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  frame    -  Integer frame being rendered
+   * @param  viewport -  Pixi viewport to use for rendering
+   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  renderMarkers(frame, viewport, zoom) {
+  renderMarkers(frame: number, viewport: Viewport, zoom: number): void {
     const osm = this.context.services.osm;
     if (!osm?.started) return;
 
@@ -113,12 +117,12 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
           iconName = 'rapid-icon-plus';
         }
 
-        const style = {
+        const style: PointStyle = {
           markerName: 'osmnote',
           markerTint: color,
           iconName: iconName,
           // override 'y' for better centering within the note balloon
-          anchor: { y: 0.65 }
+          anchor: { x: 0.5, y: 0.65 }
         };
 
         feature.style = style;
@@ -133,11 +137,11 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  frame    -  Integer frame being rendered
+   * @param  viewport -  Pixi viewport to use for rendering
+   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     const osm = this.context.services.osm;
     if (!this.enabled || !osm?.started || zoom < MINZOOM) return;
 

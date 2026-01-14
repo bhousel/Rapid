@@ -1,22 +1,29 @@
-import { AbstractPixiLayer } from './AbstractPixiLayer.js';
-import { PixiFeaturePoint } from './PixiFeaturePoint.js';
+import type { Viewport } from '@rapid-sdk/math';
+
+import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+
+import type { Marker } from '../data/Marker.ts';
+import type { PixiScene } from './PixiScene.ts';
 
 const MINZOOM = 12;
+const MAPILLARY_GREEN = 0x05cb63;
+const SELECTED = 0xffee00;
 
 
 /**
- * PixiLayerMapillarySigns
+ * PixiLayerMapillaryDetections
  * @class
  */
-export class PixiLayerMapillarySigns extends AbstractPixiLayer {
+export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
   /**
    * @constructor
-   * @param  {PixiScene}  scene - The Scene that owns this Layer
+   * @param  scene - The Scene that owns this Layer
    */
-  constructor(scene) {
+  constructor(scene: PixiScene) {
     super(scene);
-    this.id = 'mapillary-signs';
+    this.id = 'mapillary-detections';
   }
 
 
@@ -46,11 +53,11 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx as any;
     const mapillary = context.services.mapillary;
     if (val && mapillary) {
       mapillary.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => gfx!.immediateRedraw());
     }
   }
 
@@ -66,19 +73,21 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
   /**
    * filterMarkers
-   * @param  {Array<Marker>}  markers - all markers
-   * @return {Array<Marker>}  markers with filtering applied
+   * @param  markers - all markers
+   * @return markers with filtering applied
    */
-  filterMarkers(markers) {
-    const photos = this.context.systems.photos;
+  filterMarkers(markers: Marker[]): Marker[] {
+    const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
     const toDate = photos.toDate;
     const toTimestamp = toDate && new Date(toDate).getTime();
 
     return markers.filter(marker => {
-      const props = marker.props;
-      const timestamp = new Date(props.first_seen_at).getTime();
+      const seenAt = marker.props.first_seen_at;
+      if (typeof seenAt !== 'number' && typeof seenAt !== 'string') return true;
+
+      const timestamp = new Date(seenAt).getTime();
       if (fromTimestamp && fromTimestamp > timestamp) return false;
       if (toTimestamp && toTimestamp < timestamp) return false;
 
@@ -89,19 +98,20 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
   /**
    * renderMarkers
-   * @param  frame     Integer frame being rendered
-   * @param  viewport  Pixi viewport to use for rendering
-   * @param  zoom      Effective zoom to use for rendering
+   * @param  frame    -  Integer frame being rendered
+   * @param  viewport -  Pixi viewport to use for rendering
+   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  renderMarkers(frame, viewport, zoom) {
+  renderMarkers(frame: number, viewport: Viewport, zoom: number): void {
     const context = this.context;
+    const schema = context.systems.schema!;
+
     const mapillary = context.services.mapillary;
     if (!mapillary?.started) return;
 
-    const container = context.container();
     const parentContainer = this.scene.groups.get('qa');
 
-    let markers = mapillary.getData('signs');
+    let markers = mapillary.getData('detections');
     markers = this.filterMarkers(markers);
 
     for (const d of markers) {
@@ -111,39 +121,34 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
       // Check that this part has coordinates and is a Point
       if (!part.world || part.type !== 'Point') continue;
 
-      const featureID = `${this.layerID}-sign-${dataID}`;
+      const featureID = `${this.layerID}-detection-${dataID}`;
       let feature = this.features.get(featureID);
 
       if (!feature) {
-        // Some values we don't have icons for, check first - Rapid#1518
-        const hasIcon = container.selectAll(`#rapid-defs #${d.props.value}`).size();
-
-        let style;
-        if (hasIcon) {
-          style = {
-            markerName: d.props.value
-          };
-        } else {
-          style = {
-            markerName: 'xlargeSquare',
-            iconName: 'fas-question',
-            iconSize: 16
-          };
-        }
-
         feature = new PixiFeaturePoint(this, featureID);
-        feature.style = style;
         feature.parentContainer = parentContainer;
         feature.setCoords(part);
-        feature.setData(dataID, d);
-
-        const marker = feature.marker;
-        const ICONSIZE = 24;
-        marker.width = ICONSIZE;
-        marker.height = ICONSIZE;
+        feature.setData(d.id, d);
       }
 
       this.syncFeatureClasses(feature);
+
+      if (feature.dirty) {
+        const isSelected = feature.hasClass('selectdetection');
+        const presetID = mapillary.getDetectionPresetID(d.props.value);
+        const preset = presetID && schema.item(presetID);
+
+        const style: PointStyle = {
+          markerName: 'xlargeCircle',
+          markerTint: 0x000000,
+          iconName: preset?.icon || 'fas-question',
+          iconSize: 16,
+          iconTint: isSelected ? SELECTED : MAPILLARY_GREEN
+        };
+
+        feature.style = style;
+      }
+
       feature.update(viewport, zoom);
       this.retainFeature(feature, frame);
     }
@@ -153,16 +158,17 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
   /**
    * render
    * Render any data we have, and schedule fetching more of it to cover the view
-   * @param  {number}    frame    -  Integer frame being rendered
-   * @param  {Viewport}  viewport -  Pixi viewport to use for rendering
-   * @param  {number}    zoom     -  Effective zoom level to use for rendering
+   * @param  frame    -  Integer frame being rendered
+   * @param  viewport -  Pixi viewport to use for rendering
+   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  render(frame, viewport, zoom) {
+  render(frame: number, viewport: Viewport, zoom: number): void {
     const mapillary = this.context.services.mapillary;
     if (!this.enabled || !mapillary?.started || zoom < MINZOOM) return;
 
-    mapillary.loadTiles('signs');
+    mapillary.loadTiles('detections');
     this.renderMarkers(frame, viewport, zoom);
   }
 
 }
+
