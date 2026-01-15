@@ -196,9 +196,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const filters = context.systems.filters!;
     const graph = editor.staging.graph;
 
-    (context as any).loadTiles();  // Load tiles of OSM data to cover the view
+    context.loadTiles();  // Load tiles of OSM data to cover the view
 
-    let entities = editor.intersects((context as any).viewport.visibleExtent());   // Gather data in view
+    let entities = editor.intersects(context.viewport.visibleExtent());   // Gather data in view
     entities = filters.filterScene(entities, graph);   // Apply feature filters
 
     const data: OsmData = {
@@ -280,7 +280,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     this.renderVertices(frame, viewport, zoom, data, related);
 
-    if ((context as any).mode?.id === 'select-osm') {
+    if (context.mode?.id === 'select-osm') {
       this.renderMidpoints(frame, viewport, zoom, data, related);
     }
   }
@@ -617,7 +617,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (feature.dirty) {
         const preset = schema.match(node, graph);
         const iconName = preset?.props?.icon;
-        const directions = node.directions(graph, (context as any).viewport);
+        const directions = node.directions(graph, context.viewport);
 
         // set marker style
         const markerStyle: PointStyle = {
@@ -711,7 +711,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           iconName = preset?.props?.icon;
         }
 
-        const directions = node.directions(graph, (context as any).viewport);
+        const directions = node.directions(graph, context.viewport);
 
         // set marker style
         const markerStyle: PointStyle = {

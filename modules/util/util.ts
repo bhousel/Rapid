@@ -1,5 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
-import type { Context, D3Selection, Nullable } from '../core/types.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Context } from '../core/types.ts';
 import type { OsmEntity, EntityID } from '../data/types.ts';
 import type { Vec2 } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';

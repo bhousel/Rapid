@@ -9,9 +9,10 @@ import { Marker } from '../data/Marker.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { Difference } from '../lib/Difference.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { Context, D3EnterSelection, D3Selection } from './types.ts';
+import type { Context } from './types.ts';
 
 type AreaFillMode = 'wireframe' | 'partial' | 'full';
 
@@ -80,10 +81,10 @@ export class MapSystem extends AbstractSystem {
   initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
-    const context = this.context as any;
-    const editor = context.systems.editor;
+    const context = this.context;
+    const editor = context.systems.editor!;
     const filters = context.systems.filters;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n;
     const rapid = context.systems.rapid;
     const storage = context.systems.storage;
@@ -92,7 +93,7 @@ export class MapSystem extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          gfx?.initAsync(),
+          gfx.initAsync(),
           l10n?.initAsync(),
           storage?.initAsync(),
           urlhash?.initAsync()
@@ -104,7 +105,7 @@ export class MapSystem extends AbstractSystem {
         this._toggleFillMode = (storage?.getItem('area-fill-toggle') || 'partial') as AreaFillMode;  // the previous *non-wireframe* fill mode
 
         // Scene will exist after gfx init
-        const scene = gfx.scene;
+        const scene = gfx.scene!;
 
         // Setup Event Handlers..
         // Note: We want MapSystem's hashchange listener registered as early as possible
@@ -113,7 +114,9 @@ export class MapSystem extends AbstractSystem {
 
         // Forward the 'move' and 'draw' events from the GraphicsSystem
         gfx
-          .on('move', () => this.emit('move'))
+          .on('move', () => {
+            this.emit('move');
+          })
           .on('draw', () => {
             this._updateHash();
             this.emit('draw', { full: true });  // pass {full: true} for legacy receivers
@@ -151,6 +154,7 @@ export class MapSystem extends AbstractSystem {
             // If that edit exists (it might not if we are restoring) use that one, otherwise just use the current edit
             const didUndo = (currIndex === prevIndex - 1);
             const edit = (didUndo && prevEdit) ?? currEdit;
+            if (!edit) return;
 
             // Reposition the map if we've jumped to a different place.
             const t0 = context.viewport.transform.props;
@@ -162,7 +166,7 @@ export class MapSystem extends AbstractSystem {
             // Switch to select mode if the edit contains selected ids.
             // Note: draw modes need to do a little extra work to survive this,
             //  so they have their own `historyjump` listeners.
-            const modeID = context.mode?.id;
+            const modeID = context.mode?.id ?? '';
             if (/^draw/.test(modeID)) return;
 
             // For now these IDs are assumed to be OSM ids.
@@ -228,8 +232,8 @@ export class MapSystem extends AbstractSystem {
       return;   // no parent - called too early?
     }
 
-    const context = this.context as any;
-    const gfx = context.systems.gfx;
+    const context = this.context;
+    const gfx = context.systems.gfx!;
 
     // Everything in here runs one time (on enter).
     // The 'main-map' is an absolutely positioned container that fills the space where the map will go.
@@ -276,7 +280,7 @@ export class MapSystem extends AbstractSystem {
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding(): void {
-    const context = this.context as any;
+    const context = this.context;
     const keybinding = context.keybinding();
     const l10n = context.systems.l10n;
     if (!l10n) return;
@@ -309,8 +313,8 @@ export class MapSystem extends AbstractSystem {
    * @param  prevParams - The previous hash parameters
    */
   _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
-    const context = this.context as any;
-    const scene = context.systems.gfx.scene;
+    const context = this.context;
+    const scene = context.systems.gfx!.scene!;  // exists after init
 
     // map
     const newMap = currParams.get('map');
@@ -393,8 +397,8 @@ export class MapSystem extends AbstractSystem {
    * This gets called on 'draw', so fairly frequently
    */
   _updateHash(): void {
-    const context = this.context as any;
-    const scene = context.systems.gfx.scene;
+    const context = this.context;
+    const scene = context.systems.gfx!.scene!;
     const urlhash = context.systems.urlhash;
     const viewport = context.viewport;
     if (!urlhash) return;
@@ -440,7 +444,6 @@ export class MapSystem extends AbstractSystem {
     } else {
       urlhash.setParam('note', null);
     }
-
   }
 
 
@@ -471,7 +474,7 @@ export class MapSystem extends AbstractSystem {
    * @return  [x,y] pixel location of pointer (or center of the map)
    */
   mouse(): Vec2 {
-    const gfx = (this.context as any).systems.gfx;
+    const gfx = this.context.systems.gfx;
     return gfx?.eventManager?.coord?.map || this.centerPoint();
   }
 
@@ -504,7 +507,7 @@ export class MapSystem extends AbstractSystem {
     // Avoid tiny or out of bounds rotations
     t2.r = numWrap((+(t2.r || 0).toFixed(3)), 0, TAU);   // radians
 
-    const gfx = (this.context as any).systems.gfx;
+    const gfx = this.context.systems.gfx;
     gfx?.setTransformAsync(t2, duration ?? 0);
     return this;
   }
@@ -521,7 +524,7 @@ export class MapSystem extends AbstractSystem {
     // Avoid tiny or out of bounds rotations
     t2.r = numWrap((+(t2.r || 0).toFixed(3)), 0, TAU);   // radians
 
-    const gfx = (this.context as any).systems.gfx;
+    const gfx = this.context.systems.gfx;
     return gfx!.setTransformAsync(t2, duration);
   }
 
@@ -667,8 +670,8 @@ export class MapSystem extends AbstractSystem {
   fitEntities(entities: OsmEntity | OsmEntity[], duration: number = 0): this {
     let extent;
 
-    const editor = (this.context as any).systems.editor;
-    const graph = editor.staging.graph;
+    const editor = this.context.systems.editor;
+    const graph = editor!.staging.graph;
 
     if (Array.isArray(entities)) {
       extent = utilTotalExtent(entities, graph);
@@ -689,9 +692,9 @@ export class MapSystem extends AbstractSystem {
    * @param  fitEntity - Whether to force fit the map view to show the entity
    */
   selectEntityID(entityID: string, fitEntity: boolean = false): void {
-    const context = this.context as any;
-    const editor = context.systems.editor;
-    const scene = context.systems.gfx.scene;
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const scene = context.systems.gfx!.scene!;
     const viewport = context.viewport;
 
     if (!entityID) {
@@ -739,9 +742,9 @@ export class MapSystem extends AbstractSystem {
    * @param  noteID  - noteID to select
    */
   selectNoteID(noteID: number | string): void {
-    const context = this.context as any;
-    const osm = context.services.osm;
-    const scene = context.systems.gfx.scene;
+    const context = this.context;
+    const osm = context.services.osm as any;
+    const scene = context.systems.gfx!.scene!;
 
     if (!noteID || !osm) {
       context.enter('browse');
@@ -907,8 +910,8 @@ export class MapSystem extends AbstractSystem {
 
     this._highlightEdits = val;
 
-    const gfx = (this.context as any).systems.gfx;
-    gfx.scene.dirtyScene();
+    const gfx = this.context.systems.gfx!;
+    gfx.scene!.dirtyScene();
     gfx.immediateRedraw();
     this.emit('mapchange');
   }
@@ -922,8 +925,8 @@ export class MapSystem extends AbstractSystem {
     return this._currFillMode;
   }
   set areaFillMode(val: AreaFillMode) {
-    const context = this.context as any;
-    const gfx = context.systems.gfx;
+    const context = this.context;
+    const gfx = context.systems.gfx!;
     const storage = context.systems.storage;
 
     const current = this._currFillMode;
@@ -937,7 +940,7 @@ export class MapSystem extends AbstractSystem {
     this._currFillMode = val;
     storage?.setItem('area-fill', val);
 
-    gfx.scene.dirtyScene();
+    gfx.scene!.dirtyScene();
     gfx.immediateRedraw();
     this.emit('mapchange');
   }

@@ -1,8 +1,10 @@
 import type { Viewport } from '@rapid-sdk/math';
 
-import type { GeoJSON } from '../data/GeoJSON.ts';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+
+import type { D3Selection, D3EnterSelection } from 'd3-selection';
+import type { GeoJSON } from '../data/GeoJSON.ts';
 import type { PixiScene } from './PixiScene.ts';
 
 const MINZOOM = 4;
@@ -54,11 +56,13 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * @param _zoom - Effective zoom level (unused, we use real zoom from context viewport)
    */
   render(frame: number, viewport: Viewport, _zoom: number): void {
-    const context = this.context as any;
+    const context = this.context;
     const l10n = context.systems.l10n;
     const locations = context.systems.locations;
     const mapViewport = context.viewport;  // context viewport !== pixi viewport (they are offset)
     const zoom = mapViewport.transform.zoom;   // use real zoom for this, not "effective" zoom
+
+    if (!locations) return;   // Need a LocationSystem for this to work.
 
     let blocks: GeoJSON[] = [];
     if (zoom >= MINZOOM) {
@@ -68,7 +72,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
     // setup the explanation
     // add a special 'api-status' line to the map footer explain the block
-    const $explanationRow = context.container().select('.main-content > .map-footer')
+    const $explanationRow: D3Selection = context.container().select('.main-content > .map-footer')
       .selectAll('.api-status.blocks')
       .data(blocks, (d: GeoJSON) => d.id);
 
@@ -76,7 +80,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
       .remove();
 
     // enter
-    const $$explanationRow = $explanationRow.enter()
+    const $$explanationRow: D3EnterSelection = $explanationRow.enter()
       .insert('div', '.api-status')   // before any existing
       .attr('class', 'api-status blocks error');
 
@@ -89,7 +93,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
       .append('a')
       .attr('target', '_blank')
       .attr('href', (d: GeoJSON) => d.properties.url as string)
-      .text(l10n.t('rapid_menu.more_info'));
+      .text(l10n?.t('rapid_menu.more_info') || 'More Info');
   }
 
 

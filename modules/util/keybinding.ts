@@ -1,6 +1,6 @@
 import { select } from 'd3-selection';
 
-import type { D3Selection } from '../core/types.ts';
+import type { D3Selection } from 'd3-selection';
 import { type OneOrMore, utilIterable } from './iterable.ts';
 
 
@@ -13,7 +13,7 @@ interface KeyModifiers {
 }
 
 /** A parsed keybinding event specification */
-interface KeybindingEvent {
+interface KeyMatch {
   /** The key name(s) to match (preferred) */
   key: string | string[] | undefined;
   /** The keyCode to match (fallback for older browsers) */
@@ -30,8 +30,8 @@ interface KeyBinding {
   capture: boolean | undefined;
   /** Callback function to invoke when matched */
   callback: KeybindingCallback;
-  /** The parsed event specification */
-  event: KeybindingEvent;
+  /** The parameters to test */
+  test: KeyMatch;
 }
 
 /** Partial keyboard event for testing bindings */
@@ -47,14 +47,15 @@ interface KeyEventLike {
 }
 
 /** Callback function for keybinding events */
-export type KeybindingCallback = (evt: KeyEventLike) => void;
+export type KeybindingCallback = (evt: KeyboardEvent) => void;
 
+//TODO: make a core system class for utilKeybinding.  "Keybinding" becomes `this`.
 /** The keybinding instance returned by utilKeybinding */
 export interface Keybinding {
   /** Bind keybinding to a D3 selection (defaults to document) */
-  (selection?: D3Selection): Keybinding;
+  ($selection?: D3Selection): Keybinding;
   /** Unbind all keybindings from a D3 selection */
-  unbind(selection?: D3Selection): Keybinding;
+  unbind($selection?: D3Selection): Keybinding;
   /** Clear all registered keybindings */
   clear(): Keybinding;
   /** Manually trigger a keypress event (useful for testing) */
@@ -84,7 +85,7 @@ export function utilKeybinding(namespace: string): Keybinding {
    * @param  isCapturing  - `true` if capturing phase, `false` if bubbling phase
    * @return `true` if something matched, `false` if not
    */
-  function testBindings(evt: KeyEventLike, isCapturing: boolean = false): boolean {
+  function testBindings(evt: KeyboardEvent, isCapturing: boolean = false): boolean {
     const bindings = [...Object.values(_keybindings)];
 
     // Most key shortcuts will accept either lower or uppercase ('h' or 'H'),
@@ -94,9 +95,9 @@ export function utilKeybinding(namespace: string): Keybinding {
 
     // Match shifted keybindings first...
     for (const binding of bindings) {
-      if (!binding.event.modifiers.shiftKey) continue;  // no shift
+      if (!binding.test.modifiers.shiftKey) continue;  // no shift
       if (!!binding.capture !== isCapturing) continue;
-      if (testBinding(evt, binding.event, true)) {
+      if (testBinding(evt, binding.test, true)) {
         binding.callback(evt);
         return true;  // match a max of one binding per event
       }
@@ -104,9 +105,9 @@ export function utilKeybinding(namespace: string): Keybinding {
 
     // Then unshifted keybindings...
     for (const binding of bindings) {
-      if (binding.event.modifiers.shiftKey) continue;   // shift
+      if (binding.test.modifiers.shiftKey) continue;   // shift
       if (!!binding.capture !== isCapturing) continue;
-      if (testBinding(evt, binding.event, false)) {
+      if (testBinding(evt, binding.test, false)) {
         binding.callback(evt);
         return true;
       }
@@ -124,7 +125,7 @@ export function utilKeybinding(namespace: string): Keybinding {
    * @param  testShift  - whether to require the Shift key to match
    * @return `true` if a match, `false` if not
    */
-  function testBinding(evt: KeyEventLike, check: KeybindingEvent, testShift: boolean): boolean {
+  function testBinding(evt: KeyboardEvent, check: KeyMatch, testShift: boolean): boolean {
     let isMatch = false;
     let tryKey: string | undefined;
     let tryKeyCode: number | undefined;
@@ -177,19 +178,19 @@ export function utilKeybinding(namespace: string): Keybinding {
   }
 
 
-  function keybinding(selection?: D3Selection): Keybinding {
-    const sel = selection ?? select(document);
-    sel.on('keydown.capture.' + namespace, capture as any, true);
-    sel.on('keydown.bubble.' + namespace, bubble as any, false);
+  function keybinding($selection?: D3Selection): Keybinding {
+    const $sel = $selection ?? select(document);
+    $sel.on('keydown.capture.' + namespace, capture as any, true);
+    $sel.on('keydown.bubble.' + namespace, bubble as any, false);
     return keybinding;
   }
 
   // was: keybinding.off()
-  keybinding.unbind = function(selection?: D3Selection): Keybinding {
+  keybinding.unbind = function($selection?: D3Selection): Keybinding {
     _keybindings = {};
-    const sel = selection ?? select(document);
-    sel.on('keydown.capture.' + namespace, null);
-    sel.on('keydown.bubble.' + namespace, null);
+    const $sel = $selection ?? select(document);
+    $sel.on('keydown.capture.' + namespace, null);
+    $sel.on('keydown.bubble.' + namespace, null);
     return keybinding;
   };
 
@@ -202,15 +203,30 @@ export function utilKeybinding(namespace: string): Keybinding {
 
   // Manually trigger a keypress, useful for testing
   keybinding.trigger = function(event: KeyEventLike): void {
-    const evt: KeyEventLike = {
-      type: event.type || 'keydown',
-      key: event.key,
-      keyCode: event.keyCode,
-      shiftKey: event.shiftKey || false,
-      ctrlKey: event.ctrlKey || false,
-      altKey: event.altKey || false,
-      metaKey: event.metaKey || false
-    };
+    // Create a KeyboardEvent if available (browser environment),
+    // otherwise create a plain object with the same shape (Node/Bun without DOM).
+    let evt: KeyboardEvent;
+    if (typeof KeyboardEvent === 'function') {
+      evt = new KeyboardEvent(event.type || 'keydown', {
+        key: event.key,
+        keyCode: event.keyCode,
+        shiftKey: event.shiftKey || false,
+        ctrlKey: event.ctrlKey || false,
+        altKey: event.altKey || false,
+        metaKey: event.metaKey || false
+      });
+    } else {
+      // Fallback for environments without KeyboardEvent (e.g., unit tests)
+      evt = {
+        type: event.type || 'keydown',
+        key: event.key ?? '',
+        keyCode: event.keyCode ?? 0,
+        shiftKey: event.shiftKey || false,
+        ctrlKey: event.ctrlKey || false,
+        altKey: event.altKey || false,
+        metaKey: event.metaKey || false
+      } as KeyboardEvent;
+    }
     testBindings(evt, false);
   };
 
@@ -228,7 +244,7 @@ export function utilKeybinding(namespace: string): Keybinding {
   // Add one or more keycode bindings.
   keybinding.on = function(
     codes: OneOrMore<string>,
-    callback: KeybindingCallback | null | undefined,
+    callback: Nullable<KeybindingCallback>,
     capture?: boolean
   ): Keybinding {
     if (typeof callback !== 'function') {
@@ -241,7 +257,7 @@ export function utilKeybinding(namespace: string): Keybinding {
         id: id,
         capture: capture,
         callback: callback,
-        event: {
+        test: {
           key: undefined,  // preferred
           keyCode: 0,      // fallback
           modifiers: {
@@ -268,11 +284,11 @@ export function utilKeybinding(namespace: string): Keybinding {
           if (matches[j] in utilKeybinding.modifierCodes) {
             const modCode = utilKeybinding.modifierCodes[matches[j]];
             const prop = utilKeybinding.modifierProperties[modCode] as keyof KeyModifiers;
-            binding.event.modifiers[prop] = true;
+            binding.test.modifiers[prop] = true;
           } else {
-            binding.event.key = utilKeybinding.keys[matches[j]] || matches[j];
+            binding.test.key = utilKeybinding.keys[matches[j]] || matches[j];
             if (matches[j] in utilKeybinding.keyCodes) {
-              binding.event.keyCode = utilKeybinding.keyCodes[matches[j]];
+              binding.test.keyCode = utilKeybinding.keyCodes[matches[j]];
             }
           }
         }
@@ -281,7 +297,6 @@ export function utilKeybinding(namespace: string): Keybinding {
 
     return keybinding;
   };
-
 
   return keybinding;
 }

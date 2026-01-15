@@ -11,7 +11,8 @@ import {
 } from '../ui/index.js';
 
 import type { Vec2 } from '@rapid-sdk/math';
-import type { Context, D3EnterSelection, D3Selection } from './types.ts';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { Context } from './types.ts';
 
 /** The data properties of a DOMRect (without methods like toJSON) */
 type DOMRectData = Pick<DOMRectReadOnly, 'x' | 'y' | 'width' | 'height' | 'top' | 'right' | 'bottom' | 'left'>;
@@ -103,21 +104,21 @@ export class UiSystem extends AbstractSystem {
   initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
-    const context = this.context as any;
-    const assets = context.systems.assets;
-    const gfx = context.systems.gfx;
-    const l10n = context.systems.l10n;
-    const urlhash = context.systems.urlhash;
+    const context = this.context;
+    const assets = context.systems.assets!;
+    const gfx = context.systems.gfx!;
+    const l10n = context.systems.l10n!;
+    const urlhash = context.systems.urlhash!;
 
     // Many UI components require l10n and gfx (for scene/layers)
 
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          assets?.initAsync(),
-          l10n?.initAsync(),
-          gfx?.initAsync(),
-          urlhash?.initAsync()
+          assets.initAsync(),
+          l10n.initAsync(),
+          gfx.initAsync(),
+          urlhash.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })
@@ -155,7 +156,7 @@ export class UiSystem extends AbstractSystem {
           }
         });
 
-        const osm = context.services.osm;
+        const osm = context.services.osm as any;
         if (osm) {
           osm
             .on('authLoading', () => context.container()?.call(this.AuthModal))
@@ -204,11 +205,11 @@ export class UiSystem extends AbstractSystem {
   startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
-    const context = this.context as any;
-    const editor = context.systems.editor;
-    const map = context.systems.map;
-    const storage = context.systems.storage;
-    const urlhash = context.systems.urlhash;
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const map = context.systems.map!;
+    const storage = context.systems.storage!;
+    const urlhash = context.systems.urlhash!;
     const $container: D3Selection = context.container();
 
     if (!$container.size()) {
@@ -231,8 +232,8 @@ export class UiSystem extends AbstractSystem {
 
         // What to show first?
         const startWalkthrough = urlhash.initialHashParams.get('walkthrough') === 'true';
-        const sawPrivacyVersion = parseInt(storage.getItem('sawPrivacyVersion'), 10) || 0;
-        const sawWhatsNewVersion = parseInt(storage.getItem('sawWhatsNewVersion'), 10) || 0;
+        const sawPrivacyVersion = parseInt(storage.getItem('sawPrivacyVersion') ?? '', 10) || 0;
+        const sawWhatsNewVersion = parseInt(storage.getItem('sawWhatsNewVersion') ?? '', 10) || 0;
 
         if (startWalkthrough) {
           $container.call(uiIntro(context));     // Jump right into walkthrough..
@@ -256,7 +257,7 @@ export class UiSystem extends AbstractSystem {
    */
   resetAsync(): Promise<void> {
     // don't leave stale state in the inspector
-    const context = this.context as any;
+    const context = this.context;
     const $container: D3Selection = context.container();
     if ($container.size()) {
       $container.select('.inspector-wrap *').remove();
@@ -273,9 +274,9 @@ export class UiSystem extends AbstractSystem {
    *  this one doesn't need it - `$container` is always the parent.
    */
   render(): void {
-    const context = this.context as any;
-    const l10n = context.systems.l10n;
-    const map = context.systems.map;
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+    const map = context.systems.map!;
     const $container: D3Selection = context.container();
 
     $container
@@ -314,8 +315,8 @@ export class UiSystem extends AbstractSystem {
    * @param  e - the resize event (if any)
    */
   resize(e?: Event): void {
-    const context = this.context as any;
-    const map = context.systems.map;
+    const context = this.context;
+    const map = context.systems.map!;
     const viewport = context.viewport;
     const $container: D3Selection = context.container();
 
@@ -388,7 +389,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
       delete this._needWidth[selector];
     }
 
-    const context = this.context as any;
+    const context = this.context;
     const $selection: D3Selection = context.container().select(selector);
     if ($selection.empty()) return;
 
@@ -414,8 +415,8 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * @param  $showpane - A d3-selection to the pane to show
    */
   togglePanes($showpane?: D3Selection): void {
-    const context = this.context as any;
-    const l10n = context.systems.l10n;
+    const context = this.context;
+    const l10n = context.systems.l10n!;
     const $container: D3Selection = context.container();
 
     const $hidepanes: D3Selection = $container.selectAll('.map-pane.shown');
@@ -479,8 +480,8 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
   showEditMenu(anchorPoint: Vec2, triggerType: string): void {
     this.EditMenu.close();   // remove any displayed menu
 
-    const context = this.context as any;
-    const gfx = context.systems.gfx;
+    const context = this.context;
+    const gfx = context.systems.gfx!;
     const viewport = context.viewport;
 
     // The mode decides which operations are available
@@ -518,8 +519,8 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * situations where its available operations may have changed, such as Rapid#1311
    */
   redrawEditMenu(): void {
-    const context = this.context as any;
-    const gfx = context.systems.gfx;
+    const context = this.context;
+    const gfx = context.systems.gfx!;
     const $overlay: D3Selection = select(gfx.overlay);
 
     // If the menu isn't showing, there's nothing to do
@@ -549,15 +550,17 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
   // Method to show the MapRoulette context menu
   showMapRouletteMenu(anchorPoint: Vec2, triggerType: string): void {
     this.closeMapRouletteMenu(); // Close any existing menu
-    const context = this.context as any;
-    const gfx = context.systems.gfx;
+    const context = this.context;
+    const gfx = context.systems.gfx!;
     const viewport = context.viewport;
+
     this.MapRouletteMenu
       .anchorLoc(viewport.unproject(anchorPoint))
       .triggerType(triggerType);
-    const $overlay: D3Selection = select(gfx.overlay);
+
+      const $overlay: D3Selection = select(gfx.overlay);
     $overlay.call(this.MapRouletteMenu);
-    this._showsMapRouletteMenu = true; // Update state
+    this._showsMapRouletteMenu = true;
   }
 
 
@@ -576,9 +579,9 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * called by `initAsync()`
    */
   _checkEnvironment(): void {
-    const context = this.context as any;
-    const assets = context.systems.assets;
-    const urlhash = context.systems.urlhash;
+    const context = this.context;
+    const assets = context.systems.assets!;
+    const urlhash = context.systems.urlhash!;
     const detected = utilDetect();
 
     const $head: D3Selection = select('head');

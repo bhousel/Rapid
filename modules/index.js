@@ -12,4 +12,4 @@ export * from './ui/index.js';
 export * from './util/index.ts';
 export * from './validations/index.js';
 
-export { Context } from './Context.js';
+export { Context } from './Context.ts';

@@ -4,7 +4,7 @@ import throttle from 'lodash-es/throttle.js';
 import { AbstractSystem } from './AbstractSystem.ts';
 
 import type { DebouncedFunc } from 'lodash-es';
-import type { Context, Nullable } from './types.ts';
+import type { Context } from './types.ts';
 
 
 /** Mock window type for non-browser environments */
@@ -189,7 +189,7 @@ export class UrlHashSystem extends AbstractSystem {
         // A lot of things will start happening when urlhash emits its
         // first hashchange event.  Chain off Context's initAsync Promise
         // to know when everything has started up and it is ok to do this.
-        (context as any).initAsync()
+        context.initAsync()
           .then(() => this.resume());  // Emits 'hashchange'
       });
   }
@@ -327,7 +327,7 @@ export class UrlHashSystem extends AbstractSystem {
 
     // Currently only support OSM ids
     let selected: string | undefined;
-    const selectedIDs: string[] = (context as any).selectedIDs().filter((id: string) => graph.hasEntity(id));
+    const selectedIDs: string[] = context.selectedIDs().filter((id: string) => graph.hasEntity(id));
     if (selectedIDs.length) {
       const firstLabel: string = l10n.displayLabel(graph.entity(selectedIDs[0]), graph);
       if (selectedIDs.length > 1) {

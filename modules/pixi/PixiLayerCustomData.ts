@@ -63,7 +63,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       d3_event.dataTransfer!.dropEffect = 'copy';
     }
 
-    const context = this.context as any;
+    const context = this.context;
     context.container()
       .attr('dropzone', 'copy')
       .on('dragenter.draganddrop', over)
@@ -105,7 +105,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   render(frame: number, viewport: Viewport, zoom: number): void {
     if (!this.enabled || !(this.hasData())) return;
 
-    const vtService = this.context.services.vectortile;
+    const vtService = this.context.services.vectortile as any;
     let geoData: GeoJSON[] = [];
     if (this._template && vtService) {   // fetch data from vector tile service
       if (zoom >= 13) {  // avoid firing off too many API requests
@@ -530,7 +530,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   private _setUrlTemplate(url: string): void {
     // Test source against OSM imagery blocklists..
-    const osm = this.context.services.osm;
+    const osm = this.context.services.osm as any;
     if (osm) {
       const blocklists = osm.imageryBlocklists ?? [];
       let fail = false;

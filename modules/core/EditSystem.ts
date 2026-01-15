@@ -5,12 +5,14 @@ import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/u
 import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import type { Context } from './types.ts';
 import { Difference, Edit, Graph, Tree } from '../lib/index.ts';
-import type { Action } from '../lib/types.ts';
-import type { EntityID, OsmEntity, OsmEntityProps, Tags, Vec2 } from '../data/types.ts';
 import { OsmEntity as OsmEntityClass, createOsmEntity } from '../data/index.ts';
 import { uiLoading } from '../ui/loading.js';
+
+import type { TransformProps } from '@rapid-sdk/math';
+import type { Context } from './types.ts';
+import type { Action } from '../lib/types.ts';
+import type { EntityID, OsmEntity, OsmEntityProps, Tags, Vec2 } from '../data/types.ts';
 
 
 /** Options for commit/commitAppend */
@@ -1159,11 +1161,11 @@ export class EditSystem extends AbstractSystem {
 
     gfx?.pause();  // block rendering
 
-    let loading: { close(): void } | undefined;
+    let loading: any;
     const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
     if (!isTestEnvironment) {
-      loading = uiLoading(context).blocking(true) as { close(): void };
-      (context as any).container().call(loading);   // block ui
+      loading = uiLoading(context).blocking(true);
+      context.container().call(loading);   // block ui
     }
 
     const __baseEntities = new Map<EntityID, OsmEntity>();        // Map<entityID, Entity>
@@ -1297,9 +1299,10 @@ export class EditSystem extends AbstractSystem {
         if (Array.isArray(item.dataUsed))     sources.data = item.dataUsed as string[];
 
         // Handle legacy transform scale parameter, if found
-        if ((item.transform as any)?.k) {
-          (item.transform as any).z = geoScaleToZoom((item.transform as any).k);
-          delete (item.transform as any).k;
+        const transform = item.transform as (TransformProps & { k?: number });
+        if (transform?.k) {
+          transform.z = geoScaleToZoom(transform.k);
+          delete transform.k;
         }
 
         this._history.push(new Edit({
@@ -1307,7 +1310,7 @@ export class EditSystem extends AbstractSystem {
           graph:       graph,
           selectedIDs: item.selectedIDs as string[],
           sources:     sources,
-          transform:   item.transform
+          transform:   transform
         }));
       }
 
@@ -1336,8 +1339,8 @@ export class EditSystem extends AbstractSystem {
    */
   saveBackup(): void {
     const context = this.context;
-    if ((context as any).inIntro) return;               // Don't backup edits made in the walkthrough
-    if ((context as any).mode?.id === 'save') return;   // Edits made in save mode may be conflict resolutions
+    if (context.inIntro) return;               // Don't backup edits made in the walkthrough
+    if (context.mode?.id === 'save') return;   // Edits made in save mode may be conflict resolutions
     if (this._canRestoreBackup) return;        // Wait to see if the user wants to restore other edits
     if (this._inTransition) return;            // Don't backup edits mid-transition
     if (this._inTransaction) return;           // Don't backup edits mid-transaction
@@ -1383,7 +1386,7 @@ export class EditSystem extends AbstractSystem {
     const storage = context.systems.storage!;
     const json = storage.getItem(this._backupKey());
     if (json) {
-      (context as any).resetAsync()
+      context.resetAsync()
         .then(() => this.fromJSONAsync(json));
     }
   }

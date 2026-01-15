@@ -211,7 +211,7 @@ export class Map3dSystem extends AbstractSystem {
 
       this.startAsync()  // start it up, if we haven't already
         .then(() => {
-          (context as any).container().select(`#${this.containerID}`)
+          context.container().select(`#${this.containerID}`)
             .style('display', 'block')
             .style('opacity', '0')
             .transition()
@@ -224,7 +224,7 @@ export class Map3dSystem extends AbstractSystem {
 
       // Expect the MapLibre container to exist already, it's created by `UiMap3dViewer.js`
       // If it doesn't exist, this will return a null selection, and that's ok too.
-      const $mlcontainer = (context as any).container().select(`#${this.containerID}`);
+      const $mlcontainer = context.container().select(`#${this.containerID}`);
       $mlcontainer
         .transition()
         .duration(200)
@@ -240,7 +240,7 @@ export class Map3dSystem extends AbstractSystem {
    * @param  e - triggering event (if any)
    */
   toggle(e?: Event): void {
-    if (e) e.preventDefault();
+    if (e)  e.preventDefault();
     this.visible = !this.visible;
   }
 
@@ -250,7 +250,7 @@ export class Map3dSystem extends AbstractSystem {
    * This sets up the keybinding, replacing existing if needed
    */
   private _setupKeybinding(): void {
-    const context = this.context as any;
+    const context = this.context;
     const keybinding = context.keybinding();
     const l10n = this.context.systems.l10n;
 
@@ -460,7 +460,7 @@ export class Map3dSystem extends AbstractSystem {
     const editor = context.systems.editor;
     if (!editor) return;
     const graph = editor.staging.graph!;
-    const selectedIDs = (context as any).selectedIDs();
+    const selectedIDs = context.selectedIDs();
 
     const buildingFeatures = [];
     for (const entity of entities) {
@@ -527,7 +527,7 @@ export class Map3dSystem extends AbstractSystem {
     if (!editor) return;
     const graph = editor.staging.graph;
     const styles = context.systems.styles!;
-    const selectedIDs = (context as any).selectedIDs();
+    const selectedIDs = context.selectedIDs();
 
     const areaFeatures = [];
     for (const entity of entities) {
@@ -572,7 +572,7 @@ export class Map3dSystem extends AbstractSystem {
     if (!editor) return;
     const graph = editor.staging.graph;
     const styles = context.systems.styles!;
-    const selectedIDs = (context as any).selectedIDs();
+    const selectedIDs = context.selectedIDs();
 
     const roadFeatures = [];
     for (const entity of entities) {

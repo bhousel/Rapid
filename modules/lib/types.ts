@@ -10,7 +10,7 @@ import type { Vec2 } from '../data/types.ts';
 export type { Vec2 } from '../data/types.ts';
 
 // Re-export Context for convenience (used by almost every class)
-export type { Context } from '../core/types.ts';
+export type { Context } from '../Context.ts';
 
 
 // ============================================================================

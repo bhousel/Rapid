@@ -48,7 +48,7 @@ export {
 };
 
 // Re-export types from types.ts for convenience
-export type { Context, D3Selection, D3EnterSelection, Nullable, System, SystemID, Systems } from './types.ts';
+export type { Context, SystemID, Systems } from './types.ts';
 
 /** Container for registering available systems */
 interface SystemsRegistry {

@@ -13,7 +13,7 @@ import type { Context } from './types.ts';
 type AssetMap = Record<string, string>;
 
 /** Origin types for asset loading */
-type AssetOrigin = 'latest' | 'local';
+export type AssetOrigin = 'latest' | 'local';
 
 /** Sources object containing asset maps for each origin */
 interface AssetSources {

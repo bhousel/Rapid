@@ -419,7 +419,7 @@ export class ValidationSystem extends AbstractSystem {
 
     // Select the first entity in the issue.
     globalThis.setTimeout(() => {
-      (context as any).enter('select-osm', { selection: { osm: [selectID] }} );
+      context.enter('select-osm', { selection: { osm: [selectID] }} );
       this.emit('focusedIssue', issue);
     }, 250);  // after ease
   }

@@ -3,19 +3,26 @@
  *
  * This file contains:
  * - Global variable declarations (for test environment)
- * - Type augmentations for external libraries with incorrect types
+ * - Type augmentations for external libraries with inconvenient/incorrect types
  *
  * Note: Ambient module declarations for libraries without types
- * (like @mapbox/polylabel) live in modules/types/*.d.ts files.
+ * (like @mapbox/polylabel) live in `modules/types/*.d.ts` files.
  */
 
 // Global variable declarations
 declare const expect: Chai.ExpectStatic;
 declare const Rapid: typeof import("./modules/index.js");
 
-// Type augmentations for external libraries with incorrect types
 // The `export {}` makes this file a module, enabling augmentation
 export {};
+
+
+// Global type declarations
+declare global {
+  /** A type that can be T, null, or undefined */
+  type Nullable<T> = T | null | undefined;
+}
+
 
 declare module 'd3-geo' {
   /**
@@ -27,4 +34,82 @@ declare module 'd3-geo' {
    * @returns Projected [x, y] coordinates
    */
   export function geoMercatorRaw(lambda: number, phi: number): [number, number];
+}
+
+
+declare module 'd3-selection' {
+  /**
+   * Permissive D3 Selection type aliases.
+   * These use `any` for all type parameters to avoid friction when chaining
+   * D3 selections or when the datum type changes during method chains.
+   */
+  export type D3Selection = Selection<any, any, any, any>;
+  export type D3EnterSelection = Selection<any, any, any, any>;
+
+  /**
+   * Override D3 Selection interface to make callbacks more permissive.
+   * D3's default types are very strict about datum types, causing friction
+   * when the datum type is unknown or when chaining selections.
+   * These overrides allow callbacks to type their datum parameter explicitly.
+   */
+  interface Selection<GElement extends BaseType, Datum, PElement extends BaseType, PDatum> {
+    /**
+     * More permissive data binding that accepts any key function.
+     * The key function can explicitly type its datum parameter.
+     */
+    data<NewDatum>(
+      data: NewDatum[] | Iterable<NewDatum>,
+      key?: (datum: any, index: number, groups: any) => string | number
+    ): Selection<GElement, NewDatum, PElement, PDatum>;
+
+    /**
+     * Permissive attr with value function - datum can be typed by caller.
+     */
+    attr(name: string, value: (datum: any, index: number, groups: any) => any): this;
+
+    /**
+     * Permissive style with value function - datum can be typed by caller.
+     */
+    style(name: string, value: (datum: any, index: number, groups: any) => any, priority?: 'important' | null): this;
+
+    /**
+     * Permissive text with value function - datum can be typed by caller.
+     */
+    text(value: (datum: any, index: number, groups: any) => any): this;
+
+    /**
+     * Permissive html with value function - datum can be typed by caller.
+     */
+    html(value: (datum: any, index: number, groups: any) => any): this;
+
+    /**
+     * Permissive classed with value function - datum can be typed by caller.
+     */
+    classed(names: string, value: (datum: any, index: number, groups: any) => boolean): this;
+
+    /**
+     * Permissive property with value function - datum can be typed by caller.
+     */
+    property(name: string, value: (datum: any, index: number, groups: any) => any): this;
+
+    /**
+     * Permissive filter with function - datum can be typed by caller.
+     */
+    filter(selector: (datum: any, index: number, groups: any) => boolean): Selection<GElement, Datum, PElement, PDatum>;
+
+    /**
+     * Permissive sort - datum can be typed by caller.
+     */
+    sort(comparator: (a: any, b: any) => number): this;
+
+    /**
+     * Permissive each - datum can be typed by caller.
+     */
+    each(callback: (datum: any, index: number, groups: any) => void): this;
+
+    /**
+     * Permissive on with callback - datum can be typed by caller.
+     */
+    on(typenames: string, callback: ((event: any, datum: any) => void) | null, options?: any): this;
+  }
 }

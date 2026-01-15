@@ -3,7 +3,8 @@ import { Extent } from '@rapid-sdk/math';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilDate, utilDateString } from '../util/date.ts';
 
-import type { Context, D3Selection, Nullable } from './types.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Context } from './types.ts';
 
 
 /** Photo layer identifiers */
@@ -207,7 +208,7 @@ export class PhotoSystem extends AbstractSystem {
     for (const layerID of this.detectionLayerIDs) {
       const layer = scene.layers.get(layerID);
       if (layer && !layer.enabled && this._currDetectionLayerID === layerID) {
-        (context as any).enter('browse');
+        context.enter('browse');
         this.selectDetection();  // deselect
       }
     }
@@ -528,9 +529,9 @@ export class PhotoSystem extends AbstractSystem {
           // Handle the situation where we want to select a detection,
           // but we haven't properly entered SelectMode yet.
           // This can happen if the detection arrived in the URL hash.
-          if (!(context as any).selectedData().has(detection.id)) {
+          if (!context.selectedData().has(detection.id)) {
             const selection = new Map().set(detection.id, detection);
-            (context as any).enter('select', { selection: selection });
+            context.enter('select', { selection: selection });
             return;  // exit to avoid infinite loop - entering select mode will bring us right back in here.
           }
 
@@ -723,7 +724,7 @@ export class PhotoSystem extends AbstractSystem {
    */
   isViewerShowing(): boolean {
     // viewer exists and is not hidden
-    const context = this.context as any;
+    const context = this.context;
     const $viewer: D3Selection = context.container().selectAll('.photoviewer');
     return !!$viewer.size() && !$viewer.classed('hide');
   }

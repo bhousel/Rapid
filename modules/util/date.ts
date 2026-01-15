@@ -1,6 +1,4 @@
 
-import type { Nullable } from '../core/types.ts';
-
 /** A value that can be converted to a Date: Date object, numeric timestamp, or date string */
 export type DateLike = Date | number | string;
 

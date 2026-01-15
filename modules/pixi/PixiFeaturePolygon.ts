@@ -210,7 +210,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const storage = context.systems.storage as any;
     const map = context.systems.map as any;
     const isWireframeMode = map?.wireframeMode;
-    const bearing = (context as any).viewport.transform.rotation;
+    const bearing = context.viewport.transform.rotation;
     const geom = this.geom;
     let screen = geom.screen;
 

@@ -8,7 +8,8 @@ import { PixiTextures } from '../pixi/PixiTextures.ts';
 import { utilSetTransform } from '../util/util.ts';
 
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
-import type { Context, D3Selection } from './types.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Context } from './types.ts';
 
 /** Throttled rendering milliseconds (for now) */
 const THROTTLE = 250;
@@ -442,7 +443,7 @@ export class GraphicsSystem extends AbstractSystem {
 
     if (!vecEqual(mapDims, pixiDims)) {
       // If the user is currently resizing the map, don't try changing the dimensions just yet.
-      const isResizing = (context as any).container().classed('resizing');
+      const isResizing = context.container().classed('resizing');
       if (!isResizing) {
         // Allow the Pixi dimensions to change, but only after the user is finished resizing..
         pixiViewport.dimensions = mapDims;
@@ -515,7 +516,7 @@ export class GraphicsSystem extends AbstractSystem {
     const map = context.systems.map!;
 
     // If the user is currently resizing, skip rendering until the size has settled
-    if ((context as any).container().classed('resizing')) return;
+    if (context.container().classed('resizing')) return;
 
     const mapViewport = context.viewport;
     const pixiViewport = this._pixiViewport!;
@@ -863,7 +864,7 @@ export class GraphicsSystem extends AbstractSystem {
     // If the user happened to be editing something when the context was lost, that's too bad.
     // We may be able to handle this better eventually, but for now we will just
     // assume the whole graphics system is getting thrown out.
-    (this.context as any).enter('browse');
+    this.context.enter('browse');
     this.emit('statuschange', 'contextlost');
 
     // Normally Pixi's `GLContextSystem` would try to restore context if we call `render()`
@@ -892,7 +893,7 @@ export class GraphicsSystem extends AbstractSystem {
       .then(() => this._afterPixiInit())
       .then(() => {
         // We just replaced the texture manager, so we have to tell it about the available SVG icons.
-        const context = this.context as any;
+        const context = this.context;
         const $container: D3Selection = context.container();
         $container.selectAll('#rapid-defs symbol')
           .each((_d, i, nodes) => {

@@ -101,7 +101,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
    * @param  zoom      Effective zoom to use for rendering
    */
   renderMarkers(frame: number, viewport: Viewport, zoom: number): void {
-    const context = this.context as any;
+    const context = this.context;
     const mapillary = context.services.mapillary;
     if (!mapillary?.started) return;
 

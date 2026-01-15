@@ -1,6 +1,6 @@
 import { select as d3_select } from 'd3-selection';
+import type { D3Selection } from 'd3-selection';
 import type { Vec2 } from '../data/types.ts';
-import type { D3Selection, Nullable } from '../core/types.ts';
 
 /**
  * Read element dimensions from getBoundingClientRect and cache them on the selection.

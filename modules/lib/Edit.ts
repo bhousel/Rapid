@@ -1,3 +1,4 @@
+import type { TransformProps } from '@rapid-sdk/math';
 import type { Graph } from './Graph.js';
 
 
@@ -14,7 +15,7 @@ export interface EditProps {
   /** Sources that contributed to this edit */
   sources: Record<string, unknown>;
   /** Map transform at time of edit */
-  transform: unknown;
+  transform: TransformProps;
 }
 
 
@@ -23,16 +24,20 @@ export interface EditProps {
  */
 export class Edit {
   annotation: string | undefined;
-  graph: Graph | undefined;
+  graph: Graph;
   selectedIDs: string[] | undefined;
   sources: Record<string, unknown>;
-  transform: unknown;
+  transform: TransformProps | undefined;
 
   /**
    * @constructor
    * @param props - Properties to initialize the Edit
    */
   constructor(props: Partial<EditProps> = {}) {
+    if (!props.graph) {
+      throw new Error(`Edit missing 'graph' property`);
+    }
+
     this.annotation = props.annotation;
     this.graph = props.graph;
     this.selectedIDs = props.selectedIDs;

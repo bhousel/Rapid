@@ -119,7 +119,8 @@ export default [
     languageOptions: {
       globals: {
         ...globals.browser,
-        GeoJSON: false  // Global namespace from @types/geojson (UMD declaration)
+        Nullable: false,  // Global convenience type from `global.d.ts`
+        GeoJSON: false    // Global namespace from `@types/geojson` (UMD declaration)
       }
     },
     rules: {

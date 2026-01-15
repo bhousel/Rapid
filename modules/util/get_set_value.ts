@@ -1,4 +1,4 @@
-import type { D3Selection, Nullable } from '../core/types.ts';
+import type { D3Selection } from 'd3-selection';
 
 /** Element with optional value property (like form input elements) */
 type ValueElement = Element & { value?: string };

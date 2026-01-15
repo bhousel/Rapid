@@ -4,7 +4,8 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { utilDate } from '../util/date.ts';
 import { utilDetect } from '../util/detect.ts';
 
-import type { Context, D3Selection } from './types.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Context } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { EntityID, OsmEntity, Tags, Vec2 } from '../data/index.ts';
 

@@ -278,7 +278,7 @@ export class PixiEvents extends EventEmitter {
       map: [x, y]      // [0,0] is the origin of the viewport (rotation removed)
     };
 
-    const viewport = (this.context as any).viewport;
+    const viewport = this.context.viewport;
     const r = viewport.transform.r;
     if (r) {
       this.coord.map = vecRotate(this.coord.screen, -r, viewport.center());  // remove rotation

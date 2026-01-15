@@ -316,7 +316,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   getVisibleData(cacheID: string): Box[] {
     const cache = this.getCache(cacheID);
-    const extent = (this.context as any).viewport.visibleWorldExtent();   // world extent!
+    const extent = this.context.viewport.visibleWorldExtent();   // world extent!
     return cache.dataRBush.search(extent.bbox());
   }
 
@@ -391,7 +391,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   getDataAtLoc(cacheID: string, loc: Vec2): Box[] {
     const cache = this.getCache(cacheID);
-    const [x, y] = (this.context as any).viewport.wgs84ToWorld(loc);
+    const [x, y] = this.context.viewport.wgs84ToWorld(loc);
     const epsilon = 1e-7;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.search(test);
@@ -406,7 +406,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   hasDataAtLoc(cacheID: string, loc: Vec2): boolean {
     const cache = this.getCache(cacheID);
-    const [x, y] = (this.context as any).viewport.wgs84ToWorld(loc);
+    const [x, y] = this.context.viewport.wgs84ToWorld(loc);
     const epsilon = 1e-7;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.collides(test);
@@ -423,7 +423,7 @@ export class SpatialSystem extends AbstractSystem {
    * @return Adjusted [lon,lat] coordinate
    */
   preventCoincidentLoc(cacheID: string, loc: Vec2): Vec2 {
-    const viewport = (this.context as any).viewport;
+    const viewport = this.context.viewport;
     const cache = this.getCache(cacheID);
     const [x, startY] = viewport.wgs84ToWorld(loc);
     let y = startY;
@@ -488,7 +488,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   hasTileAtLoc(cacheID: string, loc: Vec2): boolean {
     const cache = this.getCache(cacheID);
-    const [x, y] = (this.context as any).viewport.wgs84ToWorld(loc);
+    const [x, y] = this.context.viewport.wgs84ToWorld(loc);
     const epsilon = 1e-7;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.tileRBush.collides(test);

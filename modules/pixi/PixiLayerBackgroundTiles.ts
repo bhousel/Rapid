@@ -190,7 +190,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     let showDebug = false;
     let debugContainer: PIXI.Container | undefined;
     if (!this.isMinimap) {
-      showDebug = (context as any).getDebug('tile');
+      showDebug = context.getDebug('tile');
       const mapUI = this.scene.layers.get('map-ui') as any;
       debugContainer = mapUI?.tileDebug;
       if (debugContainer) {
@@ -225,7 +225,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
         .tileSize(tileSize) as Tiler)
         .skipNullIsland(!!source.props.overlay) as Tiler)
         .zoomRange(tryZoom) as Tiler;
-      const result = tiler.getTiles(this.isMinimap ? viewport : (context as any).viewport);  // minimap passes in its own viewport
+      const result = tiler.getTiles(this.isMinimap ? viewport : context.viewport);  // minimap passes in its own viewport
 
       let hasHoles = false;
       for (const tile of result.tiles) {

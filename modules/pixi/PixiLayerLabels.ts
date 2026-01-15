@@ -377,7 +377,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this.labelContainer!.visible = true;
     this.renderObjects();
 
-    const showDebug = (this.context as any).getDebug('label');
+    const showDebug = this.context.getDebug('label');
     if (showDebug) {
       this.debugContainer!.visible = true;
       this.renderDebug();
@@ -431,7 +431,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    *  destroy the label and flag the feature as labeldirty for relabeling
    */
   gatherAvoids(): void {
-    const showDebug = (this.context as any).getDebug('label');
+    const showDebug = this.context.getDebug('label');
 
     // Gather the containers that have avoidable stuff on them.
     const avoidContainers: PIXI.Container[] = [];
@@ -674,7 +674,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   placeTextLabel(feature: AbstractPixiFeature, labelObj: PIXI.Sprite | PIXI.Text | PIXI.BitmapText): void {
     if (!feature) return;
 
-    const showDebug = (this.context as any).getDebug('label');
+    const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
     const container = feature.container;
     if (!container.visible || !container.renderable) return;
@@ -835,7 +835,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (!feature || !labelObj || !screenCoords) return;
     if (!feature.container.visible || !feature.container.renderable) return;
 
-    const showDebug = (this.context as any).getDebug('label');
+    const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
 
     // `l` = label, these bounds are in "local" coordinates to the label,
