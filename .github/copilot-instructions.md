@@ -288,10 +288,10 @@ Track TypeScript conversion progress here:
 
 | Folder | Status | Notes |
 |--------|--------|-------|
-| `modules/util/` | ✅ Complete | All 14 files converted |
+| `modules/util/` | ✅ Complete | All files converted |
 | `modules/lib/` | 🔄 Partial | `Tree.js`, `tag_classes.js` remain |
-| `modules/pixi/lib/` | 🔄 Partial | `DashLine.js`, `AtlasAllocator.js` remain |
-| `modules/core/` | 🔄 Partial | 16 systems converted (see below) |
+| `modules/pixi/` | ✅ Complete | All files converted |
+| `modules/core/` | ✅ Complete | All files converted |
 | `modules/actions/` | ❌ Not started | |
 | `modules/behaviors/` | ❌ Not started | |
 | `modules/modes/` | ❌ Not started | |
@@ -299,31 +299,6 @@ Track TypeScript conversion progress here:
 | `modules/services/` | ❌ Not started | |
 | `modules/ui/` | ❌ Not started | |
 | `modules/validations/` | ❌ Not started | |
-
-### modules/core/ Systems
-
-| System | Status |
-|--------|--------|
-| `AbstractSystem.ts` | ✅ Converted |
-| `AssetSystem.ts` | ✅ Converted |
-| `EditSystem.ts` | ✅ Converted |
-| `FilterSystem.ts` | ✅ Converted |
-| `ImagerySystem.ts` | ✅ Converted |
-| `LocalizationSystem.ts` | ✅ Converted |
-| `LocationSystem.ts` | ✅ Converted |
-| `Map3dSystem.ts` | ✅ Converted |
-| `PhotoSystem.ts` | ✅ Converted |
-| `RapidSystem.ts` | ✅ Converted |
-| `SchemaSystem.ts` | ✅ Converted |
-| `SpatialSystem.ts` | ✅ Converted |
-| `StorageSystem.ts` | ✅ Converted |
-| `StyleSystem.ts` | ✅ Converted |
-| `UploaderSystem.ts` | ✅ Converted |
-| `UrlHashSystem.ts` | ✅ Converted |
-| `ValidationSystem.ts` | ✅ Converted |
-| `GraphicsSystem.ts` | ✅ Converted |
-| `MapSystem.js` | ❌ Not started |
-| `UiSystem.js` | ❌ Not started |
 
 ## Testing
 

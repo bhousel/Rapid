@@ -6,7 +6,7 @@ import { Difference } from '../lib/Difference.ts';
 import { ValidationCache } from '../lib/ValidationCache.ts';
 import * as Validations from '../validations/index.js';
 
-import type { Context, SystemID } from './types.ts';
+import type { Context } from './types.ts';
 import type { OsmEntity, EntityID } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { ValidationIssue, ValidationSeverity } from '../lib/ValidationIssue.ts';

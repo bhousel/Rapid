@@ -4,7 +4,7 @@ import { Extent } from '@rapid-sdk/math';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
-import type { Context, SystemID } from './types.ts';
+import type { Context } from './types.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
 
 

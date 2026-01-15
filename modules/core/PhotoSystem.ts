@@ -3,7 +3,7 @@ import { Extent } from '@rapid-sdk/math';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilDate, utilDateString } from '../util/date.ts';
 
-import type { Context, Nullable, SystemID } from './types.ts';
+import type { Context, D3Selection, Nullable } from './types.ts';
 
 
 /** Photo layer identifiers */
@@ -723,8 +723,9 @@ export class PhotoSystem extends AbstractSystem {
    */
   isViewerShowing(): boolean {
     // viewer exists and is not hidden
-    const $viewer = (this.context as any).container().selectAll('.photoviewer');
-    return $viewer.size() && !$viewer.classed('hide');
+    const context = this.context as any;
+    const $viewer: D3Selection = context.container().selectAll('.photoviewer');
+    return !!$viewer.size() && !$viewer.classed('hide');
   }
 
 

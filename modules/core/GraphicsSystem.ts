@@ -8,7 +8,7 @@ import { PixiTextures } from '../pixi/PixiTextures.ts';
 import { utilSetTransform } from '../util/util.ts';
 
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
-import type { Context } from './types.ts';
+import type { Context, D3Selection } from './types.ts';
 
 /** Throttled rendering milliseconds (for now) */
 const THROTTLE = 250;
@@ -512,7 +512,7 @@ export class GraphicsSystem extends AbstractSystem {
     if (!this._started || this._paused) return;
 
     const context = this.context;
-    const map = context.systems.map as any;
+    const map = context.systems.map!;
 
     // If the user is currently resizing, skip rendering until the size has settled
     if ((context as any).container().classed('resizing')) return;
@@ -831,6 +831,15 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
+   * isContextLost
+   * Returns `true` if the WebGLContext is currently lost.
+   * @return `true` if the WebGLContext is current lost
+   */
+  isContextLost(): boolean {
+    return this._isContextLost;
+  }
+
+  /**
    * _handleGLContextLost
    * Handler for webglcontextlost events on the canvas.
    * @param  e  - The WebGLContextEvent
@@ -883,10 +892,10 @@ export class GraphicsSystem extends AbstractSystem {
       .then(() => this._afterPixiInit())
       .then(() => {
         // We just replaced the texture manager, so we have to tell it about the available SVG icons.
-        const context = this.context;
-        const $container = (context as any).container();
+        const context = this.context as any;
+        const $container: D3Selection = context.container();
         $container.selectAll('#rapid-defs symbol')
-          .each((d: unknown, i: number, nodes: Element[]) => {
+          .each((_d, i, nodes) => {
             const symbol = nodes[i] as SVGSymbolElement;
             const iconID = symbol.getAttribute('id');
             if (iconID) {
@@ -895,9 +904,9 @@ export class GraphicsSystem extends AbstractSystem {
           });
 
         this._isContextLost = false;
-        this.eventManager?.enable(); // resume listening
-        this.resume();          // resume rendering
-        this.ticker.start();    // resume ticking
+        this.eventManager?.enable();   // resume listening
+        this.resume();                 // resume rendering
+        this.ticker.start();           // resume ticking
         this.emit('statuschange', 'contextrestored');
       });
   }

@@ -4,7 +4,7 @@ import throttle from 'lodash-es/throttle.js';
 import { AbstractSystem } from './AbstractSystem.ts';
 
 import type { DebouncedFunc } from 'lodash-es';
-import type { Context, Nullable, SystemID } from './types.ts';
+import type { Context, Nullable } from './types.ts';
 
 
 /** Mock window type for non-browser environments */

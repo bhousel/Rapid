@@ -1,7 +1,7 @@
 import { select } from 'd3-selection';
 import { vecAdd } from '@rapid-sdk/math';
 
-import { AbstractSystem } from './AbstractSystem.js';
+import { AbstractSystem } from './AbstractSystem.ts';
 import { utilDetect } from '../util/detect.ts';
 
 import {
@@ -9,6 +9,12 @@ import {
   uiLoading, UiMapFooter, UiMapToolbar, uiMapRouletteMenu, UiOvermap,
   uiSplash, uiRestore, UiShortcuts, UiSidebar, uiWhatsNew
 } from '../ui/index.js';
+
+import type { Vec2 } from '@rapid-sdk/math';
+import type { Context, D3EnterSelection, D3Selection } from './types.ts';
+
+/** The data properties of a DOMRect (without methods like toJSON) */
+type DOMRectData = Pick<DOMRectReadOnly, 'x' | 'y' | 'width' | 'height' | 'top' | 'right' | 'bottom' | 'left'>;
 
 
 /**
@@ -19,11 +25,38 @@ import {
  */
 export class UiSystem extends AbstractSystem {
 
+  // Private state
+  private _mapRect: DOMRectData | null;
+  private _needWidth: Record<string, number>;
+  private _resizeTimeout: number | null;
+  private _showsMapRouletteMenu: boolean;
+
+  // Child UI components, created during initAsync
+  ApiStatus: any;
+  AuthModal: any;
+  Defs: any;
+  EditMenu: any;
+  MapRouletteMenu: any;
+  Flash: any;
+  Fullscreen: any;
+  MapFooter: any;
+  MapToolbar: any;
+  Overmap: any;
+  Shortcuts: any;
+  Sidebar: any;
+
+  // References to components that live deeper in the tree
+  InfoCards: any;
+  Minimap: any;
+  PhotoViewer: any;
+  Spector: any;
+
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'ui';
     this.requiredDependencies = new Set(['assets', 'editor', 'gfx', 'imagery', 'l10n', 'map', 'storage', 'urlhash']);
@@ -32,6 +65,7 @@ export class UiSystem extends AbstractSystem {
     this._mapRect = null;
     this._needWidth = {};
     this._resizeTimeout = null;
+    this._showsMapRouletteMenu = false;
 
     // Child components, we will defer creating these until after some other things have initted.
     this.ApiStatus = null;
@@ -64,12 +98,12 @@ export class UiSystem extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
-    const context = this.context;
+    const context = this.context as any;
     const assets = context.systems.assets;
     const gfx = context.systems.gfx;
     const l10n = context.systems.l10n;
@@ -94,7 +128,8 @@ export class UiSystem extends AbstractSystem {
 
         // Create UI components
         this.ApiStatus = new UiApiStatus(context);
-        this.AuthModal = uiLoading(context).blocking(true).message(l10n.t('loading_auth'));
+        const loading = uiLoading(context) as any;
+        this.AuthModal = loading.blocking(true).message(l10n.t('loading_auth'));
         this.Defs = new UiDefs(context);
         this.EditMenu = uiEditMenu(context);
         this.MapRouletteMenu = uiMapRouletteMenu(context);
@@ -164,17 +199,17 @@ export class UiSystem extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
-    const context = this.context;
+    const context = this.context as any;
     const editor = context.systems.editor;
     const map = context.systems.map;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
-    const $container = context.container();
+    const $container: D3Selection = context.container();
 
     if (!$container.size()) {
       return Promise.reject(new Error('No container to render to.'));
@@ -217,11 +252,12 @@ export class UiSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     // don't leave stale state in the inspector
-    const $container = this.context.container();
+    const context = this.context as any;
+    const $container: D3Selection = context.container();
     if ($container.size()) {
       $container.select('.inspector-wrap *').remove();
     }
@@ -236,11 +272,11 @@ export class UiSystem extends AbstractSystem {
    * Note that most `render` functions accept a parent selection,
    *  this one doesn't need it - `$container` is always the parent.
    */
-  render() {
-    const context = this.context;
+  render(): void {
+    const context = this.context as any;
     const l10n = context.systems.l10n;
     const map = context.systems.map;
-    const $container = context.container();
+    const $container: D3Selection = context.container();
 
     $container
       .attr('lang', l10n.localeCode)
@@ -251,11 +287,11 @@ export class UiSystem extends AbstractSystem {
 
     // .main-content
     // Contains the map and everything floating above it, such as toolbars, etc.
-    let $mainContent = $container.selectAll('.main-content')
+    let $mainContent: D3Selection = $container.selectAll('.main-content')
       .data([0]);
 
     // enter
-    const $$mainContent = $mainContent.enter()
+    const $$mainContent: D3EnterSelection = $mainContent.enter()
       .append('div')
       .attr('class', 'main-content active');
 
@@ -275,24 +311,24 @@ export class UiSystem extends AbstractSystem {
    * resize
    * Handler for resize events on the window.
    * Note that this can just be called with no event to recheck the dimensions.
-   * @param  {Event} e - the resize event (if any)
+   * @param  e - the resize event (if any)
    */
-  resize(e) {
-    const context = this.context;
+  resize(e?: Event): void {
+    const context = this.context as any;
     const map = context.systems.map;
     const viewport = context.viewport;
-    const $container = context.container();
+    const $container: D3Selection = context.container();
 
     // This is an actual resize event - class the container as resizing.
     if (e) {
-      window.clearTimeout(this._resizeTimeout);
+      window.clearTimeout(this._resizeTimeout!);
       $container.classed('resizing', true);
       this._resizeTimeout = window.setTimeout(() => {
         $container.classed('resizing', false);
-      }, 400);  // if no resizes for 400ms, remove class
+      }, 400) as unknown as number;  // if no resizes for 400ms, remove class
     }
 
-    const $mainContent = $container.selectAll('.main-content');
+    const $mainContent: D3Selection = $container.selectAll('.main-content');
     if (!$mainContent.size()) return;  // called too early?
 
     const curr = this._copyRect($mainContent.node().getBoundingClientRect());
@@ -313,7 +349,7 @@ export class UiSystem extends AbstractSystem {
       map.pan([dw / 2, dh / 2]);
     }
 
-    let dims = [curr.width, curr.height];
+    let dims: Vec2 = [curr.width, curr.height];
 
 // experiment:
 // Previously, the map surfaces were anchored to the top left of the main-map.
@@ -344,19 +380,21 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * Call checkOverflow when resizing or whenever the contents change.
    * I think this was to make button labels in the top bar disappear
    * when more buttons are added than the screen has available width
-   * @param  {string}   selector - selector to select the thing to check
+   * @param  selector - selector to select the thing to check
+   * @param  reset - whether to reset the needed width cache
    */
-  checkOverflow(selector, reset) {
+  checkOverflow(selector: string, reset?: boolean): void {
     if (reset) {
       delete this._needWidth[selector];
     }
 
-    const $selection = this.context.container().select(selector);
+    const context = this.context as any;
+    const $selection: D3Selection = context.container().select(selector);
     if ($selection.empty()) return;
 
     const scrollWidth = $selection.property('scrollWidth');
     const clientWidth = $selection.property('clientWidth');
-    let needed = this._needWidth[selector] || scrollWidth;
+    const needed = this._needWidth[selector] || scrollWidth;
 
     if (scrollWidth > clientWidth) {    // overflow happening
       $selection.classed('narrow', true);
@@ -373,21 +411,21 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
   /**
    * togglePanes
    * If no `$showpane` is passed, all panes are hidden.
-   * @param  {d3-selection}  $showpane? - A d3-selection to the pane to show
+   * @param  $showpane - A d3-selection to the pane to show
    */
-  togglePanes($showpane) {
-    const context = this.context;
+  togglePanes($showpane?: D3Selection): void {
+    const context = this.context as any;
     const l10n = context.systems.l10n;
-    const container = context.container();
+    const $container: D3Selection = context.container();
 
-    const $hidepanes = container.selectAll('.map-pane.shown');
+    const $hidepanes: D3Selection = $container.selectAll('.map-pane.shown');
     const side = l10n.isRTL ? 'left' : 'right';
 
     $hidepanes
       .classed('shown', false)
       .classed('hide', true);
 
-    container.selectAll('.map-pane-control button')
+    $container.selectAll('.map-pane-control button')
       .classed('active', false);
 
     if ($showpane) {
@@ -396,7 +434,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
         .classed('hide', true)
         .style(side, '-500px');
 
-      container.selectAll('.' + $showpane.attr('pane') + '-control button')
+      $container.selectAll('.' + $showpane.attr('pane') + '-control button')
         .classed('active', true);
 
       $showpane
@@ -422,7 +460,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
         .transition()
         .duration(200)
         .style(side, '-500px')
-        .on('end', function() {
+        .on('end', function(this: Element) {
           select(this)
             .classed('shown', false)
             .classed('hide', true);
@@ -435,13 +473,13 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * showEditMenu
    * This shows the contextual edit menu, called by the select behavior when the
    *  user right clicks, or long presses, or presses the menu key.
-   * @param  {Array<number>}  anchorPoint - `[x,y]` screen coordinate where the menu should be anchored
-   * @param  {string}         triggerType - (not used?)  'touch', 'pen', or 'rightclick' that triggered the menu
+   * @param  anchorPoint - `[x,y]` screen coordinate where the menu should be anchored
+   * @param  triggerType - (not used?)  'touch', 'pen', or 'rightclick' that triggered the menu
    */
-  showEditMenu(anchorPoint, triggerType) {
+  showEditMenu(anchorPoint: Vec2, triggerType: string): void {
     this.EditMenu.close();   // remove any displayed menu
 
-    const context = this.context;
+    const context = this.context as any;
     const gfx = context.systems.gfx;
     const viewport = context.viewport;
 
@@ -469,7 +507,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
       .operations(operations);
 
     // render the menu
-    const $overlay = select(gfx.overlay);
+    const $overlay: D3Selection = select(gfx.overlay);
     $overlay.call(this.EditMenu);
   }
 
@@ -479,10 +517,10 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * This just redraws the edit menu in place if it is already showing, used in
    * situations where its available operations may have changed, such as Rapid#1311
    */
-  redrawEditMenu() {
-    const context = this.context;
+  redrawEditMenu(): void {
+    const context = this.context as any;
     const gfx = context.systems.gfx;
-    const $overlay = select(gfx.overlay);
+    const $overlay: D3Selection = select(gfx.overlay);
 
     // If the menu isn't showing, there's nothing to do
     if ($overlay.selectAll('.edit-menu').empty()) return;
@@ -503,21 +541,21 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * closeEditMenu
    * Remove any existing menu
    */
-  closeEditMenu() {
+  closeEditMenu(): void {
     this.EditMenu.close();
   }
 
 
   // Method to show the MapRoulette context menu
-  showMapRouletteMenu(anchorPoint, triggerType) {
+  showMapRouletteMenu(anchorPoint: Vec2, triggerType: string): void {
     this.closeMapRouletteMenu(); // Close any existing menu
-    const context = this.context;
+    const context = this.context as any;
     const gfx = context.systems.gfx;
     const viewport = context.viewport;
     this.MapRouletteMenu
       .anchorLoc(viewport.unproject(anchorPoint))
       .triggerType(triggerType);
-    const $overlay = select(gfx.overlay);
+    const $overlay: D3Selection = select(gfx.overlay);
     $overlay.call(this.MapRouletteMenu);
     this._showsMapRouletteMenu = true; // Update state
   }
@@ -527,7 +565,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * closeMapRouletteMenu
    * Remove any existing menu
    */
-  closeMapRouletteMenu() {
+  closeMapRouletteMenu(): void {
     this.MapRouletteMenu.close();
   }
 
@@ -537,14 +575,14 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * This adjusts the favicon and document title if we detect a development or staging environment.
    * called by `initAsync()`
    */
-  _checkEnvironment() {
-    const context = this.context;
+  _checkEnvironment(): void {
+    const context = this.context as any;
     const assets = context.systems.assets;
     const urlhash = context.systems.urlhash;
     const detected = utilDetect();
 
-    const $head = select('head');
-    let $favicon = $head.select(`link[rel~='icon']`);
+    const $head: D3Selection = select('head');
+    let $favicon: D3Selection = $head.select(`link[rel~='icon']`);
     if (!$favicon.size()) {
       $favicon = $head
         .append('link')
@@ -552,11 +590,11 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
         .attr('type', 'image/svg');
     }
 
-    if (/\/canary/.test(detected.host)) {
+    if (/\/canary/.test(detected.host ?? '')) {
       urlhash.titleBase = 'Rapid Canary';
       $favicon.attr('href', assets.getFileURL('img/rapid_favicon-canary.svg'));
 
-    } else if (/(localhost|127\.0\.0\.1)/.test(detected.host)) {
+    } else if (/(localhost|127\.0\.0\.1)/.test(detected.host ?? '')) {
       urlhash.titleBase = 'Rapid Dev';
       $favicon.attr('href', assets.getFileURL('img/rapid_favicon-dev.svg'));
     }
@@ -566,10 +604,10 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
   /**
    * _copyRect
    * ClientRects are immutable, so copy them to an Object in case we need to trim the height/width.
-   * @param   {DOMRect}  src -  rectangle (or something that looks like one)
-   * @returns {Object}   the copied properties
+   * @param   src -  rectangle (or something that looks like one)
+   * @returns the copied properties
    */
-  _copyRect(src) {
+  _copyRect(src: DOMRect): DOMRectData {
     return {
       left: src.left,
       top: src.top,

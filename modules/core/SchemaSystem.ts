@@ -7,7 +7,7 @@ import { Category, Field, Preset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilWildcard } from '../util/string.ts';
 
-import type { Context, SystemID } from './types.ts';
+import type { Context } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { CategoryProps } from '../lib/Category.ts';
 import type { FieldProps } from '../lib/Field.ts';

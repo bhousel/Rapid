@@ -9,7 +9,7 @@ import {
 } from '../lib/ImagerySource.ts';
 import { utilWildcard } from '../util/string.ts';
 
-import type { Context, SystemID } from './types.ts';
+import type { Context } from './types.ts';
 import type { Vec2, Vec4 } from '../data/types.ts';
 
 // Make very sure this resolves to Rapid's `package.json`
