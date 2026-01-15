@@ -83,7 +83,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
     osmose.loadTiles();
 
     // Render the data that we have..
-    const parentContainer = this.scene.groups.get('qa');
+    const parentContainer = this.scene.groups.get('qa')!;
     const items = osmose.getData();
 
     for (const d of items) {

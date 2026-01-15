@@ -209,7 +209,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   renderPolygons(frame: number, viewport: Viewport, zoom: number, polygons: GeoJSON[]): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this.scene.groups.get('basemap');
+    const parentContainer = this.scene.groups.get('basemap')!;
 
     const polygonStyle = {
       fill: { color: CUSTOM_COLOR, alpha: 0.3, },
@@ -268,7 +268,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   renderLines(frame: number, viewport: Viewport, zoom: number, lines: GeoJSON[], styleOverride?: LineStyle): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this.scene.groups.get('basemap');
+    const parentContainer = this.scene.groups.get('basemap')!;
 
     const lineStyle = styleOverride ?? {
       stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
@@ -326,7 +326,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 //   * @param lineStyle - The line style to use
 //   */
 //  renderGridLines(frame: number, viewport: Viewport, zoom: number, features: GeoJSON.Feature[], lineStyle: LineStyle): void {
-//    const parentContainer = this.scene.groups.get('basemap');
+//    const parentContainer = this.scene.groups.get('basemap')!;
 //
 //    for (const d of features) {
 //      const dataID = d.id as string;
@@ -367,7 +367,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   renderPoints(frame: number, viewport: Viewport, zoom: number, points: GeoJSON[]): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this.scene.groups.get('points');
+    const parentContainer = this.scene.groups.get('points')!;
 
     const pointStyle = {
       markerName: 'largeCircle',

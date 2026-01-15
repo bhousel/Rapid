@@ -1,10 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { EventEmitter } from 'tseep';
-import type { Viewport } from '@rapid-sdk/math';
 
-import type { Context } from '../core/types.ts';
-import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.js';
 import { PixiLayerCustomData } from './PixiLayerCustomData.js';
 import { PixiLayerDebug } from './PixiLayerDebug.ts';
@@ -26,8 +22,11 @@ import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
-// Forward declaration for type not yet converted
-type GraphicsSystem = any;
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { Context } from '../Context.ts';
+import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 
 /**

@@ -8,7 +8,7 @@ import { OsmEntity } from './OsmEntity.ts';
 import { OsmNode } from './OsmNode.ts';
 import { OsmRelation } from './OsmRelation.ts';
 import { OsmWay } from './OsmWay.ts';
-import type { Context } from '../core/types.ts';
+import type { Context } from '../Context.ts';
 
 export {
   AbstractData,

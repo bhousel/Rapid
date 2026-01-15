@@ -61,7 +61,7 @@ This module contains a mix of data structures, schema classes, and utility funct
 
 The `Graph` class is central to Rapid's data model. It's an immutable structure that holds all entities and their relationships:
 
-```javascript
+```typescript
 // Graphs are immutable - modifications return new graphs
 const newGraph = graph.replace(entity);
 const newerGraph = newGraph.remove(entityId);

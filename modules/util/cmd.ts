@@ -1,5 +1,5 @@
 import { utilDetect } from './detect.ts';
-import type { Context } from '../core/types.ts';
+import type { Context } from '../Context.ts';
 
 
 /** A key combo symbol like '⌘', '⇧', '⌥', '⌃' */

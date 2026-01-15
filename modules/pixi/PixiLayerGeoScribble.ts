@@ -75,7 +75,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   reset() {
     super.reset();
 
-    const groupContainer = this.scene.groups.get('basemap');
+    const groupContainer = this.scene.groups.get('basemap')!;
 
     // Remove any existing containers
     for (const child of groupContainer.children) {

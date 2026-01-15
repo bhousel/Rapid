@@ -1,6 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
 
-import type { Context } from '../core/types.ts';
+import type { Context } from '../Context.ts';
 
 
 const RAPID_MAGENTA = '#da26d3';

@@ -3,7 +3,7 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 
-import type { Context } from '../core/types.ts';
+import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Vec2 } from './types.ts';

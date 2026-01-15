@@ -78,7 +78,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     const osm = this.context.services.osm;
     if (!osm?.started) return;
 
-    const parentContainer = this.scene.groups.get('qa');
+    const parentContainer = this.scene.groups.get('qa')!;
     const notes = osm.getNotes();
 
     for (const d of notes) {

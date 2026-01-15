@@ -1,6 +1,6 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
 
-import type { Context } from '../core/types.ts';
+import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 
 

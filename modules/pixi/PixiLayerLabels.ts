@@ -10,6 +10,7 @@ import type { PixiGeometryPartScreenData } from './PixiGeometryPart.ts';
 import type { PixiFeatureLine } from './PixiFeatureLine.ts';
 import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
@@ -198,7 +199,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._featureHasBoxes.clear();
 
     // Items in this layer don't actually need to be interactive
-    const groupContainer = this.scene.groups.get('labels');
+    const groupContainer = this.scene.groups.get('labels')!;
     groupContainer.eventMode = 'none';
 
     // Remove any existing containers
@@ -229,7 +230,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     labelOriginContainer.addChild(debugContainer, labelContainer);
 
     for (const feature of this.scene.features.values()) {
-      feature._labelDirty = false;
+      (feature as any)._labelDirty = false;
     }
   }
 
@@ -320,9 +321,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       this.reset();                                    // reset all labels
     } else {
       for (const [featureID, feature] of this.scene.features) {
-        if (feature._labelDirty) {       // reset only the changed labels
+        if ((feature as any)._labelDirty) {       // reset only the changed labels
           this.resetFeature(featureID);
-          feature._labelDirty = false;
+          (feature as any)._labelDirty = false;
         }
       }
     }
@@ -331,8 +332,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // The label container should be kept unrotated so that it stays screen-up not north-up.
     // We need to counter the effects of the 'stage' and 'origin' containers that we are underneath.
-    const stage = this.gfx.stage.position;
-    const origin = this.gfx.origin.position;
+    const stage = this.gfx!.stage!.position;
+    const origin = this.gfx!.origin!.position;
     const bearing = viewport.transform.rotation;
 
     // Determine the difference between the global/screen coordinate system (where [0,0] is top left)
@@ -340,7 +341,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // We need to save this labelOffset for use elsewhere, it is the basis for having a consistent coordinate
     // system to track labels to place and objects to avoid. (we apply it to values we get from `getBounds`)
     const labelOffset = this._labelOffset;
-    this.gfx.origin.toGlobal({ x: 0, y: 0 }, labelOffset);
+    this.gfx!.origin!.toGlobal({ x: 0, y: 0 }, labelOffset);
 
     const groupContainer = this.scene.groups.get('labels')!;
     groupContainer.position.set(-origin.x, -origin.y);     // undo origin - [0,0] is now center
@@ -353,18 +354,18 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this.gatherAvoids();
 
     // Collect features to place labels on.
-    const points = [];
-    const lines = [];
-    const polygons = [];
+    const points: PixiFeaturePoint[] = [];
+    const lines: PixiFeatureLine[] = [];
+    const polygons: PixiFeaturePolygon[] = [];
     for (const [featureID, feature] of this.scene.features) {
       // If the feature can be labeled, and hasn't yet been, add it to the list for placement.
       if (feature.label && feature.visible && !this._labeled.has(featureID)) {
         if (feature.type === 'Point') {
-          points.push(feature);
+          points.push(feature as PixiFeaturePoint);
         } else if (feature.type === 'LineString') {
-          lines.push(feature);
+          lines.push(feature as PixiFeatureLine);
         } else if (feature.type === 'Polygon') {
-          polygons.push(feature);
+          polygons.push(feature as PixiFeaturePolygon);
         }
       }
     }
@@ -394,7 +395,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   getLabelSprite(str: string, style: 'normal' | 'italic' = 'normal'): PIXI.Sprite {
     const textureID = `${str}-${style}`;
-    const textureManager = this.gfx.textureManager;
+    const textureManager = this.gfx.textureManager!;
 
     let texture = textureManager.getTexture('text', textureID);
     if (!texture) {
@@ -416,7 +417,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       this._textureIDs.set(str, textureID);
     }
 
-    const sprite = new PIXI.Sprite({ texture: texture });
+    const sprite = new PIXI.Sprite({ texture: texture || PIXI.Texture.EMPTY });
     sprite.label = str;
     sprite.anchor.set(0.5, 0.5);   // middle, middle
     return sprite;
@@ -436,11 +437,12 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // Gather the containers that have avoidable stuff on them.
     const avoidContainers: PIXI.Container[] = [];
 
-    const selectedContainer = this.scene.layers.get('map-ui')?.selected;
+    const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
+    const selectedContainer = mapUiLayer.selected;
     if (selectedContainer) {
       avoidContainers.push(selectedContainer);
     }
-    const pointsContainer = this.scene.groups.get('points');
+    const pointsContainer = this.scene.groups.get('points')!;
     if (pointsContainer) {
       avoidContainers.push(pointsContainer);
     }
@@ -858,10 +860,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const maxChainLength = numBoxes + 15;
 
     // Convert from screen coords to global coords..
-    const origin = this.gfx.origin;
+    const origin = this.gfx.origin!;
     const labelOffset = this._labelOffset;
     const temp = new PIXI.Point();
-    const coords: Vec2[] = screenCoords.map(([x, y]) => {
+    const coords: Vec2[] = screenCoords.map(([x, y]): Vec2 => {
       origin.toGlobal({x: x, y: y}, temp);
       return [temp.x - labelOffset.x, temp.y - labelOffset.y];
     });
@@ -1028,7 +1030,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   renderObjects(): void {
     // Get the display bounds in screen/global coordinates
-    const screen = this.gfx.pixi.screen;
+    const screen = this.gfx!.pixi!.screen;
     const labelOffset = this._labelOffset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,
@@ -1086,7 +1088,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // Cleanup label textures not visible in the scene anymore.
     // (Otherwise the text atlas will just keep growing)
-    const textureManager = this.gfx.textureManager;
+    const textureManager = this.gfx.textureManager!;
     for (const [str, textureID] of this._textureIDs) {
       if (!seenTextures.has(str)) {
         textureManager.free('text', textureID);
@@ -1102,7 +1104,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   renderDebug(): void {
     // Get the display bounds in screen/global coordinates
-    const screen = this.gfx.pixi.screen;
+    const screen = this.gfx!.pixi!.screen;
     const labelOffset = this._labelOffset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,

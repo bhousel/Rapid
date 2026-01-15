@@ -5,7 +5,7 @@ import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rap
 import { utilDateString } from '../util/date.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
-import type { Context } from '../core/types.ts';
+import type { Context } from '../Context.ts';
 import type { Vec2 } from '../lib/types.ts';
 
 // Cast utilAesDecrypt to allow optional key parameter (matches runtime behavior)

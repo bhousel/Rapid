@@ -1,15 +1,14 @@
 import * as PIXI from 'pixi.js';
 
-import type { Viewport } from '@rapid-sdk/math';
-import type { Context, SingularGeometryType } from '../lib/types.ts';
-import type { GeometryPart } from '../lib/GeometryPart.ts';
-
-import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import type { PixiScene } from './PixiScene.ts';
 import { PixiGeometryPart } from './PixiGeometryPart.ts';
 
-// Forward declarations for types not yet converted to TypeScript
-type GraphicsSystem = any;
+import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { Context } from '../Context.ts';
+import type { GeometryPart } from '../lib/GeometryPart.ts';
+import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+import type { PixiScene } from './PixiScene.ts';
+import type { SingularGeometryType } from '../lib/types.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 /** Extended PIXI.Container with feature reference */
 interface FeatureContainer extends PIXI.Container {
@@ -214,7 +213,7 @@ export class AbstractPixiFeature {
   get parentContainer(): PIXI.Container | null {
     return this.container.parent;
   }
-  set parentContainer(val: PIXI.Container | null) {
+  set parentContainer(val: Nullable<PIXI.Container>) {
     const currParent = this.container.parent;
     if (val && val !== currParent) {   // put this feature under a different parent container
       val.addChild(this.container);

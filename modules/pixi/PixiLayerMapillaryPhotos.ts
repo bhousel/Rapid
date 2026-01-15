@@ -247,7 +247,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     // const showMarkers = (zoom >= MINMARKERZOOM);
     // const showViewfields = (zoom >= MINVIEWFIELDZOOM);
 
-    const parentContainer = this.scene.groups.get('streetview');
+    const parentContainer = this.scene.groups.get('streetview')!;
     let sequences = mapillary.getSequences();
     let markers = mapillary.getData('images');
 

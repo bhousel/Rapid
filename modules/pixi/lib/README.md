@@ -10,9 +10,9 @@ These are utility classes that extend Pixi.js functionality for Rapid's specific
 
 | File | Description |
 |------|-------------|
-| `DashLine.js` | Renders dashed and dotted lines in WebGL |
-| `AtlasAllocator.js` | Manages texture atlas allocation |
-| `GuilloteneAllocator.js` | Guillotine bin-packing algorithm for atlas regions |
+| `DashLine.ts` | Renders dashed and dotted lines in WebGL |
+| `AtlasAllocator.ts` | Manages texture atlas allocation |
+| `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm for atlas regions |
 
 ## DashLine
 

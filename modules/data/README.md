@@ -39,7 +39,7 @@ Each data element has:
 
 ## Immutability Pattern
 
-```javascript
+```typescript
 // Data elements are immutable - update() returns a new instance
 const updatedNode = node.update({ tags: { ...node.tags, name: 'New Name' } });
 ```

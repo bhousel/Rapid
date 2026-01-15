@@ -9,7 +9,9 @@ import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 import type { EntityID, OsmEntity, OsmNode, OsmRelation, OsmRelationMember, Tags } from '../data/types.ts';
 import type { Style } from '../core/StyleSystem.ts';
+import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
+
 
 /** Minimum zoom level where OSM data is rendered */
 const MINZOOM = 12;
@@ -559,12 +561,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    */
   renderVertices(frame: number, viewport: Viewport, zoom: number, data: OsmData, related: RelatedIDs): void {
     const context = this.context;
-    const graph = (context.systems.editor as any).staging.graph;
+    const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
 
     // Vertices related to the selection/hover should be drawn above everything
-    const selectedContainer = this.scene.layers.get('map-ui').selected;
+    const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
+    const selectedContainer = mapUiLayer.selected;
     const pointsContainer = this.scene.groups.get('points')!;
 
     const isInterestingVertex = (node: OsmNode): boolean => {
@@ -761,7 +764,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const entities = new Map([...data.lines, ...data.polygons]);
 
     // Midpoints should be drawn above everything
-    const selectedContainer = this.scene.layers.get('map-ui').selected;
+    const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
+    const selectedContainer = mapUiLayer.selected;
 
     // If any of these change, the midpoint needs to be redrawn.
     // (This can happen if a sibling node has moved, the midpoint moves too)

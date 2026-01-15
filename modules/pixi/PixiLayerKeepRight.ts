@@ -81,7 +81,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
     keepRight.loadTiles();
 
-    const parentContainer = this.scene.groups.get('qa');
+    const parentContainer = this.scene.groups.get('qa')!;
     const data = keepRight.getData();
 
     for (const d of data) {

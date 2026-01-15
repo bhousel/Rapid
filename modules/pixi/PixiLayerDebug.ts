@@ -33,7 +33,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     super.reset();
 
     // Items in this layer don't actually need to be interactive
-    const groupContainer = this.scene.groups.get('debug-under');
+    const groupContainer = this.scene.groups.get('debug-under')!;
     groupContainer.eventMode = 'none';
   }
 
@@ -67,7 +67,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     };
 
 
-    const parentContainer = this.scene.groups.get('debug-under');
+    const parentContainer = this.scene.groups.get('debug-under')!;
     const msData = spatial.getVisibleData('msBuildings').filter((d: any) => _isBuilding(d.data));
 
     for (const hit of msData) {

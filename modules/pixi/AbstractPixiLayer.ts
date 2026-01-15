@@ -1,12 +1,10 @@
-import type { Viewport } from '@rapid-sdk/math';
-import type { Context } from '../lib/types.ts';
-import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
-// Forward declarations for types not yet converted to TypeScript
-type PixiScene = any;
-type GraphicsSystem = any;
-
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { Context } from '../Context.ts';
+import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+import type { PixiScene } from './PixiScene.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 /**
  * AbstractPixiLayer is the base class from which all rendering Layers inherit.

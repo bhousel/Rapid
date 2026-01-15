@@ -15,33 +15,33 @@ All systems extend `AbstractSystem` and follow a standard lifecycle:
 
 | File | Description |
 |------|-------------|
-| `AbstractSystem.js` | Base class for all systems with lifecycle management |
-| `AssetSystem.js` | Manages loading and caching of assets (images, data files) |
-| `EditSystem.js` | Manages edit history, undo/redo, and staging changes |
-| `FilterSystem.js` | Controls visibility filtering of map features |
-| `GraphicsSystem.js` | Manages Pixi.js rendering pipeline |
-| `ImagerySystem.js` | Manages background imagery layers |
-| `LocalizationSystem.js` | Handles internationalization (i18n) and translations |
-| `LocationSystem.js` | Geocoding and location services |
-| `Map3dSystem.js` | Manages the 3D map view (MapLibre) |
-| `MapSystem.js` | Core map state (zoom, pan, projection) |
-| `PhotoSystem.js` | Manages street-level photo integration |
-| `RapidSystem.js` | Manages Rapid AI features and datasets |
-| `SchemaSystem.js` | Loads and provides access to presets and fields |
-| `SpatialSystem.js` | Spatial indexing for fast geographic queries |
-| `StorageSystem.js` | Persistent storage (localStorage wrapper) |
-| `StyleSystem.js` | Manages feature styling and colors |
-| `UiSystem.js` | Manages the user interface components |
-| `UploaderSystem.js` | Handles uploading changes to OSM |
-| `UrlHashSystem.js` | Manages URL hash state (bookmarkable URLs) |
-| `ValidationSystem.js` | Runs validation checks on map data |
+| `AbstractSystem.ts` | Base class for all systems with lifecycle management |
+| `AssetSystem.ts` | Manages loading and caching of assets (images, data files) |
+| `EditSystem.ts` | Manages edit history, undo/redo, and staging changes |
+| `FilterSystem.ts` | Controls visibility filtering of map features |
+| `GraphicsSystem.ts` | Manages Pixi.js rendering pipeline |
+| `ImagerySystem.ts` | Manages background imagery layers |
+| `LocalizationSystem.ts` | Handles internationalization (i18n) and translations |
+| `LocationSystem.ts` | Geocoding and location services |
+| `Map3dSystem.ts` | Manages the 3D map view (MapLibre) |
+| `MapSystem.ts` | Core map state (zoom, pan, projection) |
+| `PhotoSystem.ts` | Manages street-level photo integration |
+| `RapidSystem.ts` | Manages Rapid AI features and datasets |
+| `SchemaSystem.ts` | Loads and provides access to presets and fields |
+| `SpatialSystem.ts` | Spatial indexing for fast geographic queries |
+| `StorageSystem.ts` | Persistent storage (localStorage wrapper) |
+| `StyleSystem.ts` | Manages feature styling and colors |
+| `UiSystem.ts` | Manages the user interface components |
+| `UploaderSystem.ts` | Handles uploading changes to OSM |
+| `UrlHashSystem.ts` | Manages URL hash state (bookmarkable URLs) |
+| `ValidationSystem.ts` | Runs validation checks on map data |
 | `types.ts` | TypeScript type definitions for core systems |
 
 ## Accessing Systems
 
 Systems are accessed through the application context:
 
-```javascript
+```typescript
 const editor = context.systems.editor;
 const l10n = context.systems.l10n;
 const gfx = context.systems.gfx;

@@ -185,7 +185,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const context = this.context;
     const map = context.systems.map as any;
     const wireframeMode = map?.wireframeMode;
-    const textureManager = this.gfx.textureManager;
+    const textureManager = this.gfx.textureManager!;
     const style = this._style as PointStyle;
     const isPin = ['pin', 'boldPin', 'osmose'].includes(style.markerName ?? '');
 
@@ -210,7 +210,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     // Show icon, if any..
     if (style.iconTexture || style.iconName) {
-      icon.texture = style.iconTexture || textureManager.get(style.iconName!);
+      icon.texture = style.iconTexture || textureManager.get(style.iconName!) || PIXI.Texture.EMPTY;
       icon.anchor.set(style.anchor?.x || 0.5, style.anchor?.y || 0.5);   // middle, middle by default, can be overridden in layer code
       const iconSize = style.iconSize || 11;
       icon.width = iconSize;
@@ -226,7 +226,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const vfAngles = style.viewfieldAngles || [];
     let vfTexture = PIXI.Texture.EMPTY;
     if (vfAngles.length > 0) {  // Should have viewfields
-      vfTexture = style.viewfieldTexture || textureManager.get(style.viewfieldName) || PIXI.Texture.WHITE;
+      vfTexture = style.viewfieldTexture || textureManager.get(style.viewfieldName || '') || PIXI.Texture.WHITE;
 
       // Sort markers with viewfields above markers without viewfields
       // this.container.zIndex = -latitude + 1000;
@@ -303,7 +303,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       // Replace pinlike markers with circles at lower zoom
       const markerID = isPin ? 'largeCircle' : (style.markerName ?? 'smallCircle');
       this._isCircular = (!style.markerTexture && /(circle|midpoint)$/i.test(markerID));
-      marker.texture = style.markerTexture || textureManager.get(markerID);
+      marker.texture = style.markerTexture || textureManager.get(markerID) || PIXI.Texture.EMPTY;
       marker.anchor.set(0.5, 0.5);  // middle, middle
       icon.position.set(0, 0);      // middle, middle
 
@@ -318,7 +318,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       // Replace pinlike markers with circles if viewfields are present
       const markerID = (isPin && vfAngles.length) ? 'largeCircle' : (style.markerName ?? 'smallCircle');
       this._isCircular = (!style.markerTexture && /(circle|midpoint)$/i.test(markerID));
-      marker.texture = style.markerTexture || textureManager.get(markerID);
+      marker.texture = style.markerTexture || textureManager.get(markerID) || PIXI.Texture.EMPTY;
       if (isPin && !this._isCircular) {
         marker.anchor.set(0.5, 1);    // middle, bottom
         icon.position.set(0, -14);    // mathematically 0,-15 is center of pin, but looks nicer moved down slightly

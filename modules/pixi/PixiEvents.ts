@@ -1,12 +1,10 @@
 import * as PIXI from 'pixi.js';
 import { EventEmitter } from 'tseep';
 import { vecRotate, type Vec2 } from '@rapid-sdk/math';
-
-import type { Context } from '../core/types.ts';
 import { utilDetect } from '../util/detect.ts';
 
-// Forward declarations for types not yet converted
-type GraphicsSystem = any;
+import type { Context } from '../Context.ts';
+import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 
 
 /** Coordinate data containing screen and map positions */
@@ -122,14 +120,14 @@ export class PixiEvents extends EventEmitter {
 
     // Attach wheel to supersurface so that content on the overlay (like the edit menu)
     // doesn't receive the wheel events and prevent panning and zooming.
-    const supersurface = gfx.supersurface;
+    const supersurface = gfx.supersurface!;
     supersurface.addEventListener('wheel', this._wheel, { passive: false });  // false allows preventDefault
 
-    const surface = gfx.surface;
+    const surface = gfx.surface!;
     surface.addEventListener('pointerover', this._pointerover);
     surface.addEventListener('pointerout', this._pointerout);
 
-    const stage = gfx.stage;
+    const stage = gfx.stage!;
     stage.addEventListener('click', this._click);
     stage.addEventListener('rightclick', this._click);   // pixi has a special 'rightclick' event
     stage.addEventListener('pointerdown', this._pointerdown);
@@ -155,14 +153,14 @@ export class PixiEvents extends EventEmitter {
 
     const gfx = this.gfx;
 
-    const supersurface = gfx.supersurface;
+    const supersurface = gfx.supersurface!;
     supersurface.removeEventListener('wheel', this._wheel);
 
-    const surface = gfx.surface;
+    const surface = gfx.surface!;
     surface.removeEventListener('pointerover', this._pointerover);
     surface.removeEventListener('pointerout', this._pointerout);
 
-    const stage = gfx.stage;
+    const stage = gfx.stage!;
     stage.removeEventListener('click', this._click);
     stage.removeEventListener('rightclick', this._click);
     stage.removeEventListener('pointerdown', this._pointerdown);

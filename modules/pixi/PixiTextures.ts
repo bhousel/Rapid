@@ -1,10 +1,9 @@
 import * as PIXI from 'pixi.js';
-
-import type { Context } from '../core/types.ts';
 import { AtlasAllocator, registerAtlasUploader } from './lib/AtlasAllocator.ts';
 
-// Forward declarations for types not yet converted
-type GraphicsSystem = any;
+import type { Context } from '../Context.ts';
+import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+
 
 /** Atlas collection containing symbol, text, and tile atlases */
 interface AtlasCollection {
@@ -94,6 +93,7 @@ export class PixiTextures {
    */
   reset(): void {
     const gfx = this.gfx;
+    if (!gfx.pixi) return;  // called too soon?
 
     // Before using the atlases, we need to register the upload function with the renderer.
     // This will choose the correct function for either webGL or webGPU renderer type.
@@ -106,10 +106,10 @@ export class PixiTextures {
     let maxsize = 2048;   // a reasonable default
     if (gfx.highQuality) {
       if (renderer.type === PIXI.RendererType.WEBGL) {
-        const gl = renderer.gl;
+        const gl = (renderer as PIXI.WebGLRenderer).gl;
         maxsize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
       } else if (renderer.type === PIXI.RendererType.WEBGPU) {
-        const gpu = renderer.gpu;
+        const gpu = (renderer as PIXI.WebGPURenderer).gpu;
         maxsize = gpu.adapter.limits.maxTextureDimension2D;
       }
     }
@@ -342,6 +342,8 @@ export class PixiTextures {
    * @returns Texture allocated from the symbol atlas
    */
   graphicToTexture(textureID: string, graphic: PIXI.Graphics, options: Partial<PIXI.GenerateTextureOptions> = {}): PIXI.Texture | null {
+    if (!this.gfx.pixi) return null;  // called too soon?
+
     const fullOptions: PIXI.GenerateTextureOptions = {
       ...options,
       antialias: false,
@@ -373,6 +375,8 @@ export class PixiTextures {
    * @returns Texture allocated from the text atlas
    */
   textToTexture(textureID: string, str: string, textStyle: PIXI.TextStyle): PIXI.Texture | null {
+    if (!this.gfx.pixi) return null;  // called too soon?
+
     const options = {
       text: str,
       style: textStyle,
@@ -381,7 +385,7 @@ export class PixiTextures {
 
     const renderer = this.gfx.pixi.renderer;
     const result = renderer.canvasText.createTextureAndCanvas(options);
-    const canvas = result.canvasAndContext.canvas;
+    const canvas = result.canvasAndContext.canvas as HTMLCanvasElement;
     const temp = result.texture;
     const w = temp.frame.width * temp.source.resolution;
     const h = temp.frame.height * temp.source.resolution;

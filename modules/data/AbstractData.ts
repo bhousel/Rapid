@@ -1,7 +1,7 @@
 import { Extent } from '@rapid-sdk/math';
 
 import { Geometry } from '../lib/Geometry.ts';
-import type { Context } from '../core/types.ts';
+import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { DataConstructor } from './types.ts';

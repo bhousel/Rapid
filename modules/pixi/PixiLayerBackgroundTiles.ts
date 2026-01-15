@@ -4,10 +4,10 @@ import { AdjustmentFilter, ConvolutionFilter } from 'pixi-filters';
 import { Tiler, vecScale } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { ImagerySource } from '../lib/ImagerySource.ts';
 
 import type { PixiScene } from './PixiScene.ts';
-import type { Tile as TilerTile, Viewport } from '@rapid-sdk/math';
-import { ImagerySource } from '../headless.js';
+import type { Tile, Viewport } from '@rapid-sdk/math';
 
 
 /** Filter settings for background imagery */
@@ -18,8 +18,8 @@ interface FilterSettings {
   sharpness: number;
 }
 
-/** Tile object with sprite, image, and debug info (extends TilerTile from @rapid-sdk/math) */
-interface CachedTile extends TilerTile {
+/** Tile object with sprite, image, and debug info (extends Tile from @rapid-sdk/math) */
+interface CachedTile extends Tile {
   url: string;
   sprite: PIXI.Sprite | null;
   image: HTMLImageElement | null;
@@ -176,7 +176,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    */
   renderSource(timestamp: number, viewport: Viewport, source: any, sourceContainer: PIXI.Container, tileMap: Map<string, CachedTile>): void {
     const context = this.context;
-    const textureManager = this.gfx.textureManager;
+    const textureManager = this.gfx.textureManager!;
     const osm = context.services.osm as any;
     const t = viewport.transform.props;
     const sourceID = source.key;   // note: use `key` here, for Wayback it will include the date
@@ -285,7 +285,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
         const w = tile.image.naturalWidth;
         const h = tile.image.naturalHeight;
-        tile.sprite.texture = textureManager.allocate('tile', tile.sprite.label, w, h, tile.image);
+        tile.sprite.texture = textureManager.allocate('tile', tile.sprite.label, w, h, tile.image) || PIXI.Texture.EMPTY;
 
         tile.loaded = true;
         tile.image = null;  // reference to `image` is held by the atlas, we can null it
@@ -410,7 +410,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * @param tile - Tile object
    */
   destroyTile(tile: CachedTile): void {
-    const textureManager = this.gfx.textureManager;
+    const textureManager = this.gfx.textureManager!;
 
     if (tile.sprite) {
       if (tile.loaded) {

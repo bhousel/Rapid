@@ -70,7 +70,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
     this._oldz = 0;
 
-    const groupContainer = this.scene.groups.get('ui');
+    const groupContainer = this.scene.groups.get('ui')!;
 
     // Remove any existing containers
     for (const child of groupContainer.children) {
@@ -281,8 +281,8 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
       // Show a viewfield for the heading if we have it
       if (d.heading !== null && !isNaN(d.heading)) {
-        const textures = this.gfx.textureManager;
-        const heading = new PIXI.Sprite(textures.get('viewfieldDark'));
+        const textures = this.gfx.textureManager!;
+        const heading = new PIXI.Sprite(textures.get('viewfieldDark') || PIXI.Texture.EMPTY);
         heading.anchor.set(0.5, 1);  // middle, top
         heading.angle = d.heading;
         heading.label = 'heading';

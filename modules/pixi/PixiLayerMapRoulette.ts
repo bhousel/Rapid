@@ -83,7 +83,7 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
     maproulette.loadTiles();
 
     // Render the data that we have..
-    const parentContainer = this.scene.groups.get('qa');
+    const parentContainer = this.scene.groups.get('qa')!;
     const data = maproulette.getData();
 
     for (const d of data) {

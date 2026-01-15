@@ -158,7 +158,6 @@ export class Category {
 
 ### Shared Types
 - `types.ts` files exist per folder for **cross-file shared types only**
-- Examples: `Context`, `Entity`, `EntityID`, `Tags`, `Vec2`, GeoJSON types
 - Class-specific types (like `FooProps`) stay with the class
 - **Never duplicate types** - if a type already exists in a class file, don't add it to `types.ts`
 - When converting a file, check if types already exist before adding new ones
@@ -169,6 +168,7 @@ export class Category {
 
 ### No Inline Imports
 - **Keep all imports at the top of the file** - don't use inline `import()` syntax in type annotations
+- Group `import` lines before `import type` lines.  Sort the `import` and `import type` lines alphabetically.
 - Example - avoid this:
   ```typescript
   setCoords(source: import('../lib/GeometryPart.ts').GeometryPart): void { ... }
@@ -184,7 +184,7 @@ export class Category {
 - This is a **Bun project** - use `.ts` extensions for TypeScript file imports
 - For files that have been converted to TypeScript, import with `.ts`:
   ```typescript
-  import type { Context } from '../core/types.ts';
+  import type { Context } from '../Context.ts';
   import { ValidationFix } from './ValidationFix.ts';
   ```
 - For files still in JavaScript, continue using `.js`:
@@ -212,9 +212,41 @@ export class Category {
   ```
 
 ### Type Declarations
-- **Module augmentations** (fixing incorrect external types): Add to `global.d.ts` with `export {}`
+- **Module augmentations** (fixing incorrect or inconvenient external types): Add to `global.d.ts` with `export {}`
 - **Ambient module declarations** (no @types package available): Add to `modules/types/*.d.ts` without export
+- Use `declare global { ... }` block for global types (since `global.d.ts` has `export {}`)
 - Example: `global.d.ts` has the fix for `d3-geo`'s `geoMercatorRaw` return type
+
+### Global Types
+- Common utility types like `Nullable<T>` are declared globally in `global.d.ts`
+- These types don't need to be imported - they're available everywhere
+- Example:
+  ```typescript
+  // In global.d.ts
+  declare global {
+    type Nullable<T> = T | null | undefined;
+  }
+
+  // Usage - no import needed
+  function foo(value: Nullable<string>): void { ... }
+  ```
+
+### D3 Types
+- `D3Selection` and `D3EnterSelection` are permissive type aliases defined in `global.d.ts`
+- Import directly from `'d3-selection'`, not from `types.ts`
+- The module augmentation makes D3 callbacks accept `any` datum type to reduce friction
+- **Naming conventions**:
+  - Prefix variables holding a selection with `$`, e.g., `$parent`, `$child`
+  - Prefix variables holding an _enter_ selection with `$$`, e.g., `$$items`
+- Example:
+  ```typescript
+  import type { D3Selection, D3EnterSelection } from 'd3-selection';
+
+  function render($parent: D3Selection): void {
+    const $child: D3Selection = $parent.select('.child');
+    let $$child: D3EnterSelection = $child.enter().append('div');
+  }
+  ```
 
 ### GeoJSON Types
 - **`@types/geojson`** is installed as a dev dependency and exposes a global `GeoJSON` namespace via UMD declaration
@@ -230,53 +262,31 @@ export class Category {
   - `GeoJSONFeature`, `GeoJSONObject` - slightly looser versions that allow optional `geometry` for easier construction
 - **Note**: The `data/GeoJSON.ts` class wraps arbitrary GeoJSON - be aware of the naming collision with the global namespace.
 
-### Working with Untyped Systems
+### Working with Untyped JavaScript Components
 - It's OK to assert `as any` for parts of the codebase that haven't been converted to TypeScript yet
-- This is especially common for `context.systems.*` which are typed as `System | undefined`
-- Cast upfront, then use optional chaining throughout:
-  ```typescript
-  const gfx = context.systems.gfx as any;
-  const editor = context.systems.editor as any;
-
-  // Then use optional chaining for safe access
-  gfx?.immediateRedraw();
-  const graph = editor?.staging?.graph;
-  ```
 - This pattern keeps code readable while allowing gradual TypeScript adoption
-
-### Updating the Systems Interface
-When a system is converted to TypeScript, update `modules/core/types.ts` to provide proper typing:
-
-1. **Add the import** at the top of types.ts:
-   ```typescript
-   import type { FooSystem } from './FooSystem.ts';
-   ```
-
-2. **Add to the `AnySystem` union**:
-   ```typescript
-   type AnySystem =
-     | AssetSystem
-     | FooSystem  // add here
-     | ...
-     | System;
-   ```
-
-3. **Update the property** in the `Systems` interface:
-   ```typescript
-   export interface Systems {
-     // Converted to TypeScript - use specific types:
-     foo?: FooSystem;  // move from "not converted" section
-     ...
-   }
-   ```
-
-Using `import type` avoids runtime circular dependencies. Once updated, code can access `context.systems.foo` with full type checking instead of `as any` casts.
-- As systems get properly typed, these `as any` casts can be removed
 
 ### Browser Globals
 - Prefer `globalThis` over `window` for browser globals
 - This is more portable and works in all JavaScript environments
-- When augmenting global types, extend the `Window` interface in `global.d.ts`
+
+### headless.js
+- **Never import from `headless.js`** in main application code
+- `headless.js` is a test-only build that re-exports modules for test consumption
+- Import from the actual source files instead (e.g., `../lib/ImagerySource.ts`)
+
+### Environment Detection
+- When using browser-only APIs (like `KeyboardEvent`), check if they exist first
+- Unit tests run without DOM globals unless using the happy-dom preload
+- Pattern:
+  ```typescript
+  if (typeof KeyboardEvent === 'function') {
+    evt = new KeyboardEvent('keydown', { ... });
+  } else {
+    // Fallback for environments without DOM
+    evt = { type: 'keydown', key: 'a', ... } as KeyboardEvent;
+  }
+  ```
 
 ### Converting Legacy Patterns
 - **IIFE singletons** → Convert to classes with static methods

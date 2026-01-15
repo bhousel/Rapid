@@ -1,6 +1,6 @@
 import { utilSafeString } from '@rapid-sdk/util';
 
-import type { Context } from '../core/types.ts';
+import type { Context } from '../Context.ts';
 
 
 /**
