@@ -5,7 +5,7 @@ import {
 } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { Marker } from '../data/Marker.js';
+import { Marker } from '../data/Marker.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';

@@ -1,7 +1,7 @@
 import { geomPolygonContainsPolygon } from '@rapid-sdk/math';
 import { utilArrayGroupBy, utilArrayIntersection, utilObjectOmit } from '@rapid-sdk/util';
 
-import { OsmRelation } from '../data/OsmRelation.js';
+import { OsmRelation } from '../data/OsmRelation.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
 
 

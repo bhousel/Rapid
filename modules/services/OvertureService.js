@@ -1,4 +1,4 @@
-import { AbstractSystem } from '../core/AbstractSystem.js';
+import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { RapidDataset } from '../lib/RapidDataset.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 

@@ -3,7 +3,7 @@ import whichPolygon from 'which-polygon';
 import calcArea from '@mapbox/geojson-area';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { GeoJSON } from '../data/GeoJSON.js';
+import { GeoJSON } from '../data/GeoJSON.ts';
 
 import type { Extent } from '@rapid-sdk/math';
 import type { Context } from './types.ts';

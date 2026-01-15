@@ -2,7 +2,7 @@ import { geomPathIntersections, geomPathLength, vecAdd, vecAngle, vecEqual, vecI
 import { utilArrayIntersection } from '@rapid-sdk/util';
 
 import { geoChooseEdge } from '../geo/geom.js';
-import { OsmNode } from '../data/OsmNode.js';
+import { OsmNode } from '../data/OsmNode.ts';
 
 
 export function actionMove(moveIDs, tryDelta, viewport, cache) {

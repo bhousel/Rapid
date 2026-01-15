@@ -3,8 +3,8 @@ import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 import { marked } from 'marked';
 
-import { AbstractSystem } from '../core/AbstractSystem.js';
-import { Marker } from '../data/Marker.js';
+import { AbstractSystem } from '../core/AbstractSystem.ts';
+import { Marker } from '../data/Marker.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 

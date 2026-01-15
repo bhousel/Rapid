@@ -149,7 +149,7 @@ export class ValidationSystem extends AbstractSystem {
       this._rules.set(fn.type, fn);
     });
 
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor;
     const schema = context.systems.schema;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
@@ -188,7 +188,7 @@ export class ValidationSystem extends AbstractSystem {
 
         // Setup event handlers..
         // When to run validation:
-        editor
+        editor!
           .on('stablechange', () => this.validateAsync())
           .on('merge', (entityIDs: EntityID[]) => this._validateBaseEntitiesAsync(entityIDs));
       });
@@ -289,7 +289,7 @@ export class ValidationSystem extends AbstractSystem {
       cache.uncacheIssuesOfType('unsquare_way');   // uncache existing
 
       // rerun for all buildings
-      const tree = (this.context.systems.editor as any).tree;
+      const tree = this.context.systems.editor!.tree;
       const buildings = tree.intersects(new Extent([-180,-90],[180, 90]), cache.graph)  // everywhere
         .filter((entity: OsmEntity) => (entity.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
 
@@ -326,7 +326,7 @@ export class ValidationSystem extends AbstractSystem {
     const opts: GetIssuesOptions = Object.assign({ what: 'all', where: 'all', includeIgnored: false, includeDisabledRules: false }, options);
     const context = this.context;
     const visibleExtent = context.viewport.visibleExtent();
-    const graph: Graph = (context.systems.editor as any).staging.graph;
+    const graph: Graph = context.systems.editor!.staging.graph!;
     const seen = new Set<string>();
     const results: ValidationIssue[] = [];
 
@@ -404,7 +404,7 @@ export class ValidationSystem extends AbstractSystem {
    */
   focusIssue(issue: ValidationIssue): void {
     const context = this.context;
-    const map = context.systems.map as any;
+    const map = context.systems.map;
 
     const entityIDs = issue.entityIds ?? [];
     const selectID = entityIDs[0];
@@ -591,14 +591,14 @@ export class ValidationSystem extends AbstractSystem {
    */
   validateAsync(): Promise<void> {
     const context = this.context;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor!;
     this._completeDiff = editor.difference().complete();
 
     if (editor.canRestoreBackup) return Promise.resolve();   // Wait to see if the user wants to restore their backup
     if (this._validationPromise) return this._validationPromise;   // Validation already in progress
 
-    const baseGraph = editor.base.graph;
-    const stableGraph = editor.stable.graph;
+    const baseGraph = editor.base.graph!;
+    const stableGraph = editor.stable.graph!;
     const previousGraph = this._head.graph ?? baseGraph;   // the previously validated graph
 
     // User has not edited, or undone back to the base state, reset head cache
@@ -618,7 +618,7 @@ export class ValidationSystem extends AbstractSystem {
 
     // If we get here, stable !== previous, so it's time to validate the stable graph..
     this._head.graph = stableGraph;   // take snapshot
-    const incrementalDiff = new Difference(previousGraph, stableGraph);
+    const incrementalDiff = new Difference(previousGraph, stableGraph!);
     const diffKeys = [ ...incrementalDiff.complete().keys() ];
     const entityIDs = this._head.withAllRelatedEntities(diffKeys);  // expand set
 
@@ -656,13 +656,13 @@ export class ValidationSystem extends AbstractSystem {
    */
   private _validateBaseEntitiesAsync(entityIDs: Iterable<EntityID>): Promise<void> {
     const context = this.context;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor!;
     if (!entityIDs) return Promise.resolve();
 
     // Make sure base cache has a graph assigned to it.
     // (We don't do this in `reset` because EditSystem is still resetting things and `base`/`stable` may be wrong)
     if (!this._base.graph) {
-      this._base.graph = editor.base.graph;
+      this._base.graph = editor.base.graph!;
     }
 
     const expandedEntityIDs = this._base.withAllRelatedEntities(entityIDs);  // expand set

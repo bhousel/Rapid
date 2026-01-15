@@ -1,6 +1,6 @@
 import { vecInterp } from '@rapid-sdk/math';
 
-import { OsmNode, OsmWay, OsmRelation } from '../data/index.js';
+import { OsmNode, OsmWay, OsmRelation } from '../data/index.ts';
 
 
 export function actionRapidAcceptFeature(entityID, extGraph) {

@@ -2,7 +2,7 @@ import { selection } from 'd3-selection';
 import debounce from 'lodash-es/debounce.js';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
-import { Marker } from '../../data/Marker.js';
+import { Marker } from '../../data/Marker.ts';
 import { uiIcon } from '../icon.js';
 import { utilCmd } from '../../util/cmd.ts';
 

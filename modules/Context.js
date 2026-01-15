@@ -6,7 +6,7 @@ import { utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 import { behaviors } from './behaviors/index.js';
 import { modes } from './modes/index.js';
 import { services } from './services/index.js';
-import { systems } from './core/index.js';
+import { systems } from './core/index.ts';
 
 import { utilIterable } from './util/iterable.ts';
 import { utilKeybinding } from './util/keybinding.ts';

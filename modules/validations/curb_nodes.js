@@ -1,7 +1,7 @@
 import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '@rapid-sdk/math';
 
 import { actionAddMidpoint, actionChangeTags, actionSplit} from '../actions/index.js';
-import { OsmNode } from '../data/OsmNode.js';
+import { OsmNode } from '../data/OsmNode.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 import { uiIcon } from '../ui/icon.js';

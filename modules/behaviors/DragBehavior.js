@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.js';
-import { OsmNode, Marker } from '../data/index.js';
+import { OsmNode, Marker } from '../data/index.ts';
 import { utilDetect } from '../util/detect.ts';
 
 const NEAR_TOLERANCE = 1;

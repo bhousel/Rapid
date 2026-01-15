@@ -6,7 +6,7 @@ import { osmLifecyclePrefixes } from '../lib/tags.ts';
 import type { Context } from './types.ts';
 import type { Tags } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity, OsmRelation, OsmWay } from '../data/index.js';
+import type { OsmEntity, OsmRelation, OsmWay } from '../data/index.ts';
 
 
 /** Geometry type for entities */
@@ -161,7 +161,7 @@ export class FilterSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
-    const urlhash = context.systems.urlhash as any;
+    const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -202,7 +202,7 @@ export class FilterSystem extends AbstractSystem {
 
     const context = this.context;
     const storage = context.systems.storage;
-    const urlhash = context.systems.urlhash as any;
+    const urlhash = context.systems.urlhash;
 
     // Take filter values from urlhash first, localstorage second,
     // Default to having boundaries hidden
@@ -693,13 +693,14 @@ export class FilterSystem extends AbstractSystem {
   forceVisible(entityIDs: string[]): void {
     this._forceVisible = new Set();
 
-    const editor = this.context.systems.editor as any;
-    const graph = editor.staging.graph;
+    const editor = this.context.systems.editor;
+    if (!editor) return;
+    const graph = editor.staging.graph!;
 
     for (const entityID of entityIDs) {
       this._forceVisible.add(entityID);
 
-      const entity = graph.hasEntity(entityID);
+      const entity = graph.hasEntity(entityID) as any;
       if (entity?.type === 'relation') {  // include relation members (one level deep)
         for (const member of entity.members) {
           this._forceVisible.add(member.id);
@@ -751,9 +752,9 @@ export class FilterSystem extends AbstractSystem {
    */
   _filterChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const storage = context.systems.storage;
-    const urlhash = context.systems.urlhash as any;
+    const urlhash = context.systems.urlhash;
 
     // gather hidden
     this._hidden = new Set();

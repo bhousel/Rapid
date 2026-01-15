@@ -3,7 +3,7 @@ import { selection } from 'd3-selection';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { HALF_PI, Viewport, geoZoomToScale, numClamp, vecAdd, vecInterp, vecSubtract } from '@rapid-sdk/math';
 
-import { PixiLayerBackgroundTiles } from '../pixi/PixiLayerBackgroundTiles.js';
+import { PixiLayerBackgroundTiles } from '../pixi/PixiLayerBackgroundTiles.ts';
 
 const MIN_Z = 0.5;
 const MAX_Z = 24;

@@ -2,8 +2,8 @@ import { zoom as d3_zoom, zoomIdentity as d3_zoomIdentity } from 'd3-zoom';
 import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
-import { AbstractSystem } from '../core/AbstractSystem.js';
-import { Marker, GeoJSON } from '../data/index.js';
+import { AbstractSystem } from '../core/AbstractSystem.ts';
+import { Marker, GeoJSON } from '../data/index.ts';
 import { uiIcon } from '../ui/icon.js';
 import { utilFetchResponse, utilSetTransform } from '../util/index.ts';
 

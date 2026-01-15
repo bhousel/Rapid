@@ -74,8 +74,8 @@ export class RapidSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
-    const editor = context.systems.editor as any;
-    const urlhash = context.systems.urlhash as any;
+    const editor = context.systems.editor;
+    const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -102,7 +102,7 @@ export class RapidSystem extends AbstractSystem {
 
     // We wait until startAsync to create the dataset catalog because the services need to be initialized.
     const context = this.context;
-    const urlhash = context.systems.urlhash as any;
+    const urlhash = context.systems.urlhash;
 
     const esri = context.services.esri as any;
     const mapwithai = context.services.mapwithai as any;
@@ -347,7 +347,7 @@ export class RapidSystem extends AbstractSystem {
    */
   _stablechange(): void {
     const context = this.context;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor;
     if (!editor) return;
 
     this.acceptIDs.clear();
@@ -360,12 +360,12 @@ export class RapidSystem extends AbstractSystem {
     // End at `index` - don't continue into the redo part of the history..
     for (let i = 1; i <= index; i++) {
       const edit = history[i];
-      const annotation = edit.annotation;
+      const annotation = edit.annotation as Record<string, unknown> | undefined;
 
       if (annotation?.type === 'rapid_accept_feature') {
-        if (annotation.entityID)  this.acceptIDs.add(annotation.entityID);
+        if (annotation.entityID)  this.acceptIDs.add(annotation.entityID as string);
       } else if (annotation?.type === 'rapid_ignore_feature') {
-        if (annotation.entityID)  this.ignoreIDs.add(annotation.entityID);
+        if (annotation.entityID)  this.ignoreIDs.add(annotation.entityID as string);
       }
     }
   }
@@ -406,8 +406,8 @@ export class RapidSystem extends AbstractSystem {
    */
   _datasetsChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
-    const urlhash = context.systems.urlhash as any;
+    const gfx = context.systems.gfx;
+    const urlhash = context.systems.urlhash;
 
     const enabledIDs: string[] = [];
     for (const [datasetID, dataset] of this.catalog) {

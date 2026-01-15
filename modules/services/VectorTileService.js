@@ -8,8 +8,8 @@ import * as Polyclip from 'polyclip-ts';
 import Protobuf from 'pbf';
 import RBush from 'rbush';
 
-import { AbstractSystem } from '../core/AbstractSystem.js';
-import { GeoJSON } from '../data/GeoJSON.js';
+import { AbstractSystem } from '../core/AbstractSystem.ts';
+import { GeoJSON } from '../data/GeoJSON.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 

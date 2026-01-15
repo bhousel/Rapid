@@ -1,7 +1,7 @@
 import { Tiler, Viewport } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
-import { AbstractSystem } from '../core/AbstractSystem.js';
+import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilDateString } from '../util/date.ts';
 import { FetchError, utilFetchResponse } from '../util/fetch_response.ts';
 

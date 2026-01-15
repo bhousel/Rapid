@@ -6,7 +6,7 @@ import { utilDetect } from '../util/detect.ts';
 
 import type { Context, D3Selection } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { EntityID, Tags, Vec2 } from '../data/index.js';
+import type { EntityID, OsmEntity, Tags, Vec2 } from '../data/index.ts';
 
 
 /** Information about a language */
@@ -825,7 +825,7 @@ export class LocalizationSystem extends AbstractSystem {
    */
   displayLabel(entity: { id: EntityID; tags: Tags }, graphOrGeometry: Graph | string, verbose?: boolean): string {
     const context = this.context;
-    const schema = context.systems.schema as any;
+    const schema = context.systems.schema;
 
     // Choose the display name, if possible
     const displayName = this.displayName(entity.tags);
@@ -834,8 +834,8 @@ export class LocalizationSystem extends AbstractSystem {
     let presetName;
     if (schema) {
       const preset = typeof graphOrGeometry === 'string' ?
-        schema.matchTags(entity.tags, graphOrGeometry) :
-        schema.match(entity, graphOrGeometry);
+        schema.matchTags(entity.tags, graphOrGeometry as any) :
+        schema.match(entity as OsmEntity, graphOrGeometry);
       presetName = preset && (preset.props.suggestion ? preset.subtitle() : preset.name);
     }
 
@@ -1120,7 +1120,7 @@ export class LocalizationSystem extends AbstractSystem {
    */
   private _localeChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
 
     if (!this._currLocaleCode) {       // no current locale?  shouldn't happen, reset to defaults

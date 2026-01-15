@@ -894,7 +894,7 @@ export class StyleSystem extends AbstractSystem {
    * This will trigger a redraw and emit a 'stylechange' event.
    */
   _styleChanged(): void {
-    const gfx = this.context.systems.gfx as any;
+    const gfx = this.context.systems.gfx;
 
     gfx?.immediateRedraw();
     this.emit('stylechange');

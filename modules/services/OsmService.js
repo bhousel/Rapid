@@ -3,10 +3,10 @@ import { utilArrayChunk, utilArrayUniq, utilObjectOmit, utilQsString } from '@ra
 import _throttle from 'lodash-es/throttle.js';
 import { osmAuth } from 'osm-auth';
 
-import { AbstractSystem } from '../core/AbstractSystem.js';
+import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { JXON } from '../util/jxon.ts';
-import { OsmEntity, Marker } from '../data/index.js';
-import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.js';
+import { OsmEntity, Marker } from '../data/index.ts';
+import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 

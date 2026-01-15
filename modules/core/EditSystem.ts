@@ -9,7 +9,7 @@ import type { Context } from './types.ts';
 import { Difference, Edit, Graph, Tree } from '../lib/index.ts';
 import type { Action } from '../lib/types.ts';
 import type { EntityID, OsmEntity, OsmEntityProps, Tags, Vec2 } from '../data/types.ts';
-import { OsmEntity as OsmEntityClass, createOsmEntity } from '../data/index.js';
+import { OsmEntity as OsmEntityClass, createOsmEntity } from '../data/index.ts';
 import { uiLoading } from '../ui/loading.js';
 
 
@@ -1145,7 +1145,7 @@ export class EditSystem extends AbstractSystem {
    */
   fromJSONAsync(json: string): Promise<void> {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const osm = context.services.osm as any;
 
     const backup: BackupJSON = JSON.parse(json);
@@ -1433,7 +1433,7 @@ export class EditSystem extends AbstractSystem {
    */
   private _gatherSources(annotation: string | Record<string, unknown>): EditSources {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const imagery = context.systems.imagery;
     const photos = context.systems.photos;
 
@@ -1453,8 +1453,8 @@ export class EditSystem extends AbstractSystem {
       }
     }
 
-    if (gfx) {
-      const customLayer = gfx.scene.layers.get('custom-data');
+    if (gfx?.scene) {
+      const customLayer = gfx.scene.layers.get('custom-data') as any;
       const customDataUsed = customLayer?.dataUsed() ?? [];
       const rapidDataUsed = (annotation as Record<string, unknown>)?.dataUsed as string[] ?? [];
       const dataUsed = [...rapidDataUsed, ...customDataUsed];

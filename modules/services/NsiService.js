@@ -1,6 +1,6 @@
 import { Matcher } from 'name-suggestion-index';
 
-import { AbstractSystem } from '../core/AbstractSystem.js';
+import { AbstractSystem } from '../core/AbstractSystem.ts';
 
 
 // Sometimes we can upgrade a feature tagged like `building=yes` to a better tag.

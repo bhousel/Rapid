@@ -77,7 +77,7 @@ export class PhotoSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
@@ -124,7 +124,7 @@ export class PhotoSystem extends AbstractSystem {
    */
   private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const scene = gfx?.scene;
 
     // photo_overlay
@@ -198,7 +198,7 @@ export class PhotoSystem extends AbstractSystem {
    */
   private _layerChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const scene = gfx?.scene;
     if (!scene) return;
 
@@ -206,7 +206,7 @@ export class PhotoSystem extends AbstractSystem {
     // If there is a currently selected detection, return to browse mode.
     for (const layerID of this.detectionLayerIDs) {
       const layer = scene.layers.get(layerID);
-      if (!layer.enabled && this._currDetectionLayerID === layerID) {
+      if (layer && !layer.enabled && this._currDetectionLayerID === layerID) {
         (context as any).enter('browse');
         this.selectDetection();  // deselect
       }
@@ -219,11 +219,11 @@ export class PhotoSystem extends AbstractSystem {
     let enabledCount = 0;
     for (const layerID of this.photoLayerIDs) {
       const layer = scene.layers.get(layerID);
-      if (layer.enabled) {
+      if (layer?.enabled) {
         enabledCount++;
       }
       if (layerID === this._currPhotoLayerID) {
-        if (layer.enabled) {
+        if (layer?.enabled) {
           this.selectPhoto(this._currPhotoLayerID, this._currPhotoID);  // keep selection
         } else {
           this.selectPhoto();  // deselect
@@ -244,7 +244,7 @@ export class PhotoSystem extends AbstractSystem {
    */
   private _photoChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
     const scene = gfx?.scene;
 
@@ -440,8 +440,8 @@ export class PhotoSystem extends AbstractSystem {
    */
   selectPhoto(layerID: PhotoLayerID | null = null, photoID: string | null = null): void {
     const context = this.context;
-    const map = context.systems.map as any;
-    const gfx = context.systems.gfx as any;
+    const map = context.systems.map;
+    const gfx = context.systems.gfx;
     const scene = gfx?.scene;
 
     const didChange = (this._currPhotoLayerID !== layerID || this._currPhotoID !== photoID);
@@ -492,8 +492,8 @@ export class PhotoSystem extends AbstractSystem {
    */
   selectDetection(layerID: DetectionLayerID | null = null, detectionID: string | null = null): void {
     const context = this.context;
-    const map = context.systems.map as any;
-    const gfx = context.systems.gfx as any;
+    const map = context.systems.map;
+    const gfx = context.systems.gfx;
     const scene = gfx?.scene;
 
     // If we're selecting a detection then make sure its layer is enabled too.
@@ -681,7 +681,7 @@ export class PhotoSystem extends AbstractSystem {
    */
   isLayerEnabled(layerID: LayerID): boolean {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const layer = gfx?.scene?.layers?.get(layerID);
     return layer?.enabled ?? false;
   }

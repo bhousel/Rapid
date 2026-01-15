@@ -5,7 +5,7 @@ import {
 } from '@rapid-sdk/math';
 
 import { actionAddMidpoint, actionChangeTags, actionMergeNodes, actionSplit, actionSyncCrossingTags } from '../actions/index.js';
-import { OsmNode } from '../data/OsmNode.js';
+import { OsmNode } from '../data/OsmNode.ts';
 import {
   osmFlowingWaterwayTagValues, osmPathHighwayTagValues, osmRailwayTrackTagValues,
   osmRoutableAerowayTags, osmRoutableHighwayTagValues

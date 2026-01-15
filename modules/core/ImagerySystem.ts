@@ -113,7 +113,7 @@ export class ImagerySystem extends AbstractSystem {
 
     const context = this.context;
     const assets = context.systems.assets;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const l10n = context.systems.l10n;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
@@ -541,7 +541,7 @@ export class ImagerySystem extends AbstractSystem {
     this._brightness = val;
 
     const context = this.context;
-    const layer = (context.systems.gfx as any)?.scene?.layers?.get('background');
+    const layer = context.systems.gfx?.scene?.layers?.get('background') as any;
     layer?.setBrightness(val);
     this._imageryChanged();
   }
@@ -563,7 +563,7 @@ export class ImagerySystem extends AbstractSystem {
     this._contrast = val;
 
     const context = this.context;
-    const layer = (context.systems.gfx as any)?.scene?.layers?.get('background');
+    const layer = context.systems.gfx?.scene?.layers?.get('background') as any;
     layer?.setContrast(val);
     this._imageryChanged();
   }
@@ -585,7 +585,7 @@ export class ImagerySystem extends AbstractSystem {
     this._saturation = val;
 
     const context = this.context;
-    const layer = (context.systems.gfx as any)?.scene?.layers?.get('background');
+    const layer = context.systems.gfx?.scene?.layers?.get('background') as any;
     layer?.setSaturation(val);
     this._imageryChanged();
   }
@@ -607,7 +607,7 @@ export class ImagerySystem extends AbstractSystem {
     this._sharpness = val;
 
     const context = this.context;
-    const layer = (context.systems.gfx as any)?.scene?.layers?.get('background');
+    const layer = context.systems.gfx?.scene?.layers?.get('background') as any;
     layer?.setSharpness(val);
     this._imageryChanged();
   }
@@ -795,7 +795,7 @@ export class ImagerySystem extends AbstractSystem {
    */
   private _imageryChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
 
     const baseLayer = this._baseLayer;

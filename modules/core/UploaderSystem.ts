@@ -4,7 +4,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { actionDiscardTags } from '../actions/discard_tags.js';
 import { actionMergeRemoteChanges } from '../actions/merge_remote_changes.js';
 import { actionRevert } from '../actions/revert.js';
-import { createOsmEntity } from '../data/index.js';
+import { createOsmEntity } from '../data/index.ts';
 import { Graph } from '../lib/Graph.ts';
 
 import type { Context } from './types.ts';
@@ -130,7 +130,7 @@ export class UploaderSystem extends AbstractSystem {
 
     const context = this.context;
     const assets = context.systems.assets;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor;
     const l10n = context.systems.l10n;
 
     return this._initPromise = super.initAsync()
@@ -217,7 +217,7 @@ export class UploaderSystem extends AbstractSystem {
     this._errors = [];
 
     // Store original changes, in case user wants to download them as an .osc file
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor!;
     this._origChanges = editor.changes(actionDiscardTags(editor.difference(), this._discardTags));
 
     // Attempt a fast upload first.. If there are conflicts, re-enter with `checkConflicts = true`
@@ -236,12 +236,12 @@ export class UploaderSystem extends AbstractSystem {
   private _startConflictCheck(): void {
     const context = this.context;
     const osm = context.services.osm as any;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor!;
     const summary = editor.difference().summary();
-    const graph = editor.staging.graph;
+    const graph = editor.staging.graph!;
 
     this._localGraph = graph;
-    this._remoteGraph = new Graph(editor.base.graph);
+    this._remoteGraph = new Graph(editor.base.graph!);
 
     // Gather entityIDs to check
     // We will load these from the OSM API into the `remoteGraph`
@@ -252,7 +252,7 @@ export class UploaderSystem extends AbstractSystem {
         const entity = graph.entity(entityID);
         this._toCheckIDs.add(entityID);   // The modified entity
 
-        for (const child of graph.childNodes(entity)) {  // and any children
+        for (const child of graph.childNodes(entity as any)) {  // and any children
           if (child.version !== undefined) {
             this._toCheckIDs.add(child.id);
           }
@@ -350,7 +350,7 @@ export class UploaderSystem extends AbstractSystem {
   private _detectConflicts(): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor!;
     const osm = context.services.osm as any;
     if (!osm) return;
 
@@ -457,7 +457,7 @@ export class UploaderSystem extends AbstractSystem {
       this._didResultInErrors();
 
     } else {
-      const editor = context.systems.editor as any;
+      const editor = context.systems.editor!;
       const changes = editor.changes(actionDiscardTags(editor.difference(), this._discardTags));
       if (changes.modified.length || changes.created.length || changes.deleted.length) {
         this.emit('willAttemptUpload');
@@ -513,7 +513,7 @@ export class UploaderSystem extends AbstractSystem {
    */
   private _didResultInErrors(): void {
     // this.context.systems.editor.pop();
-    const editor = this.context.systems.editor as any;
+    const editor = this.context.systems.editor!;
     editor.revert();
     this.emit('resultErrors', this._errors);
     this._endSave();
@@ -557,7 +557,7 @@ export class UploaderSystem extends AbstractSystem {
    */
   cancelConflictResolution(): void {
     // this.context.systems.editor.pop();
-    const editor = this.context.systems.editor as any;
+    const editor = this.context.systems.editor!;
     editor.revert();
   }
 
@@ -567,12 +567,12 @@ export class UploaderSystem extends AbstractSystem {
    * Process conflicts that have been resolved by the user and retry the upload
    */
   processResolvedConflicts(): void {
-    const editor = this.context.systems.editor as any;
+    const editor = this.context.systems.editor!;
 
     for (const conflict of this._conflicts) {
       if (conflict.chosen === 1) {   // user chose "use theirs"
-        const graph = editor.staging.graph;
-        const entity = graph.hasEntity(conflict.id);
+        const graph = editor.staging.graph!;
+        const entity = graph.hasEntity(conflict.id) as any;
         if (entity?.type === 'way') {
           for (const child of utilArrayUniq(entity.nodes)) {
             editor.perform(actionRevert(child));

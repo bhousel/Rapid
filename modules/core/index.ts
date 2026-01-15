@@ -19,6 +19,11 @@ import { UploaderSystem } from './UploaderSystem.ts';
 import { UrlHashSystem } from './UrlHashSystem.ts';
 import { ValidationSystem } from './ValidationSystem.ts';
 
+import type { Context, SystemID } from './types.ts';
+
+/** Type for a System class constructor */
+type SystemConstructor = new (context: Context) => AbstractSystem;
+
 export {
   AbstractSystem,
   AssetSystem,
@@ -42,9 +47,18 @@ export {
   ValidationSystem
 };
 
+// Re-export types from types.ts for convenience
+export type { Context, D3Selection, D3EnterSelection, Nullable, System, SystemID, Systems } from './types.ts';
+
+/** Container for registering available systems */
+interface SystemsRegistry {
+  /** Map of system IDs to their constructors - systems here will be instantiated at init time */
+  available: Map<SystemID, SystemConstructor>;
+}
+
 // At init time, we will instantiate any that are in the 'available' collection.
-export const systems = {
-  available: new Map()   // Map<systemID, System constructor>
+export const systems: SystemsRegistry = {
+  available: new Map<SystemID, SystemConstructor>()
 };
 
 systems.available.set('assets', AssetSystem);
@@ -66,9 +80,3 @@ systems.available.set('ui', UiSystem);
 systems.available.set('uploader', UploaderSystem);
 systems.available.set('urlhash', UrlHashSystem);
 systems.available.set('validator', ValidationSystem);
-
-/**
- *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
- *  @typedef  {string}          systemID
- *  @typedef  {AbstractSystem}  System
- */

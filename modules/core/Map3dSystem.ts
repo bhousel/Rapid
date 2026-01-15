@@ -106,8 +106,8 @@ export class Map3dSystem extends AbstractSystem {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
-    const gfx = context.systems.gfx as any;
-    const ui = context.systems.ui as any;
+    const gfx = context.systems.gfx!;
+    const ui = context.systems.ui!;
 
     const prerequisites = Promise.all([
       ui.startAsync(),    // wait for UI to be started, so the container will exist
@@ -137,8 +137,8 @@ export class Map3dSystem extends AbstractSystem {
         });
 
         // Setup event handlers..
-        gfx.on('draw', this.deferredRedraw);  // respond to changes in the main map
-        gfx.on('move', this.deferredRedraw);
+        gfx!.on('draw', this.deferredRedraw);  // respond to changes in the main map
+        gfx!.on('move', this.deferredRedraw);
         maplibre.on('move', this._map3dmoved);   // respond to changes in the 3d map
         maplibre.on('moveend', this._map3dmoved);
 
@@ -381,12 +381,13 @@ export class Map3dSystem extends AbstractSystem {
   private _map3dmoved(): void {
     const context = this.context;
     const maplibre = this.maplibre;
-    const map = context.systems.map as any;
+    const map = context.systems.map;
     const viewport = context.viewport;
     const transform = viewport.transform;
 
     if (!maplibre) return;      // called too early?
     if (!this._lastv) return;   // haven't positioned the map yet (it may be at null island), Rapid#1441
+    if (!map) return;           // map system not available
 
     const mlCenter = maplibre.getCenter();
     const mlCenterLoc: Vec2 = [mlCenter.lng, mlCenter.lat];
@@ -418,7 +419,8 @@ export class Map3dSystem extends AbstractSystem {
     if (!this.maplibre) return;   // called too soon?
 
     const context = this.context;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor;
+    if (!editor) return;
     const viewport = context.viewport;
 
     const entities = editor.intersects(viewport.visibleExtent());
@@ -455,8 +457,9 @@ export class Map3dSystem extends AbstractSystem {
    */
   private _updateBuildingData(entities: OsmEntity[]): void {
     const context = this.context;
-    const editor = context.systems.editor as any;
-    const graph = editor.staging.graph;
+    const editor = context.systems.editor;
+    if (!editor) return;
+    const graph = editor.staging.graph!;
     const selectedIDs = (context as any).selectedIDs();
 
     const buildingFeatures = [];
@@ -477,9 +480,9 @@ export class Map3dSystem extends AbstractSystem {
         const wayEntity = entity as any;  // Buildings are OsmWays with nodes property
 
         for (const node of wayEntity.nodes) {
-          const parents = graph.parentWays(graph.hasEntity(node));
+          const parents = graph.parentWays(graph.hasEntity(node) as any);
           for (const way of parents) {
-            if (way.tags['building:part'] && geomPolygonContainsPolygon(wayEntity.nodes.map((n: string) => graph.hasEntity(n).loc), way.nodes.map((n: string) => graph.hasEntity(n).loc))) {
+            if (way.tags['building:part'] && geomPolygonContainsPolygon(wayEntity.nodes.map((n: string) => (graph.hasEntity(n) as any).loc), way.nodes.map((n: string) => (graph.hasEntity(n) as any).loc))) {
               touchesBuildingPart = true;
               break;
             }
@@ -520,7 +523,8 @@ export class Map3dSystem extends AbstractSystem {
    */
   private _updateAreaData(entities: OsmEntity[]): void {
     const context = this.context;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor;
+    if (!editor) return;
     const graph = editor.staging.graph;
     const styles = context.systems.styles!;
     const selectedIDs = (context as any).selectedIDs();
@@ -564,7 +568,8 @@ export class Map3dSystem extends AbstractSystem {
    */
   private _updateRoadData(entities: OsmEntity[]): void {
     const context = this.context;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor;
+    if (!editor) return;
     const graph = editor.staging.graph;
     const styles = context.systems.styles!;
     const selectedIDs = (context as any).selectedIDs();

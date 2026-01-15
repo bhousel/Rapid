@@ -3,7 +3,7 @@ import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import * as sexagesimal from '@mapbox/sexagesimal';
 
 import { Graph } from '../lib/Graph.ts';
-import { createOsmEntity } from '../data/index.js';
+import { createOsmEntity } from '../data/index.ts';
 import { uiIcon } from './icon.js';
 import { utilCmd, utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../util/index.ts';
 

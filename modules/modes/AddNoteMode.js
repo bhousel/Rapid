@@ -1,5 +1,5 @@
 import { AbstractMode } from './AbstractMode.js';
-import { Marker } from '../data/Marker.js';
+import { Marker } from '../data/Marker.ts';
 
 const DEBUG = false;
 

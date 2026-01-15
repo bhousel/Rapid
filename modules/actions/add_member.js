@@ -1,7 +1,7 @@
 import { utilArrayGroupBy, utilObjectOmit } from '@rapid-sdk/util';
 
 import { osmJoinWays } from '../lib/multipolygon.ts';
-import { OsmWay } from '../data/OsmWay.js';
+import { OsmWay } from '../data/OsmWay.ts';
 
 
 export function actionAddMember(relationID, member, memberIndex, insertPair) {

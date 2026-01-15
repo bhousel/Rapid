@@ -3,8 +3,8 @@ import { utilArrayIntersection, utilArrayUniq } from '@rapid-sdk/util';
 
 import { actionAddMember } from './add_member.js';
 import { osmIsOldMultipolygonOuterMember } from '../lib/multipolygon.ts';
-import { OsmRelation } from '../data/OsmRelation.js';
-import { OsmWay } from '../data/OsmWay.js';
+import { OsmRelation } from '../data/OsmRelation.ts';
+import { OsmWay } from '../data/OsmWay.ts';
 
 
 // Split a way at the given node.

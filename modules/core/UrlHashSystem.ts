@@ -177,7 +177,7 @@ export class UrlHashSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor;
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -318,7 +318,7 @@ export class UrlHashSystem extends AbstractSystem {
     if (!this.doUpdateTitle) return;
 
     const context = this.context;
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor;
     const l10n = context.systems.l10n;
     const graph = editor?.staging?.graph;
     if (!editor || !l10n || !graph) return;

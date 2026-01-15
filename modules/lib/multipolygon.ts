@@ -1,9 +1,9 @@
 import { actionReverse } from '../actions/reverse.js';
 import { osmIsInterestingTag } from './tags.js';
 
-import { OsmNode } from '../data/OsmNode.js';
-import { OsmRelation } from '../data/OsmRelation.js';
-import { OsmWay } from '../data/OsmWay.js';
+import { OsmNode } from '../data/OsmNode.ts';
+import { OsmRelation } from '../data/OsmRelation.ts';
+import { OsmWay } from '../data/OsmWay.ts';
 
 import type { Graph } from './Graph.ts';
 import type { OsmEntity, OsmRelationMember } from '../data/types.ts';

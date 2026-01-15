@@ -1063,7 +1063,7 @@ export class SchemaSystem extends AbstractSystem {
    */
   private _schemaChanged(): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx;
 
     // Reset the Category, Preset, Field cached data
     for (const field of this.fields.values()) {

@@ -2,7 +2,7 @@ import { Extent } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 import RBush from 'rbush';
 
-import { AbstractSystem } from '../core/AbstractSystem.js';
+import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 

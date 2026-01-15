@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 
 import { JXON } from '../../util/jxon.ts';
 import { actionDiscardTags } from '../../actions/discard_tags.js';
-import { OsmChangeset } from '../../data/OsmChangeset.js';
+import { OsmChangeset } from '../../data/OsmChangeset.ts';
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
 import { utilHighlightEntities } from '../../util/util.ts';
