@@ -17,10 +17,10 @@ export interface CoordData {
 
 /** Extended WheelEvent with normalized delta values */
 export interface NormalizedWheelEvent extends WheelEvent {
-  _gesture?: 'zoom' | 'pan';
-  _normalizedDeltaX?: number;
-  _normalizedDeltaY?: number;
-  _coord?: CoordData;
+  _gesture: 'zoom' | 'pan';
+  _normalizedDeltaX: number;
+  _normalizedDeltaY: number;
+  _coord: CoordData;
 }
 
 

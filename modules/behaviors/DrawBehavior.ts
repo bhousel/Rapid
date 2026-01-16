@@ -1,8 +1,12 @@
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
-// import { geoChooseEdge } from '../geo/geom.js';
 import { utilDetect } from '../util/detect.ts';
+// import { geoChooseEdge } from '../geo/geom.js';
+
+import type { FederatedPointerEvent } from 'pixi.js';
+import type { EventData } from './AbstractBehavior.ts';
+import type { Context } from '../Context.ts';
 
 const NEAR_TOLERANCE = 4;
 const FAR_TOLERANCE = 12;
@@ -26,12 +30,17 @@ const FAR_TOLERANCE = 12;
  *   `finish`    Fires if user presses return, enter, or escape
  */
 export class DrawBehavior extends AbstractBehavior {
+  lastDown: EventData | null;
+  lastMove: EventData | null;
+  lastSpace: EventData | null;
+  lastClick: EventData | null;
+  private _spaceClickDisabled: boolean;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'draw';
 
@@ -58,7 +67,7 @@ export class DrawBehavior extends AbstractBehavior {
    * enable
    * Bind event handlers
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
 
     this._enabled = true;
@@ -69,7 +78,8 @@ export class DrawBehavior extends AbstractBehavior {
 
     this._spaceClickDisabled = false;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.on('keydown', this._keydown);
     eventManager.on('keyup', this._keyup);
     eventManager.on('modifierchange', this._doMove);
@@ -86,7 +96,7 @@ export class DrawBehavior extends AbstractBehavior {
    * disable
    * Unbind event handlers
    */
-  disable() {
+  disable(): void {
     if (!this._enabled) return;
 
     this._enabled = false;
@@ -97,7 +107,8 @@ export class DrawBehavior extends AbstractBehavior {
 
     this._spaceClickDisabled = false;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.off('keydown', this._keydown);
     eventManager.off('keyup', this._keyup);
     eventManager.off('modifierchange', this._doMove);
@@ -113,9 +124,9 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  {Event}  e - A DOM KeyboardEvent
+   * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e) {
+  _keydown(e: KeyboardEvent): void {
     if (['Enter', 'Escape', 'Esc'].includes(e.key)) {
       e.preventDefault();
       this.emit('finish');
@@ -136,9 +147,9 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _keyup
    * Handler for keyup events on the window.
-   * @param  {Event}  e - A DOM KeyboardEvent
+   * @param  e - A DOM KeyboardEvent
    */
-  _keyup(e) {
+  _keyup(e: KeyboardEvent): void {
     // After spacebar click, user must move pointer or lift spacebar to allow another spacebar click
     if (this._spaceClickDisabled && [' ', 'Spacebar'].includes(e.key)) {
       e.preventDefault();
@@ -152,9 +163,9 @@ export class DrawBehavior extends AbstractBehavior {
    * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
-   * @param  {Event}  e - A Pixi InteractionEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e) {
+  _pointerdown(e: FederatedPointerEvent): void {
     if (this.lastDown) return;  // a pointer is already down
 
     const down = this._getEventData(e);
@@ -167,9 +178,9 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  {Event}  e - A Pixi InteractionEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e) {
+  _pointermove(e: FederatedPointerEvent): void {
     const move = this._getEventData(e);
     this.lastMove = move;
 
@@ -197,9 +208,9 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _pointerup
    * Handler for pointerup events.
-   * @param  {Event}  e - A Pixi InteractionEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e) {
+  _pointerup(e: FederatedPointerEvent): void {
     const down = this.lastDown;
     const up = this._getEventData(e);
     if (!down || down.id !== up.id) return;  // not down, or different pointer
@@ -219,9 +230,8 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * _pointercancel
    * Handler for pointercancel events.
-   * @param  {Event}  e - A Pixi InteractionEvent
    */
-  _pointercancel() {
+  _pointercancel(): void {
     this.lastDown = null;  // prepare for the next `pointerdown`
   }
 
@@ -231,7 +241,7 @@ export class DrawBehavior extends AbstractBehavior {
    * Handler for `keydown` events of the spacebar. We use these to simulate clicks.
    * Note that the spacebar will repeat, so we can get many of these.
    */
-  _spacebar() {
+  _spacebar(): void {
     if (this._spaceClickDisabled) return;
 
     // For spacebar clicks we will use the last move event as the trigger
@@ -252,22 +262,23 @@ export class DrawBehavior extends AbstractBehavior {
    * Checks lastMove and emits a 'move' event if needed.
    * This may also be fired if we detect a change in the modifier keys.
    */
-  _doMove() {
+  _doMove(): void {
     if (!this._enabled || !this.lastMove) return;  // nothing to do
 
     // Ignore it if we are not over the canvas
     // (e.g. sidebar, out of browser window, over a button, toolbar, modal)
     const context = this.context;
-    const eventManager = context.systems.gfx.eventManager;
+    const gfx = context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     if (!eventManager.pointerOverRenderer) return;
 
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
-    const eventData = Object.assign({}, this.lastMove);  // shallow copy
+    const eventData: EventData = Object.assign({}, this.lastMove);  // shallow copy
 
     // Handle situations where we don't want to hover a target way...
-    let isActiveTarget = false;
+    const isActiveTarget = false;
 //    if (eventData?.target?.layerID === 'osm') {
 //      const mode = context.mode;
 //      const target = eventData?.target?.data || null;
@@ -313,22 +324,23 @@ export class DrawBehavior extends AbstractBehavior {
    * _doClick
    * Checks lastClick and emits a 'click' event if needed
    */
-  _doClick() {
+  _doClick(): void {
     if (!this._enabled || !this.lastClick) return;  // nothing to do
 
     // Ignore it if we are not over the canvas
     // (e.g. sidebar, out of browser window, over a button, toolbar, modal)
     const context = this.context;
-    const eventManager = context.systems.gfx.eventManager;
+    const gfx = context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     // if (!eventManager.pointerOverRenderer) return;
 
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
-    const eventData = Object.assign({}, this.lastClick);  // shallow copy
+    const eventData: EventData = Object.assign({}, this.lastClick);  // shallow copy
 
     // Handle situations where we don't want to hover a target way...
-    let isActiveTarget = false;
+    const isActiveTarget = false;
 //    if (eventData?.target?.layerID === 'osm') {
 //      const mode = context.mode;
 //      const target = eventData?.target?.data || null;

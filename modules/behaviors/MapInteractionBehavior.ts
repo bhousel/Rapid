@@ -1,6 +1,8 @@
-import { DEG2RAD, numClamp, vecLength, vecSubtract } from '@rapid-sdk/math';
+import { DEG2RAD, numClamp, Vec2, vecLength, vecSubtract } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
+import type { EventData } from './AbstractBehavior.ts';
+import type { Context } from '../Context.ts';
 import { OsmNode } from '../data/OsmNode.ts';
 
 const NEAR_TOLERANCE = 1;
@@ -8,6 +10,15 @@ const FAR_TOLERANCE = 4;
 const MIN_Z = 2;
 const MAX_Z = 24;
 const ROTATION_THRESHOLD = 0.01;
+
+
+/** Touch point tracking data */
+interface TouchData {
+  x: number;
+  y: number;
+  clientX: number;
+  clientY: number;
+}
 
 /**
  * `MapInteractionBehavior` listens to pointer events and converts those into zoom/pan map interactions
@@ -19,12 +30,21 @@ const ROTATION_THRESHOLD = 0.01;
  *   `gesture`             String containing the current detected gesture ('pan' or 'rotate')
  */
 export class MapInteractionBehavior extends AbstractBehavior {
+  lastDown: EventData | null;
+  gesture: 'pan' | 'rotate' | null;
+  doubleClickEnabled: boolean;
+  activeTouches: Record<number, TouchData>;
+  previousMode: string | undefined;
+  private _lastPoint: Vec2 | null;
+  private _lastAngle: number | null;
+  private _initialPinchDistance: number | null;
+  private _initialAngle: number | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'mapInteraction';
 
@@ -55,7 +75,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * enable
    * Bind event handlers
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
 
     this._enabled = true;
@@ -65,7 +85,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._lastPoint = null;
     this._lastAngle = null;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.on('click', this._click);
     eventManager.on('keydown', this._keydown);
     eventManager.on('pointerdown', this._pointerdown);
@@ -80,7 +101,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * disable
    * Unbind event handlers
    */
-  disable() {
+  disable(): void {
     if (!this._enabled) return;
 
     this._enabled = false;
@@ -90,7 +111,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._lastPoint = null;
     this._lastAngle = null;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.off('click', this._click);
     eventManager.off('keydown', this._keydown);
     eventManager.off('pointerdown', this._pointerdown);
@@ -104,9 +126,9 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  {Event}  e - A DOM KeyboardEvent
+   * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e) {
+  _keydown(e: KeyboardEvent): void {
     // Only allow key navigation if the user doesn't have something
     // more important focused - like a input, textarea, menu, etc.
     // (buttons are ok, but not preset buttons)
@@ -115,8 +137,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
     if (document.activeElement?.classList?.contains('preset-list-button')) return;
 
     const context = this.context;
-    const map = context.systems.map;
-    const photos = context.systems.photos;
+    const map = context.systems.map!;
+    const photos = context.systems.photos!;
     const viewport = context.viewport;
     const EASE = 100;  // milliseconds
 
@@ -127,7 +149,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
     if (e.shiftKey) {
       const ROT_AMOUNT = 2.5 * DEG2RAD;   // ± 2.5°
       const t = viewport.transform.props;
-      let delta;
+      let delta: number | undefined;
       if (e.key === 'ArrowLeft') {
         delta = -ROT_AMOUNT;
       } else if (e.key === 'ArrowRight') {
@@ -150,7 +172,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
       const [w, h] = viewport.dimensions;
       const panMore = (e.altKey || e.metaKey || e.ctrlKey);  // pan more if modifier down
 
-      let delta;
+      let delta: Vec2 | undefined;
       if (e.key === 'ArrowLeft') {
         delta = panMore ? [w / 2, 0] : [PAN_AMOUNT, 0];
       } else if (e.key === 'ArrowRight') {
@@ -172,15 +194,15 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _click
    * Handler for click events, used to support double-click to zoom/unzoom.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _click(e) {
+  _click(e: any): void {
     if (!this.doubleClickEnabled) return;
     if (e.detail !== 2) return;    // double clicks only
     if (e.pointerType === 'mouse' && e.button !== 0) return;   // left click only (if a mouse)
 
     const context = this.context;
-    const map = context.systems.map;
+    const map = context.systems.map!;
     const viewport = context.viewport;
     const t = viewport.transform.props;
 
@@ -219,13 +241,13 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e) {
+  _pointerdown(e: any): void {
     if (this._isPaneOpen()) {
       return; // Ignore move events if any pane is open
     }
-    const currentMode = this.context.mode.id;
+    const currentMode = this.context.mode!.id;
     if (this.previousMode !== currentMode) {
       this._resetTouchStates();
       this.previousMode = currentMode;
@@ -243,7 +265,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._updatePinchState();
 
     const context = this.context;
-    const eventManager = context.systems.gfx.eventManager;
+    const gfx = context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
 
     // If shift is pressed it's a lasso, not a map drag
     if (eventManager.modifierKeys.has('Shift')) return;
@@ -259,7 +282,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._lastPoint = null;
     this._lastAngle = null;
 
-    const mode = context.mode.id;
+    const mode = context.mode!.id;
     if (mode === 'draw-area' || mode === 'draw-line') {
       eventManager.setCursor('crosshair');
     } else {
@@ -271,17 +294,17 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e) {
+  _pointermove(e: any): void {
     if (this._isPaneOpen()) {
       return; // Ignore move events if any pane is open
     }
 
     const context = this.context;
-    const gfx = context.systems.gfx;
-    const map = context.systems.map;
-    const eventManager = gfx.eventManager;
+    const gfx = context.systems.gfx!;
+    const map = context.systems.map!;
+    const eventManager = gfx.eventManager!;
     const viewport = context.viewport;
 
     this.activeTouches[e.pointerId] = { x: e.global.x, y: e.global.y, clientX: e.clientX, clientY: e.clientY };
@@ -289,8 +312,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
       const touchPoints = Object.values(this.activeTouches);
       const currentDistance = this._getDistanceBetweenTouches();
       const currentAngle = Math.atan2(touchPoints[1].clientY - touchPoints[0].clientY, touchPoints[1].clientX - touchPoints[0].clientX);
-      const angleDelta = currentAngle - this._initialAngle;
-      const scaleChange = currentDistance / this._initialPinchDistance;
+      const angleDelta = currentAngle - this._initialAngle!;
+      const scaleChange = currentDistance / this._initialPinchDistance!;
       const currentZoom = viewport.transform.zoom;
       const dampingFactor = currentZoom > 16 ? 0.25 : (currentZoom / 16) * 0.1 + 0.25;
       const adjustedScaleChange = 1 + (scaleChange - 1) * dampingFactor;
@@ -312,12 +335,14 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
     // Because the handler is listening on the Pixi surface, and the surface is itself
     // getting transformed, we use `clientX`/`clientY` to avoid the map being jittery.
-    const currPoint = [move.originalEvent.clientX, move.originalEvent.clientY];
+    const moveEvent = move.originalEvent as PointerEvent;
+    const currPoint: Vec2 = [moveEvent.clientX, moveEvent.clientY];
     const t = viewport.transform.props;
 
     if (!this.gesture) {   // start dragging?
       const dist = vecLength(down.coord.screen, move.coord.screen);
-      const tolerance = (down.originalEvent.pointerType === 'pen') ? FAR_TOLERANCE : NEAR_TOLERANCE;
+      const downEvent = down.originalEvent as PointerEvent;
+      const tolerance = (downEvent.pointerType === 'pen') ? FAR_TOLERANCE : NEAR_TOLERANCE;
       this._lastPoint = currPoint;
       this._lastAngle = t.r;
 
@@ -328,7 +353,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
     }
 
     if (this.gesture) {  // continue dragging
-      const [dx, dy] = vecSubtract(currPoint, this._lastPoint);   // delta pointer movement
+      const [dx, dy] = vecSubtract(currPoint, this._lastPoint!);   // delta pointer movement
       this._lastPoint = currPoint;
 
       if (this.gesture === 'pan') {
@@ -345,7 +370,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
         ];
         const degrees = (sy * dx) + (sx * dy);   // Degrees rotation to apply: + clockwise, - counterclockwise
         const SPEED = 0.3;
-        const angle = this._lastAngle + (degrees * DEG2RAD * SPEED);
+        const angle = this._lastAngle! + (degrees * DEG2RAD * SPEED);
         this._lastAngle = angle;
 
         // map.transform({ x: t.x, y: t.y, k: t.k, r: angle });
@@ -358,9 +383,9 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _pointerup
    * Handler for pointerup events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e) {
+  _pointerup(e: any): void {
     delete this.activeTouches[e.pointerId];
     if (Object.keys(this.activeTouches).length === 0) {
       this._initialPinchDistance = null;
@@ -373,8 +398,9 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._lastPoint = null;
     this._lastAngle = null;
 
-    const eventManager = this.context.systems.gfx.eventManager;
-    const mode = this.context.mode.id;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
+    const mode = this.context.mode!.id;
     if (mode === 'draw-area' || mode === 'draw-line') {
       eventManager.setCursor('crosshair');
     } else {
@@ -386,9 +412,9 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _pointercancel
    * Handler for pointercancel events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointercancel(e) {
+  _pointercancel(e: any): void {
     delete this.activeTouches[e.pointerId];
     if (Object.keys(this.activeTouches).length === 0) {
       this._initialPinchDistance = null;
@@ -450,10 +476,9 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _getDistanceBetweenTouches
    * Calculates the distance between two touch points.
-   * @param   {Event}   e - The event object containing touch points.
-   * @return  {number}  The distance between the two touch points.
+   * @return  The distance between the two touch points.
    */
-  _getDistanceBetweenTouches() {
+  _getDistanceBetweenTouches(): number {
     const touchPoints = Object.values(this.activeTouches);
     if (touchPoints.length === 2) {
       // Use clientX and clientY for calculating distance to avoid issues with element transformations
@@ -468,11 +493,11 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _wheel
    * Handler for wheel events.
-   * @param  `e`  A DOM WheelEvent
+   * @param  e  A DOM WheelEvent (with custom properties)
    */
-  _wheel(e) {
+  _wheel(e: any): void {
     const context = this.context;
-    const map = context.systems.map;
+    const map = context.systems.map!;
 
     const [dx, dy] = [e._normalizedDeltaX, e._normalizedDeltaY];
 
@@ -523,14 +548,14 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * _updatePinchState
    * Updates the pinch state by recalculating the scale change.
    */
-  _updatePinchState() {
+  _updatePinchState(): void {
     const touchPoints = Object.values(this.activeTouches);
     if (touchPoints.length === 2) {
       const [first, second] = touchPoints;
       const currentDistance = Math.hypot(first.x - second.x, first.y - second.y);
       const currentZoom = this.context.viewport.transform.zoom;
       const clampedZoom = Math.max(MIN_Z, Math.min(currentZoom, MAX_Z));
-      this.context.systems.map.zoom(clampedZoom);
+      this.context.systems.map!.zoom(clampedZoom);
       this._initialPinchDistance = currentDistance; // Update the initial distance for the next move event
     }
   }
@@ -540,7 +565,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * _resetTouchStates
    * Resets the touch-related states to their initial values.
    */
-  _resetTouchStates() {
+  _resetTouchStates(): void {
     this.activeTouches = {};
     this._initialPinchDistance = null;
     this._initialAngle = null;
@@ -551,9 +576,9 @@ export class MapInteractionBehavior extends AbstractBehavior {
   /**
    * _isPaneOpen
    * Checks if any of the specified panes within the '.map-panes' container are open.
-   * @returns {boolean}  True if any of the specified panes are open, otherwise false.
+   * @return  True if any of the specified panes are open, otherwise false.
    */
-  _isPaneOpen() {
+  _isPaneOpen(): boolean {
     // Check if the user is on a mobile device
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     if (!isMobile) {

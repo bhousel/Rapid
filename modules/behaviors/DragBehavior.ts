@@ -2,8 +2,12 @@ import { select as d3_select } from 'd3-selection';
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
-import { OsmNode, Marker } from '../data/index.ts';
+import { Marker, OsmNode } from '../data/index.ts';
 import { utilDetect } from '../util/detect.ts';
+
+import type { FederatedPointerEvent } from 'pixi.js';
+import type { Context } from '../Context.ts';
+import type { EventData, EventTarget } from './AbstractBehavior.ts';
 
 const NEAR_TOLERANCE = 1;
 const FAR_TOLERANCE = 4;
@@ -24,12 +28,15 @@ const FAR_TOLERANCE = 4;
  *   `cancel`   Fires on pointercancel -or- pointerup outside, receives the cancel `eventData` Object
  */
 export class DragBehavior extends AbstractBehavior {
+  dragTarget: EventTarget | null;
+  lastDown: EventData | null;
+  lastMove: EventData | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'drag';
 
@@ -50,7 +57,7 @@ export class DragBehavior extends AbstractBehavior {
    * enable
    * Bind event handlers
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
 
     this._enabled = true;
@@ -58,7 +65,8 @@ export class DragBehavior extends AbstractBehavior {
     this.lastMove = null;
     this.dragTarget = null;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.on('modifierchange', this._doMove);
     eventManager.on('pointerover', this._doMove);
     eventManager.on('pointerout', this._doMove);
@@ -73,7 +81,7 @@ export class DragBehavior extends AbstractBehavior {
    * disable
    * Unbind event handlers
    */
-  disable() {
+  disable(): void {
     if (!this._enabled) return;
 
     // Something is currently dragging, so cancel the drag first.
@@ -81,7 +89,7 @@ export class DragBehavior extends AbstractBehavior {
     const target = this.dragTarget;
 
     if (eventData && target) {
-      target.feature.allowInteraction = true;
+      (target.feature as any).allowInteraction = true;
       this.dragTarget = null;
       this.emit('cancel', eventData);
     }
@@ -91,7 +99,8 @@ export class DragBehavior extends AbstractBehavior {
     this.lastMove = null;
     this.dragTarget = null;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.off('modifierchange', this._doMove);
     eventManager.off('pointerover', this._doMove);
     eventManager.off('pointerout', this._doMove);
@@ -107,9 +116,9 @@ export class DragBehavior extends AbstractBehavior {
    * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e) {
+  _pointerdown(e: FederatedPointerEvent): void {
     if (this.lastDown) return;   // a pointer is already down
     if (e.pointerType === 'mouse' && e.button !== 0) return;   // drag with left button only (if a mouse)
 
@@ -120,7 +129,7 @@ export class DragBehavior extends AbstractBehavior {
 
     const isNote = data instanceof Marker && data.isNew && target.layerID === 'notes';
     const isNode = data instanceof OsmNode && target.layerID === 'osm';       // not 'rapid'
-    const isMidpoint = data.type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
+    const isMidpoint = (data as any).type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
 
     if (!(isNote || isNode || isMidpoint)) return;
 
@@ -133,12 +142,12 @@ export class DragBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e) {
+  _pointermove(e: FederatedPointerEvent): void {
     const context = this.context;
-    const editor = context.systems.editor;
-    const gfx = context.systems.gfx;
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
     const graph = editor.staging.graph;
 
     // If we detect the edit (right-click) menu, we should cease any dragging behavior.
@@ -150,7 +159,7 @@ export class DragBehavior extends AbstractBehavior {
 
     // Ignore it if we are not over the canvas
     // (e.g. sidebar, out of browser window, over a button, toolbar, modal)
-    const eventManager = gfx.eventManager;
+    const eventManager = gfx.eventManager!;
     if (!eventManager.pointerOverRenderer) return;
 
     const down = this.lastDown;
@@ -172,12 +181,12 @@ export class DragBehavior extends AbstractBehavior {
       if (dist >= tolerance) {
         // Save the target, *and set it to be non-interactive*.
         // This lets us catch events for what other objects it passes over as the user drags it.
-        const target = Object.assign({}, down.target);  // shallow copy
+        const target: EventTarget = Object.assign({}, down.target);  // shallow copy
         this.dragTarget = target;
-        target.feature.allowInteraction = false;
+        (target.feature as any).allowInteraction = false;
 
         // What are we dragging?
-        const data = target.data;
+        const data: any = target.data;
         const isNote = data instanceof Marker;
         const isNode = data instanceof OsmNode;
         const isMidpoint = (data.type === 'midpoint');
@@ -185,7 +194,7 @@ export class DragBehavior extends AbstractBehavior {
         // If the current selection includes a parent of the dragged item,
         //  reselect those same feature(s) after the drag completes.
         // (The user is reshaping a line or area by dragging vertices or midpoints.)
-        let parentWays = [];
+        let parentWays: any[] = [];
         if (isMidpoint) {
           parentWays = [data.way];
         } else if (isNode) {
@@ -193,7 +202,7 @@ export class DragBehavior extends AbstractBehavior {
         }
 
         // Gather all parentIDs - include both ways and relations (such as multipolygons)
-        const parentIDs = new Set();
+        const parentIDs = new Set<string>();
         for (const way of parentWays) {
           parentIDs.add(way.id);
           for (const relation of graph.parentRelations(way)) {
@@ -202,7 +211,7 @@ export class DragBehavior extends AbstractBehavior {
         }
 
         const selectedIDs = context.selectedIDs();
-        const selectionIncludesParent = selectedIDs.some(selectedID => parentIDs.has(selectedID));
+        const selectionIncludesParent = selectedIDs.some((selectedID: string) => parentIDs.has(selectedID));
         const reselectIDs = selectionIncludesParent ? selectedIDs.slice() : [];
 
         // Enter the correct mode
@@ -224,9 +233,9 @@ export class DragBehavior extends AbstractBehavior {
   /**
    * _pointerup
    * Handler for pointerup events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e) {
+  _pointerup(e: FederatedPointerEvent): void {
     const down = this.lastDown;
     const up = this._getEventData(e);
     if (!down || down.id !== up.id) return;   // not down, or different pointer
@@ -248,7 +257,7 @@ export class DragBehavior extends AbstractBehavior {
 
     const target = this.dragTarget;
     if (target) {
-      target.feature.allowInteraction = true;
+      (target.feature as any).allowInteraction = true;
       this.dragTarget = null;
       this.emit('end', up);
     }
@@ -258,9 +267,9 @@ export class DragBehavior extends AbstractBehavior {
   /**
    * _pointercancel
    * Handler for pointercancel events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointercancel(e) {
+  _pointercancel(e: FederatedPointerEvent): void {
     const cancel = this._getEventData(e);
 
     // Here we can throw away the down data to prepare for another `pointerdown`.
@@ -270,7 +279,7 @@ export class DragBehavior extends AbstractBehavior {
 
     const target = this.dragTarget;
     if (target) {
-      target.feature.allowInteraction = true;
+      (target.feature as any).allowInteraction = true;
       this.dragTarget = null;
       this.emit('cancel', cancel);
     }
@@ -279,12 +288,13 @@ export class DragBehavior extends AbstractBehavior {
 
   /**
    * _snappingDisabled
-   * @return {boolean}  `true` if line snapping is disabled, `false` if line snapping is enabled.
+   * @return  `true` if line snapping is disabled, `false` if line snapping is enabled.
    */
-  _snappingDisabled() {
+  _snappingDisabled(): boolean {
     // Ignore it if we are not over the canvas
     // (e.g. sidebar, out of browser window, over a button, toolbar, modal)
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     if (!eventManager.pointerOverRenderer) return false;
 
     const modifiers = eventManager.modifierKeys;
@@ -299,9 +309,9 @@ export class DragBehavior extends AbstractBehavior {
    * Checks lastMove and emits a 'move' event if needed.
    * This may also be fired if we detect a change in the modifier keys.
    */
-  _doMove() {
+  _doMove(): void {
     if (!this._enabled || !this.lastMove) return;  // nothing to do
-    const eventData = Object.assign({}, this.lastMove);  // shallow copy
+    const eventData: EventData = Object.assign({}, this.lastMove);  // shallow copy
 
     // If a modifier key is down, discard the target to prevent snap/hover.
     if (this._snappingDisabled()) {

@@ -7,19 +7,19 @@ import type { D3Selection } from 'd3-selection';
 import type { Context } from './types.ts';
 
 
-/** Photo layer identifiers */
-export type PhotoLayerID = 'streetside' | 'mapillary' | 'kartaview';
+/** Photo layer identifiers (e.g. 'streetside', 'mapillary', 'kartaview') */
+export type PhotoLayerID = string;
 
-/** Detection layer identifiers */
-export type DetectionLayerID = 'mapillary-detections' | 'mapillary-signs';
+/** Detection layer identifiers (e.g. 'mapillary-detections', 'mapillary-signs') */
+export type DetectionLayerID = string;
 
 /** All layer identifiers (photos + detections) */
-export type LayerID = PhotoLayerID | DetectionLayerID;
+export type LayerID = string;
 
-/** Photo types for filtering */
-export type PhotoType = 'flat' | 'panoramic';
+/** Photo types for filtering (e.g. 'flat', 'panoramic') */
+export type PhotoType = string;
 
-/** Date filter types */
+/** Date filter types ('fromDate' or 'toDate') */
 export type DateFilter = 'fromDate' | 'toDate';
 
 

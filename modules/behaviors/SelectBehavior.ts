@@ -1,10 +1,15 @@
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
+import { MapInteractionBehavior } from './MapInteractionBehavior.ts';
 import { GeoJSON, Marker, OsmEntity, OsmNode, OsmWay } from '../data/index.ts';
 import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { geoChooseEdge } from '../geo/geom.js';
 import { utilDetect } from '../util/detect.ts';
+
+import type { EventData } from './AbstractBehavior.ts';
+import type { FederatedPointerEvent } from 'pixi.js';
+import type { Context } from '../Context.ts';
 
 const NEAR_TOLERANCE = 4;
 const FAR_TOLERANCE = 12;
@@ -22,12 +27,22 @@ const FAR_TOLERANCE = 12;
  *   `lastClick`    `eventData` Object for the most recent click event
  */
 export class SelectBehavior extends AbstractBehavior {
+  lastDown: EventData | null;
+  lastUp: EventData | null;
+  lastMove: EventData | null;
+  lastSpace: EventData | null;
+  lastClick: EventData | null;
+  private _multiSelection: Set<string>;
+  private _spaceClickDisabled: boolean;
+  private _longPressTimeout: ReturnType<typeof setTimeout> | null;
+  private _showsMenu: boolean;
+  private _showsMapRouletteMenu: boolean;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'select';
 
@@ -59,7 +74,7 @@ export class SelectBehavior extends AbstractBehavior {
    * enable
    * Bind event handlers
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
 
     this._enabled = true;
@@ -75,7 +90,8 @@ export class SelectBehavior extends AbstractBehavior {
     this.lastSpace = null;
     this.lastClick = null;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.on('keydown', this._keydown);
     eventManager.on('keyup', this._keyup);
     eventManager.on('pointerdown', this._pointerdown);
@@ -89,7 +105,7 @@ export class SelectBehavior extends AbstractBehavior {
    * disable
    * Unbind event handlers
    */
-  disable() {
+  disable(): void {
     if (!this._enabled) return;
 
     this._enabled = false;
@@ -107,7 +123,8 @@ export class SelectBehavior extends AbstractBehavior {
 
     this._cancelLongPress();
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.off('keydown', this._keydown);
     eventManager.off('keyup', this._keyup);
     eventManager.off('pointerdown', this._pointerdown);
@@ -120,9 +137,9 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  {Event}  e - A DOM KeyboardEvent
+   * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e) {
+  _keydown(e: KeyboardEvent): void {
     // if any key is pressed the user is probably doing something other than long-pressing
     this._cancelLongPress();
 
@@ -155,9 +172,9 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _keyup
    * Handler for keyup events on the window.
-   * @param  {Event}  e - A DOM KeyboardEvent
+   * @param  e - A DOM KeyboardEvent
    */
-  _keyup(e) {
+  _keyup(e: KeyboardEvent): void {
     // After spacebar click, user must move pointer or lift spacebar to allow another spacebar click
     if (this._spaceClickDisabled && [' ', 'Spacebar'].includes(e.key)) {
       e.preventDefault();
@@ -171,13 +188,13 @@ export class SelectBehavior extends AbstractBehavior {
    * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e) {
+  _pointerdown(e: FederatedPointerEvent): void {
     if (this.lastDown) return;  // a pointer is already down
 
     const context = this.context;
-    const ui = context.systems.ui;
+    const ui = context.systems.ui!;
 
     ui.closeEditMenu();
     this._showsMenu = false;
@@ -193,7 +210,7 @@ export class SelectBehavior extends AbstractBehavior {
 
     // For touch devices, we want to make sure that the context menu is accessible via long press.
     if (e.pointerType === 'touch') {
-      this._longPressTimeout = window.setTimeout(this._doLongPress, 750, down);
+      this._longPressTimeout = setTimeout(this._doLongPress, 750, down);
     }
   }
 
@@ -201,9 +218,9 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e) {
+  _pointermove(e: FederatedPointerEvent): void {
     const move = this._getEventData(e);
     this.lastMove = move;
 
@@ -229,9 +246,9 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _pointerup
    * Handler for pointerup events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e) {
+  _pointerup(e: FederatedPointerEvent): void {
     const down = this.lastDown;
     const up = this._getEventData(e);
     if (!down || down.id !== up.id) return;  // not down, or different pointer
@@ -241,8 +258,8 @@ export class SelectBehavior extends AbstractBehavior {
     if (down.isCancelled) return;   // was cancelled already by moving too much
 
     const dist = vecLength(down.coord.screen, up.coord.screen);
-    const updist = vecLength(up.coord.screen, this.lastUp ? this.lastUp.coord.screen : 0);
-    const lClick = up.event.button === 0;
+    const updist = vecLength(up.coord.screen, this.lastUp ? this.lastUp.coord.screen : [0, 0]);
+    const lClick = (up.event as PointerEvent).button === 0;
 
     // Second left-click nearby, targeting the same target, within half a second of the last up event.
     // We got ourselves a double click!
@@ -253,13 +270,13 @@ export class SelectBehavior extends AbstractBehavior {
     } else if (dist < NEAR_TOLERANCE || (dist < FAR_TOLERANCE && up.time - down.time < 500)) {
       this.lastClick = this.lastUp = up;  // We will accept this as a click
 
-      if (up.event.button === 2) {   // right click
-        if (!this.context.selectedIDs().includes(down.target.dataID)) {
+      if ((up.event as PointerEvent).button === 2) {   // right click
+        if (!this.context.selectedIDs().includes(down.target!.dataID!)) {
           this._doSelect();    // Select it first, if needed
         }
         const target = down.target;
-        if (target?.data?.serviceID === 'maproulette') {
-          const ui = this.context.systems.ui;
+        if ((target?.data as any)?.serviceID === 'maproulette') {
+          const ui = this.context.systems.ui!;
           const anchorPoint = up.coord.screen;
           ui.showMapRouletteMenu(anchorPoint, 'rightclick');
         } else {
@@ -276,9 +293,8 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _pointercancel
    * Handler for pointercancel events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
    */
-  _pointercancel() {
+  _pointercancel(): void {
     // Here we can throw away the down data to prepare for another `pointerdown`.
     // After pointercancel, there should be no more `pointermove` or `pointerup` events.
     this.lastDown = null;
@@ -290,7 +306,7 @@ export class SelectBehavior extends AbstractBehavior {
    * Handler for `keydown` events of the spacebar. We use these to simulate clicks.
    * Note that the spacebar will repeat, so we can get many of these.
    */
-  _spacebar() {
+  _spacebar(): void {
     if (this._spaceClickDisabled) return;
 
     // For spacebar clicks we will use the last move event as the trigger
@@ -310,21 +326,21 @@ export class SelectBehavior extends AbstractBehavior {
    * _doSelect
    * Once we have determined that the user has clicked, this is where we handle that click.
    */
-  _doSelect() {
+  _doSelect(): void {
     if (!this._enabled || !this.lastClick) return;  // nothing to do
 
     this._cancelLongPress();
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const gfx = context.systems.gfx!;
     const photos = context.systems.photos;
-    const eventManager = gfx.eventManager;
+    const eventManager = gfx.eventManager!;
 
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
     const isMultiselect = modifiers.has('Shift');
-    const eventData = Object.assign({}, this.lastClick);  // shallow copy
+    const eventData: EventData = Object.assign({}, this.lastClick);  // shallow copy
 
     // If a modifier key is down, discard the target to prevent snap/hover.
     if (disableSnap) {
@@ -333,12 +349,12 @@ export class SelectBehavior extends AbstractBehavior {
 
     // Determine what we clicked on and switch modes..
     const target = eventData.target;
-    let data = target?.data;
-    let dataID = target?.dataID;
+    let data: any = target?.data;
+    let dataID = target?.dataID || null;
 
     // If we're clicking on something real, we want to pause doubleclick zooms
     if (data) {
-      const behavior = context.behaviors.mapInteraction;
+      const behavior = context.behaviors.mapInteraction as MapInteractionBehavior;
       behavior.doubleClickEnabled = false;
       window.setTimeout(() => behavior.doubleClickEnabled = true, 500);
     }
@@ -358,8 +374,8 @@ export class SelectBehavior extends AbstractBehavior {
       return;
 
     // Clicked on a photo..
-    } else if (data.type === 'photo') {
-      const layerID = target.layerID;
+    } else if (photos && data.type === 'photo') {
+      const layerID = target?.layerID || null;
       photos.selectPhoto(layerID, dataID);
       return;
 
@@ -379,20 +395,20 @@ export class SelectBehavior extends AbstractBehavior {
       let selectedIDs = context.selectedIDs();
 
       if (!isMultiselect) {
-        if (!this._showsMenu || selectedIDs.length <= 1 || !selectedIDs.includes(dataID)) {
+        if (!this._showsMenu || selectedIDs.length <= 1 || !selectedIDs.includes(dataID!)) {
           // Always re-enter select mode even if the entity is already
           // selected since listeners may expect `context.enter` events,
           // e.g. in the walkthrough
-          context.enter('select-osm', { selection: { osm: [dataID] }} );
+          context.enter('select-osm', { selection: { osm: [dataID!] }} );
         }
       } else {
-        if (selectedIDs.includes(dataID)) {   // already in the selectedIDs..
+        if (selectedIDs.includes(dataID!)) {   // already in the selectedIDs..
           if (!this._showsMenu) {
             selectedIDs = selectedIDs.filter(id => id !== dataID);      // deselect it..
             context.enter('select-osm', { selection: { osm: selectedIDs }} );
           }
         } else {                       // not already in selectedIDs...
-          selectedIDs.push(dataID);    // select it..
+          selectedIDs.push(dataID!);    // select it..
           context.enter('select-osm', { selection: { osm: selectedIDs }} );
         }
       }
@@ -404,7 +420,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * _cancelLongPress
    */
-  _cancelLongPress() {
+  _cancelLongPress(): void {
     if (!this._longPressTimeout) return;
 
     window.clearTimeout(this._longPressTimeout);
@@ -418,9 +434,9 @@ export class SelectBehavior extends AbstractBehavior {
    * _doLongPress
    * Called a short time after pointerdown.
    * If we're still down, treat it as a click + contextmenu.
-   * @param  {Object}  down - EventData Object for the original down event
+   * @param  down - EventData Object for the original down event
    */
-  _doLongPress(down) {
+  _doLongPress(down: EventData): void {
     this._longPressTimeout = null;
 
     if (this.lastDown === down && !down.isCancelled) {   // still down
@@ -439,26 +455,29 @@ export class SelectBehavior extends AbstractBehavior {
    * - If it's on a bare part of the way
    * - If they double clicked right on a midpoint.
    */
-  _doDoubleClick() {
+  _doDoubleClick(): void {
     if (!this._enabled || !this.lastUp) return;
 
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
     const l10n = context.systems.l10n;
 
     const point = this.lastUp.coord.map;
-    const data = this.lastUp.target?.data;
+    const data: any = this.lastUp.target?.data;
 
     const isOSMWay = data instanceof OsmWay && !data.props.__fbid__;
-    const isMidpoint = data.type === 'midpoint';
+    const isMidpoint = data?.type === 'midpoint';
 
-    let loc, edge;
+    let loc: any;
+    let edge: any;
     if (isOSMWay) {
       const graph = editor.staging.graph;
       const viewport = context.viewport;
       const choice = geoChooseEdge(graph.childNodes(data), point, viewport);
-      loc = choice.loc;
-      edge = [ data.nodes[choice.index - 1], data.nodes[choice.index] ];
+      if (choice) {
+        loc = choice.loc;
+        edge = [ data.nodes[choice.index - 1], data.nodes[choice.index] ];
+      }
 
     } else if (isMidpoint) {
       loc = data.loc;
@@ -468,7 +487,7 @@ export class SelectBehavior extends AbstractBehavior {
     if (loc && edge) {
       editor.perform(actionAddMidpoint({ loc: loc, edge: edge }, new OsmNode(context)));
       editor.commit({
-        annotation: l10n.t('operations.add.annotation.vertex'),
+        annotation: l10n!.t('operations.add.annotation.vertex'),
         selectedIDs: context.selectedIDs()   // keep the parent way selected
       });
     }
@@ -481,17 +500,18 @@ export class SelectBehavior extends AbstractBehavior {
    * We get into here from `_pointerup`, `_keydown`, or `_doLongPress`
    * Uses whatever is in `this.lastClick` as the target for the menu.
    */
-  _doContextMenu() {
+  _doContextMenu(): void {
     if (!this._enabled || !this.lastClick) return;  // nothing to do
 
     const context = this.context;
-    const eventManager = context.systems.gfx.eventManager;
-    const ui = context.systems.ui;
+    const gfx = context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
+    const ui = context.systems.ui!;
 
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
-    const eventData = Object.assign({}, this.lastClick);  // shallow copy
+    const eventData: EventData = Object.assign({}, this.lastClick);  // shallow copy
 
     // If a modifier key is down, discard the target to prevent snap/hover.
     if (disableSnap) {
@@ -518,7 +538,7 @@ export class SelectBehavior extends AbstractBehavior {
     } else {                 // menu is off, toggle it on
       // Only attempt to display the context menu if we're focused on a non-Rapid OSM Entity.
       this._showsMenu = true;
-      ui.showEditMenu(eventData.coord.map);
+      ui.showEditMenu(eventData.coord.map, 'rightclick');
     }
   }
 
