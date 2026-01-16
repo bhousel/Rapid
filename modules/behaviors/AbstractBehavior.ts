@@ -1,6 +1,73 @@
 import { EventEmitter } from 'tseep';
 import { vecRotate } from '@rapid-sdk/math';
 
+import type * as PIXI from 'pixi.js';
+import type { Context } from '../Context.ts';
+import type { AbstractPixiFeature, FeatureContainer } from '../pixi/AbstractPixiFeature.ts';
+import type { AbstractPixiLayer } from '../pixi/AbstractPixiLayer.ts';
+import type { AbstractData } from '../data/AbstractData.js';
+import type { Vec2 } from '@rapid-sdk/math';
+
+
+/** Behavior ID string used to identify behaviors */
+export type BehaviorID =
+  | 'drag'
+  | 'draw'
+  | 'hover'
+  | 'lasso'
+  | 'mapInteraction'
+  | 'mapNudge'
+  | 'paste'
+  | 'select'
+  | `key-${string}`;  // for KeyOperationBehavior
+
+
+/** Coordinate pair for both screen and map space */
+export interface EventCoord {
+  /** Screen coordinates - [0,0] is top-left of the screen */
+  screen: Vec2;
+  /** Map coordinates - [0,0] is the origin of the viewport (rotation removed) */
+  map: Vec2;
+}
+
+
+/** Target information extracted from Pixi events */
+export interface EventTarget {
+  /** The Pixi DisplayObject that was targeted */
+  displayObject: FeatureContainer;
+  /** The PixiFeature, or null */
+  feature: AbstractPixiFeature | null;
+  /** The feature ID, or null */
+  featureID: string | null;
+  /** The PixiLayer, or null */
+  layer: AbstractPixiLayer | null;
+  /** The layer ID, or null */
+  layerID: string | null;
+  /** The data associated with the feature */
+  data: unknown | null;
+  /** The data ID, or null */
+  dataID: string | null;
+}
+
+
+/** Data extracted from pointer events */
+export interface EventData {
+  /** Pointer ID or type */
+  id: number | string;
+  /** The original Pixi FederatedEvent */
+  event: Event;
+  /** The original DOM event */
+  originalEvent: Event;
+  /** Coordinates in both screen and map space */
+  coord: EventCoord;
+  /** Event timestamp */
+  time: number;
+  /** Whether the event was cancelled */
+  isCancelled: boolean;
+  /** Target information, or null if no target */
+  target: EventTarget | null;
+}
+
 
 /**
  * "Behaviors" are nothing more than bundles of event handlers that we can
@@ -11,20 +78,22 @@ import { vecRotate } from '@rapid-sdk/math';
  * All behaviors are event emitters.
  *
  * Properties you can access:
- *   `id` (or `behaviorID`)  `String` identifier for the behavior (e.g. 'draw')
+ *   `id` (or `behaviorID`)  String identifier for the behavior (e.g. 'draw')
  *   `enabled`               `true` if the event handlers are enabled, `false` if not.
  */
 export class AbstractBehavior extends EventEmitter {
+  id: string;
+  context: Context;
+  protected _enabled: boolean;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super();
     this.id = '';
     this.context = context;
-
     this._enabled = false;
   }
 
@@ -34,7 +103,7 @@ export class AbstractBehavior extends EventEmitter {
    * Every behavior should have an `enable` function
    * to setup whatever event handlers this behavior needs
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
     this._enabled = true;
   }
@@ -45,7 +114,7 @@ export class AbstractBehavior extends EventEmitter {
    * Every behavior should have a `disable` function
    * to teardown whatever event handlers this behavior needs
    */
-  disable() {
+  disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
   }
@@ -54,10 +123,10 @@ export class AbstractBehavior extends EventEmitter {
   /**
    * behaviorID
    * Unique string to identify this Behavior.
-   * @return  {string}
+   * @return  The behavior identifier string (e.g. 'draw', 'hover')
    * @readonly
    */
-  get behaviorID() {
+  get behaviorID(): string {
     return this.id;
   }
 
@@ -65,10 +134,10 @@ export class AbstractBehavior extends EventEmitter {
   /**
    * enabled
    * Whether the behavior is enabled.
-   * @return  {boolean}  `true` if enabled, `false` if not enabled
+   * @return  `true` if enabled, `false` if not
    * @readonly
    */
-  get enabled() {
+  get enabled(): boolean {
     return this._enabled;
   }
 
@@ -97,10 +166,10 @@ export class AbstractBehavior extends EventEmitter {
   /**
    * _getEventData
    * Returns an object containing the important details about this Pixi event.
-   * @param  {Event}   e - A Pixi FederatedEvent (or something that looks like one)
-   * @return {Object}  Object containing data about the event and what was targeted
+   * @param  e - A Pixi FederatedEvent (or something that looks like one)
+   * @return Object containing data about the event and what was targeted
    */
-  _getEventData(e) {
+  _getEventData(e: any): EventData {
 //    const result = {
 //      //      pointer event id                touch event id        default
 //      id: e.data.originalEvent.pointerId || e.data.pointerType || 'mouse',
@@ -115,7 +184,7 @@ export class AbstractBehavior extends EventEmitter {
 //      data: null,
 //    };
 
-    const coord = {
+    const coord: EventCoord = {
       screen: [e.global.x, e.global.y],  // [0,0] is top,left of the screen
       map: [e.global.x, e.global.y]      // [0,0] is the origin of the viewport (rotation removed)
     };
@@ -127,7 +196,7 @@ export class AbstractBehavior extends EventEmitter {
       coord.map = vecRotate(coord.screen, -r, viewport.center());  // remove rotation
     }
 
-    const result = {
+    const result: EventData = {
       id: e.pointerId ?? e.pointerType ?? 'unknown',
       event: e,
       originalEvent: e.originalEvent,
@@ -143,12 +212,12 @@ export class AbstractBehavior extends EventEmitter {
       return result;
     }
 
-    let dObj = e.target;
+    let dObj: any = e.target;
 
     // Try to find a target feature - it will have a `__feature__` property.
     // Look up through the parent hierarchy until we find one or end up at the root stage.
     while (dObj) {
-      let feature = dObj.__feature__;
+      const feature = dObj.__feature__;
       if (feature) {
         result.target = {
           displayObject: dObj,
@@ -180,6 +249,7 @@ export class AbstractBehavior extends EventEmitter {
       }
     }
 
+    return result;
   }
 
 }

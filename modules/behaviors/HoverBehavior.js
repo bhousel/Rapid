@@ -1,4 +1,4 @@
-import { AbstractBehavior } from './AbstractBehavior.js';
+import { AbstractBehavior } from './AbstractBehavior.ts';
 // import { geoChooseEdge } from '../geo/geom.js';
 import { utilDetect } from '../util/detect.ts';
 

@@ -1,7 +1,7 @@
 import { select as d3_select } from 'd3-selection';
 import { vecLength } from '@rapid-sdk/math';
 
-import { AbstractBehavior } from './AbstractBehavior.js';
+import { AbstractBehavior } from './AbstractBehavior.ts';
 import { OsmNode, Marker } from '../data/index.ts';
 import { utilDetect } from '../util/detect.ts';
 

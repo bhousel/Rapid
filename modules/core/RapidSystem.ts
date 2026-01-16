@@ -43,10 +43,10 @@ export class RapidSystem extends AbstractSystem {
 
   private _addedDatasetIDs = new Set<string>();
   private _enabledDatasetIDs = new Set<string>();
-  private _nextColorIndex: number = 2;  // see note in _datasetsChanged()
+  private _nextColorIndex = 2;  // see note in _datasetsChanged()
   private _taskExtent: Extent | null = null;
   private _isTaskBoundsRect: boolean | null = null;
-  private _hadPoweruser: boolean = false;
+  private _hadPoweruser = false;
 
   /**
    * @constructor

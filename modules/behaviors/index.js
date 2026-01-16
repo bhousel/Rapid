@@ -1,4 +1,4 @@
-import { AbstractBehavior } from './AbstractBehavior.js';
+import { AbstractBehavior } from './AbstractBehavior.ts';
 import { DragBehavior } from './DragBehavior.js';
 import { DrawBehavior } from './DrawBehavior.js';
 import { HoverBehavior } from './HoverBehavior.js';

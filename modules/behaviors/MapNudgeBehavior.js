@@ -1,6 +1,6 @@
 import { numClamp, vecScale } from '@rapid-sdk/math';
 
-import { AbstractBehavior } from './AbstractBehavior.js';
+import { AbstractBehavior } from './AbstractBehavior.ts';
 
 
 // in milliseconds  (no need to do more than once per frame, 16.7ms = 60fps)

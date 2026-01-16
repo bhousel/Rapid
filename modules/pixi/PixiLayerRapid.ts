@@ -7,7 +7,7 @@ import { PixiFeaturePolygon, type PolygonStyle } from './PixiFeaturePolygon.ts';
 
 import type { Viewport } from '@rapid-sdk/math';
 import type { PixiScene } from './PixiScene.ts';
-import type { AbstractData, OsmEntity, OsmWay } from '../data/types.ts';
+import type { OsmEntity, OsmWay } from '../data/types.ts';
 
 
 /** Minimum zoom level where Rapid data is rendered */

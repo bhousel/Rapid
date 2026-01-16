@@ -11,7 +11,7 @@ import type { SingularGeometryType } from '../lib/types.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 /** Extended PIXI.Container with feature reference */
-interface FeatureContainer extends PIXI.Container {
+export interface FeatureContainer extends PIXI.Container {
   __feature__: AbstractPixiFeature | null;
 }
 
