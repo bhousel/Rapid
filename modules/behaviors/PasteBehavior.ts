@@ -5,18 +5,21 @@ import { actionCopyEntities } from '../actions/copy_entities.js';
 import { actionMove } from '../actions/move.js';
 import { utilDetect } from '../util/detect.ts';
 
+import type { Context } from '../Context.ts';
+import type { OsmEntity } from '../data/OsmEntity.ts';
 
 
 /**
  * `PasteBehavior` listens for key event '⌘V' when pasting is allowed
  */
 export class PasteBehavior extends AbstractBehavior {
+  private _isMacOS: boolean;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'paste';
 
@@ -31,11 +34,12 @@ export class PasteBehavior extends AbstractBehavior {
    * enable
    * Bind event handlers
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
     this._enabled = true;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.on('keydown', this._keydown);
   }
 
@@ -44,11 +48,12 @@ export class PasteBehavior extends AbstractBehavior {
    * disable
    * Unbind event handlers
    */
-  disable() {
+  disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.off('keydown', this._keydown);
   }
 
@@ -56,9 +61,9 @@ export class PasteBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  {Event}  e - A DOM KeyboardEvent
+   * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e) {
+  _keydown(e: KeyboardEvent): void {
     const isMacOS = this._isMacOS;
     const modifier = (isMacOS && e.metaKey) || (!isMacOS && e.ctrlKey);
     if (modifier && e.key === 'v') {
@@ -70,27 +75,27 @@ export class PasteBehavior extends AbstractBehavior {
   /**
    * _doPaste
    * Pastes copied features onto the map, if possible
-   * @param  {Event}  e - A DOM KeyboardEvent
+   * @param  e - A DOM KeyboardEvent
    */
-  _doPaste(e) {
+  _doPaste(e: KeyboardEvent): void {
     const context = this.context;
-    const editor = context.systems.editor;
-    const gfx = context.systems.gfx;
-    const l10n = context.systems.l10n;
-    const map = context.systems.map;
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
+    const l10n = context.systems.l10n!;
+    const map = context.systems.map!;
 
     // Note: nearly the same code appears in both PasteBehavior and PasteOperation
     const copyGraph = context.copyGraph;
     const copyIDs = context.copyIDs;
-    if (!copyIDs.length) return;   // Nothing to copy..
+    if (!copyIDs.length || !copyGraph) return;   // Nothing to copy..
 
     // Prevent paste if the pasted object would be invisible (see iD#10000)
-    const osmLayer = gfx.scene.layers.get('osm');
+    const osmLayer = gfx.scene!.layers.get('osm');
     if (!osmLayer?.enabled) return;
 
     // Ignore it if we are not over the canvas
     // (e.g. sidebar, out of browser window, over a button, toolbar, modal)
-    const eventManager = gfx.eventManager;
+    const eventManager = gfx.eventManager!;
     if (!eventManager.pointerOverRenderer) return;
 
     e.preventDefault();
@@ -101,19 +106,21 @@ export class PasteBehavior extends AbstractBehavior {
     editor.perform(action);
 
     const currGraph = editor.staging.graph;
-    const copies = action.copies();
+    const copies = action.copies() as Record<string, OsmEntity>;
 
-    const originalIDs = new Set();
+    const originalIDs = new Set<string>();
     for (const entity of Object.values(copies)) {
-      originalIDs.add(entity.id);
+      originalIDs.add((entity as OsmEntity).id);
     }
 
     let extent = new Extent();
-    let newIDs = [];
+    const newIDs: string[] = [];
     for (const [entityID, newEntity] of Object.entries(copies)) {
       const oldEntity = copyGraph.entity(entityID);
-
-      extent = extent.extend(oldEntity.extent(copyGraph));
+      const oldExtent = oldEntity.extent();
+      if (oldExtent) {
+        extent = extent.extend(oldExtent);
+      }
 
       // Exclude child nodes from newIDs if their parent way was also copied.
       const parents = currGraph.parentWays(newEntity);

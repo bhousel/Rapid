@@ -1,7 +1,9 @@
 import { numClamp, vecScale } from '@rapid-sdk/math';
-
 import { AbstractBehavior } from './AbstractBehavior.ts';
 
+import type { FederatedPointerEvent } from 'pixi.js';
+import type { Vec2 } from '@rapid-sdk/math';
+import type { Context } from '../Context.ts';
 
 // in milliseconds  (no need to do more than once per frame, 16.7ms = 60fps)
 // We may eventually use requestAnimationFrame or something better to schedule it
@@ -17,16 +19,18 @@ const MAP_NUDGE_INTERVAL = 16;
  *   `nudge`    Fires when the map nudges - receives the [x,y] amount panned in pixels
  */
 export class MapNudgeBehavior extends AbstractBehavior {
+  private _nudge: Vec2;
+  private _intervalID: ReturnType<typeof setInterval> | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'mapNudge';
 
-    this._nudge = [0, 0];      // amount to pan the map during the next interval
+    this._nudge = [0, 0];
     this._intervalID = null;
 
     // Make sure the event handlers have `this` bound correctly
@@ -39,16 +43,17 @@ export class MapNudgeBehavior extends AbstractBehavior {
    * enable
    * Bind event handlers
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
 
     this._nudge = [0, 0];
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.on('pointermove', this._pointermove);
 
     if (!this._intervalID) {
-      this._intervalID = window.setInterval(this._doNudge, MAP_NUDGE_INTERVAL);
+      this._intervalID = setInterval(this._doNudge, MAP_NUDGE_INTERVAL);
     }
   }
 
@@ -60,7 +65,7 @@ export class MapNudgeBehavior extends AbstractBehavior {
    * This is because: the "Add Line" "Add Area" buttons are in the top toolbar, and if
    * the user clicks one of those, we don't want the map to immediately start nudging up.
    */
-  allow() {
+  allow(): void {
     this._enabled = true;
   }
 
@@ -69,14 +74,15 @@ export class MapNudgeBehavior extends AbstractBehavior {
    * disable
    * Unbind event handlers
    */
-  disable() {
+  disable(): void {
     this._enabled = false;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.off('pointermove', this._pointermove);
 
     if (this._intervalID) {
-      window.clearInterval(this._intervalID);
+      clearInterval(this._intervalID);
       this._intervalID = null;
     }
   }
@@ -85,9 +91,9 @@ export class MapNudgeBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e) {
+  _pointermove(e: FederatedPointerEvent): void {
     if (!this._enabled) return;
 
     const context = this.context;
@@ -130,10 +136,10 @@ export class MapNudgeBehavior extends AbstractBehavior {
    * _doNudge
    * Called by the `setInterval` handler to pan the map.
    */
-  _doNudge() {
+  _doNudge(): void {
     if (!this._enabled) return;
 
-    const map = this.context.systems.map;
+    const map = this.context.systems.map!;
 
     if (this._nudge[0] || this._nudge[1]) {
       map.pan(this._nudge);

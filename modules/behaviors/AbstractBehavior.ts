@@ -1,11 +1,9 @@
 import { EventEmitter } from 'tseep';
 import { vecRotate } from '@rapid-sdk/math';
 
-import type * as PIXI from 'pixi.js';
 import type { Context } from '../Context.ts';
 import type { AbstractPixiFeature, FeatureContainer } from '../pixi/AbstractPixiFeature.ts';
 import type { AbstractPixiLayer } from '../pixi/AbstractPixiLayer.ts';
-import type { AbstractData } from '../data/AbstractData.js';
 import type { Vec2 } from '@rapid-sdk/math';
 
 

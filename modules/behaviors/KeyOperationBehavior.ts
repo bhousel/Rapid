@@ -1,22 +1,29 @@
 import { AbstractBehavior } from './AbstractBehavior.ts';
 
+import type { Context } from '../Context.ts';
+import type { Keybinding } from '../util/keybinding.ts';
+
 
 /**
  * `KeyOperationBehavior` binds whatever keystroke events trigger an "operation"
  * ("operations" are the things that go on the editing menu)
  */
 export class KeyOperationBehavior extends AbstractBehavior {
+  private _operation: any;
+  private _keybinding: Keybinding | null;
 
   /**
    * @constructor
-   * @param  {Context}   context - Global shared application context
-   * @param  {function}  operation - The operation this behavior is associated with
+   * @param  context - Global shared application context
+   * @param  operation - The operation this behavior is associated with
    */
-  constructor(context, operation) {
+  constructor(context: Context, operation: any) {
     super(context);
     this.id = `key-${operation.id}`;
 
     this._operation = operation;
+    this._keybinding = null;
+
     const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
     if (!isTestEnvironment) {
       this._keybinding = this.context.keybinding(); // "global" keybinding (on document)
@@ -31,11 +38,11 @@ export class KeyOperationBehavior extends AbstractBehavior {
    * enable
    * Bind event handlers
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
 
     const operation = this._operation;
-    if (operation.available() && operation.keys) {
+    if (operation.available() && operation.keys && this._keybinding) {
       this._keybinding.on(operation.keys, this._keydown);
       this._enabled = true;
     }
@@ -46,12 +53,12 @@ export class KeyOperationBehavior extends AbstractBehavior {
    * disable
    * Unbind event handlers
    */
-  disable() {
+  disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
 
     const operation = this._operation;
-    if (operation.keys) {
+    if (operation.keys && this._keybinding) {
       this._keybinding.off(operation.keys);
     }
   }
@@ -60,12 +67,12 @@ export class KeyOperationBehavior extends AbstractBehavior {
   /**
    * _keydown
    * Handles the keydown event
-   * @param  {Event}  e - A d3 keydown event
+   * @param  e - A d3 keydown event
    */
-  _keydown(e) {
+  _keydown(e: KeyboardEvent): void {
     const context = this.context;
     const operation = this._operation;
-    const ui = context.systems.ui;
+    const ui = context.systems.ui!;
 
     if (operation.availableForKeypress && !operation.availableForKeypress()) return;  // copy paste detail 😕
 

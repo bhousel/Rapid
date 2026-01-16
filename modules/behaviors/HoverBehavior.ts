@@ -1,6 +1,9 @@
 import { AbstractBehavior } from './AbstractBehavior.ts';
-// import { geoChooseEdge } from '../geo/geom.js';
 import { utilDetect } from '../util/detect.ts';
+
+import type { FederatedPointerEvent } from 'pixi.js';
+import type { EventData, EventTarget } from './AbstractBehavior.ts';
+import type { Context } from '../Context.ts';
 
 
 /**
@@ -15,12 +18,14 @@ import { utilDetect } from '../util/detect.ts';
  *   `hoverchange`  Fires whenever the hover target has changed, receives `eventData` Object
  */
 export class HoverBehavior extends AbstractBehavior {
+  lastMove: EventData | null;
+  hoverTarget: EventTarget | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'hover';
 
@@ -37,14 +42,15 @@ export class HoverBehavior extends AbstractBehavior {
    * enable
    * Bind event handlers
    */
-  enable() {
+  enable(): void {
     if (this._enabled) return;
 
     this._enabled = true;
     this.lastMove = null;
     this.hoverTarget = null;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.on('modifierchange', this._doHover);
     eventManager.on('pointerover', this._doHover);
     eventManager.on('pointerout', this._doHover);
@@ -56,7 +62,7 @@ export class HoverBehavior extends AbstractBehavior {
    * disable
    * Unbind event handlers
    */
-  disable() {
+  disable(): void {
     if (!this._enabled) return;
 
     // Something is currently hovered, so un-hover it first.
@@ -70,7 +76,8 @@ export class HoverBehavior extends AbstractBehavior {
     this.lastMove = null;
     this.hoverTarget = null;
 
-    const eventManager = this.context.systems.gfx.eventManager;
+    const gfx = this.context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     eventManager.off('modifierchange', this._doHover);
     eventManager.off('pointerover', this._doHover);
     eventManager.off('pointerout', this._doHover);
@@ -81,9 +88,9 @@ export class HoverBehavior extends AbstractBehavior {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  {Event}  e - A Pixi FederatedPointerEvent
+   * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e) {
+  _pointermove(e: FederatedPointerEvent): void {
     if (!this._enabled) return;
 
     this.lastMove = this._getEventData(e);
@@ -96,21 +103,22 @@ export class HoverBehavior extends AbstractBehavior {
    * Emits a 'hoverchange' event if needed
    * This may also be fired if we detect a change in the modifier keys.
    */
-  _doHover() {
+  _doHover(): void {
     if (!this._enabled || !this.lastMove) return;  // nothing to do
 
-    const interaction = this.context.behaviors.mapInteraction;
+    const interaction = this.context.behaviors.mapInteraction as any;
     if (interaction.gesture) return;  // dont change hover while interacting with the map
 
     const context = this.context;
-    const eventManager = context.systems.gfx.eventManager;
+    const gfx = context.systems.gfx!;
+    const eventManager = gfx.eventManager!;
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
-    const eventData = Object.assign({}, this.lastMove);  // shallow copy
+    const eventData: EventData = Object.assign({}, this.lastMove);  // shallow copy
 
     // Handle situations where we don't want to hover a target way...
-    let isActiveTarget = false;
+    const isActiveTarget = false;
 //    if (eventData?.target?.layerID === 'osm') {
 //      const mode = context.mode;
 //      const target = eventData?.target?.data || null;

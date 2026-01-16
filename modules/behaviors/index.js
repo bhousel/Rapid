@@ -1,12 +1,12 @@
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { DragBehavior } from './DragBehavior.js';
 import { DrawBehavior } from './DrawBehavior.js';
-import { HoverBehavior } from './HoverBehavior.js';
-import { KeyOperationBehavior } from './KeyOperationBehavior.js';
+import { HoverBehavior } from './HoverBehavior.ts';
+import { KeyOperationBehavior } from './KeyOperationBehavior.ts';
 import { LassoBehavior } from './LassoBehavior.js';
 import { MapInteractionBehavior } from './MapInteractionBehavior.js';
-import { MapNudgeBehavior } from './MapNudgeBehavior.js';
-import { PasteBehavior } from './PasteBehavior.js';
+import { MapNudgeBehavior } from './MapNudgeBehavior.ts';
+import { PasteBehavior } from './PasteBehavior.ts';
 import { SelectBehavior } from './SelectBehavior.js';
 
 export {
