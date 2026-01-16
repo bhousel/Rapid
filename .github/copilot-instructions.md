@@ -162,6 +162,19 @@ export class Category {
 - **Never duplicate types** - if a type already exists in a class file, don't add it to `types.ts`
 - When converting a file, check if types already exist before adding new ones
 
+### String ID Types
+- Use simple type aliases for identifiers: `type PhotoLayerID = string;`
+- These are **validated at runtime**, not compile time (e.g., `this.photoLayerIDs.includes(layerID)`)
+- This approach works well for Rapid because:
+  - Valid IDs depend on deployment configuration (services can be added/removed)
+  - IDs come from external sources (URLs, configs, APIs)
+  - The type alias documents intent without adding casting friction
+- Add JSDoc comments with example values:
+  ```typescript
+  /** Photo layer identifiers (e.g. 'streetside', 'mapillary', 'kartaview') */
+  export type PhotoLayerID = string;
+  ```
+
 ### Type Imports
 - Use `import type { ... }` for type-only imports
 - This prevents circular dependencies and improves tree-shaking
@@ -299,11 +312,11 @@ Track TypeScript conversion progress here:
 | Folder | Status | Notes |
 |--------|--------|-------|
 | `modules/util/` | ✅ Complete | All files converted |
-| `modules/lib/` | 🔄 Partial | `Tree.js`, `tag_classes.js` remain |
+| `modules/lib/` | ✅ Complete | All files converted |
 | `modules/pixi/` | ✅ Complete | All files converted |
 | `modules/core/` | ✅ Complete | All files converted |
+| `modules/behaviors/` | ✅ Complete | All files converted |
 | `modules/actions/` | ❌ Not started | |
-| `modules/behaviors/` | ❌ Not started | |
 | `modules/modes/` | ❌ Not started | |
 | `modules/operations/` | ❌ Not started | |
 | `modules/services/` | ❌ Not started | |

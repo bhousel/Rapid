@@ -12,7 +12,7 @@ export * from './multipolygon.ts';
 export * from './Preset.ts';
 export * from './RapidDataset.ts';
 export * from './tags.ts';
-export * from './Tree.js';
+export * from './Tree.ts';
 export * from './ValidationCache.ts';
 export * from './ValidationFix.ts';
 export * from './ValidationIssue.ts';

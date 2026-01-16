@@ -25,7 +25,7 @@ This module contains a mix of data structures, schema classes, and utility funct
 | `Geometry.ts` | Geometry wrapper for data elements |
 | `GeometryPart.ts` | Individual parts of multi-part geometries |
 | `Graph.ts` | Immutable graph structure holding all entities |
-| `Tree.js` | R-tree spatial index for fast lookups |
+| `Tree.ts` | R-tree spatial index for fast lookups |
 
 ### Imagery & Datasets
 
@@ -46,7 +46,7 @@ This module contains a mix of data structures, schema classes, and utility funct
 | File | Description |
 |------|-------------|
 | `tags.ts` | Tag-related constants and utilities (area keys, lifecycle prefixes, etc.) |
-| `tag_classes.js` | Generate CSS classes from tags |
+| `tag_classes.ts` | Generate CSS classes from tags (legacy - not used anymore) |
 
 ### Other Utilities
 

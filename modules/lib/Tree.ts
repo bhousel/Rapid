@@ -1,24 +1,37 @@
 //import RBush from 'rbush';
 
-import { Difference } from './Difference.js';
+import { Difference } from './Difference.ts';
+
+import type { Graph } from './Graph.ts';
+import type { OsmEntity } from '../data/OsmEntity.ts';
 
 
 /**
- *  Tree
- *  A wrapper class around the `RBush` spatial index, for tracking the position of OSM Entities.
- *  Internally RBush indexes rectangular bounding boxes.
- *  The tree also must keep track of which Graph is considered "current", and will update the
- *  positions of all it's tracked Entities automatically to match the current Graph.
+ * Tree
+ * A wrapper class around the `RBush` spatial index, for tracking the position of OSM Entities.
+ * Internally RBush indexes rectangular bounding boxes.
+ * The tree also must keep track of which Graph is considered "current", and will update the
+ * positions of all it's tracked Entities automatically to match the current Graph.
  *
- *  (Tree is not a good name for this thing)
+ * (Tree is not a good name for this thing)
  */
 export class Tree {
+  private _currentKey: string;
+  private _currentSnapshot: Graph;
+  private _cacheID: string;
+
+//  private _entityRBush: RBush;
+//  private _entityBoxes: Map<string, any>;
+//  private _entitySegments: Map<string, any[]>;
+//  private _segmentRBush: RBush;
+//  private _segmentBoxes: Map<string, any>;
 
   /**
    * @constructor
-   * @param  {Graph}  graph - The "current" Graph of entities that this tree is tracking
+   * @param graph - The "current" Graph of entities that this tree is tracking
+   * @param cacheID - Identifier for the spatial cache
    */
-  constructor(graph, cacheID) {
+  constructor(graph: Graph, cacheID: string) {
     this._currentKey = graph.key;
     this._currentSnapshot = graph.snapshot();
     this._cacheID = cacheID;
@@ -35,12 +48,12 @@ export class Tree {
   /**
    * _removeEntity
    * Remove an Entity from all internal indexes.
-   * @param  {string}  entityID
+   * @param entityID - The entity ID to remove
    */
-  _removeEntity(entityID) {
+  private _removeEntity(entityID: string): void {
     const graph = this._currentSnapshot;
     const context = graph.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
 
     spatial.removeData(this._cacheID, entityID);
 
@@ -66,12 +79,12 @@ export class Tree {
   /**
    * _loadEntities
    * Add or update multiple Entities in the internal indexes.
-   * @param  {Map<entityID, Entity>}  toUpdate - Entities to load into the tree
+   * @param toUpdate - Entities to load into the tree
    */
-  _loadEntities(toUpdate) {
+  private _loadEntities(toUpdate: Map<string, OsmEntity>): void {
     const graph = this._currentSnapshot;
     const context = graph.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
 
     spatial.replaceData(this._cacheID, [...toUpdate.values()]);
 
@@ -118,11 +131,11 @@ export class Tree {
    * When updating an Entity's position in the tree, we must also update
    * the positions of that Entity's parent ways and relations.
    *
-   * @param  {Entity}                 entity - Entity to check
-   * @param  {Map<entityID, Entity>}  toUpdate - gathered Entities that need updating
-   * @param  {Set<entityID>?}         seen - to avoid infinite recursion
+   * @param entity - Entity to check
+   * @param toUpdate - gathered Entities that need updating
+   * @param seen - to avoid infinite recursion
    */
-  _includeParents(entity, toUpdate, seen) {
+  private _includeParents(entity: OsmEntity, toUpdate: Map<string, OsmEntity>, seen?: Set<string>): void {
     const graph = this._currentSnapshot;
     const entityID = entity.id;
     if (!seen) seen = new Set();
@@ -152,9 +165,9 @@ export class Tree {
    * _setCurrentGraph
    * This will change the "current" Graph of this tree, performing whatever
    * operations are needed to add/update/remove tracked entities.
-   * @param  {Graph}  graph - the Graph to set "current"
+   * @param graph - the Graph to set "current"
    */
-  _setCurrentGraph(graph) {
+  private _setCurrentGraph(graph: Graph): void {
     if (graph.key === this._currentKey) return;
 
     // gather changes needed
@@ -165,7 +178,7 @@ export class Tree {
     const changed = diff.didChange;
     if (!changed.addition && !changed.deletion && !changed.geometry) return;
 
-    const toUpdate = new Map();
+    const toUpdate = new Map<string, OsmEntity>();
 
     if (changed.deletion) {
       for (const entity of diff.deleted()) {
@@ -195,16 +208,16 @@ export class Tree {
    * rebase
    * This is used to load new Entities into the tree, but without adjusting which Graph is current.
    * It's called when fetching new data from the OSM API, restoring saved history, etc.
-   * @param  {Array<Entity>}  entities - entities to load into the Tree
-   * @param  {boolean?}       force - If `true`, replace an Entity, even if we've seen it already
+   * @param entities - entities to load into the Tree
+   * @param force - If `true`, replace an Entity, even if we've seen it already
    */
-  rebase(entities, force) {
+  rebase(entities: OsmEntity[], force?: boolean): void {
     const graph = this._currentSnapshot;
     const context = graph.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
 
     const local = graph.local;
-    const toUpdate = new Map();
+    const toUpdate = new Map<string, OsmEntity>();
 
     for (const entity of entities) {
       if (!entity.visible) continue;
@@ -233,16 +246,16 @@ export class Tree {
    * intersects
    * Returns a result of Entities that intersect the given map extent.
    * We first update the current graph if needed, to make sure the results are fresh.
-   * @param   {Extent}  extent - Extent to check   (WGS84 for now)
-   * @param   {Graph}   graph - The current graph
-   * @return  {Array<Entity>}  Entities with bounding boxes that intersect the given Extent
+   * @param extent - Extent to check (WGS84 for now)
+   * @param graph - The current graph
+   * @return Entities with bounding boxes that intersect the given Extent
    */
-  intersects(extent, graph) {
+  intersects(extent: any, graph: Graph): OsmEntity[] {
     this._setCurrentGraph(graph);
 
     const context = graph.context;
-    const spatial = context.systems.spatial;
-    return spatial.getVisibleData(this._cacheID).map(box => graph.entity(box.dataID));
+    const spatial = context.systems.spatial!;
+    return spatial.getVisibleData(this._cacheID).map((box: any) => graph.entity(box.dataID));
 //    return this._entityRBush.search(extent.bbox()).map(ebox => graph.entity(ebox.id));
   }
 
@@ -250,12 +263,12 @@ export class Tree {
    * waySegments
    * Returns the result of Segments that intersect the given map extent.
    * We first update the current graph if needed, to make sure the results are fresh.
-   * @param   {Extent}  extent - Extent to check
-   * @param   {Graph}   graph - The current graph
-   * @return  {Array<Object>}  Segments with bounding boxes that intersect the given Extent
+   * @param extent - Extent to check
+   * @param graph - The current graph
+   * @return Segments with bounding boxes that intersect the given Extent
    */
-  waySegments(extent, graph) {
-return [];  // not now
+  waySegments(extent: any, graph: Graph): any[] {
+    return [];  // not now
 //    this._setCurrentGraph(graph);
 //    return this._segmentRBush.search(extent.bbox()).map(sbox => sbox.segment);
   }
