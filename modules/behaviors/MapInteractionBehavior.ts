@@ -1,9 +1,12 @@
 import { DEG2RAD, numClamp, Vec2, vecLength, vecSubtract } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
-import type { EventData } from './AbstractBehavior.ts';
-import type { Context } from '../Context.ts';
 import { OsmNode } from '../data/OsmNode.ts';
+
+import type { Context } from '../Context.ts';
+import type { EventData } from './AbstractBehavior.ts';
+import type { FederatedPointerEvent } from 'pixi.js';
+import type { NormalizedWheelEvent } from '../pixi/PixiEvents.ts';
 
 const NEAR_TOLERANCE = 1;
 const FAR_TOLERANCE = 4;
@@ -196,7 +199,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * Handler for click events, used to support double-click to zoom/unzoom.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _click(e: any): void {
+  _click(e: FederatedPointerEvent): void {
     if (!this.doubleClickEnabled) return;
     if (e.detail !== 2) return;    // double clicks only
     if (e.pointerType === 'mouse' && e.button !== 0) return;   // left click only (if a mouse)
@@ -243,7 +246,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e: any): void {
+  _pointerdown(e: FederatedPointerEvent): void {
     if (this._isPaneOpen()) {
       return; // Ignore move events if any pane is open
     }
@@ -296,7 +299,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e: any): void {
+  _pointermove(e: FederatedPointerEvent): void {
     if (this._isPaneOpen()) {
       return; // Ignore move events if any pane is open
     }
@@ -385,7 +388,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * Handler for pointerup events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e: any): void {
+  _pointerup(e: FederatedPointerEvent): void {
     delete this.activeTouches[e.pointerId];
     if (Object.keys(this.activeTouches).length === 0) {
       this._initialPinchDistance = null;
@@ -414,7 +417,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * Handler for pointercancel events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointercancel(e: any): void {
+  _pointercancel(e: FederatedPointerEvent): void {
     delete this.activeTouches[e.pointerId];
     if (Object.keys(this.activeTouches).length === 0) {
       this._initialPinchDistance = null;
@@ -495,7 +498,7 @@ export class MapInteractionBehavior extends AbstractBehavior {
    * Handler for wheel events.
    * @param  e  A DOM WheelEvent (with custom properties)
    */
-  _wheel(e: any): void {
+  _wheel(e: NormalizedWheelEvent): void {
     const context = this.context;
     const map = context.systems.map!;
 

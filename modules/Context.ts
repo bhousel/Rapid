@@ -3,7 +3,7 @@ import { select as d3_select } from 'd3-selection';
 import { Viewport } from '@rapid-sdk/math';
 import { utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
-import { behaviors } from './behaviors/index.js';
+import { behaviors } from './behaviors/index.ts';
 import { modes } from './modes/index.js';
 import { services } from './services/index.js';
 import { systems } from './core/index.ts';

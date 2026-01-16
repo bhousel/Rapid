@@ -9,6 +9,8 @@ import { MapNudgeBehavior } from './MapNudgeBehavior.ts';
 import { PasteBehavior } from './PasteBehavior.ts';
 import { SelectBehavior } from './SelectBehavior.ts';
 
+import type { Context } from '../Context.ts';
+
 export {
   AbstractBehavior,
   DragBehavior,
@@ -22,9 +24,23 @@ export {
   SelectBehavior
 };
 
+/** Type alias for behavior identifiers */
+export type BehaviorID = string;
+
+/** Type alias for Behavior classes */
+export type Behavior = AbstractBehavior;
+
+/** Constructor type for behaviors */
+export type BehaviorConstructor = new (context: Context) => AbstractBehavior;
+
+/** Collection of available behaviors */
+export interface BehaviorRegistry {
+  available: Map<BehaviorID, BehaviorConstructor>;
+}
+
 // At init time, we will instantiate any that are in the 'available' collection.
-export const behaviors = {
-  available:  new Map()  // Map<behaviorID, Behavior constructor>
+export const behaviors: BehaviorRegistry = {
+  available: new Map<BehaviorID, BehaviorConstructor>()
 };
 
 behaviors.available.set('drag', DragBehavior);
@@ -35,9 +51,3 @@ behaviors.available.set('mapInteraction', MapInteractionBehavior);
 behaviors.available.set('mapNudge', MapNudgeBehavior);
 behaviors.available.set('paste', PasteBehavior);
 behaviors.available.set('select', SelectBehavior);
-
-/**
- *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
- *  @typedef  {string}            behaviorID
- *  @typedef  {AbstractBehavior}  Behavior
- */

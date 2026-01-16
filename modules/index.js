@@ -1,5 +1,5 @@
 export * from './actions/index.js';
-export * from './behaviors/index.js';
+export * from './behaviors/index.ts';
 export * from './core/index.ts';
 export * from './data/index.ts';
 export * from './geo/index.ts';
