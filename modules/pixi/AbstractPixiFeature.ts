@@ -39,7 +39,7 @@ export interface FeatureContainer extends PIXI.Container {
  */
 export class AbstractPixiFeature {
   /** Unique string identifier for this Feature */
-  id: string;
+  id: FeatureID;
   /** The Layer that owns this Feature */
   layer: AbstractPixiLayer;
   /** The PixiScene that contains this Feature */
@@ -70,18 +70,18 @@ export class AbstractPixiFeature {
   /** Whether the label needs to be reapplied */
   protected _labelDirty: boolean;
   /** Identifier for the data bound to this Feature */
-  protected _dataID: string | null;
+  protected _dataID: DataID | null;
   /** Data bound to this Feature */
   protected _data: unknown;
   /** Pseudoclasses for styling */
-  protected _classes: Set<string>;
+  protected _classes: Set<ClassID>;
 
   /**
    * @constructor
    * @param layer - The Layer that owns this Feature
    * @param featureID - Unique string to use for the identifier of this Feature
    */
-  constructor(layer: AbstractPixiLayer, featureID: string) {
+  constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     this.id = featureID;  // put this first so debug inspect shows it first
 
     this.layer = layer;
@@ -192,7 +192,7 @@ export class AbstractPixiFeature {
    * @return This feature's unique id
    * @readonly
    */
-  get featureID(): string {
+  get featureID(): FeatureID {
     return this.id;
   }
 
@@ -319,7 +319,7 @@ export class AbstractPixiFeature {
    * (because we need to know an id/key to identify the data by, and these can be anything)
    * @readonly
    */
-  get dataID(): string | null {
+  get dataID(): DataID | null {
     return this._dataID;
   }
 
@@ -332,7 +332,7 @@ export class AbstractPixiFeature {
    * When changing the value of the class we'll also dirty the feature so that it gets redrawn on the next pass.
    * @param classID - the pseudoclass to set
    */
-  setClass(classID: string): void {
+  setClass(classID: ClassID): void {
     const hasClass = this._classes.has(classID);
     if (hasClass) return;  // nothing to do
 
@@ -350,7 +350,7 @@ export class AbstractPixiFeature {
    * When changing the value of the class we'll also dirty the feature so that it gets redrawn on the next pass.
    * @param classID - the pseudoclass to remove
    */
-  unsetClass(classID: string): void {
+  unsetClass(classID: ClassID): void {
     const hasClass = this._classes.has(classID);
     if (!hasClass) return;  // nothing to do
 
@@ -365,7 +365,7 @@ export class AbstractPixiFeature {
    * @param classID - the class to check
    * @return `true` if the feature has this class, `false` if not
    */
-  hasClass(classID: string): boolean {
+  hasClass(classID: ClassID): boolean {
     return this._classes.has(classID);
   }
 
@@ -373,7 +373,7 @@ export class AbstractPixiFeature {
    * classes
    * Returns a read-only view of the feature's pseudoclasses
    */
-  get classes(): ReadonlySet<string> {
+  get classes(): ReadonlySet<ClassID> {
     return this._classes;
   }
 
@@ -383,7 +383,7 @@ export class AbstractPixiFeature {
    * @param dataID - Identifer for this data element (e.g. 'n123')
    * @param data - data to bind to the feature (e.g. an OSM Node)
    */
-  setData(dataID: string, data: unknown): void {
+  setData(dataID: DataID, data: unknown): void {
     this._dataID = dataID;
     this._data = data;
     this.layer.bindData(this.id, dataID);
@@ -405,7 +405,7 @@ export class AbstractPixiFeature {
    * @param parentID - dataID of the parent (e.g. 'r123')
    * @param childID - dataID of the child (e.g. 'w123')
    */
-  addChildData(parentID: string, childID: string): void {
+  addChildData(parentID: DataID, childID: DataID): void {
     this.layer.addChildData(parentID, childID);
     this.dirty = true;
   }
@@ -415,7 +415,7 @@ export class AbstractPixiFeature {
    * Removes all child dataIDs for the given parent dataID
    * @param parentID - dataID of the parent (e.g. 'r123')
    */
-  clearChildData(parentID: string): void {
+  clearChildData(parentID: DataID): void {
     this.layer.clearChildData(parentID);
     this.dirty = true;
   }

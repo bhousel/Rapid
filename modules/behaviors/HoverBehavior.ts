@@ -1,9 +1,10 @@
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { utilDetect } from '../util/detect.ts';
 
-import type { FederatedPointerEvent } from 'pixi.js';
-import type { EventData, EventTarget } from './AbstractBehavior.ts';
 import type { Context } from '../Context.ts';
+import type { EventData, EventTarget } from './AbstractBehavior.ts';
+import type { FederatedPointerEvent } from 'pixi.js';
+import type { MapInteractionBehavior } from './MapInteractionBehavior.ts';
 
 
 /**
@@ -106,10 +107,10 @@ export class HoverBehavior extends AbstractBehavior {
   _doHover(): void {
     if (!this._enabled || !this.lastMove) return;  // nothing to do
 
-    const interaction = this.context.behaviors.mapInteraction as any;
+    const context = this.context;
+    const interaction = context.behaviors.mapInteraction as MapInteractionBehavior;
     if (interaction.gesture) return;  // dont change hover while interacting with the map
 
-    const context = this.context;
     const gfx = context.systems.gfx!;
     const eventManager = gfx.eventManager!;
     const modifiers = eventManager.modifierKeys;
@@ -138,7 +139,7 @@ export class HoverBehavior extends AbstractBehavior {
 //          const viewport = context.viewport;
 //          const choice = geoChooseEdge(graph.childNodes(target), eventData.coord.map, viewport, activeID);
 //
-//          const SNAP_DIST = 6;  // hack to avoid snap to fill, see #719
+//          const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
 //          if (choice && choice.distance < SNAP_DIST) {
 //            // We should not target parts of the way that are adjacent ot the active node
 //            // but we can target segments of the way that are >2 segments away.

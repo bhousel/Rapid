@@ -14,9 +14,9 @@ import { osmAreaKeys } from './tags.js';
  */
 export interface PresetProps {
   /** Unique identifier for this Preset */
-  id: string;
+  id: PresetID;
   /** The bundle that this Preset came from (e.g. 'id-tagging-schema@6.13.0') */
-  bundleID: string;
+  bundleID: BundleID;
   /** Display name */
   name: string;
   /** Alternate names that may be displayed in the UI */
@@ -30,9 +30,9 @@ export interface PresetProps {
   /** Tags to remove when removing this Preset */
   removeTags: Tags;
   /** Field IDs for this Preset */
-  fields: string[];
+  fields: FieldID[];
   /** Additional Field IDs shown in "more fields" */
-  moreFields: string[];
+  moreFields: FieldID[];
   /** Geometry types this Preset works with */
   geometry: string[];
   /** Score for ranking search results */
@@ -52,13 +52,13 @@ export interface PresetProps {
   /** Region IDs where this preset is or isn't valid. See: https://github.com/ideditor/location-conflation */
   locationSet: { include?: string[]; exclude?: string[] };
   /** Resolved locationSet ID (added by SchemaSystem after processing locationSet) */
-  locationSetID: string;
+  locationSetID: LocationSetID;
 }
 
 
 /** Localized strings for a Preset */
 interface PresetStrings {
-  id: string;
+  id: PresetID;
   type: string;
   suggestion: boolean;
   name: string;
@@ -92,9 +92,9 @@ interface ResolvedFields {
 export class Preset {
   context: Context;
   type = 'preset' as const;
-  id: string;
+  id: PresetID;
   safeid: string;
-  presetID: string;
+  presetID: PresetID;
   props: PresetProps;
   geometries: Set<string>;
   tags: Tags;
@@ -104,7 +104,7 @@ export class Preset {
   suggestion: boolean;
 
   private _strings: Map<string, PresetStrings>;
-  private _currLocaleCode: string | null;
+  private _currLocaleCode: LocaleCode | null;
   private _currStrings: PresetStrings;
   private _resolved: ResolvedFields;
 
@@ -191,7 +191,7 @@ export class Preset {
    * This is done early because we need the strings indexed by the SchemaSystem for searching.
    * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode: string = 'en-US'): void {
+  setLocale(localeCode: LocaleCode = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
@@ -274,20 +274,20 @@ export class Preset {
   /**
    * name
    * The name is the main display name of the Preset, as shown in the user interface.
-   * @return  {string}  Localized name
+   * @return Localized name
    * @readonly
    */
-  get name() {
+  get name(): string {
     return this._currStrings.name;
   }
 
   /**
    * aliases
    * Aliases are alternate names for this Preset, they may be displayed in the user interface.
-   * @return  {Array<string>}  Localized aliases
+   * @return Localized aliases
    * @readonly
    */
-  get aliases() {
+  get aliases(): string[] {
     return this._currStrings.aliases;
   }
 
@@ -295,10 +295,10 @@ export class Preset {
    * terms
    * Terms are related words used for seraching for this Preset.
    * (For suggestion presets, the terms are alternate names)
-   * @return  {Array<string>}  Localized search terms
+   * @return Localized search terms
    * @readonly
    */
-  get terms() {
+  get terms(): string[] {
     return this._currStrings.terms;
   }
 

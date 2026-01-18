@@ -103,11 +103,11 @@ class Filter {
  */
 export class FilterSystem extends AbstractSystem {
   /** Map of filterID to Filter */
-  private _filters: Map<string, Filter>;
+  private _filters: Map<FilterID, Filter>;
   /** Set of filterIDs to hide */
-  private _hidden: Set<string>;
+  private _hidden: Set<FilterID>;
   /** Set of entityIDs to force visible */
-  private _forceVisible: Set<string>;
+  private _forceVisible: Set<EntityID>;
   /** Cache of entity.key to matched filterIDs */
   private _cache: Record<string, EntityCache>;
 //  private _deferred: Set<number>;
@@ -260,7 +260,7 @@ export class FilterSystem extends AbstractSystem {
    * @param filterID - Filter ID to check
    * @return true/false
    */
-  isEnabled(filterID: string): boolean {
+  isEnabled(filterID: FilterID): boolean {
     const filter = this._filters.get(filterID);
     return filter?.enabled ?? false;
   }
@@ -271,7 +271,7 @@ export class FilterSystem extends AbstractSystem {
    * Enables the given filter
    * @param filterID - Filter ID to enable
    */
-  enable(filterID: string): void {
+  enable(filterID: FilterID): void {
     const filter = this._filters.get(filterID);
     if (filter && !filter.enabled) {
       filter.enabled = true;
@@ -303,7 +303,7 @@ export class FilterSystem extends AbstractSystem {
    * Disables the given filter
    * @param filterID - Filter ID to disable
    */
-  disable(filterID: string): void {
+  disable(filterID: FilterID): void {
     const filter = this._filters.get(filterID);
     if (filter?.enabled) {
       filter.enabled = false;
@@ -335,7 +335,7 @@ export class FilterSystem extends AbstractSystem {
    * Toggles the given filter between enabled/disabled states
    * @param filterID - Filter ID to toggle
    */
-  toggle(filterID: string): void {
+  toggle(filterID: FilterID): void {
     const filter = this._filters.get(filterID);
     if (!filter) return;
 
@@ -530,7 +530,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Preset ('point', 'line', 'vertex', 'area', 'relation')
    * @return The first `filterID` which causes the Preset to be hidden, or `null`
    */
-  isHiddenPreset(preset: PresetLike, geometry: Geometry): string | null {
+  isHiddenPreset(preset: PresetLike, geometry: Geometry): FilterID | null {
     if (!this._hidden.size) return null;
     if (!preset.tags) return null;
 
@@ -557,7 +557,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHiddenFeature(entity: OsmEntity, graph: Graph, geometry: Geometry): string | null {
+  isHiddenFeature(entity: OsmEntity, graph: Graph, geometry: Geometry): FilterID | null {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
     if (this._forceVisible.has(entity.id)) return null;
@@ -579,7 +579,7 @@ export class FilterSystem extends AbstractSystem {
    * @param graph - Graph
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHiddenVertex(entity: OsmEntity, graph: Graph): string | null {
+  isHiddenVertex(entity: OsmEntity, graph: Graph): FilterID | null {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
     if (this._forceVisible.has(entity.id)) return null;
@@ -587,7 +587,7 @@ export class FilterSystem extends AbstractSystem {
     const parents = this.getParents(entity, graph, 'vertex');
     if (!parents.length) return null;
 
-    let filterID: string | null = null;
+    let filterID: FilterID | null = null;
     for (const parent of parents) {
       const parentFilterID = this.isHidden(parent, graph, parent.geometry(graph) as Geometry);
       if (!parentFilterID) return null;  // parent is not hidden
@@ -635,7 +635,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHidden(entity: OsmEntity, graph: Graph, geometry: Geometry): string | null {
+  isHidden(entity: OsmEntity, graph: Graph, geometry: Geometry): FilterID | null {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
 
@@ -690,7 +690,7 @@ export class FilterSystem extends AbstractSystem {
    * that might otherwise be hidden
    * @param entityIDs - Array of Entity ids
    */
-  forceVisible(entityIDs: string[]): void {
+  forceVisible(entityIDs: EntityID[]): void {
     this._forceVisible = new Set();
 
     const editor = this.context.systems.editor;

@@ -32,7 +32,7 @@ export class SelectBehavior extends AbstractBehavior {
   lastMove: EventData | null;
   lastSpace: EventData | null;
   lastClick: EventData | null;
-  private _multiSelection: Set<string>;
+  private _multiSelection: Set<EntityID>;
   private _spaceClickDisabled: boolean;
   private _longPressTimeout: ReturnType<typeof setTimeout> | null;
   private _showsMenu: boolean;

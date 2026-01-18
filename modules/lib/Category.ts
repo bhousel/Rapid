@@ -11,13 +11,13 @@ import { utilGatherTokens } from '../util/string.ts';
  */
 export interface CategoryProps {
   /** Unique identifier for this Category */
-  id: string;
+  id: CategoryID;
   /** The bundle that this Category came from (e.g. 'id-tagging-schema@6.13.0') */
-  bundleID: string;
+  bundleID: BundleID;
   /** Display name (fallback if localization unavailable) */
   name: string;
   /** Array of preset IDs that belong to this Category */
-  members: string[];
+  members: PresetID[];
   /** Whether this Category appears in search results */
   searchable: boolean;
   /** Match score for ranking search results (always -1 for Categories) */
@@ -25,13 +25,13 @@ export interface CategoryProps {
   /** Region IDs where this category is or isn't valid. See: https://github.com/ideditor/location-conflation */
   locationSet?: { include?: string[]; exclude?: string[] };
   /** Resolved locationSet ID (added by SchemaSystem after processing locationSet) */
-  locationSetID?: string;
+  locationSetID?: LocationSetID;
 }
 
 
 /** Localized strings for a Category */
 interface CategoryStrings {
-  id: string;
+  id: CategoryID;
   type: string;
   suggestion: boolean;
   name: string;
@@ -58,15 +58,15 @@ interface CategoryStrings {
 export class Category {
   context: Context;
   type = 'category' as const;
-  id: string;
+  id: CategoryID;
   safeid: string;
-  categoryID: string;
+  categoryID: CategoryID;
   props: CategoryProps;
   geometries: Set<string>;
   presets: Preset[];
 
   private _strings: Map<string, CategoryStrings>;
-  private _currLocaleCode: string | null;
+  private _currLocaleCode: LocaleCode | null;
   private _currStrings: CategoryStrings;
 
   /**
@@ -138,7 +138,7 @@ export class Category {
    * This is done early because we want the strings indexed by the SchemaSystem for searching.
    * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode: string = 'en-US'): void {
+  setLocale(localeCode: LocaleCode = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 

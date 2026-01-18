@@ -1,6 +1,6 @@
 import { EventEmitter } from 'tseep';
 
-import type { Context, SystemID } from './types.ts';
+import type { Context } from '../Context.ts';
 
 
 /**

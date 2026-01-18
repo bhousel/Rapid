@@ -144,7 +144,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx!;
     const esri = context.services.esri;
     const mapwithai = context.services.mapwithai;
     const overture = context.services.overture;
@@ -158,7 +158,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
     if (val && services.length) {
       Promise.all(services.map(service => service.startAsync()))
-        .then(() => gfx!.immediateRedraw());
+        .then(() => gfx.immediateRedraw());
     }
   }
 

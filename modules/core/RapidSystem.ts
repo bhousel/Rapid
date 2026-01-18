@@ -33,16 +33,16 @@ const RAPID_COLORS: readonly string[] = [
  */
 export class RapidSystem extends AbstractSystem {
   /** Map<datasetID, RapidDataset> - all the datasets we know about */
-  readonly catalog = new Map<string, RapidDataset>();
+  readonly catalog = new Map<DatasetID, RapidDataset>();
   /** Set<string> - all the dataset 'categories' we know about */
   readonly categories = new Set<string>();
   /** Set<dataID> - features accepted by the user */
-  readonly acceptIDs = new Set<string>();
+  readonly acceptIDs = new Set<DataID>();
   /** Set<dataID> - features ignored by the user */
-  readonly ignoreIDs = new Set<string>();
+  readonly ignoreIDs = new Set<DataID>();
 
-  private _addedDatasetIDs = new Set<string>();
-  private _enabledDatasetIDs = new Set<string>();
+  private _addedDatasetIDs = new Set<DatasetID>();
+  private _enabledDatasetIDs = new Set<DatasetID>();
   private _nextColorIndex = 2;  // see note in _datasetsChanged()
   private _taskExtent: Extent | null = null;
   private _isTaskBoundsRect: boolean | null = null;
@@ -409,7 +409,7 @@ export class RapidSystem extends AbstractSystem {
     const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
 
-    const enabledIDs: string[] = [];
+    const enabledIDs: DatasetID[] = [];
     for (const [datasetID, dataset] of this.catalog) {
       // This code is a bit weird - I don't like it and we should change it...
       // I'm trying to match the legacy color-choosing behavior from before Rapid#1642 (which changed a bunch of things)

@@ -1,7 +1,7 @@
 import { Extent } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
-import type { EntityID, Vec2 } from '../data/types.ts';
+import type { Vec2 } from '../data/types.ts';
 import type { Graph } from './Graph.js';
 import { ValidationFix } from './ValidationFix.ts';
 import { utilTotalExtent } from '../util/util.ts';

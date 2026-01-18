@@ -55,7 +55,7 @@ type RawCategoryData = Partial<CategoryProps> & { icon?: string } & Record<strin
  */
 export interface SchemaBundle {
   /** A string bundle identifier, e.g. 'id-tagging-schema@6.13.0' (required) */
-  bundleID: string;
+  bundleID: BundleID;
   /** Object mapping fieldID to field data (or null to delete) */
   fields?: Record<string, RawFieldData | null>;
   /** Object mapping presetID to preset data (or null to delete) */
@@ -118,27 +118,27 @@ export class SchemaSystem extends AbstractSystem {
   readonly fieldTypes: Set<FieldType>;
 
   /** Set of presetIDs that the user can add (if `null`, all are normally addable) */
-  addablePresetIDs: Set<string> | null;
+  addablePresetIDs: Set<PresetID> | null;
 
   /** Names of schema bundles that have been merged in */
-  bundles: Set<string>;
+  bundles: Set<BundleID>;
   /** The Categories, keyed by categoryID */
-  categories: Map<string, Category>;
+  categories: Map<CategoryID, Category>;
   /** The Presets, keyed by presetID */
-  presets: Map<string, Preset>;
+  presets: Map<PresetID, Preset>;
   /** The Fields, keyed by fieldID */
-  fields: Map<string, Field>;
+  fields: Map<FieldID, Field>;
   /** The "universal" fields that can go with any Preset */
-  universal: Map<string, Field>;
+  universal: Map<FieldID, Field>;
   /** Default preset/category IDs for each geometry type */
   defaults: Map<GeometryType, Set<string>>;
 
   private _matchIndex: Map<string, Record<string, Record<string, Preset[]>>>;
-  private _recentIDs: string[] | null;
+  private _recentIDs: PresetID[] | null;
 
   // MiniSearch fulltext search indexes, one per locale
-  private _searchIndexes: Map<string, MiniSearch>;
-  private _currLocaleCode: string | null;
+  private _searchIndexes: Map<LocaleCode, MiniSearch>;
+  private _currLocaleCode: LocaleCode | null;
   private _currSearchIndex: MiniSearch | null;
 
 

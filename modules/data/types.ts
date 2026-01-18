@@ -25,8 +25,6 @@ export type Vec3 = [number, number, number];
 /** 4D vector as [x, y, z, w], also used for bounding boxes [minX, minY, maxX, maxY] */
 export type Vec4 = [number, number, number, number];
 
-/** Entity ID string (e.g. 'n123', 'w456', 'r789') */
-export type EntityID = string;
 /** Entity type discriminator */
 export type EntityType = 'node' | 'way' | 'relation';
 

@@ -1,6 +1,6 @@
 import RBush from 'rbush';
 
-import type { EntityID, OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 import type { Graph } from './Graph.ts';
 import type { ValidationIssue } from './ValidationIssue.ts';
 
@@ -8,7 +8,7 @@ import type { ValidationIssue } from './ValidationIssue.ts';
 /** Type for the spatial index box used in RBush */
 export interface RecheckBox {
   /** Issue ID this box belongs to */
-  issueID: string;
+  issueID: IssueID;
   /** Minimum X coordinate */
   minX: number;
   /** Minimum Y coordinate */
@@ -41,13 +41,13 @@ export class ValidationCache {
   /** Entity IDs that returned provisional results and need revalidation */
   provisionalEntityIDs: Set<EntityID>;
   /** Map of issue ID to ValidationIssue */
-  issues: Map<string, ValidationIssue>;
+  issues: Map<IssueID, ValidationIssue>;
   /** Map of entity ID to Set of issue IDs affecting that entity */
-  entityIssueIDs: Map<EntityID, Set<string>>;
+  entityIssueIDs: Map<EntityID, Set<IssueID>>;
   /** RBush spatial index for connectivity issues */
   recheckRBush: RBush<RecheckBox>;
   /** Map of issue ID to its spatial box */
-  recheckBoxes: Map<string, RecheckBox>;
+  recheckBoxes: Map<IssueID, RecheckBox>;
 
   /**
    * @constructor
@@ -197,7 +197,7 @@ export class ValidationCache {
     const results = new Set<EntityID>(entityIDs);  // include original entityIDs
     if (!graph || !results.size) return results;   // nothing to do
 
-    const relatedIssueIDs = new Set<string>();
+    const relatedIssueIDs = new Set<IssueID>();
 
     for (const entityID of entityIDs) {
       const entity: OsmEntity | undefined = graph.hasEntity(entityID);

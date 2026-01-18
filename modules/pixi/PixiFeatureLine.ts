@@ -1,10 +1,12 @@
 import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
 
-import type { Viewport, Vec2 } from '@rapid-sdk/math';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { getLineSegments, lineToPoly, type LineToPolyResult } from './helpers.ts';
+
+import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const ONEWAY_SPACING = 35;
 const SIDED_SPACING = 30;
@@ -76,7 +78,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * @param layer - The Layer that owns this Feature
    * @param featureID - Unique string to use for the name of this Feature
    */
-  constructor(layer: any, featureID: string) {
+  constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
     this._bufferdata = null;

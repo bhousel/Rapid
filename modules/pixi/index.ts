@@ -27,9 +27,3 @@ export { PixiLayerOsmose } from './PixiLayerOsmose.ts';
 export { PixiLayerRapid } from './PixiLayerRapid.ts';
 export { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.ts';
 export { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
-
-// Type aliases - these are commonly used throughout the pixi module
-export type FeatureID = string;
-export type LayerID = string;
-export type GroupID = string;
-export type ClassID = string;

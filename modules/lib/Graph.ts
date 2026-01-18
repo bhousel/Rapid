@@ -1,7 +1,7 @@
 import { Difference } from './Difference.ts';
 import { type Iterable, type OneOrMore, utilIterable } from '../util/iterable.ts';
 
-import type { Context, OsmEntity, EntityID, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
+import type { Context, OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
 
 
 /**
@@ -10,7 +10,7 @@ import type { Context, OsmEntity, EntityID, OsmNode, OsmRelation, OsmWay } from 
  */
 export interface GraphProps {
   /** Unique string to identify this Graph */
-  id: string;
+  id: GraphID;
   /** Internal version of the Graph, can be used to detect changes */
   v: number;
 }
@@ -48,7 +48,7 @@ export interface GraphCache {
  *   `props`   Properties object
  */
 export class Graph {
-  id: string;
+  id: GraphID;
   context: Context;
   props: GraphProps;
   isBaseGraph: boolean;

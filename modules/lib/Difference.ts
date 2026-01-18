@@ -1,7 +1,7 @@
 import deepEqual from 'fast-deep-equal';
 
 import type { Iterable } from '../util/iterable.ts';
-import type { OsmEntity, EntityID, OsmRelationMember, OsmNode, OsmWay, OsmRelation } from '../data/types.ts';
+import type { OsmEntity, OsmRelationMember, OsmNode, OsmWay, OsmRelation } from '../data/types.ts';
 import type { Graph } from './Graph.ts';
 
 

@@ -11,9 +11,9 @@ const RAPID_MAGENTA = '#da26d3';
  */
 export interface RapidDatasetProps {
   /** Unique identifier for this dataset */
-  id: string;
+  id: DatasetID;
   /** Service providing this dataset: 'esri', 'mapwithai', 'overture' */
-  serviceID: string;
+  serviceID: ServiceID;
   /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   categories: Set<string>;
   /** Tags/flags for this dataset (e.g. 'opendata') */
@@ -47,9 +47,9 @@ export interface RapidDatasetProps {
   /** Whether this dataset uses conflation */
   conflated: boolean;
   /** Localization string ID for the label */
-  labelStringID: string;
+  labelStringID: StringID;
   /** Localization string ID for the description */
-  descriptionStringID: string;
+  descriptionStringID: StringID;
   /** Fallback label if localization not available */
   label: string;
   /** Fallback description if localization not available */
@@ -65,8 +65,8 @@ export interface RapidDatasetProps {
  */
 export class RapidDataset {
   context: Context;
-  id: string;
-  serviceID: string;
+  id: DatasetID;
+  serviceID: ServiceID;
   categories: Set<string>;
   tags: Set<string>;
   color: string;
@@ -83,8 +83,8 @@ export class RapidDataset {
   filtered: boolean;
   hidden: boolean;
   conflated: boolean;
-  labelStringID: string | undefined;
-  descriptionStringID: string | undefined;
+  labelStringID: StringID | undefined;
+  descriptionStringID: StringID | undefined;
   label: string;
   description: string;
 

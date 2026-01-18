@@ -27,7 +27,7 @@ import type { Viewport } from '@rapid-sdk/math';
  */
 export class AbstractPixiLayer {
   /** Unique identifier for this Layer */
-  id: string;
+  id: LayerID;
   /** The Scene that owns this Layer */
   scene: PixiScene;
   /** Reference to the GraphicsSystem */
@@ -35,24 +35,24 @@ export class AbstractPixiLayer {
   /** Global shared application context */
   context: Context;
   /** Map of featureID to Feature */
-  features: Map<string, AbstractPixiFeature>;
+  features: Map<FeatureID, AbstractPixiFeature>;
   /** Map of featureID to frame last seen */
-  retained: Map<string, number>;
+  retained: Map<FeatureID, number>;
 
   /** Whether the user has chosen to see the layer */
   protected _enabled: boolean;
   /** Map of featureID to dataID */
-  protected _featureHasData: Map<string, string>;
+  protected _featureHasData: Map<FeatureID, DataID>;
   /** Map of dataID to Set of featureIDs */
-  protected _dataHasFeature: Map<string, Set<string>>;
+  protected _dataHasFeature: Map<DataID, Set<FeatureID>>;
   /** Map of parent dataID to Set of child dataIDs */
-  protected _parentHasChildren: Map<string, Set<string>>;
+  protected _parentHasChildren: Map<DataID, Set<DataID>>;
   /** Map of child dataID to Set of parent dataIDs */
-  protected _childHasParents: Map<string, Set<string>>;
+  protected _childHasParents: Map<DataID, Set<DataID>>;
   /** Map of dataID to Set of classIDs */
-  protected _dataHasClass: Map<string, Set<string>>;
+  protected _dataHasClass: Map<DataID, Set<ClassID>>;
   /** Map of classID to Set of dataIDs */
-  protected _classHasData: Map<string, Set<string>>;
+  protected _classHasData: Map<ClassID, Set<DataID>>;
 
   /**
    * @constructor
@@ -97,7 +97,7 @@ export class AbstractPixiLayer {
    * @return This layer's unique id
    * @readonly
    */
-  get layerID(): string {
+  get layerID(): LayerID {
     return this.id;
   }
 
@@ -232,7 +232,7 @@ export class AbstractPixiLayer {
    * @param featureID - featureID  (e.g. 'osm-w-123-fill')
    * @param dataID - dataID     (e.g. 'w-123')
    */
-  bindData(featureID: string, dataID: string): void {
+  bindData(featureID: FeatureID, dataID: DataID): void {
     this.unbindData(featureID);
 
     let featureSet = this._dataHasFeature.get(dataID);
@@ -251,7 +251,7 @@ export class AbstractPixiLayer {
    * Removes the data binding for a given featureID
    * @param featureID - featureID  (e.g. 'osm-w-123-fill')
    */
-  unbindData(featureID: string): void {
+  unbindData(featureID: FeatureID): void {
     const dataID = this._featureHasData.get(featureID);
     if (!dataID) return;
 
@@ -279,7 +279,7 @@ export class AbstractPixiLayer {
    * @param parentID - dataID of the parent (e.g. 'r123')
    * @param childIDs - dataIDs of the children to add (e.g. 'w123')
    */
-  addChildData(parentID: string, childIDs: OneOrMore<string>): void {
+  addChildData(parentID: DataID, childIDs: OneOrMore<DataID>): void {
     let childSet = this._parentHasChildren.get(parentID);
     if (!childSet) {
       childSet = new Set();
@@ -305,7 +305,7 @@ export class AbstractPixiLayer {
    * @param parentID - dataID of the parent (e.g. 'r123')
    * @param childIDs - dataIDs of the children to remove (e.g. 'w123')
    */
-  removeChildData(parentID: string, childIDs: OneOrMore<string>): void {
+  removeChildData(parentID: DataID, childIDs: OneOrMore<DataID>): void {
     const childSet = this._parentHasChildren.get(parentID);
     if (childSet) {
       for (const childID of utilIterable(childIDs)) {
@@ -333,7 +333,7 @@ export class AbstractPixiLayer {
    * Removes all child dataIDs for the given parent dataID
    * @param parentID - dataID (e.g. 'r123')
    */
-  clearChildData(parentID: string): void {
+  clearChildData(parentID: DataID): void {
     const childSet = this._parentHasChildren.get(parentID);
     if (childSet) {
       this.removeChildData(parentID, childSet);
@@ -348,7 +348,7 @@ export class AbstractPixiLayer {
    * @param result - `Set` containing the results (e.g. ['r123','w123','n123'])
    * @returns `Set` including the dataID and all dataIDs in the child hierarchy
    */
-  getSelfAndDescendants(dataID: string, result?: Set<string>): Set<string> {
+  getSelfAndDescendants(dataID: DataID, result?: Set<DataID>): Set<DataID> {
     if (result instanceof Set) {
       result.add(dataID);
     } else {
@@ -373,7 +373,7 @@ export class AbstractPixiLayer {
    * @param result - `Set` containing the results (e.g. ['n123','w123','r123'])
    * @returns `Set` including the dataID and all dataIDs in the parent hierarchy
    */
-  getSelfAndAncestors(dataID: string, result?: Set<string>): Set<string> {
+  getSelfAndAncestors(dataID: DataID, result?: Set<DataID>): Set<DataID> {
     if (result instanceof Set) {
       result.add(dataID);
     } else {
@@ -398,7 +398,7 @@ export class AbstractPixiLayer {
    * @param result - `Set` containing the results (e.g. ['n121','n122','n123','n124'])
    * @returns `Set` including the dataID and all dataIDs adjacent in the parent-child hierarchy
    */
-  getSelfAndSiblings(dataID: string, result?: Set<string>): Set<string> {
+  getSelfAndSiblings(dataID: DataID, result?: Set<DataID>): Set<DataID> {
     if (result instanceof Set) {
       result.add(dataID);
     } else {
@@ -423,7 +423,7 @@ export class AbstractPixiLayer {
    * @param classID - classID to set (e.g. 'hover')
    * @param dataID - dataID (e.g. 'r123')
    */
-  setClass(classID: string, dataID: string): void {
+  setClass(classID: ClassID, dataID: DataID): void {
     let classIDs = this._dataHasClass.get(dataID);
     if (!classIDs) {
       classIDs = new Set();
@@ -446,7 +446,7 @@ export class AbstractPixiLayer {
    * @param classID - classID to unset (e.g. 'hover')
    * @param dataID - dataID (e.g. 'r123')
    */
-  unsetClass(classID: string, dataID: string): void {
+  unsetClass(classID: ClassID, dataID: DataID): void {
     const classIDs = this._dataHasClass.get(dataID);
     if (classIDs) {
       classIDs.delete(classID);
@@ -470,7 +470,7 @@ export class AbstractPixiLayer {
    * Clear out all uses of the given classID.
    * @param classID - classID to clear (e.g. 'hover')
    */
-  clearClass(classID: string): void {
+  clearClass(classID: ClassID): void {
     const dataIDs = this._classHasData.get(classID) ?? new Set();
     for (const dataID of dataIDs) {
       this.unsetClass(classID, dataID);
@@ -484,7 +484,7 @@ export class AbstractPixiLayer {
    * @param classID - classID to check (e.g. 'hover')
    * @returns dataIDs the dataIDs that currently have this classID set
    */
-  getDataWithClass(classID: string): Set<string> {
+  getDataWithClass(classID: ClassID): Set<DataID> {
     const dataIDs = this._classHasData.get(classID) ?? new Set();
     return new Set(dataIDs);  // copy
   }
@@ -546,7 +546,7 @@ export class AbstractPixiLayer {
    * During the next "app" pass, dirty features will be rebuilt.
    * @param featureIDs - featureIDs to set dirty
    */
-  dirtyFeatures(featureIDs: OneOrMore<string>): void {
+  dirtyFeatures(featureIDs: OneOrMore<FeatureID>): void {
     for (const featureID of utilIterable(featureIDs)) {
       const feature = this.features.get(featureID);
       if (feature) {
@@ -561,7 +561,7 @@ export class AbstractPixiLayer {
    * During the next "app" pass, dirty features will be rebuilt.
    * @param dataIDs - dataIDs to set dirty
    */
-  dirtyData(dataIDs: OneOrMore<string>): void {
+  dirtyData(dataIDs: OneOrMore<DataID>): void {
     for (const dataID of utilIterable(dataIDs)) {
       const featureIDs = this._dataHasFeature.get(dataID);
       if (featureIDs) {

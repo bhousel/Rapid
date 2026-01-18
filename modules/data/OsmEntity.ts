@@ -6,7 +6,7 @@ import { osmIsInterestingTag } from '../lib/tags.ts';
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { Tags, EntityID } from './types.ts';
+import type { Tags } from './types.ts';
 
 
 /**

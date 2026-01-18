@@ -3,9 +3,10 @@ import { utilArrayIntersection } from '@rapid-sdk/util';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
 
-import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 import type { OsmNode } from '../data/types.ts';
+import type { PixiLayerMapUI } from '../pixi/PixiLayerMapUI.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -123,7 +124,7 @@ export class LassoBehavior extends AbstractBehavior {
     this._coords.push(coord);
 
     // Push the polygon data to the map UI for rendering.
-    const mapUILayer = gfx.scene!.layers.get('map-ui') as any;
+    const mapUILayer = gfx.scene!.layers.get('map-ui') as PixiLayerMapUI;
     mapUILayer.lassoData = this._coords;
     gfx.immediateRedraw();
   }
@@ -141,7 +142,7 @@ export class LassoBehavior extends AbstractBehavior {
     const context = this.context;
     const gfx = context.systems.gfx!;
 
-    const mapUILayer = gfx.scene!.layers.get('map-ui') as any;
+    const mapUILayer = gfx.scene!.layers.get('map-ui') as PixiLayerMapUI;
 
     const ids = this._lassoed();
     this._coords = [];
@@ -176,7 +177,7 @@ export class LassoBehavior extends AbstractBehavior {
    * Returns array of entity IDs that are within the lasso polygon
    * @return  Array of entity IDs
    */
-  _lassoed(): string[] {
+  _lassoed(): EntityID[] {
     const context = this.context;
     const editor = context.systems.editor!;
     const locations = context.systems.locations!;

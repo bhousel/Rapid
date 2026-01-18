@@ -79,7 +79,7 @@ export function uiSectionPhotoOverlays(context) {
 
   function drawPhotoItems(selection) {
     const allLayerIDs = photos.layerIDs;
-    const detectionLayerIDs = photos.detectionLayerIDs;
+    const LayerIDs = photos.LayerIDs;
     const layers = allLayerIDs.map(layerID => scene.layers.get(layerID)).filter(Boolean);
     const data = layers.filter(layer => layer.supported);
 
@@ -109,7 +109,7 @@ export function uiSectionPhotoOverlays(context) {
       .append('li')
       .attr('class', d => {
         let classes = `list-item-photos list-item-${d.id}`;
-        if (detectionLayerIDs.includes(d.id)) {
+        if (LayerIDs.includes(d.id)) {
           classes += ' indented';
         }
         return classes;

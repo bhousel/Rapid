@@ -168,7 +168,7 @@ export class PixiTextures {
    * @param textureID - Texture identifier
    * @returns The texture (or `null` if not found)
    */
-  get(textureID: string): PIXI.Texture | null {
+  get(textureID: TextureID): PIXI.Texture | null {
     return this.getTexture('symbol', textureID);
   }
 
@@ -179,7 +179,7 @@ export class PixiTextures {
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
    * @returns The texture (or `null` if not found)
    */
-  getTexture(atlasID: string, textureID: string): PIXI.Texture | null {
+  getTexture(atlasID: AtlasID, textureID: TextureID): PIXI.Texture | null {
     const key = `${atlasID}-${textureID}`;
     const tdata = this._textureData.get(key);
 
@@ -202,7 +202,7 @@ export class PixiTextures {
    * @param textureID - e.g. 'bushes'
    * @returns The texture (or `undefined` if not found)
    */
-  getPatternTexture(textureID: string): PIXI.Texture | undefined {
+  getPatternTexture(textureID: TextureID): PIXI.Texture | undefined {
     const tdata = this._textureData.get(textureID);
     return tdata?.texture;
   }
@@ -238,7 +238,7 @@ export class PixiTextures {
    */
   allocate(
     atlasID: keyof AtlasCollection,
-    textureID: string,
+    textureID: TextureID,
     width: number,
     height: number,
     asset: ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement
@@ -304,7 +304,7 @@ export class PixiTextures {
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
    */
-  free(atlasID: keyof AtlasCollection, textureID: string): void {
+  free(atlasID: keyof AtlasCollection, textureID: TextureID): void {
     if (!this._atlas) return;
     const atlas = this._atlas[atlasID];
     if (!atlas) return;
@@ -341,7 +341,7 @@ export class PixiTextures {
    * @param options - Options passed to `renderer.generateTexture`
    * @returns Texture allocated from the symbol atlas
    */
-  graphicToTexture(textureID: string, graphic: PIXI.Graphics, options: Partial<PIXI.GenerateTextureOptions> = {}): PIXI.Texture | null {
+  graphicToTexture(textureID: TextureID, graphic: PIXI.Graphics, options: Partial<PIXI.GenerateTextureOptions> = {}): PIXI.Texture | null {
     if (!this.gfx.pixi) return null;  // called too soon?
 
     const fullOptions: PIXI.GenerateTextureOptions = {
@@ -374,7 +374,7 @@ export class PixiTextures {
    * @param textStyle - PIXI text style
    * @returns Texture allocated from the text atlas
    */
-  textToTexture(textureID: string, str: string, textStyle: PIXI.TextStyle): PIXI.Texture | null {
+  textToTexture(textureID: TextureID, str: string, textStyle: PIXI.TextStyle): PIXI.Texture | null {
     if (!this.gfx.pixi) return null;  // called too soon?
 
     const options = {
@@ -408,7 +408,7 @@ export class PixiTextures {
    * @param textureID - Icon identifier (e.g. 'temaki-school')
    * @param symbol - The SVG Symbol element for the icon
    */
-  registerSvgIcon(textureID: string, symbol: SVGSymbolElement): void {
+  registerSvgIcon(textureID: TextureID, symbol: SVGSymbolElement): void {
     this._svgIcons.set(textureID, symbol);
   }
 
@@ -417,7 +417,7 @@ export class PixiTextures {
    * _svgIconToTexture
    * @param textureID - Icon identifier (e.g. 'temaki-school')
    */
-  private _svgIconToTexture(textureID: string): void {
+  private _svgIconToTexture(textureID: TextureID): void {
     const symbol = this._svgIcons.get(textureID);
     if (!symbol) return;
 

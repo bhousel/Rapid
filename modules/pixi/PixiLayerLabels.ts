@@ -56,8 +56,8 @@ interface RopeLabelProps {
 interface LabelBox {
   type: 'label' | 'avoid' | 'debug';
   id: string;
-  featureID: string;
-  labelID?: string | null;
+  featureID: FeatureID;
+  labelID?: LabelID | null;
   objectID?: string | null;
   tint?: number;
   minX: number;
@@ -88,12 +88,12 @@ interface ChainLink {
  *  has scrolled the placement box into view - see `renderObjects()`
  */
 class Label {
-  id: string;
+  id: LabelID;
   type: 'text' | 'rope';
   props: TextLabelProps | RopeLabelProps;
   objectID: string | null;
 
-  constructor(id: string, type: 'text' | 'rope', props: TextLabelProps | RopeLabelProps) {
+  constructor(id: LabelID, type: 'text' | 'rope', props: TextLabelProps | RopeLabelProps) {
     this.id = id;
     this.type = type;
     this.props = props;
@@ -113,13 +113,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
   private _labelRBush: RBush<LabelBox>;
   private _debugRBush: RBush<LabelBox>;
-  private _avoided: Set<string>;
-  private _labeled: Set<string>;
-  private _labels: Map<string, Label>;
+  private _avoided: Set<FeatureID>;
+  private _labeled: Set<FeatureID>;
+  private _labels: Map<LabelID, Label>;
   private _objects: Map<string, PIXI.Container>;
   private _boxes: Map<string, LabelBox>;
-  private _featureHasBoxes: Map<string, Set<string>>;
-  private _textureIDs: Map<string, string>;
+  private _featureHasBoxes: Map<FeatureID, Set<string>>;
+  private _textureIDs: Map<string, TextureID>;
   private _tPrev: { x: number; y: number; z: number; r: number };
   private _labelOffset: PIXI.Point;
   private _textStyleNormal: PIXI.TextStyle;
@@ -149,17 +149,17 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // Label objects are placeholders for where a label can go.
     // After working out the placement math, we don't automatically make display objects,
     // since many of the objects would get placed far offscreen.
-    this._labels = new Map();    // Map<labelID, Label Object>
+    this._labels = new Map();    // Map<LabelID, Label Object>
 
     // Pixi Display Objects - may include Sprite, Rope, Text, BitmapText, etc.
     this._objects = new Map();   // Map<objectID, Display Object>
 
     // Boxes are objects for working with RBush.
     this._boxes = new Map();            // Map<boxID, box>
-    this._featureHasBoxes = new Map();  // Map<featureID, Set<boxID>>
+    this._featureHasBoxes = new Map();  // Map<FeatureID, Set<boxID>>
 
     // Keep track of textures that we've allocated
-    this._textureIDs = new Map();  // Map<string, textureID>
+    this._textureIDs = new Map();  // Map<string, TextureID>
 
     // We reset the labeling when scale or rotation change
     this._tPrev = { x: 0, y: 0, z: 1, r: 0 };
@@ -241,11 +241,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * This will force the feature to be relabeled.
    * @param featureID - The feature ID to reset
    */
-  resetFeature(featureID: string): void {
+  resetFeature(featureID: FeatureID): void {
     this._avoided.delete(featureID);
     this._labeled.delete(featureID);
 
-    const labelIDs = new Set<string>();
+    const labelIDs = new Set<LabelID>();
     const objectIDs = new Set<string>();
 
     // Gather `labelIDs` and `objectIDs` from the boxes
@@ -332,8 +332,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // The label container should be kept unrotated so that it stays screen-up not north-up.
     // We need to counter the effects of the 'stage' and 'origin' containers that we are underneath.
-    const stage = this.gfx!.stage!.position;
-    const origin = this.gfx!.origin!.position;
+    const stage = this.gfx.stage!.position;
+    const origin = this.gfx.origin!.position;
     const bearing = viewport.transform.rotation;
 
     // Determine the difference between the global/screen coordinate system (where [0,0] is top left)
@@ -341,7 +341,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // We need to save this labelOffset for use elsewhere, it is the basis for having a consistent coordinate
     // system to track labels to place and objects to avoid. (we apply it to values we get from `getBounds`)
     const labelOffset = this._labelOffset;
-    this.gfx!.origin!.toGlobal({ x: 0, y: 0 }, labelOffset);
+    this.gfx.origin!.toGlobal({ x: 0, y: 0 }, labelOffset);
 
     const groupContainer = this.scene.groups.get('labels')!;
     groupContainer.position.set(-origin.x, -origin.y);     // undo origin - [0,0] is now center
@@ -1030,7 +1030,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   renderObjects(): void {
     // Get the display bounds in screen/global coordinates
-    const screen = this.gfx!.pixi!.screen;
+    const screen = this.gfx.pixi!.screen;
     const labelOffset = this._labelOffset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,
@@ -1104,7 +1104,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   renderDebug(): void {
     // Get the display bounds in screen/global coordinates
-    const screen = this.gfx!.pixi!.screen;
+    const screen = this.gfx.pixi!.screen;
     const labelOffset = this._labelOffset;
     const screenBounds = {
       minX: screen.x - labelOffset.x,

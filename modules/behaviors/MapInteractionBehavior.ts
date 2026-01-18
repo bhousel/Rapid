@@ -285,8 +285,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
     this._lastPoint = null;
     this._lastAngle = null;
 
-    const mode = context.mode!.id;
-    if (mode === 'draw-area' || mode === 'draw-line') {
+    const modeID = context.mode!.id;
+    if (modeID === 'draw-area' || modeID === 'draw-line') {
       eventManager.setCursor('crosshair');
     } else {
       eventManager.setCursor('grabbing');

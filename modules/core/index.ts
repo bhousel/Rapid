@@ -19,11 +19,6 @@ import { UploaderSystem } from './UploaderSystem.ts';
 import { UrlHashSystem } from './UrlHashSystem.ts';
 import { ValidationSystem } from './ValidationSystem.ts';
 
-import type { Context, SystemID } from './types.ts';
-
-/** Type for a System class constructor */
-type SystemConstructor = new (context: Context) => AbstractSystem;
-
 export {
   AbstractSystem,
   AssetSystem,
@@ -48,16 +43,17 @@ export {
 };
 
 // Re-export types from types.ts for convenience
-export type { Context, SystemID, Systems } from './types.ts';
+import type { SystemConstructor } from './types.ts';
+export type { Context, Systems, SystemConstructor } from './types.ts';
 
 /** Container for registering available systems */
-interface SystemsRegistry {
+interface SystemRegistry {
   /** Map of system IDs to their constructors - systems here will be instantiated at init time */
   available: Map<SystemID, SystemConstructor>;
 }
 
 // At init time, we will instantiate any that are in the 'available' collection.
-export const systems: SystemsRegistry = {
+export const systems: SystemRegistry = {
   available: new Map<SystemID, SystemConstructor>()
 };
 

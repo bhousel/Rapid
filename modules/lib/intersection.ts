@@ -6,7 +6,7 @@ import { actionReverse } from '../actions/reverse.js';
 import { actionSplit } from '../actions/split.js';
 import { Graph } from './Graph.ts';
 
-import type { Context, OsmEntity, EntityID, OsmNode, OsmRelation, OsmWay, Vec2 } from '../data/types.ts';
+import type { Context, OsmEntity, OsmNode, OsmRelation, OsmWay, Vec2 } from '../data/types.ts';
 import type { Action } from './types.ts';
 
 

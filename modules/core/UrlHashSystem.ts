@@ -327,7 +327,7 @@ export class UrlHashSystem extends AbstractSystem {
 
     // Currently only support OSM ids
     let selected: string | undefined;
-    const selectedIDs: string[] = context.selectedIDs().filter((id: string) => graph.hasEntity(id));
+    const selectedIDs: EntityID[] = context.selectedIDs().filter(id => graph.hasEntity(id));
     if (selectedIDs.length) {
       const firstLabel: string = l10n.displayLabel(graph.entity(selectedIDs[0]), graph);
       if (selectedIDs.length > 1) {

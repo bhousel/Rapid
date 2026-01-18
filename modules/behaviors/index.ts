@@ -9,8 +9,6 @@ import { MapNudgeBehavior } from './MapNudgeBehavior.ts';
 import { PasteBehavior } from './PasteBehavior.ts';
 import { SelectBehavior } from './SelectBehavior.ts';
 
-import type { Context } from '../Context.ts';
-
 export {
   AbstractBehavior,
   DragBehavior,
@@ -24,17 +22,13 @@ export {
   SelectBehavior
 };
 
-/** Type alias for behavior identifiers */
-export type BehaviorID = string;
+// Re-export types from types.ts for convenience
+import type { BehaviorConstructor } from './types.ts';
+export type { Behaviors, BehaviorConstructor } from './types.ts';
 
-/** Type alias for Behavior classes */
-export type Behavior = AbstractBehavior;
-
-/** Constructor type for behaviors */
-export type BehaviorConstructor = new (context: Context) => AbstractBehavior;
-
-/** Collection of available behaviors */
-export interface BehaviorRegistry {
+/** Container for registering available behaviors */
+interface BehaviorRegistry {
+  /** Map of behavior IDs to their constructors - behaviors here will be instantiated at init time */
   available: Map<BehaviorID, BehaviorConstructor>;
 }
 

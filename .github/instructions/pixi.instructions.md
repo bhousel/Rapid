@@ -6,20 +6,13 @@ applyTo: "modules/pixi/**"
 
 Guidelines for working with the `modules/pixi/` folder during TypeScript conversion.
 
-## GraphicsSystem Access
-
-- `GraphicsSystem` (`modules/core/GraphicsSystem.js`) is not yet converted to TypeScript
-- Cast it as `any`: `const gfx = context.systems.gfx as any;`
-- Use non-null assertion `!.` (not optional chaining `?.`) since gfx **definitely exists** when layers are running
-- Example: `gfx!.immediateRedraw();`
-
 ## Other Untyped Systems and Services
 
 Services not yet converted to TypeScript should be cast `as any`:
-- Example: `const mapillary = context.services.mapillary;` (already typed loosely)
+- Example: `const mapillary = context.services.mapillary as any;` (JavaScript code, not typed)
 
-Systems that ARE converted (use non-null assertion, not `as any`):
-- `photos`: `const photos = context.systems.photos!;` (PhotoSystem is typed)
+Systems that ARE converted to TypeScript can use non-null assertion:
+- `photos`: `const photos = context.systems.photos!;`
 
 Use `!.` for systems that definitely exist when the code runs. Only use `?.` for truly optional dependencies.
 

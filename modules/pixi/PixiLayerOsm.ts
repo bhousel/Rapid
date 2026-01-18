@@ -7,7 +7,7 @@ import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { Vec2, Viewport } from '@rapid-sdk/math';
-import type { EntityID, OsmEntity, OsmNode, OsmRelation, OsmRelationMember, Tags } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmRelation, OsmRelationMember, Tags } from '../data/types.ts';
 import type { Style } from '../core/StyleSystem.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
@@ -141,11 +141,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx!;
     const osm = context.services.osm;
     if (val && osm) {
       osm.startAsync()
-        .then(() => gfx!.immediateRedraw());
+        .then(() => gfx.immediateRedraw());
     }
   }
 

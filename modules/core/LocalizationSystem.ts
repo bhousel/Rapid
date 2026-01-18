@@ -7,7 +7,7 @@ import { utilDetect } from '../util/detect.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Context } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { EntityID, OsmEntity, Tags, Vec2 } from '../data/index.ts';
+import type { OsmEntity, Tags, Vec2 } from '../data/index.ts';
 
 
 /** Information about a language */
@@ -15,9 +15,9 @@ export interface LanguageInfo {
   /** Native name of the language (e.g. "Deutsch" for German) */
   nativeName?: string;
   /** Base language code for derived languages */
-  base?: string;
+  base?: LanguageCode;
   /** Script code for the language */
-  script?: string;
+  script?: ScriptCode;
 }
 
 /** Information about a locale */
@@ -31,7 +31,7 @@ interface ResolvedString {
   /** The resolved text */
   text: string;
   /** The locale the text was found in, or null if using default */
-  locale: string | null;
+  locale: LocaleCode | null;
 }
 
 /** Replacement tokens for localized strings */
@@ -53,7 +53,7 @@ type LocaleCache = Record<string, Record<string, any>>;
 export interface AppendFunction {
   (selection: D3Selection): D3Selection;
   /** The string ID that was used */
-  stringID: string;
+  stringID: StringID;
 }
 
 
@@ -68,22 +68,22 @@ export class LocalizationSystem extends AbstractSystem {
   private readonly _scopes: Set<string>;
 
   // Preferred locale codes can be used to override the detected locale
-  private _preferredLocaleCodes: string[];
+  private _preferredLocaleCodes: LocaleCode[];
 
   // Current locale state
-  private _currLocaleCode: string;
-  private _currLocaleCodes: string[];
-  private _currLanguageCode: string;
+  private _currLocaleCode: LocaleCode;
+  private _currLocaleCodes: LocaleCode[];
+  private _currLanguageCode: LanguageCode;
   private _currTextDirection: 'ltr' | 'rtl';
   private _currIsMetric: boolean;
-  private _currLanguageNames: Record<string, string>;
-  private _currScriptNames: Record<string, string>;
+  private _currLanguageNames: Record<LanguageCode, string>;
+  private _currScriptNames: Record<ScriptCode, string>;
 
   // All known language codes and their local name
-  private _languages: Record<string, LanguageInfo>;
+  private _languages: Record<LanguageCode, LanguageInfo>;
 
   // All supported locale codes
-  private _locales: Record<string, LocaleInfo>;
+  private _locales: Record<LocaleCode, LocaleInfo>;
 
   // Cache for loaded string data, organized by locale then scope
   private _cache: LocaleCache;
@@ -176,7 +176,7 @@ export class LocalizationSystem extends AbstractSystem {
    * localeCode
    * The current locale code (e.g. 'en-US', 'de', 'zh-CN')
    */
-  get localeCode(): string {
+  get localeCode(): LocaleCode {
     return this._currLocaleCode;
   }
 
@@ -184,7 +184,7 @@ export class LocalizationSystem extends AbstractSystem {
    * localeCodes
    * Array of locale codes in priority order, with the current locale first followed by fallbacks
    */
-  get localeCodes(): string[] {
+  get localeCodes(): LocaleCode[] {
     return this._currLocaleCodes;
   }
 
@@ -192,7 +192,7 @@ export class LocalizationSystem extends AbstractSystem {
    * languageCode
    * The language portion of the current locale (e.g. 'en' from 'en-US')
    */
-  get languageCode(): string {
+  get languageCode(): LanguageCode {
     return this._currLanguageCode;
   }
 
@@ -216,7 +216,7 @@ export class LocalizationSystem extends AbstractSystem {
    * languageNames
    * Map of language codes to their localized display names
    */
-  get languageNames(): Record<string, string> {
+  get languageNames(): Record<LanguageCode, string> {
     return this._currLanguageNames;
   }
 
@@ -224,7 +224,7 @@ export class LocalizationSystem extends AbstractSystem {
    * scriptNames
    * Map of script codes to their localized display names
    */
-  get scriptNames(): Record<string, string> {
+  get scriptNames(): Record<ScriptCode, string> {
     return this._currScriptNames;
   }
 
@@ -242,7 +242,7 @@ export class LocalizationSystem extends AbstractSystem {
    * If you're going to use this, you must call it before `initAsync` starts fetching data.
    * @param codes - Array or String of preferred locales
    */
-  set preferredLocaleCodes(codes: string | string[]) {
+  set preferredLocaleCodes(codes: LocaleCode | LocaleCode[]) {
     if (typeof codes === 'string') {
       // Be generous and accept delimited strings as input
       this._preferredLocaleCodes = codes.split(/,|;| /gi).filter(Boolean);
@@ -250,7 +250,7 @@ export class LocalizationSystem extends AbstractSystem {
       this._preferredLocaleCodes = codes || [];
     }
   }
-  get preferredLocaleCodes(): string[] {
+  get preferredLocaleCodes(): LocaleCode[] {
     return this._preferredLocaleCodes;
   }
 
@@ -283,7 +283,7 @@ export class LocalizationSystem extends AbstractSystem {
       })
       .then((results) => {
         const langResult = results[0] as { languages: Record<string, LanguageInfo> };
-        const localeResult = results[1] as { locales: Record<string, LocaleInfo> };
+        const localeResult = results[1] as { locales: Record<LocaleCode, LocaleInfo> };
         this._languages = langResult.languages;
         this._locales = localeResult.locales;
 
@@ -326,7 +326,7 @@ export class LocalizationSystem extends AbstractSystem {
     const urlhash = context.systems.urlhash;
 
     const urlLocale = urlhash?.getParam('locale');
-    let urlLocaleCodes: string[] = [];
+    let urlLocaleCodes: LocaleCode[] = [];
     if (typeof urlLocale === 'string') {
       urlLocaleCodes = urlLocale.split(',').map(s => s.trim()).filter(Boolean);
     }
@@ -421,7 +421,7 @@ export class LocalizationSystem extends AbstractSystem {
     const newLocale = currParams.get('locale');
     const oldLocale = prevParams.get('locale');
     if (newLocale !== oldLocale) {
-      let cleaned: string[] = [];
+      let cleaned: LocaleCode[] = [];
       if (typeof newLocale === 'string') {
         const requested = newLocale.split(',').map(s => s.trim()).filter(Boolean);
         cleaned = this._getSupportedLocales(requested);
@@ -467,9 +467,9 @@ export class LocalizationSystem extends AbstractSystem {
    * @return result containing the localized string and chosen locale
    */
   private _resolveString(
-    origStringID: string,
+    origStringID: StringID,
     replacements?: StringReplacements,
-    searchLocales?: string[]
+    searchLocales?: LocaleCode[]
   ): ResolvedString {
     if (!Array.isArray(searchLocales)) {
       searchLocales = this._currLocaleCodes.slice();  // copy
@@ -585,7 +585,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param stringID - string identifier
    * @return true if the given string id will return a string
    */
-  hasTextForStringID(stringID: string): boolean {
+  hasTextForStringID(stringID: StringID): boolean {
     return !!this._resolveString(stringID, { default: 'nothing found' }).locale;
   }
 
@@ -598,7 +598,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param locale        - locale to use (defaults to currentLocale)
    * @return the localized string
    */
-  t(stringID: string, replacements?: StringReplacements, locale?: string | string[]): string {
+  t(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): string {
     let localeParam: string[] | undefined;
     if (typeof locale === 'string') localeParam = [locale];
     else if (Array.isArray(locale)) localeParam = locale;
@@ -615,7 +615,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param locale        - locale to use (defaults to currentLocale)
    * @return localized string wrapped in a HTML span, or empty string ''
    */
-  tHtml(stringID: string, replacements?: StringReplacements, locale?: string | string[]): string {
+  tHtml(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): string {
     let localeParam: string[] | undefined;
     if (typeof locale === 'string') localeParam = [locale];
     else if (Array.isArray(locale)) localeParam = locale;
@@ -634,7 +634,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param locale        - locale to use (defaults to currentLocale)
    * @return Function that accepts a d3 selection and appends the localized text
    */
-  tAppend(stringID: string, replacements?: StringReplacements, locale?: string | string[]): AppendFunction {
+  tAppend(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): AppendFunction {
     let localeParam: string[] | undefined;
     if (typeof locale === 'string') localeParam = [locale];
     else if (Array.isArray(locale)) localeParam = locale;
@@ -670,7 +670,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param options - options object with optional `localOnly` property
    * @return the language string to display (e.g. "Deutsch (de)")
    */
-  languageName(code: string, options?: { localOnly?: boolean }): string | null {
+  languageName(code: LanguageCode, options?: { localOnly?: boolean }): string | null {
     if (this._currLanguageNames[code]) {      // name in locale language
       // e.g. "German"
       return this._currLanguageNames[code];
@@ -803,7 +803,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param entityID - OSM-like ID that starts with 'n', 'w', or 'r'
    * @return Localized string for 'Node', 'Way', or 'Relation'
    */
-  displayType(entityID: string): string {
+  displayType(entityID: EntityID): string {
     return ({
       n: this.t('inspector.node'),
       w: this.t('inspector.way'),
@@ -1077,7 +1077,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param requested - locale codes to consider, in priority order
    * @return The locales that we can actually support
    */
-  private _getSupportedLocales(requested: Iterable<string>): string[] {
+  private _getSupportedLocales(requested: Iterable<LocaleCode>): LocaleCode[] {
     const results = new Set();
 
     for (const locale of requested) {
@@ -1109,7 +1109,7 @@ export class LocalizationSystem extends AbstractSystem {
       }
     }
 
-    return Array.from(results) as string[];
+    return Array.from(results) as LocaleCode[];
   }
 
 

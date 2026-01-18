@@ -123,7 +123,7 @@ export class MapSystem extends AbstractSystem {
           });
 
         editor
-          .on('merge', (entityIDs: string[]) => {
+          .on('merge', (entityIDs: EntityID[]) => {
             if (entityIDs) {
               scene.dirtyData('osm', entityIDs);
             }
@@ -173,7 +173,7 @@ export class MapSystem extends AbstractSystem {
             // Check that they are actually in the stable graph.
             const graph = edit.graph;
             const checkIDs = edit.selectedIDs ?? [];
-            const selectedIDs = checkIDs.filter((entityID: string) => graph.hasEntity(entityID));
+            const selectedIDs = checkIDs.filter((entityID: EntityID) => graph.hasEntity(entityID));
             if (selectedIDs.length) {
               context.enter('select-osm', { selection: { osm: selectedIDs }} );
             } else {
@@ -691,7 +691,7 @@ export class MapSystem extends AbstractSystem {
    * @param  entityID  - entityID to select
    * @param  fitEntity - Whether to force fit the map view to show the entity
    */
-  selectEntityID(entityID: string, fitEntity: boolean = false): void {
+  selectEntityID(entityID: EntityID, fitEntity: boolean = false): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const scene = context.systems.gfx!.scene!;

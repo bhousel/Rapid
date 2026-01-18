@@ -6,6 +6,7 @@
 
 // Import converted system types for use in Systems interface.
 // Using `import type` avoids runtime circular dependencies.
+import type { AbstractSystem } from './AbstractSystem.ts';
 import type { AssetSystem } from './AssetSystem.ts';
 import type { EditSystem } from './EditSystem.ts';
 import type { FilterSystem } from './FilterSystem.ts';
@@ -28,62 +29,19 @@ import type { ValidationSystem } from './ValidationSystem.ts';
 
 // Re-export Context from the main Context module.
 // This allows existing imports from './types.ts' to continue working.
-export type { Context } from '../Context.ts';
+import type { Context } from '../Context.ts';
+export type { Context };
 
-
-/** System ID string used to identify systems in Context.systems */
-export type SystemID =
-  | 'assets'
-  | 'editor'
-  | 'filters'
-  | 'gfx'
-  | 'imagery'
-  | 'l10n'
-  | 'locations'
-  | 'map'
-  | 'map3d'
-  | 'photos'
-  | 'rapid'
-  | 'schema'
-  | 'spatial'
-  | 'storage'
-  | 'styles'
-  | 'ui'
-  | 'uploader'
-  | 'urlhash'
-  | 'validator';
-
-
-/** Union of all system types */
-type AnySystem =
-  | AssetSystem
-  | EditSystem
-  | FilterSystem
-  | GraphicsSystem
-  | ImagerySystem
-  | LocalizationSystem
-  | LocationSystem
-  | MapSystem
-  | Map3dSystem
-  | PhotoSystem
-  | RapidSystem
-  | SchemaSystem
-  | SpatialSystem
-  | StorageSystem
-  | StyleSystem
-  | UiSystem
-  | UploaderSystem
-  | UrlHashSystem
-  | ValidationSystem;
+/** A System class constructor */
+export type SystemConstructor = new (context: Context) => AbstractSystem;
 
 /**
  * Container for all system instances.
  * Systems are accessed via context.systems[systemID].
  */
 export interface Systems {
-  [key: string]: AnySystem | undefined;
+  [key: SystemID]: AbstractSystem | undefined;
 
-  // Converted to TypeScript - use specific types:
   assets?: AssetSystem;
   editor?: EditSystem;
   filters?: FilterSystem;

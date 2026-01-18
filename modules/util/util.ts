@@ -1,10 +1,10 @@
 import { Extent } from '@rapid-sdk/math';
+
 import type { D3Selection } from 'd3-selection';
 import type { Context } from '../Context.ts';
-import type { OsmEntity, EntityID } from '../data/types.ts';
+import type { OsmEntity, OsmRelation } from '../data/types.ts';
 import type { Vec2 } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-
 
 /** GeoJSON input - either a Feature or FeatureCollection */
 type GeoJSONInput = GeoJSON.Feature | GeoJSON.FeatureCollection;
@@ -98,12 +98,12 @@ export function geojsonExtent(geojson: Nullable<GeoJSONInput>): Extent {
  * @param highlighted - True to add highlight, false to remove
  */
 export function utilHighlightEntities(context: Context, entityIDs: EntityID[], highlighted: boolean): void {
-  const editor = context.systems.editor as any;
-  const gfx = context.systems.gfx as any;
+  const editor = context.systems.editor;
+  const gfx = context.systems.gfx;
   const scene = gfx?.scene;
   const layer = scene?.layers.get('osm');
 
-  if (!scene || !layer) return;  // called too soon?
+  if (!editor || !scene || !layer) return;  // called too soon?
 
   if (highlighted) {
     for (const entityID of entityIDs) {
@@ -111,7 +111,7 @@ export function utilHighlightEntities(context: Context, entityIDs: EntityID[], h
 
       // When highlighting a relation, try to highlight its members.
       if (entityID[0] === 'r') {
-        const relation = editor?.staging?.graph?.hasEntity(entityID);
+        const relation = editor.staging.graph.hasEntity(entityID) as OsmRelation;
         if (!relation) continue;
         for (const member of relation.members) {
           layer.setClass('highlight', member.id);

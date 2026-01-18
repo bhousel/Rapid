@@ -16,9 +16,9 @@ import type { Vec2, Vec3 } from '../data/types.ts';
  */
 export interface Box extends BBox {
   /** The cache this box belongs to */
-  cacheID: string;
+  cacheID: SpatialCacheID;
   /** The data or tile ID */
-  dataID: string;
+  dataID: DataID | TileID;
   /** The associated data or tile object */
   data: AbstractData | Tile;
 }
@@ -48,11 +48,11 @@ interface SpatialCache {
   /** Graph of entities */
   graph: Graph;
   /** Map of dataID or tileID to Box */
-  boxes: Map<string, Box>;
+  boxes: Map<DataID | TileID, Box>;
   /** Map of tileID to Tile */
-  tiles: Map<string, Tile>;
+  tiles: Map<TileID, Tile>;
   /** Map of dataID to AbstractData */
-  data: Map<string, AbstractData>;
+  data: Map<DataID, AbstractData>;
   /** RBush index for tiles */
   tileRBush: RBush<Box>;
   /** RBush index for data */
@@ -76,7 +76,7 @@ interface SpatialCache {
  */
 export class SpatialSystem extends AbstractSystem {
   /** Map of cacheID to SpatialCache */
-  private _caches: Map<string, SpatialCache>;
+  private _caches: Map<SpatialCacheID, SpatialCache>;
 
   /**
    * @constructor
@@ -130,7 +130,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param cacheID - the cache to get (or create)
    * @return cache data
    */
-  getCache(cacheID: string): SpatialCache {
+  getCache(cacheID: SpatialCacheID): SpatialCache {
     let cache = this._caches.get(cacheID);
     if (!cache) {
       cache = {
@@ -152,7 +152,7 @@ export class SpatialSystem extends AbstractSystem {
    * Clear (remove all items from) the given cache
    * @param cacheID - the cache to clear
    */
-  clearCache(cacheID: string): void {
+  clearCache(cacheID: SpatialCacheID): void {
     const cache = this.getCache(cacheID);
     cache.graph = new Graph(this.context);
     cache.boxes.clear();
@@ -170,7 +170,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param cacheID - the cache to insert into
    * @param items - items to add
    */
-  addData(cacheID: string, items: OneOrMore<AbstractData>): void {
+  addData(cacheID: SpatialCacheID, items: OneOrMore<AbstractData>): void {
     this.replaceData(cacheID, items);
   }
 
@@ -181,7 +181,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param cacheID - the cache to insert into
    * @param items - items to replace
    */
-  replaceData(cacheID: string, items: OneOrMore<AbstractData>): void {
+  replaceData(cacheID: SpatialCacheID, items: OneOrMore<AbstractData>): void {
     const cache = this.getCache(cacheID);
 
     const toInsert: Box[] = [];
@@ -226,7 +226,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param cacheID - the cache to remove from
    * @param itemsOrIDs - items to remove
    */
-  removeData(cacheID: string, itemsOrIDs: OneOrMore<AbstractData | string>): void {
+  removeData(cacheID: SpatialCacheID, itemsOrIDs: OneOrMore<AbstractData | string>): void {
     const cache = this.getCache(cacheID);
 
     for (const item of utilIterable(itemsOrIDs)) {
@@ -250,7 +250,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param cacheID - the cache to insert into
    * @param items - tiles to insert
    */
-  addTiles(cacheID: string, items: OneOrMore<Tile>): void {
+  addTiles(cacheID: SpatialCacheID, items: OneOrMore<Tile>): void {
     const cache = this.getCache(cacheID);
 
     const toInsert: Box[] = [];
@@ -290,7 +290,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param cacheID - the cache to remove from
    * @param itemsOrIDs - items to remove
    */
-  removeTiles(cacheID: string, itemsOrIDs: OneOrMore<Tile | string>): void {
+  removeTiles(cacheID: SpatialCacheID, itemsOrIDs: OneOrMore<Tile | string>): void {
     const cache = this.getCache(cacheID);
 
     for (const item of utilIterable(itemsOrIDs)) {
@@ -314,7 +314,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param cacheID - the cache to search
    * @return Array of boxes in the current map view
    */
-  getVisibleData(cacheID: string): Box[] {
+  getVisibleData(cacheID: SpatialCacheID): Box[] {
     const cache = this.getCache(cacheID);
     const extent = this.context.viewport.visibleWorldExtent();   // world extent!
     return cache.dataRBush.search(extent.bbox());
@@ -341,7 +341,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param dataID - the dataID to lookup
    * @return The data if found, or `undefined` if not found
    */
-  getData(cacheID: string, dataID: string): AbstractData | undefined {
+  getData(cacheID: SpatialCacheID, dataID: DataID): AbstractData | undefined {
     const cache = this.getCache(cacheID);
     return cache.data.get(dataID);
   }
@@ -353,7 +353,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param dataID - the dataID to lookup
    * @return `true` if data exists, `false` if not
    */
-  hasData(cacheID: string, dataID: string): boolean {
+  hasData(cacheID: SpatialCacheID, dataID: DataID): boolean {
     const cache = this.getCache(cacheID);
     return cache.data.has(dataID);
   }
@@ -365,7 +365,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param box - the search box (make sure to use world coordinates here)
    * @return Array of boxes in the given search box
    */
-  getDataAtBox(cacheID: string, box: BBox): Box[] {
+  getDataAtBox(cacheID: SpatialCacheID, box: BBox): Box[] {
     const cache = this.getCache(cacheID);
     return cache.dataRBush.search(box);
   }
@@ -377,7 +377,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param box - the search box (make sure to use world coordinates here)
    * @return `true` if something exists, `false` if not
    */
-  hasDataAtBox(cacheID: string, box: BBox): boolean {
+  hasDataAtBox(cacheID: SpatialCacheID, box: BBox): boolean {
     const cache = this.getCache(cacheID);
     return cache.dataRBush.collides(box);
   }
@@ -389,7 +389,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param loc - the search location (WGS84 [lon,lat])
    * @return Array of boxes at the given location
    */
-  getDataAtLoc(cacheID: string, loc: Vec2): Box[] {
+  getDataAtLoc(cacheID: SpatialCacheID, loc: Vec2): Box[] {
     const cache = this.getCache(cacheID);
     const [x, y] = this.context.viewport.wgs84ToWorld(loc);
     const epsilon = 1e-7;
@@ -404,7 +404,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param loc - the search location (WGS84 [lon,lat])
    * @return `true` if data exists there, `false` if not
    */
-  hasDataAtLoc(cacheID: string, loc: Vec2): boolean {
+  hasDataAtLoc(cacheID: SpatialCacheID, loc: Vec2): boolean {
     const cache = this.getCache(cacheID);
     const [x, y] = this.context.viewport.wgs84ToWorld(loc);
     const epsilon = 1e-7;
@@ -422,7 +422,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param loc - the search location (WGS84 [lon,lat])
    * @return Adjusted [lon,lat] coordinate
    */
-  preventCoincidentLoc(cacheID: string, loc: Vec2): Vec2 {
+  preventCoincidentLoc(cacheID: SpatialCacheID, loc: Vec2): Vec2 {
     const viewport = this.context.viewport;
     const cache = this.getCache(cacheID);
     const [x, startY] = viewport.wgs84ToWorld(loc);
@@ -450,7 +450,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param tileID - the tileID to lookup
    * @return The tile if found, or `undefined` if not found
    */
-  getTile(cacheID: string, tileID: string): Tile | undefined {
+  getTile(cacheID: SpatialCacheID, tileID: TileID): Tile | undefined {
     const cache = this.getCache(cacheID);
     return cache.tiles.get(tileID);
   }
@@ -462,7 +462,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param tileID - the tileID to lookup
    * @return `true` if the tile is loaded, `false` if not
    */
-  hasTile(cacheID: string, tileID: string): boolean {
+  hasTile(cacheID: SpatialCacheID, tileID: TileID): boolean {
     const cache = this.getCache(cacheID);
     return cache.tiles.has(tileID);
   }
@@ -474,7 +474,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param box - the search box (make sure to use world coordinates here)
    * @return `true` if something exists, `false` if not
    */
-  hasTileAtBox(cacheID: string, box: BBox): boolean {
+  hasTileAtBox(cacheID: SpatialCacheID, box: BBox): boolean {
     const cache = this.getCache(cacheID);
     return cache.tileRBush.collides(box);
   }
@@ -486,7 +486,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param loc - the search location (WGS84 [lon,lat])
    * @return `true` if a tile has been loaded there, `false` if not
    */
-  hasTileAtLoc(cacheID: string, loc: Vec2): boolean {
+  hasTileAtLoc(cacheID: SpatialCacheID, loc: Vec2): boolean {
     const cache = this.getCache(cacheID);
     const [x, y] = this.context.viewport.wgs84ToWorld(loc);
     const epsilon = 1e-7;

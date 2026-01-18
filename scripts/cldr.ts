@@ -48,7 +48,7 @@ export interface LangInfo {
  *    "kk-Arab": { "base": "kk", "script": "Arab", "nativeName": "قازاق ءتىلى (توتە)"},
  *    …
  *  }
- * @return  {Map<LangCode, LangInfo>}  Language code, language info
+ * @return Language code to language info
  */
 export async function langNamesInNativeLang(): Promise<Map<LangCode, LangInfo>> {
   const results = new Map<LangCode, LangInfo>();
@@ -122,8 +122,8 @@ export async function langNamesInNativeLang(): Promise<Map<LangCode, LangInfo>> 
  *    "kk":    "Kurdish"
  *    …
  *  }
- * @param   {LangCode}   code  - the language code to lookup
- * @return  {Map<LangCode, string>}  Language code -> language names for the given language code
+ * @param code - the language code to lookup
+ * @return Language code to language names for the given language code
  */
 export async function languageNamesInLanguageOf(code: LangCode): Promise<Map<LangCode, string>> {
   if (substitutions[code])  code = substitutions[code];
@@ -173,8 +173,8 @@ export async function languageNamesInLanguageOf(code: LangCode): Promise<Map<Lan
  *    "Latn":  "Latin",
  *    …
  *  }
- * @param   {LangCode}   code  - the language code to lookup
- * @return  {Map<ScriptCode, string>}  Script codes -> script names for the given language code
+ * @param code - the language code to lookup
+ * @return Script codes to script names for the given language code
  */
 export async function scriptNamesInLanguageOf(code: LangCode): Promise<Map<ScriptCode, string>> {
   if (substitutions[code])  code = substitutions[code];

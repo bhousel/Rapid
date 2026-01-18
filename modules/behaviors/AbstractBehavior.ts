@@ -7,19 +7,6 @@ import type { AbstractPixiLayer } from '../pixi/AbstractPixiLayer.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
-/** Behavior ID string used to identify behaviors */
-export type BehaviorID =
-  | 'drag'
-  | 'draw'
-  | 'hover'
-  | 'lasso'
-  | 'mapInteraction'
-  | 'mapNudge'
-  | 'paste'
-  | 'select'
-  | `key-${string}`;  // for KeyOperationBehavior
-
-
 /** Coordinate pair for both screen and map space */
 export interface EventCoord {
   /** Screen coordinates - [0,0] is top-left of the screen */
@@ -36,15 +23,15 @@ export interface EventTarget {
   /** The PixiFeature, or null */
   feature: AbstractPixiFeature | null;
   /** The feature ID, or null */
-  featureID: string | null;
+  featureID: FeatureID | null;
   /** The PixiLayer, or null */
   layer: AbstractPixiLayer | null;
   /** The layer ID, or null */
-  layerID: string | null;
+  layerID: LayerID | null;
   /** The data associated with the feature */
   data: unknown | null;
   /** The data ID, or null */
-  dataID: string | null;
+  dataID: DataID | null;
 }
 
 

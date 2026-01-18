@@ -1,5 +1,5 @@
 import type { ValidationIssue } from './ValidationIssue.ts';
-import type { EntityID } from '../data/types.ts';
+
 
 
 /**

@@ -9,9 +9,10 @@ import { services } from './services/index.js';
 import { systems } from './core/index.ts';
 
 import type { AssetOrigin } from './core/AssetSystem.ts';
+import type { Behaviors } from './behaviors/types.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Systems } from './core/types.ts';
 import type { Graph } from './lib/Graph.ts';
+import type { Systems } from './core/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from './util/iterable.ts';
 import { utilKeybinding, type Keybinding } from './util/keybinding.ts';
@@ -67,21 +68,10 @@ export interface ApiConnection {
 export interface Mode {
   id: string;
   selectedData?: Map<string, any>;
-  selectedIDs?: string[];
+  selectedIDs?: EntityID[];
   operations: any[];
   enter(options?: object): boolean;
   exit(): void;
-}
-
-/**
- * Behavior interface - bundles of event handlers for user interactions.
- * Behaviors are still in JavaScript, so this is a loose interface.
- */
-export interface Behavior {
-  id: string;
-  enabled: boolean;
-  enable(): void;
-  disable(): void;
 }
 
 /**
@@ -127,7 +117,7 @@ export class Context extends EventEmitter {
   maxCharsForRelationRole: number;
 
   /** Sequence counters for generating unique IDs */
-  sequences: Record<string, number>;
+  sequences: Record<SequenceID, number>;
 
   /** Asset origin override ('latest' or 'local') */
   assetOrigin: AssetOrigin | null;
@@ -142,13 +132,13 @@ export class Context extends EventEmitter {
   /** All initialized systems */
   systems: Systems;
   /** All initialized modes */
-  modes: Record<string, Mode>;
+  modes: Record<ModeID, Mode>;
   /** Currently active mode */
   private _currMode: Mode | null;
   /** All initialized behaviors */
-  behaviors: Record<string, Behavior>;
+  behaviors: Behaviors;
   /** All initialized services (not yet converted to TypeScript) */
-  services: Record<string, any>;
+  services: Record<ServiceID, any>;
 
   /** Promise for initialization */
   private _initPromise: Promise<void> | null;
@@ -170,7 +160,7 @@ export class Context extends EventEmitter {
   /** Graph snapshot for copy operations */
   private _copyGraph: Graph | null;
   /** Entity IDs for paste operations */
-  private _copyIDs: string[];
+  private _copyIDs: EntityID[];
   /** Location for paste operations */
   private _copyLoc: Vec2 | null;
 
@@ -186,7 +176,7 @@ export class Context extends EventEmitter {
   inIntro: boolean;
 
   /** Check if entity has hidden connections (set during init) */
-  hasHiddenConnections!: (entityID: string) => boolean;
+  hasHiddenConnections!: (entityID: EntityID) => boolean;
   /** Check if editing is allowed (set during init) */
   editable!: () => boolean;
 
@@ -292,7 +282,7 @@ export class Context extends EventEmitter {
     // Construct all the core classes
     // -------------------------------
     for (const [id, System] of systems.available) {
-      (this.systems as any)[id] = new System(this);
+      this.systems[id] = new System(this);
     }
 
     // AssetSystem
@@ -309,7 +299,7 @@ export class Context extends EventEmitter {
 
     // FilterSystem
     const filters = this.systems.filters;
-    this.hasHiddenConnections = (entityID: string): boolean => {
+    this.hasHiddenConnections = (entityID: EntityID): boolean => {
       const editor = this.systems.editor;
       if (!editor || !filters) return false;
       const graph = editor.staging.graph!;
@@ -384,10 +374,12 @@ export class Context extends EventEmitter {
   /**
    * keybinding
    * Returns the keybinding manager for the application.
-   * (not a system yet, but should be one)
+   * (not a System yet, but should be one)
    * @return  The keybinding manager
    */
-  keybinding(): Keybinding  { return this._keybinding; }
+  keybinding(): Keybinding {
+    return this._keybinding;
+  }
 
 
   /**
@@ -472,7 +464,7 @@ export class Context extends EventEmitter {
    * @param  entityID  The entity ID to load (e.g. 'n123', 'w456', 'r789')
    * @return  Promise resolved when the entity is loaded
    */
-  loadEntityAsync(entityID: string): Promise<void> {
+  loadEntityAsync(entityID: EntityID): Promise<void> {
     const editor = this.systems.editor;
     const osm = this.services.osm as any;
     if (!osm) {
@@ -565,7 +557,7 @@ export class Context extends EventEmitter {
    * @param  options       Optional options passed to the new mode
    * @return  The mode that was entered
    */
-  enter(modeOrModeID: Mode | string, options?: object): Mode {
+  enter(modeOrModeID: Mode | ModeID, options?: object): Mode {
     const gfx = this.systems.gfx;
     const currMode = this._currMode;
     let newMode: Mode | undefined;
@@ -607,7 +599,7 @@ export class Context extends EventEmitter {
    * Can contain multiple items of various types (e.g. OSM data, Rapid data, etc.)
    * @return  The current selected features as a `Map(datumID -> datum)`
    */
-  selectedData(): Map<string, any> {
+  selectedData(): Map<DataID, any> {
     if (!this._currMode) return new Map();
     return this._currMode.selectedData || new Map();
   }
@@ -617,7 +609,7 @@ export class Context extends EventEmitter {
    * Returns just the IDs of the selected features.
    * @return  Array of selected entity IDs
    */
-  selectedIDs(): string[] {
+  selectedIDs(): DataID[] {
     if (!this._currMode) return [];
     return this._currMode.selectedIDs || [];
   }
@@ -628,10 +620,11 @@ export class Context extends EventEmitter {
    * Enables the given behaviors, disabling all others.
    * @param  behaviorIDs  Single behavior ID or array of behavior IDs to enable
    */
-  enableBehaviors(behaviorIDs: OneOrMore<string>): void {
+  enableBehaviors(behaviorIDs: OneOrMore<BehaviorID>): void {
     const toEnable = new Set(utilIterable(behaviorIDs));
 
     for (const [behaviorID, behavior] of Object.entries(this.behaviors)) {
+      if (!behavior) continue;
       if (toEnable.has(behaviorID)) {  // should be enabled
         if (!behavior.enabled) {
           behavior.enable();
@@ -657,8 +650,8 @@ export class Context extends EventEmitter {
    * Entity IDs that have been copied for paste operations.
    * Setting this also captures the current staging graph as `copyGraph`.
    */
-  get copyIDs(): string[] { return this._copyIDs; }
-  set copyIDs(val: string[]) {
+  get copyIDs(): EntityID[] { return this._copyIDs; }
+  set copyIDs(val: EntityID[]) {
     this._copyIDs = val;
     this._copyGraph = this.systems.editor!.staging.graph!;
   }
@@ -748,11 +741,11 @@ export class Context extends EventEmitter {
    * next
    * Returns the next number for the given sequence.
    * Numbers start at 1 and increase by 1 each time `next` is called.
-   * @param  which  Which sequence to get next number from (e.g. 'node', 'way', 'relation')
+   * @param  sequenceID  Which sequence to get next number from (e.g. 'node', 'way', 'relation')
    * @return  The next number in the sequence
    */
-  next(which: string): number {
-    let num = this.sequences[which] || 0;
-    return this.sequences[which] = ++num;
+  next(sequenceID: SequenceID): number {
+    let num = this.sequences[sequenceID] || 0;
+    return this.sequences[sequenceID] = ++num;
   }
 }

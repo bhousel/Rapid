@@ -81,7 +81,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
       sharpness: 1,
     };
 
-    this._tileMaps = new Map();    // Map<sourceID, Map<tileID, tile>>
+    this._tileMaps = new Map();    // Map<sourceID, Map<TileID, tile>>
     this._failed = new Set();      // Set<failed tileURLs>
     this._tiler = new Tiler();
   }
@@ -142,7 +142,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
       let tileMap = this._tileMaps.get(sourceID);
       if (!tileMap) {
-        tileMap = new Map();   // Map<tileID, Tile>
+        tileMap = new Map();   // Map<TileID, Tile>
         this._tileMaps.set(sourceID, tileMap);
       }
 
@@ -208,7 +208,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
     // Determine tiles needed to cover the view at the zoom we want,
     // including any zoomed out tiles if this field contains any holes
-    const needTiles = new Map<string, CachedTile>();   // Map<tileID, CachedTile>
+    const needTiles = new Map<TileID, CachedTile>();   // Map<TileID, CachedTile>
 
     // Make sure the min zoom is at least 1.
     // z=0 causes a bug for Mapbox layers to disappear, these use very large tile size.
@@ -386,7 +386,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * Frees all the resources used by a source
    * @param sourceID - the sourceID to free
    */
-  destroySource(sourceID: string): void {
+  destroySource(sourceID: ImagerySourceID): void {
     const tileMap = this._tileMaps.get(sourceID);
     if (tileMap) {
       for (const [tileID, tile] of tileMap) {
@@ -439,7 +439,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * @param sourceID - the sourceID get a container for
    * @return A PIXI.Container to render tiles into
    */
-  getSourceContainer(sourceID: string): PIXI.Container {
+  getSourceContainer(sourceID: ImagerySourceID): PIXI.Container {
     const groupContainer = this.scene.groups.get('background')!;
     let sourceContainer = groupContainer.getChildByLabel(sourceID);
     if (!sourceContainer) {

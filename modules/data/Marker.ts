@@ -11,7 +11,7 @@ export interface MarkerProps extends AbstractDataProps {
   /** Location in WGS84 [lon, lat] */
   loc: Vec2;
   /** Associated service ID (e.g. 'keepright', 'maproulette', 'mapillary') */
-  serviceID: string;
+  serviceID: ServiceID;
   /** Whether this is a new marker */
   isNew: boolean;
 }
@@ -99,7 +99,7 @@ export class Marker extends AbstractData<MarkerProps> {
    * For example 'keepright', 'maproulette', 'mapillary', etc.
    * @readonly
    */
-  get serviceID(): string | undefined {
+  get serviceID(): ServiceID | undefined {
     return this.props.serviceID;
   }
 

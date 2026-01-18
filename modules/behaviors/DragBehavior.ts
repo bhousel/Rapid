@@ -183,7 +183,7 @@ export class DragBehavior extends AbstractBehavior {
         // This lets us catch events for what other objects it passes over as the user drags it.
         const target: EventTarget = Object.assign({}, down.target);  // shallow copy
         this.dragTarget = target;
-        (target.feature as any).allowInteraction = false;
+        target.feature!.allowInteraction = false;
 
         // What are we dragging?
         const data: any = target.data;
@@ -202,7 +202,7 @@ export class DragBehavior extends AbstractBehavior {
         }
 
         // Gather all parentIDs - include both ways and relations (such as multipolygons)
-        const parentIDs = new Set<string>();
+        const parentIDs = new Set<DataID>();
         for (const way of parentWays) {
           parentIDs.add(way.id);
           for (const relation of graph.parentRelations(way)) {
@@ -211,7 +211,7 @@ export class DragBehavior extends AbstractBehavior {
         }
 
         const selectedIDs = context.selectedIDs();
-        const selectionIncludesParent = selectedIDs.some((selectedID: string) => parentIDs.has(selectedID));
+        const selectionIncludesParent = selectedIDs.some(selectedID => parentIDs.has(selectedID));
         const reselectIDs = selectionIncludesParent ? selectedIDs.slice() : [];
 
         // Enter the correct mode
@@ -243,7 +243,6 @@ export class DragBehavior extends AbstractBehavior {
     // Before emitting the 'up' event, copy the drag target data to the event data
     // UNLESS snapping is disabled.
     if (this.dragTarget) {
-
       // Snapping is disabled - drag has no target.
       if (this._snappingDisabled()) {
         up.target = null;
@@ -257,7 +256,7 @@ export class DragBehavior extends AbstractBehavior {
 
     const target = this.dragTarget;
     if (target) {
-      (target.feature as any).allowInteraction = true;
+      target.feature!.allowInteraction = true;
       this.dragTarget = null;
       this.emit('end', up);
     }
@@ -279,7 +278,7 @@ export class DragBehavior extends AbstractBehavior {
 
     const target = this.dragTarget;
     if (target) {
-      (target.feature as any).allowInteraction = true;
+      target.feature!.allowInteraction = true;
       this.dragTarget = null;
       this.emit('cancel', cancel);
     }

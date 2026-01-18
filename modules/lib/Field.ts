@@ -9,9 +9,9 @@ import type { Context } from '../Context.ts';
  */
 export interface FieldProps {
   /** Unique identifier for this Field */
-  id: string;
+  id: FieldID;
   /** The bundle that this Field came from (e.g. 'id-tagging-schema@6.13.0') */
-  bundleID: string;
+  bundleID: BundleID;
   /** Type of field (e.g., 'text', 'combo', 'check', 'number', etc.) */
   type: string;
   /** English label for the field caption */
@@ -59,7 +59,7 @@ export interface FieldProps {
   /** Region IDs where this field is or isn't valid */
   locationSet: { include?: string[]; exclude?: string[] };
   /** Resolved locationSet ID (added by SchemaSystem after processing) */
-  locationSetID: string;
+  locationSetID: LocationSetID;
   /** Permalink URL for identifier fields. Must contain a {value} placeholder */
   urlFormat: string;
   /** Regular expression that a valid identifier value is expected to match */
@@ -75,7 +75,7 @@ export interface FieldProps {
 
 /** Localized strings for a Field */
 interface FieldStrings {
-  id: string;
+  id: FieldID;
   label: string;
   terms: string[];
   placeholder: string;
@@ -97,15 +97,15 @@ interface FieldStrings {
  */
 export class Field {
   context: Context;
-  id: string;
+  id: FieldID;
   safeid: string;
-  fieldID: string;
+  fieldID: FieldID;
   type: string;
   props: FieldProps;
   geometries: Set<string>;
 
   private _strings: Map<string, FieldStrings>;
-  private _currLocaleCode: string | null;
+  private _currLocaleCode: LocaleCode | null;
   private _currStrings: FieldStrings;
 
   /**
@@ -179,7 +179,7 @@ export class Field {
    *  but it is worth pre-localizing them for performance.
    * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode: string = 'en-US'): void {
+  setLocale(localeCode: LocaleCode = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 

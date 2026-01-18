@@ -119,13 +119,20 @@ export default [
     languageOptions: {
       globals: {
         ...globals.browser,
-        Nullable: false,  // Global convenience type from `global.d.ts`
         GeoJSON: false    // Global namespace from `@types/geojson` (UMD declaration)
       }
     },
     rules: {
       "no-console": "warn",
       "no-process-env": "error"
+    }
+  },
+  {
+    // Disable no-undef for TypeScript files - TypeScript's own checking is superior
+    // See: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
+    files: [ '**/*.ts' ],
+    rules: {
+      "no-undef": "off"
     }
   },
   {

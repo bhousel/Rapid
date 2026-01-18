@@ -108,13 +108,13 @@ export class PasteBehavior extends AbstractBehavior {
     const currGraph = editor.staging.graph;
     const copies = action.copies() as Record<string, OsmEntity>;
 
-    const originalIDs = new Set<string>();
+    const originalIDs = new Set<EntityID>();
     for (const entity of Object.values(copies)) {
       originalIDs.add((entity as OsmEntity).id);
     }
 
     let extent = new Extent();
-    const newIDs: string[] = [];
+    const newIDs: EntityID[] = [];
     for (const [entityID, newEntity] of Object.entries(copies)) {
       const oldEntity = copyGraph.entity(entityID);
       const oldExtent = oldEntity.extent();

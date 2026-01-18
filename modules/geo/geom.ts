@@ -1,7 +1,7 @@
 import { geomLineIntersection, vecDot, vecEqual, vecLength, vecSubtract, Viewport } from '@rapid-sdk/math';
 
 import { OsmNode } from '../data/OsmNode.ts';
-import type { EntityID, Vec2 } from '../data/types.ts';
+import type { Vec2 } from '../data/types.ts';
 
 
 /** Result from geoChooseEdge */

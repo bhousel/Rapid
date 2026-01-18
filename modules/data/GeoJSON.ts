@@ -11,7 +11,7 @@ export interface GeoJSONProps extends AbstractDataProps {
   /** The raw GeoJSON source data */
   geojson: GeoJSONObject;
   /** Associated service ID (e.g. 'mapillary', 'keepright') */
-  serviceID: string;
+  serviceID: ServiceID;
 }
 
 
@@ -82,7 +82,7 @@ export class GeoJSON extends AbstractData<GeoJSONProps> {
    * For example 'keepright', 'maproulette', 'mapillary', etc.
    * @readonly
    */
-  get serviceID(): string | undefined {
+  get serviceID(): ServiceID | undefined {
     return this.props.serviceID;
   }
 

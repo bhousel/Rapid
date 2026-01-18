@@ -12,7 +12,7 @@ import { uiLoading } from '../ui/loading.js';
 import type { TransformProps } from '@rapid-sdk/math';
 import type { Context } from './types.ts';
 import type { Action } from '../lib/types.ts';
-import type { EntityID, OsmEntity, OsmEntityProps, Tags, Vec2 } from '../data/types.ts';
+import type { OsmEntity, OsmEntityProps, Tags, Vec2 } from '../data/types.ts';
 
 
 /** Options for commit/commitAppend */
@@ -20,7 +20,7 @@ export interface CommitOptions {
   /** Annotation describing the edit */
   annotation?: string | Record<string, unknown>;
   /** IDs of selected entities */
-  selectedIDs?: string[];
+  selectedIDs?: EntityID[];
 }
 
 /** Sources used during editing */
@@ -168,7 +168,7 @@ export class EditSystem extends AbstractSystem {
   private _index: number;
   private _staging: Edit;
 
-  private _checkpoints: Map<string, Checkpoint>;
+  private _checkpoints: Map<CheckpointID, Checkpoint>;
   private _inTransition: boolean;
   private _inTransaction: boolean;
   private _tree: Tree;
@@ -674,7 +674,7 @@ export class EditSystem extends AbstractSystem {
    * If the given checkpointID exists, it will be overwritten.
    * @param checkpointID - A string to identify the checkpoint
    */
-  setCheckpoint(checkpointID: string): void {
+  setCheckpoint(checkpointID: CheckpointID): void {
     if (!checkpointID) return;
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
 
@@ -692,7 +692,7 @@ export class EditSystem extends AbstractSystem {
    * Note that all work-in-progress in the `staging` Edit is lost when calling `restoreCheckpoint()`.
    * @param checkpointID - A string to identify the checkpoint
    */
-  restoreCheckpoint(checkpointID: string): void {
+  restoreCheckpoint(checkpointID: CheckpointID): void {
     if (!checkpointID) return;
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
 
@@ -715,7 +715,7 @@ export class EditSystem extends AbstractSystem {
    * This removes the checkpoint identified by the given checkpointID.
    * @param checkpointID - A string to identify the checkpoint
    */
-  deleteCheckpoint(checkpointID: string): void {
+  deleteCheckpoint(checkpointID: CheckpointID): void {
     if (!checkpointID) return;
     this._checkpoints.delete(checkpointID);
   }

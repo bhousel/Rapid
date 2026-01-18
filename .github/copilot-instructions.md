@@ -102,6 +102,21 @@ export class Category {
 - Document properties in the interface (single source of truth)
 - Keep JSDoc block on constructor
 - Avoid duplicating property docs in the class body
+- **Never use JSDoc type annotations** in TypeScript files - use TypeScript types instead
+  - ❌ `@param {string} name` → ✅ `@param name` with TypeScript parameter type
+  - ❌ `@return {number}` → ✅ `@return` with TypeScript return type
+  - ❌ `@type {Array<string>}` → ✅ TypeScript type annotation
+- JSDoc in `.ts` files should describe **what** and **why**, not types
+- Example:
+  ```typescript
+  /**
+   * Returns the display name for the preset.
+   * @return Localized name
+   */
+  get name(): string {
+    return this._currStrings.name;
+  }
+  ```
 
 ### Destroy Methods and Nullability
 - Declare class properties as **non-null** if they are always valid during normal usage
@@ -120,41 +135,8 @@ export class Category {
 
 ### Avoid Unnecessary Casts
 - Don't add type casts that TypeScript can already infer
-- Before adding `as Type`, check if the expression already has that type (hover over it or check the type definition)
-- Common unnecessary casts to avoid:
-  - `as ReturnType` on function calls when the function already returns that type
-    (e.g., `vecAdd(a, b) as Vec2` is unnecessary when `vecAdd` already returns `Vec2`)
-  - `as SystemID` on string literals that already match the union type
-  - `as Graph` or similar when accessing properties on an `any` typed variable (already returns `any`)
-  - `as SomeType[]` on array literals passed to `new Set()` when TypeScript can infer the type
-  - `as const` on literals - TypeScript infers literal types for `const` declarations automatically
-- Example - avoid this:
-  ```typescript
-  this.id = 'validator' as SystemID;  // unnecessary - 'validator' is already a valid string
-  this.requiredDependencies = new Set(['editor', 'schema'] as SystemID[]);  // unnecessary
-  const graph = editor.base.graph as Graph;  // unnecessary if editor is `any`
-  const name = 'foo' as const;  // unnecessary - const declarations already have literal types
-  ```
-- Prefer this:
-  ```typescript
-  this.id = 'validator';
-  this.requiredDependencies = new Set(['editor', 'schema']);
-  const graph = editor.base.graph;  // already `any`, assignable to Graph
-  const name = 'foo';  // type is already 'foo', not string
-  ```
-
-### Interface Formatting
-- Use concise formatting for interface properties (no blank lines between properties)
-- Each property should have a JSDoc comment on the line directly above it
-- Example:
-  ```typescript
-  export interface GraphCache {
-    /** Map of entity ID to Entity */
-    entities: Map<EntityID, Entity | undefined>;
-    /** Map of entity ID to Set of parent Way IDs */
-    parentWays: Map<EntityID, Set<EntityID>>;
-  }
-  ```
+- Before adding `as Type`, check if the expression already has that type
+- Common unnecessary casts: `as ReturnType` on functions that already return that type, `as SystemID` on valid string literals, `as const` on literals in const declarations
 
 ### Shared Types
 - `types.ts` files exist per folder for **cross-file shared types only**
@@ -162,67 +144,115 @@ export class Category {
 - **Never duplicate types** - if a type already exists in a class file, don't add it to `types.ts`
 - When converting a file, check if types already exist before adding new ones
 
+### Registry Pattern (Systems, Behaviors, etc.)
+Rapid uses a consistent pattern for managing collections of pluggable components:
+
+**File structure per module folder:**
+- `types.ts` - Contains the instances interface and constructor type
+- `index.ts` - Contains the registry interface and `available` Map
+
+**Example: `modules/behaviors/`**
+
+```typescript
+// types.ts - Instance container interface
+export type BehaviorConstructor = new (context: Context) => AbstractBehavior;
+
+export interface Behaviors {
+  [key: BehaviorID]: AbstractBehavior | undefined;  // index signature for flexibility
+  drag?: DragBehavior;      // specific typed properties
+  hover?: HoverBehavior;
+  // ...
+}
+
+// index.ts - Registry for available constructors
+interface BehaviorRegistry {
+  available: Map<BehaviorID, BehaviorConstructor>;
+}
+
+export const behaviors: BehaviorRegistry = {
+  available: new Map<BehaviorID, BehaviorConstructor>()
+};
+
+behaviors.available.set('drag', DragBehavior);
+// ...
+```
+
+**Key points:**
+- **Instances interface** (`Systems`, `Behaviors`): Has index signature + specific optional properties for type-safe access
+- **Registry interface** (`SystemRegistry`, `BehaviorRegistry`): Contains `available` Map of ID → Constructor
+- **Index signature** uses `| undefined` because properties are optional (not all may be instantiated)
+- Components with non-standard constructors (e.g., `KeyOperationBehavior` requires extra args) are **not** in the registry - they're created dynamically
+- Context uses the instances interface: `context.systems: Systems`, `context.behaviors: Behaviors`
+
 ### String ID Types
-- Use simple type aliases for identifiers: `type PhotoLayerID = string;`
-- These are **validated at runtime**, not compile time (e.g., `this.photoLayerIDs.includes(layerID)`)
+- Common string ID types are defined in `modules/types/ids.ts`
+- They are both **exported** (for external library consumers) and **declared globally** (for internal use)
+- Available types include:
+  - `EntityID` - OSM entity IDs (e.g. 'n123', 'w456', 'r789')
+  - `SystemID` - System identifiers (e.g. 'editor', 'gfx', 'map')
+  - `BehaviorID` - Behavior identifiers (e.g. 'drag', 'draw', 'hover')
+  - `LayerID` - Layer identifiers for photo and rendering layers
+  - `PhotoLayerID`, `LayerID`, `PhotoType` - Photo system types
+  - `FeatureID`, `GroupID`, `ClassID` - Pixi rendering types
+  - `ModeID`, `OperationID`, `ServiceID`, `ValidatorID` - and more
+- These types are **validated at runtime**, not compile time
+- **Don't import these types internally** - they're available globally via `declare global`
+- External consumers can import: `import type { ModeID } from '@rapideditor/rapid';`
 - This approach works well for Rapid because:
   - Valid IDs depend on deployment configuration (services can be added/removed)
   - IDs come from external sources (URLs, configs, APIs)
-  - The type alias documents intent without adding casting friction
-- Add JSDoc comments with example values:
-  ```typescript
-  /** Photo layer identifiers (e.g. 'streetside', 'mapillary', 'kartaview') */
-  export type PhotoLayerID = string;
-  ```
+  - No import friction throughout the codebase
 
-### Type Imports
+### Using ID Types Instead of `string`
+- **Prefer specific ID types over `string`** when the purpose is clear from context
+- This makes the code **self-documenting** and helps catch mismatched ID usage
+
+**Heuristic: Match variable/property name suffix to ID type:**
+| Name pattern | Type to use |
+|--------------|-------------|
+| `behaviorID` | `BehaviorID` |
+| `bundleID` | `BundleID` |
+| `categoryID` | `CategoryID` |
+| `classID` | `ClassID` |
+| `dataID` | `DataID` |
+| `datasetID` | `DatasetID` |
+| `entityID`, `nodeID`, `wayID`, `relationID` | `EntityID` |
+| `featureID` | `FeatureID` |
+| `fieldID` | `FieldID` |
+| `graphID` | `GraphID` |
+| `issueID` | `IssueID` |
+| `languageCode` | `LanguageCode` |
+| `layerID` | `LayerID` |
+| `localeCode`, `locale` | `LocaleCode` |
+| `modeID` | `ModeID` |
+| `photoID` | `PhotoID` |
+| `presetID` | `PresetID` |
+| `scriptCode` | `ScriptCode` |
+| `sequenceID` | `SequenceID` |
+| `serviceID` | `ServiceID` |
+| `spatialCacheID`, `cacheID` | `SpatialCacheID` |
+| `systemID` | `SystemID` |
+| `tileID` | `TileID` |
+| `validatorID` | `ValidatorID` |
+
+**Exceptions - NOT string ID types:**
+- `intervalID`, `timeoutID`, `requestID` - timer/animation frame handles (numbers)
+- DOM element IDs - typically just `string`
+
+**Also check these patterns:**
+- `Map<string, X>` where keys are IDs → `Map<EntityID, X>`
+- `Set<string>` holding IDs → `Set<EntityID>`
+- `string[]` arrays of IDs → `EntityID[]`
+- Return types of ID-returning functions
+- Parameters named `id` in context of specific types (e.g., `entity.id` → `EntityID`)
+
+**When editing or reviewing TypeScript files**, actively look for `string` that should be a specific ID type.
+
+### Imports
+- Keep all imports at the top of the file - group `import` before `import type`, sort alphabetically
 - Use `import type { ... }` for type-only imports
-- This prevents circular dependencies and improves tree-shaking
-
-### No Inline Imports
-- **Keep all imports at the top of the file** - don't use inline `import()` syntax in type annotations
-- Group `import` lines before `import type` lines.  Sort the `import` and `import type` lines alphabetically.
-- Example - avoid this:
-  ```typescript
-  setCoords(source: import('../lib/GeometryPart.ts').GeometryPart): void { ... }
-  ```
-- Prefer this:
-  ```typescript
-  import type { GeometryPart } from '../lib/GeometryPart.ts';
-  // ...
-  setCoords(source: GeometryPart): void { ... }
-  ```
-
-### Import Extensions
-- This is a **Bun project** - use `.ts` extensions for TypeScript file imports
-- For files that have been converted to TypeScript, import with `.ts`:
-  ```typescript
-  import type { Context } from '../Context.ts';
-  import { ValidationFix } from './ValidationFix.ts';
-  ```
-- For files still in JavaScript, continue using `.js`:
-  ```typescript
-  import { osmAreaKeys } from './tags.js';
-  ```
-- The `tsconfig.json` has `allowImportingTsExtensions: true` to support this
-
-### Indentation
-- **2-space indent** is the modern standard
-- **4-space indent** indicates legacy code that hasn't been touched in a while
-- When converting a file to TypeScript, also update to 2-space indent
-
-### Variable Declarations
-- Put each variable declaration on its own line
-- This makes types easier to read, especially for complex types
-- Example - prefer this:
-  ```typescript
-  let leaf: OsmWay | undefined;
-  let survivor: OsmWay | undefined;
-  ```
-  Over this:
-  ```typescript
-  let leaf: OsmWay | undefined, survivor: OsmWay | undefined;
-  ```
+- This is a **Bun project** - use `.ts` extensions for TypeScript imports, `.js` for JavaScript
+- The `tsconfig.json` has `allowImportingTsExtensions: true`
 
 ### Type Declarations
 - **Module augmentations** (fixing incorrect or inconvenient external types): Add to `global.d.ts` with `export {}`
@@ -279,31 +309,14 @@ export class Category {
 - It's OK to assert `as any` for parts of the codebase that haven't been converted to TypeScript yet
 - This pattern keeps code readable while allowing gradual TypeScript adoption
 
-### Browser Globals
-- Prefer `globalThis` over `window` for browser globals
-- This is more portable and works in all JavaScript environments
-
 ### headless.js
 - **Never import from `headless.js`** in main application code
-- `headless.js` is a test-only build that re-exports modules for test consumption
-- Import from the actual source files instead (e.g., `../lib/ImagerySource.ts`)
+- `headless.js` is a test-only build - import from actual source files instead
 
 ### Environment Detection
+- Prefer `globalThis` over `window` for browser globals
 - When using browser-only APIs (like `KeyboardEvent`), check if they exist first
 - Unit tests run without DOM globals unless using the happy-dom preload
-- Pattern:
-  ```typescript
-  if (typeof KeyboardEvent === 'function') {
-    evt = new KeyboardEvent('keydown', { ... });
-  } else {
-    // Fallback for environments without DOM
-    evt = { type: 'keydown', key: 'a', ... } as KeyboardEvent;
-  }
-  ```
-
-### Converting Legacy Patterns
-- **IIFE singletons** → Convert to classes with static methods
-- **Function with static properties** → Use TypeScript namespace merging (add `// eslint-disable-next-line @typescript-eslint/no-namespace`)
 
 ## Conversion Status
 

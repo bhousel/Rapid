@@ -1,10 +1,13 @@
 import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
-import { vecEqual, vecLength, type Viewport, type Vec2 } from '@rapid-sdk/math';
+import { vecEqual, vecLength } from '@rapid-sdk/math';
 
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { lineToPoly, type LineToPolyResult } from './helpers.ts';
+
+import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;
 
@@ -106,7 +109,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @param layer - The Layer that owns this Feature
    * @param featureID - Unique string to use for the name of this Feature
    */
-  constructor(layer: any, featureID: string) {
+  constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
     this._ssrdata = null;

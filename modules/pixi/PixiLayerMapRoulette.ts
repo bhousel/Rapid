@@ -50,11 +50,11 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx!;
     const maproulette = context.services.maproulette;
     if (val && maproulette) {
       maproulette.startAsync()
-        .then(() => gfx!.immediateRedraw());
+        .then(() => gfx.immediateRedraw());
     }
   }
 

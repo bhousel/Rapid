@@ -107,7 +107,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    */
   private _dirtyCurrentPhoto(): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx!;
     const photos = context.systems.photos;
 
     const currPhotoID = photos?.currPhotoID;
@@ -120,7 +120,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
       if (!feature) continue;
       feature._styleDirty = true;
     }
-    gfx!.immediateRedraw();
+    gfx.immediateRedraw();
   }
 
 
@@ -150,11 +150,11 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx!;
     const mapillary = context.services.mapillary;
     if (val && mapillary) {
       mapillary.startAsync()
-        .then(() => gfx!.immediateRedraw());
+        .then(() => gfx.immediateRedraw());
     }
   }
 

@@ -17,7 +17,7 @@ const aesDecrypt = utilAesDecrypt as (cipherText: string | undefined, key?: numb
  * Pre-localized strings for an ImagerySource.
  */
 interface ImagerySourceStrings {
-  id: string;
+  id: ImagerySourceID;
   name: string;
   description: string;
 }
@@ -39,9 +39,9 @@ export interface VintageRange {
  */
 export interface ImagerySourceProps {
   /** Unique identifier for this imagery source (required) */
-  id: string;
+  id: ImagerySourceID;
   /** The bundle that this ImagerySource came from (e.g. 'editor-layer-index') */
-  bundleID: string;
+  bundleID: BundleID;
   /** URL template for fetching tiles */
   template?: string;
   /** Whether the imagery source is considered "best" in the area it is available */
@@ -99,15 +99,15 @@ export interface ImagerySourceProps {
 export class ImagerySource {
   context: Context;
   props: ImagerySourceProps;
-  id: string;
+  id: ImagerySourceID;
   safeid: string;
-  imageryID: string;
+  imageryID: ImagerySourceID;
   type: 'tms' | 'wms' | 'bing' | undefined;
   offset: Vec2;
 
   protected _template: string;
   protected _strings: Map<string, ImagerySourceStrings>;
-  protected _currLocaleCode: string | null;
+  protected _currLocaleCode: LocaleCode | null;
   protected _currStrings: Partial<ImagerySourceStrings>;
 
   /**
@@ -173,7 +173,7 @@ export class ImagerySource {
    * This should happen whenever LocalizationSystem changes the locale.
    * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode: string = 'en-US'): void {
+  setLocale(localeCode: LocaleCode = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 

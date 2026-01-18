@@ -7,18 +7,6 @@ import type { D3Selection } from 'd3-selection';
 import type { Context } from './types.ts';
 
 
-/** Photo layer identifiers (e.g. 'streetside', 'mapillary', 'kartaview') */
-export type PhotoLayerID = string;
-
-/** Detection layer identifiers (e.g. 'mapillary-detections', 'mapillary-signs') */
-export type DetectionLayerID = string;
-
-/** All layer identifiers (photos + detections) */
-export type LayerID = string;
-
-/** Photo types for filtering (e.g. 'flat', 'panoramic') */
-export type PhotoType = string;
-
 /** Date filter types ('fromDate' or 'toDate') */
 export type DateFilter = 'fromDate' | 'toDate';
 
@@ -33,16 +21,16 @@ export type DateFilter = 'fromDate' | 'toDate';
  *   `currPhotoID`           Current PhotoID
  *   `currPhotoLayerID`      Current Photo LayerID
  *   `currDetectionID`       Current DetectionID
- *   `currDetectionLayerID`  Current Detection LayerID
+ *   `currLayerID`  Current Detection LayerID
  *
  * Events available:
  *   `photochange`   Fires on any change in selected photo, detection, or filtering options
  */
 export class PhotoSystem extends AbstractSystem {
   private _currPhotoLayerID: PhotoLayerID | null = null;
-  private _currPhotoID: string | null = null;
-  private _currDetectionLayerID: DetectionLayerID | null = null;
-  private _currDetectionID: string | null = null;
+  private _currPhotoID: PhotoID | null = null;
+  private _currLayerID: LayerID | null = null;
+  private _currDetectionID: DetectionID | null = null;
 
   private _filterPhotoTypes: Set<PhotoType>;
   private _filterFromDate: string | null = null;
@@ -185,7 +173,7 @@ export class PhotoSystem extends AbstractSystem {
     if (newDetection !== oldDetection) {
       const [layerID, detectionID] = newDetection.split('/', 2).filter(Boolean);
       if (layerID && detectionID) {
-        this.selectDetection(layerID as DetectionLayerID, detectionID);
+        this.selectDetection(layerID as LayerID, detectionID);
       } else {
         this.selectDetection();  // deselect
       }
@@ -205,9 +193,9 @@ export class PhotoSystem extends AbstractSystem {
 
     // Update detections
     // If there is a currently selected detection, return to browse mode.
-    for (const layerID of this.detectionLayerIDs) {
+    for (const layerID of this.LayerIDs) {
       const layer = scene.layers.get(layerID);
-      if (layer && !layer.enabled && this._currDetectionLayerID === layerID) {
+      if (layer && !layer.enabled && this._currLayerID === layerID) {
         context.enter('browse');
         this.selectDetection();  // deselect
       }
@@ -281,8 +269,8 @@ export class PhotoSystem extends AbstractSystem {
 
       // current detection
       let detectionString;
-      if (this._currDetectionLayerID && this._currDetectionID) {
-        detectionString = `${this._currDetectionLayerID}/${this._currDetectionID}`;
+      if (this._currLayerID && this._currDetectionID) {
+        detectionString = `${this._currLayerID}/${this._currDetectionID}`;
       }
       urlhash.setParam('detection', detectionString);
     }
@@ -316,8 +304,8 @@ export class PhotoSystem extends AbstractSystem {
     if (this._currPhotoLayerID && this._currPhotoID) {
       results.push(LAYERNAMES[this._currPhotoLayerID]);
     }
-    if (this._currDetectionLayerID && this._currDetectionID) {
-      results.push(LAYERNAMES[this._currDetectionLayerID]);
+    if (this._currLayerID && this._currDetectionID) {
+      results.push(LAYERNAMES[this._currLayerID]);
     }
 
     return results;
@@ -343,11 +331,11 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * detectionLayerIDs
+   * LayerIDs
    * @return  All available detection layerIDs
    * @readonly
    */
-  get detectionLayerIDs(): DetectionLayerID[] {
+  get LayerIDs(): LayerID[] {
     return ['mapillary-detections', 'mapillary-signs'];
   }
 
@@ -415,12 +403,12 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * currDetectionLayerID
+   * currLayerID
    * @return  The current detection layerID
    * @readonly
    */
-  get currDetectionLayerID(): DetectionLayerID | null {
-    return this._currDetectionLayerID;
+  get currLayerID(): LayerID | null {
+    return this._currLayerID;
   }
 
   /**
@@ -439,7 +427,7 @@ export class PhotoSystem extends AbstractSystem {
    * @param layerID - The layerID to select
    * @param photoID - The photoID to select
    */
-  selectPhoto(layerID: PhotoLayerID | null = null, photoID: string | null = null): void {
+  selectPhoto(layerID: PhotoLayerID | null = null, photoID: PhotoID | null = null): void {
     const context = this.context;
     const map = context.systems.map;
     const gfx = context.systems.gfx;
@@ -491,31 +479,31 @@ export class PhotoSystem extends AbstractSystem {
    * @param layerID - The layerID to select
    * @param detectionID - The detectionID to select
    */
-  selectDetection(layerID: DetectionLayerID | null = null, detectionID: string | null = null): void {
+  selectDetection(layerID: LayerID | null = null, detectionID: DetectionID | null = null): void {
     const context = this.context;
     const map = context.systems.map;
     const gfx = context.systems.gfx;
     const scene = gfx?.scene;
 
     // If we're selecting a detection then make sure its layer is enabled too.
-    if (scene && layerID && this.detectionLayerIDs.includes(layerID) && !this.isLayerEnabled(layerID)) {
+    if (scene && layerID && this.LayerIDs.includes(layerID) && !this.isLayerEnabled(layerID)) {
       scene.enableLayers(layerID);
       return;  // exit to avoid infinite loop, we will be right back in here via `_layerChanged` handler.
     }
 
     // Clear out any existing selection..
-    this._currDetectionLayerID = null;
+    this._currLayerID = null;
     this._currDetectionID = null;
     scene?.clearClass('selectdetection');
     scene?.clearClass('highlightphoto');
 
     // Apply the new selection..
-    if (detectionID && layerID && this.detectionLayerIDs.includes(layerID)) {
+    if (detectionID && layerID && this.LayerIDs.includes(layerID)) {
       const photoLayerID = layerID.split('-')[0] as PhotoLayerID;     // e.g. 'mapillary-signs' -> 'mapillary'
       const service = context.services[photoLayerID];
       if (!service) return;
 
-      this._currDetectionLayerID = layerID;
+      this._currLayerID = layerID;
       this._currDetectionID = detectionID;
       scene?.setClass('selectdetection', layerID, detectionID);
 

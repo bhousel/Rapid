@@ -16,7 +16,7 @@ import type { Vec2, Vec4 } from '../data/types.ts';
  */
 interface HasLocationSet {
   locationSet?: LocationSet;
-  locationSetID?: string;
+  locationSetID?: LocationSetID;
 }
 
 type HasLocationSetID = Required<HasLocationSet>;
@@ -57,13 +57,13 @@ export class LocationSystem extends AbstractSystem {
   private _wpblocks!: ReturnType<typeof whichPolygon>;
 
   /** Map of locationSetID or locationID to resolved GeoJSON data */
-  private _resolved: Map<string, GeoJSON>;
+  private _resolved: Map<LocationSetID, GeoJSON>;
   /** Map of locationSetID to area in km² */
-  private _knownLocationSets: Map<string, number>;
+  private _knownLocationSets: Map<LocationSetID, number>;
   /** Map of locationID to Set of locationSetIDs that include it */
-  private _locationIncludedIn: Map<string, Set<string>>;
+  private _locationIncludedIn: Map<string, Set<LocationSetID>>;
   /** Map of locationID to Set of locationSetIDs that exclude it */
-  private _locationExcludedIn: Map<string, Set<string>>;
+  private _locationExcludedIn: Map<string, Set<LocationSetID>>;
 
   /** Blocked regions configuration */
   private _blocks: BlockedRegion[];
@@ -317,7 +317,7 @@ export class LocationSystem extends AbstractSystem {
 
       // Ensure `area` property exists
       if (!props.area) {
-        const area = calcArea.geometry(feature.geometry as any) / 1e6;  // m² to km²
+        const area = calcArea.geometry(feature.geometry) / 1e6;  // m² to km²
         props.area = Number(area.toFixed(2));
       }
 
@@ -363,8 +363,8 @@ export class LocationSystem extends AbstractSystem {
    * @param locationSet - A LocationSet Object, e.g. `{ include: ['us'] }`
    * @return String locationSetID, e.g. `+[Q30]`
    */
-  locationSetID(locationSet: LocationSet): string {
-    let locationSetID: string;
+  locationSetID(locationSet: LocationSet): LocationSetID {
+    let locationSetID: LocationSetID;
     try {
       locationSetID = this._loco.validateLocationSet(locationSet).id;
     } catch (err) {
@@ -390,8 +390,8 @@ export class LocationSystem extends AbstractSystem {
    * @param loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
    * @return Result Object of locationSetIDs valid at given location
    */
-  locationSetsAt(loc: Vec2): Record<string, number> {
-    const result: Record<string, number> = {};
+  locationSetsAt(loc: Vec2): Record<LocationSetID, number> {
+    const result: Record<LocationSetID, number> = {};
     const hits = this._wp?.(loc, true) || [];  // what's here?
 
     // locationSets
@@ -470,13 +470,13 @@ export class LocationSystem extends AbstractSystem {
   /**
    * getFeature
    * Returns the resolved GeoJSON feature for a given locationSetID or locationID (fallback to 'world')
-   * @param dataID - locationSetID or locationID to retrieve
+   * @param val - locationSetID or locationID to retrieve
    * @return GeoJSON data object (fallback to world)
    */
-  getFeature(dataID: string = '+[Q2]'): GeoJSON | undefined {
+  getFeature(val: string = '+[Q2]'): GeoJSON | undefined {
     // should we actually resolve it if it hasn't been?
     // (note that this isn't used currently, so it doesn't matter)
-    return this._resolved.get(dataID) ?? this._resolved.get('+[Q2]');
+    return this._resolved.get(val) ?? this._resolved.get('+[Q2]');
   }
 
 }

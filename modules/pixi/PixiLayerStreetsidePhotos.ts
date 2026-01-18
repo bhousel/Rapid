@@ -76,8 +76,8 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
    */
   private _dirtyCurrentPhoto(): void {
     const context = this.context;
-    const gfx = context.systems.gfx as any;
-    const photos = context.systems.photos!;
+    const gfx = context.systems.gfx!;
+    const photos = context.systems.photos;
 
     const currPhotoID = photos?.currPhotoID;
     if (!currPhotoID) return;  // shouldn't happen, the user is zooming/panning an image
@@ -89,7 +89,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       if (!feature) continue;
       feature._styleDirty = true;
     }
-    gfx!.immediateRedraw();
+    gfx.immediateRedraw();
   }
 
 
@@ -119,11 +119,11 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx as any;
+    const gfx = context.systems.gfx!;
     const streetside = context.services.streetside;
     if (val && streetside) {
       streetside.startAsync()
-        .then(() => gfx!.immediateRedraw());
+        .then(() => gfx.immediateRedraw());
     }
   }
 

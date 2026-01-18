@@ -7,7 +7,7 @@ import { osmTagSuggestingArea, osmOneWayTags, osmRightSideIsInsideTags, osmRemov
 
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { EntityID, OsmNode, Vec2 } from './types.ts';
+import type { OsmNode, Vec2 } from './types.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 
 

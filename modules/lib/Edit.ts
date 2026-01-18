@@ -11,7 +11,7 @@ export interface EditProps {
   /** The graph state after this edit */
   graph: Graph;
   /** IDs of entities selected when this edit was made */
-  selectedIDs: string[];
+  selectedIDs: EntityID[];
   /** Sources that contributed to this edit */
   sources: Record<string, unknown>;
   /** Map transform at time of edit */
@@ -25,7 +25,7 @@ export interface EditProps {
 export class Edit {
   annotation: string | undefined;
   graph: Graph;
-  selectedIDs: string[] | undefined;
+  selectedIDs: EntityID[] | undefined;
   sources: Record<string, unknown>;
   transform: TransformProps | undefined;
 

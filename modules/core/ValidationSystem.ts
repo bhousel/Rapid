@@ -7,7 +7,7 @@ import { ValidationCache } from '../lib/ValidationCache.ts';
 import * as Validations from '../validations/index.js';
 
 import type { Context } from './types.ts';
-import type { OsmEntity, EntityID } from '../data/types.ts';
+import type { OsmEntity } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { ValidationIssue, ValidationSeverity } from '../lib/ValidationIssue.ts';
 
@@ -76,17 +76,17 @@ interface ValidateEntityResult {
  */
 export class ValidationSystem extends AbstractSystem {
   /** Map of rule ID to validator function */
-  private _rules: Map<string, ValidatorFunction>;
+  private _rules: Map<ValidatorID, ValidatorFunction>;
   /** Validation cache for base graph (before user edits) */
   private _base: ValidationCache;
   /** Validation cache for head graph (with user edits) */
   private _head: ValidationCache;
   /** Disabled rule IDs */
-  private _disabledRuleIDs: Set<string>;
+  private _disabledRuleIDs: Set<ValidatorID>;
   /** Ignored issue IDs */
-  private _ignoredIssueIDs: Set<string>;
+  private _ignoredIssueIDs: Set<IssueID>;
   /** Resolved issue IDs */
-  private _resolvedIssueIDs: Set<string>;
+  private _resolvedIssueIDs: Set<IssueID>;
   /** Complete diff base -> head of what the user changed */
   private _completeDiff: Map<EntityID, OsmEntity | undefined>;
   /** Deferred `requestIdleCallback` - Map<handle, Promise.reject> */
@@ -521,7 +521,7 @@ export class ValidationSystem extends AbstractSystem {
    * getRuleKeys
    * @return An Array containing the rule keys
    */
-  getRuleKeys(): string[] {
+  getRuleKeys(): ValidatorID[] {
     return [...this._rules.keys()];
   }
 
@@ -531,7 +531,7 @@ export class ValidationSystem extends AbstractSystem {
    * @param ruleID - The ruleID (e.g. 'crossing_ways')
    * @return true/false
    */
-  isRuleEnabled(ruleID: string): boolean {
+  isRuleEnabled(ruleID: ValidatorID): boolean {
     return !this._disabledRuleIDs.has(ruleID);
   }
 
@@ -542,7 +542,7 @@ export class ValidationSystem extends AbstractSystem {
    * then reruns the validation so that the user sees something happen in the UI
    * @param ruleID - The rule to toggle (e.g. 'crossing_ways')
    */
-  toggleRule(ruleID: string): void {
+  toggleRule(ruleID: ValidatorID): void {
     if (this._disabledRuleIDs.has(ruleID)) {
       this._disabledRuleIDs.delete(ruleID);
     } else {
@@ -561,7 +561,7 @@ export class ValidationSystem extends AbstractSystem {
    * then reruns the validation so that the user sees something happen in the UI
    * @param ruleIDs - Complete set of rules that should be disabled
    */
-  disableRules(ruleIDs: string[] = []): void {
+  disableRules(ruleIDs: ValidatorID[] = []): void {
     this._disabledRuleIDs = new Set(ruleIDs);
 
     const storage = this.context.systems.storage;
@@ -575,7 +575,7 @@ export class ValidationSystem extends AbstractSystem {
    * Don't show the given issue in lists
    * @param issueID - The issueID to ignore
    */
-  ignoreIssue(issueID: string): void {
+  ignoreIssue(issueID: IssueID): void {
     this._ignoredIssueIDs.add(issueID);
     this.emit('validated');   // emit an event to redraw various UI things
   }

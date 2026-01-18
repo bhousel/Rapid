@@ -18,7 +18,7 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
 export class Tree {
   private _currentKey: string;
   private _currentSnapshot: Graph;
-  private _cacheID: string;
+  private _cacheID: SpatialCacheID;
 
 //  private _entityRBush: RBush;
 //  private _entityBoxes: Map<string, any>;
@@ -31,7 +31,7 @@ export class Tree {
    * @param graph - The "current" Graph of entities that this tree is tracking
    * @param cacheID - Identifier for the spatial cache
    */
-  constructor(graph: Graph, cacheID: string) {
+  constructor(graph: Graph, cacheID: SpatialCacheID) {
     this._currentKey = graph.key;
     this._currentSnapshot = graph.snapshot();
     this._cacheID = cacheID;
@@ -50,7 +50,7 @@ export class Tree {
    * Remove an Entity from all internal indexes.
    * @param entityID - The entity ID to remove
    */
-  private _removeEntity(entityID: string): void {
+  private _removeEntity(entityID: EntityID): void {
     const graph = this._currentSnapshot;
     const context = graph.context;
     const spatial = context.systems.spatial!;
@@ -81,7 +81,7 @@ export class Tree {
    * Add or update multiple Entities in the internal indexes.
    * @param toUpdate - Entities to load into the tree
    */
-  private _loadEntities(toUpdate: Map<string, OsmEntity>): void {
+  private _loadEntities(toUpdate: Map<EntityID, OsmEntity>): void {
     const graph = this._currentSnapshot;
     const context = graph.context;
     const spatial = context.systems.spatial!;
@@ -135,7 +135,7 @@ export class Tree {
    * @param toUpdate - gathered Entities that need updating
    * @param seen - to avoid infinite recursion
    */
-  private _includeParents(entity: OsmEntity, toUpdate: Map<string, OsmEntity>, seen?: Set<string>): void {
+  private _includeParents(entity: OsmEntity, toUpdate: Map<EntityID, OsmEntity>, seen?: Set<EntityID>): void {
     const graph = this._currentSnapshot;
     const entityID = entity.id;
     if (!seen) seen = new Set();
@@ -178,7 +178,7 @@ export class Tree {
     const changed = diff.didChange;
     if (!changed.addition && !changed.deletion && !changed.geometry) return;
 
-    const toUpdate = new Map<string, OsmEntity>();
+    const toUpdate = new Map<EntityID, OsmEntity>();
 
     if (changed.deletion) {
       for (const entity of diff.deleted()) {
@@ -217,7 +217,7 @@ export class Tree {
     const spatial = context.systems.spatial!;
 
     const local = graph.local;
-    const toUpdate = new Map<string, OsmEntity>();
+    const toUpdate = new Map<EntityID, OsmEntity>();
 
     for (const entity of entities) {
       if (!entity.visible) continue;
