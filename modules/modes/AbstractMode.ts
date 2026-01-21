@@ -1,5 +1,8 @@
 import { EventEmitter } from 'tseep';
 
+import type { AbstractData } from '../data/AbstractData.ts';
+import type { Context } from '../Context.ts';
+
 
 /**
  * "Modes" are editing tasks that the user are allowed to perform.
@@ -9,18 +12,25 @@ import { EventEmitter } from 'tseep';
  * All modes are event emitters.
  *
  * Properties you can access:
- *   `id` (or `modeID`)   `String` identifier for the mode (e.g. 'browse')
+ *   `id` (or `modeID`)   String identifier for the mode (e.g. 'browse')
  *   `active`             `true` if the mode is active, `false` if not.
- *   `operations`         `Array` of operations allowed on the right-click edit menu
- *   `selectedData`       `Map<dataID, data>` containing selected data
+ *   `operations`         Array of operations allowed on the right-click edit menu
+ *   `selectedData`       `Map<DataID, AbstractData>` containing selected data
  */
 export class AbstractMode extends EventEmitter {
+  id: ModeID;
+  context: Context;
+  // Operations are still untyped (modules/operations not yet converted)
+  operations: object[];
+
+  protected _active: boolean;
+  protected _selectedData: Map<DataID, AbstractData>;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super();
     this.id = '';
     this.context = context;
@@ -34,10 +44,10 @@ export class AbstractMode extends EventEmitter {
   /**
    * enter
    * Every mode should have an `enter` function to peform any necessary setup tasks
-   * @param   {Object}   options -  Optional `Object` of options passed to the mode
-   * @return  {boolean}  `true` if mode could be entered, `false` it not
+   * @param  options - Optional object of options passed to the mode
+   * @return `true` if mode could be entered, `false` if not
    */
-  enter() {
+  enter(options?: object): boolean {
     this._active = true;
     return true;
   }
@@ -47,7 +57,7 @@ export class AbstractMode extends EventEmitter {
    * exit
    * Every mode should have a `exit` function to perform any necessary teardown tasks
    */
-  exit() {
+  exit(): void {
     this._active = false;
   }
 
@@ -55,10 +65,9 @@ export class AbstractMode extends EventEmitter {
   /**
    * modeID
    * Unique string to identify this Mode.
-   * @return  {string}
    * @readonly
    */
-  get modeID() {
+  get modeID(): ModeID {
     return this.id;
   }
 
@@ -66,32 +75,28 @@ export class AbstractMode extends EventEmitter {
   /**
    * active
    * Whether the mode is active
-   * @return {boolean}  `true` if active, `false` if not.
    * @readonly
    */
-  get active() {
+  get active(): boolean {
     return this._active;
   }
 
 
   /**
    * selectedData
-   * @return  {Map<string,AbstractData>}  selected data
    * @readonly
    */
-  get selectedData() {
+  get selectedData(): Map<DataID, AbstractData> {
     return this._selectedData;
   }
 
 
   /**
    * selectedIDs
-   * @return  {Array<string>}  selected IDs
    * @readonly
    */
-  get selectedIDs() {
+  get selectedIDs(): DataID[] {
     return Array.from(this._selectedData.keys());
   }
 
 }
-

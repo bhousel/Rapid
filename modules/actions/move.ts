@@ -26,7 +26,7 @@ interface MoveIntersection {
 
 
 /** Cache object used during move operations */
-interface MoveCache {
+export interface MoveCache {
   /** Map of entity IDs that are moving */
   moving: Record<EntityID, boolean>;
   /** Intersections between moved and unmoved ways */

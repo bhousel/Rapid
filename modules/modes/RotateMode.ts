@@ -1,9 +1,20 @@
-import { polygonHull as d3_polygonHull, polygonCentroid as d3_polygonCentroid } from 'd3-polygon';
-import { DEG2RAD, vecInterp, vecSubtract } from '@rapid-sdk/math';
-import { utilGetAllNodes } from '@rapid-sdk/util';
+import { DEG2RAD, vecAdd, vecScale, vecSubtract } from '@rapid-sdk/math';
 
-import { AbstractMode } from './AbstractMode.js';
-import { actionRotate } from '../actions/rotate.js';
+import { AbstractMode } from './AbstractMode.ts';
+import { actionRotate } from '../actions/rotate.ts';
+
+import type { Context } from '../Context.ts';
+import type { OsmNode } from '../data/OsmNode.ts';
+import type { Vec2 } from '@rapid-sdk/math';
+
+
+/**
+ * Options for entering RotateMode
+ */
+export interface RotateModeOptions {
+  /** Selection object where keys are layerIDs and values are arrays of dataIDs */
+  selection?: Record<string, EntityID[]>;
+}
 
 
 /**
@@ -11,18 +22,24 @@ import { actionRotate } from '../actions/rotate.js';
  * In this mode, we are rotating one or more map features
  */
 export class RotateMode extends AbstractMode {
+  /** Entity IDs being rotated */
+  private _entityIDs: EntityID[];
+  /** Last pointer position for calculating rotation delta */
+  private _lastPoint: Vec2 | null;
+  /** Pivot location for rotation (in world coordinates) */
+  private _pivotWorld: Vec2 | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'rotate';
 
     this._entityIDs = [];
     this._lastPoint = null;
-    this._pivotLoc = null;
+    this._pivotWorld = null;
 
     // Make sure the event handlers have `this` bound correctly
     this._cancel = this._cancel.bind(this);
@@ -35,21 +52,19 @@ export class RotateMode extends AbstractMode {
   /**
    * enter
    * Enters the mode.
-   * @param  {Object?}  options - Optional `Object` of options passed to the new mode
-   * @param  {Object}   options.selection - An object where the keys are layerIDs
-   *    and the values are Arrays of dataIDs:  Example:  `{ 'osm': ['w1', 'w2', 'w3'] }`
-   * @return {boolean}  `true` if the mode can be entered, `false` if not
+   * @param  options - Optional options object
+   * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options = {}) {
+  enter(options: RotateModeOptions = {}): boolean {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    const filters = context.systems.filters;
+    const filters = context.systems.filters!;
     const locations = context.systems.locations;
-    const eventManager = context.systems.gfx.eventManager;
+    const eventManager = context.systems.gfx!.eventManager!;
 
     const selection = options.selection ?? {};
-    let entityIDs = selection.osm ?? [];
+    const entityIDs = selection.osm ?? [];
 
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
@@ -58,7 +73,10 @@ export class RotateMode extends AbstractMode {
     for (const entityID of entityIDs) {
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;   // not in the osm graph
-      if (entity.type === 'node' && locations.isBlockedAt(entity.loc)) continue;  // editing is blocked
+      if (entity.type === 'node') {
+        const loc = (entity as OsmNode).loc;
+        if (loc && locations?.isBlockedAt(loc)) continue;  // editing is blocked
+      }
 
       this._selectedData.set(entityID, entity);
     }
@@ -72,7 +90,7 @@ export class RotateMode extends AbstractMode {
     context.enableBehaviors(['mapInteraction']);
 
     this._lastPoint = null;
-    this._pivotLoc = this._calcPivotLoc();
+    this._pivotWorld = this._calcPivot();
 
     eventManager
       .on('click', this._finish)
@@ -86,19 +104,21 @@ export class RotateMode extends AbstractMode {
 
   /**
    * exit
+   * Exits the mode, committing any pending rotate operation.
+   * Removes event listeners and clears state.
    */
-  exit() {
+  exit(): void {
     if (!this._active) return;
     this._active = false;
 
     const context = this.context;
-    const editor = context.systems.editor;
-    const filters = context.systems.filters;
-    const l10n = context.systems.l10n;
-    const eventManager = context.systems.gfx.eventManager;
+    const editor = context.systems.editor!;
+    const filters = context.systems.filters!;
+    const l10n = context.systems.l10n!;
+    const eventManager = context.systems.gfx!.eventManager!;
 
     this._lastPoint = null;
-    this._pivotLoc = null;
+    this._pivotWorld = null;
 
     filters.forceVisible([]);
 
@@ -110,7 +130,7 @@ export class RotateMode extends AbstractMode {
 
     // If there is work in progress, finalize it.
     if (editor.hasWorkInProgress) {
-      let annotation;
+      let annotation: string;
       if (this._entityIDs.length === 1) {
         const graph = editor.staging.graph;
         const entity = graph.entity(this._entityIDs[0]);
@@ -130,9 +150,9 @@ export class RotateMode extends AbstractMode {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e) {
+  private _keydown(e: KeyboardEvent): void {
     if (['Enter'].includes(e.key)) {
       e.preventDefault();
       this._finish();
@@ -151,12 +171,13 @@ export class RotateMode extends AbstractMode {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * Converts pointer movement into rotation: moving left/right or up/down
+   * rotates the shape clockwise or counterclockwise based on position relative to pivot.
    */
-  _pointermove() {
+  private _pointermove(): void {
     const context = this.context;
-    const editor = context.systems.editor;
-    const eventManager = context.systems.gfx.eventManager;
+    const editor = context.systems.editor!;
+    const eventManager = context.systems.gfx!.eventManager!;
     const currPoint = eventManager.coord.map;
 
     // Some notes!
@@ -179,9 +200,9 @@ export class RotateMode extends AbstractMode {
 
     // "new" - determine pointer movement dx,dy but relative to the pivot point
     if (this._lastPoint) {
-      const pivotPoint = context.viewport.project(this._pivotLoc);
+      const pivotPoint = context.viewport.worldToScreen(this._pivotWorld!);
       const [dX, dY] = vecSubtract(currPoint, this._lastPoint);   // delta pointer movement
-      const [sX, sY] = [                                          // swap signs if needed
+      const [sX, sY]: Vec2 = [                     // swap signs if needed
         (currPoint[0] > pivotPoint[0]) ? 1 : -1,   // right/left of pivot
         (currPoint[1] > pivotPoint[1]) ? -1 : 1    // above/below pivot
       ];
@@ -190,10 +211,10 @@ export class RotateMode extends AbstractMode {
       const angle = degrees * DEG2RAD * SPEED;
       editor.perform(actionRotate(this._entityIDs, pivotPoint, angle, context.viewport));
     }
-    this._lastPoint = currPoint.slice();  // copy
+    this._lastPoint = currPoint.slice() as Vec2;  // copy
 
     // "old" - rotational
-    // const pivotPoint = context.viewport.project(this._pivotLoc);
+    // const pivotPoint = context.viewport.worldToScreen(this._pivotWorld);
     // const currAngle = Math.atan2(currPoint[1] - pivotPoint[1], currPoint[0] - pivotPoint[0]);
     // if (this._lastAngle !== null) {
     //   const angle = currAngle - this._lastAngle;
@@ -212,35 +233,31 @@ export class RotateMode extends AbstractMode {
 
 
   /**
-   * _calcPivotLoc
-   * Calculate the [lon,lat] location that the features should pivot around
-   * @return  Array [lon,lat]
+   * _calcPivot
+   * Calculate the location that the features should pivot around.
+   * We simply average the centroids of all selected entities - this gives each
+   * feature equal weight regardless of size/complexity, which is more intuitive
+   * for a rotation UX than a true center-of-mass calculation.
+   * @return  Array [x,y] world coordinate to pivot around
    */
-  _calcPivotLoc() {
-    const context = this.context;
-    const viewport = context.viewport;
-    const graph = context.systems.editor.staging.graph;
-    const nodes = utilGetAllNodes(this._entityIDs, graph);
-    const points = nodes.map(node => viewport.project(node.loc));
+  private _calcPivot(): Vec2 {
+    const graph = this.context.systems.editor!.staging.graph;
+    let sum: Vec2 = [0, 0];
+    let count = 0;
 
-    // Calculate in projected coordinates [x,y]
-    let centroid;
-    if (points.length === 1) {
-      centroid = points[0];
-    } else if (points.length === 2) {
-      centroid = vecInterp(points[0], points[1], 0.5);
-    } else {
-      const polygonHull = d3_polygonHull(points);
-      if (polygonHull.length === 2) {
-        centroid = vecInterp(points[0], points[1], 0.5);
-      } else {
-        centroid = d3_polygonCentroid(d3_polygonHull(points));
+    for (const entityID of this._entityIDs) {
+      const entity = graph.hasEntity(entityID);
+      if (!entity) continue;
+      for (const part of entity.geoms.parts || []) {
+        const centroid = part.world?.centroid;
+        if (centroid) {
+          sum = vecAdd(sum, centroid);
+          count++;
+        }
       }
     }
 
-    // Return spherical coordinates [lon,lat]
-    // (if viewport changes later, we just reproject instead of recalculating)
-    return viewport.unproject(centroid);
+    return count > 0 ? vecScale(sum, 1 / count) : [0, 0];
   }
 
 
@@ -248,7 +265,7 @@ export class RotateMode extends AbstractMode {
    * _finish
    * Return to select mode - `exit()` will finalize the work in progress.
    */
-  _finish() {
+  private _finish(): void {
     this.context.enter('select-osm', { selection: { osm: this._entityIDs }} );
   }
 
@@ -257,13 +274,12 @@ export class RotateMode extends AbstractMode {
    * _cancel
    * Return to select mode without doing anything
    */
-  _cancel() {
+  private _cancel(): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
 
     editor.revert();
     context.enter('select-osm', { selection: { osm: this._entityIDs }} );
   }
 
 }
-

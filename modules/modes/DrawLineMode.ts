@@ -1,14 +1,41 @@
 import { vecEqual, vecLength, vecRotate, vecSubtract } from '@rapid-sdk/math';
 
-import { AbstractMode } from './AbstractMode.js';
-import { actionAddEntity } from '../actions/add_entity.js';
-import { actionAddMidpoint } from '../actions/add_midpoint.js';
-import { actionAddVertex } from '../actions/add_vertex.js';
-import { actionMoveNode } from '../actions/move_node.js';
+import { AbstractMode } from './AbstractMode.ts';
+import { actionAddEntity } from '../actions/add_entity.ts';
+import { actionAddMidpoint } from '../actions/add_midpoint.ts';
+import { actionAddVertex } from '../actions/add_vertex.ts';
+import { actionMoveNode } from '../actions/move_node.ts';
 import { geoChooseEdge } from '../geo/geom.js';
 import { OsmNode, OsmWay } from '../data/index.ts';
 
+import type { Context } from '../Context.ts';
+import type { EventData } from '../behaviors/AbstractBehavior.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { Vec2 } from '@rapid-sdk/math';
+import type { Action } from '../actions/types.ts';
+import type { Tags } from '../data/types.ts';
+
 const DEBUG = false;
+
+
+/**
+ * Options for entering DrawLineMode
+ */
+export interface DrawLineModeOptions {
+  /** Node ID to continue from */
+  continueNodeID?: EntityID;
+  /** Way ID to continue from */
+  continueWayID?: EntityID;
+}
+
+
+/** Snapshot state for undo/redo support */
+interface DrawLineSnapshot {
+  drawWayID: EntityID;
+  insertIndex: number | undefined;
+  firstNodeID: EntityID;
+  lastNodeID: EntityID;
+}
 
 
 /**
@@ -16,44 +43,57 @@ const DEBUG = false;
  * In this mode, we are drawing a new line or continuing an existing line.
  */
 export class DrawLineMode extends AbstractMode {
+  /** Default tags for new ways */
+  defaultTags: Tags;
+  /** The draw way just contains the way that we are drawing */
+  drawWayID: EntityID | null;
+  /** The draw node is temporary and just follows the pointer */
+  drawNodeID: EntityID | null;
+  /** The first real node in the draw way */
+  firstNodeID: EntityID | null;
+  /** The last real node in the draw way (the draw node is after/before this one) */
+  lastNodeID: EntityID | null;
+
+  // So for a draw way like:
+  //
+  //  A -> B -> C -> D
+  //
+  // A is the firstNode
+  // C is the lastNode
+  // D is the drawNode, temporary and will be rolled back in `exit()`
+  // A or C can be clicked on to finish the way
+
+  /** _insertIndex determines where new nodes get added (see `OsmWay.addNode()`) `0` = beginning, `undefined` = end */
+  private _insertIndex: number | undefined;
+  /** The history index when we start drawing */
+  private _editIndex: number | null;
+  /** Watch coordinates to determine if we have moved enough */
+  private _lastPoint: Vec2 | null;
+  /**
+   * To deal with undo/redo, we take snapshots on every commit, keyed to the stable graph.
+   * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
+   * This means we've undo/redoed into an edit where the user wasn't drawing lines.
+   * It's kinda hack, but I dont know what else to do right now.
+   */
+  private _snapshots: Map<Graph, DrawLineSnapshot>;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'draw-line';
 
     this.defaultTags = {};
-    this.drawWayID = null;    // The draw way just contains the way that we are drawing
-    this.drawNodeID = null;   // The draw node is temporary and just follows the pointer
-    this.firstNodeID = null;  // The first real node in the draw way
-    this.lastNodeID = null;   // The last real node in the draw way (the draw node is after/before this one)
+    this.drawWayID = null;
+    this.drawNodeID = null;
+    this.firstNodeID = null;
+    this.lastNodeID = null;
 
-    // So for a draw way like:
-    //
-    //  A -> B -> C -> D
-    //
-    // A is the firstNode
-    // C is the lastNode
-    // D is the drawNode, temporary and will be rolled back in `exit()`
-    // A or C can be clicked on to finish the way
-
-    // _insertIndex determines where new nodes get added (see `OsmWay.addNode()`)
-    // `0` = beginning, `undefined` = end
     this._insertIndex = undefined;
-
-    // The history index when we start drawing
     this._editIndex = null;
-
-    // Watch coordinates to determine if we have moved enough
     this._lastPoint = null;
-
-    // To deal with undo/redo, we take snapshots on every commit, keyed to the stable graph.
-    // If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
-    // This means we've undo/redoed into an edit where the user wasn't drawing lines.
-    // It's kinda hack, but I dont know what else to do right now.
     this._snapshots = new Map();
 
     // Make sure the event handlers have `this` bound correctly
@@ -71,15 +111,15 @@ export class DrawLineMode extends AbstractMode {
    * enter
    * Enters the mode.
    * Draw a new line, or optionally continue an existing line.
-   * @param  {Object?}  options - Optional `Object` of options passed to the new mode
-   * @param  {Object}   options.continueNodeID - an OSM node to continue from
-   * @param  {Object}   options.continueWayID - an OSM way to continue from
-   * @return {boolean}  `true` if the mode can be entered, `false` if not
+   * @param  options - Optional options object
+   * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options = {}) {
+  enter(options: DrawLineModeOptions = {}): boolean {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
     const graph = editor.staging.graph;
+    const eventManager = gfx.eventManager!;
 
     const continueNodeID = options.continueNodeID;
     const continueWayID = options.continueWayID;
@@ -111,27 +151,26 @@ export class DrawLineMode extends AbstractMode {
     this._lastPoint = null;
     this._selectedData.clear();
 
-    const eventManager = context.systems.gfx.eventManager;
     eventManager.setCursor('crosshair');
 
     context.enableBehaviors(['hover', 'draw', 'mapInteraction', 'mapNudge']);
 
-    context.behaviors.hover
+    context.behaviors.hover!
       .on('hoverchange', this._hover);
 
-    context.behaviors.draw
+    context.behaviors.draw!
       .on('move', this._move)
       .on('click', this._click)
       .on('finish', this._finish)
       .on('cancel', this._cancel);
 
-    context.behaviors.mapNudge
+    context.behaviors.mapNudge!
       .on('nudge', this._nudge);
 
     editor
       .on('historyjump', this._restoreSnapshot);
 
-    context.behaviors.mapInteraction.doubleClickEnabled = false;
+    context.behaviors.mapInteraction!.doubleClickEnabled = false;
 
     editor.setCheckpoint('beginDraw');
     this._editIndex = editor.index;
@@ -139,10 +178,10 @@ export class DrawLineMode extends AbstractMode {
     // If we are continuing, the drawWay is the way being continued..
     if (continueNode && continueWay) {
       const continueFromStart = (continueWay.affix(continueNode.id) === 'prefix');
-      const oppositeNodeID = (continueFromStart ? continueWay.last() : continueWay.first());
+      const oppositeNodeID = (continueFromStart ? continueWay.last() : continueWay.first())!;
       this._insertIndex = (continueFromStart ? 0 : undefined);
-      this.drawWayID = continueWayID;
-      this.lastNodeID = continueNodeID;
+      this.drawWayID = continueWayID!;
+      this.lastNodeID = continueNodeID!;
       this.firstNodeID = oppositeNodeID;
       this._addDrawNode();
       this._refreshEntities();
@@ -154,8 +193,10 @@ export class DrawLineMode extends AbstractMode {
 
   /**
    * exit
+   * Exits the mode, cleaning up the draw state and reverting any incomplete work.
+   * If the draw way is invalid or degenerate, rolls back to the state before drawing started.
    */
-  exit() {
+  exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -164,23 +205,23 @@ export class DrawLineMode extends AbstractMode {
     }
 
     const context = this.context;
-    const editor = context.systems.editor;
-    const gfx = context.systems.gfx;
-    const layer = gfx.scene.layers.get('osm');
-    const eventManager = gfx.eventManager;
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
+    const layer = gfx.scene!.layers.get('osm')!;
+    const eventManager = gfx.eventManager!;
 
     eventManager.setCursor('grab');
 
-    context.behaviors.hover
+    context.behaviors.hover!
       .off('hoverchange', this._hover);
 
-    context.behaviors.draw
+    context.behaviors.draw!
       .off('move', this._move)
       .off('click', this._click)
       .off('finish', this._finish)
       .off('cancel', this._cancel);
 
-    context.behaviors.mapNudge
+    context.behaviors.mapNudge!
       .off('nudge', this._nudge);
 
     editor
@@ -192,16 +233,16 @@ export class DrawLineMode extends AbstractMode {
     // Confirm that the draw way exists and is valid..
     // If any issues, revert back to how things were before we started.
     const graph = editor.stable.graph;
-    const drawWay = this.drawWayID && graph.hasEntity(this.drawWayID);
+    const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) : undefined;
     if (!drawWay || drawWay.isDegenerate()) {
       if (DEBUG) {
         console.log('DrawLineMode: draw way invalid, rolling back');  // eslint-disable-line no-console
       }
-      if (editor.index > this._editIndex) {
+      if (editor.index > this._editIndex!) {
         while (editor.index !== this._editIndex) {
           editor.undo();
         }
-      } else if (editor.index < this._editIndex) {
+      } else if (editor.index < this._editIndex!) {
         editor.restoreCheckpoint('beginDraw');
       }
     }
@@ -218,8 +259,8 @@ export class DrawLineMode extends AbstractMode {
 
     layer.clearClass('drawing');
 
-    window.setTimeout(() => {
-      context.behaviors.mapInteraction.doubleClickEnabled = true;
+    globalThis.setTimeout(() => {
+      context.behaviors.mapInteraction!.doubleClickEnabled = true;
     }, 1000);
 
     editor.endTransaction();
@@ -228,24 +269,24 @@ export class DrawLineMode extends AbstractMode {
 
   /**
    * _refreshEntities
-   *  Confirms that the drawing entities all exist in the graph after any modifications.
-   *  Updates `selectedData` collection to include the draw way
-   *  Updates `drawing` class for items that need it
+   * Confirms that the drawing entities all exist in the graph after any modifications.
+   * Updates `selectedData` collection to include the draw way
+   * Updates `drawing` class for items that need it
    */
-  _refreshEntities() {
+  private _refreshEntities(): void {
     const context = this.context;
-    const editor = context.systems.editor;
-    const gfx = context.systems.gfx;
-    const layer = gfx.scene.layers.get('osm');
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
+    const layer = gfx.scene!.layers.get('osm')!;
 
     layer.clearClass('drawing');
     this._selectedData.clear();
 
     const graph = editor.staging.graph;
-    const drawWay = this.drawWayID && graph.hasEntity(this.drawWayID);
-    const drawNode = this.drawWayID && graph.hasEntity(this.drawNodeID);
-    const lastNode = this.lastNodeID && graph.hasEntity(this.lastNodeID);
-    const firstNode = this.firstNodeID && graph.hasEntity(this.firstNodeID);
+    const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) : undefined;
+    const drawNode = this.drawNodeID ? graph.hasEntity(this.drawNodeID) : undefined;
+    const lastNode = this.lastNodeID ? graph.hasEntity(this.lastNodeID) : undefined;
+    const firstNode = this.firstNodeID ? graph.hasEntity(this.firstNodeID) : undefined;
 
     // Sanity check - Bail out if any of these are missing.
     if (!drawWay || !lastNode || !firstNode) {
@@ -258,7 +299,7 @@ export class DrawLineMode extends AbstractMode {
       layer.setClass('drawing', drawNode.id);
 
       // Nudging at the edge of the map is allowed after the drawNode exists.
-      context.behaviors.mapNudge.allow();
+      context.behaviors.mapNudge!.allow();
     }
 
     // todo - we do want to allow connecting a line to itself in some situations
@@ -270,16 +311,16 @@ export class DrawLineMode extends AbstractMode {
   /**
    * _getAnnotation
    * An annotation is a text associated with the edit, such as "Started a line".
-   * @return  {string?}  String such as "Started a line", or undefined if the drawWay is incomplete
+   * @return String such as "Started a line", or undefined if the drawWay is incomplete
    */
-  _getAnnotation() {
+  private _getAnnotation(): string | undefined {
     const context = this.context;
-    const editor = context.systems.editor;
-    const graph = editor.staging.graph;
-    const l10n = context.systems.l10n;
+    const editor = context.systems.editor!;
+    const l10n = context.systems.l10n!;
 
-    const drawWay = this.drawWayID && graph.hasEntity(this.drawWayID);
-    const length = drawWay?.nodes?.length || 0;
+    const graph = editor.staging.graph;
+    const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) as OsmWay | undefined : undefined;
+    const length = drawWay?.nodes?.length ?? 0;
     if (length < 2) return undefined;
 
     const which = length > 2 ? 'continue' : 'start';
@@ -290,14 +331,15 @@ export class DrawLineMode extends AbstractMode {
   /**
    * _move
    * Move the draw node, or create one if needed.
-   * @param  {Object}  eventData - Object containing data about the event and what was targeted
+   * @param eventData - Object containing data about the event and what was targeted
    */
-  _move(eventData) {
+  private _move(eventData: EventData): void {
     if (!this.drawWayID) return;  // haven't started drawing yet
 
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
     const viewport = context.viewport;
+
     const point = eventData.coord.map;
     let loc = viewport.unproject(point);
 
@@ -306,7 +348,7 @@ export class DrawLineMode extends AbstractMode {
     this._lastPoint = point;
 
     let graph = editor.staging.graph;
-    let drawNode = this.drawNodeID && graph.hasEntity(this.drawNodeID);
+    let drawNode = this.drawNodeID ? graph.hasEntity(this.drawNodeID) : undefined;
 
     editor.beginTransaction();
 
@@ -327,23 +369,21 @@ export class DrawLineMode extends AbstractMode {
 
     // Calculate snap, if any..
     // Allow snapping only for OSM Entities in the current graph (i.e. not Rapid features)
-    const datum = eventData?.target?.data;
-    const choice = eventData?.target?.choice;
-    const target = datum && graph.hasEntity(datum.id);
+    const dataID = eventData?.target?.dataID;
+    const target = dataID ? graph.hasEntity(dataID) : undefined;
 
     // Snap to a node
     if (target?.type === 'node') {
-      loc = target.loc;
+      const node = target as OsmNode;
+      loc = node.loc!;
 
     // Snap to a way
-//    } else if (target?.type === 'way' && choice) {
-//      loc = choice.loc;
-//    }
     } else if (target?.type === 'way') {
-      const choice = geoChooseEdge(graph.childNodes(target), point, viewport, drawNode.id);
-      const SNAP_DIST = 6;  // hack to avoid snap to fill, see #719
-      if (choice && choice.distance < SNAP_DIST) {
-        loc = choice.loc;
+      const way = target as OsmWay;
+      const edgeChoice = geoChooseEdge(graph.childNodes(way), point, viewport, drawNode.id);
+      const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
+      if (edgeChoice && edgeChoice.distance < SNAP_DIST) {
+        loc = edgeChoice.loc;
       }
     }
 
@@ -358,27 +398,28 @@ export class DrawLineMode extends AbstractMode {
    * _nudge
    * This event fires on map pans at the edge of the screen.
    * We want to move the drawing node opposite of the pixels panned to keep it in the same place.
-   * @param  nudge - [x,y] amount of map pan in pixels
+   * @param nudge - [x,y] amount of map pan in pixels
    */
-  _nudge(nudge) {
+  private _nudge(nudge: Vec2): void {
     const context = this.context;
-    const editor = context.systems.editor;
-    const graph = editor.staging.graph;
+    const editor = context.systems.editor!;
     const locations = context.systems.locations;
     const viewport = context.viewport;
+
+    const graph = editor.staging.graph;
     const t = context.viewport.transform;
     if (t.r) {
       nudge = vecRotate(nudge, -t.r, [0, 0]);   // remove any rotation
     }
 
-    const drawNode = this.drawNodeID && graph.hasEntity(this.drawNodeID);
+    const drawNode = this.drawNodeID ? graph.hasEntity(this.drawNodeID) as OsmNode | undefined : undefined;
     if (!drawNode) return;
 
-    const currPoint = viewport.project(drawNode.loc);
+    const currPoint = viewport.project(drawNode.loc!);
     const destPoint = vecSubtract(currPoint, nudge);
     const loc = viewport.unproject(destPoint);
 
-    if (locations.isBlockedAt(loc)) {  // editing is blocked here
+    if (locations?.isBlockedAt(loc)) {  // editing is blocked here
       this._cancel();
       return;
     }
@@ -391,23 +432,25 @@ export class DrawLineMode extends AbstractMode {
   /**
    * _click
    * Process whatever the user clicked on.
-   * @param  {Object}  eventData - Object containing data about the event and what was targeted
+   * @param eventData - Object containing data about the event and what was targeted
    */
-  _click(eventData) {
+  private _click(eventData: EventData): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
     const locations = context.systems.locations;
     const viewport = context.viewport;
+
     const point = eventData.coord.map;
     let loc = viewport.unproject(point);
 
-    if (locations.isBlockedAt(loc)) return;   // editing is blocked here
+    if (locations?.isBlockedAt(loc)) return;   // editing is blocked here
 
-    const eventManager = context.systems.gfx.eventManager;
+    const eventManager = gfx.eventManager!;
     eventManager.setCursor('crosshair');
 
     let graph = editor.staging.graph;
-    let drawNode = this.drawNodeID && graph.hasEntity(this.drawNodeID);
+    let drawNode = this.drawNodeID ? graph.hasEntity(this.drawNodeID) as OsmNode | undefined : undefined;
 
     // Start transaction now - if we are making a draw node, we want it included.
     editor.beginTransaction();
@@ -422,28 +465,25 @@ export class DrawLineMode extends AbstractMode {
 
     // Calculate snap, if any..
     // Allow snapping only for OSM Entities in the current graph (i.e. not Rapid features)
-    const datum = eventData?.target?.data;
-    const choice = eventData?.target?.choice;
-    const target = datum && graph.hasEntity(datum.id);
-    let node, edge;
+    const dataID = eventData?.target?.dataID;
+    const target = dataID ? graph.hasEntity(dataID) : undefined;
+
+    let node: OsmNode | undefined;
+    let edge: [EntityID, EntityID] | undefined;
 
     // Snap to a node
     if (target?.type === 'node') {
-      loc = target.loc;
-      node = target;
+      node = target as OsmNode;
+      loc = node.loc!;
 
     // Snap to a way
-//  } else if (target?.type === 'way' && choice) {
-//      const edge = [ target.nodes[choice.index - 1], target.nodes[choice.index] ];
-//      this._clickWay(choice.loc, edge);
-//      return;
-//    }
     } else if (target?.type === 'way') {
-      const choice = geoChooseEdge(graph.childNodes(target), point, viewport, this.drawNodeID);
-      const SNAP_DIST = 6;  // hack to avoid snap to fill, see #719
-      if (choice && choice.distance < SNAP_DIST) {
-        loc = choice.loc;
-        edge = [ target.nodes[choice.index - 1], target.nodes[choice.index] ];
+      const way = target as OsmWay;
+      const edgeChoice = geoChooseEdge(graph.childNodes(way), point, viewport, this.drawNodeID ?? undefined);
+      const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
+      if (edgeChoice && edgeChoice.distance < SNAP_DIST) {
+        loc = edgeChoice.loc;
+        edge = [ way.nodes[edgeChoice.index - 1], way.nodes[edgeChoice.index] ];
       }
     }
 
@@ -465,22 +505,22 @@ export class DrawLineMode extends AbstractMode {
    * _clickLoc
    * Clicked on nothing, create a node at given `loc`.
    */
-  _clickLoc(loc) {
+  private _clickLoc(loc: Vec2): void {
     const EPSILON = 1e-6;
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
 
-    let graph = editor.staging.graph;
-    let drawWay = this.drawWayID && graph.hasEntity(this.drawWayID);
-    let drawNode = this.drawNodeID && graph.hasEntity(this.drawNodeID);
-    let lastNode = this.lastNodeID && graph.hasEntity(this.lastNodeID);
-    let firstNode = this.firstNodeID && graph.hasEntity(this.firstNodeID);
+    const graph = editor.staging.graph;
+    let drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) as OsmWay | undefined : undefined;
+    let drawNode = this.drawNodeID ? graph.hasEntity(this.drawNodeID) as OsmNode | undefined : undefined;
+    const lastNode = this.lastNodeID ? graph.hasEntity(this.lastNodeID) as OsmNode | undefined : undefined;
+    let firstNode = this.firstNodeID ? graph.hasEntity(this.firstNodeID) as OsmNode | undefined : undefined;
 
     // Extend line by adding vertex at `loc`...
     if (drawWay) {
       // The draw node is at the first or last node, try to finish the line.
       // (Normally this situation would be caught in `_clickNode`, maybe the user held down modifier key?)
-      if (vecEqual(loc, lastNode.loc, EPSILON) || vecEqual(loc, firstNode.loc, EPSILON)) {
+      if (vecEqual(loc, lastNode!.loc!, EPSILON) || vecEqual(loc, firstNode!.loc!, EPSILON)) {
         this._finish();
         return;
       }
@@ -493,11 +533,11 @@ export class DrawLineMode extends AbstractMode {
       const annotation = this._getAnnotation();
       if (annotation) {
         editor.commit({ annotation: annotation, selectedIDs: [drawWay.id] });
-        this._takeSnapshot(firstNode.id, drawNode.id);
+        this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
       // Replace draw node
-      this.lastNodeID = drawNode.id;
+      this.lastNodeID = drawNode!.id;
       this._addDrawNode(loc);
 
 
@@ -531,23 +571,23 @@ export class DrawLineMode extends AbstractMode {
    * _clickWay
    * Clicked on an target way, add a midpoint along the `edge` at given `loc`.
    */
-  _clickWay(loc, edge) {
+  private _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
     const EPSILON = 1e-6;
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
     const midpoint = { loc: loc, edge: edge };
 
-    let graph = editor.staging.graph;
-    let drawWay = this.drawWayID && graph.hasEntity(this.drawWayID);
-    let drawNode = this.drawNodeID && graph.hasEntity(this.drawNodeID);
-    let lastNode = this.lastNodeID && graph.hasEntity(this.lastNodeID);
-    let firstNode = this.firstNodeID && graph.hasEntity(this.firstNodeID);
+    const graph = editor.staging.graph;
+    let drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) as OsmWay | undefined : undefined;
+    let drawNode = this.drawNodeID ? graph.hasEntity(this.drawNodeID) as OsmNode | undefined : undefined;
+    const lastNode = this.lastNodeID ? graph.hasEntity(this.lastNodeID) as OsmNode | undefined : undefined;
+    let firstNode = this.firstNodeID ? graph.hasEntity(this.firstNodeID) as OsmNode | undefined : undefined;
 
     // Extend line by adding vertex as midpoint along target edge...
     if (drawWay) {
       // The drawNode is at the first or last node, try to finish the line.
       // (Normally this situation would be caught in `_clickNode`, maybe the user held down modifier key?)
-      if (vecEqual(loc, lastNode.loc, EPSILON) || vecEqual(loc, firstNode.loc, EPSILON)) {
+      if (vecEqual(loc, lastNode!.loc!, EPSILON) || vecEqual(loc, firstNode!.loc!, EPSILON)) {
         this._finish();
         return;
       }
@@ -557,19 +597,19 @@ export class DrawLineMode extends AbstractMode {
       }
 
       editor.perform(
-        actionMoveNode(drawNode.id, loc),       // Finalize position of draw node at `loc`
-        actionAddMidpoint(midpoint, drawNode)   // Add draw node as a midpoint on target edge
+        actionMoveNode(drawNode!.id, loc),       // Finalize position of draw node at `loc`
+        actionAddMidpoint(midpoint, drawNode!)   // Add draw node as a midpoint on target edge
       );
 
       // If the line has enough segments, commit the work in progress so we can undo/redo to it.
       const annotation = this._getAnnotation();
       if (annotation) {
         editor.commit({ annotation: annotation, selectedIDs: [drawWay.id] });
-        this._takeSnapshot(firstNode.id, drawNode.id);
+        this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
       // Replace draw node
-      this.lastNodeID = drawNode.id;
+      this.lastNodeID = drawNode!.id;
       this._addDrawNode(loc);
 
 
@@ -605,23 +645,23 @@ export class DrawLineMode extends AbstractMode {
    * _clickNode
    * Clicked on a target node, include that node in the line we are drawing.
    */
-  _clickNode(loc, targetNode) {
+  private _clickNode(loc: Vec2, targetNode: OsmNode): void {
     const EPSILON = 1e-6;
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
 
-    let graph = editor.staging.graph;
-    let drawWay = this.drawWayID && graph.hasEntity(this.drawWayID);
-    let drawNode = this.drawNodeID && graph.hasEntity(this.drawNodeID);
-    let lastNode = this.lastNodeID && graph.hasEntity(this.lastNodeID);
-    let firstNode = this.firstNodeID && graph.hasEntity(this.firstNodeID);
+    const graph = editor.staging.graph;
+    let drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) as OsmWay | undefined : undefined;
+    let drawNode = this.drawNodeID ? graph.hasEntity(this.drawNodeID) as OsmNode | undefined : undefined;
+    const lastNode = this.lastNodeID ? graph.hasEntity(this.lastNodeID) as OsmNode | undefined : undefined;
+    const firstNode = this.firstNodeID ? graph.hasEntity(this.firstNodeID) as OsmNode | undefined : undefined;
 
     // Extend line by reusing target node as a vertex...
     // (Note that we don't need to replace the draw node in this scenario)
     if (drawWay) {
 
       // Target node is the last node - finish the line here.
-      if (targetNode.id === lastNode.id || vecEqual(loc, lastNode.loc, EPSILON)) {
+      if (targetNode.id === lastNode!.id || vecEqual(loc, lastNode!.loc!, EPSILON)) {
         this._finish();
         return;
       }
@@ -631,7 +671,7 @@ export class DrawLineMode extends AbstractMode {
       }
 
       editor.perform(
-        this._actionRemoveDrawNode(drawWay, drawNode),                 // Remove the draw node from the draw way
+        this._actionRemoveDrawNode(drawWay, drawNode!),                // Remove the draw node from the draw way
         actionAddVertex(drawWay.id, targetNode.id, this._insertIndex)  // Add target node to draw way
       );
 
@@ -639,11 +679,11 @@ export class DrawLineMode extends AbstractMode {
       const annotation = this._getAnnotation();
       if (annotation) {
         editor.commit({ annotation: annotation, selectedIDs: [drawWay.id] });
-        this._takeSnapshot(firstNode.id, targetNode.id);
+        this._takeSnapshot(firstNode!.id, targetNode.id);
       }
 
       // Target node is the first node - we just closed the line and can finish it.
-      if (targetNode.id === firstNode.id || vecEqual(loc, firstNode.loc, EPSILON)) {
+      if (targetNode.id === firstNode!.id || vecEqual(loc, firstNode!.loc!, EPSILON)) {
         this._finish();
         return;
 
@@ -651,8 +691,8 @@ export class DrawLineMode extends AbstractMode {
       } else {
         this.lastNodeID = targetNode.id;
         editor.perform(
-          actionAddEntity(drawNode),
-          actionAddVertex(drawWay.id, drawNode.id, this._insertIndex)
+          actionAddEntity(drawNode!),
+          actionAddVertex(drawWay.id, drawNode!.id, this._insertIndex)
         );
       }
 
@@ -683,28 +723,38 @@ export class DrawLineMode extends AbstractMode {
 
   /**
    * _actionRemoveDrawNode
+   * Creates an action that removes the draw node from the draw way.
+   * This is used when we want to reuse an existing node as a vertex.
+   * @param  drawWay - The way being drawn
+   * @param  drawNode - The temporary draw node to remove
+   * @return An action function that modifies the graph
    */
-  _actionRemoveDrawNode(drawWay, drawNode) {
-    return (graph) => {
-      return graph.replace(graph.entity(drawWay.id).removeNode(drawNode.id)).remove(drawNode);
+  private _actionRemoveDrawNode(drawWay: OsmWay, drawNode: OsmNode): Action {
+    return (graph: Graph): Graph => {
+      const way = graph.entity(drawWay.id) as OsmWay;
+      return graph.replace(way.removeNode(drawNode.id)).remove(drawNode);
     };
   }
 
 
   /**
    * _addDrawNode
+   * Creates a new draw node and adds it to the draw way.
+   * The draw node follows the pointer as the user moves it.
+   * @param  loc - Optional location for the node; defaults to current mouse location
+   * @return The newly created draw node
    */
-  _addDrawNode(loc) {
+  private _addDrawNode(loc?: Vec2): OsmNode {
     const context = this.context;
-    const editor = context.systems.editor;
-    const map = context.systems.map;
+    const editor = context.systems.editor!;
+    const map = context.systems.map!;
 
     const drawNode = new OsmNode(context, { loc: loc ?? map.mouseLoc() });
     this.drawNodeID = drawNode.id;
 
     editor.perform(
       actionAddEntity(drawNode),                                        // Create new draw node
-      actionAddVertex(this.drawWayID, drawNode.id, this._insertIndex)   // Add new draw node to draw way
+      actionAddVertex(this.drawWayID!, drawNode.id, this._insertIndex)  // Add new draw node to draw way
     );
 
     return drawNode;
@@ -716,11 +766,11 @@ export class DrawLineMode extends AbstractMode {
    * Done drawing, select the draw way or return to browse mode.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  _finish() {
+  private _finish(): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    const drawWay = this.drawWayID && graph.hasEntity(this.drawWayID);
+    const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) : undefined;
 
     if (drawWay) {
       if (DEBUG) {
@@ -739,7 +789,7 @@ export class DrawLineMode extends AbstractMode {
    * Cancel all drawing and return to browse mode.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  _cancel() {
+  private _cancel(): void {
     if (DEBUG) {
       console.log(`DrawLineMode: _cancel`);  // eslint-disable-line no-console
     }
@@ -756,13 +806,13 @@ export class DrawLineMode extends AbstractMode {
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same line.
    */
-  _takeSnapshot(firstNodeID, lastNodeID) {
+  private _takeSnapshot(firstNodeID: EntityID, lastNodeID: EntityID): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
     const graph = editor.stable.graph;
 
-    const snapshot = {
-      drawWayID:   this.drawWayID,
+    const snapshot: DrawLineSnapshot = {
+      drawWayID:   this.drawWayID!,
       insertIndex: this._insertIndex,
       firstNodeID: firstNodeID,
       lastNodeID:  lastNodeID
@@ -779,9 +829,9 @@ export class DrawLineMode extends AbstractMode {
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same line.
    */
-  _restoreSnapshot() {
+  private _restoreSnapshot(): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
     const graph = editor.stable.graph;
     const snapshot = this._snapshots.get(graph);
 
@@ -809,15 +859,16 @@ export class DrawLineMode extends AbstractMode {
    * _hover
    * Changes the cursor styling based on what geometry is hovered
    */
-  _hover(eventData) {
+  private _hover(eventData: EventData): void {
     const context = this.context;
-    const editor = context.systems.editor;
-    const graph = editor.staging.graph;
-    const eventManager = context.systems.gfx.eventManager;
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
 
-    const target = eventData.target;
-    const datum = target?.data;
-    const entity = datum && graph.hasEntity(datum.id);
+    const graph = editor.staging.graph;
+    const eventManager = gfx.eventManager!;
+
+    const dataID = eventData.target?.dataID;
+    const entity = dataID ? graph.hasEntity(dataID) : undefined;
     const geom = entity?.geometry(graph) ?? 'unknown';
 
     switch (geom) {

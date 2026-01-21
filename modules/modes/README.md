@@ -10,19 +10,19 @@ All modes extend `AbstractMode` and manage the editing state for a particular ta
 
 | File | Description |
 |------|-------------|
-| `AbstractMode.js` | Base class for all modes with enter/exit lifecycle |
-| `AddNoteMode.js` | Adding a new OSM note |
-| `AddPointMode.js` | Adding a new point feature |
-| `BrowseMode.js` | Default browsing mode (no selection) |
-| `DragNodeMode.js` | Dragging a node to a new position |
-| `DragNoteMode.js` | Dragging an OSM note |
-| `DrawAreaMode.js` | Drawing a new area (polygon) |
-| `DrawLineMode.js` | Drawing a new line (way) |
-| `MoveMode.js` | Moving selected features |
-| `RotateMode.js` | Rotating selected features |
-| `SaveMode.js` | Saving/uploading changes to OSM |
-| `SelectMode.js` | Features are selected (base class) |
-| `SelectOsmMode.js` | OSM features are selected |
+| `AbstractMode.ts` | Base class for all modes with enter/exit lifecycle |
+| `AddNoteMode.ts` | Adding a new OSM note |
+| `AddPointMode.ts` | Adding a new point feature |
+| `BrowseMode.ts` | Default browsing mode (no selection) |
+| `DragNodeMode.ts` | Dragging a node to a new position |
+| `DragNoteMode.ts` | Dragging an OSM note |
+| `DrawAreaMode.ts` | Drawing a new area (polygon) |
+| `DrawLineMode.ts` | Drawing a new line (way) |
+| `MoveMode.ts` | Moving selected features |
+| `RotateMode.ts` | Rotating selected features |
+| `SaveMode.ts` | Saving/uploading changes to OSM |
+| `SelectMode.ts` | Features are selected (base class) |
+| `SelectOsmMode.ts` | OSM features are selected |
 
 ## Properties
 

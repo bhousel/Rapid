@@ -1,12 +1,16 @@
 import { select as d3_select } from 'd3-selection';
 
-import { AbstractMode } from './AbstractMode.js';
+import { AbstractMode } from './AbstractMode.ts';
 import { uiCommit } from '../ui/commit.js';
 import { uiConfirm } from '../ui/confirm.js';
 import { uiConflicts } from '../ui/conflicts.js';
 import { uiLoading } from '../ui/loading.js';
 import { uiSuccess } from '../ui/success.js';
 import { utilKeybinding } from '../util/index.ts';
+
+import type { Context } from '../Context.ts';
+import type { D3Selection, D3EnterSelection } from 'd3-selection';
+import type { Keybinding } from '../util/keybinding.ts';
 
 const DEBUG = false;
 
@@ -16,12 +20,26 @@ const DEBUG = false;
  * In this mode, the user is ready to upload their changes
  */
 export class SaveMode extends AbstractMode {
+  /** Keybinding handler for this mode */
+  private _keybinding: Keybinding;
+  /** Current location string for success message */
+  private _location: string | null;
+  /** UI component for conflicts */
+  private _uiConflicts: any;
+  /** UI component for commit */
+  private _uiCommit: any;
+  /** UI component for success message */
+  private _uiSuccess: any;
+  /** UI component for save loading */
+  private _saveLoading: any;
+  /** Whether the save was successful */
+  private _wasSuccessfulSave: boolean;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'save';
 
@@ -44,8 +62,9 @@ export class SaveMode extends AbstractMode {
 
     this._location = null;
     this._uiConflicts = null;
-    this._uiLoading = null;
+    this._uiCommit = null;
     this._uiSuccess = null;
+    this._saveLoading = null;
     this._wasSuccessfulSave = false;
   }
 
@@ -53,13 +72,14 @@ export class SaveMode extends AbstractMode {
   /**
    * enter
    * Enters the mode.
-   * @return  {boolean}  `true` if mode could be entered, `false` it not
+   * @return  `true` if mode could be entered, `false` it not
    */
-  enter() {
+  enter(): boolean {
     const context = this.context;
-    const osm = context.services.osm;
-    const uploader = context.systems.uploader;
-    const Sidebar = context.systems.ui.Sidebar;
+    const osm = context.services.osm as any;
+    const ui = context.systems.ui!;
+    const uploader = context.systems.uploader!;
+    const Sidebar = ui.Sidebar;
 
     if (!osm) return false;  // can't enter save mode
 
@@ -73,13 +93,13 @@ export class SaveMode extends AbstractMode {
     this._active = true;
     this._wasSuccessfulSave = false;
 
-    this._uiCommit = uiCommit(context)
+    this._uiCommit = (uiCommit(context) as any)
       .on('cancel', this._cancel);
 
     if (osm.authenticated()) {
       Sidebar.show(this._uiCommit);
     } else {
-      osm.authenticate(err => {
+      osm.authenticate((err: Error | null) => {
         if (err) {
           this._cancel();
         } else {
@@ -111,8 +131,10 @@ export class SaveMode extends AbstractMode {
 
   /**
    * exit
+   * Exits the mode, cleaning up event listeners and UI state.
+   * If save was successful, leaves the success message in the sidebar.
    */
-  exit() {
+  exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -121,8 +143,9 @@ export class SaveMode extends AbstractMode {
     }
 
     const context = this.context;
-    const uploader = context.systems.uploader;
-    const Sidebar = context.systems.ui.Sidebar;
+    const ui = context.systems.ui!;
+    const uploader = context.systems.uploader!;
+    const Sidebar = ui.Sidebar;
 
     this._uiCommit.on('cancel', null);
     this._uiCommit = null;
@@ -152,152 +175,170 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * cancel handler
+   * _cancel
+   * Return to browse mode, canceling the save operation.
    */
-  _cancel() {
+  private _cancel(): void {
     this.context.enter('browse');
   }
 
 
   /**
-   * _progressChanged handler
+   * _progressChanged
+   * Handler called when upload progress changes.
+   * Updates the loading modal to show conflict resolution progress.
+   * @param  num - Number of conflicts resolved so far
+   * @param  total - Total number of conflicts to resolve
    */
-  _progressChanged(num, total) {
+  private _progressChanged(num: number, total: number): void {
     const context = this.context;
-    const l10n = context.systems.l10n;
+    const l10n = context.systems.l10n!;
 
-    const modal = context.container().select('.loading-modal .modal-section');
-    const progress = modal.selectAll('.progress')
+    const $modal: D3Selection = context.container().select('.loading-modal .modal-section');
+    const $progress: D3Selection = $modal.selectAll('.progress')
       .data([0]);
 
     // enter/update
-    progress.enter()
+    $progress.enter()
       .append('div')
       .attr('class', 'progress')
-      .merge(progress)
+      .merge($progress)
       .text(l10n.t('save.conflict_progress', { num: num, total: total }));
   }
 
 
   /**
-   * resultConflicts handler
+   * _resultConflicts
+   * Handler called when upload results in conflicts with server data.
+   * Displays the conflicts UI so the user can resolve them.
+   * @param  conflicts - Array of conflict objects describing the conflicts
+   * @param  origChanges - The original changeset that caused the conflicts
    */
-  _resultConflicts(conflicts, origChanges) {
+  private _resultConflicts(conflicts: any[], origChanges: any): void {
     const context = this.context;
-    const uploader = context.systems.uploader;
+    const uploader = context.systems.uploader!;
 
-    const selection = context.container().select('.sidebar')
+    const $selection: D3Selection = context.container().select('.sidebar')
       .append('div')
       .attr('class','sidebar-component');
 
-    const mainContent = context.container().selectAll('.main-content');
+    const $mainContent: D3Selection = context.container().selectAll('.main-content');
 
-    mainContent
+    $mainContent
       .classed('active', true)
       .classed('inactive', false);
 
-    this._uiConflicts = uiConflicts(context)
+    this._uiConflicts = (uiConflicts(context) as any)
       .conflictList(conflicts)
       .origChanges(origChanges)
       .on('cancel', () => {
-        mainContent
+        $mainContent
           .classed('active', false)
           .classed('inactive', true);
-        selection.remove();
+        $selection.remove();
         this._keybindingOn();
         uploader.cancelConflictResolution();
       })
       .on('save', () => {
-        mainContent
+        $mainContent
           .classed('active', false)
           .classed('inactive', true);
-        selection.remove();
+        $selection.remove();
         uploader.processResolvedConflicts();
       });
 
-    selection.call(this._uiConflicts);
+    $selection.call(this._uiConflicts);
   }
 
 
   /**
-   * resultErrors handler
+   * _resultErrors
+   * Handler called when upload results in errors.
+   * Displays an error dialog to the user.
+   * @param  errors - Array of error objects with msg and details properties
    */
-  _resultErrors(errors) {
+  private _resultErrors(errors: any[]): void {
     const context = this.context;
-    const l10n = context.systems.l10n;
+    const l10n = context.systems.l10n!;
 
     this._keybindingOn();
 
-    const selection = uiConfirm(context, context.container());
-    selection
+    const $selection = uiConfirm(context, context.container());
+    $selection
       .select('.modal-section.header')
       .append('h3')
       .text(l10n.t('save.error'));
 
-    this._addErrors(selection, errors);
-    selection.okButton();
+    this._addErrors($selection, errors);
+    $selection.okButton();
   }
 
 
   /**
    * _addErrors
+   * Helper to render error messages into a D3 selection.
+   * Creates expandable error items with details.
+   * @param  $selection - The D3 selection to render errors into
+   * @param  data - Array of error objects with msg and details properties
    */
-  _addErrors(selection, data) {
+  private _addErrors($selection: D3Selection, data: any[]): void {
     const context = this.context;
-    const l10n = context.systems.l10n;
+    const l10n = context.systems.l10n!;
 
-    const message = selection
+    const $message: D3Selection = $selection
       .select('.modal-section.message-text');
 
-    const items = message
+    const $items: D3Selection = $message
       .selectAll('.error-container')
       .data(data);
 
-    const enter = items.enter()
+    const $$items: D3EnterSelection = $items.enter()
       .append('div')
       .attr('class', 'error-container');
 
-    enter
+    $$items
       .append('a')
       .attr('class', 'error-description')
       .attr('href', '#')
       .classed('hide-toggle', true)
-      .text(d => d.msg || l10n.t('save.unknown_error_details'))
-      .on('click', function(d3_event) {
+      .text(d => d?.msg || l10n.t('save.unknown_error_details'))
+      .on('click', function(this: Element, d3_event: Event) {
         d3_event.preventDefault();
 
-        const error = d3_select(this);
-        const detail = d3_select(this.nextElementSibling);
-        const exp = error.classed('expanded');
+        const $error: D3Selection = d3_select(this);
+        const $detail: D3Selection = d3_select((this as HTMLElement).nextElementSibling);
+        const exp = $error.classed('expanded');
 
-        detail.style('display', exp ? 'none' : 'block');
-        error.classed('expanded', !exp);
+        $detail.style('display', exp ? 'none' : 'block');
+        $error.classed('expanded', !exp);
       });
 
-    const details = enter
+    const $$details: D3EnterSelection = $$items
       .append('div')
       .attr('class', 'error-detail-container')
       .style('display', 'none');
 
-    details
+    $$details
       .append('ul')
       .attr('class', 'error-detail-list')
       .selectAll('li')
-      .data(d => d.details || [])
+      .data(d => d?.details || [])
       .enter()
       .append('li')
       .attr('class', 'error-detail-item')
       .text(d => d);
 
-    items.exit()
+    $items.exit()
       .remove();
   }
 
 
   /**
-   * resultNoChanges handler
+   * _resultNoChanges
+   * Handler called when there are no changes to upload.
+   * Resets the editor and returns to browse mode.
    */
-  _resultNoChanges() {
+  private _resultNoChanges(): void {
     const context = this.context;
     context.resetAsync()
       .then(() => context.enter('browse'));
@@ -305,11 +346,15 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _resultSuccess handler
+   * _resultSuccess
+   * Handler called when upload succeeds.
+   * Shows the success screen and resets after a delay.
+   * @param  changeset - The changeset object that was successfully uploaded
    */
-  _resultSuccess(changeset) {
+  private _resultSuccess(changeset: any): void {
     const context = this.context;
-    const Sidebar = context.systems.ui.Sidebar;
+    const ui = context.systems.ui!;
+    const Sidebar = ui.Sidebar;
 
     const successContent = this._uiSuccess
       .changeset(changeset)
@@ -320,7 +365,7 @@ export class SaveMode extends AbstractMode {
     Sidebar.show(successContent);
 
     // Add delay before resetting to allow for postgres replication iD#1646 iD#2678
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       context.resetAsync()
         .then(() => context.enter('browse'));
     }, 2500);
@@ -328,21 +373,24 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _saveStarted handler
+   * _saveStarted
+   * Handler called when save operation begins.
    * At this point, a changeset is inflight and we need to block the UI
+   * by disabling keybindings and showing a loading indicator.
    */
-  _saveStarted() {
+  private _saveStarted(): void {
     this._keybindingOff();
     this._showLoading();
   }
 
 
   /**
-   * _saveEnded handler
-   * At this point, the changeset is no longer inflight and we can unblock the UI
-   * (It may occur after an error condition.)
+   * _saveEnded
+   * Handler called when save operation ends (success or failure).
+   * At this point, the changeset is no longer inflight and we can unblock the UI.
+   * Note: This may occur after an error condition.
    */
-  _saveEnded() {
+  private _saveEnded(): void {
     this._keybindingOn();
     this._hideLoading();
   }
@@ -352,13 +400,16 @@ export class SaveMode extends AbstractMode {
    * _showLoading
    * Block the UI by adding a spinner
    */
-  _showLoading() {
+  private _showLoading(): void {
     if (this._saveLoading) return;
 
     const context = this.context;
-    const l10n = context.systems.l10n;
+    const l10n = context.systems.l10n!;
 
-    this._saveLoading = uiLoading(context).blocking(true).message(l10n.t('save.uploading'));
+    const loading = uiLoading(context);
+    loading.blocking(true);
+    loading.message(l10n.t('save.uploading'));
+    this._saveLoading = loading;
     context.container().call(this._saveLoading);  // block input during upload
   }
 
@@ -367,7 +418,7 @@ export class SaveMode extends AbstractMode {
    * _hideLoading
    * Unlock the UI by removing the spinner
    */
-  _hideLoading() {
+  private _hideLoading(): void {
     if (!this._saveLoading) return;
 
     this._saveLoading.close();
@@ -377,34 +428,38 @@ export class SaveMode extends AbstractMode {
 
   /**
    * _keybindingOn
+   * Enable keyboard shortcuts for the save mode (Escape to cancel).
    */
-  _keybindingOn() {
+  private _keybindingOn(): void {
     d3_select(document).call(this._keybinding.on('⎋', this._cancel, true));
   }
 
 
   /**
    * _keybindingOff
+   * Disable keyboard shortcuts for the save mode.
    */
-  _keybindingOff() {
+  private _keybindingOff(): void {
     d3_select(document).call(this._keybinding.unbind);
   }
 
 
-  // Reverse geocode current map location so we can display a message on
-  // the success screen like "Thank you for editing around place, region."
-  _prepareForSuccess() {
+  /**
+   * Reverse geocode current map location so we can display a message on
+   * the success screen like "Thank you for editing around place, region."
+   */
+  private _prepareForSuccess(): void {
     this._uiSuccess = uiSuccess(this.context);
     this._location = null;
 
     const context = this.context;
-    const l10n = context.systems.l10n;
+    const l10n = context.systems.l10n!;
     const loc = context.viewport.centerLoc();
 
-    const nominatim = context.services.nominatim;
+    const nominatim = context.services.nominatim as any;
     if (!nominatim) return;
 
-    nominatim.reverse(loc, (err, result) => {
+    nominatim.reverse(loc, (err: Error | null, result: any) => {
       if (err || !result || !result.address) return;
 
       const addr = result.address;

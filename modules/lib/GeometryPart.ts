@@ -157,7 +157,7 @@ export class GeometryPart {
 
   /**
    * updateWorld
-   * This projects original source data in WGS84 coordinates.
+   * This projects original source data from WGS84 coordinates to World coordinates
    */
   updateWorld(): void {
     if (!this.orig || this.world) return;  // can't do it, or done already

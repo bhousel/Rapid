@@ -30,6 +30,34 @@ Rapid is an AI-enhanced editor for OpenStreetMap, built with JavaScript/TypeScri
 - This shows changes in VS Code's diff view for easier review
 - Avoid using `cat` with heredoc or other terminal-based file writing
 
+### Function Structure and Dependencies
+- **Group system/service access at the top of functions** - this makes it easy to scan what a function depends on and understand coupling
+- Separate dependency access from logic with a blank line
+- Example:
+  ```typescript
+  enter(options: SomeOptions = {}): boolean {
+    // Dependencies first
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const filters = context.systems.filters!;
+    const locations = context.systems.locations;  // optional system
+    const ui = context.systems.ui;                // may not exist in CLI
+
+    // Then logic
+    const selection = options.selection ?? {};
+    // ...
+  }
+  ```
+- This pattern supports future goals like a CLI version of Rapid that won't have a UI system
+
+### Optional Systems
+- Some systems are optional and may not exist in all deployment contexts
+- Use optional chaining (`?.`) for systems that might not be present:
+  - `locations` - LocationManager may not be configured
+  - `ui` - UiSystem won't exist in a future CLI build
+- Example: `if (loc && locations?.isBlockedAt(loc)) continue;`
+- This keeps code working even when optional systems are absent
+
 ## TypeScript Patterns
 
 ### File Conversion
@@ -376,7 +404,7 @@ Track TypeScript conversion progress here:
 | `modules/core/` | ✅ Complete | All files converted |
 | `modules/behaviors/` | ✅ Complete | All files converted |
 | `modules/actions/` | ✅ Complete | All files converted |
-| `modules/modes/` | ❌ Not started | |
+| `modules/modes/` | ✅ Complete | All files converted |
 | `modules/operations/` | ❌ Not started | |
 | `modules/services/` | ❌ Not started | |
 | `modules/ui/` | ❌ Not started | |

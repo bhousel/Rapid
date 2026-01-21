@@ -496,7 +496,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
       surface.focus();
     }
 
-    for (const operation of operations) {
+    for (const operation of operations as any[]) {
       if (typeof operation.point === 'function') {
         operation.point(anchorPoint);  // let the operation know where the menu is
       }

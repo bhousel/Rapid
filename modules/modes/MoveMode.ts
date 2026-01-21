@@ -1,7 +1,21 @@
 import { vecSubtract } from '@rapid-sdk/math';
 
-import { AbstractMode } from './AbstractMode.js';
-import { actionMove } from '../actions/move.js';
+import { AbstractMode } from './AbstractMode.ts';
+import { actionMove } from '../actions/move.ts';
+
+import type { Context } from '../Context.ts';
+import type { MoveCache } from '../actions/move.ts';
+import type { OsmNode } from '../data/OsmNode.ts';
+import type { Vec2 } from '@rapid-sdk/math';
+
+
+/**
+ * Options for entering MoveMode
+ */
+export interface MoveModeOptions {
+  /** Selection object where keys are layerIDs and values are arrays of dataIDs */
+  selection?: Record<string, EntityID[]>;
+}
 
 
 /**
@@ -9,18 +23,24 @@ import { actionMove } from '../actions/move.js';
  * In this mode, we are moving one or more map features
  */
 export class MoveMode extends AbstractMode {
+  /** Entity IDs being moved */
+  private _entityIDs: EntityID[];
+  /** Starting location of the move operation */
+  private _startLoc: Vec2 | null;
+  /** Cache used by the move action */
+  private _movementCache: Partial<MoveCache> | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'move';
 
     this._entityIDs = [];
     this._startLoc = null;
-    this._movementCache = null;  // used by the move action
+    this._movementCache = null;
 
     // Make sure the event handlers have `this` bound correctly
     this._cancel = this._cancel.bind(this);
@@ -33,23 +53,21 @@ export class MoveMode extends AbstractMode {
   /**
    * enter
    * Enters the mode.
-   * @param  {Object?}  options - Optional `Object` of options passed to the new mode
-   * @param  {Object}   options.selection - An object where the keys are layerIDs
-   *    and the values are Arrays of dataIDs:  Example:  `{ 'osm': ['w1', 'w2', 'w3'] }`
-   * @return {boolean}  `true` if the mode can be entered, `false` if not
+   * @param  options - Optional options object
+   * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options = {}) {
+  enter(options: MoveModeOptions = {}): boolean {
     const context = this.context;
-    const editor = context.systems.editor;
-    const gfx = context.systems.gfx;
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
     const graph = editor.staging.graph;
-    const filters = context.systems.filters;
+    const filters = context.systems.filters!;
     const locations = context.systems.locations;
-    const map = context.systems.map;
+    const map = context.systems.map!;
     const eventManager = gfx.eventManager;
 
     const selection = options.selection ?? {};
-    let entityIDs = selection.osm ?? [];
+    const entityIDs = selection.osm ?? [];
 
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
@@ -58,7 +76,10 @@ export class MoveMode extends AbstractMode {
     for (const entityID of entityIDs) {
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;   // not in the osm graph
-      if (entity.type === 'node' && locations.isBlockedAt(entity.loc)) continue;  // editing is blocked
+      if (entity.type === 'node') {
+        const loc = (entity as OsmNode).loc;
+        if (loc && locations?.isBlockedAt(loc)) continue;  // editing is blocked
+      }
 
       this._selectedData.set(entityID, entity);
     }
@@ -70,12 +91,12 @@ export class MoveMode extends AbstractMode {
 
     filters.forceVisible(this._entityIDs);
     context.enableBehaviors(['mapInteraction', 'mapNudge']);
-    context.behaviors.mapNudge.allow();
+    context.behaviors.mapNudge!.allow();
 
     this._startLoc = map.mouseLoc();
     this._movementCache = {};
 
-    eventManager
+    eventManager!
       .on('click', this._finish)
       .on('keydown', this._keydown)
       .on('pointercancel', this._cancel)
@@ -87,8 +108,10 @@ export class MoveMode extends AbstractMode {
 
   /**
    * exit
+   * Exits the mode, committing any pending move operation.
+   * Removes event listeners and clears state.
    */
-  exit() {
+  exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -96,10 +119,10 @@ export class MoveMode extends AbstractMode {
     this._movementCache = null;
 
     const context = this.context;
-    const editor = context.systems.editor;
-    const filters = context.systems.filters;
-    const l10n = context.systems.l10n;
-    const eventManager = context.systems.gfx.eventManager;
+    const editor = context.systems.editor!;
+    const filters = context.systems.filters!;
+    const l10n = context.systems.l10n!;
+    const eventManager = context.systems.gfx!.eventManager!;
 
     filters.forceVisible([]);
 
@@ -111,7 +134,7 @@ export class MoveMode extends AbstractMode {
 
     // If there is work in progress, finalize it.
     if (editor.hasWorkInProgress) {
-      let annotation;
+      let annotation: string;
       if (this._entityIDs.length === 1) {
         const graph = editor.staging.graph;
         const entity = graph.entity(this._entityIDs[0]);
@@ -131,9 +154,10 @@ export class MoveMode extends AbstractMode {
   /**
    * _keydown
    * Handler for keydown events on the window.
-   * @param  `e`  A DOM KeyboardEvent
+   * Handles Enter to finish, Escape/Delete to cancel, and R to switch to rotate mode.
+   * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e) {
+  private _keydown(e: KeyboardEvent): void {
     if (['Enter'].includes(e.key)) {
       e.preventDefault();
       this._finish();
@@ -152,26 +176,26 @@ export class MoveMode extends AbstractMode {
   /**
    * _pointermove
    * Handler for pointermove events.
-   * @param  `e`  A Pixi FederatedPointerEvent
+   * Calculates the delta from the start location and moves all selected entities.
    */
-  _pointermove() {
+  private _pointermove(): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
     const locations = context.systems.locations;
-    const map = context.systems.map;
+    const map = context.systems.map!;
 
     const currLoc = map.mouseLoc();
-    if (locations.isBlockedAt(currLoc)) {  // editing is blocked here
+    if (locations?.isBlockedAt(currLoc)) {  // editing is blocked here
       this._cancel();
       return;
     }
 
-    const startPoint = context.viewport.project(this._startLoc);
+    const startPoint = context.viewport.project(this._startLoc!);
     const currPoint = context.viewport.project(currLoc);
     const delta = vecSubtract(currPoint, startPoint);
 
     editor.revert();  // moves are relative to the start location, so revert before applying movement
-    editor.perform(actionMove(this._entityIDs, delta, context.viewport, this._movementCache));
+    editor.perform(actionMove(this._entityIDs, delta, context.viewport, this._movementCache!));
     const graph = editor.staging.graph;  // after move
 
     // Update selected/active collections to contain the moved entities
@@ -186,7 +210,7 @@ export class MoveMode extends AbstractMode {
    * _finish
    * Return to select mode - `exit()` will finalize the work in progress.
    */
-  _finish() {
+  private _finish(): void {
     this.context.enter('select-osm', { selection: { osm: this._entityIDs }} );
   }
 
@@ -195,9 +219,9 @@ export class MoveMode extends AbstractMode {
    * _cancel
    * Return to select mode without doing anything
    */
-  _cancel() {
+  private _cancel(): void {
     const context = this.context;
-    const editor = context.systems.editor;
+    const editor = context.systems.editor!;
 
     editor.revert();
     context.enter('select-osm', { selection: { osm: this._entityIDs }} );

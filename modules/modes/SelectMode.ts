@@ -1,7 +1,7 @@
 import { Extent } from '@rapid-sdk/math';
 
-import { AbstractMode } from './AbstractMode.js';
-import { GeoJSON, Marker } from '../data/index.ts';
+import { AbstractMode } from './AbstractMode.ts';
+import { AbstractData, GeoJSON, Marker } from '../data/index.ts';
 import { uiOsmoseEditor } from '../ui/osmose_editor.js';
 import { uiDataEditor } from '../ui/data_editor.js';
 import { uiDetectionInspector } from '../ui/detection_inspector.js';
@@ -9,7 +9,18 @@ import { uiKeepRightEditor } from '../ui/keepRight_editor.js';
 import { uiNoteEditor } from '../ui/note_editor.js';
 import { uiMapRouletteEditor } from '../ui/maproulette_editor.js';
 
+import type { Context } from '../Context.ts';
+
 const DEBUG = false;
+
+
+/**
+ * Options for entering SelectMode
+ */
+export interface SelectModeOptions {
+  /** A Map of datumID -> datum for selected items */
+  selection?: Map<DataID, AbstractData>;
+}
 
 
 /**
@@ -20,12 +31,14 @@ const DEBUG = false;
  * - We also can set up the "operations" allowed (right click edit menu)
  */
 export class SelectMode extends AbstractMode {
+  /** The total extent of selected features */
+  extent: Extent | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'select';
 
@@ -36,10 +49,10 @@ export class SelectMode extends AbstractMode {
   /**
    * enter
    * Expects a `selection` property in the options argument as a `Map<datumID, datum>`
-   * @param   {Object}   options -  Optional `Object` of options passed to the mode
-   * @return  {boolean}  `true` if mode could be entered, `false` it not
+   * @param  options - Optional options object
+   * @return `true` if mode could be entered, `false` it not
    */
-  enter(options = {}) {
+  enter(options: SelectModeOptions = {}): boolean {
     const selection = options.selection;
     if (!(selection instanceof Map)) return false;
     if (!selection.size) return false;
@@ -53,30 +66,19 @@ export class SelectMode extends AbstractMode {
     this._active = true;
 
     const context = this.context;
-    const gfx = context.systems.gfx;
-    const photos = context.systems.photos;
-    const scene = gfx.scene;
-    const Sidebar = context.systems.ui.Sidebar;
+    const gfx = context.systems.gfx!;
+    const photos = context.systems.photos!;
+    const ui = context.systems.ui;
+    const scene = gfx.scene!;
+    const Sidebar = ui?.Sidebar;
 
     context.enableBehaviors(['hover', 'select', 'drag', 'mapInteraction', 'lasso', 'paste']);
 
     // Compute the total extent of selected items
     this.extent = new Extent();
     for (const datum of selection.values()) {
-      let other;
-
-      if ((datum instanceof GeoJSON || datum instanceof Marker) && datum.extent) {
-        other = datum.extent;
-
-      } else if (datum.props.__fbid__) {  // Rapid feature
-        const service = context.services[datum.props.__service__];
-        if (!service) continue;
-        const graph = service.graph(datum.props.__datasetid__);
-        if (!graph) continue;
-        other = datum.extent(graph);
-      }
-
-      if (other) {
+      const other = datum.extent();
+      if (other instanceof Extent) {
         this.extent.extendSelf(other);
       }
     }
@@ -101,7 +103,7 @@ export class SelectMode extends AbstractMode {
         }
       } else if (datum.props.__fbid__) {      // a Rapid feature
         layerID = 'rapid';
-      } else if (datum.overture) {  // Overture data
+      } else if (datum.props.overture) {      // Overture data
         layerID = 'rapid';
       } else if (datum instanceof GeoJSON) {  // custom data
         layerID = 'custom-data';
@@ -114,62 +116,61 @@ export class SelectMode extends AbstractMode {
 
 
     // What was selected?
-    Sidebar.reset();
+    Sidebar?.reset();
  // The update handlers feel like they should live with the sidebar content components, not here
-    let sidebarContent = null;
+    let sidebarContent: any = null;
     // Selected a note...
     if (datum instanceof Marker && datum.serviceID === 'osm') {
-      sidebarContent = uiNoteEditor(context).note(datum);
+      sidebarContent = (uiNoteEditor as any)(context).note(datum);
       sidebarContent
         .on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
-          const osm = context.services.osm;
+          const osm = context.services.osm as any;
           const note = osm?.getNote(datumID);
           if (!(note instanceof Marker)) return;  // or - go to browse mode
-          Sidebar.show(sidebarContent.note(note));
+          Sidebar?.show(sidebarContent.note(note));
           this._selectedData.set(datumID, note);  // update selectedData after a change happens?
         });
 
     } else if (datum instanceof Marker && datum.serviceID === 'keepright') {
-      sidebarContent = uiKeepRightEditor(context).error(datum);
+      sidebarContent = (uiKeepRightEditor as any)(context).error(datum);
       sidebarContent
         .on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
-          const keepright = context.services.keepright;
+          const keepright = context.services.keepright as any;
           const error = keepright?.getError(datumID);
           if (!(error instanceof Marker)) return;  // or - go to browse mode?
-          Sidebar.show(sidebarContent.error(error));
+          Sidebar?.show(sidebarContent.error(error));
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
 
     } else if (datum instanceof Marker && datum.serviceID === 'osmose') {
-      sidebarContent = uiOsmoseEditor(context).error(datum);
+      sidebarContent = (uiOsmoseEditor as any)(context).error(datum);
       sidebarContent
         .on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
-          const osmose = context.services.osmose;
+          const osmose = context.services.osmose as any;
           const error = osmose?.getError(datumID);
           if (!(error instanceof Marker)) return;  // or - go to browse mode?
-          Sidebar.show(sidebarContent.error(error));
+          Sidebar?.show(sidebarContent.error(error));
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
 
     } else if (datum instanceof Marker && datum.serviceID === 'maproulette') {
-      sidebarContent = uiMapRouletteEditor(context).error(datum);
-      const ui = this.context.systems.ui;
-      ui.MapRouletteMenu.error(datum);
+      sidebarContent = (uiMapRouletteEditor as any)(context).error(datum);
+      (ui as any)?.MapRouletteMenu?.error(datum);
       sidebarContent
         .on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
-          const maproulette = context.services.maproulette;
+          const maproulette = context.services.maproulette as any;
           const error = maproulette?.getError(datumID);
           if (!(error instanceof Marker)) return;  // or - go to browse mode?
-          Sidebar.show(sidebarContent.error(error));
+          Sidebar?.show(sidebarContent.error(error));
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
 
     } else if (datum instanceof Marker && datum.type === 'detection') {
-      sidebarContent = uiDetectionInspector(context).datum(datum);
+      sidebarContent = (uiDetectionInspector as any)(context).datum(datum);
       const serviceID = datum.serviceID;
       const type = (datum.props.object_type === 'traffic_sign') ? 'signs' : 'detections';
       const layerID = `${serviceID}-${type}`;    // e.g. 'mapillary-signs' or 'mapillary-detections'
@@ -177,17 +178,21 @@ export class SelectMode extends AbstractMode {
 
     // Selected custom data (e.g. gpx track)...
     } else if (datum instanceof GeoJSON) {
-      sidebarContent = uiDataEditor(context).datum(datum);
+      sidebarContent = (uiDataEditor as any)(context).datum(datum);
 
     // Selected Overture feature...
-    } else if (datum.overture) {
-      Sidebar.OvertureInspector.datum = datum;
-      sidebarContent = Sidebar.OvertureInspector.render;
+    } else if (datum.props.overture) {
+      if (Sidebar) {
+        Sidebar.OvertureInspector.datum = datum;
+        sidebarContent = Sidebar.OvertureInspector.render;
+      }
 
     // Selected Rapid feature...
-    } else if (datum.props.__fbid__) {
-      Sidebar.RapidInspector.datum = datum;
-      sidebarContent = Sidebar.RapidInspector.render;
+    } else if (datum.props?.__fbid__) {
+      if (Sidebar) {
+        Sidebar.RapidInspector.datum = datum;
+        sidebarContent = Sidebar.RapidInspector.render;
+      }
     }
 
     // Todo: build a sidebar UI for:
@@ -196,7 +201,7 @@ export class SelectMode extends AbstractMode {
 
     // setup the sidebar
     if (sidebarContent) {
-      Sidebar.show(sidebarContent); //.newNote(_newFeature));
+      Sidebar?.show(sidebarContent); //.newNote(_newFeature));
       // Attempt to expand the sidebar, avoid obscuring the selected thing if we can..
       // For this to work the datum must have an extent already
       // Sidebar.expand(Sidebar.intersects(datum.extent()));
@@ -208,15 +213,18 @@ export class SelectMode extends AbstractMode {
 
   /**
    * exit
+   * Exits the mode, clearing selection state and hiding sidebar.
    */
-  exit() {
+  exit(): void {
     if (!this._active) return;
     this._active = false;
 
     const context = this.context;
-    const photos = context.systems.photos;
-    const scene = context.systems.gfx.scene;
-    const Sidebar = context.systems.ui.Sidebar;
+    const photos = context.systems.photos!;
+    const gfx = context.systems.gfx!;
+    const ui = context.systems.ui!;
+    const scene = gfx.scene!;
+    const Sidebar = ui.Sidebar;
 
     this.extent = null;
 

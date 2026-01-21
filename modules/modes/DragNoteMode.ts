@@ -1,6 +1,17 @@
 import { vecAdd, vecRotate, vecSubtract } from '@rapid-sdk/math';
 
-import { AbstractMode } from './AbstractMode.js';
+import { AbstractMode } from './AbstractMode.ts';
+
+import type { Context } from '../Context.ts';
+import type { EventData } from '../behaviors/AbstractBehavior.ts';
+import type { Marker } from '../data/Marker.ts';
+import type { Vec2 } from '@rapid-sdk/math';
+
+/** Options for entering DragNoteMode */
+interface DragNoteModeOptions {
+  /** The ID of the note to drag */
+  noteID?: DataID;
+}
 
 
 /**
@@ -8,12 +19,19 @@ import { AbstractMode } from './AbstractMode.js';
  *  In this mode, the user has started dragging an OSM Note
  */
 export class DragNoteMode extends AbstractMode {
+  /** The note (Marker) being dragged, or null if not dragging */
+  dragNote: Marker | null;
+
+  /** Starting location of the note before dragging */
+  private _startLoc: Vec2 | null;
+  /** Location where user clicked to grab the note (for drag offset calculation) */
+  private _clickLoc: Vec2 | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'drag-note';
 
@@ -33,18 +51,17 @@ export class DragNoteMode extends AbstractMode {
   /**
    * enter
    * Enters the mode.
-   * @param  {Object?}  options - Optional `Object` of options passed to the new mode
-   * @param  {string}   options.noteID - if set, drag the note with the given id
-   * @return {boolean}  `true` if the mode can be entered, `false` if not
+   * @param  options - Optional object of options passed to the new mode
+   * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options = {}) {
+  enter(options: DragNoteModeOptions = {}): boolean {
     const context = this.context;
-    const osm = context.services.osm;
-    if (!osm) return;
+    const osm = context.services.osm as any;
+    if (!osm) return false;
 
     const noteID = options.noteID;
-    const note = osm.getNote(noteID);
-    if (!note) return;
+    const note = osm.getNote(noteID) as Marker | undefined;
+    if (!note?.loc) return false;
 
     this._active = true;
     this.dragNote = note;
@@ -53,18 +70,18 @@ export class DragNoteMode extends AbstractMode {
 
     // `_clickLoc` is used later to calculate a drag offset,
     // to correct for where "on the pin" the user grabbed the target.
-    const point = context.behaviors.drag.lastDown.coord.map;
+    const point = context.behaviors.drag!.lastDown!.coord.map;
     this._clickLoc = context.viewport.unproject(point);
 
     context.enableBehaviors(['drag', 'mapNudge']);
-    context.behaviors.mapNudge.allow();
+    context.behaviors.mapNudge!.allow();
 
-    context.behaviors.drag
+    context.behaviors.drag!
       .on('move', this._move)
       .on('end', this._end)
       .on('cancel', this._cancel);
 
-    context.behaviors.mapNudge
+    context.behaviors.mapNudge!
       .on('nudge', this._nudge);
 
     return true;
@@ -73,8 +90,9 @@ export class DragNoteMode extends AbstractMode {
 
   /**
    * exit
+   * Exits the mode, clearing state and removing event listeners.
    */
-  exit() {
+  exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -84,12 +102,12 @@ export class DragNoteMode extends AbstractMode {
     this._selectedData.clear();
 
     const context = this.context;
-    context.behaviors.drag
+    context.behaviors.drag!
       .off('move', this._move)
       .off('end', this._end)
       .off('cancel', this._cancel);
 
-    context.behaviors.mapNudge
+    context.behaviors.mapNudge!
       .off('nudge', this._nudge);
   }
 
@@ -97,15 +115,15 @@ export class DragNoteMode extends AbstractMode {
   /**
    * _move
    * Move the dragging node
-   * @param  eventData  `Object` data received from the drag behavior
+   * @param  eventData - Data received from the drag behavior
    */
-  _move(eventData) {
+  private _move(eventData: EventData): void {
     if (!this.dragNote) return;
 
     const context = this.context;
     const locations = context.systems.locations;
     const gfx = context.systems.gfx;
-    const osm = context.services.osm;
+    const osm = context.services.osm as any;
     const viewport = context.viewport;
     const point = eventData.coord.map;
 
@@ -113,13 +131,13 @@ export class DragNoteMode extends AbstractMode {
     // the marker/pin and where the location of the note actually is.
     // We calculate the drag offset each time because it's possible
     // the user may have changed zooms while dragging..
-    const clickCoord = viewport.project(this._clickLoc);
-    const startCoord = viewport.project(this._startLoc);
+    const clickCoord = viewport.project(this._clickLoc!);
+    const startCoord = viewport.project(this._startLoc!);
     const dragOffset = vecSubtract(startCoord, clickCoord);
     const adjustedCoord = vecAdd(point, dragOffset);
     const loc = viewport.unproject(adjustedCoord);
 
-    if (locations.isBlockedAt(loc)) {  // editing is blocked here
+    if (locations?.isBlockedAt(loc)) {  // editing is blocked here
       this._cancel();
       return;
     }
@@ -140,11 +158,11 @@ export class DragNoteMode extends AbstractMode {
    * We want to move the dragging note opposite of the pixels panned to keep it in the same place.
    * @param  nudge - [x,y] amount of map pan in pixels
    */
-  _nudge(nudge) {
-    if (!this.dragNote) return;
+  private _nudge(nudge: Vec2): void {
+    if (!this.dragNote || !this.dragNote.loc) return;
 
     const context = this.context;
-    const osm = context.services.osm;
+    const osm = context.services.osm as any;
     const locations = context.systems.locations;
     const viewport = context.viewport;
     const t = context.viewport.transform;
@@ -156,12 +174,12 @@ export class DragNoteMode extends AbstractMode {
     const destPoint = vecSubtract(currPoint, nudge);
     const loc = viewport.unproject(destPoint);
 
-    if (locations.isBlockedAt(loc)) {  // editing is blocked here
+    if (locations?.isBlockedAt(loc)) {  // editing is blocked here
       this._cancel();
       return;
     }
 
-    this.dragNote = this.dragNote.move(loc);
+    this.dragNote = this.dragNote.update({ loc: loc });
     osm.replaceNote(this.dragNote);
     this._selectedData.set(this.dragNote.id, this.dragNote);
   }
@@ -171,9 +189,8 @@ export class DragNoteMode extends AbstractMode {
    * _end
    * Complete the drag and keep the note selected.
    * Note that `exit()` will be called immediately after this to perform cleanup.
-   * @param  eventData  `Object` data received from the drag behavior
    */
-  _end(eventData) {
+  private _end(): void {
     if (this.dragNote) {
       const selection = new Map().set(this.dragNote.id, this.dragNote);
       this.context.enter('select', { selection: selection });
@@ -188,8 +205,7 @@ export class DragNoteMode extends AbstractMode {
    * Return to browse mode
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  _cancel() {
+  private _cancel(): void {
     this.context.enter('browse');
   }
-
 }

@@ -4,14 +4,16 @@ import { Viewport } from '@rapid-sdk/math';
 import { utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
 import { behaviors } from './behaviors/index.ts';
-import { modes } from './modes/index.js';
+import { modes } from './modes/index.ts';
 import { services } from './services/index.js';
 import { systems } from './core/index.ts';
 
+import type { AbstractMode } from './modes/AbstractMode.ts';
 import type { AssetOrigin } from './core/AssetSystem.ts';
 import type { Behaviors } from './behaviors/types.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from './lib/Graph.ts';
+import type { Modes } from './modes/types.ts';
 import type { Systems } from './core/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from './util/iterable.ts';
@@ -59,19 +61,6 @@ export interface ApiConnection {
   oauth_consumer_key?: string;
   oauth_secret?: string;
   [key: string]: string | undefined;
-}
-
-/**
- * Mode interface - represents an editing mode (browse, select, draw, etc.)
- * Modes are still in JavaScript, so this is a loose interface.
- */
-export interface Mode {
-  id: string;
-  selectedData?: Map<string, any>;
-  selectedIDs?: EntityID[];
-  operations: any[];
-  enter(options?: object): boolean;
-  exit(): void;
 }
 
 /**
@@ -132,9 +121,9 @@ export class Context extends EventEmitter {
   /** All initialized systems */
   systems: Systems;
   /** All initialized modes */
-  modes: Record<ModeID, Mode>;
+  modes: Modes;
   /** Currently active mode */
-  private _currMode: Mode | null;
+  private _currMode: AbstractMode | null;
   /** All initialized behaviors */
   behaviors: Behaviors;
   /** All initialized services (not yet converted to TypeScript) */
@@ -544,7 +533,7 @@ export class Context extends EventEmitter {
    * Returns `null` until UiSystem.render initializes the map and enters browse mode.
    * @readonly
    */
-  get mode(): Mode | null {
+  get mode(): AbstractMode | null {
     return this._currMode;
   }
 
@@ -557,10 +546,10 @@ export class Context extends EventEmitter {
    * @param  options       Optional options passed to the new mode
    * @return  The mode that was entered
    */
-  enter(modeOrModeID: Mode | ModeID, options?: object): Mode {
+  enter(modeOrModeID: AbstractMode | ModeID, options?: object): AbstractMode {
     const gfx = this.systems.gfx;
     const currMode = this._currMode;
-    let newMode: Mode | undefined;
+    let newMode: AbstractMode | undefined;
 
     if (typeof modeOrModeID === 'string') {
       newMode = this.modes[modeOrModeID];
@@ -579,10 +568,10 @@ export class Context extends EventEmitter {
     }
 
     // Try to enter the new mode, fallback to 'browse' mode
-    this._currMode = newMode;
+    this._currMode = newMode!;
     const didEnter = this._currMode.enter(options);
     if (!didEnter) {
-      this._currMode = this.modes.browse;
+      this._currMode = this.modes.browse!;
       this._currMode.enter();
     }
     this.$container.classed(`mode-${this._currMode.id}`, true);

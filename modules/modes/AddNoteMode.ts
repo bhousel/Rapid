@@ -1,5 +1,8 @@
-import { AbstractMode } from './AbstractMode.js';
+import { AbstractMode } from './AbstractMode.ts';
 import { Marker } from '../data/Marker.ts';
+
+import type { Context } from '../Context.ts';
+import type { EventData } from '../behaviors/AbstractBehavior.ts';
 
 const DEBUG = false;
 
@@ -12,9 +15,9 @@ export class AddNoteMode extends AbstractMode {
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'add-note';
 
@@ -27,9 +30,9 @@ export class AddNoteMode extends AbstractMode {
   /**
    * enter
    * Enters the mode.
-   * @return  {boolean}  `true` if mode could be entered, `false` it not
+   * @return `true` if mode could be entered, `false` if not
    */
-  enter() {
+  enter(): boolean {
     if (DEBUG) {
       console.log('AddNoteMode: entering');  // eslint-disable-line no-console
     }
@@ -38,7 +41,7 @@ export class AddNoteMode extends AbstractMode {
     const context = this.context;
     context.enableBehaviors(['hover', 'draw', 'mapInteraction']);
 
-    context.behaviors.draw
+    context.behaviors.draw!
       .on('click', this._click)
       .on('cancel', this._cancel)
       .on('finish', this._cancel);
@@ -49,8 +52,9 @@ export class AddNoteMode extends AbstractMode {
 
   /**
    * exit
+   * Exits the mode, removing event listeners from draw behavior.
    */
-  exit() {
+  exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -59,7 +63,7 @@ export class AddNoteMode extends AbstractMode {
     }
 
     const context = this.context;
-    context.behaviors.draw
+    context.behaviors.draw!
       .off('click', this._click)
       .off('cancel', this._cancel)
       .off('finish', this._cancel);
@@ -70,9 +74,9 @@ export class AddNoteMode extends AbstractMode {
    * _click
    * Add a Note at the mouse click coords
    */
-  _click(eventData) {
+  private _click(eventData: EventData): void {
     const context = this.context;
-    const osm = context.services.osm;
+    const osm = context.services.osm as any;
     const viewport = context.viewport;
     const point = eventData.coord.map;
     const loc = viewport.unproject(point);
@@ -80,7 +84,7 @@ export class AddNoteMode extends AbstractMode {
     if (!osm) return;
 
     // pass `null` to generate a new noteID
-    const props = { serviceID: 'osm', loc: loc, isNew: true, status: 'open', comments: [] };
+    const props = { serviceID: 'osm' as ServiceID, loc: loc, isNew: true, status: 'open', comments: [] };
     const note = new Marker(context, props);
     osm.replaceNote(note);
 
@@ -93,7 +97,7 @@ export class AddNoteMode extends AbstractMode {
    * _cancel
    * Return to browse mode without doing anything
    */
-  _cancel() {
+  private _cancel(): void {
     this.context.enter('browse');
   }
 }
