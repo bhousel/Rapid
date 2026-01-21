@@ -1,13 +1,13 @@
 import { RAD2DEG, geoSphericalDistance, vecAngle } from '@rapid-sdk/math';
 import { utilArrayDifference, utilArrayUniq } from '@rapid-sdk/util';
 
-import { actionDeleteRelation } from '../actions/delete_relation.js';
-import { actionReverse } from '../actions/reverse.js';
-import { actionSplit } from '../actions/split.js';
+import { actionDeleteRelation } from '../actions/delete_relation.ts';
+import { actionReverse } from '../actions/reverse.ts';
+import { actionSplit } from '../actions/split.ts';
 import { Graph } from './Graph.ts';
 
 import type { Context, OsmEntity, OsmNode, OsmRelation, OsmWay, Vec2 } from '../data/types.ts';
-import type { Action } from './types.ts';
+import type { Action } from '../actions/types.ts';
 
 
 /**
@@ -221,10 +221,10 @@ export function osmIntersection(
     // actions can be replayed on the main graph exactly in the same order.
     // (It is unintuitive, but the order of ways returned from graph.parentWays()
     // is arbitrary, depending on how the main graph and vgraph were built)
-    const splitAll = actionSplit([v.id]).keepHistoryOn('first') as any;
-    if (!splitAll.disabled(vgraph)) {
-      for (const way of splitAll.ways(vgraph) as OsmWay[]) {
-        const splitOne = actionSplit([v.id]).limitWays([way.id]).keepHistoryOn('first') as Action;
+    const splitAll = actionSplit([v.id]).keepHistoryOn('first');
+    if (!splitAll.disabled?.(vgraph)) {
+      for (const way of splitAll.ways(vgraph)) {
+        const splitOne = actionSplit([v.id]).limitWays([way.id]).keepHistoryOn('first');
         actions.push(splitOne);
         vgraph = splitOne(vgraph);
       }

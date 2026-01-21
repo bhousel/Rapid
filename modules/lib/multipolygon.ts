@@ -1,4 +1,4 @@
-import { actionReverse } from '../actions/reverse.js';
+import { actionReverse } from '../actions/reverse.ts';
 import { osmIsInterestingTag } from './tags.js';
 
 import { OsmNode } from '../data/OsmNode.ts';
@@ -7,7 +7,7 @@ import { OsmWay } from '../data/OsmWay.ts';
 
 import type { Graph } from './Graph.ts';
 import type { OsmEntity, OsmRelationMember } from '../data/types.ts';
-import type { Action } from './types.ts';
+import type { Action } from '../actions/types.ts';
 
 
 /**
@@ -182,7 +182,7 @@ export function osmJoinWays(toJoin: (OsmRelationMember | OsmWay)[], graph: Graph
   }
 
   function reverse(item: JoinableItem): JoinableItem {
-    const action = actionReverse(item.id, { reverseOneway: true }) as Action;
+    const action = actionReverse(item.id, { reverseOneway: true });
     sequences.actions.push(action);
     return (item instanceof OsmWay) ? action(graph).entity(item.id) as OsmWay : item;
   }

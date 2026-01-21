@@ -1,9 +1,9 @@
 import { utilArrayUnion, utilArrayUniq } from '@rapid-sdk/util';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { actionDiscardTags } from '../actions/discard_tags.js';
-import { actionMergeRemoteChanges } from '../actions/merge_remote_changes.js';
-import { actionRevert } from '../actions/revert.js';
+import { actionDiscardTags } from '../actions/discard_tags.ts';
+import { actionMergeRemoteChanges } from '../actions/merge_remote_changes.ts';
+import { actionRevert } from '../actions/revert.ts';
 import { createOsmEntity } from '../data/index.ts';
 import { Graph } from '../lib/Graph.ts';
 
@@ -574,7 +574,7 @@ export class UploaderSystem extends AbstractSystem {
         const graph = editor.staging.graph!;
         const entity = graph.hasEntity(conflict.id) as any;
         if (entity?.type === 'way') {
-          for (const child of utilArrayUniq(entity.nodes)) {
+          for (const child of utilArrayUniq(entity.nodes) as EntityID[]) {
             editor.perform(actionRevert(child));
           }
         }

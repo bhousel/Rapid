@@ -14,22 +14,6 @@ export type { Context } from '../Context.ts';
 
 
 // ============================================================================
-// Action Types
-// ============================================================================
-
-import type { Graph } from './Graph.ts';
-
-/**
- * Action
- * An action function that transforms a Graph and returns a new Graph.
- * Actions are the fundamental unit of graph modification in Rapid.
- * The optional `t` parameter (0-1) supports animated/transitionable actions.
- * Set the `transitionable` property to `true` to enable animation support.
- */
-export type Action = ((graph: Graph, t?: number) => Graph) & { transitionable?: boolean };
-
-
-// ============================================================================
 // GeoJSON Types
 // ============================================================================
 //

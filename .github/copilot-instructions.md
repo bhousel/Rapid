@@ -136,7 +136,37 @@ export class Category {
 ### Avoid Unnecessary Casts
 - Don't add type casts that TypeScript can already infer
 - Before adding `as Type`, check if the expression already has that type
-- Common unnecessary casts: `as ReturnType` on functions that already return that type, `as SystemID` on valid string literals, `as const` on literals in const declarations
+- Common unnecessary casts:
+  - `as ReturnType` on functions that already return that type
+  - `as SystemID` on valid string literals
+  - `as const` on literals in const declarations
+  - `obj.update({...}) as SameType` - the `update()` method returns `this`, so if `obj` is already the right type, no cast needed
+  - `variable as any` followed by passing to a typed parameter - often the types actually match after refactoring
+  - Casts that were needed before an inline type was replaced with a proper interface
+
+**When reviewing TypeScript files**, look for `as` keywords and ask:
+1. What type does the expression already have?
+2. Does the target type match what TypeScript already infers?
+3. Was this cast added as a workaround that's no longer needed?
+
+If a cast seems necessary, consider whether the root cause is:
+- A missing or incorrect type elsewhere (fix the source type instead)
+- A type declaration that doesn't match reality (fix the declaration)
+- A genuine case where TypeScript can't infer the type (e.g., after `JSON.parse`)
+
+### Type Inference in Callbacks
+- Let TypeScript infer callback parameter types from the source array/collection
+- If `graph.childNodes()` returns `OsmNode[]`, then `.map(n => n.loc)` already knows `n` is `OsmNode`
+- Avoid redundant annotations like `.map((n: OsmNode) => n.loc)`
+
+### Guard Clauses for Type Narrowing
+- Use early returns to narrow types and simplify subsequent code
+- Example: `if (!nodeIDs.length) return graph;` eliminates `| undefined` from variables computed from the array
+- This avoids needing non-null assertions or union types later in the function
+
+### Coordinate Types
+- Use `Vec2` from `@rapid-sdk/math` instead of `[number, number]` for coordinate pairs
+- This provides better semantic meaning and matches the math library's conventions
 
 ### Shared Types
 - `types.ts` files exist per folder for **cross-file shared types only**
@@ -249,10 +279,26 @@ behaviors.available.set('drag', DragBehavior);
 **When editing or reviewing TypeScript files**, actively look for `string` that should be a specific ID type.
 
 ### Imports
-- Keep all imports at the top of the file - group `import` before `import type`, sort alphabetically
+- Keep all imports at the top of the file
 - Use `import type { ... }` for type-only imports
 - This is a **Bun project** - use `.ts` extensions for TypeScript imports, `.js` for JavaScript
 - The `tsconfig.json` has `allowImportingTsExtensions: true`
+
+**Import organization order:**
+1. Regular `import` statements (sorted alphabetically by module path)
+2. Blank line
+3. `import type` statements (sorted alphabetically by module path)
+
+Example:
+```typescript
+import { geomRotatePoints, geomViewportNudge, vecAdd } from '@rapid-sdk/math';
+import { actionAddMidpoint } from '../actions/add_midpoint.ts';
+import { utilArrayGroupBy, utilArrayUniq } from '../util/array.ts';
+
+import type { Graph } from '../core/Graph.ts';
+import type { OsmNode, OsmWay } from '../core/index.ts';
+import type { Action } from './types.ts';
+```
 
 ### Type Declarations
 - **Module augmentations** (fixing incorrect or inconvenient external types): Add to `global.d.ts` with `export {}`
@@ -329,7 +375,7 @@ Track TypeScript conversion progress here:
 | `modules/pixi/` | ✅ Complete | All files converted |
 | `modules/core/` | ✅ Complete | All files converted |
 | `modules/behaviors/` | ✅ Complete | All files converted |
-| `modules/actions/` | ❌ Not started | |
+| `modules/actions/` | ✅ Complete | All files converted |
 | `modules/modes/` | ❌ Not started | |
 | `modules/operations/` | ❌ Not started | |
 | `modules/services/` | ❌ Not started | |

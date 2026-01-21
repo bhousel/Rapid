@@ -513,7 +513,7 @@ export class OsmWay extends OsmEntity {
     let nodes = this.nodes.slice();
     nodes = nodes.filter(noRepeatNodes);
     nodes.push(nodes[0]);
-    return this.update({ nodes: nodes } as any) as OsmWay;
+    return this.update({ nodes: nodes });
   }
 
   /**
@@ -535,7 +535,7 @@ export class OsmWay extends OsmEntity {
     }
 
     nodes = nodes.filter(noRepeatNodes);
-    return this.update({ nodes: nodes } as any) as OsmWay;
+    return this.update({ nodes: nodes });
   }
 
 
@@ -593,7 +593,7 @@ export class OsmWay extends OsmEntity {
       nodes.push(nodes[0]);
     }
 
-    return this.update({ nodes: nodes } as any) as OsmWay;
+    return this.update({ nodes: nodes });
   }
 
 
@@ -645,7 +645,7 @@ export class OsmWay extends OsmEntity {
       nodes.push(nodes[0]);
     }
 
-    return this.update({ nodes: nodes } as any) as OsmWay;
+    return this.update({ nodes: nodes });
   }
 
 
@@ -675,7 +675,7 @@ export class OsmWay extends OsmEntity {
       nodes.push(nodes[0]);
     }
 
-    return this.update({ nodes: nodes } as any) as OsmWay;
+    return this.update({ nodes: nodes });
   }
 
 
@@ -700,6 +700,6 @@ export class OsmWay extends OsmEntity {
       nodes.push(nodes[0]);
     }
 
-    return this.update({ nodes: nodes } as any) as OsmWay;
+    return this.update({ nodes: nodes });
   }
 }

@@ -311,7 +311,7 @@ export class OsmRelation extends OsmEntity {
   addMember(member: OsmRelationMember, index?: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index === undefined ? members.length : index, 0, member);
-    return this.update({ members: members }) as OsmRelation;
+    return this.update({ members: members });
   }
 
   /**
@@ -324,7 +324,7 @@ export class OsmRelation extends OsmEntity {
   updateMember(member: Partial<OsmRelationMember>, index: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index, 1, { ...members[index], ...member });
-    return this.update({ members: members }) as OsmRelation;
+    return this.update({ members: members });
   }
 
   /**
@@ -336,7 +336,7 @@ export class OsmRelation extends OsmEntity {
   removeMember(index: number): OsmRelation {
     const members = this.members.slice();
     members.splice(index, 1);
-    return this.update({ members: members }) as OsmRelation;
+    return this.update({ members: members });
   }
 
   /**
@@ -347,7 +347,7 @@ export class OsmRelation extends OsmEntity {
    */
   removeMembersWithID(id: EntityID): OsmRelation {
     const members = this.members.filter(m => m.id !== id);
-    return this.update({ members: members }) as OsmRelation;
+    return this.update({ members: members });
   }
 
   /**
@@ -360,7 +360,7 @@ export class OsmRelation extends OsmEntity {
   moveMember(fromIndex: number, toIndex: number): OsmRelation {
     const members = this.members.slice();
     members.splice(toIndex, 0, members.splice(fromIndex, 1)[0]);
-    return this.update({ members: members }) as OsmRelation;
+    return this.update({ members: members });
   }
 
   /**
@@ -386,7 +386,7 @@ export class OsmRelation extends OsmEntity {
       }
     }
 
-    return this.update({ members: members }) as OsmRelation;
+    return this.update({ members: members });
   }
 
   /**

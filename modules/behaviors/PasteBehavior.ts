@@ -1,8 +1,8 @@
 import { Extent, vecSubtract } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
-import { actionCopyEntities } from '../actions/copy_entities.js';
-import { actionMove } from '../actions/move.js';
+import { actionCopyEntities } from '../actions/copy_entities.ts';
+import { actionMove } from '../actions/move.ts';
 import { utilDetect } from '../util/detect.ts';
 
 import type { Context } from '../Context.ts';

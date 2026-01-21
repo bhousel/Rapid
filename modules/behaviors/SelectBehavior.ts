@@ -3,7 +3,7 @@ import { vecLength } from '@rapid-sdk/math';
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { MapInteractionBehavior } from './MapInteractionBehavior.ts';
 import { GeoJSON, Marker, OsmEntity, OsmNode, OsmWay } from '../data/index.ts';
-import { actionAddMidpoint } from '../actions/add_midpoint.js';
+import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { geoChooseEdge } from '../geo/geom.js';
 import { utilDetect } from '../util/detect.ts';
 
