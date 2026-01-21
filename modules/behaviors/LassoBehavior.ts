@@ -17,8 +17,11 @@ import type { Vec2 } from '@rapid-sdk/math';
  * and on completeion enters select mode with the OSM features selected.
  */
 export class LassoBehavior extends AbstractBehavior {
+  /** Whether the user is currently drawing a lasso */
   private _lassoing: boolean;
+  /** The bounding extent of the lasso polygon */
   private _extent: Extent | null;
+  /** The series of lat/lon coords recorded while lassoing */
   private _coords: Vec2[];
 
   /**

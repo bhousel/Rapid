@@ -6,15 +6,16 @@ applyTo: "modules/pixi/**"
 
 Guidelines for working with the `modules/pixi/` folder during TypeScript conversion.
 
-## Other Untyped Systems and Services
+## Working with Untyped Services
 
-Services not yet converted to TypeScript should be cast `as any`:
-- Example: `const mapillary = context.services.mapillary as any;` (JavaScript code, not typed)
+All services are still JavaScript and should be cast `as any`:
+- Example: `const mapillary = context.services.mapillary as any;`
 
-Systems that ARE converted to TypeScript can use non-null assertion:
-- `photos`: `const photos = context.systems.photos!;`
+All core systems ARE now TypeScript - use non-null assertion:
+- `const photos = context.systems.photos!;`
+- `const editor = context.systems.editor!;`
 
-Use `!.` for systems that definitely exist when the code runs. Only use `?.` for truly optional dependencies.
+Use `!` for systems that definitely exist when the code runs. Only use `?.` for truly optional dependencies (see `copilot-instructions.md` for the list of optional systems).
 
 ## Viewport Type
 

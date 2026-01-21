@@ -28,8 +28,11 @@ const FAR_TOLERANCE = 4;
  *   `cancel`   Fires on pointercancel -or- pointerup outside, receives the cancel `eventData` Object
  */
 export class DragBehavior extends AbstractBehavior {
+  /** Details about the feature being dragged, or null if not dragging */
   dragTarget: EventTarget | null;
+  /** EventData for the most recent pointerdown event */
   lastDown: EventData | null;
+  /** EventData for the most recent pointermove event during drag */
   lastMove: EventData | null;
 
   /**

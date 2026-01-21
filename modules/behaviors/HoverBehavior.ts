@@ -19,7 +19,9 @@ import type { MapInteractionBehavior } from './MapInteractionBehavior.ts';
  *   `hoverchange`  Fires whenever the hover target has changed, receives `eventData` Object
  */
 export class HoverBehavior extends AbstractBehavior {
+  /** EventData for the most recent pointermove event */
   lastMove: EventData | null;
+  /** Details about the feature being hovered, or null if nothing is hovered */
   hoverTarget: EventTarget | null;
 
   /**

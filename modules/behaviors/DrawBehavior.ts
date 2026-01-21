@@ -30,10 +30,15 @@ const FAR_TOLERANCE = 12;
  *   `finish`    Fires if user presses return, enter, or escape
  */
 export class DrawBehavior extends AbstractBehavior {
+  /** EventData for the most recent pointerdown event */
   lastDown: EventData | null;
+  /** EventData for the most recent pointermove event */
   lastMove: EventData | null;
+  /** EventData for the most recent spacebar press (used for spacebar clicking) */
   lastSpace: EventData | null;
+  /** EventData for the most recent successful click event */
   lastClick: EventData | null;
+  /** Whether spacebar clicking is temporarily disabled */
   private _spaceClickDisabled: boolean;
 
   /**

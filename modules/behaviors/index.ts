@@ -1,3 +1,8 @@
+/**
+ * Behaviors module barrel file.
+ * Exports all behavior classes and the behaviors registry.
+ * @module behaviors
+ */
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { DragBehavior } from './DragBehavior.ts';
 import { DrawBehavior } from './DrawBehavior.ts';
@@ -26,13 +31,21 @@ export {
 import type { BehaviorConstructor } from './types.ts';
 export type { Behaviors, BehaviorConstructor } from './types.ts';
 
-/** Container for registering available behaviors */
+/**
+ * Registry interface for available behaviors.
+ * Contains a Map of behavior IDs to their constructor functions.
+ * Behaviors in the `available` collection will be instantiated at init time.
+ * Note: `KeyOperationBehavior` is not included as it requires extra constructor args.
+ */
 interface BehaviorRegistry {
   /** Map of behavior IDs to their constructors - behaviors here will be instantiated at init time */
   available: Map<BehaviorID, BehaviorConstructor>;
 }
 
-// At init time, we will instantiate any that are in the 'available' collection.
+/**
+ * Registry of available behaviors.
+ * At init time, Context will instantiate any behaviors in the 'available' collection.
+ */
 export const behaviors: BehaviorRegistry = {
   available: new Map<BehaviorID, BehaviorConstructor>()
 };

@@ -13,6 +13,7 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
  * `PasteBehavior` listens for key event '⌘V' when pasting is allowed
  */
 export class PasteBehavior extends AbstractBehavior {
+  /** Whether the user is on macOS (affects modifier key detection) */
   private _isMacOS: boolean;
 
   /**

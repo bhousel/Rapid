@@ -33,14 +33,23 @@ interface TouchData {
  *   `gesture`             String containing the current detected gesture ('pan' or 'rotate')
  */
 export class MapInteractionBehavior extends AbstractBehavior {
+  /** EventData for the most recent pointerdown event */
   lastDown: EventData | null;
+  /** The current detected gesture ('pan' or 'rotate'), or null if none */
   gesture: 'pan' | 'rotate' | null;
+  /** Whether double-click to zoom is enabled */
   doubleClickEnabled: boolean;
+  /** Tracking data for active touch points (for multi-touch gestures) */
   activeTouches: Record<number, TouchData>;
+  /** The mode that was active before gesture started */
   previousMode: string | undefined;
+  /** Last pointer position for calculating deltas */
   private _lastPoint: Vec2 | null;
+  /** Last angle for rotation gestures */
   private _lastAngle: number | null;
+  /** Initial distance between two touch points for pinch-zoom */
   private _initialPinchDistance: number | null;
+  /** Initial angle between two touch points for pinch-rotate */
   private _initialAngle: number | null;
 
   /**

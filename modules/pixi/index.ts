@@ -1,3 +1,8 @@
+/**
+ * Pixi module barrel file.
+ * Exports Pixi.js rendering classes: Features, Layers, Scene, Textures, etc.
+ * @module pixi
+ */
 export { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 export { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 export { PixiEvents } from './PixiEvents.ts';

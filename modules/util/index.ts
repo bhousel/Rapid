@@ -1,3 +1,8 @@
+/**
+ * Utilities module barrel file.
+ * Exports utility functions for various purposes: keybinding, detection, dates, etc.
+ * @module util
+ */
 export * from './cmd.ts';
 export * from './date.ts';
 export * from './detect.ts';

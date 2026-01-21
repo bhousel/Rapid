@@ -36,10 +36,13 @@ export type { Context };
 export type SystemConstructor = new (context: Context) => AbstractSystem;
 
 /**
- * Container for all system instances.
- * Systems are accessed via context.systems[systemID].
+ * Container interface for all system instances.
+ * Systems are accessed via `context.systems[systemID]`.
+ * The index signature allows flexible access by system ID,
+ * while specific properties provide type-safe access to known systems.
  */
 export interface Systems {
+  /** Index signature for flexible system access by ID */
   [key: SystemID]: AbstractSystem | undefined;
 
   assets?: AssetSystem;

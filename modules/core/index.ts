@@ -1,3 +1,8 @@
+/**
+ * Core systems module barrel file.
+ * Exports all system classes and the systems registry.
+ * @module core
+ */
 import { AbstractSystem } from './AbstractSystem.ts';
 import { AssetSystem } from './AssetSystem.ts';
 import { EditSystem } from './EditSystem.ts';
@@ -46,13 +51,20 @@ export {
 import type { SystemConstructor } from './types.ts';
 export type { Context, Systems, SystemConstructor } from './types.ts';
 
-/** Container for registering available systems */
+/**
+ * Registry interface for available systems.
+ * Contains a Map of system IDs to their constructor functions.
+ * Systems in the `available` collection will be instantiated at init time.
+ */
 interface SystemRegistry {
   /** Map of system IDs to their constructors - systems here will be instantiated at init time */
   available: Map<SystemID, SystemConstructor>;
 }
 
-// At init time, we will instantiate any that are in the 'available' collection.
+/**
+ * Registry of available systems.
+ * At init time, Context will instantiate any systems in the 'available' collection.
+ */
 export const systems: SystemRegistry = {
   available: new Map<SystemID, SystemConstructor>()
 };

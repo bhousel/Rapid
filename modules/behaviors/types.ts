@@ -23,11 +23,14 @@ export type { Context };
 export type BehaviorConstructor = new (context: Context) => AbstractBehavior;
 
 /**
- * Container for all behavior instances.
- * Behaviors are accessed via context.behaviors[behaviorID].
- * Note: KeyOperationBehavior is not included here as it's created dynamically per-operation.
+ * Container interface for all behavior instances.
+ * Behaviors are accessed via `context.behaviors[behaviorID]`.
+ * The index signature allows flexible access by behavior ID,
+ * while specific properties provide type-safe access to known behaviors.
+ * Note: `KeyOperationBehavior` is not included as it's created dynamically per-operation.
  */
 export interface Behaviors {
+  /** Index signature for flexible behavior access by ID */
   [key: BehaviorID]: AbstractBehavior | undefined;
 
   drag?: DragBehavior;

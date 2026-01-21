@@ -1,3 +1,8 @@
+/**
+ * Library module barrel file.
+ * Exports core data structures: Graph, Preset, Field, Category, etc.
+ * @module lib
+ */
 export * from './Category.ts';
 export * from './Difference.ts';
 export * from './Edit.ts';

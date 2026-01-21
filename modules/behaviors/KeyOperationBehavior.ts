@@ -9,7 +9,9 @@ import type { Keybinding } from '../util/keybinding.ts';
  * ("operations" are the things that go on the editing menu)
  */
 export class KeyOperationBehavior extends AbstractBehavior {
+  /** The operation this behavior is associated with */
   private _operation: any;
+  /** The keybinding handler for document-level key events */
   private _keybinding: Keybinding | null;
 
   /**

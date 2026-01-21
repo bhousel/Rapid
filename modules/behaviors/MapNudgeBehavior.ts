@@ -19,7 +19,9 @@ const MAP_NUDGE_INTERVAL = 16;
  *   `nudge`    Fires when the map nudges - receives the [x,y] amount panned in pixels
  */
 export class MapNudgeBehavior extends AbstractBehavior {
+  /** The current nudge amount [x, y] to pan each interval */
   private _nudge: Vec2;
+  /** The interval ID for the nudge timer */
   private _intervalID: ReturnType<typeof setInterval> | null;
 
   /**

@@ -27,15 +27,25 @@ const FAR_TOLERANCE = 12;
  *   `lastClick`    `eventData` Object for the most recent click event
  */
 export class SelectBehavior extends AbstractBehavior {
+  /** EventData for the most recent pointerdown event */
   lastDown: EventData | null;
+  /** EventData for the most recent pointerup event (used for double-click detection) */
   lastUp: EventData | null;
+  /** EventData for the most recent pointermove event */
   lastMove: EventData | null;
+  /** EventData for the most recent spacebar press (used for spacebar clicking) */
   lastSpace: EventData | null;
+  /** EventData for the most recent successful click event */
   lastClick: EventData | null;
+  /** Set of entity IDs for multi-selection (Shift+click) */
   private _multiSelection: Set<EntityID>;
+  /** Whether spacebar clicking is temporarily disabled */
   private _spaceClickDisabled: boolean;
+  /** Timeout ID for long press detection */
   private _longPressTimeout: ReturnType<typeof setTimeout> | null;
+  /** Whether the context menu is currently shown */
   private _showsMenu: boolean;
+  /** Whether the MapRoulette menu is currently shown */
   private _showsMapRouletteMenu: boolean;
 
   /**

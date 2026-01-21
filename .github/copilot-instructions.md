@@ -320,8 +320,8 @@ behaviors.available.set('drag', DragBehavior);
 Example:
 ```typescript
 import { geomRotatePoints, geomViewportNudge, vecAdd } from '@rapid-sdk/math';
+import { utilArrayGroupBy, utilArrayUniq } from '@rapid-sdk/util';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
-import { utilArrayGroupBy, utilArrayUniq } from '../util/array.ts';
 
 import type { Graph } from '../core/Graph.ts';
 import type { OsmNode, OsmWay } from '../core/index.ts';
@@ -405,6 +405,8 @@ Track TypeScript conversion progress here:
 | `modules/behaviors/` | ✅ Complete | All files converted |
 | `modules/actions/` | ✅ Complete | All files converted |
 | `modules/modes/` | ✅ Complete | All files converted |
+| `modules/data/` | ✅ Complete | All files converted |
+| `modules/geo/` | ✅ Complete | All files converted |
 | `modules/operations/` | ❌ Not started | |
 | `modules/services/` | ❌ Not started | |
 | `modules/ui/` | ❌ Not started | |
