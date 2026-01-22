@@ -598,7 +598,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // It might be a level container with a name like "1", "-1", or just a name like "lines"
     // If `parseInt` fails, just sort the label above everything.
     function level(feature: PixiFeatureLine): number {
-      const lvl = parseInt(feature.container.parent.label, 10);
+      const parentLabel = feature.container.parent?.label;
+      const lvl = parseInt(parentLabel || '999', 10);
       return isNaN(lvl) ? 999 : lvl;
     }
 

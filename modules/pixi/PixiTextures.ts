@@ -384,9 +384,8 @@ export class PixiTextures {
     };
 
     const renderer = this.gfx.pixi.renderer;
-    const result = renderer.canvasText.createTextureAndCanvas(options);
-    const canvas = result.canvasAndContext.canvas as HTMLCanvasElement;
-    const temp = result.texture;
+    const temp = renderer.canvasText.getTexture(options);
+    const canvas = temp.source.resource as HTMLCanvasElement;
     const w = temp.frame.width * temp.source.resolution;
     const h = temp.frame.height * temp.source.resolution;
     const texture = this.allocate('text', textureID, w, h, canvas);

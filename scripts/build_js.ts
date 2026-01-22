@@ -1,20 +1,27 @@
 
 export {};
+const outdir = './dist/js';
 
 await Promise.all([
    Bun.build({
     entrypoints: ['./modules/main_prod.js'],
-    outdir: './dist/js',
+    outdir: outdir,
     target: 'browser',
     sourcemap: 'linked',
-    naming: 'rapid.[ext]'  // .js
+    naming: 'rapid.[ext]',  // .js
+    metafile: true
+  }).then(result => {
+    Bun.write(`${outdir}/rapid.meta.json`, JSON.stringify(result.metafile));
   }),
 
   Bun.build({
     entrypoints: ['./modules/main_dev.js'],
-    outdir: './dist/js',
+    outdir: outdir,
     target: 'browser',
     sourcemap: 'linked',
-    naming: 'rapid-dev.[ext]'  // .js
-  })
+    naming: 'rapid-dev.[ext]',  // .js
+    metafile: true
+  }).then(result => {
+    Bun.write(`${outdir}/rapid-dev.meta.json`, JSON.stringify(result.metafile));
+  }),
 ]);

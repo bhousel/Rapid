@@ -82,6 +82,7 @@
           "label": "Wheelchair Access",
           "terms": "handicap access",
           "options": {
+            "designated": "Designated",
             "yes": "Yes",
             "limited": "Limited",
             "no": "No"
@@ -288,6 +289,9 @@
             "yes": "Unknown Role"
           }
         },
+        "trailer": {
+          "label": "Trailer Access"
+        },
         "trail_visibility": {
           "label": "Trail Visibility",
           "placeholder": "Excellent, Good, Bad...",
@@ -365,7 +369,8 @@
           "label": "Toll"
         },
         "toilets": {
-          "label": "Toilets"
+          "label": "Toilets",
+          "terms": "bathroom,latrine,lavatory,outhouse,privy,restroom,toilet,water closet,w.c.,wc"
         },
         "to": {
           "label": "To"
@@ -451,6 +456,9 @@
             "personal": "Personal / Backyard",
             "kids": "Kids Pool"
           }
+        },
+        "swimming": {
+          "label": "Swimming"
         },
         "surveillance": {
           "label": "Surveillance Kind"
@@ -544,7 +552,8 @@
           "label": "Structure",
           "placeholder": "Unknown",
           "options": {
-            "tunnel": "Tunnel"
+            "tunnel": "Tunnel",
+            "bridge": "Bridge"
           }
         },
         "structure_power": {
@@ -728,6 +737,10 @@
             "shelter": "Shelter",
             "workshop": "Workshop"
           }
+        },
+        "snowmobile": {
+          "label": "Snowmobile Access",
+          "terms": "ski-doo"
         },
         "sms": {
           "label": "SMS"
@@ -1045,7 +1058,8 @@
             "cardboard": "Cardboard",
             "scrap_metal": "Scrap Metal",
             "cooking_oil": "Cooking Oil",
-            "engine_oil": "Engine Oil"
+            "engine_oil": "Engine Oil",
+            "food_waste": "Food Waste"
           }
         },
         "real_fire-GB-IE": {
@@ -1117,6 +1131,7 @@
           "options": {
             "activitypanel": "Activity Panel",
             "aerialrotator": "Aerial Rotator",
+            "agility_trail": "Agility Trail",
             "archimedes_screw": "Archimedes Screw",
             "balance": "Balancing Device (unspecified)",
             "balancebeam": "Balance Beam",
@@ -1165,6 +1180,7 @@
             "sandpit": "Sandbox / Sandpit",
             "seat": "Seat",
             "seesaw": "Seesaw",
+            "rotating_seesaw": "Rotating Seesaw",
             "sieve": "Sieve",
             "sledding": "Sledding Hill",
             "slide": "Slide",
@@ -1267,7 +1283,8 @@
             "visa": "Visa",
             "visa_debit": "Visa Debit",
             "visa_electron": "Visa Electron",
-            "wechat": "WeChat Pay"
+            "wechat": "WeChat Pay",
+            "upi": "UPI (Unified Payments Interface)"
           }
         },
         "parking_space": {
@@ -1527,6 +1544,9 @@
         },
         "museum": {
           "label": "Type"
+        },
+        "motorboat": {
+          "label": "Motorboat Access"
         },
         "mooring": {
           "label": "Mooring",
@@ -2452,7 +2472,7 @@
           }
         },
         "diet_multi": {
-          "label": "Diet Types",
+          "label": "Dietary Options",
           "terms": "fruitarian,gluten free,halal,kosher,lactose free,meat,pescatarian,raw,vegan,vegetarian",
           "options": {
             "vegetarian": "Vegetarian",
@@ -2639,6 +2659,7 @@
             "salad": "Salad",
             "crepe": "Crepe",
             "hot_dog": "Hot Dog",
+            "hotpot": "Hot Pot",
             "pancake": "Pancake",
             "dessert": "Dessert",
             "diner": "Diner",
@@ -2966,6 +2987,12 @@
           "label": "Capacity",
           "placeholder": "50, 100, 200..."
         },
+        "canoe": {
+          "label": "Canoe Access"
+        },
+        "camping": {
+          "label": "Camping"
+        },
         "camp_site": {
           "label": "Type",
           "options": {
@@ -3131,6 +3158,9 @@
             "removable": "Removable Bollard",
             "rising": "Rising Bollard"
           }
+        },
+        "boat": {
+          "label": "Boat Access"
         },
         "board_type": {
           "label": "Type",
@@ -3588,6 +3618,9 @@
             "extinct": "Extinct"
           }
         },
+        "tunnel/name": {
+          "label": "Tunnel Name"
+        },
         "traffic_signals/vibration": {
           "label": "Vibration"
         },
@@ -3963,6 +3996,17 @@
           "label": "SIRET Number",
           "terms": "french company identification number,siret"
         },
+        "ref/EU/EVSE-EU": {
+          "label": "EVSE identifier (Electrical Vehicle Supply Equipment)",
+          "placeholder": "DE*ABC*E12345ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        },
+        "railway/turnout_side": {
+          "label": "Turnout Side",
+          "options": {
+            "left": "Left",
+            "right": "Right"
+          }
+        },
         "railway/track_ref": {
           "label": "Track Number"
         },
@@ -3977,9 +4021,32 @@
             "abt": "Abt Switch"
           }
         },
+        "railway/signal_box": {
+          "label": "Type",
+          "options": {
+            "mechanical": "Mechanical",
+            "electric": "Electrical",
+            "track_diagram": "Digital",
+            "electronic": "Fully Automated"
+          }
+        },
+        "railway/ref": {},
         "railway/position": {
           "label": "Milestone Position",
           "placeholder": "Distance to one decimal (123.4)"
+        },
+        "railway/local_operated": {
+          "label": "Locally Operated"
+        },
+        "railway/signal/position": {
+          "label": "Placement",
+          "options": {
+            "left": "Left",
+            "right": "Right",
+            "in_track": "In the track",
+            "bridge": "Overhead (attached to a gantry)",
+            "overhead": "Overhead (attached to the catenary wire)"
+          }
         },
         "railway/signal/direction": {
           "label": "Direction Affected",
@@ -4699,6 +4766,9 @@
         "bridge/ref": {
           "label": "Bridge Number"
         },
+        "bridge/name": {
+          "label": "Bridge Name"
+        },
         "bath/type": {
           "label": "Specialty",
           "options": {
@@ -5004,6 +5074,10 @@
         "waterway/boatyard": {
           "name": "Boatyard"
         },
+        "waterway/access_point": {
+          "name": "Waterway Access Point",
+          "terms": "boat,canoe,kayak,launch,paddleboard,portage,put-in,rowboat,take-out"
+        },
         "waterway/canal/lock": {
           "name": "Canal Lock"
         },
@@ -5255,7 +5329,7 @@
         },
         "tourism/gallery": {
           "name": "Art Gallery",
-          "terms": "art,exhibition,painting,photogaph,sculpture"
+          "terms": "art,exhibition,painting,photograph,sculpture"
         },
         "tourism/chalet": {
           "name": "Holiday Cottage",
@@ -5309,6 +5383,10 @@
           "name": "History Museum",
           "terms": "artifacts,dioramas,exhibitions,exhibits,foundation,hall,institution"
         },
+        "tourism/information/visitor_centre": {
+          "name": "Visitor Center",
+          "terms": "visitors center,visitors information center,welcome center"
+        },
         "tourism/information/terminal": {
           "name": "Information Terminal"
         },
@@ -5317,8 +5395,8 @@
           "terms": "cairn,painted blaze,route flag,route marker,stone pile,trail blaze,trail post,way marker"
         },
         "tourism/information/office": {
-          "name": "Visitor Center",
-          "terms": "information office,tour guide,tourism office,tourist information center,visitors center,visitors information center,welcome center"
+          "name": "Tourist Information Office",
+          "terms": "information office,tour guide,tourism office,tourist office,tourist information center,visitors center,visitors information center,welcome center"
         },
         "tourism/information/map": {
           "name": "Map"
@@ -5820,6 +5898,10 @@
           "name": "Fabric Store",
           "terms": "sew,textile,textiles"
         },
+        "shop/esoteric": {
+          "name": "Esoteric Store",
+          "terms": "acupuncture,alternative,aromatherapy,crystal,essential oil,meditation,new age,pendant,psychic,woo"
+        },
         "shop/erotic": {
           "name": "Erotic Store",
           "terms": "porn,sex"
@@ -5834,7 +5916,7 @@
         },
         "shop/e-cigarette": {
           "name": "E-Cigarette Shop",
-          "terms": "electronic,vape,vaping,vapor"
+          "terms": "ecigarette,electronic,vape,vaping,vapor"
         },
         "shop/dry_cleaning": {
           "name": "Dry Cleaner"
@@ -6176,6 +6258,10 @@
         "railway/subway": {
           "name": "Subway Track",
           "terms": "metro,transit,underground railway"
+        },
+        "railway/signal_box": {
+          "name": "Signal Box",
+          "terms": "interlock tower,interlocking tower,lever frame,radio block center,radio block centre,signal cab,signalling box,signalling cab"
         },
         "railway/signal": {
           "name": "Railway Signal",
@@ -6546,7 +6632,7 @@
           "terms": "zip wire,zipline,zipwire"
         },
         "playground/water": {
-          "name": "Play Water Pump/Screw"
+          "name": "Play Water Device (unspecified)"
         },
         "playground/tunnel_tube": {
           "name": "Play Tunnel"
@@ -6593,6 +6679,9 @@
         "playground/roundabout": {
           "name": "Play Roundabout",
           "terms": "carousel,merry-go-round"
+        },
+        "playground/pump": {
+          "name": "Play Water Pump"
         },
         "playground/playhouse": {
           "name": "Play House",
@@ -7263,7 +7352,8 @@
           "terms": "mill,water,water wheel,waterwheel,wheel"
         },
         "man_made/water_works": {
-          "name": "Water Works"
+          "name": "Water Works",
+          "terms": "water treatment plant"
         },
         "man_made/water_well": {
           "name": "Water Well",
@@ -7527,7 +7617,7 @@
         },
         "man_made/tower/defensive": {
           "name": "Fortified Tower",
-          "terms": "castle tower,defensive tower"
+          "terms": "castle tower,defensive tower,guard tower"
         },
         "man_made/tower/cooling": {
           "name": "Cooling Tower",
@@ -8176,6 +8266,10 @@
           "name": "Orchard",
           "terms": "fruit"
         },
+        "landuse/olive_grove": {
+          "name": "Olive Grove",
+          "terms": "olive culture,olive oil,olive orchard,olive production,olive yard"
+        },
         "landuse/military": {
           "name": "Military Area",
           "terms": "air force,army,base,coast guard,depot,marines,navy,security"
@@ -8229,8 +8323,8 @@
           "terms": "crop,grow,plant"
         },
         "landuse/education": {
-          "name": "Educational Campus",
-          "terms": "campus,educational facilities,school center,school grounds"
+          "name": "Educational Area",
+          "terms": "campus,educational campus,educational facilities,school campus,school center,school grounds"
         },
         "landuse/construction": {
           "name": "Construction Area",
@@ -8590,7 +8684,7 @@
         },
         "highway/motorway_link-US-CA": {},
         "highway/motorway_junction": {
-          "name": "Motorway Junction / Exit",
+          "name": "Motorway Exit",
           "terms": "exit"
         },
         "highway/motorway": {
@@ -8835,7 +8929,7 @@
         },
         "healthcare/sample_collection": {
           "name": "Sample Collection Facility",
-          "terms": "blood sample collection,laboratory,medical,urine sample collection"
+          "terms": "blood sample collection,diagnostic,laboratory,medical,urine sample collection"
         },
         "healthcare/rehabilitation": {
           "name": "Rehabilitation Facility",
@@ -8868,7 +8962,7 @@
         },
         "healthcare/laboratory": {
           "name": "Medical Laboratory",
-          "terms": "blood_check,medical_lab,medical_laboratory"
+          "terms": "blood check,diagnostic,medical lab"
         },
         "healthcare/hospice": {
           "name": "Hospice",
@@ -9068,12 +9162,6 @@
           "name": "Ambulance Station",
           "terms": "ems,emt,rescue"
         },
-        "emergency/yes": {},
-        "emergency/private": {},
-        "emergency/official": {},
-        "emergency/no": {},
-        "emergency/destination": {},
-        "emergency/designated": {},
         "emergency/fire_hydrant/underground": {
           "name": "Underground Fire Hydrant",
           "terms": "fire plug,fire water well,underground hydrant"
@@ -9364,6 +9452,10 @@
         "building/transportation": {
           "name": "Transportation Building"
         },
+        "building/train_station": {
+          "name": "Train Station Building",
+          "terms": "halt,railway station,terminal"
+        },
         "building/terrace": {
           "name": "Row of Townhouses",
           "terms": "brownstone,dwelling,family,home,residence,row home,row house,terrace,townhome"
@@ -9549,9 +9641,6 @@
         },
         "building/allotment_house": {
           "name": "Allotment House"
-        },
-        "building/train_station": {
-          "name": "Train Station Building"
         },
         "building/outbuilding": {
           "name": "Outbuilding"
@@ -9887,8 +9976,8 @@
         },
         "amenity/toilets": {
           "name": "Restroom",
-          "aliases": "Toilets\nBathroom\nLavatory\nWater Closet",
-          "terms": "head,latrine,outhouse,privy,public restroom,public toilet,w.c.,wc"
+          "aliases": "Toilets\nBathroom\nLavatory",
+          "terms": "head,latrine,outhouse,privy,public restroom,public toilet,water closet,w.c.,wc"
         },
         "amenity/ticket_validator": {
           "name": "Ticket Validator",
@@ -10642,6 +10731,10 @@
           "name": "Indian Restaurant",
           "terms": "bar,breakfast,curry,dine,dining,dinner,drive-in,eat,grill,lunch,table"
         },
+        "amenity/restaurant/hotpot": {
+          "name": "Hot Pot Restaurant",
+          "terms": "beijing,budae jjigae,canton,chhnang pleurng,china,fondue,guangdong,hotpot,jeongol,jjigae,kimchi jjigae,lau,mu kratha,nabemono,peking,shabu shabu,sichaun,sin jum,sukiyaki,teochew,teoswa,yao hon"
+        },
         "amenity/restaurant/greek": {
           "name": "Greek Restaurant",
           "terms": "bar,breakfast,cafe,café,canteen,dine,dining,dinner,drive-in,eat,grill,gyros,lunch,olives,pitas,table"
@@ -10845,7 +10938,7 @@
         },
         "amenity/doctors/radiology": {
           "name": "Radiologist",
-          "aliases": "Rontegenologist",
+          "aliases": "Roentgenologist",
           "terms": "computed tomography,ct,magnetic resonance imaging,medical ultrasonography,medical ultrasound,mri,radiology,sonography,ultrasonography"
         },
         "amenity/doctors/pulmonology": {
@@ -10979,6 +11072,10 @@
         },
         "amenity/community_centre/club_home": {
           "name": "Club Home"
+        },
+        "amenity/community_centre/chitalishte_BG": {
+          "name": "Chitalishte",
+          "terms": "community center"
         },
         "amenity/clock/sundial": {
           "name": "Sundial",
