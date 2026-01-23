@@ -1,4 +1,4 @@
-/* eslint-disable quotes */
+/* eslint-disable @stylistic/quotes */
 
 export const waybackConfig = {
   "13534": {

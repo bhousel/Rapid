@@ -1,4 +1,4 @@
-/* eslint-disable quotes */
+/* eslint-disable @stylistic/quotes */
 
 // data near [10°, 0°]
 export const data10 = {

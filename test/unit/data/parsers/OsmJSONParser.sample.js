@@ -1,4 +1,4 @@
-/* eslint-disable quotes */
+/* eslint-disable @stylistic/quotes */
 
 // ----------------------------------------
 // Elements (nodes, ways, relations, map)

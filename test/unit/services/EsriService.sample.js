@@ -1,4 +1,4 @@
-/* eslint-disable quotes */
+/* eslint-disable @stylistic/quotes */
 
 export const datasetsPage1 = {
   "total": 198,
