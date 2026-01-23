@@ -40,8 +40,8 @@ export interface VintageRange {
 export interface ImagerySourceProps {
   /** Unique identifier for this imagery source (required) */
   id: ImagerySourceID;
-  /** The bundle that this ImagerySource came from (e.g. 'editor-layer-index') */
-  bundleID: BundleID;
+  /** The asset that this ImagerySource came from (e.g. 'editor-layer-index') */
+  assetID: AssetID;
   /** URL template for fetching tiles */
   template?: string;
   /** Whether the imagery source is considered "best" in the area it is available */
@@ -283,12 +283,12 @@ export class ImagerySource {
   /**
    * isBuiltin
    * Is this one of the builtin objects?
-   * We consider it "builtin" if it doesn't have a `bundleID` (i.e. added via a merge).
+   * We consider it "builtin" if it doesn't have a `assetID` (i.e. added via a merge).
    * These include the 'none', 'custom' and possibly 'EsriWayback' sources.
    * @return `true` if the imagery is a builtin ImagerySource, `false` if not
    */
   isBuiltin(): boolean {
-    return !this.props.bundleID;
+    return !this.props.assetID;
   }
 
 

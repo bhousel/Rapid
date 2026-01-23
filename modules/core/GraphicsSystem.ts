@@ -7,9 +7,9 @@ import { PixiScene } from '../pixi/PixiScene.ts';
 import { PixiTextures } from '../pixi/PixiTextures.ts';
 import { utilSetTransform } from '../util/util.ts';
 
-import type { TransformProps, Vec2 } from '@rapid-sdk/math';
+import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Context } from './types.ts';
+import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 /** Throttled rendering milliseconds (for now) */
 const THROTTLE = 250;

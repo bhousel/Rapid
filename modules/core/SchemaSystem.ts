@@ -7,21 +7,16 @@ import { Category, Field, Preset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilWildcard } from '../util/string.ts';
 
-import type { Context } from './types.ts';
-import type { Graph } from '../lib/Graph.ts';
 import type { CategoryProps } from '../lib/Category.ts';
+import type { Context } from '../Context.ts';
 import type { FieldProps } from '../lib/Field.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { OsmEntity, OsmNode, Tags, Vec2 } from '../data/types.ts';
 import type { PresetProps } from '../lib/Preset.ts';
-import type { Tags } from '../data/types.ts';
-import type { OsmEntity } from '../data/OsmEntity.ts';
-
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
-import {
-  version as rapidVersion,
-  dependencies as rapidDependencies
-} from '../../package.json' with { type: 'json' };
+import { dependencies as rapidDependencies } from '../../package.json' with { type: 'json' };
 
 const VERBOSE = true;        // warn about 'id-tagging-schema' features we don't support currently
 const MAXRECENTS = 30;       // how many recents to store in localstorage
@@ -50,12 +45,12 @@ type RawPresetData = Partial<PresetProps> & Record<string, unknown>;
 type RawCategoryData = Partial<CategoryProps> & { icon?: string } & Record<string, unknown>;
 
 /**
- * Schema bundle data to merge into the system.
+ * Schema asset data to merge into the system.
  * Contains categories, presets, fields, and defaults.
  */
-export interface SchemaBundle {
-  /** A string bundle identifier, e.g. 'id-tagging-schema@6.13.0' (required) */
-  bundleID: BundleID;
+export interface SchemaAsset {
+  /** An asset identifier, e.g. 'id-tagging-schema@6.13.0' (required) */
+  assetID: AssetID;
   /** Object mapping fieldID to field data (or null to delete) */
   fields?: Record<string, RawFieldData | null>;
   /** Object mapping presetID to preset data (or null to delete) */
@@ -88,7 +83,7 @@ interface SearchResult {
  * and to support user interface functions like searching for feature types and editing attributes.
  *
  * - A `Field` represents a user interface component for displaying/editing a tag or tags.
- * - A `Preset` represents a bundle of tags that identify a feature type. A Preset can reference multiple Fields.
+ * - A `Preset` represents a set of tags that identify a feature type. A Preset can reference multiple Fields.
  * - A `Category` is a collection of Presets (e.g. "Major Roads", "Buildings", etc).
  *
  * In this case, "schemas" are the files containing these rules about tagging.
@@ -101,7 +96,7 @@ interface SearchResult {
  * Properties available:
  *   `geometryTypes`  The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
  *   `fieldTypes`     The supported field types (see also `ui/fields/index.js`)
- *   `bundles`        Names of schema bundles that have been merged in
+ *   `assets`         AssetIDs of schema files that have been merged in
  *   `fields`         The Fields
  *   `presets`        The Presets
  *   `categories`     The Categories
@@ -120,8 +115,8 @@ export class SchemaSystem extends AbstractSystem {
   /** Set of presetIDs that the user can add (if `null`, all are normally addable) */
   addablePresetIDs: Set<PresetID> | null;
 
-  /** Names of schema bundles that have been merged in */
-  bundles: Set<BundleID>;
+  /** AssetIDs of schema files that have been merged in */
+  assets: Set<AssetID>;
   /** The Categories, keyed by categoryID */
   categories: Map<CategoryID, Category>;
   /** The Presets, keyed by presetID */
@@ -168,20 +163,20 @@ export class SchemaSystem extends AbstractSystem {
     // Set of presetIDs that the user can add (if `null`, all are normally addable)
     this.addablePresetIDs = null;
 
-    this.bundles = new Set();      // Set<bundleID> - track merged schema bundles
-    this.categories = new Map();   // Map<categoryID, Category>
-    this.presets = new Map();      // Map<presetID, Preset>
-    this.fields = new Map();       // Map<fieldID, Field>
-    this.universal = new Map();    // Map<fieldID, Field>  (for universal fields)
-    this.defaults = new Map();     // Map<geometryType, Set<presetID|categoryID>>
+    this.assets = new Set();       // Set<AssetID> - track merged schema assets
+    this.categories = new Map();   // Map<CategoryID, Category>
+    this.presets = new Map();      // Map<PresetID, Preset>
+    this.fields = new Map();       // Map<FieldID, Field>
+    this.universal = new Map();    // Map<FieldID, Field>  (for universal fields)
+    this.defaults = new Map();     // Map<GeometryType, Set<PresetID|CategoryID>>
 
-    this._matchIndex = new Map();  // Map<geometryType, Object>
+    this._matchIndex = new Map();  // Map<GeometryType, Object>
     this._recentIDs = null;
 
     // We will keep a MiniSearch fulltext search index for each needed locale code.
     // Most of the time people would just use Rapid in one language.
     // But this allows users to switch their locale/language while Rapid is running.
-    this._searchIndexes = new Map();  // Map<localeCode, MiniSearch>
+    this._searchIndexes = new Map();  // Map<LocaleCode, MiniSearch>
     this._currLocaleCode = null;      // The current locale code
     this._currSearchIndex = null;     // The current search index
 
@@ -262,7 +257,7 @@ export class SchemaSystem extends AbstractSystem {
    * @param   id - a Preset or Category id
    * @return  The Preset or Catetory, or `undefined` if not found
    */
-  item(id: string): Preset | Category | undefined {
+  item(id: PresetID | CategoryID): Preset | Category | undefined {
     return this.presets.get(id) || this.categories.get(id);
   }
 
@@ -273,7 +268,7 @@ export class SchemaSystem extends AbstractSystem {
    * @param   id - a Field id
    * @return  The Field, or `undefined` if not found
    */
-  field(id: string): Field | undefined {
+  field(id: FieldID): Field | undefined {
     return this.fields.get(id);
   }
 
@@ -282,7 +277,7 @@ export class SchemaSystem extends AbstractSystem {
    * merge
    * Accepts an object containing new schema data (all properties except 'id' are optional):
    * {
-   *   bundleID: '',           // A string bundle identifier, e.g. 'id-tagging-schema@6.13.0'
+   *   assetID: '',            // A string asset identifier, e.g. 'id-tagging-schema@6.13.0'
    *   fields: {},             // Object<fieldID, fieldData>
    *   presets: {},            // Object<presetID, presetData>
    *   categories: {},         // Object<categoryID, categoryData>
@@ -302,19 +297,19 @@ export class SchemaSystem extends AbstractSystem {
    *     `"barrier/*": null,`                           <-- all `barrier/*` presets deleted
    *
    * @param  src - preset data to merge into the caches
-   * @throws  Will throw if given data does not contain a `bundleID`, or if the `bundleID` has already been merged
+   * @throws  Will throw if given data does not contain a `assetID`, or if the `assetID` has already been merged
    */
-  merge(src: SchemaBundle): void {
-    const bundleID = src.bundleID;
+  merge(src: SchemaAsset): void {
+    const assetID = src.assetID;
 
-    if (!bundleID) {
-      throw new Error('Schema missing bundleID property');
+    if (!assetID) {
+      throw new Error('Schema missing assetID property');
     }
-    if (this.bundles.has(bundleID)) {
-      throw new Error(`Schema "${bundleID}" already merged`);
+    if (this.assets.has(assetID)) {
+      throw new Error(`Schema "${assetID}" already merged`);
     }
 
-    this.bundles.add(bundleID);
+    this.assets.add(assetID);
 
     const checkLocationSets: Array<{ locationSet?: object; locationSetID?: string }> = [];
     const context = this.context;
@@ -331,7 +326,7 @@ export class SchemaSystem extends AbstractSystem {
             if (VERBOSE) console.warn(`"${f.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
             continue;
           }
-          const field = new Field(context, { id: fieldID, bundleID: bundleID, ...f });
+          const field = new Field(context, { id: fieldID, assetID: assetID, ...f });
           if (field.props.locationSet) {
             checkLocationSets.push(field.props);
           }
@@ -371,7 +366,7 @@ export class SchemaSystem extends AbstractSystem {
           // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
           if (p.icon === 'fas-vector-square')            p.icon = 'temaki-portrait_framed';
 
-          const preset = new Preset(context, { id: presetID, bundleID: bundleID, ...p });
+          const preset = new Preset(context, { id: presetID, assetID: assetID, ...p });
           if (preset.props.locationSet) {
             checkLocationSets.push(preset.props);
           }
@@ -402,7 +397,7 @@ export class SchemaSystem extends AbstractSystem {
           // Rename icon identifiers to match the rapid spritesheet
           if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
 
-          const category = new Category(context, { id: categoryID, bundleID: bundleID, ...c });
+          const category = new Category(context, { id: categoryID, assetID: assetID, ...c });
           if (category.props.locationSet) {
             checkLocationSets.push(category.props);
           }
@@ -474,7 +469,7 @@ export class SchemaSystem extends AbstractSystem {
    * @return  A Minisearch `SearchResult`, containing the score and information about the match
    * @throws  Will throw if the search index is not ready
    */
-  search(query: string = '', geometries: GeometryType | GeometryType[] = [], loc: [number, number] | null = null): SearchResult[] {
+  search(query: string = '', geometries: GeometryType | GeometryType[] = [], loc: Vec2 | null = null): SearchResult[] {
     if (!this._currSearchIndex) {   // shouldn't happen
       throw new Error('Search index not ready');
     }
@@ -562,10 +557,10 @@ export class SchemaSystem extends AbstractSystem {
     return entity.transient('presetMatch', () => {
       let geometry = entity.geometry(graph) as GeometryType;
       // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
-      if (geometry === 'vertex' && (entity as any).isOnAddressLine?.(graph)) {
+      if (geometry === 'vertex' && (entity as OsmNode).isOnAddressLine?.(graph)) {
         geometry = 'point';
       }
-      const entityExtent = (entity as any).extent?.(graph);
+      const entityExtent = entity.extent();
       return this.matchTags(entity.tags, geometry, entityExtent?.center());
     });
   }
@@ -578,7 +573,7 @@ export class SchemaSystem extends AbstractSystem {
    * @param   loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
    * @return  Preset that best matches
    */
-  matchTags(tags: Tags, geometry: GeometryType, loc?: [number, number]): Preset | null {
+  matchTags(tags: Tags, geometry: GeometryType, loc?: Vec2): Preset | null {
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -951,7 +946,7 @@ export class SchemaSystem extends AbstractSystem {
 
       // Merge id-tagging-schema...
       this.merge({
-        bundleID: `id-tagging-schema@${idSchemaVersion}`,
+        assetID: `id-tagging-schema@${idSchemaVersion}`,
         categories: vals[2] as any,
         defaults: vals[3] as any,
         presets: vals[4] as any,
@@ -959,10 +954,9 @@ export class SchemaSystem extends AbstractSystem {
       });
 
       // Merge rapid_schema_overrides...
-      const rapidSchemaVersion = rapidVersion || 'unknown';
-      const overrides = vals[6] as Partial<SchemaBundle>;
+      const overrides = vals[6] as Partial<SchemaAsset>;
       this.merge({
-        bundleID: `rapid-schema-overrides@${rapidSchemaVersion}`,
+        assetID: `rapid-schema-overrides@${context.version}`,
         ...overrides
       });
     });
@@ -1126,7 +1120,7 @@ export class SchemaSystem extends AbstractSystem {
   private _resetAll(): void {
     const context = this.context;
 
-    this.bundles.clear();
+    this.assets.clear();
     this.presets.clear();
     this.fields.clear();
     this.categories.clear();

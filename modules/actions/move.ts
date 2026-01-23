@@ -6,7 +6,7 @@ import { utilArrayIntersection } from '@rapid-sdk/util';
 import type { Action } from './types.ts';
 import type { ChooseEdgeResult } from '../geo/geom.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity, OsmRelation, OsmWay } from '../data/types.ts';
+import type { OsmRelation, OsmWay } from '../data/types.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 

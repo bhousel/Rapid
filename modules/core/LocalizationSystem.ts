@@ -5,7 +5,7 @@ import { utilDate } from '../util/date.ts';
 import { utilDetect } from '../util/detect.ts';
 
 import type { D3Selection } from 'd3-selection';
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, Tags, Vec2 } from '../data/index.ts';
 

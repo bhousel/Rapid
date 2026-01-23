@@ -10,9 +10,10 @@ import {
   uiSplash, uiRestore, UiShortcuts, UiSidebar, uiWhatsNew
 } from '../ui/index.js';
 
-import type { Vec2 } from '@rapid-sdk/math';
+import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { Context } from './types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
+
 
 /** The data properties of a DOMRect (without methods like toJSON) */
 type DOMRectData = Pick<DOMRectReadOnly, 'x' | 'y' | 'width' | 'height' | 'top' | 'right' | 'bottom' | 'left'>;

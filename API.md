@@ -95,7 +95,7 @@ context.initAsync()
 ### Background Imagery
 
 Rapid's background imagery is managed by the `ImagerySystem`.
-Default imagery bundles are loaded at init time, but customizations and overrides can be
+Default imagery assets are loaded at init time, but customizations and overrides can be
 made to the imagery by calling `ImagerySystem.merge(…)` with new data to merge in.
 
 Note that the "None" and "Custom" options will always be shown in the list.
@@ -126,7 +126,7 @@ Optional properties:
 ### Tagging Schema (aka "Presets")
 
 Rapid's tagging schema is managed by the `SchemaSystem`.
-Default schema bundles are loaded at init time, but customizations and overrides can be
+Default schema assets are loaded at init time, but customizations and overrides can be
 made to the schema by calling `SchemaSystem.merge(…)` with new data to merge in.
 
 TODO: document merging sceneraios.

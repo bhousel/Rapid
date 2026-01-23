@@ -129,10 +129,10 @@ describe('SchemaSystem', () => {
         ]);
       });
 
-      it('bundles', () => {
-        assert.instanceOf(_schema.bundles, Set);
+      it('assets', () => {
+        assert.instanceOf(_schema.assets, Set);
 
-        const keys = [..._schema.bundles];
+        const keys = [..._schema.assets];
         // merged 'id-tagging-schema' data at init...
         assert.isTrue(keys.some(key => /^id-tagging-schema@/.test(key)));
         // merged 'rapid-schema-overrides' data at init...
@@ -168,16 +168,16 @@ describe('SchemaSystem', () => {
 
 
     describe('merge', () => {
-      it('throws if bundleID is missing', () => {
+      it('throws if assetID is missing', () => {
         const schemaData = {};
-        assert.throws(() => _schema.merge(schemaData), /missing bundleID/i);
+        assert.throws(() => _schema.merge(schemaData), /missing assetID/i);
       });
 
-      it('throws if bundleID has already been merged', () => {
-        const schemaData = { bundleID: 'test1' };
-        assert.doesNotHaveAnyKeys(_schema.bundles, ['test1']);
+      it('throws if assetID has already been merged', () => {
+        const schemaData = { assetID: 'test1' };
+        assert.doesNotHaveAnyKeys(_schema.assets, ['test1']);
         assert.doesNotThrow(() => _schema.merge(schemaData));
-        assert.containsAllKeys(_schema.bundles, ['test1']);
+        assert.containsAllKeys(_schema.assets, ['test1']);
         assert.throws(() => _schema.merge(schemaData), /already merged/i);
       });
 
@@ -198,8 +198,8 @@ describe('SchemaSystem', () => {
           assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
         });
 
-        it('adds the merged bundleID to the bundles Set', () => {
-          assert.containsAllKeys(_schema.bundles, ['add-surf-data']);
+        it('adds the merged assetID to the assets Set', () => {
+          assert.containsAllKeys(_schema.assets, ['add-surf-data']);
         });
 
         describe('fields', () => {
@@ -207,7 +207,7 @@ describe('SchemaSystem', () => {
             const surfField = _schema.fields.get('surf/type');
             assert.instanceOf(surfField, Rapid.Field);
             assert.deepInclude(surfField.props, {
-              bundleID: 'add-surf-data',
+              assetID: 'add-surf-data',
               id: 'surf/type',
               label: 'Surf Type',
               key: 'surf:type',
@@ -225,7 +225,7 @@ describe('SchemaSystem', () => {
             const surfPreset = _schema.presets.get('amenity/shop/surf');
             assert.instanceOf(surfPreset, Rapid.Preset);
             assert.deepInclude(surfPreset.props, {
-              bundleID: 'add-surf-data',
+              assetID: 'add-surf-data',
               id: 'amenity/shop/surf',
               name: 'Surf Shop'
             });
@@ -254,7 +254,7 @@ describe('SchemaSystem', () => {
             const surfCategory = _schema.categories.get('category-surfing');
             assert.instanceOf(surfCategory, Rapid.Category);
             assert.deepInclude(surfCategory.props, {
-              bundleID: 'add-surf-data',
+              assetID: 'add-surf-data',
               id: 'category-surfing',
               name: 'Surf Features'
             });
@@ -317,8 +317,8 @@ describe('SchemaSystem', () => {
           assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
         });
 
-        it('adds the merged bundleID to the bundles Set', () => {
-          assert.containsAllKeys(_schema.bundles, ['add-surf-data', 'update-surf-data']);
+        it('adds the merged assetID to the assets Set', () => {
+          assert.containsAllKeys(_schema.assets, ['add-surf-data', 'update-surf-data']);
         });
 
         describe('fields', () => {
@@ -326,7 +326,7 @@ describe('SchemaSystem', () => {
             const surfField = _schema.fields.get('surf/type');
             assert.instanceOf(surfField, Rapid.Field);
             assert.deepInclude(surfField.props, {
-              bundleID: 'update-surf-data',  // new bundleID
+              assetID: 'update-surf-data',  // new assetID
               id: 'surf/type',
               label: 'Surfing Type',  // new name
               key: 'surf:type',
@@ -340,7 +340,7 @@ describe('SchemaSystem', () => {
             const surfPreset = _schema.presets.get('amenity/shop/surf');
             assert.instanceOf(surfPreset, Rapid.Preset);
             assert.deepInclude(surfPreset.props, {
-              bundleID: 'update-surf-data',  // new bundleID
+              assetID: 'update-surf-data',  // new assetID
               id: 'amenity/shop/surf',
               name: 'Surfing Shop'   // new name
             });
@@ -352,7 +352,7 @@ describe('SchemaSystem', () => {
             const surfCategory = _schema.categories.get('category-surfing');
             assert.instanceOf(surfCategory, Rapid.Category);
             assert.deepInclude(surfCategory.props, {
-              bundleID: 'update-surf-data',   // new bundleID
+              assetID: 'update-surf-data',   // new assetID
               id: 'category-surfing',
               name: 'Surfing Features'  // new name
             });
@@ -401,8 +401,8 @@ describe('SchemaSystem', () => {
           assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
         });
 
-        it('adds the merged bundleID to the bundles Set', () => {
-          assert.containsAllKeys(_schema.bundles, ['add-surf-data', 'update-surf-data', 'delete-surf-data']);
+        it('adds the merged assetID to the assets Set', () => {
+          assert.containsAllKeys(_schema.assets, ['add-surf-data', 'update-surf-data', 'delete-surf-data']);
         });
 
         describe('fields', () => {
@@ -1003,9 +1003,9 @@ describe('SchemaSystem', () => {
         _schema._resetAll();
       });
 
-      it('resets bundles', () => {
-        assert.instanceOf(_schema.bundles, Set);
-        assert.isEmpty(_schema.bundles);
+      it('resets assets', () => {
+        assert.instanceOf(_schema.assets, Set);
+        assert.isEmpty(_schema.assets);
       });
 
       it('resets fields', () => {

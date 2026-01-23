@@ -9,10 +9,10 @@ import { Difference, Edit, Graph, Tree } from '../lib/index.ts';
 import { OsmEntity as OsmEntityClass, createOsmEntity } from '../data/index.ts';
 import { uiLoading } from '../ui/loading.js';
 
-import type { TransformProps } from '@rapid-sdk/math';
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
-import type { OsmEntity, OsmEntityProps, Tags, Vec2 } from '../data/types.ts';
+import type { OsmEntity, OsmEntityProps, Tags } from '../data/types.ts';
+import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 
 /** Options for commit/commitAppend */

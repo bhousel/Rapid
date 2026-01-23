@@ -213,12 +213,12 @@ async function buildImagery() {
     imagery[sourceID] = props;
   };
 
-  const bundle = {
-    bundleID: `editor-layer-index@${imageryDate}`,
+  const data = {
+    assetID: `editor-layer-index@${imageryDate}`,
     imagery: sortObject(imagery)
   };
 
-  await Bun.write('./data/imagery.json', stringify(bundle) + '\n');
+  await Bun.write('./data/imagery.json', stringify(data) + '\n');
   console.timeEnd(END);
 }
 

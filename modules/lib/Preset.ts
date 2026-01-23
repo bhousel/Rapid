@@ -15,8 +15,8 @@ import { osmAreaKeys } from './tags.js';
 export interface PresetProps {
   /** Unique identifier for this Preset */
   id: PresetID;
-  /** The bundle that this Preset came from (e.g. 'id-tagging-schema@6.13.0') */
-  bundleID: BundleID;
+  /** The asset that this Preset came from (e.g. 'id-tagging-schema@6.13.0') */
+  assetID: AssetID;
   /** Display name */
   name: string;
   /** Alternate names that may be displayed in the UI */
@@ -78,7 +78,7 @@ interface ResolvedFields {
 
 /**
  * Preset
- * A Preset represents a bundle of tags that identify a feature type on OpenStreetMap.
+ * A Preset represents a set of tags that identify a feature type on OpenStreetMap.
  * Every feature in Rapid is matched to a Preset based on its tags.
  * Users can pick from the available Presets in the Rapid editor.
  * See:  https://github.com/ideditor/schema-builder/blob/main/schemas/preset.json
@@ -393,12 +393,12 @@ export class Preset {
   /**
    * isBuiltin
    * Is this one of the builtin objects?
-   * We consider it "builtin" if it doesn't have a `bundleID` (i.e. added via a merge).
+   * We consider it "builtin" if it doesn't have a `assetID` (i.e. added via a merge).
    * (At this time, only the fallback presets are builtin).
    * @return  Returns `true` if this is a builtin Preset, `false` if not
    */
   isBuiltin(): boolean {
-    return !this.props.bundleID;
+    return !this.props.assetID;
   }
 
 

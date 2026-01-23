@@ -3,8 +3,8 @@ import throttle from 'lodash-es/throttle.js';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 
+import type { Context } from '../Context.ts';
 import type { DebouncedFunc } from 'lodash-es';
-import type { Context } from './types.ts';
 
 
 /** Mock window type for non-browser environments */

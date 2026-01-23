@@ -2,8 +2,8 @@ import { Extent, geomGetSmallestSurroundingRectangle, vecInterp } from '@rapid-s
 import { polygonArea, polygonCentroid, polygonHull } from 'd3-polygon';
 import polylabel from '@mapbox/polylabel';
 
+import type { Context } from '../Context.ts';
 import type {
-  Context,
   GeometryPartOrigData,
   GeometryPartWorldData,
   SingularGeometry,

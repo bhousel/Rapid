@@ -4,6 +4,8 @@
  * @module
  */
 
+import type { Context } from '../Context.ts';
+
 import type { AbstractMode } from './AbstractMode.ts';
 import type { AddNoteMode } from './AddNoteMode.ts';
 import type { AddPointMode } from './AddPointMode.ts';
@@ -17,11 +19,6 @@ import type { RotateMode } from './RotateMode.ts';
 import type { SaveMode } from './SaveMode.ts';
 import type { SelectMode } from './SelectMode.ts';
 import type { SelectOsmMode } from './SelectOsmMode.ts';
-
-// Re-export Context from the main Context module.
-// This allows existing imports from './types.ts' to continue working.
-import type { Context } from '../Context.ts';
-export type { Context };
 
 /** A Mode class constructor */
 export type ModeConstructor = new (context: Context) => AbstractMode;

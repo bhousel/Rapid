@@ -202,6 +202,12 @@ If a cast seems necessary, consider whether the root cause is:
 - **Never duplicate types** - if a type already exists in a class file, don't add it to `types.ts`
 - When converting a file, check if types already exist before adding new ones
 
+### Avoid Re-exporting Types for Convenience
+- **Import types from their source file**, not from convenience re-exports
+- This avoids "spaghetti code" where a type can be imported via convoluted paths
+- Example: Import `Context` from `'../Context.ts'`, not from `'./core/types.ts'`
+- Exception: Barrel files (`index.ts`) may re-export for the public API of a module
+
 ### Registry Pattern (Systems, Behaviors, etc.)
 Rapid uses a consistent pattern for managing collections of pluggable components:
 
@@ -268,8 +274,8 @@ behaviors.available.set('drag', DragBehavior);
 **Heuristic: Match variable/property name suffix to ID type:**
 | Name pattern | Type to use |
 |--------------|-------------|
+| `assetID` | `AssetID` |
 | `behaviorID` | `BehaviorID` |
-| `bundleID` | `BundleID` |
 | `categoryID` | `CategoryID` |
 | `classID` | `ClassID` |
 | `dataID` | `DataID` |

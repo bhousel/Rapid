@@ -1,8 +1,8 @@
 import { Extent } from '@rapid-sdk/math';
-
 import { GeometryPart } from './GeometryPart.ts';
+
+import type { Context } from '../Context.ts';
 import type {
-  Context,
   GeoJSONObject,
   GeometryOrigData,
   GeometryWorldData,

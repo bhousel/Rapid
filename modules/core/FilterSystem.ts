@@ -3,7 +3,7 @@ import { /* utilArrayGroupBy,*/ utilArrayUnion } from '@rapid-sdk/util';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { osmLifecyclePrefixes } from '../lib/tags.ts';
 
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmRelation, OsmWay } from '../data/index.ts';

@@ -55,7 +55,7 @@ export interface EventData {
 
 
 /**
- * "Behaviors" are nothing more than bundles of event handlers that we can
+ * "Behaviors" are groups of event handlers that we can
  * enable and disable depending on what the user is doing.
  *
  * `AbstractBehavior` is the base class from which all behaviors inherit.

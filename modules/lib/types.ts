@@ -4,13 +4,8 @@
  * @module
  */
 
-import { Extent } from '@rapid-sdk/math';
-
-import type { Vec2 } from '../data/types.ts';
-export type { Vec2 } from '../data/types.ts';
-
-// Re-export Context for convenience (used by almost every class)
-export type { Context } from '../Context.ts';
+import type { Extent, Vec2 } from '@rapid-sdk/math';
+export type { Vec2 } from '@rapid-sdk/math';
 
 
 // ============================================================================

@@ -1,7 +1,9 @@
 import { Difference } from './Difference.ts';
-import { type Iterable, type OneOrMore, utilIterable } from '../util/iterable.ts';
+import { utilIterable } from '../util/iterable.ts';
 
-import type { Context, OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
+import type { Context } from '../Context.ts';
+import type { Iterable, OneOrMore } from '../util/iterable.ts';
+import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
 
 
 /**

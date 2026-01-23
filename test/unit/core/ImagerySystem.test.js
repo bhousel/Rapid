@@ -19,11 +19,11 @@ describe('ImagerySystem', () => {
   };
 
   context.systems.assets._cache.editor_layer_index = {
-    bundleID: 'editor_layer_index',
+    assetID: 'editor_layer_index',
     imagery: {}
   };
   context.systems.assets._cache.rapid_imagery_overrides = {
-    bundleID: 'rapid_imagery_overrides',
+    assetID: 'rapid_imagery_overrides',
     imagery: {}
   };
 
@@ -86,7 +86,7 @@ describe('ImagerySystem', () => {
 
   // Test an already-constructed instance of the system..
   // The tests in here need to run serially, because we rely on being able to
-  // merge multiple imagery bundles into the ImagerySystem and then matching against them.
+  // merge multiple imagery assets into the ImagerySystem and then match against them.
   describe.serial('methods', () => {
     const spyImageryChange = mock();
     let _imagery;
@@ -101,10 +101,10 @@ describe('ImagerySystem', () => {
 
 
     describe('properties', () => {
-      it('bundles', () => {
-        assert.instanceOf(_imagery.bundles, Set);
-        // Should have the default bundles merged
-        const keys = [..._imagery.bundles];
+      it('assets', () => {
+        assert.instanceOf(_imagery.assets, Set);
+        // Should have the default assets merged
+        const keys = [..._imagery.assets];
         assert.match(keys[0], /^editor_layer_index/);
         assert.match(keys[1], /^rapid_imagery_overrides/);
       });
@@ -147,13 +147,13 @@ describe('ImagerySystem', () => {
 
 
     describe('merge', () => {
-      it('throws if bundleID is missing', () => {
-        assert.throws(() => _imagery.merge({}), /missing bundleID/i);
+      it('throws if assetID is missing', () => {
+        assert.throws(() => _imagery.merge({}), /missing assetID/i);
       });
 
-      it('throws if bundleID has already been merged', () => {
+      it('throws if assetID has already been merged', () => {
         assert.throws(
-          () => _imagery.merge({ bundleID: 'editor_layer_index' }),
+          () => _imagery.merge({ assetID: 'editor_layer_index' }),
           /already merged/i
         );
       });
@@ -165,8 +165,8 @@ describe('ImagerySystem', () => {
           _imagery.merge(sample.addImageryData);
         });
 
-        it('adds bundleID to bundles Set', () => {
-          assert.isTrue(_imagery.bundles.has('add-imagery-data'));
+        it('adds assetID to assets Set', () => {
+          assert.isTrue(_imagery.assets.has('add-imagery-data'));
         });
 
         it('adds sources to the sources Map', () => {
@@ -218,8 +218,8 @@ describe('ImagerySystem', () => {
           _imagery.merge(sample.updateImageryData);
         });
 
-        it('adds bundleID to bundles Set', () => {
-          assert.isTrue(_imagery.bundles.has('update-imagery-data'));
+        it('adds assetID to assets Set', () => {
+          assert.isTrue(_imagery.assets.has('update-imagery-data'));
         });
 
         it('replaces existing source with updated data', () => {
@@ -245,8 +245,8 @@ describe('ImagerySystem', () => {
           _imagery.merge(sample.deleteImageryData);
         });
 
-        it('adds bundleID to bundles Set', () => {
-          assert.isTrue(_imagery.bundles.has('delete-imagery-data'));
+        it('adds assetID to assets Set', () => {
+          assert.isTrue(_imagery.assets.has('delete-imagery-data'));
         });
 
         it('removes sources using wildcard patterns', () => {
@@ -665,11 +665,11 @@ describe('ImagerySystem', () => {
         return _imagery.initAsync().then(() => _imagery.startAsync());
       });
 
-      it('clears bundles', () => {
-        // After reset, should only have the initial builtin bundles
-        assert.isFalse(_imagery.bundles.has('add-imagery-data'));
-        assert.isFalse(_imagery.bundles.has('update-imagery-data'));
-        assert.isFalse(_imagery.bundles.has('delete-imagery-data'));
+      it('clears assets', () => {
+        // After reset, should only have the initial builtin assets
+        assert.isFalse(_imagery.assets.has('add-imagery-data'));
+        assert.isFalse(_imagery.assets.has('update-imagery-data'));
+        assert.isFalse(_imagery.assets.has('delete-imagery-data'));
       });
 
       it('preserves builtin sources', () => {

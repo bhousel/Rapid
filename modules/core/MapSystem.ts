@@ -8,11 +8,11 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { Marker } from '../data/Marker.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
-import type { TransformProps, Vec2 } from '@rapid-sdk/math';
+import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { Difference } from '../lib/Difference.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { Context } from './types.ts';
+import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 type AreaFillMode = 'wireframe' | 'partial' | 'full';
 

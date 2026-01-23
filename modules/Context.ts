@@ -211,7 +211,7 @@ export class Context extends EventEmitter {
     this.modes = {};
     this._currMode = null;
 
-    // "Behaviors" are bundles of event handlers that we can
+    // "Behaviors" are groups of event handlers that we can
     // enable and disable depending on what the user is doing.
     this.behaviors = {};
 

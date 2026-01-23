@@ -8,12 +8,12 @@
  * @module
  */
 
+/** Asset ID (e.g. 'id-tagging-schema@6.13.0') */
+export type AssetID = string;
 /** Atlas ID (e.g. 'symbol', 'text', 'tile') */
 export type AtlasID = 'symbol' | 'text' | 'tile';
 /** Behavior ID (e.g. 'drag', 'draw', 'hover', 'select') */
 export type BehaviorID = string;
-/** Bundle ID (e.g. 'id-tagging-schema@6.13.0') */
-export type BundleID = string;
 /** Spatial Cache ID - identifier for spatial caches (e.g. 'osm', 'mapillary') */
 export type SpatialCacheID = string;
 /** Category ID - unique identifier for preset categories */
@@ -88,7 +88,7 @@ export type ValidatorID = string;
 declare global {
   type AtlasID = string;
   type BehaviorID = string;
-  type BundleID = string;
+  type AssetID = string;
   type SpatialCacheID = string;
   type CategoryID = string;
   type CheckpointID = string;

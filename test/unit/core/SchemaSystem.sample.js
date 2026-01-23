@@ -30,7 +30,7 @@ export const surfCityNC = {
 };
 
 export const addSurfData = {
-  bundleID: 'add-surf-data',
+  assetID: 'add-surf-data',
   fields: {
     'field/foo1':  { key: 'foo1', type: 'text' },
     'field/foo2':  { key: 'foo2', type: 'text' },
@@ -94,7 +94,7 @@ export const addSurfData = {
 
 
 export const updateSurfData = {
-  bundleID: 'update-surf-data',
+  assetID: 'update-surf-data',
   fields: {
     'surf/type': {
       label: 'Surfing Type',
@@ -147,7 +147,7 @@ export const updateSurfData = {
 
 
 export const deleteSurfData = {
-  bundleID: 'delete-surf-data',
+  assetID: 'delete-surf-data',
   fields: {
     'field/foo?': null,
     'field/b*n': null,
@@ -167,7 +167,7 @@ export const deleteSurfData = {
 
 
 export const searchData = {
-  bundleID: 'search-data',
+  assetID: 'search-data',
   presets: {
     'amenity/bbq': {
       name: 'Grill',

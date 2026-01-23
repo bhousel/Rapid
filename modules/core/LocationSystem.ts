@@ -5,8 +5,8 @@ import calcArea from '@mapbox/geojson-area';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { GeoJSON } from '../data/GeoJSON.ts';
 
+import type { Context } from '../Context.ts';
 import type { Extent } from '@rapid-sdk/math';
-import type { Context } from './types.ts';
 import type { Vec2, Vec4 } from '../data/types.ts';
 
 

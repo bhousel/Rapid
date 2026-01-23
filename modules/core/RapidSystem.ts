@@ -2,10 +2,11 @@ import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { type OneOrMore, utilIterable } from '../util/iterable.ts';
+import { utilIterable } from '../util/iterable.ts';
 
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
+import type { OneOrMore } from '../util/iterable.ts';
 
 
 const RAPID_MAGENTA = '#da26d3';

@@ -7,8 +7,7 @@ import { actionRevert } from '../actions/revert.ts';
 import { createOsmEntity } from '../data/index.ts';
 import { Graph } from '../lib/Graph.ts';
 
-import type { Context } from './types.ts';
-
+import type { Context } from '../Context.ts';
 import type { OsmChangeset } from '../data/OsmChangeset.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 

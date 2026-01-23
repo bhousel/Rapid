@@ -8,11 +8,7 @@ import {
 } from '../lib/ImagerySource.ts';
 import { utilWildcard } from '../util/string.ts';
 
-// Make very sure this resolves to Rapid's `package.json`
-// If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
-import { version as rapidVersion } from '../../package.json' with { type: 'json' };
-
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
 import type { ImagerySourceProps } from '../lib/ImagerySource.ts';
 import type { PixiLayerBackgroundTiles } from '../pixi/PixiLayerBackgroundTiles.ts';
 import type { Vec2, Vec4 } from '../data/types.ts';
@@ -22,9 +18,9 @@ import type { Vec2, Vec4 } from '../data/types.ts';
  * Data to merge into the imagery system.
  * Contains imagery sources to add, replace, or remove.
  */
-export interface ImageryBundle {
+export interface ImageryAsset {
   /** A string identifier, e.g. 'editor-layer-index@2026-01-01' (required) */
-  bundleID: BundleID;
+  assetID: AssetID;
   /** Object mapping sourceID to imagery data (or null to delete) */
   imagery?: Record<ImagerySourceID, Partial<ImagerySourceProps> | null>;
 }
@@ -33,13 +29,13 @@ export interface ImageryBundle {
 /**
  * `ImagerySystem` maintains the state of the tiled background and overlay imagery.
  *
- * At init time, Rapid will load the default imagery data from the bundled imagery index,
+ * At init time, Rapid will load the default imagery data from the default imagery index,
  * but additional imagery data can be merged in to supplement or override the defaults.
  *
  * Properties available:
- *   `bundles`         Names of imagery bundles that have been merged in
- *   `features`        GeoJSON features for spatial queries
- *   `sources`         The imagery sources
+ *   `assets`         Names of imagery assets that have been merged in
+ *   `features`       GeoJSON features for spatial queries
+ *   `sources`        The imagery sources
  *   `offset`
  *   `brightness`
  *   `contrast`
@@ -51,11 +47,11 @@ export interface ImageryBundle {
  *   `imagerychange`     Fires on any change in imagery or display options
  */
 export class ImagerySystem extends AbstractSystem {
-  /** Names of imagery bundles that have been merged in */
-  bundles: Set<BundleID>;
-  /** GeoJSON features for spatial queries, keyed by sourceID */
+  /** AssetIDs of imagery files that have been merged in */
+  assets: Set<AssetID>;
+  /** GeoJSON features for spatial queries, keyed by ImagerySourceID (lowercase) */
   features: Map<ImagerySourceID, GeoJSON.Feature>;
-  /** The imagery sources, keyed by sourceID (lowercase) */
+  /** The imagery sources, keyed by ImagerySourceID (lowercase) */
   sources: Map<ImagerySourceID, ImagerySource>;
 
   private _baseLayer: ImagerySource | null;
@@ -81,7 +77,7 @@ export class ImagerySystem extends AbstractSystem {
     this.requiredDependencies = new Set(['assets']);
     this.optionalDependencies = new Set(['gfx', 'l10n', 'storage', 'urlhash']);
 
-    this.bundles = new Set();
+    this.assets = new Set();
     this.features = new Map();
     this.sources = new Map();
 
@@ -166,10 +162,10 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * merge
-   * Accepts an object containing new imagery data (all properties except 'bundleID' are optional):
+   * Accepts an object containing new imagery data (all properties except 'assetID' are optional):
    * {
-   *   bundleID: '',    // A string identifier, e.g. 'editor-layer-index@2026-01-01'
-   *   imagery: {},     // Object<sourceID, imageryData>
+   *   assetID: '',    // A string identifier, e.g. 'editor-layer-index@2026-01-01'
+   *   imagery: {},    // Object<ImagerySourceID, imageryData>
    * }
    *
    * When merging:
@@ -182,20 +178,20 @@ export class ImagerySystem extends AbstractSystem {
    *     `"US-TIGER*": null`                 <-- all `US-TIGER*` sources deleted
    *
    * @param src - imagery data to merge
-   * @throws Will throw if given data does not contain a `bundleID`, or if the `bundleID` has already been merged
+   * @throws Will throw if given data does not contain a `assetID`, or if the `assetID` has already been merged
    */
-  merge(src: ImageryBundle): void {
+  merge(src: ImageryAsset): void {
     const context = this.context;
 
-    const bundleID = src.bundleID;
-    if (!bundleID) {
-      throw new Error('Imagery missing bundleID property');
+    const assetID = src.assetID;
+    if (!assetID) {
+      throw new Error('Imagery missing assetID property');
     }
-    if (this.bundles.has(bundleID)) {
-      throw new Error(`Imagery "${bundleID}" already merged`);
+    if (this.assets.has(assetID)) {
+      throw new Error(`Imagery "${assetID}" already merged`);
     }
 
-    this.bundles.add(bundleID);
+    this.assets.add(assetID);
 
     // Merge Imagery Sources
     if (src.imagery) {
@@ -208,11 +204,11 @@ export class ImagerySystem extends AbstractSystem {
           // Instantiate the appropriate `ImagerySource` class
           let source: ImagerySource;
           if (props.type === 'bing') {
-            source = new ImagerySourceBing(context, { bundleID: bundleID, ...props } as Partial<ImagerySourceProps>);
+            source = new ImagerySourceBing(context, { assetID: assetID, ...props } as Partial<ImagerySourceProps>);
           } else if (/^EsriWorldImagery/.test(sourceID)) {
-            source = new ImagerySourceEsri(context, { bundleID: bundleID, ...props } as Partial<ImagerySourceProps>);
+            source = new ImagerySourceEsri(context, { assetID: assetID, ...props } as Partial<ImagerySourceProps>);
           } else {
-            source = new ImagerySource(context, { bundleID: bundleID, ...props } as Partial<ImagerySourceProps>);
+            source = new ImagerySource(context, { assetID: assetID, ...props } as Partial<ImagerySourceProps>);
           }
           this.sources.set(sourceKey, source);
 
@@ -317,7 +313,7 @@ export class ImagerySystem extends AbstractSystem {
 
     return sources.filter(source => {
       if (currSource === source) return true;    // always include the current imagery
-      if (source.props.isBlocked) return false;  // even bundled sources may be blocked - iD#7905
+      if (source.props.isBlocked) return false;  // even default sources may be blocked - iD#7905
       if (!source.props.feature) return true;    // always include imagery with worldwide coverage
       if (zoom && zoom < 6) return false;        // optionally exclude local imagery at low zooms
       return visible.has(source.id);             // include imagery visible in given extent
@@ -653,19 +649,18 @@ export class ImagerySystem extends AbstractSystem {
       assets.loadAssetAsync('rapid_imagery_overrides')
     ])
     .then((vals) => {
-      // Merge editor-layer-index bundle..
-      const eli = vals[0] as Partial<ImageryBundle>;
+      // Merge editor-layer-index asset..
+      const eli = vals[0] as Partial<ImageryAsset>;
       this.merge({
-        bundleID: eli.bundleID ?? 'editor-layer-index',
+        assetID: eli.assetID ?? 'editor-layer-index',
         imagery: eli.imagery
       });
 
       // Merge rapid_imagery_overrides..
-      // Use the bundleID from the data if present, otherwise generate one
-      const overrides = vals[1] as Partial<ImageryBundle>;
-      const rapidSchemaVersion = rapidVersion || 'unknown';
+      // Use the assetID from the data if present, otherwise generate one
+      const overrides = vals[1] as Partial<ImageryAsset>;
       this.merge({
-        bundleID: overrides.bundleID ?? `rapid-imagery-overrides@${rapidSchemaVersion}`,
+        assetID: overrides.assetID ?? `rapid-imagery-overrides@${context.version}`,
         imagery: overrides.imagery
       });
 
@@ -765,10 +760,9 @@ export class ImagerySystem extends AbstractSystem {
     const storage = context.systems.storage;
     const wayback = context.services.wayback;
 
-    this.bundles = new Set();    // Set<bundleID> - track merged imagery bundles
-    this.features = new Map();   // Map<sourceID, GeoJSON feature>
-    this.sources = new Map();    // Map<sourceID, ImagerySource>
-
+    this.assets = new Set();
+    this.features = new Map();
+    this.sources = new Map();
 
     // Add 'None'
     const none = new ImagerySourceNone(context);

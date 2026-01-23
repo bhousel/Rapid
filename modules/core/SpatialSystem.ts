@@ -4,9 +4,9 @@ import { Graph } from '../lib/Graph.ts';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
-import type { Extent } from '@rapid-sdk/math';
 import type { AbstractData } from '../data/AbstractData.ts';
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
+import type { Extent } from '@rapid-sdk/math';
 import type { Vec2, Vec3 } from '../data/types.ts';
 
 

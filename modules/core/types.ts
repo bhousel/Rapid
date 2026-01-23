@@ -4,8 +4,8 @@
  * @module
  */
 
-// Import converted system types for use in Systems interface.
-// Using `import type` avoids runtime circular dependencies.
+import type { Context } from '../Context.ts';
+
 import type { AbstractSystem } from './AbstractSystem.ts';
 import type { AssetSystem } from './AssetSystem.ts';
 import type { EditSystem } from './EditSystem.ts';
@@ -26,11 +26,6 @@ import type { UiSystem } from './UiSystem.ts';
 import type { UploaderSystem } from './UploaderSystem.ts';
 import type { UrlHashSystem } from './UrlHashSystem.ts';
 import type { ValidationSystem } from './ValidationSystem.ts';
-
-// Re-export Context from the main Context module.
-// This allows existing imports from './types.ts' to continue working.
-import type { Context } from '../Context.ts';
-export type { Context };
 
 /** A System class constructor */
 export type SystemConstructor = new (context: Context) => AbstractSystem;

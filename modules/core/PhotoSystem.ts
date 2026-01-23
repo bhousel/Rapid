@@ -3,8 +3,8 @@ import { Extent } from '@rapid-sdk/math';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilDate, utilDateString } from '../util/date.ts';
 
+import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Context } from './types.ts';
 
 
 /** Date filter types ('fromDate' or 'toDate') */

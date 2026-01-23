@@ -1,7 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
 
 
 /**
@@ -12,27 +12,43 @@ import type { Context } from './types.ts';
  */
 type AssetMap = Record<string, string>;
 
-/** Origin types for asset loading */
-export type AssetOrigin = 'latest' | 'local';
-
-/** Sources object containing asset maps for each origin */
+/**
+ * Sources object containing asset maps for each origin.
+ */
 interface AssetSources {
+  /** 'custom' - Assets specified at runtime - these override the assets from 'latest' or 'local' */
+  custom: AssetMap;
+  /** 'latest' - These are the default assets that Rapid loads, may load from CDN */
   latest: AssetMap;
+  /** 'local' - Local assets only, for offline/standalone use */
   local: AssetMap;
 }
+
+/** Origin types for asset loading - derived from AssetSources keys */
+export type AssetOrigin = keyof AssetSources;
 
 
 /**
  * `AssetSystem` keeps track of files and data that Rapid needs to load.
+ *
+ * Information about the assets can be found in the `sources` structure.
+ * Sources are identified by keys, and are grouped by origin.
+ *  'custom' - assets added at runtime, these override 'latest' and 'local'.
+ *  'latest' - may load latest assets from a CDN which match the expected semantic version
+ *  'local' - will only load assets from the local folder.
+ *
+ * Important: To use 'local', you'll need to have installed a version of Rapid
+ *   that has all of these dependencies copied into `/dist/data/modules/`.
+ * See https://github.com/rapideditor/rapid-standalone if this is what you need.
  *
  * Properties available:
  *   `sources`   The sources Object contains all the details about where to fetch assets from
  *   `origin`    'local' (all files fetched from dist) or 'latest' (newer files may be fetched from CDN)
  */
 export class AssetSystem extends AbstractSystem {
-  /** Asset maps organized by origin ('latest' and 'local') */
+  /** Asset maps organized by origin ('custom', 'latest', and 'local') */
   sources: AssetSources;
-  /** Current origin for asset loading - 'latest' or 'local' */
+  /** Current origin for asset loading - should be 'latest', or 'local' */
   origin: AssetOrigin;
   /** Root folder path for assets, with trailing slash (e.g. 'dist/') */
   filePath: string;
@@ -52,17 +68,9 @@ export class AssetSystem extends AbstractSystem {
     super(context);
     this.id = 'assets';
 
-    //
-    // Rapid's asset map contains all of the data files that we may need to load.
-    // The data files are identified by keys, and are organized by origin.
-    //  'latest' - may load latest assets from a CDN which match the expected semantic version
-    //  'local' - will only load assets from the local folder.
-    //
-    // Important: To use 'local', you'll need to have installed a version of Rapid
-    //   that has all of these dependencies copied into `/dist/data/modules/`.
-    // See https://github.com/rapideditor/rapid-standalone if this is what you need.
-    //
     this.sources = {
+      custom: {},
+
       latest: {
         'address_formats':      'data/address_formats.min.json',
         'intro_graph':          'data/intro_graph.min.json',
@@ -130,8 +138,8 @@ export class AssetSystem extends AbstractSystem {
     if (isTestEnvironment) {
       const c = this._cache;
       c.address_formats = { addressFormats: [{ format: [['housenumber', 'street'], ['city', 'postcode'] ] }] };
-      c.editor_layer_index = { bundleID: 'editor_layer_index' };
-      c.rapid_imagery_overrides = { bundleID: 'rapid_imagery_overrides' };
+      c.editor_layer_index = { assetID: 'editor_layer_index' };
+      c.rapid_imagery_overrides = { assetID: 'rapid_imagery_overrides' };
       c.languages = { languages: { de: { nativeName: 'Deutsch' }, en: { nativeName: 'English' } } };
       c.locales = { locales: { en: { rtl: false } } };
       c.phone_formats = { phoneFormats: {} };
@@ -190,7 +198,7 @@ export class AssetSystem extends AbstractSystem {
    * Other systems and services should call this to track the assets they need to load.
    * @param key - asset identifier
    * @param path - file path or URL
-   * @param origin - optional, 'latest' or 'local' (if missing, sets both)
+   * @param origin - optional, 'custom', 'latest', or 'local' (if missing, sets 'latest' and 'local')
    * @throws Will throw if the given origin is invalid
    */
   setAsset(key: string, path: string, origin?: AssetOrigin): void {
@@ -212,7 +220,7 @@ export class AssetSystem extends AbstractSystem {
    * getAsset
    * Get an asset path from the list of sources.
    * @param key - asset identifier
-   * @param origin - optional, 'latest' or 'local' (if missing, returns current origin)
+   * @param origin - optional, 'custom', 'latest', or 'local' (if missing, returns current origin)
    * @return The asset path or undefined if not found
    * @throws Will throw if the given origin is invalid
    */

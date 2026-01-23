@@ -16,7 +16,7 @@ describe('Category', () => {
   beforeAll(() => {
     return schema.initAsync().then(() => {
       const presetData = {
-        bundleID: 'test',
+        assetID: 'test',
         presets: {
           'highway/residential': {
             tags: { highway: 'residential' },
@@ -118,13 +118,13 @@ describe('Category', () => {
   });
 
   describe('isBuiltin', () => {
-    it('returns true for Categories with no bundleID', () => {
+    it('returns true for Categories with no assetID', () => {
       const category = new Rapid.Category(context, { id: 'test' });
       assert.isTrue(category.isBuiltin());
     });
 
-    it('returns false for Categories with a bundleID', () => {
-      const category = new Rapid.Category(context, { id: 'test', bundleID: 'hello' });
+    it('returns false for Categories with a assetID', () => {
+      const category = new Rapid.Category(context, { id: 'test', assetID: 'hello' });
       assert.isFalse(category.isBuiltin());
     });
   });

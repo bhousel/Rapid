@@ -12,8 +12,8 @@ import { utilGatherTokens } from '../util/string.ts';
 export interface CategoryProps {
   /** Unique identifier for this Category */
   id: CategoryID;
-  /** The bundle that this Category came from (e.g. 'id-tagging-schema@6.13.0') */
-  bundleID: BundleID;
+  /** The asset that this Category came from (e.g. 'id-tagging-schema@6.13.0') */
+  assetID: AssetID;
   /** Display name (fallback if localization unavailable) */
   name: string;
   /** Array of preset IDs that belong to this Category */
@@ -233,12 +233,12 @@ export class Category {
   /**
    * isBuiltin
    * Is this one of the builtin objects?
-   * We consider it "builtin" if it doesn't have a `bundleID` (i.e. added via a merge).
+   * We consider it "builtin" if it doesn't have a `assetID` (i.e. added via a merge).
    * (There are not builtin categories at this time, only the fallback presets are builtin).
    * @return  Returns `true` if this is a builtin Category, `false` if not
    */
   isBuiltin(): boolean {
-    return !this.props.bundleID;
+    return !this.props.assetID;
   }
 
 }

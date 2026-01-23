@@ -1,6 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
 
 
 /**

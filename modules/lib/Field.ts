@@ -10,8 +10,8 @@ import type { Context } from '../Context.ts';
 export interface FieldProps {
   /** Unique identifier for this Field */
   id: FieldID;
-  /** The bundle that this Field came from (e.g. 'id-tagging-schema@6.13.0') */
-  bundleID: BundleID;
+  /** The asset that this Field came from (e.g. 'id-tagging-schema@6.13.0') */
+  assetID: AssetID;
   /** Type of field (e.g., 'text', 'combo', 'check', 'number', etc.) */
   type: string;
   /** English label for the field caption */
@@ -256,12 +256,12 @@ export class Field {
   /**
    * isBuiltin
    * Is this one of the builtin objects?
-   * We consider it "builtin" if it doesn't have a `bundleID` (i.e. added via a merge).
+   * We consider it "builtin" if it doesn't have a `assetID` (i.e. added via a merge).
    * (There are not builtin fields at this time, only the fallback presets are builtin).
    * @return  Returns `true` if this is a builtin Field, `false` if not
    */
   isBuiltin(): boolean {
-    return !this.props.bundleID;
+    return !this.props.assetID;
   }
 
 

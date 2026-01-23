@@ -4,9 +4,7 @@
  * @module
  */
 
-// Re-export Context for convenience (used by almost every class)
 import type { Context } from '../Context.ts';
-export type { Context } from '../Context.ts';
 
 // Re-export entity classes as types
 export type { AbstractData } from './AbstractData.ts';

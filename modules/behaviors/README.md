@@ -1,6 +1,6 @@
 # Behaviors
 
-Behaviors are bundles of event handlers that can be enabled and disabled depending on what the user is doing. They handle user input like mouse clicks, keyboard presses, and drag operations.
+Behaviors are groups of event handlers that can be enabled and disabled depending on what the user is doing. They handle user input like mouse clicks, keyboard presses, and drag operations.
 
 ## Overview
 

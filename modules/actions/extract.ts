@@ -3,7 +3,6 @@ import { OsmNode } from '../data/OsmNode.ts';
 import type { Action } from './types.ts';
 import type { EntityType, Tags } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { OsmRelation } from '../data/OsmRelation.ts';
 import type { OsmWay } from '../data/OsmWay.ts';
 import type { Viewport } from '@rapid-sdk/math';

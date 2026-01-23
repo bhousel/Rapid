@@ -4,6 +4,7 @@
  * @module
  */
 
+import type { Context } from '../Context.ts';
 import type { AbstractBehavior } from './AbstractBehavior.ts';
 import type { DragBehavior } from './DragBehavior.ts';
 import type { DrawBehavior } from './DrawBehavior.ts';
@@ -13,11 +14,6 @@ import type { MapInteractionBehavior } from './MapInteractionBehavior.ts';
 import type { MapNudgeBehavior } from './MapNudgeBehavior.ts';
 import type { PasteBehavior } from './PasteBehavior.ts';
 import type { SelectBehavior } from './SelectBehavior.ts';
-
-// Re-export Context from the main Context module.
-// This allows existing imports from './types.ts' to continue working.
-import type { Context } from '../Context.ts';
-export type { Context };
 
 /** A Behavior class constructor */
 export type BehaviorConstructor = new (context: Context) => AbstractBehavior;

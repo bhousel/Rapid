@@ -1,6 +1,10 @@
-import { Extent, type Viewport, type Vec2 } from '@rapid-sdk/math';
-import type { Context, GeometryPartWorldData, SingularGeometry, SingularGeometryType, SSRData } from '../lib/types.ts';
+import { Extent } from '@rapid-sdk/math';
 import { GeometryPart } from '../lib/GeometryPart.ts';
+
+import type { Context } from '../Context.ts';
+import type { GeometryPartWorldData, SingularGeometry, SingularGeometryType, SSRData } from '../lib/types.ts';
+import type { Viewport, Vec2 } from '@rapid-sdk/math';
+
 
 
 /** Screen coordinate data for PixiGeometryPart */

@@ -21,7 +21,7 @@ describe('AssetSystem', () => {
         assert.isTrue(assets.autoStart);
 
         assert.isObject(assets.sources);
-        assert.hasAllKeys(assets.sources, ['latest', 'local']);
+        assert.hasAllKeys(assets.sources, ['custom', 'latest', 'local']);
         assert.strictEqual(assets.origin, 'latest');
         assert.strictEqual(assets.filePath, '');
         assert.deepEqual(assets.fileReplacements, {});
@@ -105,7 +105,7 @@ describe('AssetSystem', () => {
       const assets = new Rapid.AssetSystem(context);
       const sources = assets.sources;
       assert.isObject(sources);
-      assert.hasAllKeys(sources, ['latest', 'local']);
+      assert.hasAllKeys(sources, ['custom', 'latest', 'local']);
     });
   });
 
@@ -134,10 +134,11 @@ describe('AssetSystem', () => {
       });
 
       it('sets/gets assets, no origin specified', () => {
-        _assets.setAsset('test_asset2', 'baz');   // set both origins at once
+        _assets.setAsset('test_asset2', 'baz');   // sets 'latest' and 'local' origins
 
         assert.strictEqual(_assets.getAsset('test_asset2', 'latest'), 'baz');
         assert.strictEqual(_assets.getAsset('test_asset2', 'local'), 'baz');
+        assert.isUndefined(_assets.getAsset('test_asset2', 'custom'));  // not set in custom
         assert.strictEqual(_assets.getAsset('test_asset2'), 'baz');  // get current origin ('latest')
       });
     });

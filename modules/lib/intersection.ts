@@ -6,8 +6,10 @@ import { actionReverse } from '../actions/reverse.ts';
 import { actionSplit } from '../actions/split.ts';
 import { Graph } from './Graph.ts';
 
-import type { Context, OsmEntity, OsmNode, OsmRelation, OsmWay, Vec2 } from '../data/types.ts';
+import type { Context } from '../Context.ts';
+import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
 import type { Action } from '../actions/types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**

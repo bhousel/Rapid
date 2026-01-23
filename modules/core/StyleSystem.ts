@@ -1,7 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { osmPavedTags } from '../lib/tags.ts';
 
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
 
 

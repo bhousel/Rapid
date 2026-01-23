@@ -6,7 +6,7 @@ import throttle from 'lodash-es/throttle.js';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilCmd } from '../util/cmd.ts';
 
-import type { Context } from './types.ts';
+import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type {
   Map as MapLibreMap,
