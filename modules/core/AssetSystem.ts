@@ -32,10 +32,13 @@ export type AssetOrigin = keyof AssetSources;
  * `AssetSystem` keeps track of files and data that Rapid needs to load.
  *
  * Information about the assets can be found in the `sources` structure.
- * Sources are identified by keys, and are grouped by origin.
- *  'custom' - assets added at runtime, these override 'latest' and 'local'.
- *  'latest' - may load latest assets from a CDN which match the expected semantic version
- *  'local' - will only load assets from the local folder.
+ * Sources are identified by keys, and are grouped by origin:
+ *  - 'custom' - assets added at runtime, these **always override** 'latest' and 'local'
+ *  - 'latest' - default assets, may load from CDN (the default origin)
+ *  - 'local' - local assets only, for offline/standalone use
+ *
+ * The `origin` property controls whether 'latest' or 'local' is used as the fallback.
+ * When loading an asset, the system checks 'custom' first, then falls back to the current origin.
  *
  * Important: To use 'local', you'll need to have installed a version of Rapid
  *   that has all of these dependencies copied into `/dist/data/modules/`.
@@ -43,12 +46,12 @@ export type AssetOrigin = keyof AssetSources;
  *
  * Properties available:
  *   `sources`   The sources Object contains all the details about where to fetch assets from
- *   `origin`    'local' (all files fetched from dist) or 'latest' (newer files may be fetched from CDN)
+ *   `origin`    'latest' or 'local' - the fallback origin when asset is not in 'custom'
  */
 export class AssetSystem extends AbstractSystem {
   /** Asset maps organized by origin ('custom', 'latest', and 'local') */
   sources: AssetSources;
-  /** Current origin for asset loading - should be 'latest', or 'local' */
+  /** Current origin for asset loading - should be set to 'latest' or 'local' */
   origin: AssetOrigin;
   /** Root folder path for assets, with trailing slash (e.g. 'dist/') */
   filePath: string;
@@ -56,7 +59,7 @@ export class AssetSystem extends AbstractSystem {
   fileReplacements: Record<string, string>;
 
   /** Cache of loaded asset data, keyed by asset identifier */
-  private _cache: Record<string, unknown>;
+  private _cache: Record<AssetID, unknown>;
   /** In-flight fetch promises, keyed by URL */
   private _inflight: Record<string, Promise<unknown>>;
 
@@ -67,6 +70,7 @@ export class AssetSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'assets';
+    this.optionalDependencies = new Set(['urlhash']);
 
     this.sources = {
       custom: {},
@@ -168,7 +172,21 @@ export class AssetSystem extends AbstractSystem {
    * @return  Promise resolved when this component has completed initialization
    */
   initAsync(): Promise<void> {
-    return super.initAsync();
+    if (this._initPromise) return this._initPromise;
+
+    const context = this.context;
+    const urlhash = context.systems.urlhash;
+
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [ urlhash?.initAsync() ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
+      .then(() => {
+        const hash = urlhash?.initialHashParams || new Map();
+        // todo:  setup custom assets ,
+        //  e.g   thing = hash.get('assets');
+      });
   }
 
 
@@ -196,22 +214,22 @@ export class AssetSystem extends AbstractSystem {
    * setAsset
    * Set an asset in the list of sources.
    * Other systems and services should call this to track the assets they need to load.
-   * @param key - asset identifier
+   * @param assetID - asset identifier
    * @param path - file path or URL
    * @param origin - optional, 'custom', 'latest', or 'local' (if missing, sets 'latest' and 'local')
    * @throws Will throw if the given origin is invalid
    */
-  setAsset(key: string, path: string, origin?: AssetOrigin): void {
+  setAsset(assetID: AssetID, path: string, origin?: AssetOrigin): void {
     if (origin) {
       const sources = this.sources[origin];
       if (!sources) {
         throw new Error(`Unknown origin "${origin}"`);
       }
-      sources[key] = path;
+      sources[assetID] = path;
 
     } else {
-      this.sources.latest[key] = path;
-      this.sources.local[key] = path;
+      this.sources.latest[assetID] = path;
+      this.sources.local[assetID] = path;
     }
   }
 
@@ -219,17 +237,17 @@ export class AssetSystem extends AbstractSystem {
   /**
    * getAsset
    * Get an asset path from the list of sources.
-   * @param key - asset identifier
+   * @param assetID - asset identifier
    * @param origin - optional, 'custom', 'latest', or 'local' (if missing, returns current origin)
    * @return The asset path or undefined if not found
    * @throws Will throw if the given origin is invalid
    */
-  getAsset(key: string, origin: AssetOrigin = this.origin): string | undefined {
+  getAsset(assetID: AssetID, origin: AssetOrigin = this.origin): string | undefined {
     const sources = this.sources[origin];
     if (!sources) {
       throw new Error(`Unknown origin "${this.origin}"`);
     }
-    return sources[key];
+    return sources[assetID];
   }
 
 
@@ -252,13 +270,21 @@ export class AssetSystem extends AbstractSystem {
   /**
    * getAssetURL
    * Returns the URL for the given asset key.
+   * Checks the 'custom' origin first, then falls back to the current origin ('latest' or 'local').
    * @param key - identifier for the asset, should be found in the asset map.
    * @return URL of the asset
-   * @throws Will throw if the asset key is not found, or the current origin is invalid
+   * @throws Will throw if the asset key is not found in either custom or current origin
    */
   getAssetURL(key: string): string {
     if (/^http(s)?:\/\//i.test(key)) return key; // already a url
 
+    // Check 'custom' origin first (override layer)
+    const customVal = this.sources.custom[key];
+    if (customVal) {
+      return this.getFileURL(customVal);
+    }
+
+    // Fall back to current origin ('latest' or 'local')
     const sources = this.sources[this.origin];
     if (!sources) {
       throw new Error(`Unknown origin "${this.origin}"`);

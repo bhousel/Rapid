@@ -192,6 +192,46 @@ describe('AssetSystem', () => {
         _assets.origin = 'latest';
         assert.strictEqual(_assets.getAssetURL('intro_graph'), 'data/intro_graph.min.json');
       });
+
+      it('returns custom origin URL when asset exists in custom', () => {
+        _assets.origin = 'latest';
+        _assets.sources.custom['intro_graph'] = 'https://example.com/custom_intro.json';
+        assert.strictEqual(_assets.getAssetURL('intro_graph'), 'https://example.com/custom_intro.json');
+        delete _assets.sources.custom['intro_graph'];  // cleanup
+      });
+
+      it('custom origin overrides both latest and local', () => {
+        // Set up asset in all three origins
+        _assets.sources.custom['test_override'] = 'custom_url';
+        _assets.sources.latest['test_override'] = 'latest_url';
+        _assets.sources.local['test_override'] = 'local_url';
+
+        // Should return custom regardless of origin setting
+        _assets.origin = 'latest';
+        assert.strictEqual(_assets.getAssetURL('test_override'), 'custom_url');
+
+        _assets.origin = 'local';
+        assert.strictEqual(_assets.getAssetURL('test_override'), 'custom_url');
+
+        // cleanup
+        delete _assets.sources.custom['test_override'];
+        delete _assets.sources.latest['test_override'];
+        delete _assets.sources.local['test_override'];
+        _assets.origin = 'latest';
+      });
+
+      it('falls back to current origin when asset not in custom', () => {
+        // Ensure asset is NOT in custom
+        delete _assets.sources.custom['intro_graph'];
+
+        _assets.origin = 'latest';
+        assert.strictEqual(_assets.getAssetURL('intro_graph'), 'data/intro_graph.min.json');
+
+        _assets.origin = 'local';
+        assert.strictEqual(_assets.getAssetURL('intro_graph'), 'data/intro_graph.min.json');
+
+        _assets.origin = 'latest';  // reset
+      });
     });
 
 
