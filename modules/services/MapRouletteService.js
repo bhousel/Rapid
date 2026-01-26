@@ -2,6 +2,7 @@ import { Tiler } from '@rapid-sdk/math';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Marker } from '../data/Marker.ts';
+import { utilExtractValues } from '../util/string.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 const TILEZOOM = 14;
@@ -34,7 +35,7 @@ export class MapRouletteService extends AbstractSystem {
     this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._hashchange = this._hashchange.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._mapRouletteChanged = this._mapRouletteChanged.bind(this);
   }
 
@@ -56,7 +57,7 @@ export class MapRouletteService extends AbstractSystem {
 
         // Setup event handlers..
         gfx?.scene?.on('layerchange', this._mapRouletteChanged);
-        urlhash?.on('hashchange', this._hashchange);
+        urlhash?.on('hashChanged', this._hashChanged);
       });
   }
 
@@ -633,12 +634,12 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * _hashchange
+   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param  {Map<string, string>}  currParams - The current hash parameters
    * @param  {Map<string, string>}  prevParams - The previous hash parameters
    */
-  _hashchange(currParams, prevParams) {
+  _hashChanged(currParams, prevParams) {
     const scene = this.context.systems.gfx?.scene;
     if (!scene) return;  // test environment?
 
@@ -652,7 +653,7 @@ export class MapRouletteService extends AbstractSystem {
       let isEnabled = false;
 
       this._challengeIDs.clear();
-      const vals = newVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      const vals = utilExtractValues(newVal).filter(Boolean);
       for (const val of vals) {
         if (val === 'true') {
           isEnabled = true;

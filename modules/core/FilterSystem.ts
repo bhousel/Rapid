@@ -2,6 +2,7 @@ import { /* utilArrayGroupBy,*/ utilArrayUnion } from '@rapid-sdk/util';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 import { osmLifecyclePrefixes } from '../lib/tags.ts';
+import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
@@ -207,7 +208,7 @@ export class FilterSystem extends AbstractSystem {
     // Take filter values from urlhash first, localstorage second,
     // Default to having boundaries hidden
     const toHide = urlhash?.getParam('disable_features') ?? storage?.getItem('disabled-features') ?? 'boundaries';
-    const filterIDs = toHide.replace(/;/g, ',').split(',').map((s: string) => s.trim()).filter(Boolean);
+    const filterIDs = utilExtractValues(toHide).filter(Boolean);
     for (const filterID of filterIDs) {
       this._hidden.add(filterID);
       const filter = this._filters.get(filterID);
@@ -718,13 +719,11 @@ export class FilterSystem extends AbstractSystem {
    */
   _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // disable_features
-    const newDisable = currParams.get('disable_features');
-    const oldDisable = prevParams.get('disable_features');
+    const newDisable = currParams.get('disable_features') || '';
+    const oldDisable = prevParams.get('disable_features') || '';
     if (newDisable !== oldDisable) {
-      let toDisableIDs = new Set<string>();
-      if (typeof newDisable === 'string') {
-        toDisableIDs = new Set(newDisable.replace(/;/g, ',').split(','));
-      }
+      const vals = utilExtractValues(newDisable).filter(Boolean);
+      const toDisableIDs = new Set<FilterID>(vals);
 
       let didChange = false;
       for (const [filterID, filter] of this._filters) {

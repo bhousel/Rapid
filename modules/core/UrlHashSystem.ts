@@ -34,10 +34,11 @@ let _document: DocumentLike;
 
 /**
  * `UrlHashSystem` is responsible for managing the url hash and query parameters.
- * It updates the `window.location.hash` and document title
- * It also binds to the hashchange event and responds to changes made by the user directly to the url
- *
+ * It updates the `window.location.hash` and document title.
+ * It also binds to the hashchange event and responds to changes made by the user directly to the url.
  * Supports `pause()` / `resume()` - when paused, url hash will not emit events or do anything
+ *
+ * Please see [API.md] for the current list of supported URL parameters.
  *
  * Properties you can access:
  *   `initialHashParams`  Map<string, string> containing the initial query params (e.g. `background=Bing` etc)
@@ -48,40 +49,6 @@ let _document: DocumentLike;
  *   `hashchange`   Fires on hashchange and when enable is called, receives Map(currParams), Map(prevParams)
  */
 export class UrlHashSystem extends AbstractSystem {
-
-/**
-* Initial only
-* __`comment`__ - Prefills the changeset comment. Pass a url encoded string.
-* __`hashtags`__ - Prefills the changeset hashtags.  Pass a url encoded list of event
-* __`presets`__ - A comma-separated list of preset IDs. These will be the only presets the user may select.
-* __`source`__ - Prefills the changeset source. Pass a url encoded string.
-* __`validationDisable`__ - The issues identified by these types/subtypes will be disabled (i.e. Issues will not be shown at all). Each parameter value should contain a urlencoded, comma-separated list of type/subtype match rules.  An asterisk `*` may be used as a wildcard.
-* __`validationWarning`__ - The issues identified by these types/subtypes will be treated as warnings (i.e. Issues will be surfaced to the user but not block changeset upload). Each parameter value should contain a urlencoded, comma-separated list of type/subtype match rules.  An asterisk `*` may be used as a wildcard.
-* __`validationError`__ - The issues identified by these types/subtypes will be treated as errors (i.e. Issues will be surfaced to the user but will block changeset upload). Each parameter value should contain a urlencoded, comma-separated list of type/subtype match rules.  An asterisk `*` may be used as a wildcard.
-* __`walkthrough=true`__
-*
-* Responsive (user can change)
-* __`background`__ - Imagery sourceID for the background imagery layer
-* __`data`__ - A custom data URL for loading a gpx track, vector data source, [WKT](https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry) POLYGON or MULTIPOLYGON text string to render as custom data.
-* __`download_osc=true`__ - True to enable the "download" button
-* __`gpx`__ - Same as `data`, it's just the legacy name for the same thing
-* __`datasets`__ - A comma-separated list of Rapid/Esri datasetIDs to enable
-* __`disable_features`__ - Disables features in the list.
-* __`locale`__ - A code specifying the localization to use, affecting the language, layout, and keyboard shortcuts. Multiple codes may be specified in order of preference. The first valid code will be the locale, while the rest will be used as fallbacks if certain text hasn't been translated. The default locale preferences are set by the browser.
-* __`rtl=true`__ - Force Rapid into right-to-left mode (useful for testing).
-* __`maproulette`__ - Enable the MapRoulette task layer, e.g.`maproulette=true` -or- `maproulette=<challengeIDs>`
-* __`note`__ - Enable the Notes layer, e.g.`note=true` -or- `note=<noteID>`
-* __`overlays`__ - A comma-separated list of imagery sourceIDs to display as overlays
-* __`photo`__ - The layerID and photoID of a photo to select, e.g `photo=mapillary/fztgSDtLpa08ohPZFZjeRQ`
-* __`photo_overlay`__ - The street-level photo overlay layers to enable.
-* __`photo_dates`__ - The range of capture dates by which to filter street-level photos. Dates are given in YYYY-MM-DD format and separated by `_`. One-sided ranges are supported.
-* __`photo_username`__ - The Mapillary or KartaView username by which to filter street-level photos. Multiple comma-separated usernames are supported.
-* __`poweruser=true`__ - True to enable poweruser features, false to hide poweruser features
-* __`id`__ - An OSM ID to select.
-* __`map`__ - A slash-separated `zoom/lat/lon/rot`.
-* __`offset`__ - Background imagery alignment offset in meters, formatted as `east,north`.
-**/
-
   /** Whether to update the document title */
   doUpdateTitle: boolean;
   /** The base document title to use */

@@ -2,71 +2,115 @@ This file documents efforts toward establishing a public API for Rapid.
 
 ## URL parameters
 
-##### Rapid Standalone
+Rapid supports many URL parameters, listed below.
+When constructing a URL to Rapid the parameters should appear in the
+[fragment](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Fragment)
+part of the URL. For example: `https://rapideditor.com/edit#<param1>=<val1>&<param2>=<val2>…`
 
-Rapid supports several URL parameters. When constructing a URL to a standalone instance
-of Rapid (e.g. `https://mapwith.ai/rapid`), the following parameters are available
-**in the hash portion of the URL**:
+By convention Rapid expects these parameters to look like:
+- simple strings, for example  `thing=true`
+- comma-delimited lists, for example: `thing=one,two,three`
+- comma-delimited k|v pairs, for example:  `thing=foo|bar,fizz|buzz`
+(other list delimiters, such as '/' or ';', are generally accepted)
 
-* __`background`__ - The value of the `id` property of the source in Rapid's
-  [imagery list](https://github.com/facebook/rapid/blob/main/data/imagery.json),
-  or a custom tile URL. A custom URL is specified in the format `custom:<url>`,
-  where the URL can contain the standard tile URL placeholders `{x}`, `{y}` and
-  `{z}`/`{zoom}`, `{ty}` for flipped TMS-style Y coordinates, and `{switch:a,b,c}` for
-  DNS multiplexing.<br/>
-  _Example:_ `background=custom:https://{switch:a,b,c}.tile.openstreetmap.org/{zoom}/{x}/{y}.png`
-* __`comment`__ - Prefills the changeset comment. Pass a url encoded string.<br/>
+Note that values are first passed through
+[`decodeURIComponent()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/decodeURIComponent).
+URL-encoding is therefore optional but can be used to encode URL-unsafe characters.
+- `thing=%23one%2C%23two`   (same as `#one,#two`)
+- `thing=val%7Chttp%3A%2F%2Fexample.com`  (same as `val|http://example.com`)
+
+#### Initial only (these params take effect at init time)
+* __`assets`__ - Custom asset overrides as `assetID|url` pairs separated by commas. These
+  can be used to override the default assets loaded by Rapid (e.g. schema presets, imagery index).<br/>
+  _Example:_ `assets=my_presets|https://example.com/presets.json,my_imagery|https://example.com/imagery.json`<br/>
+* __`comment`__ - Prefills the changeset comment. Pass a URL-encoded string.<br/>
   _Example:_ `comment=CAR%20crisis%2C%20refugee%20areas%20in%20Cameroon`
-* __`datasets`__ - A comma-separated list of dataset IDs to enable<br/>
-  _Example:_ `datasets=fbRoads,msBuildings,e75b56f13b404d7d8b47ef8be1c619ec`
-* __`disable_features`__ - Disables features in the list.<br/>
-  _Example:_ `disable_features=water,service_roads,points,paths,boundaries`<br/>
-  _Available features:_ `points`, `traffic_roads`, `service_roads`, `paths`, `buildings`, `building_parts`, `indoor`, `landuse`,
-  `boundaries`, `water`, `rail`, `pistes`, `aerialways`, `power`, `past_future`, `others`
-* __`gpx`__ - A custom URL for loading a gpx track.  Specifying a `gpx` parameter will
-  automatically enable the gpx layer for display.<br/>
-  _Example:_ `gpx=https://tasks.hotosm.org/project/592/task/16.gpx`
-* __`hashtags`__ - Prefills the changeset hashtags.  Pass a url encoded list of event
+* __`hashtags`__ - Prefills the changeset hashtags.  Pass a URL-encoded list of event
   hashtags separated by commas, semicolons, or spaces.  Leading '#' symbols are
   optional and will be added automatically. (Note that hashtag-like strings are
   automatically detected in the `comment`).<br/>
   _Example:_ `hashtags=%23hotosm-task-592,%23MissingMaps`
-* __`id`__ - The character 'n', 'w', or 'r', followed by the OSM ID of a node, way or relation, respectively. Selects the specified entity, and, unless a `map` parameter is also provided, centers the map on it.<br/>
+* __`presets`__ - A comma-separated list of preset IDs. These will be the only presets the user may select.<br/>
+  _Example:_ `presets=building,highway/residential,highway/unclassified`
+* __`renderer`__ - Force the renderer to use one of: `webgpu`, `webgl1`, or `webgl2` (the default)<br/>
+  _Example:_ `renderer=webgpu`
+* __`source`__ - Prefills the changeset source. Pass a URL-encoded string.<br/>
+  _Example:_ `source=Bing%3BMapillary`
+* __`validationDisable`__ - The issues identified by these types/subtypes will be disabled
+  (i.e. Issues will not be shown at all). Each parameter value should contain a URL-encoded,
+  comma-separated list of type/subtype match rules.  An asterisk `*` may be used as a wildcard.<br/>
+  _Example:_ `validationDisable=crossing_ways/highway*,crossing_ways/tunnel*`
+* __`validationWarning`__ - The issues identified by these types/subtypes will be treated as warnings
+  (i.e. Issues will be surfaced to the user but not block changeset upload). Each parameter value
+  should contain a URL-encoded, comma-separated list of type/subtype match rules.  An asterisk `*`
+  may be used as a wildcard.<br/>
+  _Example:_ `validationWarning=crossing_ways/highway*,crossing_ways/tunnel*`
+* __`validationError`__ - The issues identified by these types/subtypes will be treated as errors
+  (i.e. Issues will be surfaced to the user but will block changeset upload). Each parameter value
+  should contain a URL-encoded, comma-separated list of type/subtype match rules.  An asterisk `*`
+  may be used as a wildcard.<br/>
+  _Example:_ `validationError=crossing_ways/highway*,crossing_ways/tunnel*`
+* __`walkthrough=true`__ - Enter the walkthrough automatically upon startup.
+
+
+#### Responsive (you can change these anytime and Rapid will respond to the change)
+* __`background`__ - The value of the `id` property of the source in Rapid's
+  [imagery list](https://github.com/facebook/rapid/blob/main/data/imagery.json),
+  or a custom tile URL. A custom URL is specified in the format `custom:<url>`, where the URL can
+  contain the standard tile URL placeholders `{x}`, `{y}` and `{z}`/`{zoom}`, `{ty}` for flipped
+  TMS-style Y coordinates, and `{switch:a,b,c}` for DNS multiplexing.<br/>
+  _Example:_ `background=custom:https://{switch:a,b,c}.tile.openstreetmap.org/{zoom}/{x}/{y}.png`
+* __`data`__ - (or legacy name __`gpx`__) A custom data URL for loading a gpx track, vector data source,
+  or URL-encoded [WKT](https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry)
+  POLYGON or MULTIPOLYGON text string to render as custom data.<br/>
+  _Example:_ `data=https://tasks.hotosm.org/project/592/task/16.gpx`<br/>
+  _Example:_ `data=POLYGON((-10%2010,%20-10%20-10,%2010%20-10,%2010%2010,%20-10%2010))`
+* __`datasets`__ - A comma-separated list of datasetIDs to enable<br/>
+  _Example:_ `datasets=fbRoads,msBuildings,e75b56f13b404d7d8b47ef8be1c619ec`
+* __`detection`__ - The layer and ID of the detection to show.<br/>
+  _Example:_ `detection=mapillary-signs|481941836449560`<br/>
+  _Available prefixes:_ `mapillary-detections`, `mapillary-signs`
+* __`disable_features`__ - Disables features that match the given filter value.<br/>
+  _Example:_ `disable_features=water,service_roads,points,paths,boundaries`<br/>
+  _Available filters:_
+  `points`, `traffic_roads`, `service_roads`, `paths`, `buildings`, `building_parts`,
+  `indoor`, `landuse`, `boundaries`, `water`, `rail`, `pistes`, `aerialways`, `power`,
+  `past_future`, `others`
+* __`id`__ - The character 'n', 'w', or 'r', followed by the OSM ID of a node, way or relation, respectively.
+  Selects the specified entity, and, unless a `map` parameter is also provided, centers the map on it.<br/>
   _Example:_ `id=n1207480649`
-* __`locale`__ - A code specifying the localization to use, affecting the language, layout, and keyboard shortcuts. Multiple codes may be specified in order of preference. The first valid code will be the locale, while the rest will be used as fallbacks if certain text hasn't been translated. The default locale preferences are set by the browser.<br/>
+* __`locale`__ - A code specifying the localization to use, affecting the language, layout,
+  and keyboard shortcuts. Multiple codes may be specified in order of preference.
+  The default locale preferences are set by the browser.<br/>
   _Example:_ `locale=ja`, `locale=pt-BR`, `locale=nl,fr,de`<br/>
-  _Available values:_ Any of the [supported locales](https://github.com/facebook/Rapid/blob/main/data/locales.json).
-* __`map`__ - A slash-separated `zoom/latitude/longitude`.<br/>
+* __`map`__ - A slash-separated `zoom/latitude/longitude/rotation`.  Rotation is optional.<br/>
   _Example:_ `map=20.00/38.90085/-77.02271`
-* __`maproulette`__ - Enable the MapRoulette task layer, optionally with comma-separated list of challenge IDs to filter.<br/>
+* __`maproulette`__ - Enable the MapRoulette task layer. Optionally provide a
+  comma-separated list of challenge IDs to filter the tasks shown.<br/>
   _Example:_  `maproulette=true` -or- `maproulette=<challengeIDs>`
+* __`note`__ - Enable the Notes layer, e.g.`note=true` -or- `note=<noteID>`
 * __`offset`__ - Background imagery alignment offset in meters, formatted as `east,north`.<br/>
   _Example:_ `offset=-10,5`
+* __`overlays`__ - A comma-separated list of imagery sourceIDs to display as overlays
+* __`photo`__ - The layer and ID of the photo to show.<br/>
+  _Example:_ `photo=mapillary|1157313301398079`<br/>
+  _Available prefixes:_ `streetside`, `mapillary`, `kartaview`
 * __`photo_overlay`__ - The street-level photo overlay layers to enable.<br/>
   _Example:_ `photo_overlay=streetside,mapillary,kartaview`<br/>
   _Available values:_ `streetside` (Microsoft Bing), `mapillary`, `mapillary-signs`, `mapillary-detections`, `kartaview`
-* __`photo_dates`__ - The range of capture dates by which to filter street-level photos. Dates are given in YYYY-MM-DD format and separated by `_`. One-sided ranges are supported.<br/>
-  _Example:_ `photo_dates=2019-01-01_2020-12-31`, `photo_dates=2019-01-01_`, `photo_dates=_2020-12-31`<br/>
-* __`photo_username`__ - The Mapillary or KartaView username by which to filter street-level photos. Multiple comma-separated usernames are supported.<br/>
-  _Example:_ `photo_user=quincylvania`, `photo_user=quincylvania,chrisbeddow`<br/>
-* __`photo`__ - The layer and ID of the photo to show.<br/>
-  _Example:_ `photo=mapillary/1157313301398079`<br/>
-  _Available prefixes:_ `streetside`, `mapillary`, `kartaview`
-* __`detection`__ - The layer and ID of the detection to show.<br/>
-  _Example:_ `mapillary-signs/481941836449560`<br/>
-  _Available prefixes:_ `mapillary-detections`, `mapillary-signs`
-* __`presets`__ - A comma-separated list of preset IDs. These will be the only presets the user may select.<br/>
-  _Example:_ `presets=building,highway/residential,highway/unclassified`
-* __`rtl=true`__ - Force Rapid into right-to-left mode (useful for testing).
-* __`source`__ - Prefills the changeset source. Pass a url encoded string.<br/>
-  _Example:_ `source=Bing%3BMapillary`
-* __`validationDisable`__ - The issues identified by these types/subtypes will be disabled (i.e. Issues will not be shown at all). Each parameter value should contain a urlencoded, comma-separated list of type/subtype match rules.  An asterisk `*` may be used as a wildcard.<br/>
-  _Example:_ `validationDisable=crossing_ways/highway*,crossing_ways/tunnel*`
-* __`validationWarning`__ - The issues identified by these types/subtypes will be treated as warnings (i.e. Issues will be surfaced to the user but not block changeset upload). Each parameter value should contain a urlencoded, comma-separated list of type/subtype match rules.  An asterisk `*` may be used as a wildcard.<br/>
-  _Example:_ `validationWarning=crossing_ways/highway*,crossing_ways/tunnel*`
-* __`validationError`__ - The issues identified by these types/subtypes will be treated as errors (i.e. Issues will be surfaced to the user but will block changeset upload). Each parameter value should contain a urlencoded, comma-separated list of type/subtype match rules.  An asterisk `*` may be used as a wildcard.<br/>
-  _Example:_ `validationError=crossing_ways/highway*,crossing_ways/tunnel*`
-* __`walkthrough=true`__ - Start the walkthrough automatically
+* __`photo_dates`__ - The range of capture dates by which to filter street-level photos.
+  Dates are given in YYYY-MM-DD format and separated by `|`. One-sided ranges are supported.<br/>
+  _Example:_ `photo_dates=2019-01-01|2020-12-31`<br/>
+  _Example:_ `photo_dates=2019-01-01|`, `photo_dates=|2020-12-31`<br/>
+* __`photo_username`__ - The Mapillary or KartaView username by which to filter street-level photos.
+  Multiple comma-separated usernames are supported.<br/>
+  _Example:_ `photo_username=quincylvania`, `photo_username=quincylvania,chrisbeddow`<br/>
+
+
+#### Advanced  (also responsive)
+* __`download_osc=true`__ - Set to `true` to enable the "download" button
+* __`poweruser=true`__ - Set to `true` to enable poweruser features
+* __`rtl=true`__ - Set to `true` for right-to-left rendering (useful for testing, normally RTL is controlled by the `locale` parameter).
 
 
 ## Customized Deployments
@@ -113,14 +157,19 @@ Each imagery source should have the following properties:
   * `{switch:a,b,c}` - for parts of the url that can be cycled for connection parallelization
 
 Optional properties:
-* `description` - A longer source description which, if included, will be displayed in a popup when viewing the background imagery list
-* `overlay` - If `true`, this is an overlay layer (a transparent layer rendered above base imagery layer). Defaults to `false`
-* `zoomExtent` - Allowable min and max zoom levels, defaults to `[0, 22]`
-* `feature` - A GeoJSON 'Polygon' or 'MultiPolygon' within which imagery is valid.  If omitted, imagery is assumed to be valid worldwide
-* `terms_url` - Url to link to when displaying the imagery terms
-* `terms_html` - Html content to display in the imagery terms
-* `terms_text` - Text content to display in the imagery terms
-* `best` - If set to `true`, this imagery is considered "better than Bing" and may be chosen by default when Rapid starts.  Will display with a star in the background imagery list.  Defaults to `false`
+* `description` - A longer source description which, if included, will be
+  displayed in a popup when viewing the background imagery list.
+* `overlay` - If `true`, this is an overlay layer (a transparent layer rendered
+  above base imagery). Defaults to `false`.
+* `zoomExtent` - Allowable min and max zoom levels, defaults to `[0, 22]`.
+* `feature` - A GeoJSON `Polygon` or `MultiPolygon` within which imagery is valid.
+  If omitted, imagery is assumed to be valid worldwide.
+* `terms_url` - Url to link to when displaying the imagery terms.
+* `terms_html` - Html content to display in the imagery terms.
+* `terms_text` - Text content to display in the imagery terms.
+* `best` - If set to `true`, this imagery is considered "better than Bing" and
+  may be chosen by default when Rapid starts. It will display with a star in the
+  background imagery list. Defaults to `false`.
 
 
 ### Tagging Schema (aka "Presets")

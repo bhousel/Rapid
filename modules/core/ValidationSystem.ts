@@ -3,6 +3,7 @@ import { utilArrayChunk, utilArrayGroupBy } from '@rapid-sdk/util';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference } from '../lib/Difference.ts';
+import { utilExtractValues } from '../util/string.ts';
 import { ValidationCache } from '../lib/ValidationCache.ts';
 import * as Validations from '../validations/index.js';
 
@@ -180,11 +181,9 @@ export class ValidationSystem extends AbstractSystem {
         this._warningOverrides = this._parseHashParam(hash.get('validationWarning'));
         this._disableOverrides = this._parseHashParam(hash.get('validationDisable'));
 
-        const disabledRules = storage?.getItem('validate-disabledRules');
-        if (disabledRules) {
-          const ruleIDs = disabledRules.split(',').map((s: string) => s.trim()).filter(Boolean);
-          this._disabledRuleIDs = new Set(ruleIDs);
-        }
+        const disabledRules = storage?.getItem('validate-disabledRules') ?? '';
+        const ruleIDs = utilExtractValues(disabledRules).filter(Boolean);
+        this._disabledRuleIDs = new Set(ruleIDs);
 
         // Setup event handlers..
         // When to run validation:
@@ -245,7 +244,8 @@ export class ValidationSystem extends AbstractSystem {
    */
   private _parseHashParam(val: string = ''): SeverityOverride[] {
     const result: SeverityOverride[] = [];
-    const rules = val.split(',').map(s => s.trim()).filter(Boolean);
+
+    const rules = utilExtractValues(val, /[,;|]/).filter(Boolean);
     for (const rule of rules) {
       const parts = rule.split('/', 2);  // "type/subtype"
       const type = parts[0];

@@ -113,3 +113,25 @@ export function utilWildcard(str: string): RegExp | null {
 
   return new RegExp(`^${wild}$`);
 }
+
+
+/**
+ * utilExtractValues
+ * This extracts multiple values from a string, typically used as a URL parameter.
+ * If separator is not provided, a default list of separator characters will be used.
+ * Note that empty values are not filtered - caller should append `.filter(Boolean)` if you want this.
+ *
+ * @param s - the string to extract from
+ * @param separator  - optional, the separator to use to split the values
+ * @returns An array of strings
+ *
+ * @example
+ * utilExtractValues('one,two,three')                      // returns ['one', 'two', 'three']
+ * utilExtractValues('mapillary-signs|481941836449560')    // returns ['mapillary-signs', '481941836449560']
+ */
+export function utilExtractValues(s: string, separator?: string | RegExp): string[] {
+  if (typeof s !== 'string') return [];
+  if (!separator) separator = /[,/;\\|]/;
+  return s.split(separator).map(s => s.trim());
+}
+

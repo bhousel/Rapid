@@ -184,8 +184,19 @@ export class AssetSystem extends AbstractSystem {
       })
       .then(() => {
         const hash = urlhash?.initialHashParams || new Map();
-        // todo:  setup custom assets ,
-        //  e.g   thing = hash.get('assets');
+
+        // Parse `assets` parameter: key|url pairs separated by commas
+        // e.g. `assets=my_presets|https://example.com/presets.json,my_imagery|https://example.com/imagery.json`
+        const assetsParam = hash.get('assets');
+        if (assetsParam) {
+          const pairs = assetsParam.split(',');
+          for (const pair of pairs) {
+            const [assetID, url] = pair.split('|');
+            if (assetID && url) {
+              this.sources.custom[assetID] = url;
+            }
+          }
+        }
       });
   }
 

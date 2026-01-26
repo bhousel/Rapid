@@ -5,7 +5,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.ts';
 import { Category, Field, Preset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
-import { utilWildcard } from '../util/string.ts';
+import { utilExtractValues, utilWildcard } from '../util/string.ts';
 
 import type { CategoryProps } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
@@ -218,10 +218,10 @@ export class SchemaSystem extends AbstractSystem {
         this._resetAll();
 
         // If we received a subset of addable presetIDs specified in the url hash, save them.
-        const presetIDs = urlhash?.initialHashParams.get('presets');
+        const presetIDs = urlhash?.initialHashParams.get('presets') || '';
         if (presetIDs) {
-          const arr = presetIDs.split(',').map(s => s.trim()).filter(Boolean);
-          this.addablePresetIDs = new Set(arr);
+          const vals = utilExtractValues(presetIDs, /[,;|]/).filter(Boolean);  // allow '/' in PresetIDs
+          this.addablePresetIDs = new Set(vals);
         }
 
         return this._loadDefaultSchemaAsync();

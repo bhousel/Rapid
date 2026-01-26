@@ -3,6 +3,7 @@ import { numClamp, numWrap } from '@rapid-sdk/math';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilDate } from '../util/date.ts';
 import { utilDetect } from '../util/detect.ts';
+import { utilExtractValues } from '../util/string.ts';
 
 import type { D3Selection } from 'd3-selection';
 import type { Context } from '../Context.ts';
@@ -418,13 +419,13 @@ export class LocalizationSystem extends AbstractSystem {
     }
 
     // locale
-    const newLocale = currParams.get('locale');
-    const oldLocale = prevParams.get('locale');
+    const newLocale = currParams.get('locale') || '';
+    const oldLocale = prevParams.get('locale') || '';
     if (newLocale !== oldLocale) {
+      const vals = utilExtractValues(newLocale).filter(Boolean);
       let cleaned: LocaleCode[] = [];
-      if (typeof newLocale === 'string') {
-        const requested = newLocale.split(',').map(s => s.trim()).filter(Boolean);
-        cleaned = this._getSupportedLocales(requested);
+      if (vals.length) {
+        cleaned = this._getSupportedLocales(vals);
       }
       urlhash?.setParam('locale', cleaned.length ? cleaned.join(',') : null);
       this.selectLocaleAsync();

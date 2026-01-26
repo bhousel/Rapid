@@ -2,6 +2,7 @@ import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.ts';
+import { utilExtractValues } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
@@ -386,13 +387,13 @@ export class RapidSystem extends AbstractSystem {
     }
 
     // datasets
-    const newDatasets = currParams.get('datasets');
-    const oldDatasets = prevParams.get('datasets');
+    const newDatasets = currParams.get('datasets') || '';
+    const oldDatasets = prevParams.get('datasets') || '';
     if (newDatasets !== oldDatasets) {
       this._enabledDatasetIDs.clear();
-      if (typeof newDatasets === 'string') {
-        const toEnable = newDatasets.replace(/;/g, ',').split(',').map(s => s.trim()).filter(Boolean);
-        this.enableDatasets(toEnable);
+      const vals = utilExtractValues(newDatasets).filter(Boolean);
+      if (vals.length) {
+        this.enableDatasets(vals);
       } else {  // all removed
         this._datasetsChanged();
       }

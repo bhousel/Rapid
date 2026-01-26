@@ -6,7 +6,7 @@ import {
   ImagerySource, ImagerySourceBing, ImagerySourceCustom,
   ImagerySourceEsri, ImagerySourceEsriWayback, ImagerySourceNone
 } from '../lib/ImagerySource.ts';
-import { utilWildcard } from '../util/string.ts';
+import { utilExtractValues, utilWildcard } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { ImagerySourceProps } from '../lib/ImagerySource.ts';
@@ -704,44 +704,31 @@ export class ImagerySystem extends AbstractSystem {
    */
   private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // background
-    const newBackground = currParams.get('background') as ImagerySourceID;
-    const oldBackground = prevParams.get('background') as ImagerySourceID;
+    const newBackground = currParams.get('background') || '';
+    const oldBackground = prevParams.get('background') || '';
     if (!newBackground || newBackground !== oldBackground) {
-      let foundSource: ImagerySource | undefined;
-      if (typeof newBackground === 'string') {
-        foundSource = this.getSourceByID(newBackground);
-      }
+      const foundSource = this.getSourceByID(newBackground);
       if (foundSource) {
-        this.setSourceByID(newBackground!);
+        this.setSourceByID(newBackground!);  // Calling `setSourceByID` handles Esri Wayback w/date
       } else {
         this.baseLayerSource(this.chooseDefaultSource());
       }
     }
 
     // overlays
-    const newOverlays = currParams.get('overlays');
-    const oldOverlays = prevParams.get('overlays');
+    const newOverlays = currParams.get('overlays') || '';
+    const oldOverlays = prevParams.get('overlays') || '';
     if (newOverlays !== oldOverlays) {
-      let toEnableIDs = new Set<ImagerySourceID>();
-      if (typeof newOverlays === 'string') {
-        const vals = newOverlays.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-        toEnableIDs = new Set(vals);
-      }
+      const vals = utilExtractValues(newOverlays).filter(Boolean);
+      const toEnableIDs = new Set<ImagerySourceID>(vals);
       this.enableOverlayLayers(toEnableIDs);
     }
 
     // offset
-    const newOffset = currParams.get('offset');
-    const oldOffset = prevParams.get('offset');
+    const newOffset = currParams.get('offset') || '';
+    const oldOffset = prevParams.get('offset') || '';
     if (newOffset !== oldOffset) {
-      let x: number;
-      let y: number;
-      if (typeof newOffset === 'string') {
-        [x, y] = newOffset.replace(/;/g, ',').split(',').map(s => s.trim()).map(Number);
-      } else {
-        x = 0;
-        y = 0;
-      }
+      let [x, y] = newOffset.split(/[;,]/).map(s => s.trim()).map(Number);
       if (isNaN(x) || !isFinite(x)) x = 0;
       if (isNaN(y) || !isFinite(y)) y = 0;
       this.offset = geoMetersToOffset([x, y]) as Vec2;

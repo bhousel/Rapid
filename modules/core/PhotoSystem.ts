@@ -2,9 +2,12 @@ import { Extent } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilDate, utilDateString } from '../util/date.ts';
+import { utilExtractValues } from '../util/string.ts';
+import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OneOrMore } from '../util/iterable.ts';
 
 
 /** Date filter types ('fromDate' or 'toDate') */
@@ -118,13 +121,11 @@ export class PhotoSystem extends AbstractSystem {
 
     // photo_overlay
     // support enabling photo layers by default via a URL parameter, e.g. `photo_overlay=kartaview;mapillary;streetside`
-    const newPhotoOverlay = currParams.get('photo_overlay');
-    const oldPhotoOverlay = prevParams.get('photo_overlay');
+    const newPhotoOverlay = currParams.get('photo_overlay') || '';
+    const oldPhotoOverlay = prevParams.get('photo_overlay') || '';
     if (scene && newPhotoOverlay !== oldPhotoOverlay) {
-      let toEnableIDs = new Set<string>();
-      if (typeof newPhotoOverlay === 'string') {
-        toEnableIDs = new Set(newPhotoOverlay.replace(/;/g, ',').split(','));
-      }
+      const vals = utilExtractValues(newPhotoOverlay).filter(Boolean);
+      const toEnableIDs = new Set<LayerID>(vals);
       for (const layerID of this.layerIDs) {
         const layer = scene.layers.get(layerID);
         if (!layer) continue;
@@ -133,47 +134,49 @@ export class PhotoSystem extends AbstractSystem {
     }
 
     // photo_dates
-    const newPhotoDates = currParams.get('photo_dates');
-    const oldPhotoDates = prevParams.get('photo_dates');
+    // support a from-to date range, like `photo_dates=2019-01-01|2020-12-31`
+    const newPhotoDates = currParams.get('photo_dates') || '';
+    const oldPhotoDates = prevParams.get('photo_dates') || '';
     if (newPhotoDates !== oldPhotoDates) {
-      if (typeof newPhotoDates === 'string') {
-        // expect format like `photo_dates=2019-01-01_2020-12-31`, but allow a couple different separators
-        const parts = /^(.*)[–_](.*)$/g.exec(newPhotoDates.trim());
-        this.setDateFilter('fromDate', parts && parts.length >= 2 ? parts[1] : null);
-        this.setDateFilter('toDate', parts && parts.length >= 3 ? parts[2] : null);
+      const [fromDateStr, toDateStr] = utilExtractValues(newPhotoDates);
+      if (fromDateStr || toDateStr) {
+        this.setDateFilter('fromDate', fromDateStr);
+        this.setDateFilter('toDate', toDateStr);
       } else {
         this._filterToDate = this._filterFromDate = null;
       }
     }
 
     // photo_username
-    const newPhotoUsername = currParams.get('photo_username');
-    const oldPhotoUsername = prevParams.get('photo_username');
+    // support delimited list of usernames, e.g. 'photo_usernames=quincylvania,chrisbeddow'
+    const newPhotoUsername = currParams.get('photo_username') || '';
+    const oldPhotoUsername = prevParams.get('photo_username') || '';
     if (newPhotoUsername !== oldPhotoUsername) {
-      this.setUsernameFilter(newPhotoUsername);
+      const usernames = utilExtractValues(newPhotoUsername).filter(Boolean);
+      this.setUsernameFilter(usernames);
     }
 
     // photo
-    // support opening a specific photo via a URL parameter, e.g. `photo=mapillary/<photoID>`
+    // support opening a specific LayerID and PhotoID, e.g. `photo=mapillary|<PhotoID>`
     const newPhoto = currParams.get('photo') || '';
     const oldPhoto = prevParams.get('photo') || '';
     if (newPhoto !== oldPhoto) {
-      const [layerID, photoID] = newPhoto.split('/', 2).filter(Boolean);
+      const [layerID, photoID] = utilExtractValues(newPhoto);
       if (layerID && photoID) {
-        this.selectPhoto(layerID as PhotoLayerID, photoID);
+        this.selectPhoto(layerID, photoID);
       } else {
         this.selectPhoto();  // deselect
       }
     }
 
     // detections
-    // support opening a specific detection via a URL parameter, e.g. `detection=mapillary-detections/<detectionID>`
+    // support opening a specific LayerID and DetectionID, e.g. `detection=mapillary-detections|<DetectionID>`
     const newDetection = currParams.get('detection') || '';
     const oldDetection = prevParams.get('detection') || '';
     if (newDetection !== oldDetection) {
-      const [layerID, detectionID] = newDetection.split('/', 2).filter(Boolean);
+      const [layerID, detectionID] = utilExtractValues(newDetection);
       if (layerID && detectionID) {
-        this.selectDetection(layerID as LayerID, detectionID);
+        this.selectDetection(layerID, detectionID);
       } else {
         this.selectDetection();  // deselect
       }
@@ -263,14 +266,14 @@ export class PhotoSystem extends AbstractSystem {
       // current photo
       let photoString;
       if (this._currPhotoLayerID && this._currPhotoID) {
-        photoString = `${this._currPhotoLayerID}/${this._currPhotoID}`;
+        photoString = `${this._currPhotoLayerID}|${this._currPhotoID}`;
       }
       urlhash.setParam('photo', photoString);
 
       // current detection
       let detectionString;
       if (this._currLayerID && this._currDetectionID) {
-        detectionString = `${this._currLayerID}/${this._currDetectionID}`;
+        detectionString = `${this._currLayerID}|${this._currDetectionID}`;
       }
       urlhash.setParam('detection', detectionString);
     }
@@ -625,22 +628,11 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * setUsernameFilter
    * Sets a username filter value
-   * @param val - The value to set it to
+   * @param val - Username or Array or Set of usernames to filter by
    */
-  setUsernameFilter(val: string | string[] | null | undefined): void {
-    let usernames: string[] | null = null;
-    if (val && typeof val === 'string') {
-      usernames = val.replace(/;/g, ',').split(',');
-    } else if (Array.isArray(val)) {
-      usernames = val;
-    }
-    if (usernames) {
-      usernames = usernames.map(d => d.trim()).filter(Boolean);
-      if (!usernames.length) {
-        usernames = null;
-      }
-    }
-    this._filterUsernames = usernames;
+  setUsernameFilter(val: OneOrMore<string>): void {
+    const usernames = [...utilIterable(val)];
+    this._filterUsernames = usernames.length ? usernames : null;
     this._photoChanged();
   }
 
