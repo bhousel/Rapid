@@ -4257,6 +4257,36 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 }
 
 
+/* Spector (WebGL inspector)
+------------------------------------------------------- */
+.spector .captureMenuActionsComponent {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+}
+
+.spector .captureMenuActionsComponent [commandName=onPauseRequested]:before {
+  content: "";
+  position: absolute;
+  display: inline-block;
+  width: 2px;
+  height: 11px;
+  margin-left: 10px;
+  margin-top: 3px;
+  background-color: #f9f9f9;
+}
+.spector .captureMenuActionsComponent [commandName=onPauseRequested]:after {
+  content: "";
+  position: absolute;
+  display: inline-block;
+  width: 2px;
+  height: 11px;
+  margin-left: 5px;
+  margin-top: 3px;
+  background-color: #f9f9f9;
+}
+
+
 /* 3D Map
 ------------------------------------------------------- */
 #map3d_container {

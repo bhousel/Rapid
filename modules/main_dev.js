@@ -32,5 +32,5 @@ globalThis.d3 = d3;
 import * as PIXI from 'pixi.js';
 globalThis.PIXI = PIXI;
 
-// import * as SPECTOR from 'spectorjs';
-// globalThis.SPECTOR = SPECTOR;
+import * as SPECTOR from 'spectorjs';
+globalThis.SPECTOR = SPECTOR;

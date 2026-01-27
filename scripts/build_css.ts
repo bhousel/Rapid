@@ -18,7 +18,7 @@ async function buildCSS(): Promise<void> {
 
   const processor = postcss([ autoprefixer, prepend({ selector: '.ideditor ' }) as postcss.AcceptedPlugin ]);
 
-  return Promise.resolve()
+  await Promise.resolve()
     .then(() => {
       return [...new Glob('./css/*.css').scanSync()];
     })
@@ -34,6 +34,7 @@ async function buildCSS(): Promise<void> {
         concat += result + '\n';
       }
       return Bun.write('./dist/css/rapid.css', concat);
-    })
-    .then(() => console.timeEnd(END));
+    });
+
+    console.timeEnd(END);
 }

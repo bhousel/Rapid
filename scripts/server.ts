@@ -75,7 +75,8 @@ const server = Bun.serve({
 
 console.log('');
 console.log(styleText(['blue', 'bold'], `Bun v${Bun.version}`));
-console.log(styleText('cyanBright', `Serving:    /*, dist/*, test/*`));
+console.log(styleText('cyanBright', `Serving:    dist/*, test/*`));
 console.log(styleText('cyanBright', `Listening:  ${server.url}`));
+console.log(styleText('cyanBright', `Dev Build:  http://127.0.0.1:8080/dist/index-dev.html`));
 console.log(styleText(['whiteBright', 'bold'], `Ctrl-C to stop`));
 console.log('');

@@ -2,9 +2,9 @@
 <html>
   <head>
     <meta charset='utf-8'>
-    <title>Rapid</title>
-    <link rel='stylesheet' href='dist/css/rapid.css'>
-    <link rel='icon' type='image/svg' href='dist/img/rapid_favicon.svg'>
+    <title>Rapid Dev</title>
+    <link rel='stylesheet' href='css/rapid.css'>
+    <link rel='icon' type='image/svg' href='img/rapid_favicon-dev.svg'>
 
     <meta name='viewport' content='width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no'/>
     <meta name='mobile-web-app-capable' content='yes'/>
@@ -32,7 +32,7 @@
       newScript.type = 'text/javascript';
       newScript.onload = checkScript;
       newScript.onerror = checkScript;
-      newScript.src = 'dist/js/rapid.js';
+      newScript.src = 'js/rapid-dev.js';
 
       document.getElementsByTagName('head')[0].appendChild(newScript);
 
@@ -44,7 +44,7 @@
         } else {
           const context = new Rapid.Context();
           context.containerNode = container;
-          context.assetPath = 'dist/';
+          context.assetPath = '';
           // context.assetOrigin = 'local';   // test no CDN
           context.buildID = '';
           context.buildSHA = '';
@@ -63,7 +63,6 @@
             }
           ];
 
-          window.context = context;  // for debugging
           window.rapidContext = context;
           context.initAsync();
         }
