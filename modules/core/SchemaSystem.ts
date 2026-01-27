@@ -900,23 +900,37 @@ export class SchemaSystem extends AbstractSystem {
 
     // Tell the AssetSystem what to load..
     const latestPath = 'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist';
-    assets.setAsset('iD_schema_deprecated', `${latestPath}/deprecated.min.json`, 'latest');
-    assets.setAsset('iD_schema_discarded', `${latestPath}/discarded.min.json`, 'latest');
-    assets.setAsset('iD_schema_categories', `${latestPath}/preset_categories.min.json`, 'latest');
-    assets.setAsset('iD_schema_defaults', `${latestPath}/preset_defaults.min.json`, 'latest');
-    assets.setAsset('iD_schema_presets', `${latestPath}/presets.min.json`, 'latest');
-    assets.setAsset('iD_schema_fields', `${latestPath}/fields.min.json`, 'latest');
-
     const localPath = 'data/modules/id-tagging-schema';
-    assets.setAsset('iD_schema_deprecated', `${localPath}/deprecated.min.json`, 'local');
-    assets.setAsset('iD_schema_discarded', `${localPath}/discarded.min.json`, 'local');
-    assets.setAsset('iD_schema_categories', `${localPath}/preset_categories.min.json`, 'local');
-    assets.setAsset('iD_schema_defaults', `${localPath}/preset_defaults.min.json`, 'local');
-    assets.setAsset('iD_schema_presets', `${localPath}/presets.min.json`, 'local');
-    assets.setAsset('iD_schema_fields', `${localPath}/fields.min.json`, 'local');
+
+    assets.registerAsset('iD_schema_deprecated', {
+      latest: `${latestPath}/deprecated.min.json`,
+      local:  `${localPath}/deprecated.min.json`
+    });
+    assets.registerAsset('iD_schema_discarded', {
+      latest: `${latestPath}/discarded.min.json`,
+      local:  `${localPath}/discarded.min.json`
+    });
+    assets.registerAsset('iD_schema_categories', {
+      latest: `${latestPath}/preset_categories.min.json`,
+      local:  `${localPath}/preset_categories.min.json`
+    });
+    assets.registerAsset('iD_schema_defaults', {
+      latest: `${latestPath}/preset_defaults.min.json`,
+      local:  `${localPath}/preset_defaults.min.json`
+    });
+    assets.registerAsset('iD_schema_presets', {
+      latest: `${latestPath}/presets.min.json`,
+      local:  `${localPath}/presets.min.json`
+    });
+    assets.registerAsset('iD_schema_fields', {
+      latest: `${latestPath}/fields.min.json`,
+      local:  `${localPath}/fields.min.json`
+    });
 
     // 'rapid_schema_overrides' = customizations to merge in after the id-tagging-schema
-    assets.setAsset('rapid_schema_overrides', 'data/schema_overrides.min.json');
+    assets.registerAsset('rapid_schema_overrides', {
+      preferred: 'data/schema_overrides.min.json'
+    });
 
     // Fetch the schema data
     return Promise.all([

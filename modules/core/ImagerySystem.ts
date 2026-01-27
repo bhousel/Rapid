@@ -639,9 +639,9 @@ export class ImagerySystem extends AbstractSystem {
     const assets = context.systems.assets!;
 
     // Tell the AssetSystem what to load..
-    assets.setAsset('editor_layer_index', 'data/imagery.min.json');
+    assets.registerAsset('editor_layer_index', { preferred: 'data/imagery.min.json' });
     // 'rapid_imagery_overrides' = customizations to merge in after the editor-layer-index
-    assets.setAsset('rapid_imagery_overrides', 'data/imagery_overrides.min.json');
+    assets.registerAsset('rapid_imagery_overrides', { preferred: 'data/imagery_overrides.min.json' });
 
     // Fetch the imagery data
     return Promise.all([

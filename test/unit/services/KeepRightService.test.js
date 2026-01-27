@@ -17,7 +17,7 @@ describe('KeepRightService', () => {
 
   // Supply cached qa_data and localization strings
   const assets = context.systems.assets;
-  assets._cache.qa_data = sample.qa_data;
+  assets._loaded.qa_data = sample.qa_data;
   const l10n = context.systems.l10n;
   l10n._cache.en = sample.l10n_data;
 

@@ -65,22 +65,36 @@ export class NsiService extends AbstractSystem {
       .then(() => {
         // Tell the AssetSystem what to load..
         const latestPath = 'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist';
-        assets.setAsset('nsi_data',         `${latestPath}/nsi.min.json`, 'latest');
-        assets.setAsset('nsi_dissolved',    `${latestPath}/dissolved.min.json`, 'latest');
-        assets.setAsset('nsi_features',     `${latestPath}/featureCollection.min.json`, 'latest');
-        assets.setAsset('nsi_generics',     `${latestPath}/genericWords.min.json`, 'latest');
-        assets.setAsset('nsi_presets',      `${latestPath}/presets/nsi-id-presets.min.json`, 'latest');
-        assets.setAsset('nsi_replacements', `${latestPath}/replacements.min.json`, 'latest');
-        assets.setAsset('nsi_trees',        `${latestPath}/trees.min.json`, 'latest');
-
         const localPath = 'data/modules/name-suggestion-index';
-        assets.setAsset('nsi_data',         `${localPath}/nsi.min.json`, 'local');
-        assets.setAsset('nsi_dissolved',    `${localPath}/dissolved.min.json`, 'local');
-        assets.setAsset('nsi_features',     `${localPath}/featureCollection.min.json`, 'local');
-        assets.setAsset('nsi_generics',     `${localPath}/genericWords.min.json`, 'local');
-        assets.setAsset('nsi_presets',      `${localPath}/presets/nsi-id-presets.min.json`, 'local');
-        assets.setAsset('nsi_replacements', `${localPath}/replacements.min.json`, 'local');
-        assets.setAsset('nsi_trees',        `${localPath}/trees.min.json`, 'local');
+
+        assets.registerAsset('nsi_data', {
+          latest: `${latestPath}/nsi.min.json`,
+          local:  `${localPath}/nsi.min.json`
+        });
+        assets.registerAsset('nsi_dissolved', {
+          latest: `${latestPath}/dissolved.min.json`,
+          local:  `${localPath}/dissolved.min.json`
+        });
+        assets.registerAsset('nsi_features', {
+          latest: `${latestPath}/featureCollection.min.json`,
+          local:  `${localPath}/featureCollection.min.json`
+        });
+        assets.registerAsset('nsi_generics', {
+          latest: `${latestPath}/genericWords.min.json`,
+          local:  `${localPath}/genericWords.min.json`
+        });
+        assets.registerAsset('nsi_presets', {
+          latest: `${latestPath}/presets/nsi-id-presets.min.json`,
+          local:  `${localPath}/presets/nsi-id-presets.min.json`
+        });
+        assets.registerAsset('nsi_replacements', {
+          latest: `${latestPath}/replacements.min.json`,
+          local:  `${localPath}/replacements.min.json`
+        });
+        assets.registerAsset('nsi_trees', {
+          latest: `${latestPath}/trees.min.json`,
+          local:  `${localPath}/trees.min.json`
+        });
       })
       .then(() => this._loadNsiPresetsAsync())
       .then(() => this._loadNsiDataAsync())

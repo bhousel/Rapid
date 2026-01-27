@@ -1,65 +1,72 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
+import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 
 
 /**
- * Map of asset keys to their file paths or URLs.
- * Keys are identifiers like 'address_formats', 'languages', 'oci_defaults'.
- * Values are either relative paths (e.g. 'data/languages.min.json')
- * or absolute URLs (e.g. 'https://cdn.jsdelivr.net/npm/...').
+ * An `AssetOrigin` describes an strategy for fetching an asset.
+ * 'preferred' is checked first, then either 'latest' or 'local' are checked as fallback.
  */
-type AssetMap = Record<string, string>;
+export type AssetOrigin = 'latest' | 'local' | 'preferred';
 
 /**
- * Sources object containing asset maps for each origin.
+ * An `AssetPath` is a string path we can use to load the asset
+ * It should be either a relative path (e.g. 'data/languages.min.json')
+ * or an absolute URL (e.g. 'https://cdn.jsdelivr.net/npm/…').
  */
-interface AssetSources {
-  /** 'custom' - Assets specified at runtime - these override the assets from 'latest' or 'local' */
-  custom: AssetMap;
-  /** 'latest' - These are the default assets that Rapid loads, may load from CDN */
-  latest: AssetMap;
-  /** 'local' - Local assets only, for offline/standalone use */
-  local: AssetMap;
-}
+export type AssetPath = string;
 
-/** Origin types for asset loading - derived from AssetSources keys */
-export type AssetOrigin = keyof AssetSources;
+/**
+ * An `AssetSource` lists the various alternatives for loading assets.
+ * It represents a mapping from the available asset origins to asset paths.
+ */
+export interface AssetSource {
+  /** 'latest' - Latest assets prioritize freshness, they may load from a CDN */
+  latest?: AssetPath;
+  /** 'local' - Local assets must be included with Rapid - for offline/standalone use */
+  local?: AssetPath;
+  /** 'preferred' - Preferred assets take priority over the 'latest' or 'local' assets */
+  preferred?: AssetPath;
+}
 
 
 /**
  * `AssetSystem` keeps track of files and data that Rapid needs to load.
  *
  * Information about the assets can be found in the `sources` structure.
- * Sources are identified by keys, and are grouped by origin:
- *  - 'custom' - assets added at runtime, these **always override** 'latest' and 'local'
- *  - 'latest' - default assets, may load from CDN (the default origin)
- *  - 'local' - local assets only, for offline/standalone use
+ * Each `AssetSource` lists the alternative paths for loading the asset.
+ * - 'latest':  Latest assets prioritize freshness - they may load from a CDN.
+ * - 'local':  Local assets must be included with Rapid - for environments where CDN is not allowed.
+ * - 'preferred':  Preferred assets always take priority over the 'latest' or 'local' sources.
  *
- * The `origin` property controls whether 'latest' or 'local' is used as the fallback.
- * When loading an asset, the system checks 'custom' first, then falls back to the current origin.
- *
+ * When loading an asset, the system checks 'preferred' first, followed by the `this.origin` value.
+
+ * `this.origin` can be changed before init. *
  * Important: To use 'local', you'll need to have installed a version of Rapid
  *   that has all of these dependencies copied into `/dist/data/modules/`.
  * See https://github.com/rapideditor/rapid-standalone if this is what you need.
  *
  * Properties available:
  *   `sources`   The sources Object contains all the details about where to fetch assets from
- *   `origin`    'latest' or 'local' - the fallback origin when asset is not in 'custom'
+ *   `origin`    'latest' or 'local' - the fallback origin when asset is not found in 'preferred'
  */
 export class AssetSystem extends AbstractSystem {
-  /** Asset maps organized by origin ('custom', 'latest', and 'local') */
-  sources: AssetSources;
-  /** Current origin for asset loading - should be set to 'latest' or 'local' */
-  origin: AssetOrigin;
+  /**
+   * Map of string AssetID to AssetSource record of properties.
+  * AssetIDs are identifiers like 'address_formats', 'languages', 'oci_defaults'.
+  */
+  sources: Record<AssetID, AssetSource>;
+  /** The fallback origin must be set to 'latest' or 'local' */
+  origin: 'latest' | 'local';
   /** Root folder path for assets, with trailing slash (e.g. 'dist/') */
   filePath: string;
   /** Custom filename replacements, e.g. from Rails asset pipeline */
   fileReplacements: Record<string, string>;
 
   /** Cache of loaded asset data, keyed by asset identifier */
-  private _cache: Record<AssetID, unknown>;
+  private _loaded: Record<AssetID, unknown>;
   /** In-flight fetch promises, keyed by URL */
   private _inflight: Record<string, Promise<unknown>>;
 
@@ -73,46 +80,35 @@ export class AssetSystem extends AbstractSystem {
     this.optionalDependencies = new Set(['urlhash']);
 
     this.sources = {
-      custom: {},
+      'address_formats':      { preferred: 'data/address_formats.min.json' },
+      'intro_graph':          { preferred: 'data/intro_graph.min.json' },
+      'intro_rapid_graph':    { preferred: 'data/intro_rapid_graph.min.json' },
+      'languages':            { preferred: 'data/languages.min.json' },
+      'locales':              { preferred: 'data/locales.min.json' },
+      'phone_formats':        { preferred: 'data/phone_formats.min.json' },
+      'qa_data':              { preferred: 'data/qa_data.min.json' },
+      'shortcuts':            { preferred: 'data/shortcuts.min.json' },
+      'territory_languages':  { preferred: 'data/territory_languages.min.json' },
 
-      latest: {
-        'address_formats':      'data/address_formats.min.json',
-        'intro_graph':          'data/intro_graph.min.json',
-        'intro_rapid_graph':    'data/intro_rapid_graph.min.json',
-        'languages':            'data/languages.min.json',
-        'locales':              'data/locales.min.json',
-        'phone_formats':        'data/phone_formats.min.json',
-        'qa_data':              'data/qa_data.min.json',
-        'shortcuts':            'data/shortcuts.min.json',
-        'territory_languages':  'data/territory_languages.min.json',
-
-        'oci_defaults':   'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/defaults.min.json',
-        'oci_features':   'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/featureCollection.min.json',
-        'oci_resources':  'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/resources.min.json',
-
-        'wmf_sitematrix':  'https://cdn.jsdelivr.net/npm/wmf-sitematrix@0.2/data/wikipedia.min.json'
+      'oci_defaults': {
+        latest: 'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/defaults.min.json',
+        local:  'data/modules/osm-community-index/defaults.min.json'
       },
-
-      local: {
-        'address_formats':      'data/address_formats.min.json',
-        'intro_graph':          'data/intro_graph.min.json',
-        'intro_rapid_graph':    'data/intro_rapid_graph.min.json',
-        'languages':            'data/languages.min.json',
-        'locales':              'data/locales.min.json',
-        'phone_formats':        'data/phone_formats.min.json',
-        'qa_data':              'data/qa_data.min.json',
-        'shortcuts':            'data/shortcuts.min.json',
-        'territory_languages':  'data/territory_languages.min.json',
-
-        'oci_defaults':   'data/modules/osm-community-index/defaults.min.json',
-        'oci_features':   'data/modules/osm-community-index/featureCollection.min.json',
-        'oci_resources':  'data/modules/osm-community-index/resources.min.json',
-
-        'wmf_sitematrix':  'data/modules/wmf-sitematrix/wikipedia.min.json'
+      'oci_features': {
+        latest: 'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/featureCollection.min.json',
+        local:  'data/modules/osm-community-index/featureCollection.min.json'
+      },
+      'oci_resources': {
+        latest: 'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/resources.min.json',
+        local:  'data/modules/osm-community-index/resources.min.json'
+      },
+      'wmf_sitematrix': {
+        latest: 'https://cdn.jsdelivr.net/npm/wmf-sitematrix@0.2/data/wikipedia.min.json',
+        local:  'data/modules/wmf-sitematrix/wikipedia.min.json'
       }
     };
 
-    // The origin can be set to 'local' or 'latest'
+    // The fallback origin (checked after 'preferred') must be set to 'local' or 'latest'.
     // (This must set before init, and should not be changed later)
     this.origin = 'latest';
 
@@ -132,7 +128,7 @@ export class AssetSystem extends AbstractSystem {
     // (This must set before init, and should not be changed later)
     this.fileReplacements = {};
 
-    this._cache = {};
+    this._loaded = {};
     this._inflight = {};
 
     // Mock data for testing, prevents the data from being fetched.
@@ -140,7 +136,7 @@ export class AssetSystem extends AbstractSystem {
     /* c8 ignore start */
     const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
     if (isTestEnvironment) {
-      const c = this._cache;
+      const c = this._loaded;
       c.address_formats = { addressFormats: [{ format: [['housenumber', 'street'], ['city', 'postcode'] ] }] };
       c.editor_layer_index = { assetID: 'editor_layer_index' };
       c.rapid_imagery_overrides = { assetID: 'rapid_imagery_overrides' };
@@ -185,16 +181,15 @@ export class AssetSystem extends AbstractSystem {
       .then(() => {
         const hash = urlhash?.initialHashParams || new Map();
 
-        // Parse `assets` parameter: key|url pairs separated by commas
+        // Parse `assets` parameter: `key|value` pairs separated by commas
         // e.g. `assets=my_presets|https://example.com/presets.json,my_imagery|https://example.com/imagery.json`
-        const assetsParam = hash.get('assets');
-        if (assetsParam) {
-          const pairs = assetsParam.split(',');
-          for (const pair of pairs) {
-            const [assetID, url] = pair.split('|');
-            if (assetID && url) {
-              this.sources.custom[assetID] = url;
-            }
+        // Assets specified this way are always flagged as 'preferred'.
+        const str = hash.get('assets') || '';
+        const vals = utilExtractValues(str);
+        for (let i = 0; i < vals.length; i += 2) {
+          const [k, v] = [vals[i], vals[i+1]];
+          if (k && v) {
+            this.registerAsset(k, { preferred: v });
           }
         }
       });
@@ -222,43 +217,14 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * setAsset
-   * Set an asset in the list of sources.
-   * Other systems and services should call this to track the assets they need to load.
+   * registerAsset
+   * Add an asset to the list of sources.
+   * Other systems and services should call this to track any assets that they need to load.
    * @param assetID - asset identifier
-   * @param path - file path or URL
-   * @param origin - optional, 'custom', 'latest', or 'local' (if missing, sets 'latest' and 'local')
-   * @throws Will throw if the given origin is invalid
+   * @param assetSource - source information
    */
-  setAsset(assetID: AssetID, path: string, origin?: AssetOrigin): void {
-    if (origin) {
-      const sources = this.sources[origin];
-      if (!sources) {
-        throw new Error(`Unknown origin "${origin}"`);
-      }
-      sources[assetID] = path;
-
-    } else {
-      this.sources.latest[assetID] = path;
-      this.sources.local[assetID] = path;
-    }
-  }
-
-
-  /**
-   * getAsset
-   * Get an asset path from the list of sources.
-   * @param assetID - asset identifier
-   * @param origin - optional, 'custom', 'latest', or 'local' (if missing, returns current origin)
-   * @return The asset path or undefined if not found
-   * @throws Will throw if the given origin is invalid
-   */
-  getAsset(assetID: AssetID, origin: AssetOrigin = this.origin): string | undefined {
-    const sources = this.sources[origin];
-    if (!sources) {
-      throw new Error(`Unknown origin "${this.origin}"`);
-    }
-    return sources[assetID];
+  registerAsset(assetID: AssetID, source: AssetSource = {}): void {
+    this.sources[assetID] = source;
   }
 
 
@@ -270,8 +236,8 @@ export class AssetSystem extends AbstractSystem {
    * @param val - asset path
    * @return The real URL pointing to that filename
    */
-  getFileURL(val: string): string {
-    if (/^http(s)?:\/\//i.test(val)) return val; // already a url
+  getFileURL(val: AssetPath): string {
+    if (/^http(s)?:\/\//i.test(val)) return val;  // already a url
 
     const filename = `${this.filePath}${val}`;
     return this.fileReplacements[filename] ?? filename;
@@ -281,48 +247,48 @@ export class AssetSystem extends AbstractSystem {
   /**
    * getAssetURL
    * Returns the URL for the given asset key.
-   * Checks the 'custom' origin first, then falls back to the current origin ('latest' or 'local').
+   * Checks the 'preferred' origin first, then falls back to the current origin ('latest' or 'local').
    * @param key - identifier for the asset, should be found in the asset map.
    * @return URL of the asset
-   * @throws Will throw if the asset key is not found in either custom or current origin
+   * @throws Will throw if the assetID is not found, or if an asset path can't be determined
    */
-  getAssetURL(key: string): string {
-    if (/^http(s)?:\/\//i.test(key)) return key; // already a url
+  getAssetURL(assetID: AssetID): string {
+    if (/^http(s)?:\/\//i.test(assetID)) return assetID;  // already a url
 
-    // Check 'custom' origin first (override layer)
-    const customVal = this.sources.custom[key];
-    if (customVal) {
-      return this.getFileURL(customVal);
+    const source = this.sources[assetID];
+    if (!source) {
+      throw new Error(`Unknown assetID "${assetID}"`);
     }
 
-    // Fall back to current origin ('latest' or 'local')
-    const sources = this.sources[this.origin];
-    if (!sources) {
-      throw new Error(`Unknown origin "${this.origin}"`);
-    }
-    const val = sources[key];
-    if (!val) {
-      throw new Error(`Unknown asset key "${key}"`);
+    let path;
+    if (source.preferred) {
+      path = source.preferred;
+    } else if (source[this.origin]) {
+      path = source[this.origin];
     }
 
-    return this.getFileURL(val);
+    if (!path) {
+      throw new Error(`No asset found for assetID "${assetID}" - "preferred" or "${this.origin}"`);
+    } else {
+      return this.getFileURL(path);
+    }
   }
 
 
   /**
    * loadAssetAsync
-   * Returns a Promise to fetch the data identified by the key.
-   * @param key - identifier for the data, should be found in the asset map.
+   * Returns a Promise to fetch the data identified by the assetID.
+   * @param assetID - identifier for the data, should be found in the asset map.
    * @return Promise resolved with the data
    */
-  loadAssetAsync(key: string): Promise<unknown> {
-    if (this._cache[key]) {
-      return Promise.resolve(this._cache[key]);
+  loadAssetAsync(assetID: AssetID): Promise<unknown> {
+    if (this._loaded[assetID]) {
+      return Promise.resolve(this._loaded[assetID]);
     }
 
     let url: string;
     try {
-      url = this.getAssetURL(key);
+      url = this.getAssetURL(assetID);
     } catch (err) {
       return Promise.reject((err as Error).message);
     }
@@ -333,13 +299,13 @@ export class AssetSystem extends AbstractSystem {
         .then(utilFetchResponse)
         .then(result => {
           if (!result) {
-            throw new Error(`No data loaded for "${key}"`);
+            throw new Error(`No data loaded for "${assetID}"`);
           }
-          this._cache[key] = result;
+          this._loaded[assetID] = result;
           return result;
         })
         //.catch(err => {
-        //  console.error(`key: ${key}, url: ${url}`);
+        //  console.error(`assetID: ${assetID}, url: ${url}`);
         //  throw new Error(err);
         //})
         .finally(() => {

@@ -271,16 +271,19 @@ export class Map3dSystem extends AbstractSystem {
   private _loadMapLibreAsync(): Promise<void> {
     if (this._loadPromise) return this._loadPromise;
 
-    const assets = this.context.systems.assets!;
-
     // Tell the AssetSystem what to load..
+    const assets = this.context.systems.assets!;
     const latestPath = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.15/dist';
-    assets.setAsset('maplibre_css', `${latestPath}/maplibre-gl.min.css`, 'latest');
-    assets.setAsset('maplibre_js',  `${latestPath}/maplibre-gl.min.js`,  'latest');
-
     const localPath = 'data/modules/maplibre-gl';
-    assets.setAsset('maplibre_css', `${localPath}/maplibre-gl.css`, 'local');  // note no .min
-    assets.setAsset('maplibre_js',  `${localPath}/maplibre-gl.js`,  'local');  // note no .min
+
+    assets.registerAsset('maplibre_css', {
+      latest: `${latestPath}/maplibre-gl.min.css`,
+      local:  `${localPath}/maplibre-gl.css`  // note no .min
+    });
+    assets.registerAsset('maplibre_js', {
+      latest: `${latestPath}/maplibre-gl.min.js`,
+      local:  `${localPath}/maplibre-gl.js`  // note no .min
+    });
 
     return this._loadPromise = new Promise((resolve, reject) => {
       let count = 0;

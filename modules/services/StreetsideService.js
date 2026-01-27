@@ -488,12 +488,16 @@ export class StreetsideService extends AbstractSystem {
 
     // Tell the AssetSystem what to load..
     const latestPath = 'https://cdn.jsdelivr.net/npm/pannellum@2/build';
-    assets.setAsset('pannellum_css', `${latestPath}/pannellum.min.css`, 'latest');
-    assets.setAsset('pannellum_js',  `${latestPath}/pannellum.min.js`,  'latest');
-
     const localPath = 'data/modules/pannellum';
-    assets.setAsset('pannellum_css', `${localPath}/pannellum.css`, 'local');  // note no .min
-    assets.setAsset('pannellum_js',  `${localPath}/pannellum.js`,  'local');  // note no .min
+
+    assets.registerAsset('pannellum_css', {
+      latest: `${latestPath}/pannellum.min.css`,
+      local:  `${localPath}/pannellum.css`  // note no .min
+    });
+    assets.registerAsset('pannellum_js', {
+      latest: `${latestPath}/pannellum.min.js`,
+      local:  `${localPath}/pannellum.js`  // note no .min
+    });
 
     return this._loadPromise = new Promise((resolve, reject) => {
       let count = 0;

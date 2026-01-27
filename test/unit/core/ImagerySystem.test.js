@@ -18,11 +18,11 @@ describe('ImagerySystem', () => {
     }
   };
 
-  context.systems.assets._cache.editor_layer_index = {
+  context.systems.assets._loaded.editor_layer_index = {
     assetID: 'editor_layer_index',
     imagery: {}
   };
-  context.systems.assets._cache.rapid_imagery_overrides = {
+  context.systems.assets._loaded.rapid_imagery_overrides = {
     assetID: 'rapid_imagery_overrides',
     imagery: {}
   };

@@ -9,7 +9,6 @@ import { services } from './services/index.js';
 import { systems } from './core/index.ts';
 
 import type { AbstractMode } from './modes/AbstractMode.ts';
-import type { AssetOrigin } from './core/AssetSystem.ts';
 import type { Behaviors } from './behaviors/types.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from './lib/Graph.ts';
@@ -109,7 +108,7 @@ export class Context extends EventEmitter {
   sequences: Record<SequenceID, number>;
 
   /** Asset origin override ('latest' or 'local') */
-  assetOrigin: AssetOrigin | null;
+  assetOrigin: 'latest' | 'local' | null;
   /** Asset path override */
   assetPath: string | null;
   /** Asset file replacement map */

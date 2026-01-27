@@ -21,12 +21,11 @@ describe('AssetSystem', () => {
         assert.isTrue(assets.autoStart);
 
         assert.isObject(assets.sources);
-        assert.hasAllKeys(assets.sources, ['custom', 'latest', 'local']);
         assert.strictEqual(assets.origin, 'latest');
         assert.strictEqual(assets.filePath, '');
         assert.deepEqual(assets.fileReplacements, {});
 
-        assert.isObject(assets._cache);
+        assert.isObject(assets._loaded);
         assert.isObject(assets._inflight);
       });
     });
@@ -104,8 +103,8 @@ describe('AssetSystem', () => {
     it('gets the sources', () => {
       const assets = new Rapid.AssetSystem(context);
       const sources = assets.sources;
-      assert.isObject(sources);
-      assert.hasAllKeys(sources, ['custom', 'latest', 'local']);
+      assert.isObject(sources);   // Expect some keys to be present
+      assert.containsAllKeys(sources, ['address_formats', 'intro_graph', 'phone_formats']);
     });
   });
 
@@ -119,27 +118,11 @@ describe('AssetSystem', () => {
       return _assets.initAsync().then(() => _assets.startAsync());
     });
 
-    describe('setAsset / getAsset', () => {
-      it('throws if origin is invalid', () => {
-        assert.throws(() => _assets.setAsset('test_asset', '/data/test.json', 'NOPE'), /unknown origin/i);
-        assert.throws(() => _assets.getAsset('test_asset', 'NOPE'), /unknown origin/i);
-      });
-
-      it('sets/gets assets, origin specified', () => {
-        _assets.setAsset('test_asset1', 'foo', 'latest');
-        _assets.setAsset('test_asset1', 'bar', 'local');
-
-        assert.strictEqual(_assets.getAsset('test_asset1', 'latest'), 'foo');
-        assert.strictEqual(_assets.getAsset('test_asset1', 'local'), 'bar');
-      });
-
-      it('sets/gets assets, no origin specified', () => {
-        _assets.setAsset('test_asset2', 'baz');   // sets 'latest' and 'local' origins
-
-        assert.strictEqual(_assets.getAsset('test_asset2', 'latest'), 'baz');
-        assert.strictEqual(_assets.getAsset('test_asset2', 'local'), 'baz');
-        assert.isUndefined(_assets.getAsset('test_asset2', 'custom'));  // not set in custom
-        assert.strictEqual(_assets.getAsset('test_asset2'), 'baz');  // get current origin ('latest')
+    describe('registerAsset', () => {
+      it('registers assets, origin specified', () => {
+        const sample = { latest: 'foo.json', local: 'bar.json' };
+        _assets.registerAsset('test_asset1', sample);
+        assert.deepEqual(_assets.sources['test_asset1'], sample);
       });
     });
 
@@ -157,7 +140,7 @@ describe('AssetSystem', () => {
         _assets.fileReplacements = {};
       });
 
-      it('ignores urls', () => {
+      it('passes URLs through unchanged', () => {
         assert.strictEqual(_assets.getFileURL('HTTP://hello'), 'HTTP://hello');
         assert.strictEqual(_assets.getFileURL('https://world'), 'https://world');
       });
@@ -173,71 +156,50 @@ describe('AssetSystem', () => {
 
 
     describe('getAssetURL', () => {
-      it('ignores urls', () => {
+      beforeAll(() => {
+        // add some test data
+        _assets.registerAsset('foo', {
+          latest: 'foo_latest.json',
+          local:  'foo_local.json'
+        });
+        _assets.registerAsset('bar', {
+          preferred: 'bar_preferred.json',
+          latest:    'bar_latest.json',
+          local:     'bar_local.json'
+        });
+      });
+
+      it('passes URLs through unchanged', () => {
         assert.strictEqual(_assets.getAssetURL('HTTP://hello'), 'HTTP://hello');
         assert.strictEqual(_assets.getAssetURL('https://world'), 'https://world');
       });
 
-      it('throws if origin is invalid', () => {
-        _assets.origin = 'nope';
-        assert.throws(() => _assets.getAssetURL('intro_graph'), /unknown origin/i);
+      it('throws if assetID is invalid', () => {
+        assert.throws(() => _assets.getAssetURL('nope'), /unknown assetID/i);
       });
 
-      it('throws if key is invalid', () => {
-        _assets.origin = 'latest';
-        assert.throws(() => _assets.getAssetURL('nope'), /unknown asset key/i);
+      it('throws if assetID is valid but no matching asset path exists', () => {
+        _assets.origin = 'nope';   // no 'nope' or 'preferred'
+        assert.throws(() => _assets.getAssetURL('foo'), /no asset found/i);
       });
 
-      it('returns the URL if the key is valid', () => {
+      it('returns the URL if the assetID and origin is valid', () => {
         _assets.origin = 'latest';
-        assert.strictEqual(_assets.getAssetURL('intro_graph'), 'data/intro_graph.min.json');
+        assert.strictEqual(_assets.getAssetURL('foo'), 'foo_latest.json');
       });
 
-      it('returns custom origin URL when asset exists in custom', () => {
+      it(`'preferred' origin overrides both 'latest' and 'local'`, () => {
         _assets.origin = 'latest';
-        _assets.sources.custom['intro_graph'] = 'https://example.com/custom_intro.json';
-        assert.strictEqual(_assets.getAssetURL('intro_graph'), 'https://example.com/custom_intro.json');
-        delete _assets.sources.custom['intro_graph'];  // cleanup
-      });
-
-      it('custom origin overrides both latest and local', () => {
-        // Set up asset in all three origins
-        _assets.sources.custom['test_override'] = 'custom_url';
-        _assets.sources.latest['test_override'] = 'latest_url';
-        _assets.sources.local['test_override'] = 'local_url';
-
-        // Should return custom regardless of origin setting
-        _assets.origin = 'latest';
-        assert.strictEqual(_assets.getAssetURL('test_override'), 'custom_url');
-
+        assert.strictEqual(_assets.getAssetURL('bar'), 'bar_preferred.json');
         _assets.origin = 'local';
-        assert.strictEqual(_assets.getAssetURL('test_override'), 'custom_url');
-
-        // cleanup
-        delete _assets.sources.custom['test_override'];
-        delete _assets.sources.latest['test_override'];
-        delete _assets.sources.local['test_override'];
-        _assets.origin = 'latest';
-      });
-
-      it('falls back to current origin when asset not in custom', () => {
-        // Ensure asset is NOT in custom
-        delete _assets.sources.custom['intro_graph'];
-
-        _assets.origin = 'latest';
-        assert.strictEqual(_assets.getAssetURL('intro_graph'), 'data/intro_graph.min.json');
-
-        _assets.origin = 'local';
-        assert.strictEqual(_assets.getAssetURL('intro_graph'), 'data/intro_graph.min.json');
-
-        _assets.origin = 'latest';  // reset
+        assert.strictEqual(_assets.getAssetURL('bar'), 'bar_preferred.json');
       });
     });
 
 
     describe('loadAssetAsync', () => {
       it('returns a promise resolved if we already have the data', () => {
-        _assets._cache.test = { hello: 'world' };
+        _assets._loaded.test = { hello: 'world' };
 
         const prom = _assets.loadAssetAsync('test');
         assert.instanceOf(prom, Promise);
@@ -245,12 +207,12 @@ describe('AssetSystem', () => {
           .then(data => assert.deepEqual(data, { hello: 'world' }));
       });
 
-      it('returns a promise rejected if the asset key is invalid', () => {
+      it('returns a promise rejected if the assetID is invalid', () => {
         const prom = _assets.loadAssetAsync('nope');
         assert.instanceOf(prom, Promise);
         return prom
           .then(data => assert.fail(`We were not supposed to get data but did: ${data}`))
-          .catch(err => assert.match(err, /unknown asset key/i));
+          .catch(err => assert.match(err, /unknown assetID/i));
       });
 
       it('returns a promise rejected if we can not get the data', () => {

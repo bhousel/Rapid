@@ -363,7 +363,7 @@ export class LocalizationSystem extends AbstractSystem {
    */
   private _loadStringsAsync(locale: string): Promise<void | PromiseSettledResult<void>[]> {
     const context = this.context;
-    const assets = context.systems.assets;
+    const assets = context.systems.assets!;
 
     if (locale.toLowerCase() === 'en-us') {  // `en-US` strings are stored as `en`
       locale = 'en';
@@ -378,11 +378,11 @@ export class LocalizationSystem extends AbstractSystem {
 
     const loadPromises: Promise<void>[] = [];
     for (const scope of this._scopes) {   // 'core', 'tagging', 'imagery', 'community'
-      const key = `l10n_${scope}_${locale}`;
-      const path = `data/l10n/${scope}.${locale}.min.json`;
-      assets!.setAsset(key, path);
+      const assetID = `l10n_${scope}_${locale}`;
+      const assetSource = { preferred: `data/l10n/${scope}.${locale}.min.json` };
+      assets.registerAsset(assetID, assetSource);
 
-      const prom = assets!.loadAssetAsync(key)
+      const prom = assets!.loadAssetAsync(assetID)
         .then((data) => {
           const d = data as Record<string, any>;
           cache[locale][scope] = d[locale];

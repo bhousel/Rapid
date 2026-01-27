@@ -16,7 +16,7 @@ describe('OsmoseService', () => {
 
   // Supply cached qa_data and localization strings
   const assets = context.systems.assets;
-  assets._cache.qa_data = sample.qa_data;
+  assets._loaded.qa_data = sample.qa_data;
 
   // Spy on redraws..
   const gfx = context.systems.gfx;

@@ -60,7 +60,7 @@ export class WaybackService extends AbstractSystem {
       .then(() => this.resetAsync())
       .then(() => {
         // Tell the AssetSystem what to load..
-        assets.setAsset('wayback', 'data/wayback.min.json');
+        assets.registerAsset('wayback', { preferred: 'data/wayback.min.json' });
         return assets.loadAssetAsync('wayback');
       })
       .then(data => {

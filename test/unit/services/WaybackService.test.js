@@ -14,7 +14,7 @@ describe('WaybackService', () => {
 
   // Supply cached wayback config
   const assets = context.systems.assets;
-  assets._cache.wayback = {
+  assets._loaded.wayback = {
     wayback: sample.waybackConfig
   };
 

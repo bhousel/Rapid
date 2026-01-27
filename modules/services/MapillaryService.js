@@ -1044,12 +1044,16 @@ export class MapillaryService extends AbstractSystem {
 
     // Tell the AssetSystem what to load..
     const latestPath = 'https://cdn.jsdelivr.net/npm/mapillary-js@4/dist';
-    assets.setAsset('mapillary_css', `${latestPath}/mapillary.min.css`, 'latest');
-    assets.setAsset('mapillary_js',  `${latestPath}/mapillary.min.js`,  'latest');
-
     const localPath = 'data/modules/mapillary-js';
-    assets.setAsset('mapillary_css', `${localPath}/mapillary.css`, 'local');  // note no .min
-    assets.setAsset('mapillary_js',  `${localPath}/mapillary.js`,  'local');  // note no .min
+
+    assets.registerAsset('mapillary_css', {
+      latest: `${latestPath}/mapillary.min.css`,
+      local:  `${localPath}/mapillary.css`  // note no .min
+    });
+    assets.registerAsset('mapillary_js', {
+      latest: `${latestPath}/mapillary.min.js`,
+      local:  `${localPath}/mapillary.js`  // note no .min
+    });
 
     return this._loadPromise = new Promise((resolve, reject) => {
       let count = 0;
