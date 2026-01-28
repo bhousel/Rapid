@@ -46,7 +46,7 @@ const dashLineOptionsDefault: ResolvedDashLineOptions = {
   color: 0xffffff,
   alpha: 1,
   scale: 1,
-  useTexture: true,
+  useTexture: false, //true,
   alignment: 0.5
 };
 
@@ -109,6 +109,7 @@ export class DashLine {
         color: resolvedOptions.color,
         matrix: new PIXI.Matrix(),
         texture: this.activeTexture!,
+        textureSpace: 'global',
         width: resolvedOptions.width * resolvedOptions.scale
       };
     } else {

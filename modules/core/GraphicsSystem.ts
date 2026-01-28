@@ -154,6 +154,8 @@ export class GraphicsSystem extends AbstractSystem {
       resolution: 1
     });
 
+    PIXI.GraphicsContext.defaultFillStyle.textureSpace = 'global';
+    PIXI.GraphicsContext.defaultStrokeStyle.textureSpace = 'global';
 
     // Prepare a basic bitmap font that we can use for things like debug messages
     PIXI.BitmapFont.install({
@@ -731,6 +733,7 @@ export class GraphicsSystem extends AbstractSystem {
         click: true,
         wheel: false
       },
+      gcActive: true,
       multiView: true,   // Needed for minimap
       powerPreference: 'high-performance' as const,
       preference: renderPreference,
@@ -739,7 +742,6 @@ export class GraphicsSystem extends AbstractSystem {
       resolution: this.highQuality ? window.devicePixelRatio : 1,
       sharedLoader: true,
       sharedTicker: false,  // Avoid the ticker
-      textureGCActive: true,
       useBackBuffer: false
     };
 
