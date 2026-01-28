@@ -234,6 +234,7 @@ export class PixiTextures {
    * @param width - width in pixels
    * @param height - height in pixels
    * @param asset - The thing to pack
+   * @param textureOptions - optional options to pass to Pixi when creating the texture.
    * @returns The newly allocated texture (or `null` if it couldn't be packed)
    */
   allocate(
@@ -241,7 +242,8 @@ export class PixiTextures {
     textureID: TextureID,
     width: number,
     height: number,
-    asset: ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement
+    asset: ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement,
+    textureOptions?: PIXI.TextureOptions
   ): PIXI.Texture | null {
     if (!this._atlas) return null;
     const atlas = this._atlas[atlasID];
@@ -285,7 +287,7 @@ export class PixiTextures {
     }
 
 
-    const texture = atlas.allocate(imageData);
+    const texture = atlas.allocate(imageData, textureOptions);
     if (!texture) {
       throw new Error(`Couldn't allocate texture ${key}`);
     }
@@ -344,22 +346,24 @@ export class PixiTextures {
   graphicToTexture(textureID: TextureID, graphic: PIXI.Graphics, options: Partial<PIXI.GenerateTextureOptions> = {}): PIXI.Texture | null {
     if (!this.gfx.pixi) return null;  // called too soon?
 
-    const fullOptions: PIXI.GenerateTextureOptions = {
+    const generateTextureOptions: PIXI.GenerateTextureOptions = {
       ...options,
       antialias: false,
       target: graphic
     };
 
     const renderer = this.gfx.pixi.renderer;
-    const temp = renderer.generateTexture(fullOptions);
+    const temp = renderer.generateTexture(generateTextureOptions);
     const { pixels, width, height } = renderer.texture.getPixels(temp);   // a Uint8ClampedArray
-    const texture = this.allocate('symbol', textureID, width, height, pixels);
 
-    if (texture) {
-      // These textures are overscaled, but `orig` Rectangle stores the original width/height
-      // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
-      (texture as { orig: PIXI.Rectangle }).orig = temp.orig.clone();
-    }
+    // The generated texture is overscaled, but `orig` Rectangle stores the original width/height
+    // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
+    const textureOptions: PIXI.TextureOptions = {
+      orig: temp.orig.clone()
+    };
+
+    const texture = this.allocate('symbol', textureID, width, height, pixels, textureOptions);
+
     temp.destroy();
     graphic.destroy({ context: true });
     return texture;
@@ -377,24 +381,29 @@ export class PixiTextures {
   textToTexture(textureID: TextureID, str: string, textStyle: PIXI.TextStyle): PIXI.Texture | null {
     if (!this.gfx.pixi) return null;  // called too soon?
 
-    const options = {
+    const textOptions: PIXI.CanvasTextOptions = {
       text: str,
+      resolution: 2,
       style: textStyle,
-      resolution: 2
+      textureStyle: { scaleMode: 'nearest' }
+    };
+
+    const generateTextureOptions: PIXI.GenerateTextureOptions = {
+      antialias: false,
+      target: new PIXI.Text(textOptions)
     };
 
     const renderer = this.gfx.pixi.renderer;
-    const temp = renderer.canvasText.getTexture(options);
-    const canvas = temp.source.resource as HTMLCanvasElement;
-    const w = temp.frame.width * temp.source.resolution;
-    const h = temp.frame.height * temp.source.resolution;
-    const texture = this.allocate('text', textureID, w, h, canvas);
+    const temp = renderer.generateTexture(generateTextureOptions);
+    const { pixels, width, height } = renderer.texture.getPixels(temp);   // a Uint8ClampedArray
 
-    if (texture) {
-      // These textures are overscaled, but `orig` Rectangle stores the original width/height
-      // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
-      (texture as { orig: PIXI.Rectangle }).orig = temp.orig.clone();
-    }
+    // The generated texture is overscaled, but `orig` Rectangle stores the original width/height
+    // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
+    const textureOptions: PIXI.TextureOptions = {
+      orig: temp.orig.clone()
+    };
+
+    const texture = this.allocate('text', textureID, width, height, pixels, textureOptions);
 
     temp.destroy();
     return texture;

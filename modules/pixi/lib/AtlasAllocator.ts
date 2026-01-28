@@ -49,15 +49,16 @@ export class AtlasAllocator {
    * allocate
    * Allocates the given asset, returning a `PIXI.Texture`, or throwing if it could not be done.
    * @param imageData - The asset to pack in the atlas, must be of type ImageData
+   * @param textureOptions - optional options to pass to Pixi when creating the texture.
    * @return The issued texture
    * @throws If asset type is unrecognized, or dimensions will not fit on a slab
    */
-  allocate(imageData: ImageData): AtlasTexture {
+  allocate(imageData: ImageData, textureOptions?: PIXI.TextureOptions): AtlasTexture {
     if (!(imageData instanceof ImageData)) {
       throw new Error('Unsupported asset type - convert it to ImageData first');
     }
 
-    const texture = this._allocateTexture(imageData.width, imageData.height);
+    const texture = this._allocateTexture(imageData.width, imageData.height, textureOptions);
     const uid = texture.uid;
     const slab = texture.source as AtlasSource;
 
@@ -122,10 +123,11 @@ export class AtlasAllocator {
    *
    * @param width - The width of the requested texture.
    * @param height - The height of the requested texture.
+   * @param textureOptions - optional options to pass to Pixi when creating the texture.
    * @return The allocated texture, if successful; otherwise, `null`.
    * @throws When dimensions are too large to fit on a slab
    */
-  private _allocateTexture(width: number, height: number): AtlasTexture {
+  private _allocateTexture(width: number, height: number, textureOptions?: PIXI.TextureOptions): AtlasTexture {
     // We'll always include an extra pixel of padding to avoid color bleeding into neighbor texture.
     const padding = 1;
 
@@ -136,7 +138,7 @@ export class AtlasAllocator {
 
     // Loop through the slabs and find one with enough space, if any.
     for (const slab of this.slabs) {
-      const texture = this._issueTexture(slab, width, height);
+      const texture = this._issueTexture(slab, width, height, textureOptions);
       if (texture) return texture;
     }
 
@@ -145,7 +147,7 @@ export class AtlasAllocator {
     this.slabs.push(slab);
 
     // Issue the texture from this blank slab.
-    return this._issueTexture(slab, width, height)!;
+    return this._issueTexture(slab, width, height, textureOptions)!;
   }
 
 
@@ -155,9 +157,10 @@ export class AtlasAllocator {
    * @param slab - The texture slab to allocate frame.
    * @param width - The width of the requested texture.
    * @param height - The height of the requested texture.
+   * @param textureOptions - optional options to pass to Pixi when creating the texture.
    * @return The issued texture, if successful; otherwise, `null`.
    */
-  private _issueTexture(slab: AtlasSource, width: number, height: number): AtlasTexture | null {
+  private _issueTexture(slab: AtlasSource, width: number, height: number, textureOptions?: PIXI.TextureOptions): AtlasTexture | null {
     // We'll always include an extra pixel of padding to avoid color bleeding into neighbor texture.
     const padding = 1;
 
@@ -165,6 +168,7 @@ export class AtlasAllocator {
     if (!bin) return null;
 
     const texture: AtlasTexture = new PIXI.Texture({
+      ...textureOptions,
       source: slab,
       frame: bin.clone().pad(-padding)   // The actual frame shouldn't include the padding
     });
