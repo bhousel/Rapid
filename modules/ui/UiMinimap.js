@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { selection } from 'd3-selection';
 import { zoom, zoomIdentity } from 'd3-zoom';
-import { HALF_PI, Viewport, geoZoomToScale, numClamp, vecAdd, vecInterp, vecSubtract } from '@rapid-sdk/math';
+import { HALF_PI, Viewport, geoScaleToZoom, geoZoomToScale, numClamp, vecAdd, vecInterp, vecSubtract } from '@rapid-sdk/math';
 
 import { PixiLayerBackgroundTiles } from '../pixi/PixiLayerBackgroundTiles.ts';
 
@@ -80,10 +80,6 @@ export class UiMinimap {
       return;   // no parent - called too early?
     }
 
-// worldcoordinates
-// not yet
-return;
-
     // add .map-in-map
     let $wrap = $parent.selectAll('.map-in-map')
       .data([0]);
@@ -157,7 +153,8 @@ return;
     if (this._skipEvents) return;
 
     const t = this.viewMini.transform.props;
-    this._tStart = zoomIdentity.translate(t.x, t.y).scale(t.k);
+    const k = geoZoomToScale(t.z);
+    this._tStart = zoomIdentity.translate(t.x, t.y).scale(k);
     this._gesture = null;
   }
 
@@ -171,6 +168,7 @@ return;
     if (this._skipEvents) return;
 
     const {x, y, k} = d3_event.transform;
+    const z = geoScaleToZoom(k);
 
     if (!this._gesture) {
       this._gesture = (k !== this._tStart.k) ? 'zoom' : 'pan';
@@ -185,15 +183,14 @@ return;
       const tMain = viewMain.transform.props;
       const cMini = viewMini.center();
 
-      viewMini.transform = { x: tMain.x, y: tMain.y, k: k };
+      viewMini.transform = { x: tMain.x, y: tMain.y, z: z };
       let xy = viewMini.transform.translation;
       const point = viewMini.project(loc);
       const delta = vecSubtract(cMini, point);
       xy = vecAdd(xy, delta);
-
-      viewMini.transform = { x: xy[0], y: xy[1], k: k };
+      viewMini.transform = { x: xy[0], y: xy[1], z: z };
     } else {
-      viewMini.transform = { x: x, y: y, k: k };
+      viewMini.transform = { x: x, y: y, z: z };
     }
 
     // update `_zDiff` (difference in zoom between main and mini)
@@ -245,12 +242,12 @@ return;
     this.stage.position.set(0, 0);
 
     // Update minimap transform
-    viewMini.transform = { x: tMain.x, y: tMain.y, k: kMini };
+    viewMini.transform = { x: tMain.x, y: tMain.y, z: zMini };
     let xy = viewMini.transform.translation;
     const point = viewMini.project(loc);
     const delta = vecSubtract(cMini, point);
     xy = vecAdd(xy, delta);
-    viewMini.transform = { x: xy[0], y: xy[1], k: kMini };
+    viewMini.transform = { x: xy[0], y: xy[1], z: zMini };
 
     // update d3-zoom transform
     const zoom = this._zoom;
@@ -284,17 +281,20 @@ return;
     // If user is currently panning, keep the bbox in the center
     // so they can see where the map will translate to.
     let offset = [0, 0];
-    const tStart = this._tStart;
-    const tCurr = viewMini.transform.props;
-    if (tStart && tStart.k === tCurr.k) {   // `k` unchanged, so user is not zooming
-      offset = [tCurr.x - tStart.x, tCurr.y - tStart.y];
+    if (this._tStart) {  // if user is interacting with the minimap...
+      const tStart = this._tStart;
+      const tCurr = viewMini.transform.props;
+      const zStart = geoScaleToZoom(tStart.k);
+      if (zStart === tCurr.z) {   // `z` unchanged, so user is not zooming
+        offset = [tCurr.x - tStart.x, tCurr.y - tStart.y];
+      }
     }
 
     // Compute the viewport bounding box coordinates..
     for (let i = 0; i < mainPoints.length; i++) {
       // Unproject from the original screen coords to lon/lat (true = consider rotation)
       // Then project to the coordinates used by the minimap.
-      const [x, y] = viewMini.project(viewMain.unproject(mainPoints[i], true));
+      const [x, y] = viewMini.worldToScreen(viewMain.screenToWorld(mainPoints[i], true));
       miniPoints[i] = vecSubtract([x, y], offset);
       flatPoints[(i * 2)] = x - offset[0];
       flatPoints[(i * 2) + 1] = y - offset[1];
@@ -408,23 +408,10 @@ return;
 
     const renderer = gfx.pixi.renderer;
     const targetCanvas = this.$surface.node();
-
-// workaround for https://github.com/pixijs/pixijs/issues/11168
-let mainCanvas;
-if (renderer.type === PIXI.RendererType.WEBGL && renderer.context.multiView) {
-mainCanvas = renderer.view.canvas;
-renderer.view.canvas = targetCanvas;  // switch to target canvas
-}
-
     renderer.render({    // DRAW
       container: this.stage,
       target: targetCanvas
     });
-
-// workaround for https://github.com/pixijs/pixijs/issues/11168
-if (mainCanvas) {
-renderer.view.canvas = mainCanvas;  // restore main canvas
-}
 
     window.performance.mark('minimap-end');
     window.performance.measure('minimap', 'minimap-start', 'minimap-end');
@@ -438,7 +425,6 @@ renderer.view.canvas = mainCanvas;  // restore main canvas
    */
   initAsync() {
     if (this._initPromise) return this._initPromise;
-
     if (!this.$supersurface || !this.$surface)  return Promise.reject();  // called too early?
 
     const context = this.context;
@@ -469,7 +455,7 @@ renderer.view.canvas = mainCanvas;  // restore main canvas
       stage: stage,
       origin: stage,
       pixi: gfx.pixi,
-      textures: gfx.textureManager,
+      textureManager: gfx.textureManager,
       deferredRedraw: gfx.deferredRedraw,
       immediateRedraw: gfx.immediateRedraw
     };
