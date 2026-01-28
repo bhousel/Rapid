@@ -197,8 +197,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
           container.addChild(lineMarkers);
         }
 
-        const lineMarkerTexture = style.lineMarkerTexture || textureManager.get(style.lineMarkerName!) || PIXI.Texture.WHITE;
-        const sidedMarkerTexture = style.sidedMarkerTexture || textureManager.get(style.sidedMarkerName!) || PIXI.Texture.WHITE;
+        const lineMarkerTexture = style.lineMarkerTexture ||
+          textureManager.getTexture('symbol', style.lineMarkerName!) || PIXI.Texture.WHITE;
+        const sidedMarkerTexture = style.sidedMarkerTexture ||
+          textureManager.getTexture('symbol', style.sidedMarkerName!) || PIXI.Texture.WHITE;
         const sided = style.sidedMarkerName === 'sided';
         const oneway = style.lineMarkerName === 'oneway';
         lineMarkers.removeChildren();

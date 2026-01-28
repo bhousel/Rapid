@@ -6,11 +6,7 @@ import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 
 
 /** Atlas collection containing symbol, text, and tile atlases */
-interface AtlasCollection {
-  symbol: AtlasAllocator;
-  text: AtlasAllocator;
-  tile: AtlasAllocator;
-}
+type AtlasCollection = Record<AtlasID, AtlasAllocator>;
 
 /** Tracked texture data with refcount */
 interface TextureData {
@@ -161,19 +157,6 @@ export class PixiTextures {
 
 
   /**
-   * get
-   * a legacy accessor - we used to just expose the Map publicly
-   * and other code would just call map.get(textureID) to get what they need
-   *
-   * @param textureID - Texture identifier
-   * @returns The texture (or `null` if not found)
-   */
-  get(textureID: TextureID): PIXI.Texture | null {
-    return this.getTexture('symbol', textureID);
-  }
-
-
-  /**
    * getTexture
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
@@ -212,11 +195,13 @@ export class PixiTextures {
    * getDebugTexture
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @returns Texture for the specified atlas
+   * @throws Throws if passed an invalid atlasID
    */
-  getDebugTexture(atlasID: keyof AtlasCollection): PIXI.Texture | null {
-    if (!this._atlas) return null;
-    const atlas = this._atlas[atlasID];
-    if (!atlas) return null;
+  getDebugTexture(atlasID: AtlasID): PIXI.Texture | null {
+    const atlas = this._atlas && this._atlas[atlasID];
+    if (!atlas) {
+      throw new Error(`Unknown atlasID "${atlasID}"`);
+    };
 
     const source = atlas.slabs[0];
     if (!source) return null;
@@ -236,18 +221,21 @@ export class PixiTextures {
    * @param asset - The thing to pack
    * @param textureOptions - optional options to pass to Pixi when creating the texture.
    * @returns The newly allocated texture (or `null` if it couldn't be packed)
+   * @throws Throws if passed an invalid atlasID or if allocation failed for some other reason
    */
   allocate(
-    atlasID: keyof AtlasCollection,
+    atlasID: AtlasID,
     textureID: TextureID,
     width: number,
     height: number,
     asset: ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement,
     textureOptions?: PIXI.TextureOptions
   ): PIXI.Texture | null {
-    if (!this._atlas) return null;
-    const atlas = this._atlas[atlasID];
-    if (!atlas) return null;
+
+    const atlas = this._atlas && this._atlas[atlasID];
+    if (!atlas) {
+      throw new Error(`Unknown atlasID "${atlasID}"`);
+    };
 
     const key = `${atlasID}-${textureID}`;
     const tdata = this._textureData.get(key);
@@ -286,7 +274,6 @@ export class PixiTextures {
       return null;  // some other format?
     }
 
-
     const texture = atlas.allocate(imageData, textureOptions);
     if (!texture) {
       throw new Error(`Couldn't allocate texture ${key}`);
@@ -305,11 +292,13 @@ export class PixiTextures {
    * Unpacks a texture from the atlas and frees its resources
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
+   * @throws Throws if passed an invalid atlasID
    */
-  free(atlasID: keyof AtlasCollection, textureID: TextureID): void {
-    if (!this._atlas) return;
-    const atlas = this._atlas[atlasID];
-    if (!atlas) return;
+  free(atlasID: AtlasID, textureID: TextureID): void {
+    const atlas = this._atlas && this._atlas[atlasID];
+    if (!atlas) {
+      throw new Error(`Unknown atlasID "${atlasID}"`);
+    };
 
     const key = `${atlasID}-${textureID}`;
     const tdata = this._textureData.get(key);
@@ -327,10 +316,11 @@ export class PixiTextures {
 
 
   /**
-   * graphicToTexture
-   * Convert frequently used graphics to textures/sprites for performance
+   * createTexture
+   * Convert frequently used graphics to textures for performance.
    * https://stackoverflow.com/questions/50940737/how-to-convert-a-graphic-to-a-sprite-in-pixijs
    *
+   * The "container" can be any drawable Pixi object: a Container, Graphic, Mesh, Text, etc.
    * For example, rather than drawing a pin, we draw a square with a pin texture on it.
    * This is much more performant than drawing the graphics.
    *
@@ -338,74 +328,46 @@ export class PixiTextures {
    * TextureSource.  This texture gets sent to the GPU once then reused, so WebGL isn't constantly
    * swapping between textures as it draws things.
    *
+   * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @param textureID - Texture identifier (e.g. 'boldPin')
-   * @param graphic - A PIXI.Graphics to convert to a texture (will be destroyed)
+   * @param container - A PIXI.Container (or derived class) to convert to a texture (will be destroyed)
    * @param options - Options passed to `renderer.generateTexture`
-   * @returns Texture allocated from the symbol atlas
+   * @returns A Texture allocated from the requested texture atlas
+   * @throws Throws if passed an invalid atlasID
    */
-  graphicToTexture(textureID: TextureID, graphic: PIXI.Graphics, options: Partial<PIXI.GenerateTextureOptions> = {}): PIXI.Texture | null {
+  createTexture(
+    atlasID: AtlasID,
+    textureID: TextureID,
+    container: PIXI.Container,
+    options: Partial<PIXI.GenerateTextureOptions> = {}
+  ): PIXI.Texture | null {
     if (!this.gfx.pixi) return null;  // called too soon?
+
+    const atlas = this._atlas && this._atlas[atlasID];
+    if (!atlas) {
+      throw new Error(`Unknown atlasID "${atlasID}"`);
+    };
 
     const generateTextureOptions: PIXI.GenerateTextureOptions = {
       ...options,
       antialias: false,
-      target: graphic
+      target: container
     };
 
     const renderer = this.gfx.pixi.renderer;
     const temp = renderer.generateTexture(generateTextureOptions);
     const { pixels, width, height } = renderer.texture.getPixels(temp);   // a Uint8ClampedArray
 
-    // The generated texture is overscaled, but `orig` Rectangle stores the original width/height
+    // The generated texture may be overscaled, but the `orig` Rectangle stores the original width/height
     // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
     const textureOptions: PIXI.TextureOptions = {
       orig: temp.orig.clone()
     };
 
-    const texture = this.allocate('symbol', textureID, width, height, pixels, textureOptions);
+    const texture = this.allocate(atlasID, textureID, width, height, pixels, textureOptions);
 
     temp.destroy();
-    graphic.destroy({ context: true });
-    return texture;
-  }
-
-
-  /**
-   * textToTexture
-   * Convert frequently used text to textures/sprites for performance
-   * @param textureID - e.g. 'Main Street-normal'
-   * @param str - the string
-   * @param textStyle - PIXI text style
-   * @returns Texture allocated from the text atlas
-   */
-  textToTexture(textureID: TextureID, str: string, textStyle: PIXI.TextStyle): PIXI.Texture | null {
-    if (!this.gfx.pixi) return null;  // called too soon?
-
-    const textOptions: PIXI.CanvasTextOptions = {
-      text: str,
-      resolution: 2,
-      style: textStyle,
-      textureStyle: { scaleMode: 'nearest' }
-    };
-
-    const generateTextureOptions: PIXI.GenerateTextureOptions = {
-      antialias: false,
-      target: new PIXI.Text(textOptions)
-    };
-
-    const renderer = this.gfx.pixi.renderer;
-    const temp = renderer.generateTexture(generateTextureOptions);
-    const { pixels, width, height } = renderer.texture.getPixels(temp);   // a Uint8ClampedArray
-
-    // The generated texture is overscaled, but `orig` Rectangle stores the original width/height
-    // (i.e. the dimensions that a PIXI.Sprite using this texture will want to make itself)
-    const textureOptions: PIXI.TextureOptions = {
-      orig: temp.orig.clone()
-    };
-
-    const texture = this.allocate('text', textureID, width, height, pixels, textureOptions);
-
-    temp.destroy();
+    container.destroy({ context: true });
     return texture;
   }
 
@@ -539,9 +501,9 @@ export class PixiTextures {
       .closePath()
       .stroke({ color: 0xcccccc, width: 1 });
 
-    this.graphicToTexture('viewfield', viewfield, viewfieldOptions);
-    this.graphicToTexture('viewfieldDark', viewfieldDark, viewfieldOptions);
-    this.graphicToTexture('viewfieldOutline', viewfieldOutline, viewfieldOptions);
+    this.createTexture('symbol', 'viewfield', viewfield, viewfieldOptions);
+    this.createTexture('symbol', 'viewfieldDark', viewfieldDark, viewfieldOptions);
+    this.createTexture('symbol', 'viewfieldOutline', viewfieldOutline, viewfieldOptions);
 
 
     const pano = new PIXI.Graphics()  // just a full circle - for panoramic / 360° images
@@ -558,9 +520,9 @@ export class PixiTextures {
       .circle(0, 0, 20)
       .stroke({ color: 0xcccccc, width: 1 });
 
-    this.graphicToTexture('pano', pano);
-    this.graphicToTexture('panoDark', panoDark);
-    this.graphicToTexture('panoOutline', panoOutline);
+    this.createTexture('symbol', 'pano', pano);
+    this.createTexture('symbol', 'panoDark', panoDark);
+    this.createTexture('symbol', 'panoOutline', panoOutline);
 
 
     //
@@ -624,15 +586,15 @@ export class PixiTextures {
       .circle(0, 0, 2)
       .fill({ color: 0x000000, alpha: 1 });
 
-    this.graphicToTexture('pin', pin);
-    this.graphicToTexture('boldPin', boldPin);
-    this.graphicToTexture('xlargeSquare', xlargeSquare);
-    this.graphicToTexture('largeSquare', largeSquare);
-    this.graphicToTexture('xlargeCircle', xlargeCircle);
-    this.graphicToTexture('largeCircle', largeCircle);
-    this.graphicToTexture('mediumCircle', mediumCircle);
-    this.graphicToTexture('smallCircle', smallCircle);
-    this.graphicToTexture('taggedCircle', taggedCircle);
+    this.createTexture('symbol', 'pin', pin);
+    this.createTexture('symbol', 'boldPin', boldPin);
+    this.createTexture('symbol', 'xlargeSquare', xlargeSquare);
+    this.createTexture('symbol', 'largeSquare', largeSquare);
+    this.createTexture('symbol', 'xlargeCircle', xlargeCircle);
+    this.createTexture('symbol', 'largeCircle', largeCircle);
+    this.createTexture('symbol', 'mediumCircle', mediumCircle);
+    this.createTexture('symbol', 'smallCircle', smallCircle);
+    this.createTexture('symbol', 'taggedCircle', taggedCircle);
 
 
     // KeepRight
@@ -679,9 +641,9 @@ export class PixiTextures {
       .fill({ color: 0xffffff })
       .stroke({ color: 0x333333, width: 1 });
 
-    this.graphicToTexture('keepright', keepright, { frame: new PIXI.Rectangle(0, 0, 20, 20) });
-    this.graphicToTexture('osmnote', osmnote);
-    this.graphicToTexture('osmose', osmose);
+    this.createTexture('symbol', 'keepright', keepright, { frame: new PIXI.Rectangle(0, 0, 20, 20) });
+    this.createTexture('symbol', 'osmnote', osmnote);
+    this.createTexture('symbol', 'osmose', osmose);
 
 
     //
@@ -700,9 +662,9 @@ export class PixiTextures {
       .poly([0,5, 5,0, 0,-5])
       .fill({ color: 0xffffff, alpha: 1 });
 
-    this.graphicToTexture('midpoint', midpoint);
-    this.graphicToTexture('oneway', oneway);
-    this.graphicToTexture('sided', sided);
+    this.createTexture('symbol', 'midpoint', midpoint);
+    this.createTexture('symbol', 'oneway', oneway);
+    this.createTexture('symbol', 'sided', sided);
 
 
     //
@@ -725,9 +687,9 @@ export class PixiTextures {
       .fill({ color: 0xffffff, alpha: 0.6 })
       .stroke({ color: 0xffffff, width: 1 });
 
-    this.graphicToTexture('lowres-square', lowresSquare);
-    this.graphicToTexture('lowres-ell', lowresEll);
-    this.graphicToTexture('lowres-circle', lowresCircle);
+    this.createTexture('symbol', 'lowres-square', lowresSquare);
+    this.createTexture('symbol', 'lowres-ell', lowresEll);
+    this.createTexture('symbol', 'lowres-circle', lowresCircle);
 
     //
     // Low-res unfilled areas
@@ -745,9 +707,9 @@ export class PixiTextures {
       .circle(0, 0, 5)
       .stroke({ color: 0xffffff, width: 1 });
 
-    this.graphicToTexture('lowres-unfilled-square', lowresUnfilledSquare);
-    this.graphicToTexture('lowres-unfilled-ell', lowresUnfilledEll);
-    this.graphicToTexture('lowres-unfilled-circle', lowresUnfilledCircle);
+    this.createTexture('symbol', 'lowres-unfilled-square', lowresUnfilledSquare);
+    this.createTexture('symbol', 'lowres-unfilled-ell', lowresUnfilledEll);
+    this.createTexture('symbol', 'lowres-unfilled-circle', lowresUnfilledCircle);
   }
 
 }

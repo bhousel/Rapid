@@ -317,7 +317,7 @@ return;
 
       // We're repurposing the 'sided' arrow, so we need to turn it -90°
       const sprite = new PIXI.Sprite();
-      sprite.texture = gfx.textureManager.get('sided');
+      sprite.texture = gfx.textureManager.getTexture('symbol', 'sided');
       sprite.tint = 0xffff00;
       sprite.anchor.set(0, 0.5); // left, middle
       sprite.scale.set(2, 2);

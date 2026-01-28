@@ -413,7 +413,14 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         textStyle = (style === 'normal' ? this._textStyleNormal : this._textStyleItalic);
       }
 
-      texture = textureManager.textToTexture(textureID, str, textStyle);
+      const textOptions: PIXI.CanvasTextOptions = {
+        text: str,
+        resolution: 2,
+        style: textStyle,
+        textureStyle: { scaleMode: 'nearest' }
+      };
+
+      texture = textureManager.createTexture('text', textureID, new PIXI.Text(textOptions));
       this._textureIDs.set(str, textureID);
     }
 

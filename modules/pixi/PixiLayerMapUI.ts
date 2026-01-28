@@ -281,8 +281,8 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
       // Show a viewfield for the heading if we have it
       if (d.heading !== null && !isNaN(d.heading)) {
-        const textures = this.gfx.textureManager!;
-        const heading = new PIXI.Sprite(textures.get('viewfieldDark') || PIXI.Texture.EMPTY);
+        const textureManager = this.gfx.textureManager!;
+        const heading = new PIXI.Sprite(textureManager.getTexture('symbol', 'viewfieldDark') || PIXI.Texture.EMPTY);
         heading.anchor.set(0.5, 1);  // middle, top
         heading.angle = d.heading;
         heading.label = 'heading';

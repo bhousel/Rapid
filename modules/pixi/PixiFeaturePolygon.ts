@@ -354,7 +354,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const w = vecLength(axis1[0], axis1[1]);
       const h = vecLength(axis2[0], axis2[1]);
 
-      lowRes.texture = textureManager.get(textureName) || PIXI.Texture.WHITE;
+      lowRes.texture = textureManager.getTexture('symbol', textureName) || PIXI.Texture.WHITE;
       lowRes.position.set(x, y);
       lowRes.scale.set(w / 10, h / 10);   // our sprite is 10x10
       lowRes.rotation = rotation;
