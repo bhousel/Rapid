@@ -6,9 +6,6 @@ import * as Rapid from '../../../modules/headless.js';
 describe('UrlHashSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
-  context.systems = {
-    l10n: new Rapid.LocalizationSystem(context),
-  };
   context.selectedIDs = () => [];
 
 

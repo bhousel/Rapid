@@ -245,7 +245,7 @@ export class ValidationSystem extends AbstractSystem {
   private _parseHashParam(val: string = ''): SeverityOverride[] {
     const result: SeverityOverride[] = [];
 
-    const rules = utilExtractValues(val, /[,;|]/).filter(Boolean);
+    const rules = utilExtractValues(val, /[,;|]/).filter(Boolean);  // keep slashes
     for (const rule of rules) {
       const parts = rule.split('/', 2);  // "type/subtype"
       const type = parts[0];

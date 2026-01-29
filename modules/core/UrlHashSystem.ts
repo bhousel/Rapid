@@ -75,8 +75,7 @@ export class UrlHashSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'urlhash';
-    this.requiredDependencies = new Set(['l10n']);
-    this.optionalDependencies = new Set(['editor', 'map']);
+    this.optionalDependencies = new Set(['editor', 'l10n', 'map']);
 
     this.doUpdateTitle = true;
     this.titleBase = 'Rapid';

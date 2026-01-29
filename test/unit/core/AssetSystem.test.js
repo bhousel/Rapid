@@ -7,6 +7,9 @@ import * as Rapid from '../../../modules/headless.js';
 describe('AssetSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
+  context.systems = {
+    urlhash: new Rapid.UrlHashSystem(context)
+  };
 
   // Test construction and startup of the system..
   describe('lifecycle', () => {
@@ -47,6 +50,22 @@ describe('AssetSystem', () => {
         return prom
           .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
           .catch(err => assert.match(err, /cannot init/i));
+      });
+
+      it('registers assets specified in the URL hash, if any', () => {
+        const assets = new Rapid.AssetSystem(context);
+        const urlhash = context.systems.urlhash;
+        const params = 'my_presets|https://example.com/presets.json,my_imagery|https://example.com/imagery.json';
+        urlhash._initParams.set('assets', params);
+
+        const prom = assets.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            assert.strictEqual(assets.sources['my_presets']?.preferred, 'https://example.com/presets.json');
+            assert.strictEqual(assets.sources['my_imagery']?.preferred, 'https://example.com/imagery.json');
+          })
+          .finally(() => urlhash._initParams.clear());  // cleanup
       });
     });
 

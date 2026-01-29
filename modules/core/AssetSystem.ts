@@ -41,11 +41,11 @@ export interface AssetSource {
  * - 'local':  Local assets must be included with Rapid - for environments where CDN is not allowed.
  * - 'preferred':  Preferred assets always take priority over the 'latest' or 'local' sources.
  *
- * When loading an asset, the system checks 'preferred' first, followed by the `this.origin` value.
-
- * `this.origin` can be changed before init. *
- * Important: To use 'local', you'll need to have installed a version of Rapid
- *   that has all of these dependencies copied into `/dist/data/modules/`.
+ * When resolving an asset path, the system checks 'preferred' first, followed by the `this.origin` value.
+ * `this.origin` defaults to 'latest', but can be set to 'local' before init.
+ *
+ * Important: To use 'local', you'll need to have installed a version of Rapid that
+ *   has all of these dependencies copied into `/dist/data/modules/`.
  * See https://github.com/rapideditor/rapid-standalone if this is what you need.
  *
  * Properties available:
@@ -185,7 +185,7 @@ export class AssetSystem extends AbstractSystem {
         // e.g. `assets=my_presets|https://example.com/presets.json,my_imagery|https://example.com/imagery.json`
         // Assets specified this way are always flagged as 'preferred'.
         const str = hash.get('assets') || '';
-        const vals = utilExtractValues(str);
+        const vals = utilExtractValues(str, /[,;|]/).filter(Boolean);  // keep slashes
         for (let i = 0; i < vals.length; i += 2) {
           const [k, v] = [vals[i], vals[i+1]];
           if (k && v) {
@@ -218,7 +218,7 @@ export class AssetSystem extends AbstractSystem {
 
   /**
    * registerAsset
-   * Add an asset to the list of sources.
+   * Add an AssetSource to the list of sources.
    * Other systems and services should call this to track any assets that they need to load.
    * @param assetID - asset identifier
    * @param assetSource - source information
