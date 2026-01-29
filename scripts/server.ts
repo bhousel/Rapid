@@ -1,3 +1,4 @@
+import { $ } from 'bun';
 import { styleText } from 'node:util';
 
 const project = '@rapideditor/rapid';
@@ -33,10 +34,30 @@ const server = Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
 
-    // by default redirect root `/` to `dist/`
+    // Handle special cases first
+    // By default, redirect root `/` to `dist/`
     if (url.pathname === '/') {
       console.log(styleText('yellowBright', `307:  Temporary Redirect → 'dist/'`));
       return new Response('Temporary Redirect', { status: 307, headers: { location: 'dist/' }});
+    }
+    // Chrome Devtools - generate a workspace JSON file
+    // see: http://goo.gle/devtools-automatic-workspace-folders
+    if (url.pathname === '/.well-known/appspecific/com.chrome.devtools.json') {
+      const contentType = 'application/json;charset=utf-8';
+      const root = (await $`pwd`.text()).replace(/[\r\n]/g, '');
+      const json = {
+        workspace: {
+          root: root,
+          uuid: Bun.randomUUIDv7()
+        }
+      };
+
+      console.log(styleText('yellowBright', `${req.method}:  ${url.pathname}`));
+      console.log(
+        styleText('greenBright', `200:  Generating workspace JSON`) +
+        styleText('green', `  ${contentType}`)
+      );
+      return new Response(JSON.stringify(json), { status: 200, headers: { 'content-type': contentType }});
     }
 
     const path = url.pathname.split('/');
@@ -53,7 +74,7 @@ const server = Bun.serve({
       if (await file.exists()) {
         console.log(
           styleText('greenBright', `200:  Found → '${file.name}'`) +
-          styleText('green', `  ${file.type}'`)
+          styleText('green', `  ${file.type}`)
         );
         if (/(html|javascript)/.test(file.type)) {
           const content: string = await file.text();
