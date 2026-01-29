@@ -69,7 +69,7 @@ describe('MapWithAIService', () => {
         const prom = mapwithai.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -80,7 +80,7 @@ describe('MapWithAIService', () => {
         const prom = mapwithai.initAsync().then(() => mapwithai.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(mapwithai.started));
+          .then(() => assert.isTrue(mapwithai.started));
       });
     });
 

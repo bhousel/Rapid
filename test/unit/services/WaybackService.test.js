@@ -56,7 +56,7 @@ describe('WaybackService', () => {
         const prom = wayback.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => {
+          .then(() => {
             assert.isObject(wayback._cache);
             assert.instanceOf(wayback._metadata, Map);
             assert.instanceOf(wayback._localDates, Map);
@@ -69,7 +69,7 @@ describe('WaybackService', () => {
         const prom = wayback.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -80,7 +80,7 @@ describe('WaybackService', () => {
         const prom = wayback.initAsync().then(() => wayback.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(wayback.started));
+          .then(() => assert.isTrue(wayback.started));
       });
     });
 
@@ -95,7 +95,7 @@ describe('WaybackService', () => {
         const prom = wayback.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => {
+          .then(() => {
             assert.isObject(wayback._cache);
             assert.instanceOf(wayback._metadata, Map);
             assert.instanceOf(wayback._localDates, Map);

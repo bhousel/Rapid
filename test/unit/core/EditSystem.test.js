@@ -41,7 +41,7 @@ describe('EditSystem', () => {
         const prom = editor.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -50,7 +50,7 @@ describe('EditSystem', () => {
         const prom = editor.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -61,7 +61,7 @@ describe('EditSystem', () => {
         const prom = editor.initAsync().then(() => editor.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(editor.started));
+          .then(() => assert.isTrue(editor.started));
       });
     });
 
@@ -72,7 +72,7 @@ describe('EditSystem', () => {
         const prom = editor.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('clears the history stack', () => {

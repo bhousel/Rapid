@@ -50,7 +50,7 @@ describe('MapSystem', () => {
         const prom = map.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -59,7 +59,7 @@ describe('MapSystem', () => {
         const prom = map.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -70,7 +70,7 @@ describe('MapSystem', () => {
         const prom = map.initAsync().then(() => map.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(map.started));
+          .then(() => assert.isTrue(map.started));
       });
     });
 
@@ -80,7 +80,7 @@ describe('MapSystem', () => {
         const prom = map.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
   });

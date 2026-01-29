@@ -32,7 +32,7 @@ describe('UploaderSystem', () => {
         const prom = uploader.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -41,7 +41,7 @@ describe('UploaderSystem', () => {
         const prom = uploader.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -52,7 +52,7 @@ describe('UploaderSystem', () => {
         const prom = uploader.initAsync().then(() => uploader.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(uploader.started));
+          .then(() => assert.isTrue(uploader.started));
       });
     });
 
@@ -62,7 +62,7 @@ describe('UploaderSystem', () => {
         const prom = uploader.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
   });

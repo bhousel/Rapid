@@ -30,7 +30,7 @@ describe('LocalizationSystem', () => {
         const prom = l10n.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -39,7 +39,7 @@ describe('LocalizationSystem', () => {
         const prom = l10n.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -50,7 +50,7 @@ describe('LocalizationSystem', () => {
         const prom = l10n.initAsync().then(() => l10n.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(l10n.started));
+          .then(() => assert.isTrue(l10n.started));
       });
     });
 
@@ -60,7 +60,7 @@ describe('LocalizationSystem', () => {
         const prom = l10n.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
   });

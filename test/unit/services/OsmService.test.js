@@ -80,7 +80,7 @@ describe('OsmService', () => {
         const prom = osm.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -91,7 +91,7 @@ describe('OsmService', () => {
         const prom = osm.initAsync().then(() => osm.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(osm.started));
+          .then(() => assert.isTrue(osm.started));
       });
     });
 

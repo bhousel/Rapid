@@ -27,7 +27,7 @@ describe('LocationSystem', () => {
         const prom = locations.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -36,7 +36,7 @@ describe('LocationSystem', () => {
         const prom = locations.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -47,7 +47,7 @@ describe('LocationSystem', () => {
         const prom = locations.initAsync().then(() => locations.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(locations.started));
+          .then(() => assert.isTrue(locations.started));
       });
     });
 
@@ -57,7 +57,7 @@ describe('LocationSystem', () => {
         const prom = locations.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
   });

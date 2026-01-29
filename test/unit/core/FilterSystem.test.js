@@ -38,7 +38,7 @@ describe('FilterSystem', () => {
         const prom = filters.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -47,7 +47,7 @@ describe('FilterSystem', () => {
         const prom = filters.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -58,7 +58,7 @@ describe('FilterSystem', () => {
         const prom = filters.initAsync().then(() => filters.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(filters.started));
+          .then(() => assert.isTrue(filters.started));
       });
     });
 
@@ -68,7 +68,7 @@ describe('FilterSystem', () => {
         const prom = filters.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
   });

@@ -57,7 +57,7 @@ describe('TaginfoService', () => {
         const prom = taginfo.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -66,7 +66,7 @@ describe('TaginfoService', () => {
         const prom = taginfo.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -77,7 +77,7 @@ describe('TaginfoService', () => {
         const prom = taginfo.initAsync().then(() => taginfo.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(taginfo.started));
+          .then(() => assert.isTrue(taginfo.started));
       });
     });
 
@@ -87,7 +87,7 @@ describe('TaginfoService', () => {
         const prom = taginfo.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
   });

@@ -48,7 +48,7 @@ describe('ImagerySystem', () => {
         const prom = imagery.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -57,7 +57,7 @@ describe('ImagerySystem', () => {
         const prom = imagery.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -68,7 +68,7 @@ describe('ImagerySystem', () => {
         const prom = imagery.initAsync().then(() => imagery.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(imagery.started));
+          .then(() => assert.isTrue(imagery.started));
       });
     });
 
@@ -78,7 +78,7 @@ describe('ImagerySystem', () => {
         const prom = imagery.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
   });

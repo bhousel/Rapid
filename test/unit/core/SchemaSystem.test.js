@@ -35,7 +35,7 @@ describe('SchemaSystem', () => {
         const prom = schema.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -44,7 +44,7 @@ describe('SchemaSystem', () => {
         const prom = schema.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
 
@@ -71,7 +71,7 @@ describe('SchemaSystem', () => {
         const prom = schema.initAsync().then(() => schema.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(schema.started));
+          .then(() => assert.isTrue(schema.started));
       });
     });
 
@@ -81,7 +81,7 @@ describe('SchemaSystem', () => {
         const prom = schema.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
   });

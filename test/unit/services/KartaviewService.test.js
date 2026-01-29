@@ -75,7 +75,7 @@ describe('KartaviewService', () => {
         const prom = kartaview.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -86,7 +86,7 @@ describe('KartaviewService', () => {
         const prom = kartaview.initAsync().then(() => kartaview.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(kartaview.started));
+          .then(() => assert.isTrue(kartaview.started));
       });
     });
 

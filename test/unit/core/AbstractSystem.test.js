@@ -47,7 +47,7 @@ describe('AbstractSystem', () => {
         const prom = a.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -56,7 +56,7 @@ describe('AbstractSystem', () => {
         const prom = a.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -67,7 +67,7 @@ describe('AbstractSystem', () => {
         const prom = a.initAsync().then(() => a.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(a.started));
+          .then(() => assert.isTrue(a.started));
       });
     });
 
@@ -77,7 +77,7 @@ describe('AbstractSystem', () => {
         const prom = a.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
 

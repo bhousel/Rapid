@@ -29,7 +29,7 @@ describe('UrlHashSystem', () => {
         const prom = urlhash.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
 
       it('rejects if a dependency is missing', () => {
@@ -38,7 +38,7 @@ describe('UrlHashSystem', () => {
         const prom = urlhash.initAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
       });
     });
@@ -49,7 +49,7 @@ describe('UrlHashSystem', () => {
         const prom = urlhash.initAsync().then(() => urlhash.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(urlhash.started));
+          .then(() => assert.isTrue(urlhash.started));
       });
     });
 
@@ -59,7 +59,7 @@ describe('UrlHashSystem', () => {
         const prom = urlhash.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(val => assert.isTrue(true));
+          .then(() => assert.isTrue(true));
       });
     });
   });
