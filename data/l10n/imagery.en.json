@@ -197,7 +197,7 @@
       "skoterleder": {"attribution": {"text": "© Skoterleder.org"}, "description": "Snowmobile trails", "name": "Snowmobile map Sweden"},
       "sropczyce-buildings": {"attribution": {"text": "Powiat ropczycko-sędziszowski"}, "name": "Powiat ropczycko-sędziszowski: Buildings"},
       "stalowowolski-buildings": {"attribution": {"text": "Powiat stalowowolski"}, "name": "Powiat stalowowolski: Buildings"},
-      "stamen-terrain-background": {"name": "Stamen Terrain"},
+      "stamen-terrain-background": {"attribution": {"text": "Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL"}, "name": "Stamen Terrain"},
       "stockholm-orto": {"attribution": {"text": "© Stockholm municipality, CC0"}, "description": "Orthophotos from the municipality of Stockholm 2018, CC0 license", "name": "Stockholm Orthophoto"},
       "susono_shizuoka_jp_orthophoto": {"attribution": {"text": "Susono city orthophoto"}, "description": "The aerial photos released by Susono City as open data.", "name": "Susono city orthophoto"},
       "svk-electricity-network": {"attribution": {"text": "© Svenska kraftnät"}, "description": "Swedish transmission network for electricity.", "name": "SVK - Electricity Network"},
@@ -210,7 +210,8 @@
       "trafikverket-vagnat-extra": {"attribution": {"text": "© Trafikverket, CC0"}, "description": "Swedish NVDB extra details: Highway reference, traffic calming, rest area, bus stop, bridge, tunnel, speed camera", "name": "Trafikverket Road Network extra"},
       "trafikverket-vagnat-option": {"attribution": {"text": "© Trafikverket, CC0"}, "description": "Swedish NVDB road network with several options for map layers", "name": "Trafikverket Road Network options"},
       "wroclaw-orto2015": {"attribution": {"text": "Urząd Miasta Wrocław"}, "name": "Wrocław: Orthophotomap 2015 (aerial image)"},
-      "wroclaw-orto2018": {"attribution": {"text": "Urząd Miasta Wrocław"}, "name": "Wrocław: Orthophotomap 2018 (aerial image)"}
+      "wroclaw-orto2018": {"attribution": {"text": "Urząd Miasta Wrocław"}, "name": "Wrocław: Orthophotomap 2018 (aerial image)"},
+      "EsriWayback": {"attribution": {"text": "Terms & Feedback"}, "name": "Esri Wayback", "description": "Esri Wayback contains archived snapshots of Esri World Imagery created over time."}
     }
   }
 }

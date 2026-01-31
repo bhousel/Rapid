@@ -34,6 +34,7 @@ for (const f of folders) {
 
 // Legacy: Remove some older things from the project
 await $`rm -f ./dist/esbuild.json`.quiet();
+await $`rm -f ./dist/data/*.json`.quiet();
 await $`rm -f ./dist/*.js`.quiet();
 await $`rm -f ./dist/*.map`.quiet();
 await $`rm -f ./dist/*.css`.quiet();

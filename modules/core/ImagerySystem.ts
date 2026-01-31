@@ -7,9 +7,11 @@ import {
   ImagerySourceEsri, ImagerySourceEsriWayback, ImagerySourceNone
 } from '../lib/ImagerySource.ts';
 import { utilExtractValues, utilWildcard } from '../util/string.ts';
+import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
 import type { ImagerySourceProps } from '../lib/ImagerySource.ts';
+import type { OneOrMore } from '../util/iterable.ts';
 import type { PixiLayerBackgroundTiles } from '../pixi/PixiLayerBackgroundTiles.ts';
 import type { Vec2, Vec4 } from '../data/types.ts';
 
@@ -18,9 +20,11 @@ import type { Vec2, Vec4 } from '../data/types.ts';
  * Data to merge into the imagery system.
  * Contains imagery sources to add, replace, or remove.
  */
-export interface ImageryAsset {
-  /** A string identifier, e.g. 'editor-layer-index@2026-01-01' (required) */
+export interface ImageryData {
+  /** A string identifier, e.g. 'editor_layer_index' (required) */
   assetID: AssetID;
+  /** A string version specifier, e.g. '2026-01-01' */
+  assetVersion?: string;
   /** Object mapping sourceID to imagery data (or null to delete) */
   imagery?: Record<ImagerySourceID, Partial<ImagerySourceProps> | null>;
 }
@@ -29,13 +33,11 @@ export interface ImageryAsset {
 /**
  * `ImagerySystem` maintains the state of the tiled background and overlay imagery.
  *
- * At init time, Rapid will load the default imagery data from the default imagery index,
- * but additional imagery data can be merged in to supplement or override the defaults.
+ * At init time, Rapid will attempt to load the imagery.
  *
  * Properties available:
- *   `assets`         Names of imagery assets that have been merged in
- *   `features`       GeoJSON features for spatial queries
- *   `sources`        The imagery sources
+ *   `features`    Map<ImagerySourceID, GeoJSON>  - Bounding features for spatial queries
+ *   `sources`     Map<ImagerySourceID, ImagerySource> - The imagery sources
  *   `offset`
  *   `brightness`
  *   `contrast`
@@ -44,15 +46,20 @@ export interface ImageryAsset {
  *   `numGridSplits`
  *
  * Events available:
- *   `imagerychange`     Fires on any change in imagery or display options
+ *   `imagerychange`   Fires on any change in imagery or display options
  */
 export class ImagerySystem extends AbstractSystem {
-  /** AssetIDs of imagery files that have been merged in */
-  assets: Set<AssetID>;
   /** GeoJSON features for spatial queries, keyed by ImagerySourceID (lowercase) */
   features: Map<ImagerySourceID, GeoJSON.Feature>;
   /** The imagery sources, keyed by ImagerySourceID (lowercase) */
   sources: Map<ImagerySourceID, ImagerySource>;
+
+  /** Default imagery file assetIDs */
+  private _defaultAssetIDs: Set<AssetID>;
+  /** Currently loaded imagery file assetIDs, maps to the version string that was loaded, if known */
+  private _loadedAssetIDs: Map<AssetID, string>;
+  /** Requested imagery file assetIDs - optional, these can be different than the default files */
+  private _requestedAssetIDs: Set<AssetID> | null;
 
   private _baseLayer: ImagerySource | null;
   private _overlayLayers: Map<ImagerySourceID, ImagerySource>;
@@ -77,9 +84,12 @@ export class ImagerySystem extends AbstractSystem {
     this.requiredDependencies = new Set(['assets']);
     this.optionalDependencies = new Set(['gfx', 'l10n', 'storage', 'urlhash']);
 
-    this.assets = new Set();
     this.features = new Map();
     this.sources = new Map();
+
+    this._defaultAssetIDs = new Set(['editor_layer_index', 'rapid_imagery']);
+    this._loadedAssetIDs = new Map();
+    this._requestedAssetIDs = null;
 
     this._baseLayer = null;
     this._overlayLayers = new Map();
@@ -132,10 +142,12 @@ export class ImagerySystem extends AbstractSystem {
         gfx?.scene?.on('layerchange', this._imageryChanged);
         l10n?.on('localechange', this._localeChanged);
 
-        // Clear data and create the builtin imagery sources..
-        this._resetAll();
+        // Tell the AssetSystem about default imagery files..
+        // By default we'll load 'editor_layer_index', then 'rapid_imagery'
+        assets!.registerAsset('editor_layer_index', { preferred: 'data/editor_layer_index.min.json' });
+        assets!.registerAsset('rapid_imagery', { preferred: 'data/rapid_imagery.min.json' });
 
-        this._loadDefaultImageryAsync();
+        this.loadImageryAssetsAsync();
       });
   }
 
@@ -161,11 +173,143 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
+   * loadImageryAssetsAsync
+   * @return Promise fulfilled when the imagery has been loaded
+   */
+  loadImageryAssetsAsync(): Promise<void> {
+    const context = this.context;
+    const assets = context.systems.assets!;
+
+    // Clear out whatever was loaded before.
+    this.resetAll();
+
+    // Load the imagery files
+    const which = this._requestedAssetIDs ?? this._defaultAssetIDs;
+    const assetIDs = [...which];
+
+    // Type guard, see https://stackoverflow.com/a/73913774/7620
+    const isFulfilled = <T,>(p:PromiseSettledResult<T>): p is PromiseFulfilledResult<T> => p.status === 'fulfilled';
+    const isRejected = <T,>(p:PromiseSettledResult<T>): p is PromiseRejectedResult => p.status === 'rejected';
+
+    return Promise.allSettled(
+      assetIDs.map(assetID => assets.loadAssetAsync(assetID))
+    )
+    .then(results => {
+      const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
+      const rejectedReasons = results.filter(isRejected).map(p => p.reason);
+
+      for (const data of fulfilledValues as ImageryData[]) {
+        if (data.assetID === 'rapid_imagery') {
+          data.assetVersion = context.version;
+        }
+        this.merge(data);
+      }
+      for (const reason of rejectedReasons as string[]) {
+        console.warn(reason);   // eslint-disable-line no-console
+      }
+
+      // Default the locator overlay to "on"..
+      const locator = this.sources.get('mapbox_locator_overlay');
+      if (locator) {
+        this.toggleOverlayLayer(locator);
+      }
+    });
+  }
+
+
+  /**
+   * resetAll
+   * This puts the ImagerySystem internal data back to its initial state, i.e. no imagery.
+   */
+  resetAll(): void {
+    const context = this.context;
+    const storage = context.systems.storage;
+
+    this._loadedAssetIDs.clear();
+    this.features.clear();
+    this.sources.clear();
+
+    // Add 'None'
+    const none = new ImagerySourceNone(context);
+    this.sources.set(none.id.toLowerCase(), none);
+
+    // Add 'Custom' - seed it with whatever template the user has used previously
+    const custom = new ImagerySourceCustom(context);
+    custom.template = storage?.getItem('background-custom-template') ?? '';
+    this.sources.set(custom.id.toLowerCase(), custom);
+
+    this._baseLayer = none;
+    this._overlayLayers.clear();
+
+    this._rebuildIndex();    // also calls _imageryChanged()
+  }
+
+
+  /**
+   * defaultAssetIDs
+   * Returns the default assetIDs
+   * @return  Default assetIDs
+   * @readonly
+   */
+  get defaultAssetIDs(): Set<AssetID> {
+    return this._defaultAssetIDs;
+  }
+
+  /**
+   * loadedAssetIDs
+   * Returns the loaded assetIDs, along with their version numbers if known.
+   * @return  Loaded assetIDs
+   * @readonly
+   */
+  get loadedAssetIDs(): Map<AssetID, string> {
+    return this._loadedAssetIDs;
+  }
+
+  /**
+   * requestedAssetIDs
+   * Allows user to request different imagery asset files than what Rapid uses by default.
+   *
+   * If set before init time, these assets will be loaded at init time when init calls `loadImageryAssetsAsync`.
+   * You can also change this after init time, but then you'll need to call `loadImageryAssetsAsync` again.
+   *
+   * The 'default' keyword is special - if found in the list, it will expand to all the default IDs.
+   *
+   * You can set `requestedAssetIDs` to an empty list ''.  In this case, subsequent calls to
+   *   `loadImageryAssetsAsync` will load nothing, you'll have only builtin 'none' and 'custom' sources.
+   * You can also pass `null` - in this case the `requestedAssetIDs` list is not used,
+   *   and subsequent calls to `loadImageryAssetsAsync` will use the `defaultAssetIDs` Set.
+   * @param vals - A `string`, `Array<string>` or `Set<string>` of assetIDs to load (or `null` to disable)
+   */
+  set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
+    if (vals === null || vals === undefined) {
+      this._requestedAssetIDs = null;
+      return;
+    }
+
+    this._requestedAssetIDs = new Set();
+    for (const assetID of utilIterable(vals)) {
+      if (!assetID) continue;
+      if (assetID === 'default') {
+        for (const defaultID of this._defaultAssetIDs) {
+          this._requestedAssetIDs.add(defaultID);
+        }
+      } else {
+        this._requestedAssetIDs.add(assetID);
+      }
+    }
+  }
+  get requestedAssetIDs(): Set<AssetID> | null {
+    return this._requestedAssetIDs;
+  }
+
+
+  /**
    * merge
    * Accepts an object containing new imagery data (all properties except 'assetID' are optional):
    * {
-   *   assetID: '',    // A string identifier, e.g. 'editor-layer-index@2026-01-01'
-   *   imagery: {},    // Object<ImagerySourceID, imageryData>
+   *   assetID: '',       // A string identifier, e.g. 'editor_layer_index'
+   *   assetVersion: ''   // A string version specifier, e.g. '2026-01-01'  (defaults to 'unknown' if not present)
+   *   imagery: {},       // Object<ImagerySourceID, ImageryData>
    * }
    *
    * When merging:
@@ -180,18 +324,21 @@ export class ImagerySystem extends AbstractSystem {
    * @param src - imagery data to merge
    * @throws Will throw if given data does not contain a `assetID`, or if the `assetID` has already been merged
    */
-  merge(src: ImageryAsset): void {
+  merge(src: ImageryData): void {
     const context = this.context;
+    const wayback = context.services.wayback;
 
     const assetID = src.assetID;
+    const assetVersion = src.assetVersion ?? 'unknown';
+
     if (!assetID) {
       throw new Error('Imagery missing assetID property');
     }
-    if (this.assets.has(assetID)) {
+    if (this._loadedAssetIDs.has(assetID)) {
       throw new Error(`Imagery "${assetID}" already merged`);
     }
 
-    this.assets.add(assetID);
+    this._loadedAssetIDs.set(assetID, assetVersion);
 
     // Merge Imagery Sources
     if (src.imagery) {
@@ -201,14 +348,18 @@ export class ImagerySystem extends AbstractSystem {
         if (existing?.isBuiltin()) continue;  // don't override a builtin ImagerySource
 
         if (props) {   // add or replace
+          const setProps = { ...props, assetID, assetVersion } as Partial<ImagerySourceProps>;
+
           // Instantiate the appropriate `ImagerySource` class
           let source: ImagerySource;
           if (props.type === 'bing') {
-            source = new ImagerySourceBing(context, { assetID: assetID, ...props } as Partial<ImagerySourceProps>);
+            source = new ImagerySourceBing(context, setProps);
+          } else if (props.type === 'wayback' && wayback) {    // if the WaybackService exists..
+            source = new ImagerySourceEsriWayback(context, setProps);
           } else if (/^EsriWorldImagery/.test(sourceID)) {
-            source = new ImagerySourceEsri(context, { assetID: assetID, ...props } as Partial<ImagerySourceProps>);
+            source = new ImagerySourceEsri(context, setProps);
           } else {
-            source = new ImagerySource(context, { assetID: assetID, ...props } as Partial<ImagerySourceProps>);
+            source = new ImagerySource(context, setProps);
           }
           this.sources.set(sourceKey, source);
 
@@ -629,51 +780,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * _loadDefaultImageryAsync
-   * This loads the default imagery for Rapid:
-   *  - editor-layer-index
-   *  - rapid imagery overrides
-   */
-  private _loadDefaultImageryAsync(): Promise<void> {
-    const context = this.context;
-    const assets = context.systems.assets!;
-
-    // Tell the AssetSystem what to load..
-    assets.registerAsset('editor_layer_index', { preferred: 'data/imagery.min.json' });
-    // 'rapid_imagery_overrides' = customizations to merge in after the editor-layer-index
-    assets.registerAsset('rapid_imagery_overrides', { preferred: 'data/imagery_overrides.min.json' });
-
-    // Fetch the imagery data
-    return Promise.all([
-      assets.loadAssetAsync('editor_layer_index'),
-      assets.loadAssetAsync('rapid_imagery_overrides')
-    ])
-    .then((vals) => {
-      // Merge editor-layer-index asset..
-      const eli = vals[0] as Partial<ImageryAsset>;
-      this.merge({
-        assetID: eli.assetID ?? 'editor-layer-index',
-        imagery: eli.imagery
-      });
-
-      // Merge rapid_imagery_overrides..
-      // Use the assetID from the data if present, otherwise generate one
-      const overrides = vals[1] as Partial<ImageryAsset>;
-      this.merge({
-        assetID: overrides.assetID ?? `rapid-imagery-overrides@${context.version}`,
-        imagery: overrides.imagery
-      });
-
-      // Default the locator overlay to "on"..
-      const locator = this.sources.get('mapbox_locator_overlay');
-      if (locator) {
-        this.toggleOverlayLayer(locator);
-      }
-    });
-  }
-
-
-  /**
    * _rebuildIndex
    * Reset all sources and rebuild the whichPolygon spatial index.
    * This should be called after merging new imagery data.
@@ -703,70 +809,54 @@ export class ImagerySystem extends AbstractSystem {
    * @param prevParams - The previous hash parameters
    */
   private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
-    // background
-    const newBackground = currParams.get('background') || '';
-    const oldBackground = prevParams.get('background') || '';
-    if (!newBackground || newBackground !== oldBackground) {
-      const foundSource = this.getSourceByID(newBackground);
-      if (foundSource) {
-        this.setSourceByID(newBackground!);  // Calling `setSourceByID` handles Esri Wayback w/date
+    let loadPromise = Promise.resolve();
+
+    // imagery
+    // AssetIDs to request, e.g. `imagery=default,my_imagery`
+    const newImagery = currParams.get('imagery');
+    const oldImagery = prevParams.get('imagery') || '';
+    if (newImagery !== oldImagery) {
+      if (typeof newImagery === 'string') {
+        this.requestedAssetIDs = utilExtractValues(newImagery).filter(Boolean);
       } else {
-        this.baseLayerSource(this.chooseDefaultSource());
+        this.requestedAssetIDs = [];
       }
+      loadPromise = this.loadImageryAssetsAsync();
     }
 
-    // overlays
-    const newOverlays = currParams.get('overlays') || '';
-    const oldOverlays = prevParams.get('overlays') || '';
-    if (newOverlays !== oldOverlays) {
-      const vals = utilExtractValues(newOverlays).filter(Boolean);
-      const toEnableIDs = new Set<ImagerySourceID>(vals);
-      this.enableOverlayLayers(toEnableIDs);
-    }
+    // Handle any change in the imagery index first, then consider the other parameters.
+    loadPromise.then(() => {
+      // background
+      const newBackground = currParams.get('background') || '';
+      const oldBackground = prevParams.get('background') || '';
+      if (!newBackground || newBackground !== oldBackground) {
+        const foundSource = this.getSourceByID(newBackground);
+        if (foundSource) {
+          this.setSourceByID(newBackground!);  // Calling `setSourceByID` handles Esri Wayback w/date
+        } else {
+          this.baseLayerSource(this.chooseDefaultSource());
+        }
+      }
 
-    // offset
-    const newOffset = currParams.get('offset') || '';
-    const oldOffset = prevParams.get('offset') || '';
-    if (newOffset !== oldOffset) {
-      let [x, y] = newOffset.split(/[;,]/).map(s => s.trim()).map(Number);
-      if (isNaN(x) || !isFinite(x)) x = 0;
-      if (isNaN(y) || !isFinite(y)) y = 0;
-      this.offset = geoMetersToOffset([x, y]) as Vec2;
-    }
-  }
+      // overlays
+      const newOverlays = currParams.get('overlays') || '';
+      const oldOverlays = prevParams.get('overlays') || '';
+      if (newOverlays !== oldOverlays) {
+        const vals = utilExtractValues(newOverlays).filter(Boolean);
+        const toEnableIDs = new Set<ImagerySourceID>(vals);
+        this.enableOverlayLayers(toEnableIDs);
+      }
 
-
-  /**
-   * _resetAll
-   * This puts ImagerySystem internal data back to its initial state.
-   * i.e. nothing loaded, only default imagery sources.
-   * This would probably only be useful for testing, or setting up a special non-OSM Rapid.
-   */
-  private _resetAll(): void {
-    const context = this.context;
-    const storage = context.systems.storage;
-    const wayback = context.services.wayback;
-
-    this.assets = new Set();
-    this.features = new Map();
-    this.sources = new Map();
-
-    // Add 'None'
-    const none = new ImagerySourceNone(context);
-    this.sources.set(none.id.toLowerCase(), none);
-
-    // Add 'Custom' - seed it with whatever template the user has used previously
-    const custom = new ImagerySourceCustom(context);
-    custom.template = storage?.getItem('background-custom-template') ?? '';
-    this.sources.set(custom.id.toLowerCase(), custom);
-
-    // Add 'Esri Wayback', if the WaybackService exists.
-    if (wayback) {
-      const waybackSource = new ImagerySourceEsriWayback(context);
-      this.sources.set(waybackSource.id.toLowerCase(), waybackSource);
-    }
-
-    this._rebuildIndex();    // also calls _imageryChanged()
+      // offset
+      const newOffset = currParams.get('offset') || '';
+      const oldOffset = prevParams.get('offset') || '';
+      if (newOffset !== oldOffset) {
+        let [x, y] = newOffset.split(/[;,]/).map(s => s.trim()).map(Number);
+        if (isNaN(x) || !isFinite(x)) x = 0;
+        if (isNaN(y) || !isFinite(y)) y = 0;
+        this.offset = geoMetersToOffset([x, y]) as Vec2;
+      }
+    });
   }
 
 

@@ -214,11 +214,12 @@ async function buildImagery() {
   };
 
   const data = {
-    assetID: `editor-layer-index@${imageryDate}`,
+    assetID: `editor_layer_index`,
+    asserVersion: imageryDate,
     imagery: sortObject(imagery)
   };
 
-  await Bun.write('./data/imagery.json', stringify(data) + '\n');
+  await Bun.write('./data/editor_layer_index.json', stringify(data) + '\n');
   console.timeEnd(END);
 }
 

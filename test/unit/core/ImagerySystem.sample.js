@@ -30,6 +30,7 @@ export const caPolygon = {
 // Initial imagery data to add
 export const addImageryData = {
   assetID: 'add-imagery-data',
+  assetVersion: '2026-01-01',
   imagery: {
     'nj-2015': {
       id: 'nj-2015',
@@ -141,6 +142,7 @@ export const addImageryData = {
 // Update some existing imagery
 export const updateImageryData = {
   assetID: 'update-imagery-data',
+  assetVersion: '2026-01-02',
   imagery: {
     'nj-2015': {
       id: 'nj-2015',
@@ -171,6 +173,7 @@ export const updateImageryData = {
 // Delete some imagery using wildcards
 export const deleteImageryData = {
   assetID: 'delete-imagery-data',
+  assetVersion: '2026-01-03',
   imagery: {
     'foo-*': null,      // delete all foo-* sources
     'bar-source': null  // delete specific source
@@ -181,6 +184,7 @@ export const deleteImageryData = {
 // Imagery with blocklist-matching template (for testing blocklist)
 export const blocklistedImageryData = {
   assetID: 'blocklisted-imagery-data',
+  assetVersion: '2026-01-04',
   imagery: {
     'blocked-source': {
       id: 'blocked-source',

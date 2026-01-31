@@ -143,6 +143,11 @@ describe('AssetSystem', () => {
         _assets.registerAsset('test_asset1', sample);
         assert.deepEqual(_assets.sources['test_asset1'], sample);
       });
+
+      it('throws if the assetID is a reserved word', () => {
+        const sample = { latest: 'foo.json', local: 'bar.json' };
+        assert.throws(() => _assets.registerAsset('default', sample), /reserved word/i);
+      });
     });
 
 

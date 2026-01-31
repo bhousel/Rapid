@@ -139,7 +139,7 @@ export class AssetSystem extends AbstractSystem {
       const c = this._loaded;
       c.address_formats = { addressFormats: [{ format: [['housenumber', 'street'], ['city', 'postcode'] ] }] };
       c.editor_layer_index = { assetID: 'editor_layer_index' };
-      c.rapid_imagery_overrides = { assetID: 'rapid_imagery_overrides' };
+      c.rapid_imagery = { assetID: 'rapid_imagery' };
       c.languages = { languages: { de: { nativeName: 'Deutsch' }, en: { nativeName: 'English' } } };
       c.locales = { locales: { en: { rtl: false } } };
       c.phone_formats = { phoneFormats: {} };
@@ -151,7 +151,7 @@ export class AssetSystem extends AbstractSystem {
       c.iD_schema_defaults = {};
       c.iD_schema_fields = {};
       c.iD_schema_presets = {};
-      c.rapid_schema_overrides = {};
+      c.rapid_schema = {};
       c.l10n_core_en = {};
       c.l10n_tagging_en = {};
       c.l10n_imagery_en = {};
@@ -222,8 +222,12 @@ export class AssetSystem extends AbstractSystem {
    * Other systems and services should call this to track any assets that they need to load.
    * @param assetID - asset identifier
    * @param assetSource - source information
+   * @throws Will throw if a reserved assetID is used.
    */
   registerAsset(assetID: AssetID, source: AssetSource = {}): void {
+    if (assetID === 'default') {
+      throw new Error(`assetID "${assetID}" is a reserved word`);
+    }
     this.sources[assetID] = source;
   }
 

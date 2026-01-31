@@ -887,16 +887,12 @@ export class SchemaSystem extends AbstractSystem {
    * _loadDefaultSchemaAsync
    * This loads the default schema for Rapid:
    *  - iD-tagging-schema
-   *  - rapid schema overrides
+   *  - rapid_schema
    * @return  Promise fulfilled when the default schema has been downloaded and merged into Rapid.
    */
   private _loadDefaultSchemaAsync(): Promise<void> {
     const context = this.context;
-    const assets = context.systems.assets;
-
-    if (!assets) {
-      return Promise.reject(new Error('AssetSystem not available'));
-    }
+    const assets = context.systems.assets!;
 
     // Tell the AssetSystem what to load..
     const latestPath = 'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist';
@@ -927,9 +923,9 @@ export class SchemaSystem extends AbstractSystem {
       local:  `${localPath}/fields.min.json`
     });
 
-    // 'rapid_schema_overrides' = customizations to merge in after the id-tagging-schema
-    assets.registerAsset('rapid_schema_overrides', {
-      preferred: 'data/schema_overrides.min.json'
+    // 'rapid_schema' = customizations to merge in after the id-tagging-schema
+    assets.registerAsset('rapid_schema', {
+      preferred: 'data/rapid_schema.min.json'
     });
 
     // Fetch the schema data
@@ -940,7 +936,7 @@ export class SchemaSystem extends AbstractSystem {
       assets.loadAssetAsync('iD_schema_defaults'),
       assets.loadAssetAsync('iD_schema_presets'),
       assets.loadAssetAsync('iD_schema_fields'),
-      assets.loadAssetAsync('rapid_schema_overrides')
+      assets.loadAssetAsync('rapid_schema')
     ])
     .then(vals => {
       osmSetDeprecatedTags(vals[0] as any);
@@ -967,11 +963,11 @@ export class SchemaSystem extends AbstractSystem {
         fields: vals[5] as any
       });
 
-      // Merge rapid_schema_overrides...
-      const overrides = vals[6] as Partial<SchemaAsset>;
+      // Merge rapid_schema...
+      const rapidSchema = vals[6] as Partial<SchemaAsset>;
       this.merge({
-        assetID: `rapid-schema-overrides@${context.version}`,
-        ...overrides
+        assetID: `rapid_schema@${context.version}`,
+        ...rapidSchema
       });
     });
   }

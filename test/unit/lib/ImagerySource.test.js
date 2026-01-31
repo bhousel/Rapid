@@ -368,7 +368,7 @@ describe('ImagerySource', () => {
 
   describe('isBuiltin', () => {
     it('returns true only for sources with no assetID', () => {
-      const source1 = new Rapid.ImagerySource(context, { id: 'anyid1', assetID: 'editor-layer-index' });
+      const source1 = new Rapid.ImagerySource(context, { id: 'anyid1', assetID: 'editor_layer_index' });
       const source2 = new Rapid.ImagerySource(context, { id: 'anyid2' });
       assert.isFalse(source1.isBuiltin());
       assert.isTrue(source2.isBuiltin());

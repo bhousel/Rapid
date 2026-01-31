@@ -12,6 +12,9 @@ import type { Vec2 } from '../lib/types.ts';
 const aesDecrypt = utilAesDecrypt as (cipherText: string | undefined, key?: number[]) => string;
 
 
+/** Supported Imagery Types */
+export type ImageryType = 'tms' | 'wms' | 'bing' | 'wayback';
+
 /**
  * ImagerySourceStrings
  * Pre-localized strings for an ImagerySource.
@@ -40,8 +43,10 @@ export interface VintageRange {
 export interface ImagerySourceProps {
   /** Unique identifier for this imagery source (required) */
   id: ImagerySourceID;
-  /** The asset that this ImagerySource came from (e.g. 'editor-layer-index') */
-  assetID: AssetID;
+  /** The asset that this ImagerySource came from (e.g. 'editor_layer_index') */
+  assetID?: AssetID;
+  /** The asset version that this ImagerySource came from (e.g. '2026-01-01') */
+  assetVersion?: string;
   /** URL template for fetching tiles */
   template?: string;
   /** Whether the imagery source is considered "best" in the area it is available */
@@ -50,8 +55,8 @@ export interface ImagerySourceProps {
   overlay: boolean;
   /** Whether the template is encrypted */
   encrypted: boolean;
-  /** Imagery type: 'tms', 'wms', or 'bing' */
-  type: 'tms' | 'wms' | 'bing';
+  /** Imagery type: 'tms', 'wms', 'bing', or 'wayback' */
+  type: ImageryType;
   /** Display name of the imagery source */
   name?: string;
   /** Description text for the imagery source */
@@ -102,7 +107,7 @@ export class ImagerySource {
   id: ImagerySourceID;
   safeid: string;
   imageryID: ImagerySourceID;
-  type: 'tms' | 'wms' | 'bing' | undefined;
+  type: ImageryType | undefined;
   offset: Vec2;
 
   protected _template: string;
@@ -148,7 +153,7 @@ export class ImagerySource {
 
     // For convenient access:
     this.imageryID = this.props.id;
-    this.type = this.props.type;   // 'tms', 'wms', or 'bing'
+    this.type = this.props.type;   // 'tms', 'wms', 'bing', or 'wayback'
   }
 
 
@@ -822,21 +827,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context: Context) {
-    const props = {
-      id: 'EsriWayback',
-      name: 'Esri Wayback',
-      description: 'Esri Wayback contains archived snapshots of Esri World Imagery created over time.',
-      nameStringID: 'background.wayback.name',
-      descriptionStringID: 'background.wayback.description',
-      type: 'tms',
-      template: '',
-      zoomExtent: [0, 22],
-      terms_url: 'https://wiki.openstreetmap.org/wiki/Esri',
-      terms_text: 'Terms & Feedback',
-      icon: 'https://osmlab.github.io/editor-layer-index/sources/world/EsriImageryClarity.png'
-    } as ImagerySourceProps;
-
+  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
     super(context, props);
   }
 

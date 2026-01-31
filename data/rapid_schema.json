@@ -1,6 +1,5 @@
 {
-  "categories": {},
-  "defaults": {},
+  "assetID": "rapid_schema",
 
   "fields": {
     "crossing/markings*": null,

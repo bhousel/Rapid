@@ -20,10 +20,12 @@ describe('ImagerySystem', () => {
 
   context.systems.assets._loaded.editor_layer_index = {
     assetID: 'editor_layer_index',
+    assetVersion: 'unknown',
     imagery: {}
   };
-  context.systems.assets._loaded.rapid_imagery_overrides = {
-    assetID: 'rapid_imagery_overrides',
+  context.systems.assets._loaded.rapid_imagery = {
+    assetID: 'rapid_imagery',
+    assetVersion: 'unknown',
     imagery: {}
   };
 
@@ -101,12 +103,17 @@ describe('ImagerySystem', () => {
 
 
     describe('properties', () => {
-      it('assets', () => {
-        assert.instanceOf(_imagery.assets, Set);
-        // Should have the default assets merged
-        const keys = [..._imagery.assets];
-        assert.match(keys[0], /^editor_layer_index/);
-        assert.match(keys[1], /^rapid_imagery_overrides/);
+      it('defaultAssetIDs', () => {
+        assert.deepEqual(_imagery.defaultAssetIDs, new Set(['editor_layer_index', 'rapid_imagery']));
+      });
+
+      it('loadedAssetIDs', () => {
+        // After init, we should see the default assets merged
+        assert.instanceOf(_imagery.loadedAssetIDs, Map);
+        const keys = [..._imagery.loadedAssetIDs.keys()];
+        assert.deepEqual(keys, ['editor_layer_index', 'rapid_imagery']);
+        const values = [..._imagery.loadedAssetIDs.values()];
+        assert.deepEqual(values, ['unknown', 'unknown']);
       });
 
       it('sources', () => {
@@ -145,6 +152,45 @@ describe('ImagerySystem', () => {
       });
     });
 
+    describe('requestedAssetIDs', () => {
+      it('is initially null', () => {
+        assert.isNull(_imagery.requestedAssetIDs);
+      });
+
+      it('accepts a string', () => {
+        _imagery.requestedAssetIDs = 'zero';
+        assert.deepEqual(_imagery.requestedAssetIDs, new Set(['zero']));
+      });
+
+      it('accepts an Array', () => {
+        _imagery.requestedAssetIDs = ['one', 'two'];
+        assert.deepEqual(_imagery.requestedAssetIDs, new Set(['one', 'two']));
+      });
+
+      it('accepts a Set', () => {
+        _imagery.requestedAssetIDs = new Set(['three', 'four']);
+        assert.deepEqual(_imagery.requestedAssetIDs, new Set(['three', 'four']));
+      });
+
+      it(`handles the 'default' keyword`, () => {
+        _imagery.requestedAssetIDs = new Set(['five', 'default', 'six']);
+        const expected = ['five', ..._imagery.defaultAssetIDs, 'six'];
+        assert.deepEqual(_imagery.requestedAssetIDs, new Set(expected));
+      });
+
+      it('accepts empty string', () => {
+        _imagery.requestedAssetIDs = '';
+        assert.deepEqual(_imagery.requestedAssetIDs, new Set());
+      });
+
+      it('accepts null or undefined', () => {
+        _imagery.requestedAssetIDs = null;
+        assert.isNull(_imagery.requestedAssetIDs);
+        _imagery.requestedAssetIDs = undefined;
+        assert.isNull(_imagery.requestedAssetIDs);
+      });
+    });
+
 
     describe('merge', () => {
       it('throws if assetID is missing', () => {
@@ -165,8 +211,9 @@ describe('ImagerySystem', () => {
           _imagery.merge(sample.addImageryData);
         });
 
-        it('adds assetID to assets Set', () => {
-          assert.isTrue(_imagery.assets.has('add-imagery-data'));
+        it('adds assetID and assetVersion to loadedAssetIDs Map', () => {
+          const version = _imagery.loadedAssetIDs.get('add-imagery-data');
+          assert.strictEqual(version, '2026-01-01');
         });
 
         it('adds sources to the sources Map', () => {
@@ -218,8 +265,9 @@ describe('ImagerySystem', () => {
           _imagery.merge(sample.updateImageryData);
         });
 
-        it('adds assetID to assets Set', () => {
-          assert.isTrue(_imagery.assets.has('update-imagery-data'));
+        it('adds assetID and assetVersion to loadedAssetIDs Map', () => {
+          const version = _imagery.loadedAssetIDs.get('update-imagery-data');
+          assert.strictEqual(version, '2026-01-02');
         });
 
         it('replaces existing source with updated data', () => {
@@ -245,8 +293,9 @@ describe('ImagerySystem', () => {
           _imagery.merge(sample.deleteImageryData);
         });
 
-        it('adds assetID to assets Set', () => {
-          assert.isTrue(_imagery.assets.has('delete-imagery-data'));
+        it('adds assetID and assetVersion to loadedAssetIDs Map', () => {
+          const version = _imagery.loadedAssetIDs.get('delete-imagery-data');
+          assert.strictEqual(version, '2026-01-03');
         });
 
         it('removes sources using wildcard patterns', () => {
@@ -655,9 +704,9 @@ describe('ImagerySystem', () => {
     });
 
 
-    describe('_resetAll', () => {
+    describe('resetAll', () => {
       beforeAll(() => {
-        _imagery._resetAll();
+        _imagery.resetAll();
       });
 
       afterEach(() => {
@@ -665,11 +714,11 @@ describe('ImagerySystem', () => {
         return _imagery.initAsync().then(() => _imagery.startAsync());
       });
 
-      it('clears assets', () => {
+      it('clears collections', () => {
         // After reset, should only have the initial builtin assets
-        assert.isFalse(_imagery.assets.has('add-imagery-data'));
-        assert.isFalse(_imagery.assets.has('update-imagery-data'));
-        assert.isFalse(_imagery.assets.has('delete-imagery-data'));
+        assert.isEmpty(_imagery.loadedAssetIDs);
+        assert.isEmpty(_imagery.features);
+        assert.lengthOf(_imagery.sources, 2);
       });
 
       it('preserves builtin sources', () => {
@@ -679,7 +728,7 @@ describe('ImagerySystem', () => {
     });
 
 
-    describe('_resetAll with storage', () => {
+    describe('resetAll with storage', () => {
       let mockStorage;
 
       beforeAll(() => {
@@ -703,37 +752,9 @@ describe('ImagerySystem', () => {
       });
 
       it('loads custom template from storage', () => {
-        _imagery._resetAll();
+        _imagery.resetAll();
         const custom = _imagery.sources.get('custom');
         assert.strictEqual(custom.template, 'https://custom.example.com/{z}/{x}/{y}.png');
-      });
-    });
-
-
-    describe('_resetAll with wayback service', () => {
-      let mockWayback;
-
-      beforeAll(() => {
-        // Set up mock wayback service
-        mockWayback = {
-          getReleases: () => [],
-          getRelease: () => null
-        };
-        context.services.wayback = mockWayback;
-      });
-
-      afterEach(() => {
-        // Clear wayback mock
-        delete context.services.wayback;
-        // Re-merge the test data for subsequent tests
-        return _imagery.initAsync().then(() => _imagery.startAsync());
-      });
-
-      it('adds EsriWayback source when wayback service exists', () => {
-        _imagery._resetAll();
-        assert.isTrue(_imagery.sources.has('esriwayback'));
-        const waybackSource = _imagery.sources.get('esriwayback');
-        assert.instanceOf(waybackSource, Rapid.ImagerySourceEsriWayback);
       });
     });
 

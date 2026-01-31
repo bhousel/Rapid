@@ -135,8 +135,8 @@ describe('SchemaSystem', () => {
         const keys = [..._schema.assets];
         // merged 'id-tagging-schema' data at init...
         assert.isTrue(keys.some(key => /^id-tagging-schema@/.test(key)));
-        // merged 'rapid-schema-overrides' data at init...
-        assert.isTrue(keys.some(key => /^rapid-schema-overrides@/.test(key)));
+        // merged 'rapid_schema' data at init...
+        assert.isTrue(keys.some(key => /^rapid_schema@/.test(key)));
       });
 
       it('presets', () => {

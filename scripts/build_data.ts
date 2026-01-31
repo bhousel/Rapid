@@ -202,18 +202,18 @@ async function writeEnJson(): Promise<void> {
   // imagery
   const imagery = Bun.YAML.parse(await Bun.file('./node_modules/editor-layer-index/i18n/en.yaml').text()) as any;
 
-  // Gather strings for imagery overrides not included in the imagery index
-  const imageryOverrides = (await Bun.file('./data/imagery_overrides.json').json()).imagery;
+  // Gather strings for Rapid imagery not included in the imagery index
+  const rapidImagery = (await Bun.file('./data/rapid_imagery.json').json()).imagery;
 
-  for (const [sourceID, source] of Object.entries(imageryOverrides) as [string, any][]) {
-    if (!source) continue;
+  for (const [id, props] of Object.entries(rapidImagery) as [string, any][]) {
+    if (!props) continue;
     const target: any = {};
-    if (source.terms_text)   target.attribution = { text: source.terms_text };
-    if (source.name)         target.name = source.name;
-    if (source.description)  target.description = source.description;
+    if (props.terms_text)   target.attribution = { text: props.terms_text };
+    if (props.name)         target.name = props.name;
+    if (props.description)  target.description = props.description;
 
     if (Object.keys(target).length) {
-      imagery.en.imagery[sourceID] = target;
+      imagery.en.imagery[id] = target;
     }
   }
 
@@ -223,40 +223,42 @@ async function writeEnJson(): Promise<void> {
   const taggingFile = './node_modules/@openstreetmap/id-tagging-schema/dist/translations/en.json';
   const tagging = await Bun.file(taggingFile).json();
 
-  // Gather strings for tagging overrides not included in the tagging index
-  const taggingOverrides = await Bun.file('./data/schema_overrides.json').json();
+  // Gather strings for Rapid schema not included in the tagging index
+  const rapidSchema = await Bun.file('./data/rapid_schema.json').json();
 
   // categories, presets
   for (const group of ['categories', 'presets']) {
-    for (const [key, source] of Object.entries((taggingOverrides as any)[group]) as [string, any][]) {
-      if (!source) continue;
+    const obj = rapidSchema[group] || {};
+    for (const [id, props] of Object.entries(obj) as [string, any][]) {
+      if (!props) continue;
       const target: any = {};
-      if (source.name)                    target.name = source.name;
-      if (Array.isArray(source.terms))    target.terms = source.terms.join(',');
-      if (Array.isArray(source.aliases))  target.aliases = source.aliases.join('\n');
+      if (props.name)                    target.name = props.name;
+      if (Array.isArray(props.terms))    target.terms = props.terms.join(',');
+      if (Array.isArray(props.aliases))  target.aliases = props.aliases.join('\n');
 
       if (Object.keys(target).length) {
-        (tagging as any).en.presets[group][key] = target;
+        tagging.en.presets[group][id] = target;
       }
     }
   }
 
   // fields
-  for (const [key, source] of Object.entries((taggingOverrides as any).fields) as [string, any][]) {
-    if (!source) continue;
+  const obj = rapidSchema.fields || {};
+  for (const [id, props] of Object.entries(obj) as [string, any][]) {
+    if (!props) continue;
     const target: any = {};
-    if (source.label && !source.label.startsWith('{')) {
-      target.label = source.label;
+    if (props.label && !props.label.startsWith('{')) {
+      target.label = props.label;
     }
-    if (source.placeholder && !source.placeholder.startsWith('{')) {
-      target.placeholder = source.placeholder;
+    if (props.placeholder && !props.placeholder.startsWith('{')) {
+      target.placeholder = props.placeholder;
     }
-    if (source.strings?.options) {
-      target.options = source.strings.options;
+    if (props.strings?.options) {
+      target.options = props.strings.options;
     }
 
     if (Object.keys(target).length) {
-      (tagging as any).en.presets.fields[key] = target;
+      tagging.en.presets.fields[id] = target;
     }
   }
 
