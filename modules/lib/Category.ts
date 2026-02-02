@@ -12,8 +12,10 @@ import { utilGatherTokens } from '../util/string.ts';
 export interface CategoryProps {
   /** Unique identifier for this Category */
   id: CategoryID;
-  /** The asset that this Category came from (e.g. 'id-tagging-schema@6.13.0') */
-  assetID: AssetID;
+  /** The asset that this Category came from (e.g. 'id_tagging_schema') */
+  assetID?: AssetID;
+  /** The asset version that this Category came from (e.g. '^6.6.0') */
+  assetVersion?: string;
   /** Display name (fallback if localization unavailable) */
   name: string;
   /** Array of preset IDs that belong to this Category */
@@ -22,6 +24,10 @@ export interface CategoryProps {
   searchable: boolean;
   /** Match score for ranking search results (always -1 for Categories) */
   matchScore: number;
+  /** Name of preset icon which represents this preset */
+  icon: string;
+  /** URL of a remote image that is more specific than 'icon' */
+  imageURL: string;
   /** Region IDs where this category is or isn't valid. See: https://github.com/ideditor/location-conflation */
   locationSet?: { include?: string[]; exclude?: string[] };
   /** Resolved locationSet ID (added by SchemaSystem after processing locationSet) */

@@ -96,7 +96,8 @@ export class UploaderSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'uploader';
-    this.requiredDependencies = new Set(['assets', 'editor', 'l10n']);
+    this.requiredDependencies = new Set(['editor', 'l10n']);
+    this.optionalDependencies = new Set(['assets', 'schema']);
 
     this.changeset = null;    // uiCommit will create it
 
@@ -131,18 +132,30 @@ export class UploaderSystem extends AbstractSystem {
     const assets = context.systems.assets;
     const editor = context.systems.editor;
     const l10n = context.systems.l10n;
+    const schema = context.systems.schema;
 
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          assets!.initAsync(),
+          assets?.initAsync(),
           editor?.initAsync(),
-          l10n?.initAsync()
+          l10n?.initAsync(),
+          schema?.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })
-      .then(() => assets!.loadAssetAsync('iD_schema_discarded'))
-      .then(d => { this._discardTags = d as Record<string, boolean>; });
+      .then(() => {
+        if (assets && schema) {
+          // todo, actually store discarded tags with the SchemaSystem
+          assets.loadAssetAsync('id_tagging_schema')
+            .then(result => {
+              const discarded = (result as any)?.discarded as Record<string, boolean> | undefined;
+              if (discarded) {
+                this._discardTags = discarded;
+              }
+            });
+        }
+      });
   }
 
 

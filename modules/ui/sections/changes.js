@@ -17,9 +17,12 @@ export function uiSectionChanges(context) {
 
   let _discardTags = {};
 
-  assets.loadAssetAsync('iD_schema_discarded')
-    .then(d => _discardTags = d)
-    .catch(() => { /* ignore */ });
+  if (assets && schema) {
+    // todo, actually store discarded tags with the SchemaSystem
+    assets.loadAssetAsync('id_tagging_schema')
+      .then(result => _discardTags = result?.discarded)
+      .catch (() => { /* ignore */ });
+  }
 
   let section = uiSection(context, 'changes-list')
     .label(() => {

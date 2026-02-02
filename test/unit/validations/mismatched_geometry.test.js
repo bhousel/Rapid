@@ -26,24 +26,30 @@ describe('validationMismatchedGeometry', () => {
   const validator = Rapid.validationMismatchedGeometry(context);
 
 
+  // merge test preset data into the schema system
   beforeAll(() => {
-    // cache test presets to avoid `schema.initAsync` from fetching them
+    const schema = context.systems.schema;
+
     const testPresets = {
-      building: {
-        tags: { building: '*' },
-        geometry: ['area']
-      },
-      desert_library: {
-        tags: { amenity: 'library' },
-        geometry: ['point'],
-        locationSet: { include: ['Q620634'] }
+      assetID: 'geometry-test',
+      presets: {
+        building: {
+          tags: { building: '*' },
+          geometry: ['area']
+        },
+        desert_library: {
+          tags: { amenity: 'library' },
+          geometry: ['point'],
+          locationSet: { include: ['Q620634'] }
+        }
       }
     };
-    context.systems.assets._loaded.iD_schema_presets = testPresets;
 
-    return Promise.all([
-      context.systems.schema.initAsync()
-    ]);
+    return schema.initAsync()
+      .then(() => {
+        schema.resetAll();
+        schema.merge(testPresets);
+      });
   });
 
   beforeEach(() => {

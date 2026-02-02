@@ -24,6 +24,7 @@ describe('AssetSystem', () => {
         assert.isTrue(assets.autoStart);
 
         assert.isObject(assets.sources);
+        assert.isObject(assets.bundles);
         assert.strictEqual(assets.origin, 'latest');
         assert.strictEqual(assets.filePath, '');
         assert.deepEqual(assets.fileReplacements, {});
@@ -269,6 +270,215 @@ describe('AssetSystem', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(data => assert.deepEqual(data, { value: 'success' }))
+          .finally(() => fetchMock.hardReset());
+      });
+
+      it('delegates to loadBundleAssetAsync if assetID is a registered bundle', () => {
+        // Register a bundle and pre-load its data
+        const parts = {
+          part1: { preferred: 'part1.json' },
+          part2: { preferred: 'part2.json' },
+        };
+        const cached = {
+          assetID: 'test_bundle',
+          part1: 'data1',
+          part2: 'data2'
+        };
+
+        _assets.registerBundleAsset('test_bundle', parts);
+        _assets._loaded.test_bundle = cached;
+
+        const prom = _assets.loadAssetAsync('test_bundle');
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(data => {
+            assert.deepEqual(data, cached);
+          });
+      });
+    });
+
+
+    describe('registerBundleAsset', () => {
+      it('registers a bundle asset with multiple parts', () => {
+        const parts = {
+          part1: { preferred: 'part1.json' },
+          part2: { preferred: 'part2.json' },
+        };
+        _assets.registerBundleAsset('test_bundle', parts);
+        assert.deepEqual(_assets.bundles['test_bundle'], { parts });
+      });
+
+      it('throws if the assetID is a reserved word', () => {
+        const parts = {
+          part1: { preferred: 'part1.json' },
+          part2: { preferred: 'part2.json' },
+        };
+        assert.throws(() => _assets.registerBundleAsset('default', parts), /reserved word/i);
+      });
+    });
+
+
+    describe('loadBundleAssetAsync', () => {
+      beforeAll(() => {
+        // Register a test bundle
+        _assets.registerBundleAsset('my_bundle', {
+          categories: { preferred: 'data/categories.json' },
+          presets:    { preferred: 'data/presets.json' },
+          fields:     { preferred: 'data/fields.json' }
+        });
+      });
+
+      it('returns a promise resolved if we already have the data', () => {
+        _assets._loaded.my_bundle = {
+          assetID: 'my_bundle',
+          categories: { category1: {} },
+          presets: { preset1: {} },
+          fields: { field1: {} }
+        };
+
+        const prom = _assets.loadBundleAssetAsync('my_bundle');
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(data => {
+            assert.strictEqual(data.assetID, 'my_bundle');
+            assert.deepEqual(data.categories, { category1: {} });
+            assert.deepEqual(data.presets, { preset1: {} });
+            assert.deepEqual(data.fields, { field1: {} });
+          })
+          .finally(() => delete _assets._loaded.my_bundle);
+      });
+
+      it('returns a promise rejected if the bundle assetID is unknown', () => {
+        const prom = _assets.loadBundleAssetAsync('unknown_bundle');
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(data => assert.fail(`We were not supposed to get data but did: ${data}`))
+          .catch(err => assert.match(err, /unknown bundle assetID/i));
+      });
+
+      it('returns a promise to fetch all bundle parts and combine them', () => {
+        delete _assets._loaded.my_bundle;  // ensure not cached
+
+        fetchMock
+          .mockGlobal()
+          .route(/\/data\/categories\.json/i, {
+            body: JSON.stringify({ category_road: {} }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+          .route(/\/data\/presets\.json/i, {
+            body: JSON.stringify({ 'highway/residential': {} }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+          .route(/\/data\/fields\.json/i, {
+            body: JSON.stringify({ name: { type: 'text' } }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+        const prom = _assets.loadBundleAssetAsync('my_bundle');
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(data => {
+            assert.strictEqual(data.assetID, 'my_bundle');
+            assert.deepEqual(data.categories, { category_road: {} });
+            assert.deepEqual(data.presets, { 'highway/residential': {} });
+            assert.deepEqual(data.fields, { name: { type: 'text' } });
+          })
+          .finally(() => fetchMock.hardReset());
+      });
+
+      it('caches the combined result after loading', () => {
+        delete _assets._loaded.my_bundle;
+
+        fetchMock
+          .mockGlobal()
+          .route(/\/data\/categories\.json/i, {
+            body: JSON.stringify({ cached_category: {} }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+          .route(/\/data\/presets\.json/i, {
+            body: JSON.stringify({ cached_preset: {} }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+          .route(/\/data\/fields\.json/i, {
+            body: JSON.stringify({ cached_field: {} }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+        return _assets.loadBundleAssetAsync('my_bundle')
+          .then(() => {
+            // Now check that it's cached
+            const cached = _assets._loaded.my_bundle;
+            assert.isObject(cached);
+            assert.strictEqual(cached.assetID, 'my_bundle');
+            assert.deepEqual(cached.categories, { cached_category: {} });
+          })
+          .finally(() => fetchMock.hardReset());
+      });
+
+      it('handles partial failures gracefully (some parts fail to load)', () => {
+        delete _assets._loaded.my_bundle;
+        const origWarn = console.warn;
+        console.warn = () => {};  // silence the warning during this test
+
+        fetchMock
+          .mockGlobal()
+          .route(/\/data\/categories\.json/i, {
+            body: JSON.stringify({ good_category: {} }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+          .route(/\/data\/presets\.json/i, {
+            status: 404  // simulate failure
+          })
+          .route(/\/data\/fields\.json/i, {
+            body: JSON.stringify({ good_field: {} }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+        const prom = _assets.loadBundleAssetAsync('my_bundle');
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(data => {
+            // Should still return successful parts
+            assert.strictEqual(data.assetID, 'my_bundle');
+            assert.deepEqual(data.categories, { good_category: {} });
+            assert.deepEqual(data.fields, { good_field: {} });
+            // Failed part should be undefined
+            assert.isUndefined(data.presets);
+          })
+          .finally(() => {
+            console.warn = origWarn;
+            fetchMock.hardReset();
+          });
+      });
+
+      it('uses origin fallback when preferred is not specified', () => {
+        // Register a bundle without 'preferred', only 'latest' and 'local'
+        _assets.registerBundleAsset('origin_bundle', {
+          data: { latest: 'data/origin_latest.json', local: 'data/origin_local.json' }
+        });
+        _assets.origin = 'latest';
+
+        fetchMock
+          .mockGlobal()
+          .route(/\/data\/origin_latest\.json/i, {
+            body: JSON.stringify({ source: 'latest' }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+        return _assets.loadBundleAssetAsync('origin_bundle')
+          .then(data => {
+            assert.strictEqual(data.assetID, 'origin_bundle');
+            assert.deepEqual(data.data, { source: 'latest' });
+          })
           .finally(() => fetchMock.hardReset());
       });
     });

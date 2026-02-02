@@ -12,6 +12,7 @@ import type { Context } from '../Context.ts';
 import type { FieldProps } from '../lib/Field.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, Tags, Vec2 } from '../data/types.ts';
+import type { OneOrMore } from '../util/iterable.ts';
 import type { PresetProps } from '../lib/Preset.ts';
 
 // Make very sure this resolves to Rapid's `package.json`
@@ -35,28 +36,21 @@ export type FieldType =
   | 'wikidata' | 'wikipedia';
 
 
-/** Raw field data as it comes from the schema files (before processing) */
-type RawFieldData = Partial<FieldProps> & Record<string, unknown>;
-
-/** Raw preset data as it comes from the schema files (before processing) */
-type RawPresetData = Partial<PresetProps> & Record<string, unknown>;
-
-/** Raw category data as it comes from the schema files (before processing) */
-type RawCategoryData = Partial<CategoryProps> & { icon?: string } & Record<string, unknown>;
-
 /**
  * Schema asset data to merge into the system.
  * Contains categories, presets, fields, and defaults.
  */
-export interface SchemaAsset {
+export interface SchemaData {
   /** An asset identifier, e.g. 'id-tagging-schema@6.13.0' (required) */
   assetID: AssetID;
+  /** A string version specifier, e.g. '6.13.0' */
+  assetVersion?: string;
   /** Object mapping fieldID to field data (or null to delete) */
-  fields?: Record<string, RawFieldData | null>;
+  fields?: Record<string, Partial<FieldProps> | null>;
   /** Object mapping presetID to preset data (or null to delete) */
-  presets?: Record<string, RawPresetData | null>;
+  presets?: Record<string, Partial<PresetProps> | null>;
   /** Object mapping categoryID to category data (or null to delete) */
-  categories?: Record<string, RawCategoryData | null>;
+  categories?: Record<string, Partial<CategoryProps> | null>;
   /** Object mapping geometry type to array of default preset/category IDs */
   defaults?: Record<string, string[]>;
   /** Custom GeoJSON features for locationSets */
@@ -94,14 +88,15 @@ interface SearchResult {
  * For the default schema data, see: https://github.com/openstreetmap/id-tagging-schema
  *
  * Properties available:
- *   `geometryTypes`  The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
- *   `fieldTypes`     The supported field types (see also `ui/fields/index.js`)
- *   `assets`         AssetIDs of schema files that have been merged in
- *   `fields`         The Fields
- *   `presets`        The Presets
- *   `categories`     The Categories
- *   `universal`      The "universal" fields (fields that can go with any Preset)
- *   `defaults`       Default items that are suggested for each geometry
+ *   `geometryTypes`    The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
+ *   `fieldTypes`       The supported field types (see also `ui/fields/index.js`)
+ *   `defaultAssetIDs`  Default assetIDs that are loaded if no custom assets are requested
+ *   `loadedAssetIDs`   Map<AssetID, string> - assetIDs that have been loaded (maps to version string)
+ *   `fields`           The Fields
+ *   `presets`          The Presets
+ *   `categories`       The Categories
+ *   `universal`        The "universal" fields (fields that can go with any Preset)
+ *   `defaults`         Default items that are suggested for each geometry
  *
  * Events available:
  *   `schemachange`    Fires on any change in the available schemas
@@ -115,8 +110,6 @@ export class SchemaSystem extends AbstractSystem {
   /** Set of presetIDs that the user can add (if `null`, all are normally addable) */
   addablePresetIDs: Set<PresetID> | null;
 
-  /** AssetIDs of schema files that have been merged in */
-  assets: Set<AssetID>;
   /** The Categories, keyed by categoryID */
   categories: Map<CategoryID, Category>;
   /** The Presets, keyed by presetID */
@@ -126,7 +119,14 @@ export class SchemaSystem extends AbstractSystem {
   /** The "universal" fields that can go with any Preset */
   universal: Map<FieldID, Field>;
   /** Default preset/category IDs for each geometry type */
-  defaults: Map<GeometryType, Set<string>>;
+  defaults: Map<GeometryType, Set<PresetID | CategoryID>>;
+
+  /** Default schema file assetIDs */
+  private _defaultAssetIDs: Set<AssetID>;
+  /** Currently loaded schema file assetIDs, maps to the version string that was loaded, if known */
+  private _loadedAssetIDs: Map<AssetID, string>;
+  /** Requested schema file assetIDs - optional, these can be different than the default files */
+  private _requestedAssetIDs: Set<AssetID> | null;
 
   private _matchIndex: Map<string, Record<string, Record<string, Preset[]>>>;
   private _recentIDs: PresetID[] | null;
@@ -163,12 +163,18 @@ export class SchemaSystem extends AbstractSystem {
     // Set of presetIDs that the user can add (if `null`, all are normally addable)
     this.addablePresetIDs = null;
 
-    this.assets = new Set();       // Set<AssetID> - track merged schema assets
     this.categories = new Map();   // Map<CategoryID, Category>
     this.presets = new Map();      // Map<PresetID, Preset>
     this.fields = new Map();       // Map<FieldID, Field>
     this.universal = new Map();    // Map<FieldID, Field>  (for universal fields)
     this.defaults = new Map();     // Map<GeometryType, Set<PresetID|CategoryID>>
+
+    // The default schema assets.
+    // 'id_tagging_schema' is a "bundle" that combines multiple id_tagging_schema files.
+    // 'rapid_schema' is Rapid's customizations to merge in after.
+    this._defaultAssetIDs = new Set(['id_tagging_schema', 'rapid_schema']);
+    this._loadedAssetIDs = new Map();
+    this._requestedAssetIDs = null;
 
     this._matchIndex = new Map();  // Map<GeometryType, Object>
     this._recentIDs = null;
@@ -181,6 +187,7 @@ export class SchemaSystem extends AbstractSystem {
     this._currSearchIndex = null;     // The current search index
 
     // Ensure methods used as callbacks always have `this` bound correctly.
+    this._hashChanged = this._hashChanged.bind(this);
     this._localeChanged = this._localeChanged.bind(this);
     this._schemaChanged = this._schemaChanged.bind(this);
   }
@@ -212,10 +219,11 @@ export class SchemaSystem extends AbstractSystem {
       })
       .then(() => {
         // Setup Event Handlers..
+        urlhash?.on('hashchange', this._hashChanged);
         l10n?.on('localechange', this._localeChanged);
 
-        // Clear data and create the fallback Presets..
-        this._resetAll();
+        // Tell the AssetSystem about default schema files..
+        this._registerDefaultAssets();
 
         // If we received a subset of addable presetIDs specified in the url hash, save them.
         const presetIDs = urlhash?.initialHashParams.get('presets') || '';
@@ -224,7 +232,7 @@ export class SchemaSystem extends AbstractSystem {
           this.addablePresetIDs = new Set(vals);
         }
 
-        return this._loadDefaultSchemaAsync();
+        return this.loadSchemaAssetsAsync();
       });
   }
 
@@ -248,6 +256,153 @@ export class SchemaSystem extends AbstractSystem {
     // Note: We don't reset the SchemaSystem here.
     // This method is called when the user starts a new session.
     return Promise.resolve();
+  }
+
+
+  /**
+   * loadSchemaAssetsAsync
+   * @return Promise fulfilled when the schema assets have been loaded
+   */
+  loadSchemaAssetsAsync(): Promise<void> {
+    const context = this.context;
+    const assets = context.systems.assets!;
+
+    // Clear out whatever was loaded before.
+    this.resetAll();
+
+    // Load the schema files
+    const which = this._requestedAssetIDs ?? this._defaultAssetIDs;
+    const assetIDs = [...which];
+
+    // Type guard, see https://stackoverflow.com/a/73913774/7620
+    const isFulfilled = <T,>(p:PromiseSettledResult<T>): p is PromiseFulfilledResult<T> => p.status === 'fulfilled';
+    const isRejected = <T,>(p:PromiseSettledResult<T>): p is PromiseRejectedResult => p.status === 'rejected';
+
+    return Promise.allSettled(
+      assetIDs.map(assetID => assets.loadAssetAsync(assetID))
+    )
+    .then(results => {
+      // Determine a version for id-tagging-schema...
+      // This might not be exact because the CDN can return a newer semver patch.
+      // But it's close enough, and this version string is informational only.
+      let idSchemaVersion = 'unknown';
+      for (const [k, semver] of Object.entries(rapidDependencies)) {
+        if (/id-tagging-schema$/.test(k)) {
+          idSchemaVersion = semver;
+          break;
+        }
+      }
+
+      // Process the loaded data
+      const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
+      for (const value of fulfilledValues as SchemaData[]) {
+        if (value.assetID === 'id_tagging_schema') {
+          value.assetVersion ||= idSchemaVersion;
+        } else if (value.assetID === 'rapid_schema') {
+          value.assetVersion ||= context.version;
+        }
+        this.merge(value);
+      }
+
+      const rejectedReasons = results.filter(isRejected).map(p => p.reason);
+      for (const reason of rejectedReasons as string[]) {
+        console.warn(reason);   // eslint-disable-line no-console
+      }
+    });
+  }
+
+
+  /**
+   * resetAll
+   * This puts the SchemaSystem internal data back to its initial state.
+   * i.e. nothing loaded, only fallback presets.
+   */
+  resetAll(): void {
+    const context = this.context;
+
+    this._loadedAssetIDs.clear();
+    this.presets.clear();
+    this.fields.clear();
+    this.categories.clear();
+    this.universal.clear();
+    this.defaults.clear();
+
+    // Defaults are the Presets and Categories offered to the user when adding a new feature.
+    // A fallback preset is appended to the list automatically so they dont need to be included here.
+    for (const geometry of this.geometryTypes) {
+      this.defaults.set(geometry, new Set());
+    }
+
+    // Create geometry fallback presets
+    const point = new Preset(context, { id: 'point', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
+    const line = new Preset(context, { id: 'line', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
+    const area = new Preset(context, { id: 'area', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
+    const relation = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
+
+    this.presets.set('point', point);
+    this.presets.set('line', line);
+    this.presets.set('area', area);
+    this.presets.set('relation', relation);
+
+    this._schemaChanged();  // this will reset the search index too
+  }
+
+
+  /**
+   * defaultAssetIDs
+   * Returns the default assetIDs
+   * @return  Default assetIDs
+   * @readonly
+   */
+  get defaultAssetIDs(): Set<AssetID> {
+    return this._defaultAssetIDs;
+  }
+
+  /**
+   * loadedAssetIDs
+   * Returns the loaded assetIDs, along with their version numbers if known.
+   * @return  Loaded assetIDs
+   * @readonly
+   */
+  get loadedAssetIDs(): Map<AssetID, string> {
+    return this._loadedAssetIDs;
+  }
+
+  /**
+   * requestedAssetIDs
+   * Allows user to request different schema asset files than what Rapid uses by default.
+   *
+   * If set before init time, these assets will be loaded at init time when init calls `loadSchemaAssetsAsync`.
+   * You can also change this after init time, but then you'll need to call `loadSchemaAssetsAsync` again.
+   *
+   * The 'default' keyword is special - if found in the list, it will expand to all the default IDs.
+   *
+   * You can set `requestedAssetIDs` to an empty list ''.  In this case, subsequent calls to
+   *   `loadSchemaAssetsAsync` will load nothing, you'll have only the fallback presets.
+   * You can also pass `null` - in this case the `requestedAssetIDs` list is not used,
+   *   and subsequent calls to `loadSchemaAssetsAsync` will use the `defaultAssetIDs` Set.
+   * @param vals - A `string`, `Array<string>` or `Set<string>` of assetIDs to load (or `null` to disable)
+   */
+  set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
+    if (vals === null || vals === undefined) {
+      this._requestedAssetIDs = null;
+      return;
+    }
+
+    this._requestedAssetIDs = new Set();
+    for (const assetID of utilIterable(vals)) {
+      if (!assetID) continue;
+      if (assetID === 'default') {
+        for (const defaultID of this._defaultAssetIDs) {
+          this._requestedAssetIDs.add(defaultID);
+        }
+      } else {
+        this._requestedAssetIDs.add(assetID);
+      }
+    }
+  }
+  get requestedAssetIDs(): Set<AssetID> | null {
+    return this._requestedAssetIDs;
   }
 
 
@@ -277,7 +432,8 @@ export class SchemaSystem extends AbstractSystem {
    * merge
    * Accepts an object containing new schema data (all properties except 'id' are optional):
    * {
-   *   assetID: '',            // A string asset identifier, e.g. 'id-tagging-schema@6.13.0'
+   *   assetID: '',            // A string asset identifier, e.g. 'id-tagging-schema'
+   *   assetVersion: '',       // A string version specifier, e.g. '6.13.0'  (defaults to 'unknown' if not present)
    *   fields: {},             // Object<fieldID, fieldData>
    *   presets: {},            // Object<presetID, presetData>
    *   categories: {},         // Object<categoryID, categoryData>
@@ -299,34 +455,37 @@ export class SchemaSystem extends AbstractSystem {
    * @param  src - preset data to merge into the caches
    * @throws  Will throw if given data does not contain a `assetID`, or if the `assetID` has already been merged
    */
-  merge(src: SchemaAsset): void {
+  merge(src: SchemaData): void {
+    const context = this.context;
+    const locations = context.systems.locations;
+
     const assetID = src.assetID;
+    const assetVersion = src.assetVersion ?? 'unknown';
 
     if (!assetID) {
       throw new Error('Schema missing assetID property');
     }
-    if (this.assets.has(assetID)) {
+    if (this._loadedAssetIDs.has(assetID)) {
       throw new Error(`Schema "${assetID}" already merged`);
     }
 
-    this.assets.add(assetID);
+    this._loadedAssetIDs.set(assetID, assetVersion);
 
     const checkLocationSets: Array<{ locationSet?: object; locationSetID?: string }> = [];
-    const context = this.context;
-    const locations = context.systems.locations;
 
     // Merge Fields
     if (src.fields) {
-      for (const [fieldID, f] of Object.entries(src.fields)) {
+      for (const [fieldID, props] of Object.entries(src.fields)) {
         const existing = this.fields.get(fieldID);
         if (existing?.isBuiltin()) continue;  // don't override a builtin Field
 
-        if (f) {   // add or replace
-          if (!this.fieldTypes.has(f.type as FieldType)) {
-            if (VERBOSE) console.warn(`"${f.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
+        if (props) {   // add or replace
+          if (!this.fieldTypes.has(props.type as FieldType)) {
+            if (VERBOSE) console.warn(`"${props.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
             continue;
           }
-          const field = new Field(context, { id: fieldID, assetID: assetID, ...f });
+          const setProps = { ...props, id: fieldID, assetID, assetVersion } as Partial<FieldProps>;
+          const field = new Field(context, setProps);
           if (field.props.locationSet) {
             checkLocationSets.push(field.props);
           }
@@ -349,24 +508,25 @@ export class SchemaSystem extends AbstractSystem {
 
     // Merge Presets
     if (src.presets) {
-      for (const [presetID, p] of Object.entries(src.presets)) {
+      for (const [presetID, props] of Object.entries(src.presets)) {
         const existing = this.presets.get(presetID);
         if (existing?.isBuiltin()) continue;  // don't override a builtin Preset
 
-        if (p) {   // add or replace
+        if (props) {   // add or replace
           // Rename icon identifiers to match the rapid spritesheet
-          if (p.icon) p.icon = p.icon.replace(/^iD-/, 'rapid-');
+          if (props.icon)  props.icon = props.icon.replace(/^iD-/, 'rapid-');
 
           // A few overrides to use better icons than the ones provided by the id-tagging-schema project
-          if (presetID === 'address')                    p.icon = 'maki-circle-stroked';
-          if (presetID === 'highway/turning_loop')       p.icon = 'maki-circle';
-          if (p.icon === 'roentgen-needleleaved_tree')   p.icon = 'temaki-tree_needleleaved';
-          if (p.icon === 'roentgen-tree')                p.icon = 'temaki-tree_broadleaved';
+          if (presetID === 'address')                        props.icon = 'maki-circle-stroked';
+          if (presetID === 'highway/turning_loop')           props.icon = 'maki-circle';
+          if (props.icon === 'roentgen-needleleaved_tree')   props.icon = 'temaki-tree_needleleaved';
+          if (props.icon === 'roentgen-tree')                props.icon = 'temaki-tree_broadleaved';
           // fix: FontAwesome v7 no longer has 'fas-vector-square'
           // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
-          if (p.icon === 'fas-vector-square')            p.icon = 'temaki-portrait_framed';
+          if (props.icon === 'fas-vector-square')            props.icon = 'temaki-portrait_framed';
 
-          const preset = new Preset(context, { id: presetID, assetID: assetID, ...p });
+          const setProps = { ...props, id: presetID, assetID, assetVersion } as Partial<PresetProps>;
+          const preset = new Preset(context, setProps);
           if (preset.props.locationSet) {
             checkLocationSets.push(preset.props);
           }
@@ -389,15 +549,16 @@ export class SchemaSystem extends AbstractSystem {
 
     // Merge Categories
     if (src.categories) {
-      for (const [categoryID, c] of Object.entries(src.categories)) {
+      for (const [categoryID, props] of Object.entries(src.categories)) {
         const existing = this.categories.get(categoryID);
         if (existing?.isBuiltin()) continue;  // don't override a builtin Category
 
-        if (c) {   // add or replace
+        if (props) {   // add or replace
           // Rename icon identifiers to match the rapid spritesheet
-          if (c.icon) c.icon = c.icon.replace(/^iD-/, 'rapid-');
+          if (props.icon)  props.icon = props.icon.replace(/^iD-/, 'rapid-');
 
-          const category = new Category(context, { id: categoryID, assetID: assetID, ...c });
+          const setProps = { ...props, id: categoryID, assetID, assetVersion } as Partial<CategoryProps>;
+          const category = new Category(context, setProps);
           if (category.props.locationSet) {
             checkLocationSets.push(category.props);
           }
@@ -884,92 +1045,71 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
-   * _loadDefaultSchemaAsync
-   * This loads the default schema for Rapid:
-   *  - iD-tagging-schema
-   *  - rapid_schema
-   * @return  Promise fulfilled when the default schema has been downloaded and merged into Rapid.
+   * _registerDefaultAssets
+   * Tell the AssetSystem where to find the default schema files.
+   * This is called during initAsync before loading the assets.
    */
-  private _loadDefaultSchemaAsync(): Promise<void> {
-    const context = this.context;
-    const assets = context.systems.assets!;
+  private _registerDefaultAssets(): void {
+    const assets = this.context.systems.assets!;
 
     // Tell the AssetSystem what to load..
     const latestPath = 'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist';
     const localPath = 'data/modules/id-tagging-schema';
 
-    assets.registerAsset('iD_schema_deprecated', {
-      latest: `${latestPath}/deprecated.min.json`,
-      local:  `${localPath}/deprecated.min.json`
-    });
-    assets.registerAsset('iD_schema_discarded', {
-      latest: `${latestPath}/discarded.min.json`,
-      local:  `${localPath}/discarded.min.json`
-    });
-    assets.registerAsset('iD_schema_categories', {
-      latest: `${latestPath}/preset_categories.min.json`,
-      local:  `${localPath}/preset_categories.min.json`
-    });
-    assets.registerAsset('iD_schema_defaults', {
-      latest: `${latestPath}/preset_defaults.min.json`,
-      local:  `${localPath}/preset_defaults.min.json`
-    });
-    assets.registerAsset('iD_schema_presets', {
-      latest: `${latestPath}/presets.min.json`,
-      local:  `${localPath}/presets.min.json`
-    });
-    assets.registerAsset('iD_schema_fields', {
-      latest: `${latestPath}/fields.min.json`,
-      local:  `${localPath}/fields.min.json`
+    // Register id_schema as a bundle - multiple files fetched together
+    assets.registerBundleAsset('id_tagging_schema', {
+      deprecated: {
+        latest: `${latestPath}/deprecated.min.json`,
+        local:  `${localPath}/deprecated.min.json`
+      },
+      discarded: {
+        latest: `${latestPath}/discarded.min.json`,
+        local:  `${localPath}/discarded.min.json`
+      },
+      categories: {
+        latest: `${latestPath}/preset_categories.min.json`,
+        local:  `${localPath}/preset_categories.min.json`
+      },
+      defaults: {
+        latest: `${latestPath}/preset_defaults.min.json`,
+        local:  `${localPath}/preset_defaults.min.json`
+      },
+      presets: {
+        latest: `${latestPath}/presets.min.json`,
+        local:  `${localPath}/presets.min.json`
+      },
+      fields: {
+        latest: `${latestPath}/fields.min.json`,
+        local:  `${localPath}/fields.min.json`
+      }
     });
 
     // 'rapid_schema' = customizations to merge in after the id-tagging-schema
     assets.registerAsset('rapid_schema', {
       preferred: 'data/rapid_schema.min.json'
     });
+  }
 
-    // Fetch the schema data
-    return Promise.all([
-      assets.loadAssetAsync('iD_schema_deprecated'),
-      assets.loadAssetAsync('iD_schema_discarded'),
-      assets.loadAssetAsync('iD_schema_categories'),
-      assets.loadAssetAsync('iD_schema_defaults'),
-      assets.loadAssetAsync('iD_schema_presets'),
-      assets.loadAssetAsync('iD_schema_fields'),
-      assets.loadAssetAsync('rapid_schema')
-    ])
-    .then(vals => {
-      osmSetDeprecatedTags(vals[0] as any);
-      // osmSetDiscardedTags(vals[1]);  // TODO: should be here, but it isn't yet
 
-      // Determine the version of id-tagging-schema
-      // This might not be exact because the CDN can return a newer semver patch.
-      // But it's close enough, and this string is informational only.
-      // (It would be better if these files included some metadata like my other projects do).
-      let idSchemaVersion = 'unknown';
-      for (const [k, v] of Object.entries(rapidDependencies)) {
-        if (/id-tagging-schema$/.test(k)) {
-          idSchemaVersion = v.replaceAll(/[\^~]/g, '');  // no carat/tilde
-          break;
-        }
+  /**
+   * _hashChanged
+   * Respond to any changes appearing in the url hash
+   * @param currParams - The current hash parameters
+   * @param prevParams - The previous hash parameters
+   */
+  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+    // schema
+    // AssetIDs to request, e.g. `schema=default,my_presets`
+    const newSchema = currParams.get('schema');
+    const oldSchema = prevParams.get('schema');
+    if (newSchema !== oldSchema) {
+      if (typeof newSchema === 'string') {
+        this.requestedAssetIDs = utilExtractValues(newSchema).filter(Boolean);
+      } else {
+        this.requestedAssetIDs = [];
       }
-
-      // Merge id-tagging-schema...
-      this.merge({
-        assetID: `id-tagging-schema@${idSchemaVersion}`,
-        categories: vals[2] as any,
-        defaults: vals[3] as any,
-        presets: vals[4] as any,
-        fields: vals[5] as any
-      });
-
-      // Merge rapid_schema...
-      const rapidSchema = vals[6] as Partial<SchemaAsset>;
-      this.merge({
-        assetID: `rapid_schema@${context.version}`,
-        ...rapidSchema
-      });
-    });
+      this.loadSchemaAssetsAsync();
+    }
   }
 
 
@@ -1118,43 +1258,6 @@ export class SchemaSystem extends AbstractSystem {
 
     gfx?.immediateRedraw();
     this.emit('schemachange');
-  }
-
-
-  /**
-   * _resetAll
-   * This puts SchemaSystem internal data back to its initial state.
-   * i.e. nothing loaded, only fallback presets.
-   * This would probably only be useful for testing, or setting up a special non-OSM Rapid.
-   */
-  private _resetAll(): void {
-    const context = this.context;
-
-    this.assets.clear();
-    this.presets.clear();
-    this.fields.clear();
-    this.categories.clear();
-    this.universal.clear();
-    this.defaults.clear();
-
-    // Defaults are the Presets and Categories offered to the user when adding a new feature.
-    // A fallback preset is appended to the list automatically so they dont need to be included here.
-    for (const geometry of this.geometryTypes) {
-      this.defaults.set(geometry, new Set());
-    }
-
-    // Create geometry fallback presets
-    const point = new Preset(context, { id: 'point', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
-    const line = new Preset(context, { id: 'line', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
-    const area = new Preset(context, { id: 'area', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
-    const relation = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
-
-    this.presets.set('point', point);
-    this.presets.set('line', line);
-    this.presets.set('area', area);
-    this.presets.set('relation', relation);
-
-    this._schemaChanged();  // this will reset the search index too
   }
 
 }

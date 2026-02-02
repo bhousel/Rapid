@@ -13,6 +13,7 @@ export function uiSectionRawTagEditor(context, id) {
   const assets = context.systems.assets;
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const schema = context.systems.schema;
   const storage = context.systems.storage;
   const taginfo = context.services.taginfo;
   const dispatch = d3_dispatch('change');
@@ -32,8 +33,15 @@ export function uiSectionRawTagEditor(context, id) {
 
 
   let _discardKeys = new Set();
-  assets.loadAssetAsync('iD_schema_discarded')
-    .then(data => _discardKeys = new Set(Object.keys(data)));
+  if (assets && schema) {
+    // todo, actually store discarded tags with the SchemaSystem
+    assets.loadAssetAsync('id_tagging_schema')
+      .then(result => {
+        const discarded = result?.discarded ?? {};
+        _discardKeys = new Set(Object.keys(discarded));
+      })
+      .catch(() => { /* ignore */ });
+  }
 
   let _tagView = storage.getItem('raw-tag-editor-view') || 'list';   // 'list, 'text'
   let _readOnlyTags = [];

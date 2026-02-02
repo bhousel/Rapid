@@ -10,8 +10,10 @@ import type { Context } from '../Context.ts';
 export interface FieldProps {
   /** Unique identifier for this Field */
   id: FieldID;
-  /** The asset that this Field came from (e.g. 'id-tagging-schema@6.13.0') */
-  assetID: AssetID;
+  /** The asset that this Field came from (e.g. 'id_tagging_schema') */
+  assetID?: AssetID;
+  /** The asset version that this Field came from (e.g. '^6.6.0') */
+  assetVersion?: string;
   /** Type of field (e.g., 'text', 'combo', 'check', 'number', etc.) */
   type: string;
   /** English label for the field caption */

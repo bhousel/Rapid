@@ -31,6 +31,8 @@ export const surfCityNC = {
 
 export const addSurfData = {
   assetID: 'add-surf-data',
+  assetVersion: '2026-01-01',
+
   fields: {
     'field/foo1':  { key: 'foo1', type: 'text' },
     'field/foo2':  { key: 'foo2', type: 'text' },
@@ -95,6 +97,8 @@ export const addSurfData = {
 
 export const updateSurfData = {
   assetID: 'update-surf-data',
+  assetVersion: '2026-01-02',
+
   fields: {
     'surf/type': {
       label: 'Surfing Type',
@@ -148,6 +152,8 @@ export const updateSurfData = {
 
 export const deleteSurfData = {
   assetID: 'delete-surf-data',
+  assetVersion: '2026-01-03',
+
   fields: {
     'field/foo?': null,
     'field/b*n': null,

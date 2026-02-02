@@ -215,7 +215,7 @@ async function buildImagery() {
 
   const data = {
     assetID: `editor_layer_index`,
-    asserVersion: imageryDate,
+    assetVersion: imageryDate,
     imagery: sortObject(imagery)
   };
 

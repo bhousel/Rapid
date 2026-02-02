@@ -36,8 +36,8 @@ export interface ImageryData {
  * At init time, Rapid will attempt to load the imagery.
  *
  * Properties available:
- *   `features`    Map<ImagerySourceID, GeoJSON>  - Bounding features for spatial queries
- *   `sources`     Map<ImagerySourceID, ImagerySource> - The imagery sources
+ *   `sources`     Map<ImagerySourceID, ImagerySource> - Imagery sources
+ *   `features`    Map<ImagerySourceID, GeoJSON.Feature> - Imagery geofences
  *   `offset`
  *   `brightness`
  *   `contrast`
@@ -49,10 +49,10 @@ export interface ImageryData {
  *   `imagerychange`   Fires on any change in imagery or display options
  */
 export class ImagerySystem extends AbstractSystem {
-  /** GeoJSON features for spatial queries, keyed by ImagerySourceID (lowercase) */
-  features: Map<ImagerySourceID, GeoJSON.Feature>;
-  /** The imagery sources, keyed by ImagerySourceID (lowercase) */
+  /** Imagery sources, keyed by ImagerySourceID (lowercase) */
   sources: Map<ImagerySourceID, ImagerySource>;
+  /** Imagery geofences, keyed by ImagerySourceID (lowercase) */
+  features: Map<ImagerySourceID, GeoJSON.Feature>;
 
   /** Default imagery file assetIDs */
   private _defaultAssetIDs: Set<AssetID>;
@@ -84,8 +84,8 @@ export class ImagerySystem extends AbstractSystem {
     this.requiredDependencies = new Set(['assets']);
     this.optionalDependencies = new Set(['gfx', 'l10n', 'storage', 'urlhash']);
 
-    this.features = new Map();
-    this.sources = new Map();
+    this.sources = new Map();    // Map<ImagerySourceID, ImagerySource>
+    this.features = new Map();   // Map<ImagerySourceID, GeoJSON.Feature>
 
     this._defaultAssetIDs = new Set(['editor_layer_index', 'rapid_imagery']);
     this._loadedAssetIDs = new Map();
@@ -196,14 +196,14 @@ export class ImagerySystem extends AbstractSystem {
     )
     .then(results => {
       const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
-      const rejectedReasons = results.filter(isRejected).map(p => p.reason);
-
-      for (const data of fulfilledValues as ImageryData[]) {
-        if (data.assetID === 'rapid_imagery') {
-          data.assetVersion = context.version;
+      for (const value of fulfilledValues as ImageryData[]) {
+        if (value.assetID === 'rapid_imagery') {
+          value.assetVersion ||= context.version;
         }
-        this.merge(data);
+        this.merge(value);
       }
+
+      const rejectedReasons = results.filter(isRejected).map(p => p.reason);
       for (const reason of rejectedReasons as string[]) {
         console.warn(reason);   // eslint-disable-line no-console
       }
@@ -348,7 +348,7 @@ export class ImagerySystem extends AbstractSystem {
         if (existing?.isBuiltin()) continue;  // don't override a builtin ImagerySource
 
         if (props) {   // add or replace
-          const setProps = { ...props, assetID, assetVersion } as Partial<ImagerySourceProps>;
+          const setProps = { ...props, id: sourceID, assetID, assetVersion } as Partial<ImagerySourceProps>;
 
           // Instantiate the appropriate `ImagerySource` class
           let source: ImagerySource;
@@ -814,7 +814,7 @@ export class ImagerySystem extends AbstractSystem {
     // imagery
     // AssetIDs to request, e.g. `imagery=default,my_imagery`
     const newImagery = currParams.get('imagery');
-    const oldImagery = prevParams.get('imagery') || '';
+    const oldImagery = prevParams.get('imagery');
     if (newImagery !== oldImagery) {
       if (typeof newImagery === 'string') {
         this.requestedAssetIDs = utilExtractValues(newImagery).filter(Boolean);

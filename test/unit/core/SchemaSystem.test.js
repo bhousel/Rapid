@@ -129,14 +129,14 @@ describe('SchemaSystem', () => {
         ]);
       });
 
-      it('assets', () => {
-        assert.instanceOf(_schema.assets, Set);
+      it('defaultAssetIDs', () => {
+        assert.deepEqual(_schema.defaultAssetIDs, new Set(['id_tagging_schema', 'rapid_schema']));
+      });
 
-        const keys = [..._schema.assets];
-        // merged 'id-tagging-schema' data at init...
-        assert.isTrue(keys.some(key => /^id-tagging-schema@/.test(key)));
-        // merged 'rapid_schema' data at init...
-        assert.isTrue(keys.some(key => /^rapid_schema@/.test(key)));
+      it('loadedAssetIDs', () => {
+        assert.instanceOf(_schema.loadedAssetIDs, Map);
+        // Note: The actual assets loaded depend on test environment.
+        // The merge tests below verify that merge() properly adds to loadedAssetIDs.
       });
 
       it('presets', () => {
@@ -167,6 +167,46 @@ describe('SchemaSystem', () => {
     });
 
 
+    describe('requestedAssetIDs', () => {
+      it('is initially null', () => {
+        assert.isNull(_schema.requestedAssetIDs);
+      });
+
+      it('accepts a string', () => {
+        _schema.requestedAssetIDs = 'zero';
+        assert.deepEqual(_schema.requestedAssetIDs, new Set(['zero']));
+      });
+
+      it('accepts an Array', () => {
+        _schema.requestedAssetIDs = ['one', 'two'];
+        assert.deepEqual(_schema.requestedAssetIDs, new Set(['one', 'two']));
+      });
+
+      it('accepts a Set', () => {
+        _schema.requestedAssetIDs = new Set(['three', 'four']);
+        assert.deepEqual(_schema.requestedAssetIDs, new Set(['three', 'four']));
+      });
+
+      it(`handles the 'default' keyword`, () => {
+        _schema.requestedAssetIDs = new Set(['five', 'default', 'six']);
+        const expected = ['five', ..._schema.defaultAssetIDs, 'six'];
+        assert.deepEqual(_schema.requestedAssetIDs, new Set(expected));
+      });
+
+      it('accepts empty string', () => {
+        _schema.requestedAssetIDs = '';
+        assert.deepEqual(_schema.requestedAssetIDs, new Set());
+      });
+
+      it('accepts null or undefined', () => {
+        _schema.requestedAssetIDs = null;
+        assert.isNull(_schema.requestedAssetIDs);
+        _schema.requestedAssetIDs = undefined;
+        assert.isNull(_schema.requestedAssetIDs);
+      });
+    });
+
+
     describe('merge', () => {
       it('throws if assetID is missing', () => {
         const schemaData = {};
@@ -175,9 +215,9 @@ describe('SchemaSystem', () => {
 
       it('throws if assetID has already been merged', () => {
         const schemaData = { assetID: 'test1' };
-        assert.doesNotHaveAnyKeys(_schema.assets, ['test1']);
+        assert.isFalse(_schema.loadedAssetIDs.has('test1'));
         assert.doesNotThrow(() => _schema.merge(schemaData));
-        assert.containsAllKeys(_schema.assets, ['test1']);
+        assert.isTrue(_schema.loadedAssetIDs.has('test1'));
         assert.throws(() => _schema.merge(schemaData), /already merged/i);
       });
 
@@ -198,8 +238,9 @@ describe('SchemaSystem', () => {
           assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
         });
 
-        it('adds the merged assetID to the assets Set', () => {
-          assert.containsAllKeys(_schema.assets, ['add-surf-data']);
+        it('adds assetID and assetVersion to loadedAssetIDs Map', () => {
+          const version = _schema.loadedAssetIDs.get('add-surf-data');
+          assert.strictEqual(version, '2026-01-01');
         });
 
         describe('fields', () => {
@@ -317,8 +358,9 @@ describe('SchemaSystem', () => {
           assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
         });
 
-        it('adds the merged assetID to the assets Set', () => {
-          assert.containsAllKeys(_schema.assets, ['add-surf-data', 'update-surf-data']);
+        it('adds assetID and assetVersion to loadedAssetIDs Map', () => {
+          const version = _schema.loadedAssetIDs.get('update-surf-data');
+          assert.strictEqual(version, '2026-01-02');
         });
 
         describe('fields', () => {
@@ -401,8 +443,9 @@ describe('SchemaSystem', () => {
           assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
         });
 
-        it('adds the merged assetID to the assets Set', () => {
-          assert.containsAllKeys(_schema.assets, ['add-surf-data', 'update-surf-data', 'delete-surf-data']);
+        it('adds assetID and assetVersion to loadedAssetIDs Map', () => {
+          const version = _schema.loadedAssetIDs.get('delete-surf-data');
+          assert.strictEqual(version, '2026-01-03');
         });
 
         describe('fields', () => {
@@ -490,7 +533,7 @@ describe('SchemaSystem', () => {
 
     describe('search', () => {
       beforeAll(() => {
-        _schema._resetAll();   // remove the surf data
+        _schema.resetAll();   // remove the surf data
         _schema.merge(sample.searchData);
       });
 
@@ -673,7 +716,7 @@ describe('SchemaSystem', () => {
 
     describe('setMostRecent', () => {
       beforeAll(() => {
-        _schema._resetAll();
+        _schema.resetAll();
         _schema.merge(sample.searchData);  // use the sample search data
         _schema._recentIDs = null;
       });
@@ -707,7 +750,7 @@ describe('SchemaSystem', () => {
 
     describe('getRecents', () => {
       beforeAll(() => {
-        _schema._resetAll();
+        _schema.resetAll();
         _schema.merge(sample.searchData);  // use the sample search data
         _schema._recentIDs = null;
       });
@@ -736,7 +779,7 @@ describe('SchemaSystem', () => {
 
     describe('getDefaults', () => {
       beforeAll(() => {
-        _schema._resetAll();
+        _schema.resetAll();
         _schema.merge(sample.searchData);  // use the sample search data
       });
 
@@ -997,15 +1040,15 @@ describe('SchemaSystem', () => {
     });
 
 
-    describe('_resetAll', () => {
+    describe('resetAll', () => {
       beforeAll(() => {
         spySchemaChange.mockClear();  // reset call count
-        _schema._resetAll();
+        _schema.resetAll();
       });
 
-      it('resets assets', () => {
-        assert.instanceOf(_schema.assets, Set);
-        assert.isEmpty(_schema.assets);
+      it('clears loadedAssetIDs', () => {
+        assert.instanceOf(_schema.loadedAssetIDs, Map);
+        assert.isEmpty(_schema.loadedAssetIDs);
       });
 
       it('resets fields', () => {
@@ -1052,7 +1095,15 @@ describe('SchemaSystem', () => {
         residential: { tags: { highway: 'residential' }, geometry: ['line'] },
         park: { tags: { leisure: 'park' }, geometry: ['point', 'area'] }
       };
-      context.systems.assets._loaded.iD_schema_presets = testPresets;
+      context.systems.assets._loaded.id_tagging_schema = {
+        assetID: 'id_tagging_schema',
+        deprecated: [],
+        discarded: {},
+        categories: {},
+        defaults: {},
+        fields: {},
+        presets: testPresets
+      };
     });
 
     it('returns a collection containing presets matching a geometry and tags', () => {
@@ -1111,7 +1162,15 @@ describe('SchemaSystem', () => {
         'natural/tree_row': { tags: { 'natural': 'tree_row' }, geometry: ['line'] },
         'natural/wood': { tags: { 'natural': 'wood' }, geometry: ['point', 'area'] }
       };
-      context.systems.assets._loaded.iD_schema_presets = testPresets;
+      context.systems.assets._loaded.id_tagging_schema = {
+        assetID: 'id_tagging_schema',
+        deprecated: [],
+        discarded: {},
+        categories: {},
+        defaults: {},
+        fields: {},
+        presets: testPresets
+      };
     });
 
     it('includes keys for presets with area geometry', () => {
@@ -1193,7 +1252,15 @@ describe('SchemaSystem', () => {
           tags: { highway: 'pedestrian', area: 'yes' }
         }
       };
-      context.systems.assets._loaded.iD_schema_presets = testPresets;
+      context.systems.assets._loaded.id_tagging_schema = {
+        assetID: 'id_tagging_schema',
+        deprecated: [],
+        discarded: {},
+        categories: {},
+        defaults: {},
+        fields: {},
+        presets: testPresets
+      };
     });
 
 

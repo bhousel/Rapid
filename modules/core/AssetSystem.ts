@@ -31,6 +31,17 @@ export interface AssetSource {
   preferred?: AssetPath;
 }
 
+type BundlePartID = string;
+
+/**
+ * A `BundleAssetSource` describes a bundle - multiple files that are fetched together
+ * and returned as a combined object. Each part is keyed by its partID.
+ */
+export interface BundleAssetSource {
+  /** Map of PartID to AssetSource for each part of the bundle */
+  parts: Record<BundlePartID, AssetSource>;
+}
+
 
 /**
  * `AssetSystem` keeps track of files and data that Rapid needs to load.
@@ -55,9 +66,11 @@ export interface AssetSource {
 export class AssetSystem extends AbstractSystem {
   /**
    * Map of string AssetID to AssetSource record of properties.
-  * AssetIDs are identifiers like 'address_formats', 'languages', 'oci_defaults'.
-  */
+   * AssetIDs are identifiers like 'address_formats', 'languages', 'oci_defaults'.
+   */
   sources: Record<AssetID, AssetSource>;
+  /** Map of bundled assets - multiple files fetched together and returned as combined object */
+  bundles: Record<AssetID, BundleAssetSource>;
   /** The fallback origin must be set to 'latest' or 'local' */
   origin: 'latest' | 'local';
   /** Root folder path for assets, with trailing slash (e.g. 'dist/') */
@@ -69,6 +82,7 @@ export class AssetSystem extends AbstractSystem {
   private _loaded: Record<AssetID, unknown>;
   /** In-flight fetch promises, keyed by URL */
   private _inflight: Record<string, Promise<unknown>>;
+
 
   /**
    * @constructor
@@ -108,6 +122,8 @@ export class AssetSystem extends AbstractSystem {
       }
     };
 
+    this.bundles = {};
+
     // The fallback origin (checked after 'preferred') must be set to 'local' or 'latest'.
     // (This must set before init, and should not be changed later)
     this.origin = 'latest';
@@ -145,13 +161,16 @@ export class AssetSystem extends AbstractSystem {
       c.phone_formats = { phoneFormats: {} };
       c.shortcuts = { shortcuts: [] };
       c.territory_languages = { territoryLanguages: {} };
-      c.iD_schema_deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
-      c.iD_schema_discarded = {};
-      c.iD_schema_categories = {};
-      c.iD_schema_defaults = {};
-      c.iD_schema_fields = {};
-      c.iD_schema_presets = {};
-      c.rapid_schema = {};
+      c.id_tagging_schema = {
+        assetID: 'id_tagging_schema',
+        deprecated: [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }],
+        discarded: {},
+        categories: {},
+        defaults: {},
+        fields: {},
+        presets: {}
+      };
+      c.rapid_schema = { assetID: 'rapid_schema' };
       c.l10n_core_en = {};
       c.l10n_tagging_en = {};
       c.l10n_imagery_en = {};
@@ -233,6 +252,22 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
+   * registerBundleAsset
+   * Register a bundle - multiple files that are fetched together and returned as a combined object.
+   * This is useful when logically related data is split across multiple files (e.g. id_tagging_schema).
+   * @param assetID - bundle identifier
+   * @param parts - Object mapping a BundlePartID to AssetSource for each part
+   * @throws Will throw if a reserved assetID is used.
+   */
+  registerBundleAsset(assetID: AssetID, parts: Record<BundlePartID, AssetSource>): void {
+    if (assetID === 'default') {
+      throw new Error(`assetID "${assetID}" is a reserved word`);
+    }
+    this.bundles[assetID] = { parts };
+  }
+
+
+  /**
    * getFileURL
    * Returns the URL for the given filename.
    *   If the given value is already a URL, it's returned
@@ -290,6 +325,11 @@ export class AssetSystem extends AbstractSystem {
       return Promise.resolve(this._loaded[assetID]);
     }
 
+    // Check if this is a bundle asset
+    if (this.bundles[assetID]) {
+      return this.loadBundleAssetAsync(assetID);
+    }
+
     let url: string;
     try {
       url = this.getAssetURL(assetID);
@@ -318,6 +358,60 @@ export class AssetSystem extends AbstractSystem {
     }
 
     return loadPromise;
+  }
+
+
+  /**
+   * loadBundleAssetAsync
+   * Load all parts of a bundle asset in parallel and return a combined object.
+   * The returned object has the `assetID` plus each `BundlePartID` as keys.
+   * @param assetID - asset identifier for the bundle
+   * @return Promise resolved with combined data object
+   */
+  loadBundleAssetAsync(assetID: AssetID): Promise<Record<BundlePartID, unknown>> {
+    if (this._loaded[assetID]) {
+      return Promise.resolve(this._loaded[assetID] as Record<BundlePartID, unknown>);
+    }
+
+    const bundle = this.bundles[assetID];
+    if (!bundle) {
+      return Promise.reject(`Unknown bundle assetID "${assetID}"`);
+    }
+
+    const partIDs: BundlePartID[] = Object.keys(bundle.parts);
+    const partPromises = partIDs.map(partID => {
+      const source = bundle.parts[partID];
+      const path = source.preferred ?? source[this.origin];
+      if (!path) {
+        return Promise.reject(`No asset path found for bundle part "${partID}"`);
+      }
+      const url = this.getFileURL(path);
+      return fetch(url)
+        .then(utilFetchResponse)
+        .then(data => ({ partID, data }));
+    });
+
+    // Type guard, see https://stackoverflow.com/a/73913774/7620
+    const isFulfilled = <T,>(p: PromiseSettledResult<T>): p is PromiseFulfilledResult<T> => p.status === 'fulfilled';
+    const isRejected = <T,>(p: PromiseSettledResult<T>): p is PromiseRejectedResult => p.status === 'rejected';
+
+    return Promise.allSettled(partPromises)
+      .then(results => {
+        const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
+        const rejectedReasons = results.filter(isRejected).map(p => p.reason);
+        const combined: Record<BundlePartID, unknown> = { assetID };
+
+        for (const value of fulfilledValues) {
+          const { partID, data } = value;
+          combined[partID] = data;
+        }
+        for (const reason of rejectedReasons as string[]) {
+          console.warn(reason);   // eslint-disable-line no-console
+        }
+
+        this._loaded[assetID] = combined;
+        return combined;
+      });
   }
 
 }
