@@ -210,8 +210,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     if (!this.dirty) return;  // nothing to do
 
     const context = this.context;
-    const storage = context.systems.storage as any;
-    const map = context.systems.map as any;
+    const storage = context.systems.storage;
+    const map = context.systems.map;
     const isWireframeMode = map?.wireframeMode;
     const bearing = context.viewport.transform.rotation;
     const geom = this.geom;
@@ -308,7 +308,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 // I've noticed that we can't use textures from a spritesheet for patterns,
 // and it would be nice to figure out why
 
-    const fillstyle = storage.getItem('area-fill') ?? 'partial';
+    const fillstyle = storage?.getItem('area-fill') ?? 'partial';
     let doFullFill = style.requireFill || (fillstyle === 'full');
 
     // If this shape is so small that partial filling makes no sense, fill fully (faster?)
@@ -562,7 +562,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
    */
   updateHalo(): void {
-    const map = this.context.systems.map as any;
+    const map = this.context.systems.map;
     const wireframeMode = map?.wireframeMode;
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select'));

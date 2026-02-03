@@ -9,21 +9,6 @@ describe('uiFieldLocalized', () => {
     }
   }
 
-  class MockLocalizationSystem {
-    constructor() { }
-    get localeCode()   { return 'en-US'; }
-    get languageCode() { return 'en'; }
-    t(id)              { return id; }
-    tHtml(id)          { return id; }
-    languageName(code) {
-      const langs = {
-        de: { nativeName: 'Deutsch' },
-        en: { nativeName: 'English' }
-      };
-      return langs[code]?.nativeName;
-    }
-  }
-
   class MockContext {
     constructor()   {
       this.viewport = new Rapid.sdk.Viewport();
@@ -32,7 +17,7 @@ describe('uiFieldLocalized', () => {
       this.systems = {
         assets:  new Rapid.AssetSystem(this),
         editor:  new MockEditSystem(this),
-        l10n:    new MockLocalizationSystem(this),
+        l10n:    new Rapid.LocalizationSystem(this),
         schema:  new Rapid.SchemaSystem(this)
       };
     }
@@ -47,6 +32,16 @@ describe('uiFieldLocalized', () => {
 
   const context = new MockContext();
   let selection, field, uifield;
+
+  before(() => {
+    // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
+    const assets = context.systems.assets;
+    assets._loaded.languages = { languages: { de: { nativeName: 'Deutsch' }, en: { nativeName: 'English' } } };
+    assets._loaded.locales = { locales: { en: { rtl: false }, de: { rtl: false } } };
+    assets._loaded.territory_languages = { territoryLanguages: { de: ['de'], us: ['en'] } };
+
+    return context.systems.l10n.initAsync();
+  });
 
   beforeEach(() => {
     selection = d3.select(document.createElement('div'));

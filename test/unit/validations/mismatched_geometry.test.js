@@ -23,6 +23,12 @@ describe('validationMismatchedGeometry', () => {
     urlhash:    new Rapid.UrlHashSystem(context)
   };
 
+  // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
+  const assets = context.systems.assets;
+  assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
+  assets._loaded.locales = { locales: { en: { rtl: false } } };
+  assets._loaded.territory_languages = { territoryLanguages: {} };
+
   const validator = Rapid.validationMismatchedGeometry(context);
 
 

@@ -4,11 +4,17 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('LocalizationSystem', () => {
-  // Setup context..
+  // Setup context with AssetSystem for most tests
   const context = new Rapid.MockContext();
   context.systems = {
     assets: new Rapid.AssetSystem(context)
   };
+
+  // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
+  const assets = context.systems.assets;
+  assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
+  assets._loaded.locales =   { locales:   { en: { rtl: false } } };
+  assets._loaded.territory_languages = { territoryLanguages: { us: ['en'] } };
 
   // Test construction and startup of the system..
   describe('lifecycle', () => {
@@ -18,7 +24,6 @@ describe('LocalizationSystem', () => {
         assert.instanceOf(l10n, Rapid.LocalizationSystem);
         assert.strictEqual(l10n.id, 'l10n');
         assert.strictEqual(l10n.context, context);
-        assert.instanceOf(l10n.requiredDependencies, Set);
         assert.instanceOf(l10n.optionalDependencies, Set);
         assert.isTrue(l10n.autoStart);
       });
@@ -31,6 +36,23 @@ describe('LocalizationSystem', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => assert.isTrue(true));
+      });
+
+      it('works without an AssetSystem (English-only fallback)', () => {
+        // Create a context with no AssetSystem
+        const minimalContext = new Rapid.MockContext();
+        minimalContext.systems = {};
+
+        const l10n = new Rapid.LocalizationSystem(minimalContext);
+        return l10n.initAsync()
+          .then(() => {
+            // Should default to English (en-US is the fallback when browser locale is detected)
+            assert.match(l10n.localeCode, /^en/);
+            assert.strictEqual(l10n.languageCode, 'en');
+            assert.strictEqual(l10n.textDirection, 'ltr');
+            // Should return missing translation messages (no strings loaded)
+            assert.match(l10n.t('test.string'), /Missing.*translation/);
+          });
       });
 
       it('rejects if a dependency is missing', () => {
@@ -75,8 +97,7 @@ describe('LocalizationSystem', () => {
       _l10n._currLocaleCode = 'en-US';  // Force 'en-US' for the testing
 
       // init?
-
-      _l10n._cache = {
+      _l10n._strings = {
         en: {
           core: {
             inspector: {

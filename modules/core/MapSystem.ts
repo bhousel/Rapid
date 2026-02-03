@@ -51,7 +51,7 @@ export class MapSystem extends AbstractSystem {
     super(context);
     this.id = 'map';
     this.requiredDependencies = new Set(['editor', 'gfx']);
-    this.optionalDependencies = new Set(['filters', 'l10n', 'rapid', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set(['filters', 'l10n', 'rapid', 'schema', 'storage', 'urlhash']);
 
     // display options
     this.areaFillOptions = ['wireframe', 'partial', 'full'];
@@ -87,6 +87,7 @@ export class MapSystem extends AbstractSystem {
     const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n;
     const rapid = context.systems.rapid;
+    const schema = context.systems.schema;
     const storage = context.systems.storage;
     const urlhash = context.systems.urlhash;
 
@@ -187,6 +188,10 @@ export class MapSystem extends AbstractSystem {
 
         rapid?.on('datasetchange', () => {
           scene.dirtyLayers(['rapid', 'rapidoverlay']);
+        });
+
+        schema?.on('schemachange', () => {
+          scene.dirtyLayers(['osm', 'rapid']);
         });
 
         l10n?.on('localechange', () => {

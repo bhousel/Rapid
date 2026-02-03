@@ -149,7 +149,7 @@ export class Field {
     this.fieldID = this.props.id;
     this.type = this.props.type;
 
-    const schema = (context.systems.schema as any);
+    const schema = context.systems.schema!;
     if (this.props.geometry.length) {
       this.geometries = new Set(this.props.geometry);
     } else {
@@ -275,7 +275,7 @@ export class Field {
    * @return the Field to get the property from (either this Field or another Field)
    */
   private _resolveReference(prop: keyof FieldProps): Field {
-    const schema = (this.context.systems.schema as any);
+    const schema = this.context.systems.schema!;
 
     const val = this.props[prop];
     if (val && (typeof val === 'string')) {   // This will only work for strings

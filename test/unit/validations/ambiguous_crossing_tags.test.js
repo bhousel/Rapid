@@ -20,26 +20,15 @@ describe('validationAmbiguousCrossingTags', () => {
     spatial:    new Rapid.SpatialSystem(context)
   };
 
+  // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
+  const assets = context.systems.assets;
+  assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
+  assets._loaded.locales = { locales: { en: { rtl: false } } };
+  assets._loaded.territory_languages = { territoryLanguages: {} };
+
   const validator = Rapid.validationAmbiguousCrossingTags(context);
 
-
   beforeAll(() => {
-    const l10n = context.systems.l10n;
-    l10n.preferredLocaleCodes = 'en';
-    l10n._cache = {
-      en: {
-        core: {
-          issues: {
-            ambiguous_crossing: {
-              annotation: {
-                changed: 'changed crossing tags'
-              }
-            }
-          }
-        }
-      }
-    };
-
     return Promise.all([
       context.systems.locations.initAsync(),
       context.systems.spatial.initAsync(),

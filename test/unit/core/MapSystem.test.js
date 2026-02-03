@@ -14,20 +14,11 @@ describe('MapSystem', () => {
     map:      new Rapid.MapSystem(context)
   };
 
-  const l10n = context.systems.l10n;
-  l10n.preferredLocaleCodes = 'en';
-  l10n._cache = {
-    en: {
-      core: {
-        shortcuts: {
-          command: {
-            wireframe: { key: 'W' },
-            highlight_edits: { key: 'G' }
-          }
-        }
-      }
-    }
-  };
+  // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
+  const assets = context.systems.assets;
+  assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
+  assets._loaded.locales = { locales: { en: { rtl: false } } };
+  assets._loaded.territory_languages = { territoryLanguages: {} };
 
 
   // Test construction and startup of the system..

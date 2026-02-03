@@ -65,7 +65,7 @@ export class PixiTextures {
     this._dashTextureCache = {};
 
     // Prepare a "bundle" to load the pattern textures
-    const assets = this.context.systems.assets as any;
+    const assets = this.context.systems.assets!;
     const filenames = [
       'bushes', 'cemetery', 'cemetery_buddhist', 'cemetery_christian', 'cemetery_jewish', 'cemetery_muslim',
       'construction', 'dots', 'farmland', 'farmyard', 'forest', 'forest_broadleaved', 'forest_leafless',

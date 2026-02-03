@@ -9,21 +9,14 @@ describe('uiFieldAccess', () => {
     }
   }
 
-  class MockLocalizationSystem {
-    constructor() { }
-    t(id)         { return id; }
-    tHtml(id)     { return id; }
-  }
-
   class MockContext {
     constructor()   {
       this.viewport = new Rapid.sdk.Viewport();
       this.sequences = {};
       this.services = {};
       this.systems = {
-        assets:  new Rapid.AssetSystem(this),
         editor:  new MockEditSystem(this),
-        l10n:    new MockLocalizationSystem(this),
+        l10n:    new Rapid.LocalizationSystem(this),
         schema:  new Rapid.SchemaSystem(this)
       };
     }
@@ -39,6 +32,13 @@ describe('uiFieldAccess', () => {
 
   const context = new MockContext();
   let selection, field, uifield;
+
+  before(() => {
+    return Promise.all([
+      context.systems.l10n.initAsync()
+      // context.systems.schema.initAsync()
+    ]);
+  });
 
   beforeEach(() => {
     selection = d3.select(document.createElement('div'));

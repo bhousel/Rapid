@@ -185,7 +185,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     if (!screen?.coords) return;  // can't render anything without screen coords
 
     const context = this.context;
-    const map = context.systems.map as any;
+    const map = context.systems.map!;
     const wireframeMode = map?.wireframeMode;
     const textureManager = this.gfx.textureManager!;
     const style = this._style as PointStyle;

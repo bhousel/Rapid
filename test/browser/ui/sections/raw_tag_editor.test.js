@@ -1,12 +1,5 @@
 describe('uiSectionRawTagEditor', () => {
 
-  class MockLocalizationSystem {
-    constructor() { }
-    get isRTL()   { return false; }
-    t(id)         { return id; }
-    tHtml(id)     { return id; }
-  }
-
   class MockStorageSystem {
     constructor() { }
     getItem()     { return null; }
@@ -18,8 +11,7 @@ describe('uiSectionRawTagEditor', () => {
       this.sequences = {};
       this.services = {};
       this.systems = {
-        assets:   new Rapid.AssetSystem(this),
-        l10n:     new MockLocalizationSystem(),
+        l10n:     new Rapid.LocalizationSystem(this),
         storage:  new MockStorageSystem()
       };
     }
@@ -35,6 +27,9 @@ describe('uiSectionRawTagEditor', () => {
   const entity = new Rapid.OsmNode(context, { id: 'n-1' });
   let rawTagEditor, wrap;
 
+  before(() => {
+    return context.systems.l10n.initAsync();
+  });
 
   beforeEach(() => {
     render({ highway: 'residential' });

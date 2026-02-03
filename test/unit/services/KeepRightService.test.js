@@ -15,11 +15,9 @@ describe('KeepRightService', () => {
     spatial: new Rapid.SpatialSystem(context)
   };
 
-  // Supply cached qa_data and localization strings
+  // Supply cached qa_data
   const assets = context.systems.assets;
   assets._loaded.qa_data = sample.qa_data;
-  const l10n = context.systems.l10n;
-  l10n._cache.en = sample.l10n_data;
 
   // Spy on redraws..
   const gfx = context.systems.gfx;

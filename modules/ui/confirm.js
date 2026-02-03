@@ -25,7 +25,7 @@ export function uiConfirm(context, selection) {
       .append('button')
       .attr('class', 'button ok-button action')
       .on('click.confirm', () => modalSelection.remove())
-      .text(l10n.t('confirm.okay'))
+      .text(l10n?.t('confirm.okay') ?? 'Okay')
       .node()
       .focus();
 

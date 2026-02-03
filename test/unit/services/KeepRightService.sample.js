@@ -85,16 +85,3 @@ export const qa_data = {
     }
   }
 };
-
-
-export const l10n_data = {
-  core: {
-    QA: {
-      keepRight: {
-        error_parts: {
-          this_highway: 'this highway'
-        }
-      }
-    }
-  }
-};

@@ -8,8 +8,6 @@ import { uiTooltip } from '../tooltip.js';
 import { uiCombobox } from '../combobox.js';
 import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
-var _languagesArray = [];
-
 
 // Matches 'key:<code>', where <code> is a BCP47 locale code.
 // Motivation is to avoid matching on similarly formatted tags that are
@@ -18,7 +16,6 @@ export const LANGUAGE_SUFFIX_REGEX = /^(.*):([a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A
 
 
 export function uiFieldLocalized(context, uifield) {
-  const assets = context.systems.assets;
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
@@ -29,24 +26,11 @@ export function uiFieldLocalized(context, uifield) {
     var localizedInputs = d3_select(null);
     var _countryCode;
     var _tags;
-
-
-    // A concern here in switching to async data means that languages will not
-    // be available the first time through, so things like the fetchers and
-    // the language() function will not work immediately.
-
-    assets.loadAssetAsync('languages')
-        .then(loadLanguagesArray)
-        .catch(e => console.error(e));  // eslint-disable-line
-
-    var _territoryLanguages = {};
-    assets.loadAssetAsync('territory_languages')
-        .then(data => _territoryLanguages = data.territoryLanguages)
-        .catch(e => console.error(e));  // eslint-disable-line
+    var _languagesArray = [];
 
     // reuse these combos
     var langCombo = uiCombobox(context, 'localized-lang')
-        .fetcher(fetchLanguages)
+        .fetcher(getLanguages)
         .minItems(0);
 
     var _selection = d3_select(null);
@@ -58,7 +42,7 @@ export function uiFieldLocalized(context, uifield) {
     var _entityIDs = [];
 
 
-    function loadLanguagesArray(data) {
+    function buildLanguagesArray() {
       if (_languagesArray.length) return;  // done already
 
       // some conversion is needed to ensure correct OSM tags are used
@@ -67,7 +51,7 @@ export function uiFieldLocalized(context, uifield) {
         'sr-Cyrl': false    // `sr-Cyrl` isn't used in OSM
       };
 
-      const languages = data.languages;
+      const languages = l10n.languages;
       for (var code in languages) {
         if (replacements[code] === false) continue;
         var metaCode = code;
@@ -276,6 +260,9 @@ export function uiFieldLocalized(context, uifield) {
 
 
     function changeLang(d3_event, d) {
+        // Ensure languages array is built
+        buildLanguagesArray();
+
         var tags = {};
 
         // make sure unrecognized suffixes are lowercase - iD#7156
@@ -321,14 +308,18 @@ export function uiFieldLocalized(context, uifield) {
     }
 
 
-    function fetchLanguages(value, cb) {
+    function getLanguages(value, cb) {
+        // Ensure languages array is built (it may not have been ready earlier)
+        buildLanguagesArray();
+
         var v = value.toLowerCase();
 
         // show the user's language first
         var langCodes = [l10n.localeCode, l10n.languageCode];
 
-        if (_countryCode && _territoryLanguages[_countryCode]) {
-            langCodes = langCodes.concat(_territoryLanguages[_countryCode]);
+        const territoryLanguages = l10n.territoryLanguages;
+        if (_countryCode && territoryLanguages[_countryCode]) {
+            langCodes = langCodes.concat(territoryLanguages[_countryCode]);
         }
 
         var langItems = [];

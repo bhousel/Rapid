@@ -5,20 +5,13 @@ describe('operationExtract', () => {
     get staging() { return { graph: _graph }; }
   }
 
-  class MockLocalizationSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    t(id)         { return id; }
-    tHtml(id)     { return id; }
-  }
-
   class MockContext {
     constructor() {
       this.viewport = new Rapid.sdk.Viewport();
       this.sequences = {};
       this.systems = {
         editor:   new MockEditSystem(),
-        l10n:     new MockLocalizationSystem(),
+        l10n:     new Rapid.LocalizationSystem(this),
         schema:   new Rapid.SchemaSystem(this),
         storage:  new Rapid.StorageSystem(this)
       };
@@ -33,6 +26,14 @@ describe('operationExtract', () => {
 
   const context = new MockContext();
   let _graph;
+
+  before(() => {
+    return Promise.all([
+      context.systems.l10n.initAsync(),
+      // context.systems.schema.initAsync(),
+      context.systems.storage.initAsync()
+    ]);
+  });
 
   describe('available', () => {
     beforeEach(() => {

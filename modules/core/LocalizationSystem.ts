@@ -48,7 +48,7 @@ export interface StringReplacements {
 }
 
 /** Cache structure for localized strings by scope */
-type LocaleCache = Record<string, Record<string, any>>;
+type StringCache = Record<LocaleCode, Record<string, any>>;
 
 /** Function that appends localized text to a D3 selection */
 export interface AppendFunction {
@@ -65,10 +65,17 @@ export interface AppendFunction {
  *   `localechange`    Fires on any change in the current locale
  */
 export class LocalizationSystem extends AbstractSystem {
-  // These are the different language packs that can be loaded
+  /** These are the different language packs that can be loaded */
   private readonly _scopes: Set<string>;
 
-  // Preferred locale codes can be used to override the detected locale
+  /** All known language codes and their local name */
+  private _languages: Record<LanguageCode, LanguageInfo>;
+  /** All supported locale codes */
+  private _locales: Record<LocaleCode, LocaleInfo>;
+  /** Language codes per territory, sorted by population */
+  private _territoryLanguages: Record<string, LanguageCode[]>;
+
+  /** Preferred locale codes can be used to override the detected locale */
   private _preferredLocaleCodes: LocaleCode[];
 
   // Current locale state
@@ -80,14 +87,8 @@ export class LocalizationSystem extends AbstractSystem {
   private _currLanguageNames: Record<LanguageCode, string>;
   private _currScriptNames: Record<ScriptCode, string>;
 
-  // All known language codes and their local name
-  private _languages: Record<LanguageCode, LanguageInfo>;
-
-  // All supported locale codes
-  private _locales: Record<LocaleCode, LocaleInfo>;
-
-  // Cache for loaded string data, organized by locale then scope
-  private _cache: LocaleCache;
+  /** Cache for loaded string data, organized by locale then scope */
+  private _strings: StringCache;
 
 
   /**
@@ -97,8 +98,7 @@ export class LocalizationSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'l10n';
-    this.requiredDependencies = new Set(['assets']);
-    this.optionalDependencies = new Set(['gfx', 'schema', 'urlhash']);
+    this.optionalDependencies = new Set(['assets', 'gfx', 'schema', 'urlhash']);
 
     // These are the different language packs that can be loaded..
     this._scopes = new Set(['core', 'tagging', 'imagery', 'community']);
@@ -148,7 +148,17 @@ export class LocalizationSystem extends AbstractSystem {
     // }
     this._locales = {};
 
-    // `_cache`
+    // `_territoryLanguages`
+    // Language codes per territory, sorted by population (most spoken first).
+    // This is used by UI components to suggest relevant languages for a location.
+    // {
+    //   "us": ["en", "es", "zh", ...],
+    //   "de": ["de", "en", "tr", ...],
+    //   …
+    // }
+    this._territoryLanguages = {};
+
+    // `_strings`
     // Where we keep all loaded string data, organized by "locale" then "scope":
     // {
     //   en: {
@@ -162,7 +172,7 @@ export class LocalizationSystem extends AbstractSystem {
     //     …
     //   },
     // }
-    this._cache = {} as LocaleCache;
+    this._strings = {} as StringCache;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -230,6 +240,24 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
+   * languages
+   * All known language codes and their info (native name, base, script).
+   * This is used for language pickers in the UI.
+   */
+  get languages(): Record<LanguageCode, LanguageInfo> {
+    return this._languages;
+  }
+
+  /**
+   * territoryLanguages
+   * Map of territory/country codes to arrays of language codes, sorted by population.
+   * Used to suggest relevant languages based on geographic location.
+   */
+  get territoryLanguages(): Record<string, LanguageCode[]> {
+    return this._territoryLanguages;
+  }
+
+  /**
    * isRTL
    * Whether the current locale uses right-to-left text direction
    */
@@ -277,22 +305,33 @@ export class LocalizationSystem extends AbstractSystem {
         return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => {
-        return Promise.all([
-          assets!.loadAssetAsync('languages'),
-          assets!.loadAssetAsync('locales')
-        ]);
-      })
-      .then((results) => {
-        const langResult = results[0] as { languages: Record<string, LanguageInfo> };
-        const localeResult = results[1] as { locales: Record<LocaleCode, LocaleInfo> };
-        this._languages = langResult.languages;
-        this._locales = localeResult.locales;
-
         // Setup event handlers..
         urlhash?.on('hashchange', this._hashChanged);
 
-        return this.selectLocaleAsync();
-      });
+        // If no AssetSystem, bootstrap with minimal English-only defaults.
+        // This allows LocalizationSystem to work independently for testing or minimal deployments.
+        if (!assets) {
+          this._languages = { en: { nativeName: 'English' } };
+          this._locales = { en: { rtl: false } };
+          this._territoryLanguages = {};
+
+        } else {
+          return Promise.all([
+            assets.loadAssetAsync('languages'),
+            assets.loadAssetAsync('locales'),
+            assets.loadAssetAsync('territory_languages')
+          ])
+          .then((results) => {
+            const langResult = results[0] as { languages: Record<LanguageCode, LanguageInfo> };
+            const localeResult = results[1] as { locales: Record<LocaleCode, LocaleInfo> };
+            const territoryResult = results[2] as { territoryLanguages: Record<string, LanguageCode[]> };
+            this._languages = langResult.languages;
+            this._locales = localeResult.locales;
+            this._territoryLanguages = territoryResult.territoryLanguages;
+          });
+        }
+      })
+      .then(() => this.selectLocaleAsync());
 //      .catch(e => console.error(e));  // eslint-disable-line
   }
 
@@ -363,13 +402,19 @@ export class LocalizationSystem extends AbstractSystem {
    */
   private _loadStringsAsync(locale: string): Promise<void | PromiseSettledResult<void>[]> {
     const context = this.context;
-    const assets = context.systems.assets!;
+    const assets = context.systems.assets;
+
+    // If no AssetSystem, we can't load strings - just use an empty cache for the locale
+    if (!assets) {
+      this._strings[locale] = {};
+      return Promise.resolve();
+    }
 
     if (locale.toLowerCase() === 'en-us') {  // `en-US` strings are stored as `en`
       locale = 'en';
     }
 
-    const cache = this._cache;
+    const cache = this._strings;
     if (cache[locale]) {  // already loaded
       return Promise.resolve();
     } else {
@@ -382,7 +427,7 @@ export class LocalizationSystem extends AbstractSystem {
       const assetSource = { preferred: `data/l10n/${scope}.${locale}.min.json` };
       assets.registerAsset(assetID, assetSource);
 
-      const prom = assets!.loadAssetAsync(assetID)
+      const prom = assets.loadAssetAsync(assetID)
         .then((data) => {
           const d = data as Record<string, any>;
           cache[locale][scope] = d[locale];
@@ -472,14 +517,18 @@ export class LocalizationSystem extends AbstractSystem {
     replacements?: StringReplacements,
     searchLocales?: LocaleCode[]
   ): ResolvedString {
+
+    const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
+
     if (!Array.isArray(searchLocales)) {
       searchLocales = this._currLocaleCodes.slice();  // copy
     }
-
     const locale = searchLocales.shift();  // remove first one
     if (!locale) {
       const missing = `Missing translation: ${origStringID}`;
-      if (typeof console !== 'undefined') console.error(missing);  // eslint-disable-line
+      if (!isTestEnvironment) {
+        console.error(missing);  // eslint-disable-line
+      }
       return { text: missing, locale: 'en' };
     }
 
@@ -504,7 +553,7 @@ export class LocalizationSystem extends AbstractSystem {
       .map(s => s.replace(/<TX_DOT>/g, '.'))
       .reverse();
 
-    let result: any = tryLocale && this._cache[tryLocale] && this._cache[tryLocale][scope];
+    let result: any = tryLocale && this._strings[tryLocale] && this._strings[tryLocale][scope];
     while (result !== undefined && path.length) {
       const key = path.pop()!;
       result = result[key];
@@ -573,7 +622,9 @@ export class LocalizationSystem extends AbstractSystem {
     }
 
     const missing = `Missing ${locale} translation: ${origStringID}`;
-    if (typeof console !== 'undefined') console.error(missing);  // eslint-disable-line
+    if (!isTestEnvironment) {
+      console.error(missing);  // eslint-disable-line
+    }
 
     return { text: missing, locale: 'en' };
   }
@@ -1153,14 +1204,14 @@ export class LocalizationSystem extends AbstractSystem {
       currLocale = 'en';
     }
 
-    const langNamesCurr = this._cache[currLocale]?.core?.languageNames ?? {};
-    const langNamesLang = this._cache[languageCode]?.core?.languageNames ?? {};
-    const langNamesEn = this._cache?.en?.core?.languageNames ?? {};
+    const langNamesCurr = this._strings[currLocale]?.core?.languageNames ?? {};
+    const langNamesLang = this._strings[languageCode]?.core?.languageNames ?? {};
+    const langNamesEn = this._strings?.en?.core?.languageNames ?? {};
     this._currLanguageNames = Object.assign({}, langNamesEn, langNamesLang, langNamesCurr);
 
-    const scriptNamesCurr = this._cache[currLocale]?.core?.scriptNames ?? {};
-    const scriptNamesLang = this._cache[languageCode]?.core?.scriptNames ?? {};
-    const scriptNamesEn = this._cache?.en?.core?.scriptNames ?? {};
+    const scriptNamesCurr = this._strings[currLocale]?.core?.scriptNames ?? {};
+    const scriptNamesLang = this._strings[languageCode]?.core?.scriptNames ?? {};
+    const scriptNamesEn = this._strings?.en?.core?.scriptNames ?? {};
     this._currScriptNames = Object.assign({}, scriptNamesEn, scriptNamesLang, scriptNamesCurr);
 
     gfx?.immediateRedraw();

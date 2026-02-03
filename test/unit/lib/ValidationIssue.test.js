@@ -5,25 +5,6 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('ValidationIssue', () => {
   const context = new Rapid.MockContext();
-  context.systems = {
-    l10n:  new Rapid.LocalizationSystem(context)
-  };
-
-  const l10n = context.systems.l10n;
-  l10n.preferredLocaleCodes = 'en';
-  l10n._cache = {
-    en: {
-      core: {
-        issues: {
-          fix: {
-            ignore_issue: {
-              title: 'Ignore Issue'
-            }
-          }
-        }
-      }
-    }
-  };
 
 
   it('should construct a ValidationIssue object and test its methods', () => {
@@ -53,7 +34,7 @@ describe('ValidationIssue', () => {
     // Test fixes method
     const fixes = result.fixes();
     assert.lengthOf(fixes, 1);
-    assert.strictEqual(fixes[0].title, 'Ignore Issue');
+    assert.strictEqual(fixes[0].title, 'Ignore this issue');  // no l10n, fallback string
     assert.strictEqual(fixes[0].issue, result);
   });
 });

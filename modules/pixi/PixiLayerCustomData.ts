@@ -443,7 +443,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const extent = this._geoDataExtent;
     if (!extent) return;
 
-    (this.context.systems.map as any).trimmedExtent(extent);
+    const map = this.context.systems.map!;
+    map.trimmedExtent(extent);
   }
 
 

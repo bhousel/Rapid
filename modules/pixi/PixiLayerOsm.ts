@@ -194,7 +194,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const osm = context.services.osm;
     if (!this.enabled || !osm?.started || zoom < MINZOOM) return;
 
-    const editor = context.systems.editor as any;
+    const editor = context.systems.editor!;
     const filters = context.systems.filters!;
     const graph = editor.staging.graph;
 
@@ -297,7 +297,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    */
   renderPolygons(frame: number, viewport: Viewport, zoom: number, data: OsmData): void {
     const context = this.context;
-    const graph = (context.systems.editor as any).staging.graph;
+    const graph = context.systems.editor!.staging.graph;
     const filters = context.systems.filters!;
     const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
@@ -445,7 +445,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    */
   renderLines(frame: number, viewport: Viewport, zoom: number, data: OsmData): void {
     const context = this.context;
-    const graph = (context.systems.editor as any).staging.graph;
+    const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
     const styles = context.systems.styles!;
     const lineContainer = this.lineContainer!;
@@ -671,7 +671,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    */
   renderPoints(frame: number, viewport: Viewport, zoom: number, data: OsmData): void {
     const context = this.context;
-    const graph = (context.systems.editor as any).staging.graph;
+    const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
     const pointsContainer = this.scene.groups.get('points')!;
@@ -758,7 +758,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   renderMidpoints(frame: number, viewport: Viewport, zoom: number, data: OsmData, related: RelatedIDs): void {
     const MIN_MIDPOINT_DIST = 40;   // distance in pixels
     const context = this.context;
-    const graph = (context.systems.editor as any).staging.graph;
+    const graph = context.systems.editor!.staging.graph;
 
     // Need to consider both lines and polygons for drawing our midpoints
     const entities = new Map([...data.lines, ...data.polygons]);
@@ -786,13 +786,21 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       // Compute midpoints in projected screen coordinates
       // We do this so that we can skip midpoints that are closer than the minimum distance.
-      const nodeData = nodes.map((node: OsmNode) => {
-        if (!node.loc) return null;
-        return {
-          id: node.id,
-          point: viewport.project(node.loc)
-        };
-      }).filter(Boolean);
+      interface NodeData {
+        id: EntityID;
+        point: Vec2;
+      };
+
+      const nodeData = nodes
+        .map((node: OsmNode): NodeData | null => {
+          if (!node.loc) return null;
+          return {
+            id: node.id,
+            point: viewport.project(node.loc)
+          };
+        })
+        .filter(Boolean) as NodeData[];
+
       if (way.tags.oneway === '-1') {
         nodeData.reverse();
       }

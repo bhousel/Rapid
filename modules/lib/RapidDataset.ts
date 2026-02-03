@@ -145,7 +145,7 @@ export class RapidDataset {
     else if (this.categories.has('roads'))    type = 'roads';
     else type = 'points';
 
-    const assets = (this.context.systems.assets as any);
+    const assets = this.context.systems.assets;
     return assets?.getFileURL(`img/data-${type}.png`) || '';
   }
 

@@ -160,7 +160,7 @@ export class Preset {
     this.searchable = this.props.searchable;
     this.suggestion = this.props.suggestion;
 
-    const schema = (context.systems.schema as any);
+    const schema = context.systems.schema!;
     if (this.props.geometry.length) {
       this.geometries = new Set(this.props.geometry);
     } else {
@@ -369,7 +369,7 @@ export class Preset {
   subtitle(): string | null {
     if (!this.props.suggestion) return null;
 
-    const schema = (this.context.systems.schema as any);
+    const schema = this.context.systems.schema!;
 
     const path = this.id.split('/');
     path.pop();  // remove brand name
@@ -530,7 +530,7 @@ export class Preset {
    * @return the Preset to get the name from (either this Preset or another Preset)
    */
   private _resolveReference(prop: keyof PresetProps): Preset {
-    const schema = (this.context.systems.schema as any);
+    const schema = this.context.systems.schema!;
 
     const val = this.props[prop];
     if (val && (typeof val === 'string')) {   // This will only work for strings
@@ -556,7 +556,7 @@ export class Preset {
    * @return the resolved fields or moreFields
    */
   private _resolveFields(prop: 'fields' | 'moreFields'): Field[] {
-    const schema = (this.context.systems.schema as any);
+    const schema = this.context.systems.schema!;
 
     const fieldIDs = this.props[prop] ?? [];  // always lookup original properties, don't use the functions
     let resolved: Field[] = [];
@@ -582,7 +582,7 @@ export class Preset {
       if (match !== null) {    // a presetID wrapped in braces {}
         resolved = resolved.concat(inheritFields(match[1], prop));
       } else if (schema.fields.has(fieldID)) {    // a normal fieldID
-        resolved.push(schema.fields.get(fieldID));
+        resolved.push(schema.fields.get(fieldID)!);
       } else {
         console.warn(`Unable to resolve referenced fieldID: ${this.id}.${prop} -> ${fieldID}`);  // eslint-disable-line no-console
       }

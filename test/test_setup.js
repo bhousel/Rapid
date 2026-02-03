@@ -2,6 +2,12 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 GlobalRegistrator.register();
 
+// Note that Bun uses Jest-style hooks, but our index.html uses Mocha.
+// Only a few small differences - define as functions that forward to Bun's hooks
+// (can't assign directly because Bun injects beforeAll/afterAll after preload runs)
+window.before = (...args) => beforeAll(...args);  // eslint-disable-line no-undef
+window.after = (...args) => afterAll(...args);    // eslint-disable-line no-undef
+
 import fetchMock from 'fetch-mock';
 window.fetchMock = fetchMock;
 window.fetchMock.mockGlobal();

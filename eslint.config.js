@@ -127,8 +127,7 @@ export default [
     files: [ 'scripts/**', 'test/unit/**' ],
     languageOptions: {
       globals: {
-        ...globals.node,
-        Bun: false
+        ...globals.bunBuiltin
       }
     }
   },

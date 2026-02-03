@@ -156,11 +156,11 @@ export class AssetSystem extends AbstractSystem {
       c.address_formats = { addressFormats: [{ format: [['housenumber', 'street'], ['city', 'postcode'] ] }] };
       c.editor_layer_index = { assetID: 'editor_layer_index' };
       c.rapid_imagery = { assetID: 'rapid_imagery' };
-      c.languages = { languages: { de: { nativeName: 'Deutsch' }, en: { nativeName: 'English' } } };
-      c.locales = { locales: { en: { rtl: false } } };
+      // c.languages - now loaded in LocalizationSystem
+      // c.locales - now loaded in LocalizationSystem
+      // c.territory_languages - now loaded in LocalizationSystem
       c.phone_formats = { phoneFormats: {} };
       c.shortcuts = { shortcuts: [] };
-      c.territory_languages = { territoryLanguages: {} };
       c.id_tagging_schema = {
         assetID: 'id_tagging_schema',
         deprecated: [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }],

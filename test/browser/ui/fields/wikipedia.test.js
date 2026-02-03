@@ -12,14 +12,6 @@ describe('uiFieldWikipedia', () => {
     get staging() { return { graph: graph }; }
   }
 
-  class MockLocalizationSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    startAsync()  { return Promise.resolve(); }
-    t(id)         { return id; }
-    tHtml(id)     { return id; }
-  }
-
   class MockContext {
     constructor()   {
       this.sequences = {};
@@ -30,7 +22,7 @@ describe('uiFieldWikipedia', () => {
       this.systems = {
         assets:  new Rapid.AssetSystem(this),
         editor:  new MockEditSystem(this),
-        l10n:    new MockLocalizationSystem(this),
+        l10n:    new Rapid.LocalizationSystem(this),
         schema:  new Rapid.SchemaSystem(this)
       };
     }
@@ -45,6 +37,17 @@ describe('uiFieldWikipedia', () => {
 
   const context = new MockContext();
   let entity, base, graph, selection, field, uifield;
+
+
+  before(() => {
+    // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
+    const assets = context.systems.assets;
+    assets._loaded.languages = { languages: { de: { nativeName: 'Deutsch' }, en: { nativeName: 'English' } } };
+    assets._loaded.locales = { locales: { en: { rtl: false }, de: { rtl: false } } };
+    assets._loaded.territory_languages = { territoryLanguages: { de: ['de'], us: ['en'] } };
+
+    return context.systems.l10n.initAsync();
+  });
 
   beforeEach(() => {
     entity = new Rapid.OsmNode(context, { id: 'n-1', tags: {} });

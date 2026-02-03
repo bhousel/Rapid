@@ -1,17 +1,8 @@
 describe('uiConfirm', () => {
 
-  class MockLocalizationSystem {
-    constructor() { }
-    initAsync()   { return Promise.resolve(); }
-    t(id)         { return id; }
-    tHtml(id)     { return id; }
-  }
-
   class MockContext {
     constructor()   {
-      this.systems = {
-        l10n:  new MockLocalizationSystem()
-      };
+      this.systems = {};
     }
   }
 
