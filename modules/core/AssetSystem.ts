@@ -161,16 +161,8 @@ export class AssetSystem extends AbstractSystem {
       // c.territory_languages - now loaded in LocalizationSystem
       c.phone_formats = { phoneFormats: {} };
       c.shortcuts = { shortcuts: [] };
-      c.id_tagging_schema = {
-        assetID: 'id_tagging_schema',
-        deprecated: [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }],
-        discarded: {},
-        categories: {},
-        defaults: {},
-        fields: {},
-        presets: {}
-      };
-      c.rapid_schema = { assetID: 'rapid_schema' };
+      // c.id_tagging_schema - now loaded in SchemaSystem
+      // c.rapid_schema - now loaded in SchemaSystem
       c.l10n_core_en = {};
       c.l10n_tagging_en = {};
       c.l10n_imagery_en = {};

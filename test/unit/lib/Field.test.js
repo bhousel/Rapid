@@ -7,7 +7,6 @@ import * as sample from './Field.sample.js';
 describe('Field', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:  new Rapid.AssetSystem(context),
     schema:  new Rapid.SchemaSystem(context)
   };
 

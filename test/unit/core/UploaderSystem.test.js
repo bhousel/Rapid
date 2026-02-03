@@ -7,7 +7,6 @@ describe('UploaderSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:   new Rapid.AssetSystem(context),
     editor:   new Rapid.MockSystem(context),
     l10n:     new Rapid.MockSystem(context)
   };

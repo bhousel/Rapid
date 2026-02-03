@@ -7,19 +7,11 @@ describe('MapSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:   new Rapid.AssetSystem(context),
     editor:   new Rapid.MockSystem(context),
     gfx:      new Rapid.MockGfxSystem(context),
     l10n:     new Rapid.LocalizationSystem(context),
     map:      new Rapid.MapSystem(context)
   };
-
-  // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
-  const assets = context.systems.assets;
-  assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
-  assets._loaded.locales = { locales: { en: { rtl: false } } };
-  assets._loaded.territory_languages = { territoryLanguages: {} };
-
 
   // Test construction and startup of the system..
   describe('lifecycle', () => {

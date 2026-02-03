@@ -6,16 +6,9 @@ import * as Rapid from '../../../modules/headless.js';
 describe('actionChangePreset', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:  new Rapid.AssetSystem(context),
     l10n:    new Rapid.LocalizationSystem(context),
     schema:  new Rapid.SchemaSystem(context)
   };
-
-  // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
-  const assets = context.systems.assets;
-  assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
-  assets._loaded.locales = { locales: { en: { rtl: false } } };
-  assets._loaded.territory_languages = { territoryLanguages: {} };
 
 
   let oldPreset, newPreset;

@@ -8,17 +8,10 @@ describe('SchemaSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:    new Rapid.AssetSystem(context),
     l10n:      new Rapid.LocalizationSystem(context),
     locations: new Rapid.LocationSystem(context),
     urlhash:   new Rapid.UrlHashSystem(context)
   };
-
-  // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
-  const assets = context.systems.assets;
-  assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
-  assets._loaded.locales = { locales: { en: { rtl: false } } };
-  assets._loaded.territory_languages = { territoryLanguages: {} };
 
 
   // Test construction and startup of the system..
@@ -1096,25 +1089,18 @@ describe('SchemaSystem', () => {
 
 
   describe('match', () => {
-    beforeEach(() => {
-      const testPresets = {
+    const testPresets = {
+      assetID: 'match-test-1',
+      presets: {
         residential: { tags: { highway: 'residential' }, geometry: ['line'] },
         park: { tags: { leisure: 'park' }, geometry: ['point', 'area'] }
-      };
-      context.systems.assets._loaded.id_tagging_schema = {
-        assetID: 'id_tagging_schema',
-        deprecated: [],
-        discarded: {},
-        categories: {},
-        defaults: {},
-        fields: {},
-        presets: testPresets
-      };
-    });
+      }
+    };
 
     it('returns a collection containing presets matching a geometry and tags', () => {
       const schema = new Rapid.SchemaSystem(context);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
         const way = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
         const graph = new Rapid.Graph(context, [way]);
         assert.strictEqual(schema.match(way, graph).id, 'residential');
@@ -1123,11 +1109,11 @@ describe('SchemaSystem', () => {
 
     it('returns the appropriate fallback preset when no tags match', () => {
       const schema = new Rapid.SchemaSystem(context);
-      const point = new Rapid.OsmNode(context);
-      const line = new Rapid.OsmWay(context, { tags: { foo: 'bar' } });
-      const graph = new Rapid.Graph(context, [point, line]);
-
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const point = new Rapid.OsmNode(context);
+        const line = new Rapid.OsmWay(context, { tags: { foo: 'bar' } });
+        const graph = new Rapid.Graph(context, [point, line]);
         assert.strictEqual(schema.match(point, graph).id, 'point');
         assert.strictEqual(schema.match(line, graph).id, 'line');
       });
@@ -1135,22 +1121,22 @@ describe('SchemaSystem', () => {
 
     it('matches vertices on a line as points', () => {
       const schema = new Rapid.SchemaSystem(context);
-      const point = new Rapid.OsmNode(context, { tags: { leisure: 'park' } });
-      const line = new Rapid.OsmWay(context, { nodes: [point.id], tags: { 'highway': 'residential' } });
-      const graph = new Rapid.Graph(context, [point, line]);
-
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const point = new Rapid.OsmNode(context, { tags: { leisure: 'park' } });
+        const line = new Rapid.OsmWay(context, { nodes: [point.id], tags: { 'highway': 'residential' } });
+        const graph = new Rapid.Graph(context, [point, line]);
         assert.strictEqual(schema.match(point, graph).id, 'point');
       });
     });
 
     it('matches vertices on an addr:interpolation line as points', () => {
       const schema = new Rapid.SchemaSystem(context);
-      const point = new Rapid.OsmNode(context, { tags: { leisure: 'park' } });
-      const line = new Rapid.OsmWay(context, { nodes: [point.id], tags: { 'addr:interpolation': 'even' } });
-      const graph = new Rapid.Graph(context, [point, line]);
-
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const point = new Rapid.OsmNode(context, { tags: { leisure: 'park' } });
+        const line = new Rapid.OsmWay(context, { nodes: [point.id], tags: { 'addr:interpolation': 'even' } });
+        const graph = new Rapid.Graph(context, [point, line]);
         assert.strictEqual(schema.match(point, graph).id, 'park');
       });
     });
@@ -1158,8 +1144,9 @@ describe('SchemaSystem', () => {
 
 
   describe('areaKeys', () => {
-    beforeEach(() => {
-      const testPresets = {
+    const testPresets = {
+      assetID: 'areakeys-test',
+      presets: {
         'amenity/fuel/shell': { tags: { 'amenity': 'fuel' }, geometry: ['point', 'area'], suggestion: true },
         'highway/foo': { tags: { 'highway': 'foo' }, geometry: ['area'] },
         'leisure/track': { tags: { 'leisure': 'track' }, geometry: ['line', 'area'] },
@@ -1167,21 +1154,13 @@ describe('SchemaSystem', () => {
         'natural/peak': { tags: { 'natural': 'peak' }, geometry: ['point', 'vertex'] },
         'natural/tree_row': { tags: { 'natural': 'tree_row' }, geometry: ['line'] },
         'natural/wood': { tags: { 'natural': 'wood' }, geometry: ['point', 'area'] }
-      };
-      context.systems.assets._loaded.id_tagging_schema = {
-        assetID: 'id_tagging_schema',
-        deprecated: [],
-        discarded: {},
-        categories: {},
-        defaults: {},
-        fields: {},
-        presets: testPresets
-      };
-    });
+      }
+    };
 
     it('includes keys for presets with area geometry', () => {
       const schema = new Rapid.SchemaSystem(context);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
         assert.containsAllKeys(schema.areaKeys(), ['natural']);
       });
     });
@@ -1189,6 +1168,7 @@ describe('SchemaSystem', () => {
     it('discards key-values for presets with a line geometry', () => {
       const schema = new Rapid.SchemaSystem(context);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
         assert.containsAllKeys(schema.areaKeys().natural, ['tree_row']);
         assert.isTrue(schema.areaKeys().natural.tree_row);
       });
@@ -1197,6 +1177,7 @@ describe('SchemaSystem', () => {
     it('discards key-values for presets with both area and line geometry', () => {
       const schema = new Rapid.SchemaSystem(context);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
         assert.containsAllKeys(schema.areaKeys().leisure, ['track']);
       });
     });
@@ -1204,6 +1185,7 @@ describe('SchemaSystem', () => {
     it('does not discard key-values for presets with neither area nor line geometry', () => {
       const schema = new Rapid.SchemaSystem(context);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
         assert.doesNotHaveAllKeys(schema.areaKeys().natural, ['peak']);
       });
     });
@@ -1211,6 +1193,7 @@ describe('SchemaSystem', () => {
     it('does not discard generic \'*\' key-values', () => {
       const schema = new Rapid.SchemaSystem(context);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
         assert.doesNotHaveAllKeys(schema.areaKeys().natural, ['natural']);
       });
     });
@@ -1218,6 +1201,7 @@ describe('SchemaSystem', () => {
     it('ignores keys like \'highway\' that are assumed to be lines', () => {
       const schema = new Rapid.SchemaSystem(context);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
         assert.doesNotHaveAllKeys(schema.areaKeys(), ['highway']);
       });
     });
@@ -1225,6 +1209,7 @@ describe('SchemaSystem', () => {
     it('ignores suggestion presets', () => {
       const schema = new Rapid.SchemaSystem(context);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
         assert.doesNotHaveAllKeys(schema.areaKeys(), ['amenity']);
       });
     });
@@ -1232,8 +1217,9 @@ describe('SchemaSystem', () => {
 
 
   describe('match', () => {
-    beforeEach(() => {
-      const testPresets = {
+    const testPresets = {
+      assetID: 'match-test-2',
+      presets: {
         building: {
           name: 'Building',
           tags: { building: 'yes' },
@@ -1257,24 +1243,15 @@ describe('SchemaSystem', () => {
           geometry: ['area'],
           tags: { highway: 'pedestrian', area: 'yes' }
         }
-      };
-      context.systems.assets._loaded.id_tagging_schema = {
-        assetID: 'id_tagging_schema',
-        deprecated: [],
-        discarded: {},
-        categories: {},
-        defaults: {},
-        fields: {},
-        presets: testPresets
-      };
-    });
-
+      }
+    };
 
     it('prefers building to multipolygon', () => {
       const schema = new Rapid.SchemaSystem(context);
-      const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon', building: 'yes' } });
-      const graph = new Rapid.Graph(context, [relation]);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const relation = new Rapid.OsmRelation(context, { tags: { type: 'multipolygon', building: 'yes' } });
+        const graph = new Rapid.Graph(context, [relation]);
         const match = schema.match(relation, graph);
         assert.strictEqual(match.id, 'building');
       });
@@ -1282,9 +1259,10 @@ describe('SchemaSystem', () => {
 
     it('prefers building to address', () => {
       const schema = new Rapid.SchemaSystem(context);
-      const way = new Rapid.OsmWay(context, { tags: { area: 'yes', building: 'yes', 'addr:housenumber': '1234' } });
-      const graph = new Rapid.Graph(context, [way]);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const way = new Rapid.OsmWay(context, { tags: { area: 'yes', building: 'yes', 'addr:housenumber': '1234' } });
+        const graph = new Rapid.Graph(context, [way]);
         const match = schema.match(way, graph);
         assert.strictEqual(match.id, 'building');
       });
@@ -1292,9 +1270,10 @@ describe('SchemaSystem', () => {
 
     it('prefers pedestrian to area', () => {
       const schema = new Rapid.SchemaSystem(context);
-      const way = new Rapid.OsmWay(context, { tags: { area: 'yes', highway: 'pedestrian' } });
-      const graph = new Rapid.Graph(context, [way]);
       return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const way = new Rapid.OsmWay(context, { tags: { area: 'yes', highway: 'pedestrian' } });
+        const graph = new Rapid.Graph(context, [way]);
         const match = schema.match(way, graph);
         assert.strictEqual(match.id, 'highway/pedestrian_area');
       });

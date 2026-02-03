@@ -12,7 +12,6 @@ describe('validationMismatchedGeometry', () => {
 
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:     new Rapid.AssetSystem(context),
     editor:     new MockEditSystem(context),
     l10n:       new Rapid.LocalizationSystem(context),
     locations:  new Rapid.LocationSystem(context),
@@ -22,12 +21,6 @@ describe('validationMismatchedGeometry', () => {
     storage:    new Rapid.StorageSystem(context),
     urlhash:    new Rapid.UrlHashSystem(context)
   };
-
-  // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
-  const assets = context.systems.assets;
-  assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
-  assets._loaded.locales = { locales: { en: { rtl: false } } };
-  assets._loaded.territory_languages = { territoryLanguages: {} };
 
   const validator = Rapid.validationMismatchedGeometry(context);
 

@@ -7,7 +7,6 @@ import * as sample from './Preset.sample.js';
 describe('Preset', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:  new Rapid.AssetSystem(context),
     schema:  new Rapid.SchemaSystem(context)
   };
 

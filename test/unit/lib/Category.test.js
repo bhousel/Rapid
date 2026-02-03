@@ -7,7 +7,6 @@ import * as sample from './Category.sample.js';
 describe('Category', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:  new Rapid.AssetSystem(context),
     schema:  new Rapid.SchemaSystem(context)
   };
 

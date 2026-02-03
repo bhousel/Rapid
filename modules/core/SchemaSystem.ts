@@ -144,8 +144,7 @@ export class SchemaSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'schema';
-    this.requiredDependencies = new Set(['assets']);
-    this.optionalDependencies = new Set(['gfx', 'l10n', 'locations', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'locations', 'storage', 'urlhash']);
 
     this.geometryTypes = new Set(['point', 'vertex', 'line', 'area', 'relation'] as GeometryType[]);
 
@@ -222,9 +221,6 @@ export class SchemaSystem extends AbstractSystem {
         urlhash?.on('hashchange', this._hashChanged);
         l10n?.on('localechange', this._localeChanged);
 
-        // Tell the AssetSystem about default schema files..
-        this._registerDefaultAssets();
-
         // If we received a subset of addable presetIDs specified in the url hash, save them.
         const presetIDs = urlhash?.initialHashParams.get('presets') || '';
         if (presetIDs) {
@@ -232,7 +228,15 @@ export class SchemaSystem extends AbstractSystem {
           this.addablePresetIDs = new Set(vals);
         }
 
-        return this.loadSchemaAssetsAsync();
+        // If AssetSystem is available, tell it about default schema files and load them.
+        // Without AssetSystem, we'll just have the fallback presets (point, line, area, relation).
+        if (assets) {
+          this._registerDefaultAssets();
+          return this.loadSchemaAssetsAsync();
+        } else {
+          this.resetAll();  // Set up fallback presets
+          return Promise.resolve();
+        }
       });
   }
 
@@ -265,10 +269,16 @@ export class SchemaSystem extends AbstractSystem {
    */
   loadSchemaAssetsAsync(): Promise<void> {
     const context = this.context;
-    const assets = context.systems.assets!;
+    const assets = context.systems.assets;
 
     // Clear out whatever was loaded before.
     this.resetAll();
+
+    // If AssetSystem is not available, we can't load schema files.
+    // resetAll() has already set up the fallback presets (point, line, area, relation).
+    if (!assets) {
+      return Promise.resolve();
+    }
 
     // Load the schema files
     const which = this._requestedAssetIDs ?? this._defaultAssetIDs;
