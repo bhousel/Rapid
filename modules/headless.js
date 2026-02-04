@@ -1,3 +1,6 @@
+// Polyfills for missing JavaScript features.
+import './polyfills.ts';
+
 // Core components to support a headless (no browser) Rapid for testing.
 export * from './actions/index.js';
 export * from './data/index.ts';
@@ -27,7 +30,6 @@ export { UploaderSystem } from './core/UploaderSystem.ts';
 export { UrlHashSystem } from './core/UrlHashSystem.ts';
 export { ValidationSystem } from './core/ValidationSystem.ts';
 
-
 // Reexport only what our tests use, see iD#4379
 import * as D3 from 'd3';
 export const d3 = {
@@ -42,25 +44,3 @@ export const d3 = {
 import * as SDKMATH from '@rapid-sdk/math';
 import * as SDKUTIL from '@rapid-sdk/util';
 export const sdk = { ...SDKMATH, ...SDKUTIL };
-
-
-// Polyfill idle callback functions (for Node)
-if (!globalThis.requestIdleCallback) {
-  globalThis.requestIdleCallback = (callback) => {
-    const start = Date.now();
-    return globalThis.setTimeout(() => {
-      callback({
-        didTimeout: false,
-        timeRemaining: () => {
-          return Math.max(0, 50 - (Date.now() - start));   // Simulates a time limit
-        }
-      });
-    }, 1); // Executes with a minimal delay
-  };
-}
-
-if (!globalThis.cancelIdleCallback) {
-  globalThis.cancelIdleCallback = (handle) => {
-    globalThis.clearTimeout(handle);
-  };
-}
