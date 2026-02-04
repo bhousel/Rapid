@@ -86,7 +86,7 @@ export class MapillaryService extends AbstractSystem {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
-    const eventManager = context.systems.gfx?.events;
+    const eventManager = context.systems.gfx?.eventManager;
 
     // add mly-wrapper
     const $$wrapper = context.container().select('.photoviewer .middle-middle')
@@ -534,7 +534,7 @@ export class MapillaryService extends AbstractSystem {
    */
   _keydown(e) {
     const context = this.context;
-    const eventManager = context.systems.gfx?.events;
+    const eventManager = context.systems.gfx?.eventManager;
     const photos = context.systems.photos;
 
     // Test environment?

@@ -99,7 +99,7 @@ export class StreetsideService extends AbstractSystem {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
-    const eventManager = context.systems.gfx?.events;
+    const eventManager = context.systems.gfx?.eventManager;
     const ui = context.systems.ui;
 
     // create ms-wrapper, a photo wrapper class
@@ -581,7 +581,7 @@ export class StreetsideService extends AbstractSystem {
    */
   _keydown(e) {
     const context = this.context;
-    const eventManager = context.systems.gfx?.events;
+    const eventManager = context.systems.gfx?.eventManager;
     const photos = context.systems.photos;
 
     // Test environment?
