@@ -1,4 +1,6 @@
 import { DOMParser } from '@xmldom/xmldom';
+import JSON5 from 'json5';
+import stripJsonComments from 'strip-json-comments';
 
 /**
  * FetchError
@@ -63,6 +65,14 @@ export function utilFetchResponse(
         contentType = 'application/json';
         break;
 
+      case 'json5':
+        contentType = 'application/json5';
+        break;
+
+      case 'jsonc':
+        contentType = 'application/jsonc';
+        break;
+
       case 'htm':
       case 'html':
         contentType = 'text/html';
@@ -98,6 +108,14 @@ export function utilFetchResponse(
     case 'text/x-json':
       if (response.status === 204 || response.status === 205) return;  // No Content, Reset Content
       return response.json();
+
+    case 'application/json5':
+      if (response.status === 204 || response.status === 205) return;  // No Content, Reset Content
+      return response.text().then(text => JSON5.parse(text));
+
+    case 'application/jsonc':
+      if (response.status === 204 || response.status === 205) return;  // No Content, Reset Content
+      return response.text().then(text => JSON.parse(stripJsonComments(text)));
 
     // bhousel note 9/8/25:  Now prefer xmldom instead of builtin browser DOMParser,
     // 1. to better handle the togeojson usecases:
