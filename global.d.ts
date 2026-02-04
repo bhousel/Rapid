@@ -9,13 +9,8 @@
  * (like @mapbox/polylabel) live in `modules/types/*.d.ts` files.
  */
 
-// Global variable declarations
-declare const expect: Chai.ExpectStatic;
-declare const Rapid: typeof import("./modules/index.js");
-
 // The `export {}` makes this file a module, enabling augmentation
 export {};
-
 
 // Global type declarations
 declare global {
@@ -65,54 +60,25 @@ declare module 'd3-selection' {
       key?: (datum: any, index: number, groups: any) => string | number
     ): Selection<GElement, NewDatum, PElement, PDatum>;
 
-    /**
-     * Permissive attr with value function - datum can be typed by caller.
-     */
+    /** Permissive attr with value function - datum can be typed by caller. */
     attr(name: string, value: (datum: any, index: number, groups: any) => any): this;
-
-    /**
-     * Permissive style with value function - datum can be typed by caller.
-     */
+    /** Permissive style with value function - datum can be typed by caller. */
     style(name: string, value: (datum: any, index: number, groups: any) => any, priority?: 'important' | null): this;
-
-    /**
-     * Permissive text with value function - datum can be typed by caller.
-     */
+    /** Permissive text with value function - datum can be typed by caller. */
     text(value: (datum: any, index: number, groups: any) => any): this;
-
-    /**
-     * Permissive html with value function - datum can be typed by caller.
-     */
+    /** Permissive html with value function - datum can be typed by caller. */
     html(value: (datum: any, index: number, groups: any) => any): this;
-
-    /**
-     * Permissive classed with value function - datum can be typed by caller.
-     */
+    /** Permissive classed with value function - datum can be typed by caller. */
     classed(names: string, value: (datum: any, index: number, groups: any) => boolean): this;
-
-    /**
-     * Permissive property with value function - datum can be typed by caller.
-     */
+    /** Permissive property with value function - datum can be typed by caller. */
     property(name: string, value: (datum: any, index: number, groups: any) => any): this;
-
-    /**
-     * Permissive filter with function - datum can be typed by caller.
-     */
+    /** Permissive filter with function - datum can be typed by caller. */
     filter(selector: (datum: any, index: number, groups: any) => boolean): Selection<GElement, Datum, PElement, PDatum>;
-
-    /**
-     * Permissive sort - datum can be typed by caller.
-     */
+    /** Permissive sort - datum can be typed by caller. */
     sort(comparator: (a: any, b: any) => number): this;
-
-    /**
-     * Permissive each - datum can be typed by caller.
-     */
+    /** Permissive each - datum can be typed by caller. */
     each(callback: (datum: any, index: number, groups: any) => void): this;
-
-    /**
-     * Permissive on with callback - datum can be typed by caller.
-     */
+    /** Permissive on with callback - datum can be typed by caller. */
     on(typenames: string, callback: ((event: any, datum: any) => void) | null, options?: any): this;
   }
 }
