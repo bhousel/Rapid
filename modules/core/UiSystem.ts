@@ -61,6 +61,7 @@ export class UiSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'ui';
+    // Require any systems that might be required by any UI component.
     this.requiredDependencies = new Set(['assets', 'editor', 'gfx', 'imagery', 'l10n', 'map', 'storage', 'urlhash']);
     this.optionalDependencies = new Set();
 

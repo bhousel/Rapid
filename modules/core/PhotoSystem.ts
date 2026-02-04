@@ -48,7 +48,6 @@ export class PhotoSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'photos';
-    this.requiredDependencies = new Set();
     this.optionalDependencies = new Set(['gfx', 'map', 'urlhash', 'ui']);
 
     this._filterPhotoTypes = new Set(this.photoTypes);

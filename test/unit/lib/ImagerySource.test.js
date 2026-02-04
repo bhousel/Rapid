@@ -16,9 +16,6 @@ import * as sample from './ImagerySource.sample.js';
 
 describe('ImagerySource', () => {
   const context = new Rapid.MockContext();
-  context.systems = {
-    l10n:  new Rapid.LocalizationSystem(context)
-  };
 
   describe('constructor', () => {
     it('throws if missing an id', () => {

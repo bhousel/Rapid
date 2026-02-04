@@ -57,7 +57,6 @@ export class RapidSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'rapid';
-    this.requiredDependencies = new Set();
     this.optionalDependencies = new Set(['editor', 'gfx', 'urlhash']);
 
     // Ensure methods used as callbacks always have `this` bound correctly.

@@ -145,8 +145,6 @@ export class StyleSystem extends AbstractSystem {
     super(context);
     this.id = 'styles';
     this.context = context;
-
-    this.requiredDependencies = new Set();
     this.optionalDependencies = new Set(['gfx']);
 
     // Ensure methods used as callbacks always have `this` bound correctly.

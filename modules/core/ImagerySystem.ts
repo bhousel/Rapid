@@ -81,8 +81,7 @@ export class ImagerySystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'imagery';
-    this.requiredDependencies = new Set(['assets']);
-    this.optionalDependencies = new Set(['gfx', 'l10n', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'storage', 'urlhash']);
 
     this.sources = new Map();    // Map<ImagerySourceID, ImagerySource>
     this.features = new Map();   // Map<ImagerySourceID, GeoJSON.Feature>
@@ -128,7 +127,7 @@ export class ImagerySystem extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
-          assets!.initAsync(),
+          assets?.initAsync(),
           gfx?.initAsync(),      // `gfx.scene` will exist after `initAsync`
           l10n?.initAsync(),
           storage?.initAsync(),
@@ -142,12 +141,16 @@ export class ImagerySystem extends AbstractSystem {
         gfx?.scene?.on('layerchange', this._imageryChanged);
         l10n?.on('localechange', this._localeChanged);
 
-        // Tell the AssetSystem about default imagery files..
-        // By default we'll load 'editor_layer_index', then 'rapid_imagery'
-        assets!.registerAsset('editor_layer_index', { preferred: 'data/editor_layer_index.min.json' });
-        assets!.registerAsset('rapid_imagery', { preferred: 'data/rapid_imagery.min.json' });
-
-        this.loadImageryAssetsAsync();
+        // If AssetSystem is available, tell it about default imagery files and load them.
+        // Without AssetSystem, we'll just have the builtin 'none' and 'custom' sources.
+        if (assets) {
+          assets.registerAsset('editor_layer_index', { preferred: 'data/editor_layer_index.min.json' });
+          assets.registerAsset('rapid_imagery', { preferred: 'data/rapid_imagery.min.json' });
+          return this.loadImageryAssetsAsync();
+        } else {
+          this.resetAll();  // Set up builtin sources
+          return Promise.resolve();
+        }
       });
   }
 
@@ -178,10 +181,16 @@ export class ImagerySystem extends AbstractSystem {
    */
   loadImageryAssetsAsync(): Promise<void> {
     const context = this.context;
-    const assets = context.systems.assets!;
+    const assets = context.systems.assets;
 
     // Clear out whatever was loaded before.
     this.resetAll();
+
+    // If AssetSystem is not available, we can't load imagery files.
+    // resetAll() has already set up the builtin 'none' and 'custom' sources.
+    if (!assets) {
+      return Promise.resolve();
+    }
 
     // Load the imagery files
     const which = this._requestedAssetIDs ?? this._defaultAssetIDs;

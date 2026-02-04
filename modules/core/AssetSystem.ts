@@ -66,16 +66,40 @@ export interface BundleAssetSource {
 export class AssetSystem extends AbstractSystem {
   /**
    * Map of string AssetID to AssetSource record of properties.
-   * AssetIDs are identifiers like 'address_formats', 'languages', 'oci_defaults'.
+   * AssetIDs are string identifiers like 'address_formats', 'languages', 'oci_defaults'.
    */
   sources: Record<AssetID, AssetSource>;
+
   /** Map of bundled assets - multiple files fetched together and returned as combined object */
   bundles: Record<AssetID, BundleAssetSource>;
-  /** The fallback origin must be set to 'latest' or 'local' */
+
+  /**
+   * Fallback origin
+   * The fallback origin (checked after 'preferred') must be set to 'local' or 'latest'.
+   * (This must set before init, and should not be changed later)
+   */
   origin: 'latest' | 'local';
-  /** Root folder path for assets, with trailing slash (e.g. 'dist/') */
+
+  /**
+   * Root folder path for assets, with trailing slash (e.g. 'dist/')
+   * The file path defines the root folder that files are stored under.
+   * If used, it should have a trailing slash, for example 'dist/'
+   * (This must set before init, and should not be changed later)
+   */
   filePath: string;
-  /** Custom filename replacements, e.g. from Rails asset pipeline */
+
+  /**
+   * Custom filename replacements, e.g. from Rails asset pipeline
+   * A custom asset map may be provided by a separate asset management system.
+   * (For example this may be provided by the Rails asset pipeline.)
+   * This should be in the form of key-value replacement filenames like:
+   * {
+   *   'original1.json': 'replacement1.json',
+   *   'original2.json': 'replacement2.json',
+   *   …
+   * }
+   * (This must set before init, and should not be changed later)
+   */
   fileReplacements: Record<string, string>;
 
   /** Cache of loaded asset data, keyed by asset identifier */
@@ -124,52 +148,12 @@ export class AssetSystem extends AbstractSystem {
 
     this.bundles = {};
 
-    // The fallback origin (checked after 'preferred') must be set to 'local' or 'latest'.
-    // (This must set before init, and should not be changed later)
     this.origin = 'latest';
-
-    // The file path defines the root folder that files are stored under.
-    // If used, it should have a trailing slash, for example 'dist/'
-    // (This must set before init, and should not be changed later)
     this.filePath = '';
-
-    // A custom asset map may be provided by a separate asset management system.
-    // (For example this may be provided by the Rails asset pipeline.)
-    // This should be in the form of key-value replacement filenames like:
-    // {
-    //   'original1.json': 'replacement1.json',
-    //   'original2.json': 'replacement2.json',
-    //   …
-    // }
-    // (This must set before init, and should not be changed later)
     this.fileReplacements = {};
 
     this._loaded = {};
     this._inflight = {};
-
-    // Mock data for testing, prevents the data from being fetched.
-    // Not sure how I feel about this :-/
-    /* c8 ignore start */
-    const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
-    if (isTestEnvironment) {
-      const c = this._loaded;
-      c.address_formats = { addressFormats: [{ format: [['housenumber', 'street'], ['city', 'postcode'] ] }] };
-      c.editor_layer_index = { assetID: 'editor_layer_index' };
-      c.rapid_imagery = { assetID: 'rapid_imagery' };
-      // c.languages - now loaded in LocalizationSystem
-      // c.locales - now loaded in LocalizationSystem
-      // c.territory_languages - now loaded in LocalizationSystem
-      c.phone_formats = { phoneFormats: {} };
-      c.shortcuts = { shortcuts: [] };
-      // c.id_tagging_schema - now loaded in SchemaSystem
-      // c.rapid_schema - now loaded in SchemaSystem
-      c.l10n_core_en = {};
-      c.l10n_tagging_en = {};
-      c.l10n_imagery_en = {};
-      c.l10n_community_en = {};
-      c.wmf_sitematrix = [ ['English', 'English', 'en'], ['German', 'Deutsch', 'de'] ];
-    }
-    /* c8 ignore end */
   }
 
 

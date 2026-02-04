@@ -123,10 +123,10 @@ export class FilterSystem extends AbstractSystem {
     this.requiredDependencies = new Set(['editor']);
     this.optionalDependencies = new Set(['gfx', 'storage', 'urlhash']);
 
-    this._filters = new Map();        // Map(filterID -> Filter)
-    this._hidden = new Set();         // Set(filterID) to hide
-    this._forceVisible = new Set();   // Set(entityIDs) to show
-    this._cache = {};                 // Cache of entity.key to matched filterIDs
+    this._filters = new Map();        // Map<FilterID, Filter>
+    this._hidden = new Set();         // Set<FilterID> to hide
+    this._forceVisible = new Set();   // Set<EntityIDs> to show
+    this._cache = {};                 // Cache of entity.key to matched FilterIDs
 //    this._deferred = new Set();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -249,16 +249,16 @@ export class FilterSystem extends AbstractSystem {
 
   /**
    * hidden
-   * @return Set of hidden filterIDs
+   * @return Set of hidden FilterIDs
    */
-  get hidden(): Set<string> {
+  get hidden(): Set<FilterID> {
     return this._hidden;
   }
 
 
   /**
    * isEnabled
-   * @param filterID - Filter ID to check
+   * @param filterID - FilterID to check
    * @return true/false
    */
   isEnabled(filterID: FilterID): boolean {
@@ -270,7 +270,7 @@ export class FilterSystem extends AbstractSystem {
   /**
    * enable
    * Enables the given filter
-   * @param filterID - Filter ID to enable
+   * @param filterID - FilterID to enable
    */
   enable(filterID: FilterID): void {
     const filter = this._filters.get(filterID);
@@ -302,7 +302,7 @@ export class FilterSystem extends AbstractSystem {
   /**
    * disable
    * Disables the given filter
-   * @param filterID - Filter ID to disable
+   * @param filterID - FilterID to disable
    */
   disable(filterID: FilterID): void {
     const filter = this._filters.get(filterID);

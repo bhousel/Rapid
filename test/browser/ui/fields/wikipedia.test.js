@@ -40,11 +40,12 @@ describe('uiFieldWikipedia', () => {
 
 
   before(() => {
-    // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
+    // Setup mock asset data needed for testing
     const assets = context.systems.assets;
     assets._loaded.languages = { languages: { de: { nativeName: 'Deutsch' }, en: { nativeName: 'English' } } };
     assets._loaded.locales = { locales: { en: { rtl: false }, de: { rtl: false } } };
     assets._loaded.territory_languages = { territoryLanguages: { de: ['de'], us: ['en'] } };
+    assets._loaded.wmf_sitematrix = [ ['English', 'English', 'en'], ['German', 'Deutsch', 'de'] ];
 
     return context.systems.l10n.initAsync();
   });
