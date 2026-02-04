@@ -49,8 +49,8 @@ export class Map3dSystem extends AbstractSystem {
     super(context);
     this.id = 'map3d';
     this.autoStart = false;
-    this.requiredDependencies = new Set(['editor', 'gfx', 'map', 'styles', 'ui', 'urlhash']);
-    this.optionalDependencies = new Set(['l10n']);
+    this.requiredDependencies = new Set(['editor', 'gfx', 'map', 'ui']);
+    this.optionalDependencies = new Set(['l10n', 'styles', 'urlhash']);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -116,7 +116,7 @@ export class Map3dSystem extends AbstractSystem {
 
     return this._startPromise = prerequisites
       .then((): Promise<void> => {
-        const maplibregl = (globalThis as any).maplibregl;
+        const maplibregl = globalThis?.maplibregl;
         if (!maplibregl) throw new Error('maplibre-gl not loaded');
 
         const maplibre = this.maplibre = new maplibregl.Map({
@@ -156,7 +156,7 @@ export class Map3dSystem extends AbstractSystem {
             });
 
             // Setup Sources.. Empty for now, we will fill them in later
-            const EMPTY = { type: 'FeatureCollection', features: [] };
+            const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
             maplibre.addSource('osmareas', { type: 'geojson', data: EMPTY });
             maplibre.addSource('osmroads', { type: 'geojson', data: EMPTY });
             maplibre.addSource('osmbuildings', {type: 'geojson', data: EMPTY });
@@ -529,7 +529,7 @@ export class Map3dSystem extends AbstractSystem {
     const editor = context.systems.editor;
     if (!editor) return;
     const graph = editor.staging.graph;
-    const styles = context.systems.styles!;
+    const styles = context.systems.styles;
     const selectedIDs = context.selectedIDs();
 
     const areaFeatures = [];
@@ -539,9 +539,14 @@ export class Map3dSystem extends AbstractSystem {
       const geom = geoJSON.geometry;
       if (geom?.type !== 'Polygon' && geom?.type !== 'MultiPolygon') continue;
 
-      const style = styles.styleMatch(entity.tags);
-      const fillColor = new Color(style.fill.color).toHex();
-      const strokeColor = new Color(style.stroke.color).toHex();
+      // Use default colors if styles system not available
+      let fillColor = '#cccccc';
+      let strokeColor = '#888888';
+      if (styles) {
+        const style = styles.styleMatch(entity.tags);
+        fillColor = new Color(style.fill.color).toHex();
+        strokeColor = new Color(style.stroke.color).toHex();
+      }
 
       const newFeature: GeoJSON.Feature = {
         type: 'Feature',
@@ -574,7 +579,7 @@ export class Map3dSystem extends AbstractSystem {
     const editor = context.systems.editor;
     if (!editor) return;
     const graph = editor.staging.graph;
-    const styles = context.systems.styles!;
+    const styles = context.systems.styles;
     const selectedIDs = context.selectedIDs();
 
     const roadFeatures = [];
@@ -584,9 +589,14 @@ export class Map3dSystem extends AbstractSystem {
       const geom = geoJSON.geometry;
       if (geom?.type !== 'LineString') continue;
 
-      const style = styles.styleMatch(entity.tags);
-      const casingColor = new Color(style.casing.color).toHex();
-      const strokeColor = new Color(style.stroke.color).toHex();
+      // Use default colors if styles system not available
+      let casingColor = '#444444';
+      let strokeColor = '#ffffff';
+      if (styles) {
+        const style = styles.styleMatch(entity.tags);
+        casingColor = new Color(style.casing.color).toHex();
+        strokeColor = new Color(style.stroke.color).toHex();
+      }
 
       const newFeature: GeoJSON.Feature = {
         type: 'Feature',
