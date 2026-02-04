@@ -25,7 +25,7 @@ export function uiDisclosure(context, key) {
 
   let disclosure = function render(selection) {
     if (_checkPreference) {   // does user's preference override _isExpanded
-      const preferExpanded = storage.getItem(`disclosure.${key}.expanded`) || 'true';
+      const preferExpanded = storage?.getItem(`disclosure.${key}.expanded`) || 'true';
       _isExpanded = (preferExpanded === 'true');
     }
     if (_expandOverride !== undefined) {
@@ -86,7 +86,7 @@ export function uiDisclosure(context, key) {
 
       // Only update the expanded preference if it's not been overrided
       if (_checkPreference && _expandOverride === undefined) {
-        storage.setItem(`disclosure.${key}.expanded`, _isExpanded);
+        storage?.setItem(`disclosure.${key}.expanded`, _isExpanded);
       }
       _expandOverride = undefined;  // reset this flag here, as the user has interacted with it
 

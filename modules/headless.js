@@ -6,6 +6,7 @@ export * from './lib/index.ts';
 export * from './services/index.js';
 export * from './util/index.ts';
 export * from './validations/index.js';
+export * from './mocks.ts';
 
 // These Systems and Services can work without browser and UI.
 export { AbstractSystem } from './core/AbstractSystem.ts';
@@ -41,70 +42,6 @@ export const d3 = {
 import * as SDKMATH from '@rapid-sdk/math';
 import * as SDKUTIL from '@rapid-sdk/util';
 export const sdk = { ...SDKMATH, ...SDKUTIL };
-
-
-// Mocks for testing
-// Headless will not have access to the GraphicsSystem or UiSystem.
-
-/**
- * MockSystem
- * @class
- */
-export class MockSystem {
-  constructor(context) { this.context = context; }
-  initAsync()   { return Promise.resolve(); }
-  startAsync()  { return Promise.resolve(); }
-  resetAsync()  { return Promise.resolve(); }
-  on()          { return this; }
-  off()         { return this; }
-  pause()       { }
-  resume()      { }
-}
-
-/**
- * MockContext
- * @class
- */
-export class MockContext {
-  constructor() {
-    this.sequences = {};
-    this.services = {};
-    this.systems = {};
-    this.viewport = new sdk.Viewport();
-    this._keybinding = new MockSystem(this);
-  }
-  initAsync()   { return Promise.resolve(); }
-  startAsync()  { return Promise.resolve(); }
-  resetAsync()  { return Promise.resolve(); }
-  on()          { return this; }
-  off()         { return this; }
-  keybinding()  { return this._keybinding; }
-  container()   { return d3.select(null); }
-  next(which) {
-    let num = this.sequences[which] || 0;
-    return this.sequences[which] = ++num;
-  }
-}
-
-
-/**
- * MockGfxSystem
- * @class
- */
-export class MockGfxSystem extends MockSystem {
-  constructor(context) {
-    super(context);
-    this.id = 'gfx';
-    this.scene = new MockSystem();
-    this.scene.layers = new Map();
-  }
-  deferredRedraw() {}
-  immediateRedraw() {}
-  setTransformAsync(t) {
-    this.context.viewport.transform = t;
-    return Promise.resolve(t);
-  }
-}
 
 
 // Polyfill idle callback functions (for Node)

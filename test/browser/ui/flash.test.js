@@ -1,16 +1,12 @@
 describe('uiFlash', () => {
 
-  class MockContext {
-    constructor() { }
-    container()   { return container; }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
   let body, container;
 
   beforeEach(() => {
     body = d3.select('body');
     container = body.append('div');
+    context.container = () => container;
     container
       .append('div')
       .attr('class', 'flash-wrap')

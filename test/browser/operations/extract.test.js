@@ -1,30 +1,22 @@
 describe('operationExtract', () => {
 
-  class MockEditSystem {
-    constructor() {}
+  const context = new Rapid.MockContext();
+
+  class MockEditSystem extends Rapid.MockSystem {
+    constructor(context) {
+      super(context);
+      this.id = 'editor';
+    }
     get staging() { return { graph: _graph }; }
   }
 
-  class MockContext {
-    constructor() {
-      this.viewport = new Rapid.sdk.Viewport();
-      this.sequences = {};
-      this.systems = {
-        editor:   new MockEditSystem(),
-        l10n:     new Rapid.LocalizationSystem(this),
-        schema:   new Rapid.SchemaSystem(this),
-        storage:  new Rapid.StorageSystem(this)
-      };
-    }
-    hasHiddenConnections()  { return false; }
-    next(which) {
-      let num = this.sequences[which] || 0;
-      return this.sequences[which] = ++num;
-    }
-  }
-
-
-  const context = new MockContext();
+  context.systems = {
+    editor:   new MockEditSystem(context),
+    l10n:     new Rapid.LocalizationSystem(context),
+    schema:   new Rapid.SchemaSystem(context),
+    storage:  new Rapid.StorageSystem(context)
+  };
+  context.hasHiddenConnections = () => false;
   let _graph;
 
   before(() => {

@@ -1,31 +1,12 @@
 describe('uiSectionRawTagEditor', () => {
 
-  class MockStorageSystem {
-    constructor() { }
-    getItem()     { return null; }
-  }
-
-  class MockContext {
-    constructor()   {
-      this.viewport = new Rapid.sdk.Viewport();
-      this.sequences = {};
-      this.services = {};
-      this.systems = {
-        l10n:     new Rapid.LocalizationSystem(this),
-        storage:  new MockStorageSystem()
-      };
-    }
-    next(which) {
-      let num = this.sequences[which] || 0;
-      return this.sequences[which] = ++num;
-    }
-    cleanTagKey(val)    { return val; }
-    cleanTagValue(val)  { return val; }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
   const entity = new Rapid.OsmNode(context, { id: 'n-1' });
   let rawTagEditor, wrap;
+
+  context.systems = {
+    l10n:  new Rapid.LocalizationSystem(context)
+  };
 
   before(() => {
     return context.systems.l10n.initAsync();

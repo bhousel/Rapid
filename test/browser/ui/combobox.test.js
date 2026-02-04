@@ -1,16 +1,12 @@
 describe('uiCombobox', () => {
 
-  class MockContext {
-    constructor() { }
-    container()   { return container; }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
   let body, container, content, input, combobox;
 
   beforeEach(() => {
     body = d3.select('body');
     container = body.append('div').attr('class', 'container');
+    context.container = () => container;
     content = container.append('div');
     input = content.append('input');
     combobox = Rapid.uiCombobox(context);

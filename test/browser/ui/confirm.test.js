@@ -1,12 +1,6 @@
 describe('uiConfirm', () => {
 
-  class MockContext {
-    constructor()   {
-      this.systems = {};
-    }
-  }
-
-  const context = new MockContext();
+  const context = new Rapid.MockContext();
   let elem;
 
   function delay(msec) {

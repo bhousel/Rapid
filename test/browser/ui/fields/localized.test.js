@@ -1,37 +1,25 @@
 describe('uiFieldLocalized', () => {
 
-  class MockEditSystem {
+  const context = new Rapid.MockContext();
+  let selection, field, uifield;
+
+  class MockEditSystem extends Rapid.MockSystem {
     constructor(context) {
-      this.context = context;
+      super(context);
+      this.id = 'editor';
     }
     get staging() {
       return { graph: new Rapid.Graph(this.context) };
     }
   }
 
-  class MockContext {
-    constructor()   {
-      this.viewport = new Rapid.sdk.Viewport();
-      this.sequences = {};
-      this.services = {};
-      this.systems = {
-        assets:  new Rapid.AssetSystem(this),
-        editor:  new MockEditSystem(this),
-        l10n:    new Rapid.LocalizationSystem(this),
-        schema:  new Rapid.SchemaSystem(this)
-      };
-    }
-    cleanTagKey(val)   { return val; }
-    cleanTagValue(val) { return val; }
-    container()        { return selection; }
-    next(which) {
-      let num = this.sequences[which] || 0;
-      return this.sequences[which] = ++num;
-    }
-  }
-
-  const context = new MockContext();
-  let selection, field, uifield;
+  context.systems = {
+    assets:  new Rapid.AssetSystem(context),
+    editor:  new MockEditSystem(context),
+    l10n:    new Rapid.LocalizationSystem(context),
+    schema:  new Rapid.SchemaSystem(context)
+  };
+  context.container = () => selection;
 
   before(() => {
     // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
