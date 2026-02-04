@@ -68,12 +68,12 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
 
     const parentContainer = this.scene.groups.get('debug-under')!;
-    const msData = spatial.getVisibleData('msBuildings').filter((d: any) => _isBuilding(d.data));
+    const msData = spatial.getVisibleData('msBuildings').filter(hit => _isBuilding(hit.contents as OsmEntity));
 
     for (const hit of msData) {
       if (!spatial.hasTileAtBox('osm', hit)) continue;  // is osm data loaded here?
 
-      const data = hit.data as OsmEntity;
+      const data = hit.contents as OsmEntity;
       // if (data.type !== 'way') continue;  // consider ways only (not the nodes at the corners)
 
       const dataID = data.id;
@@ -105,10 +105,10 @@ export class PixiLayerDebug extends AbstractPixiLayer {
           const style = Object.assign({}, DEFAULTSTYLE);
           const box = { minX: poi![0], minY: poi![1], maxX: poi![0], maxY: poi![1] };
           // does this test point hit an OSM building?
-          const didHitBuilding = spatial.getDataAtBox('osm', box).some((result: any) => _isBuilding(result.data));
+          const didHitBuilding = spatial.getDataAtBox('osm', box).some(hit => _isBuilding(hit.contents as OsmEntity));
 
           if (didHitBuilding) {
-            // console.log(`${dataID} id hit osm building ${didHitBuilding.data.id}`);
+            // console.log(`${dataID} id hit osm building ${didHitBuilding.contents.id}`);
             style.fill.color = 0xff0000;  // red
           } else {
             style.fill.color = 0x00ff00;  // green

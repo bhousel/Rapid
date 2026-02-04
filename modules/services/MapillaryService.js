@@ -227,12 +227,12 @@ export class MapillaryService extends AbstractSystem {
     const spatial = this.context.systems.spatial;
 
     if (datasetID === 'images') {
-      return spatial.getVisibleData('mapillary-images').map(d => d.data);
+      return spatial.getVisibleData('mapillary-images').map(hit => hit.contents);
 
-    } else {  // both signs and detections are now stored in the `detections` cache
+    } else {  // both signs and detections are currently stored in the `detections` cache
       const type = (datasetID === 'signs') ? 'traffic_sign' : 'point';
       return spatial.getVisibleData('mapillary-detections')
-        .map(d => d.data)
+        .map(box => box.data)
         .filter(d => d.props.object_type === type);
     }
   }
@@ -245,7 +245,7 @@ export class MapillaryService extends AbstractSystem {
    */
   getSequences() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('mapillary-sequences').map(d => d.data);
+    return spatial.getVisibleData('mapillary-sequences').map(hit => hit.contents);
   }
 
 

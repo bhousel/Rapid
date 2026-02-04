@@ -108,7 +108,7 @@ export class OsmoseService extends AbstractSystem {
    */
   getData() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('osmose').map(d => d.data);
+    return spatial.getVisibleData('osmose').map(hit => hit.contents);
   }
 
 

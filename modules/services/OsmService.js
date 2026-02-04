@@ -1545,7 +1545,7 @@ export class OsmService extends AbstractSystem {
   // get all cached notes covering the viewport
   getNotes() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('osm-notes').map(d => d.data);
+    return spatial.getVisibleData('osm-notes').map(hit => hit.contents);
   }
 
 

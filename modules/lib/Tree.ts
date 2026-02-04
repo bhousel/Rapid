@@ -18,7 +18,7 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
 export class Tree {
   private _currentKey: string;
   private _currentSnapshot: Graph;
-  private _cacheID: SpatialCacheID;
+  private _cacheID: DatasetID;
 
 //  private _entityRBush: RBush;
 //  private _entityBoxes: Map<string, any>;
@@ -31,7 +31,7 @@ export class Tree {
    * @param graph - The "current" Graph of entities that this tree is tracking
    * @param cacheID - Identifier for the spatial cache
    */
-  constructor(graph: Graph, cacheID: SpatialCacheID) {
+  constructor(graph: Graph, cacheID: DatasetID) {
     this._currentKey = graph.key;
     this._currentSnapshot = graph.snapshot();
     this._cacheID = cacheID;
@@ -255,7 +255,7 @@ export class Tree {
 
     const context = graph.context;
     const spatial = context.systems.spatial!;
-    return spatial.getVisibleData(this._cacheID).map((box: any) => graph.entity(box.dataID));
+    return spatial.getVisibleData(this._cacheID).map(hit => graph.entity(hit.boxID));
 //    return this._entityRBush.search(extent.bbox()).map(ebox => graph.entity(ebox.id));
   }
 

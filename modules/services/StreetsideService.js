@@ -180,9 +180,9 @@ export class StreetsideService extends AbstractSystem {
     }
 
     this._cache = {
-      inflight:            new Map(),  // Map<tileID, {Promise, AbortController}>
-      unattachedBubbles:   new Set(),  // Set<bubbleID>
-      bubbleHasSequences:  new Map(),  // Map<bubbleID, Set<sequenceID>>
+      inflight:            new Map(),  // Map<TileID, {Promise, AbortController}>
+      unattachedBubbles:   new Set(),  // Set<BubbleID>
+      bubbleHasSequences:  new Map(),  // Map<BubbleID, Set<SequenceID>>
       metadataPromise:     null,
       lastv:               null
     };
@@ -202,7 +202,7 @@ export class StreetsideService extends AbstractSystem {
    */
   getImages() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('streetside-images').map(d => d.data);
+    return spatial.getVisibleData('streetside-images').map(hit => hit.contents);
   }
 
 
@@ -213,7 +213,7 @@ export class StreetsideService extends AbstractSystem {
    */
   getSequences() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('streetside-sequences').map(d => d.data);
+    return spatial.getVisibleData('streetside-sequences').map(hit => hit.contents);
   }
 
 
@@ -660,7 +660,7 @@ export class StreetsideService extends AbstractSystem {
     let minDist = Infinity;
     const hits = spatial.getDataAtBox('streetside-images', extent.bbox());
     for (const hit of hits) {
-      const bubble = hit.data;
+      const bubble = hit.contents;
       if (bubble.id === selected.id) continue;
       if (!geomPointInPolygon(bubble.loc, poly)) continue;
 

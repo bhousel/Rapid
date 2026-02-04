@@ -294,7 +294,6 @@ behaviors.available.set('drag', DragBehavior);
 | `scriptCode` | `ScriptCode` |
 | `sequenceID` | `SequenceID` |
 | `serviceID` | `ServiceID` |
-| `spatialCacheID`, `cacheID` | `SpatialCacheID` |
 | `systemID` | `SystemID` |
 | `tileID` | `TileID` |
 | `validatorID` | `ValidatorID` |
@@ -329,9 +328,9 @@ import { geomRotatePoints, geomViewportNudge, vecAdd } from '@rapid-sdk/math';
 import { utilArrayGroupBy, utilArrayUniq } from '@rapid-sdk/util';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 
+import type { Action } from '../actions/types.ts';
 import type { Graph } from '../core/Graph.ts';
 import type { OsmNode, OsmWay } from '../core/index.ts';
-import type { Action } from './types.ts';
 ```
 
 ### Type Declarations

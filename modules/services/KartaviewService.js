@@ -190,7 +190,7 @@ export class KartaviewService extends AbstractSystem {
    */
   getImages() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('kartaview-images').map(d => d.data);
+    return spatial.getVisibleData('kartaview-images').map(hit => hit.contents);
   }
 
 
@@ -201,7 +201,7 @@ export class KartaviewService extends AbstractSystem {
    */
   getSequences() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('kartaview-sequences').map(d => d.data);
+    return spatial.getVisibleData('kartaview-sequences').map(hit => hit.contents);
   }
 
 

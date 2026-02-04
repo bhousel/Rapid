@@ -137,7 +137,7 @@ export class MapRouletteService extends AbstractSystem {
     const spatial = this.context.systems.spatial;
 
     return spatial.getVisibleData('maproulette')
-      .map(d => d.data)
+      .map(hit => hit.contents)
       .filter(task => {
         if (this._challengeIDs.size) {
           return this._challengeIDs.has(task.props.parentId);  // ignore isVisible if it's in the list

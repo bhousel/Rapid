@@ -90,7 +90,7 @@ export class GeoScribbleService extends AbstractSystem {
    */
   getData() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('geoscribble').map(d => d.data);
+    return spatial.getVisibleData('geoscribble').map(hit => hit.contents);
   }
 
 

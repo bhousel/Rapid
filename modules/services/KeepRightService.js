@@ -130,7 +130,7 @@ export class KeepRightService extends AbstractSystem {
    */
   getData() {
     const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('keepright').map(d => d.data);
+    return spatial.getVisibleData('keepright').map(hit => hit.contents);
   }
 
 
