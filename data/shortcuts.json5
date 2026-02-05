@@ -1,5 +1,9 @@
 {
+  // Keyboard shortcuts and gestures for Rapid
+  // Organized by tab (browsing, editing, commands, operations, tools)
+  // Each shortcut has modifiers (⌘ ⇧ ⌥ ⌃), key combos, and localized text
   "shortcuts": [
+    // Browsing tab - navigation and selection shortcuts
     {
       "tab": "browsing",
       "text": "shortcuts.browsing",

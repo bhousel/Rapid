@@ -1096,7 +1096,7 @@ export class SchemaSystem extends AbstractSystem {
 
     // 'rapid_schema' = customizations to merge in after the id-tagging-schema
     assets.registerAsset('rapid_schema', {
-      preferred: 'data/rapid_schema.min.json'
+      preferred: 'data/rapid_schema.min.json5'
     });
   }
 

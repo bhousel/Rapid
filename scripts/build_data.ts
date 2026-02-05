@@ -11,13 +11,13 @@ const localeCompare = new Intl.Collator('en').compare;
 const categoriesFile = './node_modules/@openstreetmap/id-tagging-schema/dist/preset_categories.min.json';
 const fieldsFile = './node_modules/@openstreetmap/id-tagging-schema/dist/fields.min.json';
 const presetsFile = './node_modules/@openstreetmap/id-tagging-schema/dist/presets.min.json';
-const qaDataFile = './data/qa_data.json';
+const qaDataFile = './data/qa_data.json5';
 const territoriesFile = './node_modules/cldr-core/supplemental/territoryInfo.json';
 
 const categoriesJSON = await Bun.file(categoriesFile).json();
 const fieldsJSON = await Bun.file(fieldsFile).json();
 const presetsJSON = await Bun.file(presetsFile).json();
-const qaDataJSON = await Bun.file(qaDataFile).json();
+const qaDataJSON = Bun.JSON5.parse(await Bun.file(qaDataFile).text()) as any;
 const territoriesJSON = await Bun.file(territoriesFile).json();
 
 
@@ -51,7 +51,7 @@ async function buildData() {
   await $`rm -rf ./data/territory_languages.json`;
   await $`rm -rf ./data/l10n/*.en.json`;
   await $`rm -rf ./data/modules`;
-  await $`rm -rf ./dist/data/**/*.json`;
+  await $`rm -rf ./dist/data/**/*.json{,c,5}`;
   await $`rm -rf ./dist/data/modules`;
   await $`rm -rf ./svg/fontawesome/*.svg`;
 
@@ -94,7 +94,7 @@ async function buildData() {
   await writeEnJson();
 
   // copy `./data/*` files to `./dist/data/*`
-  const glob = new Glob('./data/**/*.json');
+  const glob = new Glob('./data/**/*.json{,c,5}');
   for (const src of glob.scanSync()) {
     const dest = src.replace(/\\/g, '/').replace('data/', 'dist/data/');
     await $`cp -f ${src} ${dest}`;
@@ -203,7 +203,7 @@ async function writeEnJson(): Promise<void> {
   const imagery = Bun.YAML.parse(await Bun.file('./node_modules/editor-layer-index/i18n/en.yaml').text()) as any;
 
   // Gather strings for Rapid imagery not included in the imagery index
-  const rapidImagery = (await Bun.file('./data/rapid_imagery.json').json()).imagery;
+  const rapidImagery = (Bun.JSON5.parse(await Bun.file('./data/rapid_imagery.json5').text()) as any).imagery;
 
   for (const [id, props] of Object.entries(rapidImagery) as [string, any][]) {
     if (!props) continue;
@@ -224,7 +224,7 @@ async function writeEnJson(): Promise<void> {
   const tagging = await Bun.file(taggingFile).json();
 
   // Gather strings for Rapid schema not included in the tagging index
-  const rapidSchema = await Bun.file('./data/rapid_schema.json').json();
+  const rapidSchema = Bun.JSON5.parse(await Bun.file('./data/rapid_schema.json5').text()) as any;
 
   // categories, presets
   for (const group of ['categories', 'presets']) {

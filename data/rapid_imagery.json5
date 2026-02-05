@@ -1,7 +1,11 @@
 {
   "assetID": "rapid_imagery",
 
+  // Imagery source definitions for Rapid
+  // Includes satellite imagery and overlay layers
   "imagery": {
+    // Mapbox Satellite - global high-resolution satellite and aerial imagery
+    // template is encrypted for security (contains API key)
     "Mapbox": {
       "id": "Mapbox",
       "name": "Mapbox Satellite",
@@ -19,6 +23,8 @@
       "template": "7586487389962e3f7c24b076dcc8270e6e23a5cb81e890c3fbe9928c5093fa862d808c64bfa45e1ca5ea01e6bdb5d851d975b7887f2343067753facf2bd16b88737f2c48432eb6f3afa376222da7c5f3a8b5e3179267e08766b0f26f2922c9a038f2ae5dafed78160634357f777719bc7d5dd2e00a612c19f43c53b79b1e3605931b6ac51a68ac81e7c4b95b9952f8079faad2b4111c3b347c731c7e3498b3ea12ef5035d990a749c209d7fcfd1aed68a9aaaf4c06fd8e3bc011dfe49a7f12e4049e",
       "encrypted": true
     },
+    // Locator overlay - shows major features for orientation (roads, boundaries)
+    // Displayed on top of satellite imagery
     "mapbox_locator_overlay": {
       "id": "mapbox_locator_overlay",
       "name": "Locator Overlay",
@@ -35,6 +41,8 @@
       "template": "7586487389962e3f7c24b076dcc8270e6e23a5cb81e890c3fbe9928c5093fa862d808c64bfa45e1ca5ea01e6bdb5c311917ab7887f234306770cf1c729d573dc60632c48432eb6f3afa376222da7c5f3a8b5e3179267e08766b0f26f2922c9a038f2ae5dafed78160634357f777719bc7d5dd2e00a612c19f43c53b79b1e3605931b6ac51a68ac81e7c4b95b9952f8079faad2b4111c3b347c731c7e3498b3ea12ef5035d990a749c209d7fcfd1aed68a9aaaf4c06fd8e3bc011dfe49a7f12e4049e",
       "encrypted": true
     },
+    // Esri Wayback - time machine for historical satellite imagery
+    // Provides access to archived snapshots over time
     "EsriWayback": {
       "id": "EsriWayback",
       "name": "Esri Wayback",

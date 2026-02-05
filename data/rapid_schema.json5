@@ -1,9 +1,11 @@
 {
   "assetID": "rapid_schema",
 
+  // Field definitions for Rapid presets
+  // null values indicate deprecated fields (removed from use)
   "fields": {
-    "crossing/markings*": null,
-    "crossing/signals*": null,
+    "crossing/markings*": null,  // Deprecated
+    "crossing/signals*": null,    // Deprecated
 
     "leaf_type_singular": {
       "key": "leaf_type",
@@ -25,7 +27,7 @@
       "key": "crossing",
       "type": "combo",
       "label": "Crossing Type",
-      "$note": "This displays the legacy `crossing=*` tag"
+      // This displays the legacy `crossing=*` tag (replaced $note hack)
     },
     "crossing/markings": {
       "key": "crossing:markings",
@@ -40,12 +42,16 @@
 
   },
 
+  // Preset definitions for Rapid
+  // null values indicate deprecated presets (removed from use)
   "presets": {
-    "natural/tree/*": null,
-    "highway/crossing/*": null,
-    "highway/cycleway/crossing*": null,
-    "highway/footway/crossing*": null,
+    "natural/tree/*": null,            // Deprecated - replaced by specific leaf type presets
+    "highway/crossing/*": null,        // Deprecated - replaced by specific crossing types
+    "highway/cycleway/crossing*": null,  // Deprecated
+    "highway/footway/crossing*": null,   // Deprecated
 
+    // Curb/Kerb presets with tactile paving
+    // matchScore: 0.55 gives these higher priority when matching existing features
     "barrier/kerb/lowered/tactile": {
       "name": "Lowered Curb, Tactile Paving",
       "icon": "temaki-kerb-lowered",

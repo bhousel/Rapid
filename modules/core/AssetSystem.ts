@@ -124,8 +124,8 @@ export class AssetSystem extends AbstractSystem {
       'languages':            { preferred: 'data/languages.min.json' },
       'locales':              { preferred: 'data/locales.min.json' },
       'phone_formats':        { preferred: 'data/phone_formats.min.json' },
-      'qa_data':              { preferred: 'data/qa_data.min.json' },
-      'shortcuts':            { preferred: 'data/shortcuts.min.json' },
+      'qa_data':              { preferred: 'data/qa_data.min.json5' },
+      'shortcuts':            { preferred: 'data/shortcuts.min.json5' },
       'territory_languages':  { preferred: 'data/territory_languages.min.json' },
 
       'oci_defaults': {

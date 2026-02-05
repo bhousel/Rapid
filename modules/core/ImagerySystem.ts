@@ -145,7 +145,7 @@ export class ImagerySystem extends AbstractSystem {
         // Without AssetSystem, we'll just have the builtin 'none' and 'custom' sources.
         if (assets) {
           assets.registerAsset('editor_layer_index', { preferred: 'data/editor_layer_index.min.json' });
-          assets.registerAsset('rapid_imagery', { preferred: 'data/rapid_imagery.min.json' });
+          assets.registerAsset('rapid_imagery', { preferred: 'data/rapid_imagery.min.json5' });
           return this.loadImageryAssetsAsync();
         } else {
           this.resetAll();  // Set up builtin sources
