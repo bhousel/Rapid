@@ -34,7 +34,7 @@ These are pulled automatically from the Transifex translation platform.
 ## Supported File Formats
 
 The following formats are supported for the data files.
-(Rapid treats them all equally).
+Rapid treats them all equally, but note that classic JSON will load slightly quicker.
 
 - **JSON** (`.json`) - Classic JSON format - [json.org](https://www.json.org/)
 - **JSONC** (`.jsonc`) - JSON with comments - Used by VS Code for config files like `tsconfig.json`
