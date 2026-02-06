@@ -134,6 +134,9 @@ export class Category {
   - ❌ `@param {string} name` → ✅ `@param name` with TypeScript parameter type
   - ❌ `@return {number}` → ✅ `@return` with TypeScript return type
   - ❌ `@type {Array<string>}` → ✅ TypeScript type annotation
+- **Use `@throws` for methods that throw exceptions** - document what conditions cause throws
+  - Format: `@throws Error description of when/why it throws`
+  - No curly braces around the type (consistent with other JSDoc in TypeScript)
 - JSDoc in `.ts` files should describe **what** and **why**, not types
 - Example:
   ```typescript
@@ -143,6 +146,17 @@ export class Category {
    */
   get name(): string {
     return this._currStrings.name;
+  }
+
+  /**
+   * @constructor
+   * @param props - Properties defining the matcher
+   * @throws Error if `key` property is missing
+   */
+  constructor(props: MatcherProps) {
+    if (!props.key) {
+      throw new Error('Matcher: key is required');
+    }
   }
   ```
 

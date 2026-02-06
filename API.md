@@ -128,8 +128,8 @@ means to apply the default assets in that position.
   _Example:_ `imagery=default,my_imagery`
 * __`schema`__ - A comma-separated list of assetIDs to load schema (presets) from.<br/>
   _Example:_ `schema=default,my_presets`
-<!-- * __`style`__ - (soon) A comma-separated list of assetIDs to load styles from.<br/> -->
-<!--  _Example:_ `style=default,my_styles` -->
+* __`style`__ - A comma-separated list of assetIDs to load styles from.<br/>
+  _Example:_ `style=default,my_styles`
 
 #### Advanced
 * __`download_osc=true`__ - Set to `true` to enable the "download" button.
@@ -204,4 +204,61 @@ Default schema assets are loaded at init time, but customizations and overrides 
 made to the schema by calling `SchemaSystem.merge(…)` with new data to merge in.
 
 TODO: document merging sceneraios.
+
+
+### Map Styling
+
+Rapid's map styling is managed by the `StyleSystem`.
+Default style assets are loaded at init time, but customizations and overrides can be
+made to the styles by calling `StyleSystem.merge(…)` with new data to merge in.
+
+Each style asset should have the following structure:
+```javascript
+{
+  assetID: 'my_styles',        // Required: unique identifier for this asset
+  assetVersion: '1.0.0',       // Optional: version string
+
+  // Style declarations define how features look (fill, casing, stroke properties)
+  declarations: {
+    "my_style_id": {
+      fill:   { color: 0xff0000, alpha: 0.3 },          // fill properties
+      casing: { width: 10, color: 0x444444 },           // casing line properties
+      stroke: { width: 8, color: 0xffffff, dash: [8, 8] }  // stroke line properties
+    },
+    "forest": {
+      fill: { pattern: "forest" }   // pattern-only style
+    }
+  },
+
+  // Style selectors map OSM tags to styles using styleIDs array
+  // ALL matching selectors are applied, merged in specificity order (most specific wins)
+  // Multiple styleIDs within a selector are merged in order (later overrides earlier)
+  selectors: {
+    "highway-motorway": {
+      "styleIDs": ["my_style_id"],  // array of styleIDs to apply
+      "match": { "tags": [{ "key": "highway", "value": "motorway" }] }
+    },
+    "landuse-forest": {
+      "styleIDs": ["green", "forest"],  // color + pattern composed together
+      "match": { "tags": [{ "key": "landuse", "value": "forest" }] }
+    }
+  }
+}
+```
+
+Available properties for style declarations:
+* `width` - line width in pixels
+* `color` - color as hex number, e.g. `0xcf2081`
+* `alpha` - opacity: 0 = transparent, 1 = opaque
+* `cap` - line cap: 'butt', 'round', or 'square'
+* `join` - line join: 'bevel', 'miter', or 'round'
+* `dash` - dash pattern array, e.g. `[8, 4]` for dashed line
+* `pattern` - (fill only) pattern ID for fill patterns
+
+When merging:
+* New items replace existing items with the same ID
+* Setting a value to `null` deletes that item
+* Wildcards `*` and `?` are allowed when deleting
+* The `DEFAULTS` and `LIFECYCLE` declarations cannot be deleted
+
 

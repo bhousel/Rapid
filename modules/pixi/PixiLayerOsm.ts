@@ -8,7 +8,7 @@ import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 import type { OsmEntity, OsmNode, OsmRelation, OsmRelationMember, Tags } from '../data/types.ts';
-import type { Style } from '../core/StyleSystem.ts';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 
@@ -368,7 +368,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         if (feature.dirty) {
           const preset = schema.match(entity, graph);
 
-          const style = styles.styleMatch(entity.tags) as Style;
+          const style = styles.styleMatch(entity.tags) as MatchedStyle;
           style.labelTint = style.fill.color ?? style.stroke.color ?? 0xeeeeee;
           feature.style = style;
 
@@ -526,7 +526,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
               }
             }
 
-            const style = styles.styleMatch(tags) as Style;
+            const style = styles.styleMatch(tags) as MatchedStyle;
             // Todo: handle alternating/two-way case too
             if (geom === 'line') {
               style.lineMarkerName = entity.isOneWay() ? 'oneway' : '';

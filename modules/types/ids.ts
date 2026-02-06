@@ -64,14 +64,18 @@ export type PhotoLayerID = string;
 export type PhotoType = string;
 /** Preset ID - unique identifier for presets (e.g. 'highway/residential') */
 export type PresetID = string;
-/** Service ID (e.g. 'osm', 'mapillary', 'streetside') */
-export type ServiceID = string;
-/** Sequence ID - identifier for sequence counters (e.g. 'node', 'way', 'relation') */
-export type SequenceID = string;
 /** Script Code - ISO 15924 script code (e.g. 'Latn', 'Cyrl', 'Hans') */
 export type ScriptCode = string;
+/** Sequence ID - identifier for sequence counters (e.g. 'node', 'way', 'relation') */
+export type SequenceID = string;
+/** Service ID (e.g. 'osm', 'mapillary', 'streetside') */
+export type ServiceID = string;
 /** String ID - identifier for localized strings (e.g. 'toolbar.undo', 'modes.add_area') */
 export type StringID = string;
+/** Style ID - unique identifier for styles */
+export type StyleID = string;
+/** Style Selector ID - unique identifier for style selectors */
+export type StyleSelectorID = string;
 /** System ID (e.g. 'editor', 'gfx', 'map') */
 export type SystemID = string;
 /** Tile ID - unique identifier for map tiles */
@@ -116,6 +120,8 @@ declare global {
   type SequenceID = string;
   type ScriptCode = string;
   type StringID = string;
+  type StyleID = string;
+  type StyleSelectorID = string;
   type SystemID = string;
   type TileID = string;
   type TextureID = string;

@@ -1,57 +1,41 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { osmPavedTags } from '../lib/tags.ts';
+import { Style } from '../lib/Style.ts';
+import { StyleSelector } from '../lib/StyleSelector.ts';
+import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
-
-
-/** Line cap style */
-type LineCap = 'butt' | 'round' | 'square';
-/** Line join style */
-type LineJoin = 'bevel' | 'miter' | 'round';
+import type { LineCap, LineJoin, StyleProps } from '../lib/Style.ts';
+import type { StyleMatchConditions } from '../lib/StyleSelector.ts';
+import type { OneOrMore } from '../util/iterable.ts';
 
 
 /**
- * Properties for fill styling.
+ * Style selector input - the format used in style data files.
+ * The `id` is provided separately as the object key.
  */
-interface FillProps {
-  /** Line width in pixels (for fills, this is the width of the outline) */
-  width?: number;
-  /** The color as a hex number */
-  color?: number;
-  /** 0 = transparent/invisible, 1 = filled */
-  alpha?: number;
-  /** Pattern ID for fill patterns */
-  pattern?: string;
+interface StyleSelectorInput {
+  /** IDs of Styles to apply when this selector matches (merged in order) */
+  styleIDs: StyleID[];
+  /** Conditions that must be met for this selector to match */
+  match: StyleMatchConditions;
 }
 
 
 /**
- * Properties for casing/stroke styling.
+ * Style asset data to merge into the system.
+ * Contains styles and selectors.
  */
-interface LineProps {
-  /** Line width in pixels */
-  width?: number;
-  /** The color as a hex number */
-  color?: number;
-  /** 0 = transparent/invisible, 1 = filled */
-  alpha?: number;
-  /** Line cap style */
-  cap?: LineCap;
-  /** Line join style */
-  join?: LineJoin;
-  /** Array of pixels on/off - e.g. `[20, 5, 5, 5]` */
-  dash?: number[];
-}
-
-
-/**
- * A style declaration containing fill, casing, and stroke properties.
- */
-interface StyleDeclaration {
-  fill?: FillProps;
-  casing?: LineProps;
-  stroke?: LineProps;
+export interface StyleData {
+  /** An asset identifier, e.g. 'rapid_style' (required) */
+  assetID: AssetID;
+  /** A string version specifier, e.g. '1.0.0' */
+  assetVersion?: string;
+  /** Object mapping styleID to style (or null to delete) */
+  styles?: Record<StyleID, Partial<StyleProps> | null>;
+  /** Object mapping selectorID to style selector (or null to delete) */
+  selectors?: Record<StyleSelectorID, StyleSelectorInput | null>;
 }
 
 
@@ -82,20 +66,13 @@ interface ResolvedLineProps {
 /**
  * The resolved style object returned by styleMatch.
  */
-export interface Style {
+export interface MatchedStyle {
   fill: ResolvedFillProps;
   casing: ResolvedLineProps;
   stroke: ResolvedLineProps;
   /** Extra properties are allowed */
   [key: string]: unknown;
 }
-
-
-/** Style selector mapping OSM values to style IDs */
-type StyleSelector = Record<string, string>;
-
-/** Pattern selector mapping OSM values to pattern IDs */
-type PatternSelector = Record<string, string>;
 
 
 const roadVals = new Set([
@@ -116,6 +93,12 @@ const lifecycleRegex = new RegExp('^(' + Array.from(lifecycleVals).join('|') + '
 /**
  * `StyleSystem` maintains the the rules about how map data should look.
  *
+ * Properties available:
+ *   `styles`           Map of styleID → Style
+ *   `selectors`        Map of selectorID → StyleSelector
+ *   `defaultAssetIDs`  Default assetIDs that are loaded if no custom assets are requested
+ *   `loadedAssetIDs`   Map<AssetID, string> - assetIDs that have been loaded (maps to version string)
+ *
  * Events available:
  *   `stylechange`  Fires on any change in style
  */
@@ -127,14 +110,19 @@ export class StyleSystem extends AbstractSystem {
   /** Tritanopia color blindness simulation matrix */
   tritanopiaMatrix: number[];
 
-  /** Map of styleID to StyleDeclaration */
-  STYLE_DECLARATIONS: Record<string, StyleDeclaration>;
-  /** Map of OSM key to StyleSelector */
-  STYLE_SELECTORS: Record<string, StyleSelector>;
-  /** List of supported pattern IDs */
-  PATTERN_DECLARATIONS: string[];
-  /** Map of OSM key to PatternSelector */
-  PATTERN_SELECTORS: Record<string, PatternSelector>;
+  /** Map of styleID to Style */
+  styles: Map<StyleID, Style>;
+  /** Map of selectorID to StyleSelector */
+  selectors: Map<StyleSelectorID, StyleSelector>;
+  /** List of supported pattern IDs (hardcoded, must match patterns loaded by PixiTextures) */
+  patternIDs: Set<string>;
+
+  /** Default style file assetIDs */
+  private _defaultAssetIDs: Set<AssetID>;
+  /** Currently loaded style file assetIDs, maps to the version string that was loaded, if known */
+  private _loadedAssetIDs: Map<AssetID, string>;
+  /** Requested style file assetIDs - optional, these can be different than the default files */
+  private _requestedAssetIDs: Set<AssetID> | null;
 
 
   /**
@@ -144,13 +132,28 @@ export class StyleSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'styles';
-    this.context = context;
-    this.optionalDependencies = new Set(['gfx']);
+    this.optionalDependencies = new Set(['assets', 'gfx', 'urlhash']);
+
+    this.styles = new Map();
+    this.selectors = new Map();
+
+    this._defaultAssetIDs = new Set(['rapid_style']);
+    this._loadedAssetIDs = new Map();
+    this._requestedAssetIDs = null;
+
+    // Pattern IDs - hardcoded list that must match the patterns loaded by PixiTextures.
+    // (Maybe we will make this dynamic someday, but for now it stays in code.)
+    this.patternIDs = new Set([
+      'bushes', 'cemetery', 'cemetery_buddhist', 'cemetery_christian', 'cemetery_jewish', 'cemetery_muslim',
+      'construction', 'dots', 'farmland', 'farmyard', 'forest', 'forest_broadleaved', 'forest_leafless',
+      'forest_needleleaved', 'grass', 'landfill', 'lines', 'orchard', 'pond', 'quarry', 'vineyard',
+      'waves', 'wetland', 'wetland_bog', 'wetland_marsh', 'wetland_reedbed', 'wetland_swamp'
+    ]);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.styleMatch = this.styleMatch.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
     this._styleChanged = this._styleChanged.bind(this);
-
 
     // Experiment, see Rapid#1230
     // matrix values from https://github.com/maputnik/editor
@@ -174,499 +177,6 @@ export class StyleSystem extends AbstractSystem {
       0,      0.475,  0.525, 0,  0,
       0,      0,      0,     1,  0
     ];
-
-
-    // A "Style Declaration" contains properties that describe how features should look.
-    // Each style declaration looks like this:
-    //
-    // styleID: {
-    //   fill:   { fill props… },
-    //   casing: { casing props… },
-    //   stroke: { stroke props… }
-    // }
-    //
-    // Available property groups:
-    //   `fill`   - properties used when drawing fill (fill draws at the bottom)
-    //   `casing` - properties used when drawing line (casing draws above fill)
-    //   `stroke` - properties used when drawing line (stroke draws above casing)
-    //
-    // Available properties:
-    //   `width` - line width in pixel (for fills, this is the width of the outline)
-    //   `color` - the color
-    //   `alpha` - 0 = transparent/invisible, 1 = filled
-    //   `cap`   - one of 'butt', 'round', or 'square'  (see https://pixijs.download/dev/docs/PIXI.html#LINE_CAP)
-    //   `join`  - one of 'bevel', 'miter', or 'round', (see https://pixijs.download/dev/docs/PIXI.html#LINE_JOIN)
-    //   `dash`  - array of pixels on/off - e.g. `[20, 5, 5, 5]`
-    //
-    // The fill group also supports:
-    //   `pattern` - supported pattern (see dist/img/pattern/* for these)
-    //
-
-    this.STYLE_DECLARATIONS = {
-      DEFAULTS: {
-        fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3 },
-        casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
-        stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' }
-      },
-
-      LIFECYCLE: {   // e.g. planned, proposed, abandoned, disused, razed
-        casing: { alpha: 0 },  // disable
-        stroke: { dash: [7, 3], cap: 'butt' }
-      },
-
-      red: {
-        fill: { color: 0xe06e5f, alpha: 0.3 }   // rgb(224, 110, 95)
-      },
-      green: {
-        fill: { color: 0x8cd05f, alpha: 0.3 }   // rgb(140, 208, 95)
-      },
-      blue: {
-        fill: { color: 0x77d4de, alpha: 0.3 }   // rgb(119, 211, 222)
-      },
-      yellow: {
-        fill: { color: 0xffff94, alpha: 0.25 }  // rgb(255, 255, 148)
-      },
-      gold: {
-        fill: { color: 0xc4be19, alpha: 0.3 }   // rgb(196, 189, 25)
-      },
-      orange: {
-        fill: { color: 0xd6881a, alpha: 0.3 }   // rgb(214, 136, 26)
-      },
-      pink: {
-        fill: { color: 0xe3a4f5, alpha: 0.3 }   // rgb(228, 164, 245)
-      },
-      teal: {
-        fill: { color: 0x99e1aa, alpha: 0.3 }   // rgb(153, 225, 170)
-      },
-      lightgreen: {
-        fill: { color: 0xbee83f, alpha: 0.3 }   // rgb(191, 232, 63)
-      },
-      tan: {
-        fill: { color: 0xf5dcba, alpha: 0.3 }   // rgb(245, 220, 186)
-      },
-      darkgray: {
-        fill: { color: 0x8c8c8c, alpha: 0.5 }   // rgb(140, 140, 140)
-      },
-      lightgray: {
-        fill: { color: 0xaaaaaa, alpha: 0.3 }   // rgb(170, 170, 170)
-      },
-
-      motorway: {
-        casing: { width: 10, color: 0x70372f },
-        stroke: { width: 8, color: 0xcf2081 }
-      },
-      trunk: {
-        casing: { width: 10, color: 0x70372f },
-        stroke: { width: 8, color: 0xdd2f22 }
-      },
-      primary: {
-        casing: { width: 10, color: 0x70372f },
-        stroke: { width: 8, color: 0xf99806 }
-      },
-      secondary: {
-        casing: { width: 10, color: 0x70372f },
-        stroke: { width: 8, color: 0xf3f312 }
-      },
-      tertiary: {
-        casing: { width: 10, color: 0x70372f },
-        stroke: { width: 8, color: 0xfff9b3 }
-      },
-      unclassified: {
-        casing: { width: 10, color: 0x444444 },
-        stroke: { width: 8, color: 0xddccaa }
-      },
-      residential: {
-        casing: { width: 10, color: 0x444444 },
-        stroke: { width: 8, color: 0xffffff }
-      },
-      living_street: {
-        casing: { width: 7, color: 0xffffff },
-        stroke: { width: 5, color: 0xcccccc }
-      },
-      service: {
-        casing: { width: 7, color: 0x444444 },
-        stroke: { width: 5, color: 0xffffff }
-      },
-      special_service: {
-        casing: { width: 7, color: 0x444444 },
-        stroke: { width: 5, color: 0xddccaa }
-      },
-      track: {
-        casing: { width: 7, color: 0x746f6f },
-        stroke: { width: 5, color: 0xc5b59f }
-      },
-      pedestrian: {
-        casing: { width: 7, color: 0xffffff },
-        stroke: { width: 5, color: 0x998888, dash: [8, 8], cap: 'butt' }
-      },
-      path: {
-        casing: { width: 5, color: 0xddccaa },
-        stroke: { width: 3, color: 0x998888, dash: [6, 6], cap: 'butt' }
-      },
-      footway: {
-        casing: { width: 5, color: 0xffffff },
-        stroke: { width: 3, color: 0x998888, dash: [6, 6], cap: 'butt' }
-      },
-      crossing_marked: {
-        casing: { width: 5, color: 0xddccaa },
-        stroke: { width: 3, color: 0x4c4444, dash: [6, 3], cap: 'butt' }
-      },
-      crossing_unmarked: {
-        casing: { width: 5, color: 0xddccaa },
-        stroke: { width: 3, color: 0x776a6a, dash: [6, 4], cap: 'butt' }
-      },
-      cycleway: {
-        casing: { width: 5, color: 0xffffff },
-        stroke: { width: 3, color: 0x58a9ed, dash: [6, 6], cap: 'butt' }
-      },
-      bridleway: {
-        casing: { width: 5, color: 0xffffff },
-        stroke: { width: 3, color: 0xe06d5f, dash: [6, 6], cap: 'butt' }
-      },
-      corridor: {
-        casing: { width: 5, color: 0xffffff },
-        stroke: { width: 3, color: 0x8cd05f, dash: [2, 8], cap: 'round' }
-      },
-      steps: {
-        casing: { width: 5, color: 0xffffff },
-        stroke: { width: 3, color: 0x81d25c, dash: [3, 3], cap: 'butt' }
-      },
-      river: {
-        fill:   { color: 0x77d4de, alpha: 0.3 },   // rgb(119, 211, 222)
-        casing: { width: 10, color: 0x444444 },
-        stroke: { width: 8, color: 0x77dddd }
-      },
-      stream: {
-        fill:   { color: 0x77d4de, alpha: 0.3 },   // rgb(119, 211, 222)
-        casing: { width: 7, color: 0x444444 },
-        stroke: { width: 5, color: 0x77dddd }
-      },
-      ridge: {
-        stroke: { width: 2, color: 0x8cd05f}  // rgb(140, 208, 95)
-      },
-      runway: {
-        casing: { width: 10, color: 0x000000, cap: 'butt' },
-        stroke: { width: 8, color: 0xffffff, dash: [24, 48], cap: 'butt' }
-      },
-      taxiway: {
-        casing: { width: 7, color: 0x444444 },
-        stroke: { width: 5, color: 0xffff00 }
-      },
-      railway: {
-        casing: { width: 7, color: 0x555555, cap: 'butt' },
-        stroke: { width: 2, color: 0xeeeeee, dash: [12, 12], cap: 'butt' }
-      },
-      ferry: {
-        casing: { alpha: 0 },  // disable
-        stroke: { width: 3, color: 0x58a9ed, dash: [12, 8], cap: 'butt' }
-      },
-      boundary: {
-        casing: { width: 6, color: 0x82b5fe, cap: 'butt' },
-        stroke: { width: 2, color: 0xffffff, dash: [20, 5, 5, 5], cap: 'butt' }
-      },
-      boundary_park: {
-        casing: { width: 6, color: 0x82b5fe, cap: 'butt' },
-        stroke: { width: 2, color: 0xb0e298, dash: [20, 5, 5, 5], cap: 'butt' }
-      },
-      barrier: {
-        casing: { alpha: 0 },  // disable
-        stroke: { width: 3, color: 0xdddddd, dash: [10, 5, 2, 5], cap: 'round' }
-      },
-      barrier_wall: {
-        casing: { alpha: 0 },  // disable
-        stroke: { width: 3, color: 0xdddddd, dash: [10, 5, 2, 5], cap: 'round' }
-      },
-      barrier_hedge: {
-        fill:   { color: 0x8cd05f, alpha: 0.3 },   // rgb(140, 208, 95)
-        casing: { alpha: 0 },  // disable
-        stroke: { width: 3, color: 0x8cd05f, dash: [10, 5, 2, 5], cap: 'round' }
-      },
-      tree_row: {
-        casing: { width: 7, color: 0x444444 },
-        stroke: { width: 5, color: 0x8cd05f }
-      },
-      construction: {
-        casing: { width: 10, color: 0xffffff},
-        stroke: { width: 8, color: 0xfc6c14, dash: [10, 10], cap: 'butt' }
-      },
-      pipeline: {
-        casing: { width: 7, color: 0x444444 },
-        stroke: { width: 5, color: 0xdddddd, dash: [80, 2], cap: 'butt' }
-      },
-      roller_coaster: {
-        casing: { width: 7, color: 0x444444 },
-        stroke: { width: 5, color: 0xdddddd, dash: [10, 1], cap: 'butt' }
-      }
-    };
-
-    //
-    // A "Style Selector" contains OSM key/value tags to match to a style declaration.
-    // Each style selector looks like this:
-    //
-    // osmkey: {
-    //   osmvalue: styleID
-    // }
-    //
-    // Can use the value '*' to match any osmvalue.
-    //
-    // Important: The fewer rules in the selector, the more selective it is.
-    // For example:
-    //   The `amenity` selector has 8 rules in it
-    //   The `building` selector has 1 rule in it
-    //
-    // So a feature with both `amenity=kindergarden` and `building=yes` tags
-    // will be styled with the `building` rule.
-    //
-
-    this.STYLE_SELECTORS = {
-      aeroway: {
-        runway: 'runway',
-        taxiway: 'taxiway'
-      },
-      amenity: {
-        childcare: 'yellow',
-        college: 'yellow',
-        fountain: 'blue',
-        kindergarten: 'yellow',
-        parking: 'darkgray',
-        research_institute: 'yellow',
-        school: 'yellow',
-        university: 'yellow'
-      },
-      building: {
-        '*': 'red'
-      },
-      barrier: {
-        city_wall: 'barrier_wall',
-        hedge: 'barrier_hedge',
-        retaining_wall: 'barrier_wall',
-        wall: 'barrier_wall',
-        '*': 'barrier'
-      },
-      boundary: {
-        protected_area: 'boundary_park',
-        national_park: 'boundary_park',
-        '*': 'boundary'
-      },
-      crossing: {
-        marked: 'crossing_marked',
-        traffic_signals: 'crossing_marked',
-        uncontrolled: 'crossing_marked',
-        zebra: 'crossing_marked',
-        '*': 'crossing_unmarked'
-      },
-      golf: {
-        green: 'lightgreen'
-      },
-      highway: {
-        bridleway: 'bridleway',
-        bus_guideway: 'railway',
-        busway: 'special_service',
-        corridor: 'corridor',
-        construction: 'construction',
-        cycleway: 'cycleway',
-        footway: 'footway',
-        living_street: 'living_street',
-        living_street_link: 'living_street',
-        motorway: 'motorway',
-        motorway_link: 'motorway',
-        path: 'path',
-        pedestrian: 'pedestrian',
-        primary: 'primary',
-        primary_link: 'primary',
-        residential: 'residential',
-        residential_link: 'residential',
-        secondary: 'secondary',
-        secondary_link: 'secondary',
-        service: 'service',
-        service_link: 'service',
-        steps: 'steps',
-        tertiary: 'tertiary',
-        tertiary_link: 'tertiary',
-        track: 'track',
-        trunk: 'trunk',
-        trunk_link: 'trunk',
-        unclassified: 'unclassified',
-        unclassified_link: 'unclassified'
-      },
-      landuse: {
-        cemetery: 'lightgreen',
-        commercial: 'orange',
-        construction: 'gold',
-        farmland: 'lightgreen',
-        farmyard: 'tan',
-        flowerbed: 'green',
-        forest: 'green',
-        grass: 'green',
-        industrial: 'pink',
-        landfill: 'orange',
-        meadow: 'lightgreen',
-        military: 'orange',
-        orchard: 'lightgreen',
-        quarry: 'darkgray',
-        railway: 'darkgray',
-        recreation_ground: 'green',
-        residential: 'gold',
-        retail: 'orange',
-        village_green: 'green',
-        vineyard: 'lightgreen'
-      },
-      leisure: {
-        garden: 'green',
-        golf_course: 'green',
-        nature_reserve: 'green',
-        park: 'green',
-        pitch: 'green',
-        swimming_pool: 'blue',
-        track: 'yellow'
-      },
-      man_made: {
-        adit: 'darkgray',
-        breakwater: 'barrier_wall',
-        groyne: 'barrier_wall',
-        pipeline: 'pipeline'
-      },
-      military: {
-        '*': 'orange'
-      },
-      natural: {
-        bare_rock: 'darkgray',
-        bay: 'blue',
-        beach: 'yellow',
-        cave_entrance: 'darkgray',
-        cliff: 'darkgray',
-        glacier: 'lightgray',
-        ridge: 'ridge',
-        rock: 'darkgray',
-        sand: 'yellow',
-        scree: 'darkgray',
-        scrub: 'yellow',
-        shingle: 'darkgray',
-        stone: 'darkgray',
-        strait: 'blue',
-        tree_row: 'tree_row',
-        water: 'blue',
-        wetland: 'teal',
-        '*': 'green'
-      },
-      power: {
-        plant: 'pink'
-      },
-      railway: {
-        platform: 'footway',
-        '*': 'railway'
-      },
-      roller_coaster: {
-        track: 'roller_coaster'
-      },
-      route: {
-        ferry: 'ferry'
-      },
-      sport: {
-        baseball: 'yellow',
-        basketball: 'darkgray',
-        beachvolleyball: 'yellow',
-        skateboard: 'darkgray',
-        softball: 'yellow'
-      },
-      type: {
-        waterway: 'river'
-      },
-      waterway: {
-        river: 'river',
-        dam: 'DEFAULTS',
-        weir: 'DEFAULTS',
-        '*': 'stream'
-      },
-      service: {
-        alley: 'special_service',
-        driveway: 'special_service',
-        'drive-through': 'special_service',
-        parking_aisle: 'special_service',
-        '*': 'special_service'
-      }
-    };
-
-
-    //
-    // "Pattern Declarations" is just the list of supported `patternIDs`
-    // This needs to match the list of patterns loaded by `PixiTextures.js`
-    //
-    this.PATTERN_DECLARATIONS = [
-      'bushes', 'cemetery', 'cemetery_buddhist', 'cemetery_christian', 'cemetery_jewish', 'cemetery_muslim',
-      'construction', 'dots', 'farmland', 'farmyard', 'forest', 'forest_broadleaved', 'forest_leafless',
-      'forest_needleleaved', 'grass', 'landfill', 'lines', 'orchard', 'pond', 'quarry', 'vineyard',
-      'waves', 'wetland', 'wetland_bog', 'wetland_marsh', 'wetland_reedbed', 'wetland_swamp'
-    ];
-
-    //
-    // "Pattern Selectors" work like style selectors.
-    // They contain OSM key/value tags to match to a `patternID`.
-    //
-    // osmkey: {
-    //   osmvalue: patternID
-    // }
-    //
-    this.PATTERN_SELECTORS = {
-      amenity: {
-        fountain: 'pond',
-        grave_yard: 'cemetery'
-      },
-      golf: {
-        green: 'grass'
-      },
-      landuse: {
-        cemetery: 'cemetery',
-        construction: 'construction',
-        farmland: 'farmland',
-        farmyard: 'farmyard',
-        forest: 'forest',
-        grass: 'grass',
-        grave_yard: 'cemetery',
-        landfill: 'landfill',
-        meadow: 'grass',
-        military: 'construction',
-        orchard: 'orchard',
-        quarry: 'quarry',
-        vineyard: 'vineyard'
-      },
-      leaf_type: {
-        broadleaved: 'forest_broadleaved',
-        leafless: 'forest_leafless',
-        needleleaved: 'forest_needleleaved'
-      },
-      natural: {
-        bay: 'waves',
-        beach: 'dots',
-        grassland: 'grass',
-        sand: 'dots',
-        scrub: 'bushes',
-        strait: 'waves',
-        water: 'waves',
-        wetland: 'wetland',
-        wood: 'forest'
-      },
-      religion: {
-        buddhist: 'cemetery_buddhist',
-        christian: 'cemetery_christian',
-        jewish: 'cemetery_jewish',
-        muslim: 'cemetery_muslim'
-      },
-      surface: {
-        grass: 'grass'
-      },
-      water: {
-        pond: 'pond',
-        reservoir: 'lines'
-      },
-      wetland: {
-        bog: 'wetland_bog',
-        marsh: 'wetland_marsh',
-        reedbed: 'wetland_reedbed',
-        swamp: 'wetland_swamp'
-      },
-    };
-
   }
 
 
@@ -676,7 +186,34 @@ export class StyleSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed initialization
    */
   initAsync(): Promise<void> {
-    return super.initAsync();
+    if (this._initPromise) return this._initPromise;
+
+    const context = this.context;
+    const assets = context.systems.assets;
+    const urlhash = context.systems.urlhash;
+
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [
+          assets?.initAsync(),
+          urlhash?.initAsync()
+        ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
+      .then(() => {
+        // Setup event handlers..
+        urlhash?.on('hashchange', this._hashChanged);
+
+        // If AssetSystem is available, tell it about default style files and load them.
+        // Without AssetSystem, we'll just have empty styles.
+        if (assets) {
+          assets.registerAsset('rapid_style', { preferred: 'data/rapid_style.min.json5' });
+          return this.loadStyleAssetsAsync();
+        } else {
+          this.resetAll();
+          return Promise.resolve();
+        }
+      });
   }
 
   /**
@@ -700,51 +237,319 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
+   * loadStyleAssetsAsync
+   * @return Promise fulfilled when the style assets have been loaded
+   */
+  loadStyleAssetsAsync(): Promise<void> {
+    const context = this.context;
+    const assets = context.systems.assets;
+
+    // Clear out whatever was loaded before.
+    this.resetAll();
+
+    // If AssetSystem is not available, we can't load style files.
+    // resetAll() has already set up empty maps.
+    if (!assets) return Promise.resolve();
+
+    // Load the style files
+    const which = this._requestedAssetIDs ?? this._defaultAssetIDs;
+    const assetIDs = [...which];
+
+    // Type guard, see https://stackoverflow.com/a/73913774/7620
+    const isFulfilled = <T,>(p:PromiseSettledResult<T>): p is PromiseFulfilledResult<T> => p.status === 'fulfilled';
+    const isRejected = <T,>(p:PromiseSettledResult<T>): p is PromiseRejectedResult => p.status === 'rejected';
+
+    return Promise.allSettled(
+      assetIDs.map(assetID => assets.loadAssetAsync(assetID))
+    )
+    .then(results => {
+      for (const result of results) {
+        if (isFulfilled(result) && result.value) {
+          this.merge(result.value as StyleData);
+        }
+      }
+      for (const result of results) {
+        if (isRejected(result)) {
+          console.error(result.reason);  // eslint-disable-line no-console
+        }
+      }
+
+      this._styleChanged();
+    });
+  }
+
+
+  /**
+   * resetAll
+   * This puts the StyleSystem internal data back to its initial state, i.e. no styles.
+   */
+  resetAll(): void {
+    this._loadedAssetIDs.clear();
+    this.styles.clear();
+    this.selectors.clear();
+
+    this._styleChanged();
+  }
+
+
+  /**
+   * defaultAssetIDs
+   * Returns the default assetIDs
+   * @return  Default assetIDs
+   * @readonly
+   */
+  get defaultAssetIDs(): Set<AssetID> {
+    return this._defaultAssetIDs;
+  }
+
+  /**
+   * loadedAssetIDs
+   * Returns the loaded assetIDs, along with their version numbers if known.
+   * @return  Loaded assetIDs
+   * @readonly
+   */
+  get loadedAssetIDs(): Map<AssetID, string> {
+    return this._loadedAssetIDs;
+  }
+
+  /**
+   * requestedAssetIDs
+   * Allows user to request different style asset files than what Rapid uses by default.
+   *
+   * If set before init time, these assets will be loaded at init time when init calls `loadStyleAssetsAsync`.
+   * You can also change this after init time, but then you'll need to call `loadStyleAssetsAsync` again.
+   *
+   * The 'default' keyword is special - if found in the list, it will expand to all the default IDs.
+   *
+   * You can set `requestedAssetIDs` to an empty list ''.  In this case, subsequent calls to
+   *   `loadStyleAssetsAsync` will load nothing, you'll have only empty styles.
+   * You can also pass `null` - in this case the `requestedAssetIDs` list is not used,
+   *   and subsequent calls to `loadStyleAssetsAsync` will use the `defaultAssetIDs` Set.
+   * @param vals - A `string`, `Array<string>` or `Set<string>` of assetIDs to load (or `null` to disable)
+   */
+  set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
+    if (vals === null || vals === undefined) {
+      this._requestedAssetIDs = null;
+      return;
+    }
+
+    this._requestedAssetIDs = new Set();
+    for (const assetID of utilIterable(vals)) {
+      if (assetID === 'default') {
+        for (const defaultID of this._defaultAssetIDs) {
+          this._requestedAssetIDs.add(defaultID);
+        }
+      } else {
+        this._requestedAssetIDs.add(assetID);
+      }
+    }
+  }
+  get requestedAssetIDs(): Set<AssetID> | null {
+    return this._requestedAssetIDs;
+  }
+
+
+  /**
+   * merge
+   * Accepts an object containing new style data (all properties except 'assetID' are optional):
+   * {
+   *   assetID: '',           // A string asset identifier, e.g. 'rapid_style'
+   *   assetVersion: '',      // A string version specifier, e.g. '1.0.0'  (defaults to 'unknown' if not present)
+   *   styles: {},            // Object<StyleID, Style>
+   *   selectors: {}          // Object<SelectorID, StyleSelector>
+   * }
+   *
+   * When merging:
+   *  - Items are processed in the order they appear.
+   *  - You can't replace the `DEFAULTS` or `LIFECYCLE` styles (these are required).
+   *  - New items will replace existing items that have the same `id`.
+   *     `"motorway": { casing: { color: 0xff0000 }, … }`    <-- `motorway` style replaced
+   *  - If no new data supplied (null), this is treated as a delete.
+   *     `"motorway": null`                                   <-- `motorway` style deleted
+   *  - Wildcard characters '*' and '?' are allowed when deleting.
+   *     `"motor*": null`                                     <-- all `motor*` styles deleted
+   *
+   * @param src - style data to merge into the system
+   * @throws Will throw if given data does not contain an `assetID`, or if the `assetID` has already been merged
+   */
+  merge(src: StyleData): void {
+    const assetID = src.assetID;
+    const assetVersion = src.assetVersion ?? 'unknown';
+
+    if (!assetID) {
+      throw new Error('StyleSystem.merge(): data must include assetID');
+    }
+    if (this._loadedAssetIDs.has(assetID)) {
+      throw new Error(`StyleSystem.merge(): assetID '${assetID}' was already merged`);
+    }
+
+    this._loadedAssetIDs.set(assetID, assetVersion);
+
+    // Merge styles
+    if (src.styles) {
+      for (const [styleID, input] of Object.entries(src.styles)) {
+        // Skip protected styles
+        if (styleID === 'DEFAULTS' || styleID === 'LIFECYCLE') {
+          if (input === null) continue;  // can't delete these
+        }
+
+        if (input === null) {
+          // Delete: supports wildcards
+          this._deleteMatching(this.styles, styleID);
+        } else {
+          // Add/replace - create Style instance from input
+          const style = new Style({
+            id: styleID,
+            assetID: assetID,
+            assetVersion: assetVersion,
+            fill: input.fill,
+            casing: input.casing,
+            stroke: input.stroke
+          });
+          this.styles.set(styleID, style);
+        }
+      }
+    }
+
+    // Merge selectors
+    if (src.selectors) {
+      for (const [selectorID, input] of Object.entries(src.selectors)) {
+        if (input === null) {
+          // Delete: supports wildcards
+          this._deleteMatching(this.selectors, selectorID);
+        } else {
+          // Add/replace - create StyleSelector instance from input
+          const selector = new StyleSelector({
+            id: selectorID,
+            assetID: assetID,
+            assetVersion: assetVersion,
+            styleIDs: input.styleIDs,
+            match: input.match
+          });
+          this.selectors.set(selectorID, selector);
+        }
+      }
+    }
+
+    this._styleChanged();
+  }
+
+
+  /**
+   * _deleteMatching
+   * Delete entries from a Map that match a pattern (supports '*' and '?' wildcards)
+   */
+  private _deleteMatching<V>(map: Map<string, V>, pattern: string): void {
+    if (pattern.includes('*') || pattern.includes('?')) {
+      // Convert wildcard pattern to regex
+      const regexPattern = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape regex special chars
+        .replace(/\*/g, '.*')                   // * matches any characters
+        .replace(/\?/g, '.');                   // ? matches single character
+      const regex = new RegExp(`^${regexPattern}$`);
+
+      for (const key of map.keys()) {
+        if (regex.test(key)) {
+          map.delete(key);
+        }
+      }
+    } else {
+      map.delete(pattern);
+    }
+  }
+
+
+  /**
+   * _hashChanged
+   * Respond to any changes appearing in the url hash
+   * @param currParams - The current hash parameters
+   * @param prevParams - The previous hash parameters
+   */
+  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+    const context = this.context;
+    const assets = context.systems.assets;
+
+    // style=assetID1,assetID2,assetID3
+    const currStyle = currParams.get('style');
+    const prevStyle = prevParams.get('style');
+
+    if (currStyle !== prevStyle) {
+      // Special: setting to '' means load nothing
+      // Special: setting to null means load the defaults
+      if (currStyle === '') {
+        this.requestedAssetIDs = '';
+        this.loadStyleAssetsAsync();
+      } else if (currStyle === null || currStyle === undefined) {
+        this.requestedAssetIDs = null;
+        this.loadStyleAssetsAsync();
+      } else {
+        // First register any custom assets from `assets=` parameter
+        const customAssets = currParams.get('assets');
+        if (customAssets && assets) {
+          for (const pair of customAssets.split(',')) {
+            const [assetID, url] = pair.split('|');
+            if (assetID && url) {
+              assets.registerAsset(assetID, { preferred: url });
+            }
+          }
+        }
+        this.requestedAssetIDs = currStyle;
+        this.loadStyleAssetsAsync();
+      }
+    }
+  }
+
+
+  /**
    * styleMatch
    * @param tags - OSM tags to match to a display style
    * @return Styling info for the given tags
    */
-  styleMatch(tags: Tags): Style {
-    const defaults = this.STYLE_DECLARATIONS.DEFAULTS;
+  styleMatch(tags: Tags): MatchedStyle {
+    const defaults = this.styles.get('DEFAULTS');
 
-    let matched: StyleDeclaration = defaults;
-    let styleScore = 999;   // lower numbers are better
-// eventually expose this to the caller?
-// it may be useful to know what `k=v` pair matched
-    let styleKey: string | undefined;           // the key controlling the styling, if any
-//    let styleVal;           // the value controlling the styling, if any
+    // If DEFAULTS hasn't been loaded yet, return a minimal style
+    if (!defaults) {
+      return {
+        fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3 },
+        casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
+        stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' }
+      };
+    }
 
-    // First, match the tags to the best matching `styleID`..
-    for (const [k, v] of Object.entries(tags)) {
-      const selector = this.STYLE_SELECTORS[k];
-      if (!selector || !v) continue;
+    // Find all matching selectors, sorted by specificity (highest first)
+    const featureInfo = { tags };
+    const matchingSelectors = StyleSelector.findAll(this.selectors.values(), featureInfo);
 
-      // Exception: only consider 'service' when a 'highway' tag is present (not 'railway'), see Rapid#1252
-      if (k === 'service' && getTag(tags, 'highway') === undefined) continue;
+    // Start with defaults, then merge all matching selectors in order.
+    // We iterate in reverse (lowest specificity first) so higher specificity selectors win.
+    let matched: Style = defaults;
+    let styleKey: string | undefined;
 
-      const styleID = selector[v] ?? selector['*'];  // '*' = fallback value
-      let score = Object.keys(selector).length;      // smaller groups are more selective
-      if (lifecycleVals.has(v)) score = 999;         // exception: lifecycle values
-
-      if (styleID && score <= styleScore) {
-        const declaration = this.STYLE_DECLARATIONS[styleID];
-        if (!declaration) {
+    for (let i = matchingSelectors.length - 1; i >= 0; i--) {
+      const selector = matchingSelectors[i];
+      for (const styleID of selector.styleIDs) {
+        const style = this.styles.get(styleID);
+        if (style) {
+          matched = matched.merge(style);
+        } else {
           console.error(`invalid styleID: ${styleID}`);  // eslint-disable-line
-          continue;
         }
+      }
+    }
 
-        matched = declaration;
-        styleScore = score;
-        styleKey = k;
-//        styleVal = v;
-
-        if (styleScore === 1) break;  // no need to keep looking at tags
+    // Extract styleKey from most specific selector (for lifecycle handling)
+    if (matchingSelectors.length > 0) {
+      const bestSelector = matchingSelectors[0];
+      const tagMatchers = bestSelector.tagMatchers;
+      if (tagMatchers.length > 0) {
+        styleKey = tagMatchers[0].key;
       }
     }
 
     // Also scan for lifecycle keywords in any of their various forms.
     // The feature will be drawn with dashed lines.
-    // see Rapid#1312, Rapid#1199, Rapid#791, Rapid #535
+    // see Rapid#1312, Rapid#1199, Rapid#791, Rapid#535
     let hasLifecycleTag = false;
     for (const [k, v] of Object.entries(tags)) {
       // Lifecycle key, e.g. `demolished=yes`
@@ -767,17 +572,16 @@ export class StyleSystem extends AbstractSystem {
       }
     }
 
-
-    // Copy style properties from the matched style declaration, fallback to defaults as needed..
-    // We use type assertions here since we're building the style object dynamically
-    const style: Style = {
+    // Copy style properties from the matched style, fallback to defaults as needed..
+    // We use type assertions here since we're building the result object dynamically
+    const result: MatchedStyle = {
       fill: {} as ResolvedFillProps,
       casing: {} as ResolvedLineProps,
       stroke: {} as ResolvedLineProps
     };
 
     for (const group of ['fill', 'casing', 'stroke'] as const) {
-      const styleGroup = style[group] as unknown as Record<string, unknown>;
+      const styleGroup = result[group] as unknown as Record<string, unknown>;
       const matchedGroup = matched[group] as Record<string, unknown> | undefined;
       const defaultGroup = defaults[group] as Record<string, unknown> | undefined;
 
@@ -808,74 +612,51 @@ export class StyleSystem extends AbstractSystem {
     }
 
     if (bridge || embankment || cutting) {
-      style.casing.width += 7;
-      style.casing.color = 0x000000;
-      style.casing.cap = 'butt';
+      result.casing.width += 7;
+      result.casing.color = 0x000000;
+      result.casing.cap = 'butt';
       if (embankment || cutting) {
-        style.casing.dash = [2, 4];
+        result.casing.dash = [2, 4];
       }
     }
     if (tunnel) {
-      style.stroke.alpha = 0.5;
+      result.stroke.alpha = 0.5;
     }
 
     // Bumpy casing for roads with unpaved surface
     if (surface && highway && roadVals.has(highway) && !osmPavedTags.surface[surface]) {
-      if (!bridge) style.casing.color = 0xcccccc;
-      style.casing.cap = 'butt';
-      style.casing.dash = [4, 4];
+      if (!bridge) result.casing.color = 0xcccccc;
+      result.casing.cap = 'butt';
+      result.casing.dash = [4, 4];
     }
 
     // After applying all other styling rules and overrides, perform lifecycle overrides.
     // (This is for features that are not really existing - "abandoned", "proposed", etc.)
     if (hasLifecycleTag) {
-      const lifecycle = this.STYLE_DECLARATIONS.LIFECYCLE;
-      for (const group of ['fill', 'casing', 'stroke'] as const) {
-        for (const prop of ['width', 'color', 'alpha', 'cap', 'dash'] as const) {
-          const lifecycleGroup = lifecycle[group] as Record<string, unknown> | undefined;
-          const value = lifecycleGroup?.[prop];
-          if (value !== undefined) {
-            (style[group] as unknown as Record<string, unknown>)[prop] = value;
+      const lifecycle = this.styles.get('LIFECYCLE');
+      if (lifecycle) {
+        for (const group of ['fill', 'casing', 'stroke'] as const) {
+          for (const prop of ['width', 'color', 'alpha', 'cap', 'dash'] as const) {
+            const lifecycleGroup = lifecycle[group] as Record<string, unknown> | undefined;
+            const value = lifecycleGroup?.[prop];
+            if (value !== undefined) {
+              (result[group] as unknown as Record<string, unknown>)[prop] = value;
+            }
           }
         }
       }
     }
 
 
-    // Finally look for fill pattern..
-    if (building) return style;   // exception: don't apply patterns to buildings
+    // Validate fill pattern (patterns come from styles/selectors via styleIDs array)
+    if (building) return result;   // exception: don't apply patterns to buildings
 
-    // If the style declaration already contains a valid pattern, we can stop here
-    if (style.fill.pattern) {
-      if (!this.PATTERN_DECLARATIONS.includes(style.fill.pattern)) {
-        console.error(`invalid patternID: ${style.fill.pattern}`);  // eslint-disable-line
-      } else {
-        return style;
-      }
+    if (result.fill.pattern && !this.patternIDs.has(result.fill.pattern)) {
+      console.error(`invalid patternID: ${result.fill.pattern}`);  // eslint-disable-line
+      result.fill.pattern = undefined;
     }
 
-    // Match the tags to the best matching `patternID`..
-    let patternScore = 999;
-    for (const [k, v] of Object.entries(tags)) {
-      const selector = this.PATTERN_SELECTORS[k];
-      if (!selector || !v) continue;
-
-      const patternID = selector[v] ?? selector['*'];  // '*' = fallback value
-      let score = Object.keys(selector).length;        // smaller groups are more selective
-      if (lifecycleVals.has(v)) score = 999;           // exception: lifecycle values
-
-      if (patternID && score <= patternScore) {
-        if (!this.PATTERN_DECLARATIONS.includes(patternID)) {
-          console.error(`invalid patternID: ${patternID}`);  // eslint-disable-line
-          continue;
-        }
-        style.fill.pattern = patternID;
-        patternScore = score;
-        if (patternScore === 1) break;  // no need to keep looking at tags
-      }
-    }
-
-    return style;
+    return result;
 
 
     // This just returns the value of the tag, but ignores 'no' values
@@ -887,7 +668,6 @@ export class StyleSystem extends AbstractSystem {
 
   /**
    * _styleChanged
-   * (currently not used, see PhotoSystem, ImagerySystem for similar)
    * Called whenever the style changes.
    * This will trigger a redraw and emit a 'stylechange' event.
    */
