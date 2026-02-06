@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, it } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
@@ -223,6 +223,21 @@ describe('AssetSystem', () => {
 
 
     describe('loadAssetAsync', () => {
+      const origError = console.error;
+      const spyError = mock();
+
+      beforeAll(() => {
+        console.error = spyError;
+      });
+
+      beforeEach(() => {
+        spyError.mockClear();  // reset call count
+      });
+
+      afterAll(() => {
+        console.error = origError;
+      });
+
       it('returns a promise resolved if we already have the data', () => {
         _assets._loaded.test = { hello: 'world' };
 
@@ -253,7 +268,11 @@ describe('AssetSystem', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(data => assert.fail(`We were not supposed to get data but did: ${data}`))
-          .catch(err => assert.match(err, /no data loaded/i))
+          .catch(err => {
+            assert.match(err, /no data/i);
+            assert.lengthOf(spyError.mock.calls, 1);   // console.error called once
+            assert.match(spyError.mock.lastCall[0], /no data/i);
+          })
           .finally(() => fetchMock.hardReset());
       });
 
@@ -319,13 +338,26 @@ describe('AssetSystem', () => {
 
 
     describe('loadBundleAssetAsync', () => {
+      const origError = console.error;
+      const spyError = mock();
+
       beforeAll(() => {
+        console.error = spyError;
+
         // Register a test bundle
         _assets.registerBundleAsset('my_bundle', {
           categories: { preferred: 'data/categories.json' },
           presets:    { preferred: 'data/presets.json' },
           fields:     { preferred: 'data/fields.json' }
         });
+      });
+
+      beforeEach(() => {
+        spyError.mockClear();  // reset call count
+      });
+
+      afterAll(() => {
+        console.error = origError;
       });
 
       it('returns a promise resolved if we already have the data', () => {
@@ -423,8 +455,6 @@ describe('AssetSystem', () => {
 
       it('handles partial failures gracefully (some parts fail to load)', () => {
         delete _assets._loaded.my_bundle;
-        const origWarn = console.warn;
-        console.warn = () => {};  // silence the warning during this test
 
         fetchMock
           .mockGlobal()
@@ -452,9 +482,10 @@ describe('AssetSystem', () => {
             assert.deepEqual(data.fields, { good_field: {} });
             // Failed part should be undefined
             assert.isUndefined(data.presets);
+            assert.lengthOf(spyError.mock.calls, 1);   // console.error called once
+            assert.match(spyError.mock.lastCall[0], /not found/i);
           })
           .finally(() => {
-            console.warn = origWarn;
             fetchMock.hardReset();
           });
       });

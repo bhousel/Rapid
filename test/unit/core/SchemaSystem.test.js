@@ -8,10 +8,26 @@ describe('SchemaSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
+    assets:    new Rapid.AssetSystem(context),
     l10n:      new Rapid.LocalizationSystem(context),
     locations: new Rapid.LocationSystem(context),
     urlhash:   new Rapid.UrlHashSystem(context)
   };
+
+  // Setup mock asset data that SchemaSystem attempts to load at init time.
+  const assets = context.systems.assets;
+  assets._loaded.id_tagging_schema = { assetID: 'id_tagging_schema' };
+  assets._loaded.rapid_schema = { assetID: 'rapid_schema' };
+  assets._loaded.custom_schema = { assetID: 'custom_schema' };
+
+  // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
+  assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
+  assets._loaded.locales = { locales: { en: { rtl: false } } };
+  assets._loaded.territory_languages = { territoryLanguages: { us: ['en'] } };
+  assets._loaded.l10n_core_en = { en: {} };
+  assets._loaded.l10n_tagging_en = { en: {} };
+  assets._loaded.l10n_imagery_en = { en: {} };
+  assets._loaded.l10n_community_en = { en: {} };
 
 
   // Test construction and startup of the system..
@@ -61,6 +77,18 @@ describe('SchemaSystem', () => {
           .finally(() => {
             urlhash.initialHashParams.delete('presets');
           });
+      });
+
+      it('inits without an AssetSystem', () => {
+        const orig = context.systems.assets;
+        delete context.systems.assets;
+
+        const schema = new Rapid.SchemaSystem(context);
+        const prom = schema.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => assert.isTrue(true))
+          .finally(() => context.systems.assets = orig);  // restore
       });
     });
 
@@ -879,6 +907,61 @@ describe('SchemaSystem', () => {
     });
 
 
+    describe('loadSchemaAssetsAsync', () => {
+      const origError = console.error;
+      const spyError = mock();
+
+      beforeAll(() => {
+        console.error = spyError;
+      });
+
+      beforeEach(() => {
+        spyError.mockClear();  // reset call count
+      });
+
+      afterAll(() => {
+        console.error = origError;
+      });
+
+      it('returns a promise', () => {
+        const prom = _schema.loadSchemaAssetsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom;
+      });
+
+      it('uses requestedAssetIDs when set', () => {
+        _schema.requestedAssetIDs = 'custom_schema';
+        const prom = _schema.loadSchemaAssetsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => assert.isTrue(true))
+          .finally(() => _schema.requestedAssetIDs = null);  // restore
+      });
+
+      it('uses defaultAssetIDs when requestedAssetIDs is null', () => {
+        _schema.requestedAssetIDs = null;
+        const prom = _schema.loadSchemaAssetsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => assert.isTrue(true));
+      });
+
+      it('handles rejected asset loading gracefully', () => {
+        // Set requestedAssetIDs to something that will fail to load
+        _schema.requestedAssetIDs = 'nonexistent-asset-12345';
+        const prom = _schema.loadSchemaAssetsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            // promise succeeds, but error is logged
+            assert.lengthOf(spyError.mock.calls, 1);   // console.error called once
+            assert.match(spyError.mock.lastCall[0], /unknown assetID/i);
+          })
+          .finally(() => _schema.requestedAssetIDs = null);
+      });
+    });
+
+
     describe('_localeChanged', () => {
       let field, preset, category;
       let fieldSpy, presetSpy, categorySpy;
@@ -1007,6 +1090,48 @@ describe('SchemaSystem', () => {
     });
 
 
+    describe('_hashChanged', () => {
+      afterEach(() => {
+        _schema.requestedAssetIDs = null;
+      });
+
+      it('does nothing when schema param is unchanged', () => {
+        spySchemaChange.mockClear();
+        const curr = new Map([['other', 'value']]);
+        const prev = new Map([['other', 'value']]);
+        _schema._hashChanged(curr, prev);
+        assert.lengthOf(spySchemaChange.mock.calls, 0);   // No schema change should occur
+      });
+
+      it('handles schema param set to empty string', () => {
+        spySchemaChange.mockClear();
+        const curr = new Map([['schema', '']]);
+        const prev = new Map();
+        _schema._hashChanged(curr, prev);
+        assert.deepEqual(_schema.requestedAssetIDs, new Set());
+        assert.isAtLeast(spySchemaChange.mock.calls.length, 1);   // schemachange emitted by resetAll
+      });
+
+      it('handles schema param set to null', () => {
+        spySchemaChange.mockClear();
+        const curr = new Map();
+        const prev = new Map([['schema', 'something']]);
+        _schema._hashChanged(curr, prev);
+        assert.isNull(_schema.requestedAssetIDs);
+        assert.isAtLeast(spySchemaChange.mock.calls.length, 1);   // schemachange emitted by resetAll
+      });
+
+      it('handles schema param with asset IDs', () => {
+        spySchemaChange.mockClear();
+        const curr = new Map([['schema', 'id_tagging_schema']]);
+        const prev = new Map();
+        _schema._hashChanged(curr, prev);
+        assert.deepEqual(_schema.requestedAssetIDs, new Set(['id_tagging_schema']));
+        assert.isAtLeast(spySchemaChange.mock.calls.length, 1);   // schemachange emitted by resetAll
+      });
+    });
+
+
     describe('_schemaChanged', () => {
       let field, preset, category;
       let fieldSpy, presetSpy, categorySpy;
@@ -1080,8 +1205,8 @@ describe('SchemaSystem', () => {
         assert.hasAllKeys(_schema._matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
       });
 
-      it('emits schemachange after merging', () => {
-        assert.lengthOf(spySchemaChange.mock.calls, 1);   // schemachange emitted once
+      it('emits schemachange', () => {
+        assert.lengthOf(spySchemaChange.mock.calls, 1);
       });
     });
 

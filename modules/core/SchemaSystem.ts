@@ -316,7 +316,7 @@ export class SchemaSystem extends AbstractSystem {
 
       const rejectedReasons = results.filter(isRejected).map(p => p.reason);
       for (const reason of rejectedReasons as string[]) {
-        console.warn(reason);   // eslint-disable-line no-console
+        console.error(reason);   // eslint-disable-line no-console
       }
     });
   }
@@ -1116,7 +1116,7 @@ export class SchemaSystem extends AbstractSystem {
       if (typeof newSchema === 'string') {
         this.requestedAssetIDs = utilExtractValues(newSchema).filter(Boolean);
       } else {
-        this.requestedAssetIDs = [];
+        this.requestedAssetIDs = null;
       }
       this.loadSchemaAssetsAsync();
     }

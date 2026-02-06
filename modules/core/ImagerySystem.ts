@@ -214,7 +214,7 @@ export class ImagerySystem extends AbstractSystem {
 
       const rejectedReasons = results.filter(isRejected).map(p => p.reason);
       for (const reason of rejectedReasons as string[]) {
-        console.warn(reason);   // eslint-disable-line no-console
+        console.error(reason);   // eslint-disable-line no-console
       }
 
       // Default the locator overlay to "on"..
@@ -828,7 +828,7 @@ export class ImagerySystem extends AbstractSystem {
       if (typeof newImagery === 'string') {
         this.requestedAssetIDs = utilExtractValues(newImagery).filter(Boolean);
       } else {
-        this.requestedAssetIDs = [];
+        this.requestedAssetIDs = null;
       }
       loadPromise = this.loadImageryAssetsAsync();
     }

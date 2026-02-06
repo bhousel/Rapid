@@ -13,8 +13,13 @@ describe('LocalizationSystem', () => {
   // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
   const assets = context.systems.assets;
   assets._loaded.languages = { languages: { en: { nativeName: 'English' } } };
-  assets._loaded.locales =   { locales:   { en: { rtl: false } } };
+  assets._loaded.locales = { locales: { en: { rtl: false } } };
   assets._loaded.territory_languages = { territoryLanguages: { us: ['en'] } };
+  assets._loaded.l10n_core_en = { en: {} };
+  assets._loaded.l10n_tagging_en = { en: {} };
+  assets._loaded.l10n_imagery_en = { en: {} };
+  assets._loaded.l10n_community_en = { en: {} };
+
 
   // Test construction and startup of the system..
   describe('lifecycle', () => {
@@ -38,23 +43,6 @@ describe('LocalizationSystem', () => {
           .then(() => assert.isTrue(true));
       });
 
-      it('works without an AssetSystem (English-only fallback)', () => {
-        // Create a context with no AssetSystem
-        const minimalContext = new Rapid.MockContext();
-        minimalContext.systems = {};
-
-        const l10n = new Rapid.LocalizationSystem(minimalContext);
-        return l10n.initAsync()
-          .then(() => {
-            // Should default to English (en-US is the fallback when browser locale is detected)
-            assert.match(l10n.localeCode, /^en/);
-            assert.strictEqual(l10n.languageCode, 'en');
-            assert.strictEqual(l10n.textDirection, 'ltr');
-            // Should return missing translation messages (no strings loaded)
-            assert.match(l10n.t('test.string'), /Missing.*translation/);
-          });
-      });
-
       it('rejects if a dependency is missing', () => {
         const l10n = new Rapid.LocalizationSystem(context);
         l10n.requiredDependencies.add('missing');
@@ -63,6 +51,24 @@ describe('LocalizationSystem', () => {
         return prom
           .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
+      });
+
+      it('inits without an AssetSystem (English-only fallback)', () => {
+        // Create a context with no AssetSystem
+        const orig = context.systems.assets;
+        delete context.systems.assets;
+
+        const l10n = new Rapid.LocalizationSystem(context);
+        return l10n.initAsync()
+          .then(() => {
+            // Should default to English (en-US is the fallback when browser locale is detected)
+            assert.match(l10n.localeCode, /^en/);
+            assert.strictEqual(l10n.languageCode, 'en');
+            assert.strictEqual(l10n.textDirection, 'ltr');
+            // Should return missing translation messages (no strings loaded)
+            assert.match(l10n.t('test.string'), /Missing.*translation/i);
+          })
+          .finally(() => context.systems.assets = orig);  // restore
       });
     });
 

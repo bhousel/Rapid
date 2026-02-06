@@ -27,6 +27,10 @@ describe('uiFieldLocalized', () => {
     assets._loaded.languages = { languages: { de: { nativeName: 'Deutsch' }, en: { nativeName: 'English' } } };
     assets._loaded.locales = { locales: { en: { rtl: false }, de: { rtl: false } } };
     assets._loaded.territory_languages = { territoryLanguages: { de: ['de'], us: ['en'] } };
+    assets._loaded.l10n_core_en = { en: {} };
+    assets._loaded.l10n_tagging_en = { en: {} };
+    assets._loaded.l10n_imagery_en = { en: {} };
+    assets._loaded.l10n_community_en = { en: {} };
 
     return context.systems.l10n.initAsync();
   });

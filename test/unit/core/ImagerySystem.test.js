@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, afterEach, describe, it, mock, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock, spyOn } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './ImagerySystem.sample.js';
@@ -7,6 +7,15 @@ import * as sample from './ImagerySystem.sample.js';
 describe('ImagerySystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
+  context.systems = {
+    assets: new Rapid.AssetSystem(context)
+  };
+
+  // Setup mock asset data that ImagerySystem attempts to load at init time.
+  const assets = context.systems.assets;
+  assets._loaded.editor_layer_index = { assetID: 'editor_layer_index' };
+  assets._loaded.rapid_imagery = { assetID: 'rapid_imagery' };
+  assets._loaded.custom_imagery = { assetID: 'custom_imagery' };
 
   // Mock osm service with empty blocklists (needed for baseLayerSource)
   context.services = {
@@ -46,6 +55,18 @@ describe('ImagerySystem', () => {
         return prom
           .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(err => assert.match(err, /cannot init/i));
+      });
+
+      it('inits without an AssetSystem', () => {
+        const orig = context.systems.assets;
+        delete context.systems.assets;
+
+        const imagery = new Rapid.ImagerySystem(context);
+        const prom = imagery.initAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => assert.isTrue(true))
+          .finally(() => context.systems.assets = orig);  // restore
       });
     });
 
@@ -531,6 +552,273 @@ describe('ImagerySystem', () => {
     });
 
 
+    describe('visibleSources', () => {
+      let origViewport;
+
+      beforeAll(() => {
+        origViewport = context.viewport;
+      });
+
+      afterEach(() => {
+        _imagery.setSourceByID('none');
+        context.services.osm.imageryBlocklists = [];
+        context.viewport = origViewport;
+      });
+
+      it('returns empty array when called too soon (no sources)', () => {
+        const temp = new Rapid.ImagerySystem(context);
+        const visible = temp.visibleSources();
+        assert.isArray(visible);
+        assert.isEmpty(visible);
+      });
+
+      it('returns empty array when called too soon (no whichPolygon)', () => {
+        const temp = new Rapid.ImagerySystem(context);
+        temp.sources.set('test', _imagery.source('nj-2015'));
+        const visible = temp.visibleSources();
+        assert.isArray(visible);
+        assert.isEmpty(visible);
+      });
+
+      it('returns sources visible in current viewport extent', () => {
+        // Mock viewport with extent covering New Jersey
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
+          }),
+          transform: { zoom: 10 }
+        };
+
+        const visible = _imagery.visibleSources();
+        assert.isArray(visible);
+        // Should include nj-2015 and nj-2020 which have NJ coverage
+        const ids = visible.map(s => s.id);
+        assert.isTrue(ids.includes('nj-2015'));
+        assert.isTrue(ids.includes('nj-2020'));
+      });
+
+      it('always includes current base layer source', () => {
+        // Set CA imagery as base layer, but viewport is in NJ
+        _imagery.setSourceByID('ca-imagery');
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
+          }),
+          transform: { zoom: 10 }
+        };
+
+        const visible = _imagery.visibleSources();
+        const ids = visible.map(s => s.id);
+        // Should include CA even though we're viewing NJ
+        assert.isTrue(ids.includes('ca-imagery'));
+      });
+
+      it('excludes blocked sources', () => {
+        // Add a blocklist that matches test-overlay's template
+        const overlay = _imagery.source('test-overlay');
+        const template = overlay.template;
+        context.services.osm.imageryBlocklists = [new RegExp(template.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))];
+
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-180, -90, 180, 90]  // worldwide
+          }),
+          transform: { zoom: 10 }
+        };
+
+        const visible = _imagery.visibleSources();
+        const ids = visible.map(s => s.id);
+        // test-overlay should be blocked
+        assert.isFalse(ids.includes('test-overlay'));
+      });
+
+      it('includes sources with worldwide coverage regardless of extent', () => {
+        // Sources without a 'feature' property have worldwide coverage
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
+          }),
+          transform: { zoom: 10 }
+        };
+
+        const visible = _imagery.visibleSources();
+        // Should include sources without geographic restrictions
+        // Check for sources that don't have a feature property
+        const worldwideSources = visible.filter(s => !s.props.feature);
+        assert.isAbove(worldwideSources.length, 0);
+      });
+
+      it('excludes local imagery at low zoom levels', () => {
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
+          }),
+          transform: { zoom: 5 }  // Low zoom
+        };
+
+        const visible = _imagery.visibleSources();
+        const ids = visible.map(s => s.id);
+        // Should exclude local sources at zoom < 6
+        assert.isFalse(ids.includes('nj-2015'));
+        assert.isFalse(ids.includes('nj-2020'));
+      });
+
+      it('rechecks blocked sources when blocklists change', () => {
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-180, -90, 180, 90]
+          }),
+          transform: { zoom: 10 }
+        };
+
+        // Get first visible source
+        context.services.osm.imageryBlocklists = [];
+        let visible = _imagery.visibleSources();
+        assert.isAbove(visible.length, 0);
+        const sourceToBlock = visible[0];
+
+        // Add a blocklist matching that source's template
+        const escapedTemplate = sourceToBlock.template.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        context.services.osm.imageryBlocklists = [new RegExp(escapedTemplate)];
+
+        // Call visibleSources again to trigger recheck
+        visible = _imagery.visibleSources();
+        const ids = visible.map(s => s.id);
+
+        // The blocked source should no longer be in the list (unless it's the current base layer)
+        if (sourceToBlock.id !== _imagery.baseLayerSource()?.id) {
+          assert.isFalse(ids.includes(sourceToBlock.id));
+        }
+      });
+    });
+
+
+    describe('chooseDefaultSource', () => {
+      let origViewport;
+
+      beforeAll(() => {
+        origViewport = context.viewport;
+      });
+
+      afterEach(() => {
+        _imagery.setSourceByID('none');
+        delete context.systems.storage;
+        context.viewport = origViewport;
+      });
+
+      it('returns source marked as best when available', () => {
+        // nj-2015 was updated with best:true in updateImageryData
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
+          }),
+          transform: { zoom: 10 }
+        };
+
+        const chosen = _imagery.chooseDefaultSource();
+        assert.strictEqual(chosen.props.id, 'nj-2015');
+        assert.isTrue(chosen.props.best);
+      });
+
+      it('returns previously used source from storage', () => {
+        // Mock storage with previously used source
+        context.systems.storage = {
+          getItem: (key) => {
+            if (key === 'background-last-used') return 'ca-imagery';
+            return null;
+          }
+        };
+
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-122, 37, -121, 38]  // CA area
+          }),
+          transform: { zoom: 10 }
+        };
+
+        const chosen = _imagery.chooseDefaultSource();
+        assert.strictEqual(chosen.props.id, 'ca-imagery');
+      });
+
+      it('ignores previously used "none" source', () => {
+        // Mock storage with 'none' as previous
+        context.systems.storage = {
+          getItem: (key) => {
+            if (key === 'background-last-used') return 'none';
+            return null;
+          }
+        };
+
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-180, -90, 180, 90]
+          }),
+          transform: { zoom: 10 }
+        };
+
+        const chosen = _imagery.chooseDefaultSource();
+        // Should not return 'none', should return best source (nj-2015) or fallback
+        assert.notStrictEqual(chosen.props.id, 'none');
+      });
+
+      it('falls back through priority chain: best, previous, Bing, first, none', () => {
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-180, -90, 180, 90]
+          }),
+          transform: { zoom: 3 }  // Low zoom, no local imagery
+        };
+
+        const chosen = _imagery.chooseDefaultSource();
+        // Should return some valid source
+        assert.isDefined(chosen);
+        assert.instanceOf(chosen, Rapid.ImagerySource);
+      });
+
+      it('returns first available source if Bing not available', () => {
+        // Remove Bing from sources temporarily
+        const bing = _imagery.sources.get('testbing');
+        _imagery.sources.delete('testbing');
+
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-180, -90, 180, 90]
+          }),
+          transform: { zoom: 3 }
+        };
+
+        const chosen = _imagery.chooseDefaultSource();
+        assert.isDefined(chosen);
+        // Should be some available source
+        assert.isTrue(_imagery.sources.has(chosen.id));
+
+        // Restore Bing
+        if (bing) _imagery.sources.set('testbing', bing);
+      });
+
+      it('returns "none" source as last resort', () => {
+        // Clear all sources except 'none'
+        const sourcesBackup = new Map(_imagery.sources);
+        _imagery.sources.clear();
+        const none = sourcesBackup.get('none');
+        if (none) _imagery.sources.set('none', none);
+
+        context.viewport = {
+          visibleExtent: () => ({
+            rectangle: () => [-180, -90, 180, 90]
+          }),
+          transform: { zoom: 10 }
+        };
+
+        const chosen = _imagery.chooseDefaultSource();
+        assert.strictEqual(chosen.props.id, 'none');
+
+        // Restore sources
+        _imagery.sources = sourcesBackup;
+      });
+    });
+
+
     describe('display settings', () => {
       afterEach(() => {
         _imagery.brightness = 1;
@@ -614,8 +902,22 @@ describe('ImagerySystem', () => {
       });
 
       describe('nudge', () => {
+        let origViewport;
+
+        beforeAll(() => {
+          origViewport = context.viewport;
+          context.viewport = {
+            visibleExtent: () => ({ rectangle: () => [-180, -90, 180, 90] }),
+            transform: { zoom: 10 }
+          };
+        });
+
         afterEach(() => {
           _imagery.setSourceByID('none');
+        });
+
+        afterAll(() => {
+          context.viewport = origViewport;
         });
 
         it('adjusts offset when base layer is set', () => {
@@ -687,8 +989,120 @@ describe('ImagerySystem', () => {
     });
 
 
+    describe('_hashChanged', () => {
+      let origViewport;
+
+      beforeAll(() => {
+        origViewport = context.viewport;
+        context.viewport = {
+          visibleExtent: () => ({ rectangle: () => [-180, -90, 180, 90] }),
+          transform: { zoom: 10 }
+        };
+      });
+
+      afterEach(() => {
+        _imagery.requestedAssetIDs = null;
+      });
+
+      afterAll(() => {
+        context.viewport = origViewport;
+      });
+
+      it('does nothing when schema param is unchanged', () => {
+        spyImageryChange.mockClear();
+        const curr = new Map([['other', 'value']]);
+        const prev = new Map([['other', 'value']]);
+        _imagery._hashChanged(curr, prev);
+        assert.lengthOf(spyImageryChange.mock.calls, 0);  // No imagery change should occur
+      });
+
+      it('handles imagery param set to empty string', () => {
+        spyImageryChange.mockClear();
+        const curr = new Map([['imagery', '']]);
+        const prev = new Map();
+        _imagery._hashChanged(curr, prev);
+        assert.deepEqual(_imagery.requestedAssetIDs, new Set());
+        assert.isAtLeast(spyImageryChange.mock.calls.length, 1);  // imagerychange emitted by resetAll
+      });
+
+      it('handles imagery param set to null', () => {
+        spyImageryChange.mockClear();
+        const curr = new Map();
+        const prev = new Map([['imagery', 'something']]);
+        _imagery._hashChanged(curr, prev);
+        assert.isNull(_imagery.requestedAssetIDs);
+        assert.isAtLeast(spyImageryChange.mock.calls.length, 1);  // imagerychange emitted by resetAll
+      });
+
+      it('handles imagery param with asset IDs', () => {
+        spyImageryChange.mockClear();
+        const curr = new Map([['imagery', 'editor_layer_index']]);
+        const prev = new Map();
+        _imagery._hashChanged(curr, prev);
+        assert.deepEqual(_imagery.requestedAssetIDs, new Set(['editor_layer_index']));
+        assert.isAtLeast(spyImageryChange.mock.calls.length, 1);  // imagerychange emitted by resetAll
+      });
+    });
+
+
+    describe('loadImageryAssetsAsync', () => {
+      const origError = console.error;
+      const spyError = mock();
+
+      beforeAll(() => {
+        console.error = spyError;
+      });
+
+      beforeEach(() => {
+        spyError.mockClear();  // reset call count
+      });
+
+      afterAll(() => {
+        console.error = origError;
+      });
+
+      it('returns a promise', () => {
+        const prom = _imagery.loadImageryAssetsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom;
+      });
+
+      it('uses requestedAssetIDs when set', () => {
+        _imagery.requestedAssetIDs = 'custom_imagery';
+        const prom = _imagery.loadImageryAssetsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => assert.isTrue(true))
+          .finally(() => _imagery.requestedAssetIDs = null);  // restore
+      });
+
+      it('uses defaultAssetIDs when requestedAssetIDs is null', () => {
+        _imagery.requestedAssetIDs = null;
+        const prom = _imagery.loadImageryAssetsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => assert.isTrue(true));
+      });
+
+      it('handles rejected asset loading gracefully', () => {
+        // Set requestedAssetIDs to something that will fail to load
+        _imagery.requestedAssetIDs = 'nonexistent-asset-12345';
+        const prom = _imagery.loadImageryAssetsAsync();
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(() => {
+            // promise succeeds, but error is logged
+            assert.lengthOf(spyError.mock.calls, 1);   // console.error called once
+            assert.match(spyError.mock.lastCall[0], /unknown assetID/i);
+          })
+          .finally(() => _imagery.requestedAssetIDs = null);
+      });
+    });
+
+
     describe('resetAll', () => {
       beforeAll(() => {
+        spyImageryChange.mockClear();
         _imagery.resetAll();
       });
 
@@ -707,6 +1121,10 @@ describe('ImagerySystem', () => {
       it('preserves builtin sources', () => {
         assert.isTrue(_imagery.sources.has('none'));
         assert.isTrue(_imagery.sources.has('custom'));
+      });
+
+      it('emits imagerychange event', () => {
+        assert.lengthOf(spyImageryChange.mock.calls, 1);
       });
     });
 

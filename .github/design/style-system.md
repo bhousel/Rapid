@@ -9,7 +9,7 @@ The StyleSystem manages how map features are visually rendered. It determines co
 **Goals:**
 - Externalize style definitions to JSON5 files for easy customization
 - Support dataset-aware styling (e.g., OSM vs Rapid AI suggestions)
-- Explicit priority-based matching (no "magic" selectivity rules)
+- Composable styles via multi-selector matching
 - Lightweight, testable classes with minimal dependencies
 
 ## Core Concepts
@@ -65,13 +65,12 @@ interface LineStyle {
 
 ### StyleSelector
 
-A **StyleSelector** describes *when to apply a style*. It contains matching conditions and references a Style.
+A **StyleSelector** describes *when to apply a style*. It contains matching conditions and references one or more Styles.
 
 ```typescript
 interface StyleSelectorProps {
   id: StyleSelectorID;
-  styleID: StyleID;  // Which Style to apply
-  priority?: number;              // Higher wins (default: 0)
+  styleIDs: StyleID[];   // Styles to apply (merged in order)
   match: {
     dataset?: DatasetID | DatasetID[];  // 'osm', 'rapid', '*'
     geometry?: GeometryType | GeometryType[];  // 'point', 'line', 'area', '*'
@@ -80,42 +79,43 @@ interface StyleSelectorProps {
 }
 ```
 
+**Specificity** determines which selectors win when multiple match:
+- Dataset condition: +100
+- Geometry condition: +50
+- Each tag matcher: +10
+
 **Examples:**
 ```json5
-// Match all buildings on any dataset
+// Match all buildings on any dataset (specificity: 10)
 "building-default": {
-  "styleID": "building_red",
-  "priority": 5,
+  "styleIDs": ["building_red"],
   "match": {
     "tags": [{ "key": "building" }]
   }
 }
 
-// Match motorways with higher priority
+// Match motorways (specificity: 10)
 "highway-motorway": {
-  "styleID": "motorway",
-  "priority": 10,
+  "styleIDs": ["motorway"],
   "match": {
     "tags": [{ "key": "highway", "value": "motorway" }]
   }
 }
 
-// Dataset-specific styling for Rapid AI suggestions
+// Dataset-specific styling for Rapid AI suggestions (specificity: 110)
 "rapid-building": {
-  "styleID": "building_rapid",
-  "priority": 6,
+  "styleIDs": ["building_rapid"],
   "match": {
     "dataset": "rapid",
     "tags": [{ "key": "building" }]
   }
 }
 
-// Geometry-specific default
-"area-default": {
-  "styleID": "DEFAULTS",
-  "priority": -1,
+// Compose color + pattern (specificity: 10)
+"landuse-forest": {
+  "styleIDs": ["green", "pattern-forest"],
   "match": {
-    "geometry": "area"
+    "tags": [{ "key": "landuse", "value": "forest" }]
   }
 }
 ```
@@ -171,37 +171,55 @@ type PropMatcherOp =
 
 ## Matching Algorithm
 
-When determining the style for a feature:
+When determining the style for a feature, **all matching selectors are applied** (not just the best one). This enables style composition where base selectors provide color and refinement selectors add patterns.
 
 1. **Collect matching selectors**: Iterate through all StyleSelectors and find those whose `match` conditions are satisfied by the feature.
 
-2. **Sort by priority**: Higher priority wins. If priorities are equal, more specific matches win (more tag matchers = more specific).
+2. **Sort by specificity**: Higher specificity wins. Specificity = dataset (+100) + geometry (+50) + tags (+10 each).
 
-3. **Return the style**: Look up the winning selector's `styleID` and return the corresponding Style.
+3. **Merge all styles**: Starting from DEFAULTS, merge all matching selectors in order (lowest specificity first, so higher specificity wins).
 
 ```typescript
-function styleMatch(feature: FeatureInfo): Style {
-  const { dataset, geometry, tags } = feature;
+function styleMatch(tags: Tags): MatchedStyle {
+  const featureInfo = { tags };
+  const matchingSelectors = StyleSelector.findAll(selectors.values(), featureInfo);
 
-  let bestSelector: StyleSelector | null = null;
-  let bestPriority = -Infinity;
+  // Start with defaults, merge all matching selectors
+  // Iterate in reverse (lowest specificity first) so higher specificity wins
+  let matched = styles.get('DEFAULTS');
 
-  for (const selector of selectors.values()) {
-    if (!selectorMatches(selector, feature)) continue;
-
-    const priority = selector.priority ?? 0;
-    if (priority > bestPriority) {
-      bestPriority = priority;
-      bestSelector = selector;
+  for (let i = matchingSelectors.length - 1; i >= 0; i--) {
+    const selector = matchingSelectors[i];
+    for (const styleID of selector.styleIDs) {
+      matched = matched.merge(styles.get(styleID));
     }
   }
 
-  if (bestSelector) {
-    return styles.get(bestSelector.styleID);
-  }
-  return styles.get('DEFAULTS');
+  return matched;
 }
 ```
+
+### Style Composition Example
+
+A feature with `landuse=forest` and `leaf_type=needleleaved` matches two selectors:
+
+```json5
+// Base selector (specificity: 10)
+"landuse-forest": {
+  "styleIDs": ["green", "pattern-forest"],
+  "match": { "tags": [{ "key": "landuse", "value": "forest" }] }
+}
+
+// Refinement selector (specificity: 10)
+"leaf_type-needleleaved": {
+  "styleIDs": ["pattern-forest_needleleaved"],
+  "match": { "tags": [{ "key": "leaf_type", "value": "needleleaved" }] }
+}
+```
+
+Both selectors are applied. The final style has the green fill color from `landuse-forest` and the needleleaved pattern from `leaf_type-needleleaved`.
+
+This approach is analogous to how SchemaSystem's `matchTags()` calculates scores based on tag matches and uses `matchScore` to weight presets.
 
 ## File Format
 
@@ -216,16 +234,22 @@ Style data is stored in JSON5 format for human readability (supports comments, t
   "styles": {
     "DEFAULTS": { ... },
     "motorway": { ... },
-    "building_red": { ... }
+    "building_red": { ... },
+    "pattern-forest": { "fill": { "pattern": "forest" } }
   },
 
   // StyleSelectors: matching rules
   "selectors": {
     "highway-motorway": {
-      "styleID": "motorway",
-      "priority": 10,
+      "styleIDs": ["motorway"],
       "match": {
         "tags": [{ "key": "highway", "value": "motorway" }]
+      }
+    },
+    "landuse-forest": {
+      "styleIDs": ["green", "pattern-forest"],
+      "match": {
+        "tags": [{ "key": "landuse", "value": "forest" }]
       }
     },
     ...
@@ -247,13 +271,20 @@ Style data is stored in JSON5 format for human readability (supports comments, t
 
 ### Phase 3 (Complete)
 - Migrate StyleSystem to use new classes
-- Update `rapid_style.json5` to new selector format with explicit priority
+- Update `rapid_style.json5` to new selector format
 - Add dataset-aware matching
 
-### Phase 4 (Future)
+### Phase 4 (Complete)
+- Multi-selector matching: all matching selectors applied, not just best
+- Removed explicit `priority` in favor of calculated specificity
+- Style composition via `styleIDs` array
+- Refinement selectors for patterns (e.g., `leaf_type=needleleaved`)
+
+### Phase 5 (Future)
 - MapCSS import tool (transforms subset of MapCSS → Rapid style format)
 - UI for editing styles in-app
 - Style "themes" (complete swappable style sets)
+- Optional `matchScore` property if finer control needed (like Preset.matchScore)
 
 ## Comparison with Other Systems
 
@@ -279,9 +310,10 @@ The goal is to be simpler than MapCSS while supporting the most useful subset of
 
 ## Open Questions
 
-1. **Pattern handling**: Should patterns move into `fill.pattern` in declarations, or stay as separate pattern selectors?
-2. **Lifecycle styles**: How do `new`, `modified`, `deleted` states interact with selectors? Special pseudo-selectors?
+1. ~~**Pattern handling**: Should patterns move into `fill.pattern` in declarations, or stay as separate pattern selectors?~~ **Resolved**: Patterns are now in `fill.pattern` and composed via multi-selector matching.
+2. **Lifecycle styles**: How do `new`, `modified`, `deleted` states interact with selectors? Currently handled via tag scanning after style match.
 3. **Caching**: Should we cache selector matches per feature, or is matching fast enough?
+4. **matchScore**: If specificity alone isn't sufficient, we could add an optional `matchScore` property (like Preset) to weight specific selectors.
 
 ## Future: PropMatcher as Side Project
 

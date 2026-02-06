@@ -221,7 +221,7 @@ export class AssetSystem extends AbstractSystem {
    */
   registerAsset(assetID: AssetID, source: AssetSource = {}): void {
     if (assetID === 'default') {
-      throw new Error(`assetID "${assetID}" is a reserved word`);
+      throw new Error(`AssetSystem: assetID "${assetID}" is a reserved word`);
     }
     this.sources[assetID] = source;
   }
@@ -237,7 +237,7 @@ export class AssetSystem extends AbstractSystem {
    */
   registerBundleAsset(assetID: AssetID, parts: Record<BundlePartID, AssetSource>): void {
     if (assetID === 'default') {
-      throw new Error(`assetID "${assetID}" is a reserved word`);
+      throw new Error(`AssetSystem: assetID "${assetID}" is a reserved word`);
     }
     this.bundles[assetID] = { parts };
   }
@@ -272,7 +272,7 @@ export class AssetSystem extends AbstractSystem {
 
     const source = this.sources[assetID];
     if (!source) {
-      throw new Error(`Unknown assetID "${assetID}"`);
+      throw new Error(`AssetSystem: Unknown assetID "${assetID}"`);
     }
 
     let path;
@@ -283,7 +283,7 @@ export class AssetSystem extends AbstractSystem {
     }
 
     if (!path) {
-      throw new Error(`No asset found for assetID "${assetID}" - "preferred" or "${this.origin}"`);
+      throw new Error(`AssetSystem: No asset found for assetID "${assetID}" - "preferred" or "${this.origin}"`);
     } else {
       return this.getFileURL(path);
     }
@@ -317,17 +317,19 @@ export class AssetSystem extends AbstractSystem {
     if (!loadPromise) {
       this._inflight[url] = loadPromise = fetch(url)
         .then(utilFetchResponse)
-        .then(result => {
-          if (!result) {
-            throw new Error(`No data loaded for "${assetID}"`);
+        .then(data => {
+          if (!data) {
+            throw new Error('No data');
           }
-          this._loaded[assetID] = result;
-          return result;
+          this._loaded[assetID] = data;
+          return data;
         })
-        //.catch(err => {
-        //  console.error(`assetID: ${assetID}, url: ${url}`);
-        //  throw new Error(err);
-        //})
+        .catch(err => {
+          const info = { assetID, url };
+          const message = `AssetSystem: ${err.message}\n`;
+          console.error(message, JSON.stringify(info));  // eslint-disable-line no-console
+          throw new Error(err);
+        })
         .finally(() => {
           delete this._inflight[url];
         });
@@ -351,7 +353,7 @@ export class AssetSystem extends AbstractSystem {
 
     const bundle = this.bundles[assetID];
     if (!bundle) {
-      return Promise.reject(`Unknown bundle assetID "${assetID}"`);
+      return Promise.reject(`AssetSystem: Unknown bundle assetID "${assetID}"`);
     }
 
     const partIDs: BundlePartID[] = Object.keys(bundle.parts);
@@ -364,25 +366,31 @@ export class AssetSystem extends AbstractSystem {
       const url = this.getFileURL(path);
       return fetch(url)
         .then(utilFetchResponse)
-        .then(data => ({ partID, data }));
+        .then(data => {
+          if (!data) {
+            throw new Error(`No data`);
+          }
+          return { partID, data };
+        })
+        .catch(err => {
+          const info = { assetID, partID, url };
+          const message = `AssetSystem: ${err.message}\n`;
+          console.error(message, JSON.stringify(info));  // eslint-disable-line no-console
+          throw new Error(err);
+        });
     });
 
     // Type guard, see https://stackoverflow.com/a/73913774/7620
     const isFulfilled = <T,>(p: PromiseSettledResult<T>): p is PromiseFulfilledResult<T> => p.status === 'fulfilled';
-    const isRejected = <T,>(p: PromiseSettledResult<T>): p is PromiseRejectedResult => p.status === 'rejected';
 
     return Promise.allSettled(partPromises)
       .then(results => {
         const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
-        const rejectedReasons = results.filter(isRejected).map(p => p.reason);
         const combined: Record<BundlePartID, unknown> = { assetID };
 
         for (const value of fulfilledValues) {
           const { partID, data } = value;
           combined[partID] = data;
-        }
-        for (const reason of rejectedReasons as string[]) {
-          console.warn(reason);   // eslint-disable-line no-console
         }
 
         this._loaded[assetID] = combined;

@@ -3,6 +3,7 @@ import { osmPavedTags } from '../lib/tags.ts';
 import { Style } from '../lib/Style.ts';
 import { StyleSelector } from '../lib/StyleSelector.ts';
 import { utilIterable } from '../util/iterable.ts';
+import { utilExtractValues, utilWildcard } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
@@ -249,7 +250,9 @@ export class StyleSystem extends AbstractSystem {
 
     // If AssetSystem is not available, we can't load style files.
     // resetAll() has already set up empty maps.
-    if (!assets) return Promise.resolve();
+    if (!assets) {
+      return Promise.resolve();
+    }
 
     // Load the style files
     const which = this._requestedAssetIDs ?? this._defaultAssetIDs;
@@ -263,11 +266,15 @@ export class StyleSystem extends AbstractSystem {
       assetIDs.map(assetID => assets.loadAssetAsync(assetID))
     )
     .then(results => {
-      for (const result of results) {
-        if (isFulfilled(result) && result.value) {
-          this.merge(result.value as StyleData);
+      // Process the loaded data
+      const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
+      for (const value of fulfilledValues as StyleData[]) {
+        if (value.assetID === 'rapid_style') {
+          value.assetVersion ||= context.version;
         }
+        this.merge(value);
       }
+
       for (const result of results) {
         if (isRejected(result)) {
           console.error(result.reason);  // eslint-disable-line no-console
@@ -335,6 +342,7 @@ export class StyleSystem extends AbstractSystem {
 
     this._requestedAssetIDs = new Set();
     for (const assetID of utilIterable(vals)) {
+      if (!assetID) continue;
       if (assetID === 'default') {
         for (const defaultID of this._defaultAssetIDs) {
           this._requestedAssetIDs.add(defaultID);
@@ -466,36 +474,17 @@ export class StyleSystem extends AbstractSystem {
    * @param prevParams - The previous hash parameters
    */
   private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
-    const context = this.context;
-    const assets = context.systems.assets;
-
-    // style=assetID1,assetID2,assetID3
-    const currStyle = currParams.get('style');
-    const prevStyle = prevParams.get('style');
-
-    if (currStyle !== prevStyle) {
-      // Special: setting to '' means load nothing
-      // Special: setting to null means load the defaults
-      if (currStyle === '') {
-        this.requestedAssetIDs = '';
-        this.loadStyleAssetsAsync();
-      } else if (currStyle === null || currStyle === undefined) {
-        this.requestedAssetIDs = null;
-        this.loadStyleAssetsAsync();
+    // style
+    // AssetIDs to request, e.g. `style=default,my_presets`
+    const newStyle = currParams.get('style');
+    const oldStyle = prevParams.get('style');
+    if (newStyle !== oldStyle) {
+      if (typeof newStyle === 'string') {
+        this.requestedAssetIDs = utilExtractValues(newStyle).filter(Boolean);
       } else {
-        // First register any custom assets from `assets=` parameter
-        const customAssets = currParams.get('assets');
-        if (customAssets && assets) {
-          for (const pair of customAssets.split(',')) {
-            const [assetID, url] = pair.split('|');
-            if (assetID && url) {
-              assets.registerAsset(assetID, { preferred: url });
-            }
-          }
-        }
-        this.requestedAssetIDs = currStyle;
-        this.loadStyleAssetsAsync();
+        this.requestedAssetIDs = null;
       }
+      this.loadStyleAssetsAsync();
     }
   }
 
@@ -585,7 +574,7 @@ export class StyleSystem extends AbstractSystem {
       const matchedGroup = matched[group] as Record<string, unknown> | undefined;
       const defaultGroup = defaults[group] as Record<string, unknown> | undefined;
 
-      for (const prop of ['width', 'color', 'alpha', 'cap', 'join', 'dash']) {
+      for (const prop of ['width', 'color', 'alpha', 'cap', 'join', 'dash', 'pattern']) {
         const value = matchedGroup?.[prop];
         if (value !== undefined) {
           styleGroup[prop] = value;
