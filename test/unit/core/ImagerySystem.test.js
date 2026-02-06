@@ -1000,6 +1000,10 @@ describe('ImagerySystem', () => {
         };
       });
 
+      beforeEach(() => {
+        spyImageryChange.mockClear();
+      });
+
       afterEach(() => {
         _imagery.requestedAssetIDs = null;
       });
@@ -1009,7 +1013,6 @@ describe('ImagerySystem', () => {
       });
 
       it('does nothing when schema param is unchanged', () => {
-        spyImageryChange.mockClear();
         const curr = new Map([['other', 'value']]);
         const prev = new Map([['other', 'value']]);
         _imagery._hashChanged(curr, prev);
@@ -1017,7 +1020,6 @@ describe('ImagerySystem', () => {
       });
 
       it('handles imagery param set to empty string', () => {
-        spyImageryChange.mockClear();
         const curr = new Map([['imagery', '']]);
         const prev = new Map();
         _imagery._hashChanged(curr, prev);
@@ -1026,7 +1028,6 @@ describe('ImagerySystem', () => {
       });
 
       it('handles imagery param set to null', () => {
-        spyImageryChange.mockClear();
         const curr = new Map();
         const prev = new Map([['imagery', 'something']]);
         _imagery._hashChanged(curr, prev);
@@ -1035,7 +1036,6 @@ describe('ImagerySystem', () => {
       });
 
       it('handles imagery param with asset IDs', () => {
-        spyImageryChange.mockClear();
         const curr = new Map([['imagery', 'editor_layer_index']]);
         const prev = new Map();
         _imagery._hashChanged(curr, prev);

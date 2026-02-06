@@ -1091,12 +1091,15 @@ describe('SchemaSystem', () => {
 
 
     describe('_hashChanged', () => {
+      beforeEach(() => {
+        spySchemaChange.mockClear();
+      });
+
       afterEach(() => {
         _schema.requestedAssetIDs = null;
       });
 
       it('does nothing when schema param is unchanged', () => {
-        spySchemaChange.mockClear();
         const curr = new Map([['other', 'value']]);
         const prev = new Map([['other', 'value']]);
         _schema._hashChanged(curr, prev);
@@ -1104,7 +1107,6 @@ describe('SchemaSystem', () => {
       });
 
       it('handles schema param set to empty string', () => {
-        spySchemaChange.mockClear();
         const curr = new Map([['schema', '']]);
         const prev = new Map();
         _schema._hashChanged(curr, prev);
@@ -1113,7 +1115,6 @@ describe('SchemaSystem', () => {
       });
 
       it('handles schema param set to null', () => {
-        spySchemaChange.mockClear();
         const curr = new Map();
         const prev = new Map([['schema', 'something']]);
         _schema._hashChanged(curr, prev);
@@ -1122,7 +1123,6 @@ describe('SchemaSystem', () => {
       });
 
       it('handles schema param with asset IDs', () => {
-        spySchemaChange.mockClear();
         const curr = new Map([['schema', 'id_tagging_schema']]);
         const prev = new Map();
         _schema._hashChanged(curr, prev);

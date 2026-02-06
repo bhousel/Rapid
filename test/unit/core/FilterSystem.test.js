@@ -1,4 +1,4 @@
-import { beforeAll, describe, it } from 'bun:test';
+import { beforeAll, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -76,11 +76,14 @@ describe('FilterSystem', () => {
 
   // Test an already-constructed instance of the system..
   describe('methods', () => {
+    const spyFilterChange = mock();
     let _filters;
 
     beforeAll(() => {
       _filters = new Rapid.FilterSystem(context);
-      return _filters.initAsync().then(() => _filters.startAsync());
+      return _filters.initAsync()
+        .then(() => _filters.startAsync())
+        .then(() => _filters.on('filterchange', spyFilterChange));
     });
 
 
@@ -98,76 +101,289 @@ describe('FilterSystem', () => {
       ]);
     });
 
+    it('gets hidden filters', () => {
+      _filters.enableAll();
+      let hidden = _filters.hidden;
+      assert.instanceOf(hidden, Set);
+      assert.strictEqual(hidden.size, 0);
+
+      _filters.disable('water');
+      _filters.disable('power');
+      hidden = _filters.hidden;
+      assert.strictEqual(hidden.size, 2);
+      assert.isTrue(hidden.has('water'));
+      assert.isTrue(hidden.has('power'));
+
+      _filters.enableAll();
+    });
+
     it('disable', () => {
+      _filters.enable('water');  // reset
+      spyFilterChange.mockClear();
+
       _filters.disable('water');
       assert.isFalse(_filters.isEnabled('water'));
+      assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchanged called once
     });
 
     it('disableAll', () => {
+      _filters.enableAll();  // reset
+      spyFilterChange.mockClear();
+
       _filters.disableAll();
       for (const k of _filters.keys) {
         assert.isFalse(_filters.isEnabled(k));
       }
+      assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchanged called once
     });
 
     it('enable', () => {
-      _filters.disable('water');
+      _filters.disable('water');  // reset
+      spyFilterChange.mockClear();
+
       _filters.enable('water');
       assert.isTrue(_filters.isEnabled('water'));
+      assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchanged called once
     });
 
     it('enableAll', () => {
-      _filters.disableAll();
+      _filters.disableAll();  // reset
+      spyFilterChange.mockClear();
+
       _filters.enableAll();
       for (const k of _filters.keys) {
         assert.isTrue(_filters.isEnabled(k));
       }
+      assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchanged called once
     });
 
     describe('toggle', () => {
       it('toggles', () => {
+        _filters.enable('water');  // reset
+        spyFilterChange.mockClear();
+
         _filters.toggle('water');
         assert.isFalse(_filters.isEnabled('water'));
 
         _filters.toggle('water');
         assert.isTrue(_filters.isEnabled('water'));
+        assert.lengthOf(spyFilterChange.mock.calls, 2);   // filterchanged called twice
       });
     });
 
 
-  // This previously counted all the features,
-  // but currently it only counts the hidden features
-  // so the counts are wrong
-    describe.skip('#filterScene', () => {
-      it('counts hidden features', () => {
+    describe('cache management', () => {
+      it('clearEntity clears cache for a single entity', () => {
+        const graph = new Rapid.Graph(context, [
+          new Rapid.OsmNode(context, { id: 'a', tags: { amenity: 'bar' }, version: 1 })
+        ]);
+        const entity = graph.entity('a');
+        const geometry = entity.geometry(graph);
+
+        // First call will populate cache
+        _filters.getMatches(entity, graph, geometry);
+        assert.isDefined(_filters._cache[entity.key]);
+
+        // Clear should remove from cache
+        _filters.clearEntity(entity);
+        assert.isUndefined(_filters._cache[entity.key]);
+      });
+
+      it('clear clears cache for multiple entities', () => {
+        const graph = new Rapid.Graph(context, [
+          new Rapid.OsmNode(context, { id: 'a', tags: { amenity: 'bar' }, version: 1 }),
+          new Rapid.OsmNode(context, { id: 'b', tags: { waterway: 'dock' }, version: 1 })
+        ]);
+        const a = graph.entity('a');
+        const b = graph.entity('b');
+
+        // Populate cache
+        _filters.getMatches(a, graph, a.geometry(graph));
+        _filters.getMatches(b, graph, b.geometry(graph));
+        assert.isDefined(_filters._cache[a.key]);
+        assert.isDefined(_filters._cache[b.key]);
+
+        // Clear both
+        _filters.clear([a, b]);
+        assert.isUndefined(_filters._cache[a.key]);
+        assert.isUndefined(_filters._cache[b.key]);
+      });
+    });
+
+
+    describe('isHiddenPreset', () => {
+      it('returns null when no filters are hidden', () => {
+        _filters.enableAll();
+        const preset = {
+          tags: { amenity: 'bar' },
+          setTags: (tags) => ({ ...tags, amenity: 'bar' })
+        };
+        assert.isNull(_filters.isHiddenPreset(preset, 'point'));
+      });
+
+      it('returns null when preset has no tags', () => {
+        _filters.disable('points');
+        const preset = {
+          setTags: (tags) => tags
+        };
+        assert.isNull(_filters.isHiddenPreset(preset, 'point'));
+      });
+
+      it('returns filterID when preset matches a hidden filter', () => {
+        _filters.enableAll();
+        _filters.disable('water');
+        const preset = {
+          tags: { natural: 'water' },
+          setTags: (tags) => ({ ...tags, natural: 'water', area: 'yes' })
+        };
+        assert.strictEqual(_filters.isHiddenPreset(preset, 'area'), 'water');
+      });
+
+      it('returns null when preset matches an enabled filter', () => {
+        _filters.enableAll();
+        const preset = {
+          tags: { highway: 'residential' },
+          setTags: (tags) => ({ ...tags, highway: 'residential' })
+        };
+        assert.isNull(_filters.isHiddenPreset(preset, 'line'));
+      });
+    });
+
+
+    describe('hasHiddenConnections', () => {
+      it('returns false when no filters are hidden', () => {
+        _filters.enableAll();
+        const a = new Rapid.OsmNode(context, { id: 'a', version: 1 });
+        const b = new Rapid.OsmNode(context, { id: 'b', version: 1 });
+        const way = new Rapid.OsmWay(context, { id: 'w', nodes: [a.id, b.id], tags: { highway: 'residential' }, version: 1 });
+        const graph = new Rapid.Graph(context, [a, b, way]);
+
+        assert.isFalse(_filters.hasHiddenConnections(way, graph));
+      });
+
+      it('returns true when entity is connected to a hidden way', () => {
+        const a = new Rapid.OsmNode(context, { id: 'a', version: 1 });
+        const b = new Rapid.OsmNode(context, { id: 'b', version: 1 });
+        const c = new Rapid.OsmNode(context, { id: 'c', version: 1 });
+        const way1 = new Rapid.OsmWay(context, { id: 'w1', nodes: [a.id, b.id], tags: { highway: 'residential' }, version: 1 });
+        const way2 = new Rapid.OsmWay(context, { id: 'w2', nodes: [b.id, c.id], tags: { highway: 'path' }, version: 1 });
+        const graph = new Rapid.Graph(context, [a, b, c, way1, way2]);
+
+        _filters.enableAll();
+        _filters.disable('paths');
+
+        // way1 should detect connection to hidden way2 (they share node b)
+        assert.isTrue(_filters.hasHiddenConnections(way1, graph));
+      });
+
+      it('returns false for entities without nodes or connections', () => {
+        const way = new Rapid.OsmWay(context, { id: 'w1', tags: { highway: 'residential' }, version: 1 });
+        const graph = new Rapid.Graph(context, [way]);
+
+        _filters.enableAll();
+        _filters.disable('traffic_roads');
+
+        // way has no connections, so should return false
+        assert.isFalse(_filters.hasHiddenConnections(way, graph));
+      });
+
+      it('handles midpoint entities', () => {
+        const a = new Rapid.OsmNode(context, { id: 'a', version: 1 });
+        const b = new Rapid.OsmNode(context, { id: 'b', version: 1 });
+        const way = new Rapid.OsmWay(context, { id: 'w', nodes: [a.id, b.id], tags: { highway: 'path' }, version: 1 });
+        const graph = new Rapid.Graph(context, [a, b, way]);
+
+        _filters.enableAll();
+        _filters.disable('paths');
+
+        const midpoint = { type: 'midpoint', edge: [a.id, b.id] };
+        assert.isTrue(_filters.hasHiddenConnections(midpoint, graph));
+      });
+    });
+
+
+    describe('filterScene', () => {
+      it('returns all entities when no filters are hidden', () => {
+        _filters.enableAll();
         const graph = new Rapid.Graph(context, [
           new Rapid.OsmNode(context, { id: 'point_bar', tags: { amenity: 'bar' }, version: 1 }),
           new Rapid.OsmNode(context, { id: 'point_dock', tags: { waterway: 'dock' }, version: 1 }),
-          new Rapid.OsmNode(context, { id: 'point_rail_station', tags: { railway: 'station' }, version: 1 }),
-          new Rapid.OsmNode(context, { id: 'point_generator', tags: { power: 'generator' }, version: 1 }),
-          new Rapid.OsmNode(context, { id: 'point_old_rail_station', tags: { railway: 'station', disused: 'yes' }, version: 1 }),
+          new Rapid.OsmWay(context, { id: 'motorway', tags: { highway: 'motorway' }, version: 1 })
+        ]);
+        const all = [...graph.base.entities.values()];
+
+        const result = _filters.filterScene(all, graph);
+        assert.strictEqual(result.length, 3);
+        const stats = _filters.getStats();
+        assert.strictEqual(stats.points.count, 0);
+        assert.strictEqual(stats.water.count, 0);
+        assert.strictEqual(stats.traffic_roads.count, 0);
+      });
+
+      it('filters out hidden features and counts them', () => {
+        _filters.enableAll();
+        _filters.disable('water');
+        _filters.disable('power');
+        _filters.disable('buildings');
+
+        const graph = new Rapid.Graph(context, [
+          new Rapid.OsmNode(context, { id: 'point_bar', tags: { amenity: 'bar' }, version: 1 }),
+          new Rapid.OsmNode(context, { id: 'point_rail', tags: { railway: 'station' }, version: 1 }),
           new Rapid.OsmWay(context, { id: 'motorway', tags: { highway: 'motorway' }, version: 1 }),
-          new Rapid.OsmWay(context, { id: 'building_yes', tags: { area: 'yes', amenity: 'school', building: 'yes' }, version: 1 }),
-          new Rapid.OsmWay(context, { id: 'boundary', tags: { boundary: 'administrative' }, version: 1 }),
+          new Rapid.OsmWay(context, { id: 'building_yes', tags: { area: 'yes', building: 'yes' }, version: 1 }),
+          new Rapid.OsmWay(context, { id: 'water', tags: { area: 'yes', natural: 'water' }, version: 1 }),
+          new Rapid.OsmWay(context, { id: 'river', tags: { waterway: 'river' }, version: 1 }),
+          new Rapid.OsmWay(context, { id: 'power_line', tags: { power: 'line' }, version: 1 }),
           new Rapid.OsmWay(context, { id: 'fence', tags: { barrier: 'fence' }, version: 1 })
         ]);
         const all = [...graph.base.entities.values()];
 
-        _filters.filterScene(all, graph);
+        const result = _filters.filterScene(all, graph);
         const stats = _filters.getStats();
 
-        assert.strictEqual(stats.boundaries, 1);
-        assert.strictEqual(stats.buildings, 1);
-        assert.strictEqual(stats.landuse, 0);
-        assert.strictEqual(stats.traffic_roads, 1);
-        assert.strictEqual(stats.service_roads, 0);
-        assert.strictEqual(stats.others, 1);
-        assert.strictEqual(stats.past_future, 1);
-        assert.strictEqual(stats.paths, 0);
-        assert.strictEqual(stats.points, 5);
-        assert.strictEqual(stats.power, 1);
-        assert.strictEqual(stats.rail, 2);
-        assert.strictEqual(stats.water, 1);
+        // Check that hidden features are counted
+        assert.strictEqual(stats.water.count, 2);  // water way + river way
+        assert.strictEqual(stats.power.count, 1);  // power_line
+        assert.strictEqual(stats.buildings.count, 1);  // building_yes
+
+        // Check that enabled filters have zero count
+        assert.strictEqual(stats.points.count, 0);
+        assert.strictEqual(stats.traffic_roads.count, 0);
+        assert.strictEqual(stats.rail.count, 0);
+
+        // Check that result doesn't include hidden features
+        const resultIDs = result.map(e => e.id);
+        assert.isTrue(resultIDs.includes('point_bar'));
+        assert.isTrue(resultIDs.includes('point_rail'));
+        assert.isFalse(resultIDs.includes('building_yes')); // hidden (buildings)
+        assert.isFalse(resultIDs.includes('power_line')); // hidden (power)
+        assert.isFalse(resultIDs.includes('water'));          // hidden (water)
+        assert.isFalse(resultIDs.includes('river'));          // hidden (water)
+        assert.isTrue(resultIDs.includes('motorway'));
+        assert.isTrue(resultIDs.includes('fence'));
+      });
+
+      it('does not count uninteresting vertices', () => {
+        _filters.enableAll();
+        _filters.disable('paths');
+
+        const a = new Rapid.OsmNode(context, { id: 'a', version: 1 });
+        const b = new Rapid.OsmNode(context, { id: 'b', version: 1 });
+        const path = new Rapid.OsmWay(context, { id: 'path', nodes: [a.id, b.id], tags: { highway: 'path' }, version: 1 });
+        const graph = new Rapid.Graph(context, [a, b, path]);
+        const all = [...graph.base.entities.values()];
+
+        const result = _filters.filterScene(all, graph);
+        const stats = _filters.getStats();
+
+        // The path way should be counted
+        assert.strictEqual(stats.paths.count, 1);
+
+        // Vertices should not be included in result
+        const resultIDs = result.map(e => e.id);
+        assert.isFalse(resultIDs.includes('a'));
+        assert.isFalse(resultIDs.includes('b'));
+        assert.isFalse(resultIDs.includes('path'));
       });
     });
 
@@ -652,8 +868,61 @@ describe('FilterSystem', () => {
         _filters.forceVisible(['a']);
         assert.isNull(_filters.isHidden(a, graph, ageo));
       });
-
     });
+
+
+    describe('_hashChanged', () => {
+      it('does nothing when disable_features param is unchanged', () => {
+        _filters.enableAll();  // reset
+        spyFilterChange.mockClear();
+
+        const curr = new Map([['other', 'value']]);
+        const prev = new Map([['other', 'value']]);
+        _filters._hashChanged(curr, prev);
+        assert.lengthOf(spyFilterChange.mock.calls, 0);   // No filterchange should occur
+      });
+
+      it('handles disable_features param set to a value', () => {
+        _filters.enableAll();  // reset
+        spyFilterChange.mockClear();
+
+        // 'water' and 'rail' added to the list
+        const curr = new Map([['disable_features', 'water,rail']]);
+        const prev = new Map();
+        _filters._hashChanged(curr, prev);
+        assert.isFalse(_filters.isEnabled('water'));
+        assert.isFalse(_filters.isEnabled('rail'));
+        assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchange emitted
+      });
+
+      it('handles disable_features param set to empty string', () => {
+        _filters.disable('water');
+        _filters.disable('rail');
+        spyFilterChange.mockClear();
+
+        // 'water' and 'rail' removed from the list
+        const curr = new Map([['disable_features', '']]);
+        const prev = new Map([['disable_features', 'water,rail']]);
+        _filters._hashChanged(curr, prev);
+        assert.isTrue(_filters.isEnabled('water'));
+        assert.isTrue(_filters.isEnabled('rail'));
+        assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchange emitted
+      });
+
+      it('handles disable_features param set to empty string', () => {
+        _filters.disable('water');
+        spyFilterChange.mockClear();
+
+        // list cleared
+        const curr = new Map();
+        const prev = new Map([['disable_features', 'water,rail']]);
+        _filters._hashChanged(curr, prev);
+        assert.isTrue(_filters.isEnabled('water'));
+        assert.isTrue(_filters.isEnabled('rail'));
+        assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchange emitted
+      });
+    });
+
   });
 
 });

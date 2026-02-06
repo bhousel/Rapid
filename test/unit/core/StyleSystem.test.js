@@ -471,12 +471,15 @@ describe('StyleSystem', () => {
 
 
     describe('_hashChanged', () => {
+      beforeEach(() => {
+        spyStyleChange.mockClear();
+      });
+
       afterEach(() => {
         _styles.requestedAssetIDs = null;
       });
 
       it('does nothing when style param is unchanged', () => {
-        spyStyleChange.mockClear();
         const curr = new Map([['other', 'value']]);
         const prev = new Map([['other', 'value']]);
         _styles._hashChanged(curr, prev);
@@ -484,7 +487,6 @@ describe('StyleSystem', () => {
       });
 
       it('handles style param set to empty string', () => {
-        spyStyleChange.mockClear();
         const curr = new Map([['style', '']]);
         const prev = new Map();
         _styles._hashChanged(curr, prev);
@@ -493,7 +495,6 @@ describe('StyleSystem', () => {
       });
 
       it('handles style param set to null', () => {
-        spyStyleChange.mockClear();
         const curr = new Map();
         const prev = new Map([['style', 'something']]);
         _styles._hashChanged(curr, prev);
@@ -502,7 +503,6 @@ describe('StyleSystem', () => {
       });
 
       it('handles style param with asset IDs', () => {
-        spyStyleChange.mockClear();
         const curr = new Map([['style', 'rapid_style']]);
         const prev = new Map();
         _styles._hashChanged(curr, prev);
