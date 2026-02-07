@@ -10,6 +10,10 @@ Rapid is an AI-enhanced editor for OpenStreetMap, built with JavaScript/TypeScri
 - **Pixi.js** for rendering
 - **D3** for UI components
 
+## Scratchpad
+
+There is a `.github/scratchpad.md` file (git-ignored) that serves as persistent working memory across chat sessions. At the start of a session, read it for context on recent work, lessons learned, and known quirks. Before ending a session that involved significant work, update it with anything a future session would benefit from knowing.
+
 ## General Guidelines
 
 ### Comments

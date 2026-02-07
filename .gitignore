@@ -2,6 +2,7 @@
 .esm-cache
 npm-debug.log
 transifex.auth
+scratchpad.md
 
 .coverage/
 .idea/
