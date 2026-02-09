@@ -1,11 +1,12 @@
 import { scaleLinear, type ScaleLinear } from 'd3-scale';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
+import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
 
 import type { GeoJSON } from '../data/GeoJSON.ts';
 import type { Marker } from '../data/Marker.ts';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -16,19 +17,17 @@ const SELECTED = 0xffee00;
 const LINESTYLE = {
   casing: { alpha: 0 },  // disable
   stroke: { alpha: 0.7, width: 4, color: MAPILLARY_GREEN }
-} as LineStyle;
+} as Partial<MatchedStyle>;
 
-const MARKERSTYLE = {
-  markerAlpha:     0.8,
-  markerName:      'mediumCircle',
-  markerTint:      MAPILLARY_GREEN,
+const MARKERSTYLE: Partial<PointStyle> = {
+  marker: { name: 'mediumCircle', color: MAPILLARY_GREEN, alpha: 0.8 },
   viewfieldAlpha:  0.7,
   viewfieldName:   'viewfield',
-  viewfieldTint:   MAPILLARY_GREEN,
+  viewfieldColor:   MAPILLARY_GREEN,
   scale:           1.0,
   fovWidth:        1,
   fovLength:       1
-} as PointStyle;
+};
 
 const fovWidthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [1.3, 0.7]);
 const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7, 1.5]);
@@ -314,14 +313,14 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style: PointStyle = Object.assign({}, MARKERSTYLE);
+        const style: Partial<PointStyle> = Object.assign({}, MARKERSTYLE);
 
         if (feature.hasClass('selectphoto')) {  // selected photo style
           style.viewfieldAngles = [this._viewerBearing ?? d.props.ca];
           style.viewfieldName = 'viewfield';
           style.viewfieldAlpha = 1;
-          style.viewfieldTint = SELECTED;
-          style.markerTint = SELECTED;
+          style.viewfieldColor = SELECTED;
+          style.marker = Object.assign({}, style.marker, { color: SELECTED });
           style.scale = 2.0;
           style.fovWidth = fovWidthInterp(this._viewerFov ?? 55);
           style.fovLength = fovLengthInterp(this._viewerFov ?? 55);
@@ -332,8 +331,8 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
             style.viewfieldAlpha = 1;
-            style.viewfieldTint = SELECTED;
-            style.markerTint = SELECTED;
+            style.viewfieldColor = SELECTED;
+            style.marker = Object.assign({}, style.marker, { color: SELECTED });
           }
         }
 

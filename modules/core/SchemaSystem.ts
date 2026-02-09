@@ -444,10 +444,10 @@ export class SchemaSystem extends AbstractSystem {
    * {
    *   assetID: '',            // A string asset identifier, e.g. 'id-tagging-schema'
    *   assetVersion: '',       // A string version specifier, e.g. '6.13.0'  (defaults to 'unknown' if not present)
-   *   fields: {},             // Object<fieldID, fieldData>
-   *   presets: {},            // Object<presetID, presetData>
-   *   categories: {},         // Object<categoryID, categoryData>
-   *   defaults: {},           // Object<geometry, Array<presetIDs>>
+   *   fields: {},             // Object<FieldID, Partial<FieldProps>>
+   *   presets: {},            // Object<PresetID, Partial<PresetProps>>
+   *   categories: {},         // Object<CategoryID, Partial<CategoryProps>>
+   *   defaults: {},           // Object<geometry, Array<PresetID>>
    *   featureCollection: {}   // Custom GeoJSON, possibly referenced by locationSets
    * }
    *

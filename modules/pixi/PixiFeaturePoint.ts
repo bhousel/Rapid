@@ -6,48 +6,34 @@ import { DashLine } from './lib/DashLine.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 
-/** Style properties for point features */
-export interface PointStyle {
+/**
+ * PointStyle extends MatchedStyle with point-specific rendering properties.
+ * The MatchedStyle contains everything needed to render any feature type.
+ * Point rendering code uses marker, icon, and the viewfield properties defined here.
+ * Line-specific properties like lineMarker, sidedMarker are ignored.
+ */
+export interface PointStyle extends MatchedStyle {
   /** Anchor position for icon { x, y } (0.5,0.5 = centered) */
   anchor?: { x: number; y: number };
+  /** Scale multiplier */
+  scale?: number;
+
+  // Viewfield properties (specific to point features)
   /** Field of view length multiplier */
   fovLength?: number;
   /** Field of view width multiplier */
   fovWidth?: number;
-  /** Icon alpha/opacity (0-1) */
-  iconAlpha?: number;
-  /** Icon texture name to load */
-  iconName?: string;
-  /** Icon size in pixels */
-  iconSize?: number;
-  /** Custom icon texture */
-  iconTexture?: PIXI.Texture;
-  /** Icon tint color */
-  iconTint?: number;
-  /** Label tint color */
-  labelTint?: number;
-  /** Marker alpha/opacity (0-1) */
-  markerAlpha?: number;
-  /** Marker texture name to load */
-  markerName?: string;
-  /** Custom marker texture */
-  markerTexture?: PIXI.Texture;
-  /** Marker tint color */
-  markerTint?: number;
-  /** Scale multiplier */
-  scale?: number;
   /** Viewfield alpha/opacity (0-1) */
   viewfieldAlpha?: number;
   /** Array of viewfield angles in degrees */
   viewfieldAngles?: number[];
   /** Viewfield texture name to load */
   viewfieldName?: string;
-  /** Custom viewfield texture */
-  viewfieldTexture?: PIXI.Texture;
-  /** Viewfield tint color */
-  viewfieldTint?: number;
+  /** Viewfield color */
+  viewfieldColor?: number;
 }
 
 
@@ -189,7 +175,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const wireframeMode = map?.wireframeMode;
     const textureManager = this.gfx.textureManager!;
     const style = this._style as PointStyle;
-    const isPin = ['pin', 'boldPin', 'osmose'].includes(style.markerName ?? '');
+    const isPin = ['pin', 'boldPin', 'osmose'].includes(style.marker.name ?? '');
 
     const marker = this.marker!;
     const icon = this.icon!;
@@ -201,25 +187,24 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this.container.rotation = -bearing;
 
     // Show marker, if any..
-    if (style.markerTexture || style.markerName) {
+    if (style.marker.name) {
       // note - marker.texture gets set below in the effective zoom block
-      marker.alpha = style.markerAlpha ?? 1;
-      marker.tint = style.markerTint ?? 0xffffff;
+      marker.alpha = style.marker.alpha ?? 1;
+      marker.tint = style.marker.color ?? 0xffffff;
       marker.visible = true;
     } else {  // No marker
       marker.visible = false;
     }
 
     // Show icon, if any..
-    if (style.iconTexture || style.iconName) {
-      icon.texture = style.iconTexture ||
-        textureManager.getTexture('symbol', style.iconName!) || PIXI.Texture.EMPTY;
+    if (style.icon.name) {
+      icon.texture = textureManager.getTexture('symbol', style.icon.name) || PIXI.Texture.EMPTY;
       icon.anchor.set(style.anchor?.x || 0.5, style.anchor?.y || 0.5);   // middle, middle by default, can be overridden in layer code
-      const iconSize = style.iconSize || 11;
+      const iconSize = style.icon.size || 11;
       icon.width = iconSize;
       icon.height = iconSize;
-      icon.alpha = style.iconAlpha ?? 1;
-      icon.tint = style.iconTint ?? 0x111111;
+      icon.alpha = style.icon.alpha ?? 1;
+      icon.tint = style.icon.color ?? 0x111111;
       icon.visible = true;
     } else {  // No icon
       icon.visible = false;
@@ -229,8 +214,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const vfAngles = style.viewfieldAngles || [];
     let vfTexture = PIXI.Texture.EMPTY;
     if (vfAngles.length > 0) {  // Should have viewfields
-      vfTexture = style.viewfieldTexture ||
-        textureManager.getTexture('symbol', style.viewfieldName || '') || PIXI.Texture.WHITE;
+      vfTexture = textureManager.getTexture('symbol', style.viewfieldName || '') || PIXI.Texture.WHITE;
 
       // Sort markers with viewfields above markers without viewfields
       // this.container.zIndex = -latitude + 1000;
@@ -274,7 +258,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       for (let i = 0; i < vfAngles.length; i++) {
         const vfSprite = this.viewfields.getChildAt(i);
         vfSprite.alpha = style.viewfieldAlpha ?? 1;
-        vfSprite.tint = style.viewfieldTint || 0x333333;
+        vfSprite.tint = style.viewfieldColor ?? 0x333333;
         vfSprite.scale.set(xScale, yScale);
         vfSprite.angle = vfAngles[i];
       }
@@ -305,10 +289,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
 
       // Replace pinlike markers with circles at lower zoom
-      const markerID = isPin ? 'largeCircle' : (style.markerName ?? 'smallCircle');
-      this._isCircular = (!style.markerTexture && /(circle|midpoint)$/i.test(markerID));
-      marker.texture = style.markerTexture ||
-        textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
+      const markerID = isPin ? 'largeCircle' : (style.marker.name ?? 'smallCircle');
+      this._isCircular = /(circle|midpoint)$/i.test(markerID);
+      marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
       marker.anchor.set(0.5, 0.5);  // middle, middle
       icon.position.set(0, 0);      // middle, middle
 
@@ -321,10 +304,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
 
       // Replace pinlike markers with circles if viewfields are present
-      const markerID = (isPin && vfAngles.length) ? 'largeCircle' : (style.markerName ?? 'smallCircle');
-      this._isCircular = (!style.markerTexture && /(circle|midpoint)$/i.test(markerID));
-      marker.texture = style.markerTexture ||
-        textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
+      const markerID = (isPin && vfAngles.length) ? 'largeCircle' : (style.marker.name ?? 'smallCircle');
+      this._isCircular = /(circle|midpoint)$/i.test(markerID);
+      marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
       if (isPin && !this._isCircular) {
         marker.anchor.set(0.5, 1);    // middle, bottom
         icon.position.set(0, -14);    // mathematically 0,-15 is center of pin, but looks nicer moved down slightly
@@ -466,16 +448,17 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
 const STYLE_DEFAULTS: PointStyle = {
-  iconAlpha: 1,
-  iconName: '',
-  iconTint: 0x111111,
-  iconSize: 11,
-  labelTint: 0xeeeeee,
-  markerAlpha: 1,
-  markerName: 'smallCircle',
-  markerTint: 0xffffff,
+  fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3, pattern: undefined },
+  casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
+  stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' },
+  marker: { name: 'smallCircle', color: 0xffffff, alpha: 1 },
+  icon: { name: undefined, color: 0x111111, alpha: 1, size: 11 },
+  lineMarker: { name: undefined, color: 0x000000 },
+  sidedMarker: { name: undefined, color: 0xffffff },
+  labelColor: 0xeeeeee,
+  requireFill: false,
   viewfieldAlpha: 0.75,
   viewfieldAngles: [],
   viewfieldName: 'viewfield',
-  viewfieldTint: 0xffffff
+  viewfieldColor: 0xffffff
 };

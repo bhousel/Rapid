@@ -143,8 +143,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._debugRBush = new RBush();  // debug sprites
 
     // Keep track of the features we have processed
-    this._avoided = new Set();   // Set<featureID>
-    this._labeled = new Set();   // Set<featureID>
+    this._avoided = new Set();   // Set<FeatureID>
+    this._labeled = new Set();   // Set<FeatureID>
 
     // Label objects are placeholders for where a label can go.
     // After working out the placement math, we don't automatically make display objects,
@@ -798,7 +798,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           labelObj: labelObj,
           x: x,
           y: y,
-          tint: style?.labelTint || 0xeeeeee
+          tint: style?.labelColor ?? 0xeeeeee
         });
 
         this._labels.set(featureID, label);
@@ -1014,7 +1014,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         str: feature.label!,
         coords: scaledCoords,
         labelObj: labelObj,
-        tint: style?.labelTint || 0xeeeeee
+        tint: style?.labelColor ?? 0xeeeeee
       });
       this._labels.set(labelID, label);
     });
@@ -1048,7 +1048,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     };
 
     // Collect Labels in view
-    const labelIDs = new Set<string>();
+    const labelIDs = new Set<LabelID>();
     const seenTextures = new Set<string>();
     const hits = this._labelRBush.search(screenBounds);
     for (const box of hits) {

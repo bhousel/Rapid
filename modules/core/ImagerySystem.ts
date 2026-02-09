@@ -318,7 +318,7 @@ export class ImagerySystem extends AbstractSystem {
    * {
    *   assetID: '',       // A string identifier, e.g. 'editor_layer_index'
    *   assetVersion: ''   // A string version specifier, e.g. '2026-01-01'  (defaults to 'unknown' if not present)
-   *   imagery: {},       // Object<ImagerySourceID, ImageryData>
+   *   imagery: {},       // Object<ImagerySourceID, Partial<ImagerySourceProps>>
    * }
    *
    * When merging:

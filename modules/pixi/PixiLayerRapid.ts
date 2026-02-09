@@ -1,11 +1,12 @@
 import * as PIXI from 'pixi.js';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
+import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
-import { PixiFeaturePolygon, type PolygonStyle } from './PixiFeaturePolygon.ts';
+import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { Viewport } from '@rapid-sdk/math';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { OsmEntity, OsmWay } from '../data/types.ts';
 
@@ -370,9 +371,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
         if (feature.dirty) {
           const colorNum = color.toNumber();
-          const style: PolygonStyle = {
-            labelTint: colorNum,
-            fill: { width: 2, color: colorNum, alpha: 0.3 },
+          const style: Partial<MatchedStyle> = {
+            labelColor: colorNum,
+            fill: { width: 2, color: colorNum, alpha: 0.3, pattern: undefined },
           };
           feature.style = style;
           feature.label = l10n.displayName(entity.tags);
@@ -412,12 +413,12 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
         if (feature.dirty) {
           const colorNum = color.toNumber();
-          const style: LineStyle = {
-            labelTint: colorNum,
-            casing: { width: 5, color: 0x444444 },
-            stroke: { width: 3, color: colorNum },
+          const style: Partial<MatchedStyle> = {
+            labelColor: colorNum,
+            casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
+            stroke: { width: 3, color: colorNum, alpha: 1, cap: 'round', join: 'round' },
+            lineMarker: { name: entity.isOneWay() ? 'oneway' : undefined, color: 0x000000 }
           };
-          style.lineMarkerName = entity.isOneWay() ? 'oneway' : '';
           feature.style = style;
           feature.label = l10n.displayName(entity.tags);
           feature.update(viewport, zoom);
@@ -437,16 +438,14 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const l10n = this.context.systems.l10n!;
 
     const colorNum = color.toNumber();
-    const pointStyle: PointStyle = {
-      markerName: 'largeCircle',
-      markerTint: colorNum,
-      iconName: 'maki-circle-stroked',
-      labelTint: colorNum
+    const pointStyle: Partial<PointStyle> = {
+      marker: { name: 'largeCircle', color: colorNum, alpha: 1 },
+      icon: { name: 'maki-circle-stroked', color: colorNum, alpha: 1, size: 11 },
+      labelColor: colorNum
     };
-    const vertexStyle: PointStyle = {
-      markerName: 'smallCircle',
-      markerTint: colorNum,
-      labelTint: colorNum
+    const vertexStyle: Partial<PointStyle> = {
+      marker: { name: 'smallCircle', color: colorNum, alpha: 1 },
+      labelColor: colorNum
     };
 
     for (const entity of data.points) {

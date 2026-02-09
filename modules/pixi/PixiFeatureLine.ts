@@ -7,48 +7,10 @@ import { getLineSegments, lineToPoly, type LineToPolyResult } from './helpers.ts
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 const ONEWAY_SPACING = 35;
 const SIDED_SPACING = 30;
-
-
-/** Style properties for line stroke/casing */
-export interface LinePartStyle {
-  /** Line width in pixels */
-  width?: number;
-  /** Line color */
-  color?: number;
-  /** Alpha/opacity (0-1) */
-  alpha?: number;
-  /** Line cap style */
-  cap?: 'butt' | 'round' | 'square';
-  /** Line join style */
-  join?: 'bevel' | 'miter' | 'round';
-  /** Dash pattern [dash, gap] */
-  dash?: number[];
-}
-
-/** Style properties for line features */
-export interface LineStyle {
-  /** Texture name for line markers (e.g. 'oneway') */
-  lineMarkerName?: string;
-  /** Custom line marker texture */
-  lineMarkerTexture?: PIXI.Texture;
-  /** Line marker tint color */
-  lineMarkerTint?: number;
-  /** Texture name for sided markers */
-  sidedMarkerName?: string;
-  /** Custom sided marker texture */
-  sidedMarkerTexture?: PIXI.Texture;
-  /** Label tint color */
-  labelTint?: number;
-  /** Fill style (for closed lines) */
-  fill?: LinePartStyle;
-  /** Casing style (bottom layer) */
-  casing?: LinePartStyle;
-  /** Stroke style (top layer) */
-  stroke?: LinePartStyle;
-}
 
 
 /**
@@ -133,7 +95,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const textureManager = this.gfx.textureManager!;
     const container = this.container;
     const geom = this.geom;
-    const style = this._style as LineStyle;
+    const style = this._style as Partial<MatchedStyle>;
     let screen = geom.screen;
 
     //
@@ -186,7 +148,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       //
       let lineMarkers = container.getChildByLabel('lineMarkers');
 
-      if (showMarkers && ((style.lineMarkerTexture || style.lineMarkerName) || (style.sidedMarkerTexture || style.sidedMarkerName))) {
+      if (showMarkers && (style.lineMarker?.name || style.sidedMarker?.name)) {
         // Create line marker container, if necessary
         if (!lineMarkers) {
           lineMarkers = new PIXI.Container();
@@ -197,12 +159,12 @@ export class PixiFeatureLine extends AbstractPixiFeature {
           container.addChild(lineMarkers);
         }
 
-        const lineMarkerTexture = style.lineMarkerTexture ||
-          textureManager.getTexture('symbol', style.lineMarkerName!) || PIXI.Texture.WHITE;
-        const sidedMarkerTexture = style.sidedMarkerTexture ||
-          textureManager.getTexture('symbol', style.sidedMarkerName!) || PIXI.Texture.WHITE;
-        const sided = style.sidedMarkerName === 'sided';
-        const oneway = style.lineMarkerName === 'oneway';
+        const lineMarkerName = style.lineMarker?.name;
+        const sidedMarkerName = style.sidedMarker?.name;
+        const lineMarkerTexture = (lineMarkerName && textureManager.getTexture('symbol', lineMarkerName)) || PIXI.Texture.WHITE;
+        const sidedMarkerTexture = (sidedMarkerName && textureManager.getTexture('symbol', sidedMarkerName)) || PIXI.Texture.WHITE;
+        const sided = sidedMarkerName === 'sided';
+        const oneway = lineMarkerName === 'oneway';
         lineMarkers.removeChildren();
 
         if (oneway) {
@@ -216,7 +178,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
               arrow.anchor.set(0.5, 0.5); // middle, middle
               arrow.position.set(x, y);
               arrow.rotation = segment.angle;
-              arrow.tint = style.lineMarkerTint ?? 0x000000;
+              arrow.tint = style.lineMarker?.color ?? 0x000000;
               lineMarkers!.addChild(arrow);
             });
           });
@@ -297,7 +259,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   /**
    * updateGraphic
    */
-  updateGraphic(which: 'casing' | 'stroke', graphic: PIXI.Graphics, points: Vec2[], style: LineStyle, zoom: number, isWireframe: boolean): void {
+  updateGraphic(which: 'casing' | 'stroke', graphic: PIXI.Graphics, points: Vec2[], style: Partial<MatchedStyle>, zoom: number, isWireframe: boolean): void {
     const partStyle = style[which];
     if (!partStyle) return;
 
@@ -422,10 +384,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * 'point' - @see `PixiFeaturePoint.ts`
    * 'line'/'polygon' - @see `StyleSystem.ts`
    */
-  get style(): LineStyle {
-    return this._style as LineStyle;
+  get style(): Partial<MatchedStyle> {
+    return this._style as Partial<MatchedStyle>;
   }
-  set style(obj: Partial<LineStyle>) {
+  set style(obj: Partial<MatchedStyle>) {
     this._style = Object.assign({}, STYLE_DEFAULTS, obj);
     this._styleDirty = true;
   }
@@ -433,10 +395,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 }
 
 
-const STYLE_DEFAULTS: LineStyle = {
-  lineMarkerName: '',
-  lineMarkerTint: 0x000000,
-  labelTint: 0xeeeeee,
+const STYLE_DEFAULTS: Partial<MatchedStyle> = {
+  lineMarker: { name: '', color: 0x000000 },
+  sidedMarker: { color: 0x000000 },
+  labelColor: 0xeeeeee,
 
   fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3 },
   casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },

@@ -369,7 +369,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           const preset = schema.match(entity, graph);
 
           const style = styles.styleMatch(entity.tags) as MatchedStyle;
-          style.labelTint = style.fill.color ?? style.stroke.color ?? 0xeeeeee;
+          style.labelColor = style.fill.color ?? style.stroke.color ?? 0xeeeeee;
           feature.style = style;
 
           const label = l10n.displayPOIName(entity.tags);
@@ -410,18 +410,16 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           this.syncFeatureClasses(poiFeature);
 
           if (poiFeature.dirty) {
-            const markerStyle: PointStyle = {
-              iconName: (feature as any).poiPreset?.props?.icon,
-              iconTint: 0x111111,
-              markerName: 'pin',
-              markerTint: 0xffffff
+            const markerStyle: Partial<PointStyle> = {
+              icon: { name: (feature as any).poiPreset?.props?.icon, color: 0x111111, alpha: 1, size: 11 },
+              marker: { name: 'pin', color: 0xffffff, alpha: 1 }
             };
 
             if (hasWikidata(entity)) {
-              markerStyle.iconTint = 0x444444;
-              markerStyle.labelTint = 0xdddddd;
-              markerStyle.markerName = 'boldPin';
-              markerStyle.markerTint = 0xdddddd;
+              markerStyle.icon!.color = 0x444444;
+              markerStyle.labelColor = 0xdddddd;
+              markerStyle.marker!.name = 'boldPin';
+              markerStyle.marker!.color = 0xdddddd;
             }
             poiFeature.style = markerStyle;
             poiFeature.label = feature.label;
@@ -529,8 +527,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             const style = styles.styleMatch(tags) as MatchedStyle;
             // Todo: handle alternating/two-way case too
             if (geom === 'line') {
-              style.lineMarkerName = entity.isOneWay() ? 'oneway' : '';
-              style.sidedMarkerName = entity.isSided() ? 'sided' : '';
+              style.lineMarker.name = entity.isOneWay() ? 'oneway' : undefined;
+              style.sidedMarker.name = entity.isSided() ? 'sided' : undefined;
             } else {  // an area
               style.casing.width = 0;
               style.stroke.color = style.fill.color;
@@ -623,33 +621,30 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const directions = node.directions(graph, context.viewport);
 
         // set marker style
-        const markerStyle: PointStyle = {
-          iconName: iconName,
-          iconTint: 0x111111,
-          labelTint: 0xeeeeee,
-          markerName: 'smallCircle',
-          markerTint: 0xffffff,
+        const markerStyle: Partial<PointStyle> = {
+          icon: { name: iconName, color: 0x111111, alpha: 1, size: 11 },
+          labelColor: 0xeeeeee,
+          marker: { name: 'smallCircle', color: 0xffffff, alpha: 1 },
           viewfieldAngles: directions,
           viewfieldName: 'viewfieldDark',
-          viewfieldTint: 0xffffff
+          viewfieldColor: 0xffffff
         };
 
         if (iconName) {
-          markerStyle.markerName = 'largeCircle';
-          markerStyle.iconName = iconName;
+          markerStyle.marker!.name = 'largeCircle';
         } else if (node.hasInterestingTags()) {
-          markerStyle.markerName = 'taggedCircle';
+          markerStyle.marker!.name = 'taggedCircle';
         }
 
         if (hasWikidata(node)) {
-          markerStyle.iconTint = 0x444444;
-          markerStyle.labelTint = 0xdddddd;
-          markerStyle.markerTint = 0xdddddd;
+          markerStyle.icon!.color = 0x444444;
+          markerStyle.labelColor = 0xdddddd;
+          markerStyle.marker!.color = 0xdddddd;
         }
         if (node.isShared(graph)) {     // shared nodes / junctions are more grey
-          markerStyle.iconTint = 0x111111;
-          markerStyle.labelTint = 0xbbbbbb;
-          markerStyle.markerTint = 0xbbbbbb;
+          markerStyle.icon!.color = 0x111111;
+          markerStyle.labelColor = 0xbbbbbb;
+          markerStyle.marker!.color = 0xbbbbbb;
         }
 
         feature.style = markerStyle;
@@ -717,24 +712,22 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const directions = node.directions(graph, context.viewport);
 
         // set marker style
-        const markerStyle: PointStyle = {
-          iconName: iconName,
-          iconTint: 0x111111,
-          markerName: 'pin',
-          markerTint: 0xffffff,
+        const markerStyle: Partial<PointStyle> = {
+          icon: { name: iconName, color: 0x111111, alpha: 1, size: 11 },
+          marker: { name: 'pin', color: 0xffffff, alpha: 1 },
           viewfieldAngles: directions,
           viewfieldName: 'viewfieldDark',
-          viewfieldTint: 0xffffff
+          viewfieldColor: 0xffffff
         };
         if (hasWikidata(node)) {
-          markerStyle.iconTint = 0x444444;
-          markerStyle.labelTint = 0xdddddd;
-          markerStyle.markerName = 'boldPin';
-          markerStyle.markerTint = 0xdddddd;
+          markerStyle.icon!.color = 0x444444;
+          markerStyle.labelColor = 0xdddddd;
+          markerStyle.marker!.name = 'boldPin';
+          markerStyle.marker!.color = 0xdddddd;
         }
         if (preset?.id === 'address') {
-          markerStyle.iconName = 'maki-circle-stroked';
-          markerStyle.markerName = 'largeCircle';
+          markerStyle.icon!.name = 'maki-circle-stroked';
+          markerStyle.marker!.name = 'largeCircle';
         }
 
         feature.style = markerStyle;

@@ -94,10 +94,9 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
-        const style: PointStyle = {
-          markerName: 'osmose',
-          markerTint: 0x00ff00,
-          iconName: d.icon
+        const style: Partial<PointStyle> = {
+          marker: { name: 'osmose', color: 0x00ff00, alpha: 1 },
+          icon: { name: d.icon, color: 0x000000, alpha: 1, size: 11 }
         };
 
         feature = new PixiFeaturePoint(this, featureID);

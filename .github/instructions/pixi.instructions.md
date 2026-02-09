@@ -29,24 +29,24 @@ import type { Viewport } from '@rapid-sdk/math';
 All style properties are **optional**. Use type assertions (`as`) when defining constant style objects:
 
 ```typescript
-import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
+import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 const LINESTYLE = {
   casing: { alpha: 0 },
   stroke: { alpha: 0.7, width: 4, color: 0x0fffc4 }
-} as LineStyle;
+} as Partial<MatchedStyle>;
 
-const MARKERSTYLE = {
-  markerAlpha: 0.8,
-  markerName: 'mediumCircle',
-  markerTint: 0x0fffc4
-} as PointStyle;
+const MARKERSTYLE: Partial<PointStyle> = {
+  marker: { name: 'mediumCircle', tint: 0x0fffc4, alpha: 0.8 }
+};
 ```
 
 When creating dynamic styles, use `Object.assign()` with spread or mutation:
 ```typescript
-const style: PointStyle = Object.assign({}, MARKERSTYLE);
+const style: Partial<PointStyle> = Object.assign({}, MARKERSTYLE);
 style.viewfieldAngles = [bearing];
 ```
 

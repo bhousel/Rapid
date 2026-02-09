@@ -1,21 +1,40 @@
+import type { Context } from '../Context.ts';
+
 /**
  * Style - Visual styling properties for map features.
  *
- * A Style describes *what something looks like*. It contains
- * visual properties for fill (areas), casing (line outline), and stroke (line).
+ * A Style describes *what something looks like*. It contains visual properties for:
+ * - fill (areas)
+ * - casing (line outline, draws below stroke)
+ * - stroke (line)
+ * - markers (point markers)
+ * - icons (rendered inside markers)
+ * - line decorations (oneway arrows, sided markers)
+ * - labels
+ *
+ * The Icon name typically comes from SchemaSystem presets, but can be overridden
+ * in a style file. Other visual properties (color, size, alpha) come from styles.
  *
  * @example
  * // A simple fill color
- * const green = new Style({
+ * const green = new Style(context, {
  *   id: 'green',
  *   fill: { color: 0x8cd05f, alpha: 0.3 }
  * });
  *
  * // A road with casing and stroke
- * const motorway = new Style({
+ * const motorway = new Style(context, {
  *   id: 'motorway',
  *   casing: { width: 10, color: 0x70372f },
  *   stroke: { width: 8, color: 0xcf2081 }
+ * });
+ *
+ * // A point style with marker and icon properties
+ * const poi = new Style(context, {
+ *   id: 'poi_pin',
+ *   marker: { name: 'pin', color: 0xffffff },
+ *   icon: { color: 0x111111, size: 11 },
+ *   labelColor: 0xdddddd
  * });
  *
  * @module
@@ -28,9 +47,7 @@ export type LineCap = 'butt' | 'round' | 'square';
 export type LineJoin = 'bevel' | 'miter' | 'round';
 
 
-/**
- * Properties for fill styling (used for area features).
- */
+/** Properties for fill styling (used for area features). */
 export interface FillStyleProps {
   /** Line width in pixels (for the fill outline) */
   width?: number;
@@ -42,10 +59,7 @@ export interface FillStyleProps {
   pattern?: string;
 }
 
-
-/**
- * Properties for line styling (used for casing and stroke).
- */
+/** Properties for line styling (used for casing and stroke). */
 export interface LineStyleProps {
   /** Line width in pixels */
   width?: number;
@@ -61,6 +75,25 @@ export interface LineStyleProps {
   dash?: number[];
 }
 
+/**
+ * Style properties for point-like graphics (markers, icons, line markers, sided markers).
+ * Used for:
+ * - `marker`: Background shape behind an icon
+ * - `icon`: Symbol rendered inside a marker
+ * - `lineMarker`: Repeating markers along lines (e.g. oneway arrows)
+ * - `sidedMarker`: One-sided markers (e.g. cliffs, retaining walls)
+ */
+export interface PointStyleProps {
+  /** Texture name for the graphic */
+  name?: string;
+  /** Display color applied to the graphic */
+  color?: number;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  alpha?: number;
+  /** Size in pixels (defaults vary by usage, typically 11 for icons) */
+  size?: number;
+}
+
 
 /**
  * Properties for creating a Style.
@@ -72,29 +105,61 @@ export interface StyleProps {
   assetID?: AssetID;
   /** Version of the asset */
   assetVersion?: string;
+
+  //
+  // Area and line rendering
+  //
+
   /** Fill styling (areas) */
   fill?: FillStyleProps;
   /** Casing styling (line outline, draws below stroke) */
   casing?: LineStyleProps;
   /** Stroke styling (line, draws above casing) */
   stroke?: LineStyleProps;
+
+  //
+  // Point/vertex marker appearance
+  //
+
+  /** Marker styling (point background shape) */
+  marker?: PointStyleProps;
+  /** Icon styling (rendered inside marker) */
+  icon?: PointStyleProps;
+
+  //
+  // Line decorations
+  //
+
+  /** Line marker styling (repeating markers along lines, e.g. 'oneway') */
+  lineMarker?: PointStyleProps;
+  /** Sided marker styling (one-sided markers, e.g. for coastlines, retaining walls) */
+  sidedMarker?: PointStyleProps;
+
+  //
+  // Shared properties
+  //
+
+  /** Label color (defaults to fill.color or stroke.color) */
+  labelColor?: number;
+
+  //
+  // Rendering hints
+  //
+
+  /** If true, always use full fill for polygons (not partial fill) */
+  requireFill?: boolean;
 }
 
 
-/**
- * Default fill style values.
- */
-const DEFAULT_FILL: Required<Omit<FillStyleProps, 'pattern'>> = {
+/** Default fill style values. */
+const DEFAULT_FILL: FillStyleProps = {
   width: 2,
   color: 0xaaaaaa,
   alpha: 0.3
 };
 
-
-/**
- * Default line style values.
- */
-const DEFAULT_LINE: Required<Omit<LineStyleProps, 'dash'>> = {
+/** Default line style values. */
+const DEFAULT_LINE: LineStyleProps = {
   width: 3,
   color: 0xcccccc,
   alpha: 1,
@@ -102,18 +167,39 @@ const DEFAULT_LINE: Required<Omit<LineStyleProps, 'dash'>> = {
   join: 'round'
 };
 
+/** Default marker style values. */
+const DEFAULT_MARKER: PointStyleProps = {
+  name: 'smallCircle',
+  color: 0xffffff,
+  alpha: 1
+};
+
+/** Default icon style values. */
+const DEFAULT_ICON: PointStyleProps = {
+  color: 0x111111,
+  alpha: 1,
+  size: 11
+};
+
 
 /**
  * Style - Describes visual appearance of map features.
  *
  * Properties you can access:
- *   `id`      Unique identifier for this style
- *   `props`   The full props object
- *   `fill`    Fill style properties
- *   `casing`  Casing (line outline) style properties
- *   `stroke`  Stroke (line) style properties
+ *   `id`          Unique identifier for this style
+ *   `props`       The full props object
+ *   `fill`        Fill style properties (areas)
+ *   `casing`      Casing style properties (line outline)
+ *   `stroke`      Stroke style properties (line)
+ *   `marker`      Marker style properties (point background)
+ *   `icon`        Icon style properties (rendered in marker)
+ *   `lineMarker`  Line marker style (oneway arrows, etc.)
+ *   `sidedMarker` Sided marker style (coastlines, retaining walls)
+ *   `labelColor`   Label color
+ *   `requireFill` Force full fill for polygons
  */
 export class Style {
+  context: Context;
   props: StyleProps;
 
   /** Unique identifier */
@@ -125,13 +211,15 @@ export class Style {
    * @param props - Properties defining the visual style
    * @throws Error if `id` property is missing
    */
-  constructor(props: StyleProps) {
+  constructor(context: Context, props: Partial<StyleProps> = {}) {
+    this.context = context;
+
     if (!props.id) {
-      throw new Error('Style: id is required');
+      throw new Error('Style: Missing id property');
     }
 
     // Deep clone to avoid mutations
-    this.props = globalThis.structuredClone(props);
+    this.props = globalThis.structuredClone(props) as StyleProps;
     this.id = props.id;
   }
 
@@ -169,12 +257,59 @@ export class Style {
 
 
   /**
+   * Marker style properties (point background shape).
+   */
+  get marker(): PointStyleProps | undefined {
+    return this.props.marker;
+  }
+
+
+  /**
+   * Icon style properties (rendered inside marker).
+   */
+  get icon(): PointStyleProps | undefined {
+    return this.props.icon;
+  }
+
+
+  /**
+   * Line marker style properties (repeating markers along lines).
+   */
+  get lineMarker(): PointStyleProps | undefined {
+    return this.props.lineMarker;
+  }
+
+
+  /**
+   * Sided marker style properties (one-sided markers).
+   */
+  get sidedMarker(): PointStyleProps | undefined {
+    return this.props.sidedMarker;
+  }
+
+
+  /**
+   * Label color.
+   */
+  get labelColor(): number | undefined {
+    return this.props.labelColor;
+  }
+
+
+  /**
+   * Whether to force full fill for polygons.
+   */
+  get requireFill(): boolean | undefined {
+    return this.props.requireFill;
+  }
+
+
+  /**
    * Get resolved fill properties with defaults applied.
    * Returns an object with all required fill properties.
-   *
    * @return Resolved fill properties
    */
-  resolvedFill(): Required<Omit<FillStyleProps, 'pattern'>> & { pattern?: string } {
+  resolvedFill(): FillStyleProps {
     const fill = this.props.fill ?? {};
     return {
       width: fill.width ?? DEFAULT_FILL.width,
@@ -188,10 +323,9 @@ export class Style {
   /**
    * Get resolved casing properties with defaults applied.
    * Returns an object with all required line properties.
-   *
    * @return Resolved casing properties
    */
-  resolvedCasing(): Required<Omit<LineStyleProps, 'dash'>> & { dash?: number[] } {
+  resolvedCasing(): LineStyleProps {
     const casing = this.props.casing ?? {};
     return {
       width: casing.width ?? 5,  // Casing typically wider
@@ -207,10 +341,9 @@ export class Style {
   /**
    * Get resolved stroke properties with defaults applied.
    * Returns an object with all required line properties.
-   *
    * @return Resolved stroke properties
    */
-  resolvedStroke(): Required<Omit<LineStyleProps, 'dash'>> & { dash?: number[] } {
+  resolvedStroke(): LineStyleProps {
     const stroke = this.props.stroke ?? {};
     return {
       width: stroke.width ?? DEFAULT_LINE.width,
@@ -220,6 +353,57 @@ export class Style {
       join: stroke.join ?? DEFAULT_LINE.join,
       dash: stroke.dash
     };
+  }
+
+
+  /**
+   * Get resolved marker properties with defaults applied.
+   * Returns an object with all required marker properties.
+   * @return Resolved marker properties
+   */
+  resolvedMarker(): PointStyleProps {
+    const marker = this.props.marker ?? {};
+    return {
+      name: marker.name ?? DEFAULT_MARKER.name,
+      color: marker.color ?? DEFAULT_MARKER.color,
+      alpha: marker.alpha ?? DEFAULT_MARKER.alpha
+    };
+  }
+
+
+  /**
+   * Get resolved icon properties with defaults applied.
+   * Returns an object with all required icon properties (except name, which is optional).
+   * @return Resolved icon properties
+   */
+  resolvedIcon(): PointStyleProps {
+    const icon = this.props.icon ?? {};
+    return {
+      name: icon.name,  // undefined if not set (usually comes from preset)
+      color: icon.color ?? DEFAULT_ICON.color,
+      alpha: icon.alpha ?? DEFAULT_ICON.alpha,
+      size: icon.size ?? DEFAULT_ICON.size
+    };
+  }
+
+
+  /**
+   * Get resolved label color with smart default.
+   * Falls back to fill.color, then stroke.color, then a default gray.
+   * @return Resolved label color
+   */
+  resolvedLabelColor(): number {
+    if (this.props.labelColor !== undefined) {
+      return this.props.labelColor;
+    }
+    // Smart default: follow the dominant color
+    if (this.props.fill?.color !== undefined) {
+      return this.props.fill.color;
+    }
+    if (this.props.stroke?.color !== undefined) {
+      return this.props.stroke.color;
+    }
+    return 0xeeeeee;  // default gray
   }
 
 
@@ -234,12 +418,22 @@ export class Style {
   merge(other: Style): Style {
     const merged: StyleProps = {
       id: this.id,  // Keep original ID
+
+      // Nested objects: spread merge
       fill: { ...this.props.fill, ...other.props.fill },
       casing: { ...this.props.casing, ...other.props.casing },
-      stroke: { ...this.props.stroke, ...other.props.stroke }
+      stroke: { ...this.props.stroke, ...other.props.stroke },
+      marker: { ...this.props.marker, ...other.props.marker },
+      icon: { ...this.props.icon, ...other.props.icon },
+      lineMarker: { ...this.props.lineMarker, ...other.props.lineMarker },
+      sidedMarker: { ...this.props.sidedMarker, ...other.props.sidedMarker },
+
+      // Scalar properties: other wins if defined
+      labelColor: other.props.labelColor ?? this.props.labelColor,
+      requireFill: other.props.requireFill ?? this.props.requireFill
     };
 
-    // Clean up empty objects
+    // Clean up empty nested objects
     if (merged.fill && Object.keys(merged.fill).length === 0) {
       delete merged.fill;
     }
@@ -249,8 +443,20 @@ export class Style {
     if (merged.stroke && Object.keys(merged.stroke).length === 0) {
       delete merged.stroke;
     }
+    if (merged.marker && Object.keys(merged.marker).length === 0) {
+      delete merged.marker;
+    }
+    if (merged.icon && Object.keys(merged.icon).length === 0) {
+      delete merged.icon;
+    }
+    if (merged.lineMarker && Object.keys(merged.lineMarker).length === 0) {
+      delete merged.lineMarker;
+    }
+    if (merged.sidedMarker && Object.keys(merged.sidedMarker).length === 0) {
+      delete merged.sidedMarker;
+    }
 
-    return new Style(merged);
+    return new Style(this.context, merged);
   }
 
 
@@ -265,7 +471,7 @@ export class Style {
     if (newID) {
       cloned.id = newID;
     }
-    return new Style(cloned);
+    return new Style(this.context, cloned);
   }
 
 
@@ -294,6 +500,38 @@ export class Style {
 
 
   /**
+   * Check if this declaration has any marker properties.
+   */
+  hasMarker(): boolean {
+    return this.props.marker !== undefined && Object.keys(this.props.marker).length > 0;
+  }
+
+
+  /**
+   * Check if this declaration has any icon properties.
+   */
+  hasIcon(): boolean {
+    return this.props.icon !== undefined && Object.keys(this.props.icon).length > 0;
+  }
+
+
+  /**
+   * Check if this declaration has any line marker properties.
+   */
+  hasLineMarker(): boolean {
+    return this.props.lineMarker !== undefined && Object.keys(this.props.lineMarker).length > 0;
+  }
+
+
+  /**
+   * Check if this declaration has any sided marker properties.
+   */
+  hasSidedMarker(): boolean {
+    return this.props.sidedMarker !== undefined && Object.keys(this.props.sidedMarker).length > 0;
+  }
+
+
+  /**
    * Convert to a JSON-serializable object.
    */
   toJSON(): StyleProps {
@@ -318,18 +556,18 @@ export class Style {
       const s = this.props.stroke!;
       parts.push(`stroke(w=${s.width ?? '?'})`);
     }
+    if (this.hasMarker()) {
+      const m = this.props.marker!;
+      parts.push(`marker(${m.name ?? '?'})`);
+    }
+    if (this.hasIcon()) {
+      const i = this.props.icon!;
+      parts.push(`icon(${i.name ?? '?'})`);
+    }
+    if (this.props.labelColor !== undefined) {
+      parts.push(`labelColor(${this.props.labelColor.toString(16)})`);
+    }
     return `Style[${this.id}]{${parts.join(', ')}}`;
   }
 
-
-  /**
-   * Create a Style from raw props (from JSON).
-   * This is essentially the same as the constructor but provided for consistency.
-   *
-   * @param props - Raw properties object
-   * @return A new Style instance
-   */
-  static from(props: StyleProps): Style {
-    return new Style(props);
-  }
 }

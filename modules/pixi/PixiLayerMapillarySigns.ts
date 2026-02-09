@@ -125,16 +125,15 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
         // Some values we don't have icons for, check first - Rapid#1518
         const hasIcon = container.selectAll(`#rapid-defs #${d.props.value}`).size();
 
-        let style: PointStyle;
+        let style: Partial<PointStyle>;
         if (hasIcon) {
           style = {
-            markerName: d.props.value
+            marker: { name: d.props.value, color: 0xffffff, alpha: 1 }
           };
         } else {
           style = {
-            markerName: 'xlargeSquare',
-            iconName: 'fas-question',
-            iconSize: 16
+            marker: { name: 'xlargeSquare', color: 0xffffff, alpha: 1 },
+            icon: { name: 'fas-question', color: 0x000000, alpha: 1, size: 16 }
           };
         }
 

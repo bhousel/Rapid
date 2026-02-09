@@ -713,6 +713,136 @@ describe('StyleSystem', () => {
         const result = _styles.styleMatch({ 'demolished:railway': 'no' });
         assert.isUndefined(result.stroke.dash);
       });
+
+      it('applies lifecycle value only when tag matches styleKey', () => {
+        // highway=motorway matched, styleKey='highway'
+        // amenity=proposed should NOT trigger lifecycle because amenity != styleKey
+        const result = _styles.styleMatch({ highway: 'motorway', amenity: 'proposed' });
+        assert.isUndefined(result.stroke.dash);
+      });
+
+      it('applies lifecycle key prefix only when no styleKey', () => {
+        // When there's a styleKey (highway=motorway matched), lifecycle prefix should be ignored
+        const result = _styles.styleMatch({ highway: 'motorway', 'demolished:amenity': 'cafe' });
+        assert.isUndefined(result.stroke.dash);
+      });
+    });
+
+
+    describe('marker and icon resolution', () => {
+      it('returns default marker when no style-specific marker', () => {
+        const result = _styles.styleMatch({ some_random_tag: 'xyz' });
+        assert.isObject(result.marker);
+        assert.strictEqual(result.marker.name, 'smallCircle');
+        assert.strictEqual(result.marker.color, 0xffffff);
+        assert.strictEqual(result.marker.alpha, 1);
+      });
+
+      it('returns style-specific marker when defined', () => {
+        const result = _styles.styleMatch({ amenity: 'cafe' });
+        assert.strictEqual(result.marker.name, 'pin');
+        assert.strictEqual(result.marker.color, 0xff0000);
+      });
+
+      it('returns default icon when no style-specific icon', () => {
+        const result = _styles.styleMatch({ some_random_tag: 'xyz' });
+        assert.isObject(result.icon);
+        assert.isUndefined(result.icon.name);
+        assert.strictEqual(result.icon.color, 0x111111);
+        assert.strictEqual(result.icon.alpha, 1);
+        assert.strictEqual(result.icon.size, 11);
+      });
+
+      it('returns style-specific icon when defined', () => {
+        const result = _styles.styleMatch({ amenity: 'cafe' });
+        assert.strictEqual(result.icon.name, 'maki-cafe');
+        assert.strictEqual(result.icon.color, 0x333333);
+        assert.strictEqual(result.icon.size, 15);
+      });
+    });
+
+
+    describe('lineMarker and sidedMarker resolution', () => {
+      it('returns default lineMarker', () => {
+        const result = _styles.styleMatch({ highway: 'motorway' });
+        assert.isObject(result.lineMarker);
+        assert.strictEqual(result.lineMarker.name, 'oneway');
+        assert.strictEqual(result.lineMarker.color, 0xffffff);
+      });
+
+      it('returns default sidedMarker when no style-specific sidedMarker', () => {
+        const result = _styles.styleMatch({ highway: 'motorway' });
+        assert.isObject(result.sidedMarker);
+        assert.isUndefined(result.sidedMarker.name);
+        assert.strictEqual(result.sidedMarker.color, 0xffffff);
+      });
+
+      it('returns style-specific sidedMarker when defined', () => {
+        const result = _styles.styleMatch({ natural: 'cliff' });
+        assert.strictEqual(result.sidedMarker.name, 'cliff');
+        assert.strictEqual(result.sidedMarker.color, 0x888888);
+      });
+    });
+
+
+    describe('labelColor and requireFill resolution', () => {
+      it('returns default labelColor when no style-specific labelColor', () => {
+        const result = _styles.styleMatch({ some_random_tag: 'xyz' });
+        assert.strictEqual(result.labelColor, 0xeeeeee);
+      });
+
+      it('returns style-specific labelColor when defined', () => {
+        const result = _styles.styleMatch({ amenity: 'cafe' });
+        assert.strictEqual(result.labelColor, 0xdddddd);
+      });
+
+      it('returns default requireFill (false) when no style-specific value', () => {
+        const result = _styles.styleMatch({ highway: 'motorway' });
+        assert.strictEqual(result.requireFill, false);
+      });
+
+      it('returns style-specific requireFill when defined', () => {
+        const result = _styles.styleMatch({ natural: 'cliff' });
+        assert.strictEqual(result.requireFill, true);
+      });
+    });
+
+
+    describe('fill pattern validation', () => {
+      const origError = console.error;
+      const spyError = mock();
+
+      beforeAll(() => {
+        console.error = spyError;
+      });
+
+      beforeEach(() => {
+        spyError.mockClear();
+      });
+
+      afterAll(() => {
+        console.error = origError;
+      });
+
+      it('allows valid fill patterns', () => {
+        const result = _styles.styleMatch({ landuse: 'forest' });
+        assert.strictEqual(result.fill.pattern, 'forest');
+        assert.lengthOf(spyError.mock.calls, 0);
+      });
+
+      it('clears invalid fill patterns and logs error', () => {
+        const result = _styles.styleMatch({ landuse: 'invalid_test' });
+        assert.isUndefined(result.fill.pattern);
+        assert.lengthOf(spyError.mock.calls, 1);
+        assert.match(spyError.mock.lastCall[0], /invalid patternID/i);
+      });
+
+      it('does not validate patterns for buildings (exception)', () => {
+        // Buildings skip pattern validation entirely
+        const result = _styles.styleMatch({ building: 'yes' });
+        // Should not have a pattern property since building_red style has no pattern
+        assert.isUndefined(result.fill.pattern);
+      });
     });
 
   });  // styleMatch

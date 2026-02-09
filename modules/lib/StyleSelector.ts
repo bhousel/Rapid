@@ -1,3 +1,8 @@
+import { PropMatcher } from './PropMatcher.ts';
+
+import type { Context } from '../Context.ts';
+import type { PropMatcherProps } from './PropMatcher.ts';
+
 /**
  * StyleSelector - Matching conditions for applying styles to features.
  *
@@ -9,7 +14,7 @@
  *
  * @example
  * // Match highway=motorway on any dataset
- * const hwMotorway = new StyleSelector({
+ * const hwMotorway = new StyleSelector(context, {
  *   id: 'highway-motorway',
  *   styleIDs: ['motorway'],
  *   match: {
@@ -18,7 +23,7 @@
  * });
  *
  * // Match buildings on the Rapid dataset (more specific due to dataset condition)
- * const rapidBuilding = new StyleSelector({
+ * const rapidBuilding = new StyleSelector(context, {
  *   id: 'rapid-building',
  *   styleIDs: ['building_rapid'],
  *   match: {
@@ -28,7 +33,7 @@
  * });
  *
  * // Compose multiple styles: base color + pattern overlay
- * const cemetery = new StyleSelector({
+ * const cemetery = new StyleSelector(context, {
  *   id: 'landuse-cemetery',
  *   styleIDs: ['lightgreen', 'pattern-cemetery'],
  *   match: {
@@ -39,9 +44,6 @@
  * @module
  */
 
-import { PropMatcher } from './PropMatcher.ts';
-
-import type { PropMatcherProps } from './PropMatcher.ts';
 
 /** Geometry types supported by the style system */
 export type StyleGeometry = 'point' | 'vertex' | 'line' | 'area' | 'relation';
@@ -59,7 +61,6 @@ export interface StyleMatchConditions {
   tags?: PropMatcherProps[];
 }
 
-
 /**
  * Properties for creating a StyleSelector.
  */
@@ -75,7 +76,6 @@ export interface StyleSelectorProps {
   /** Conditions that must be met for this selector to match */
   match: StyleMatchConditions;
 }
-
 
 /**
  * Information about a feature to match against selectors.
@@ -99,6 +99,7 @@ export interface FeatureMatchInfo {
  *   `props`          The full props object
  */
 export class StyleSelector {
+  context: Context;
   props: StyleSelectorProps;
 
   /** Unique identifier */
@@ -115,16 +116,18 @@ export class StyleSelector {
    * @throws Error if `id` property is missing
    * @throws Error if `styleIDs` property is missing or empty
    */
-  constructor(props: StyleSelectorProps) {
+  constructor(context: Context, props: Partial<StyleSelectorProps> = {}) {
+    this.context = context;
+
     if (!props.id) {
-      throw new Error('StyleSelector: id is required');
+      throw new Error('StyleSelector: Missing id property');
     }
     if (!props.styleIDs || props.styleIDs.length === 0) {
       throw new Error('StyleSelector: styleIDs is required and must not be empty');
     }
 
     // Deep clone to avoid mutations
-    this.props = globalThis.structuredClone(props);
+    this.props = globalThis.structuredClone(props) as StyleSelectorProps;
     this.id = props.id;
     this.styleIDs = props.styleIDs;
   }
@@ -246,7 +249,7 @@ export class StyleSelector {
     if (newID) {
       cloned.id = newID;
     }
-    return new StyleSelector(cloned);
+    return new StyleSelector(this.context, cloned);
   }
 
 
@@ -280,17 +283,6 @@ export class StyleSelector {
     }
 
     return `StyleSelector[${this.id}](${parts.join(', ')}) → [${this.styleIDs.join(', ')}]`;
-  }
-
-
-  /**
-   * Create a StyleSelector from raw props (from JSON).
-   *
-   * @param props - Raw properties object
-   * @return A new StyleSelector instance
-   */
-  static from(props: StyleSelectorProps): StyleSelector {
-    return new StyleSelector(props);
   }
 
 

@@ -117,10 +117,9 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
           iconName = 'rapid-icon-plus';
         }
 
-        const style: PointStyle = {
-          markerName: 'osmnote',
-          markerTint: color,
-          iconName: iconName,
+        const style: Partial<PointStyle> = {
+          marker: { name: 'osmnote', color: color, alpha: 1 },
+          icon: { name: iconName, color: 0x000000, alpha: 1, size: 11 },
           // override 'y' for better centering within the note balloon
           anchor: { x: 0.5, y: 0.65 }
         };

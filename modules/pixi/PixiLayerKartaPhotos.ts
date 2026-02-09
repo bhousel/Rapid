@@ -1,9 +1,10 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
+import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
 
 import type { GeoJSON } from '../data/GeoJSON.ts';
 import type { Marker } from '../data/Marker.ts';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -14,19 +15,17 @@ const SELECTED = 0xffee00;
 const LINESTYLE = {
   casing: { alpha: 0 },  // disable
   stroke: { alpha: 0.7, width: 4, color: KARTAVIEW_BLUE }
-} as LineStyle;
+} as Partial<MatchedStyle>;
 
-const MARKERSTYLE = {
-  markerAlpha:     0.8,
-  markerName:      'mediumCircle',
-  markerTint:      KARTAVIEW_BLUE,
+const MARKERSTYLE: Partial<PointStyle> = {
+  marker: { name: 'mediumCircle', color: KARTAVIEW_BLUE, alpha: 0.8 },
   viewfieldAlpha:  0.7,
   viewfieldName:   'viewfield',
-  viewfieldTint:   KARTAVIEW_BLUE,
+  viewfieldColor:   KARTAVIEW_BLUE,
   scale:           1.0,
   fovWidth:        1,
   fovLength:       1
-} as PointStyle;
+};
 
 
 /**
@@ -240,7 +239,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style: PointStyle = Object.assign({}, MARKERSTYLE);
+        const style: Partial<PointStyle> = Object.assign({}, MARKERSTYLE);
 
 // todo handle pano
         if (feature.hasClass('selectphoto')) {  // selected photo style
@@ -248,8 +247,8 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
           style.viewfieldAngles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];
           style.viewfieldName = 'viewfield';
           style.viewfieldAlpha = 1;
-          style.viewfieldTint = SELECTED;
-          style.markerTint = SELECTED;
+          style.viewfieldColor = SELECTED;
+          style.marker = Object.assign({}, style.marker, { color: SELECTED });
           style.scale = 2.0;
           //style.fovWidth = fovWidthInterp(this._viewerZoom);
           //style.fovLength = fovLengthInterp(this._viewerZoom);
@@ -260,8 +259,8 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
             style.viewfieldAlpha = 1;
-            style.viewfieldTint = SELECTED;
-            style.markerTint = SELECTED;
+            style.viewfieldColor = SELECTED;
+            style.marker = Object.assign({}, style.marker, { color: SELECTED });
           }
         }
 

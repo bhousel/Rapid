@@ -6,10 +6,12 @@ import { parse as wktParse } from 'wkt';
 import { geojsonFeatures } from '../util/util.ts';
 import { GeoJSON } from '../data/GeoJSON.ts';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
+import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
-import { PixiFeaturePolygon, type PolygonStyle } from './PixiFeaturePolygon.ts';
+import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
+
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 import type { PixiScene } from './PixiScene.ts';
 
@@ -214,8 +216,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const polygonStyle = {
       fill: { color: CUSTOM_COLOR, alpha: 0.3, },
       stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
-      labelTint: CUSTOM_COLOR
-    } as PolygonStyle;
+      labelColor: CUSTOM_COLOR
+    } as Partial<MatchedStyle>;
 
     for (const d of polygons) {
       const dataID = d.id;
@@ -266,14 +268,14 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param lines - Array of line data
    * @param styleOverride - Custom style
    */
-  renderLines(frame: number, viewport: Viewport, zoom: number, lines: GeoJSON[], styleOverride?: LineStyle): void {
+  renderLines(frame: number, viewport: Viewport, zoom: number, lines: GeoJSON[], styleOverride?: Partial<MatchedStyle>): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('basemap')!;
 
     const lineStyle = styleOverride ?? {
       stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
-      labelTint: CUSTOM_COLOR
-    } as LineStyle;
+      labelColor: CUSTOM_COLOR
+    } as Partial<MatchedStyle>;
 
     for (const d of lines) {
       const dataID = d.id;
@@ -369,12 +371,11 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('points')!;
 
-    const pointStyle = {
-      markerName: 'largeCircle',
-      markerTint: CUSTOM_COLOR,
-      iconName: 'maki-circle-stroked',
-      labelTint: CUSTOM_COLOR
-    } as PointStyle;
+    const pointStyle: Partial<PointStyle> = {
+      marker: { name: 'largeCircle', color: CUSTOM_COLOR, alpha: 1 },
+      icon: { name: 'maki-circle-stroked', color: CUSTOM_COLOR, alpha: 1, size: 11 },
+      labelColor: CUSTOM_COLOR
+    };
 
     for (const d of points) {
       const dataID = d.id;

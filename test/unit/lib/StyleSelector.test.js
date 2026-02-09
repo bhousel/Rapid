@@ -4,24 +4,19 @@ import * as Rapid from '../../../modules/headless.js';
 
 
 describe('StyleSelector', () => {
+  const context = new Rapid.MockContext();
 
   describe('constructor', () => {
-    it('requires an id', () => {
-      assert.throws(
-        () => new Rapid.StyleSelector({ styleIDs: ['test'], match: {} }),
-        /id is required/
-      );
+    it('throws if missing an id', () => {
+      assert.throws(() => new Rapid.StyleSelector(context), /missing id/i);
     });
 
     it('requires styleIDs', () => {
-      assert.throws(
-        () => new Rapid.StyleSelector({ id: 'test', match: {} }),
-        /styleIDs is required/
-      );
+      assert.throws(() => new Rapid.StyleSelector(context, { id: 'test', match: {} }), /styleIDs is required/);
     });
 
     it('creates a selector with minimal props', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['motorway'],
         match: {}
@@ -31,7 +26,7 @@ describe('StyleSelector', () => {
     });
 
     it('exposes match conditions via getter', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['motorway'],
         match: { dataset: 'osm', tags: [{ key: 'highway' }] }
@@ -41,7 +36,7 @@ describe('StyleSelector', () => {
     });
 
     it('exposes assetID via getter', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['motorway'],
         assetID: 'rapid_style',
@@ -51,7 +46,7 @@ describe('StyleSelector', () => {
     });
 
     it('assetID is undefined when not provided', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['motorway'],
         match: {}
@@ -65,7 +60,7 @@ describe('StyleSelector', () => {
         styleIDs: ['motorway'],
         match: { tags: [{ key: 'highway', value: 'motorway' }] }
       };
-      const s = new Rapid.StyleSelector(props);
+      const s = new Rapid.StyleSelector(context, props);
 
       // Modify original should not affect selector
       props.match.tags[0].value = 'trunk';
@@ -76,7 +71,7 @@ describe('StyleSelector', () => {
 
   describe('matching - dataset', () => {
     it('matches when dataset not specified', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: {}
@@ -87,7 +82,7 @@ describe('StyleSelector', () => {
     });
 
     it('matches single dataset', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { dataset: 'osm' }
@@ -97,7 +92,7 @@ describe('StyleSelector', () => {
     });
 
     it('matches multiple datasets', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { dataset: ['osm', 'rapid'] }
@@ -108,7 +103,7 @@ describe('StyleSelector', () => {
     });
 
     it('matches wildcard dataset', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { dataset: '*' }
@@ -122,7 +117,7 @@ describe('StyleSelector', () => {
 
   describe('matching - geometry', () => {
     it('matches when geometry not specified', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: {}
@@ -133,7 +128,7 @@ describe('StyleSelector', () => {
     });
 
     it('matches single geometry', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { geometry: 'line' }
@@ -144,7 +139,7 @@ describe('StyleSelector', () => {
     });
 
     it('matches multiple geometries', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { geometry: ['line', 'area'] }
@@ -155,7 +150,7 @@ describe('StyleSelector', () => {
     });
 
     it('matches wildcard geometry', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { geometry: '*' }
@@ -169,7 +164,7 @@ describe('StyleSelector', () => {
 
   describe('matching - tags', () => {
     it('matches when no tags specified', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: {}
@@ -180,7 +175,7 @@ describe('StyleSelector', () => {
     });
 
     it('matches single tag', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['motorway'],
         match: {
@@ -193,7 +188,7 @@ describe('StyleSelector', () => {
     });
 
     it('matches tag existence', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['building'],
         match: {
@@ -206,7 +201,7 @@ describe('StyleSelector', () => {
     });
 
     it('matches multiple tags (AND logic)', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['tunnel_road'],
         match: {
@@ -228,7 +223,7 @@ describe('StyleSelector', () => {
     });
 
     it('accepts PropMatcherProps objects in tags', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { tags: [{ key: 'highway', op: '~', value: '^motor' }] }
@@ -242,7 +237,7 @@ describe('StyleSelector', () => {
 
   describe('matching - combined conditions', () => {
     it('matches dataset + geometry + tags', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['rapid_building'],
         priority: 10,
@@ -286,7 +281,7 @@ describe('StyleSelector', () => {
 
   describe('specificity', () => {
     it('returns 0 for no conditions', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: {}
@@ -295,7 +290,7 @@ describe('StyleSelector', () => {
     });
 
     it('adds 100 for dataset condition', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { dataset: 'osm' }
@@ -304,7 +299,7 @@ describe('StyleSelector', () => {
     });
 
     it('adds 50 for geometry condition', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { geometry: 'line' }
@@ -313,14 +308,14 @@ describe('StyleSelector', () => {
     });
 
     it('adds 10 per tag matcher', () => {
-      const s1 = new Rapid.StyleSelector({
+      const s1 = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { tags: [{ key: 'highway' }] }
       });
       assert.strictEqual(s1.specificity(), 10);
 
-      const s2 = new Rapid.StyleSelector({
+      const s2 = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: {
@@ -334,7 +329,7 @@ describe('StyleSelector', () => {
     });
 
     it('combines all factors', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: {
@@ -350,14 +345,14 @@ describe('StyleSelector', () => {
     });
 
     it('does not count wildcard as specific', () => {
-      const s1 = new Rapid.StyleSelector({
+      const s1 = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { dataset: '*' }
       });
       assert.strictEqual(s1.specificity(), 0);
 
-      const s2 = new Rapid.StyleSelector({
+      const s2 = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { geometry: '*' }
@@ -369,12 +364,12 @@ describe('StyleSelector', () => {
 
   describe('compare', () => {
     it('higher specificity wins', () => {
-      const lessSpecific = new Rapid.StyleSelector({
+      const lessSpecific = new Rapid.StyleSelector(context, {
         id: 'less',
         styleIDs: ['style'],
         match: { tags: [{ key: 'highway' }] }  // specificity: 10
       });
-      const moreSpecific = new Rapid.StyleSelector({
+      const moreSpecific = new Rapid.StyleSelector(context, {
         id: 'more',
         styleIDs: ['style'],
         match: {
@@ -388,12 +383,12 @@ describe('StyleSelector', () => {
     });
 
     it('returns 0 for equal specificity', () => {
-      const a = new Rapid.StyleSelector({
+      const a = new Rapid.StyleSelector(context, {
         id: 'a',
         styleIDs: ['style'],
         match: { tags: [{ key: 'highway' }] }
       });
-      const b = new Rapid.StyleSelector({
+      const b = new Rapid.StyleSelector(context, {
         id: 'b',
         styleIDs: ['style'],
         match: { tags: [{ key: 'building' }] }
@@ -406,7 +401,7 @@ describe('StyleSelector', () => {
 
   describe('clone', () => {
     it('creates an independent copy', () => {
-      const original = new Rapid.StyleSelector({
+      const original = new Rapid.StyleSelector(context, {
         id: 'original',
         styleIDs: ['style'],
         match: { tags: [{ key: 'highway' }] }
@@ -419,7 +414,7 @@ describe('StyleSelector', () => {
     });
 
     it('can clone with a new ID', () => {
-      const original = new Rapid.StyleSelector({
+      const original = new Rapid.StyleSelector(context, {
         id: 'original',
         styleIDs: ['style'],
         match: {}
@@ -433,7 +428,7 @@ describe('StyleSelector', () => {
 
   describe('serialization', () => {
     it('toJSON returns a plain object', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['motorway'],
         match: {
@@ -454,7 +449,7 @@ describe('StyleSelector', () => {
     });
 
     it('toString returns readable format', () => {
-      const s = new Rapid.StyleSelector({
+      const s = new Rapid.StyleSelector(context, {
         id: 'highway-motorway',
         styleIDs: ['motorway'],
         match: {
@@ -472,24 +467,11 @@ describe('StyleSelector', () => {
 
 
   describe('static methods', () => {
-    describe('from', () => {
-      it('creates a StyleSelector from raw props', () => {
-        const props = {
-          id: 'test',
-          styleIDs: ['motorway'],
-          match: { tags: [{ key: 'highway', value: 'motorway' }] }
-        };
-        const s = Rapid.StyleSelector.from(props);
-        assert.instanceOf(s, Rapid.StyleSelector);
-        assert.strictEqual(s.id, 'test');
-        assert.deepEqual(s.styleIDs, ['motorway']);
-      });
-    });
 
     describe('findBest', () => {
       it('returns undefined when no selectors match', () => {
         const selectors = [
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'motorway',
             styleIDs: ['motorway'],
             match: { tags: [{ key: 'highway', value: 'motorway' }] }
@@ -502,7 +484,7 @@ describe('StyleSelector', () => {
       });
 
       it('returns the only matching selector', () => {
-        const selector = new Rapid.StyleSelector({
+        const selector = new Rapid.StyleSelector(context, {
           id: 'motorway',
           styleIDs: ['motorway'],
           match: { tags: [{ key: 'highway', value: 'motorway' }] }
@@ -515,12 +497,12 @@ describe('StyleSelector', () => {
 
       it('returns most specific selector', () => {
         const selectors = [
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'general',
             styleIDs: ['general'],
             match: { tags: [{ key: 'highway' }] }  // specificity: 10
           }),
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'specific',
             styleIDs: ['specific'],
             match: {
@@ -538,13 +520,13 @@ describe('StyleSelector', () => {
 
       it('uses specificity for ranking', () => {
         const selectors = [
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'less-specific',
             styleIDs: ['less'],
             priority: 5,
             match: { tags: [{ key: 'highway' }] }  // specificity: 10
           }),
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'more-specific',
             styleIDs: ['more'],
             priority: 5,
@@ -565,7 +547,7 @@ describe('StyleSelector', () => {
     describe('findAll', () => {
       it('returns empty array when no selectors match', () => {
         const selectors = [
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'motorway',
             styleIDs: ['motorway'],
             match: { tags: [{ key: 'highway', value: 'motorway' }] }
@@ -579,12 +561,12 @@ describe('StyleSelector', () => {
 
       it('returns all matching selectors sorted by specificity', () => {
         const selectors = [
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'low',
             styleIDs: ['low'],
             match: { tags: [{ key: 'highway' }] }  // specificity: 10
           }),
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'high',
             styleIDs: ['high'],
             match: {
@@ -593,7 +575,7 @@ describe('StyleSelector', () => {
               tags: [{ key: 'highway' }]  // specificity: 160
             }
           }),
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'medium',
             styleIDs: ['medium'],
             match: {
@@ -616,17 +598,17 @@ describe('StyleSelector', () => {
 
       it('only includes matching selectors', () => {
         const selectors = [
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'highway',
             styleIDs: ['road'],
             match: { tags: [{ key: 'highway' }] }
           }),
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'building',
             styleIDs: ['building'],
             match: { tags: [{ key: 'building' }] }
           }),
-          new Rapid.StyleSelector({
+          new Rapid.StyleSelector(context, {
             id: 'motorway',
             styleIDs: ['motorway'],
             match: { tags: [{ key: 'highway', value: 'motorway' }] }

@@ -8,55 +8,10 @@ import { lineToPoly, type LineToPolyResult } from './helpers.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 const PARTIALFILLWIDTH = 32;
 
-
-/** Style properties for polygon fill */
-export interface PolygonFillStyle {
-  /** Fill width for strokes */
-  width?: number;
-  /** Fill color */
-  color?: number;
-  /** Alpha/opacity (0-1) */
-  alpha?: number;
-  /** Pattern name */
-  pattern?: string;
-}
-
-/** Style properties for polygon stroke */
-export interface PolygonStrokeStyle {
-  /** Stroke width in pixels */
-  width?: number;
-  /** Stroke color */
-  color?: number;
-  /** Alpha/opacity (0-1) */
-  alpha?: number;
-  /** Dash pattern [dash, gap] */
-  dash?: number[];
-  /** Line cap style */
-  cap?: 'butt' | 'round' | 'square';
-  /** Line join style */
-  join?: 'bevel' | 'miter' | 'round';
-}
-
-/** Style properties for polygon features */
-export interface PolygonStyle {
-  /** If true, always use full fill (not partial) */
-  requireFill?: boolean;
-  /** Texture name for line markers */
-  lineMarkerName?: string;
-  /** Line marker tint color */
-  lineMarkerTint?: number;
-  /** Label tint color */
-  labelTint?: number;
-  /** Fill style */
-  fill?: PolygonFillStyle;
-  /** Casing style */
-  casing?: PolygonStrokeStyle;
-  /** Stroke style */
-  stroke?: PolygonStrokeStyle;
-}
 
 /** SSR (smallest surrounding rectangle) data for a polygon */
 interface SSRData {
@@ -289,7 +244,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const w = screen.width ?? 0;
     const h = screen.height ?? 0;
 
-    const style = this._style as PolygonStyle;
+    const style = this._style as MatchedStyle;
     const textureManager = this.gfx.textureManager!;
     const color = style.fill?.color ?? 0xaaaaaa;
     const alpha = style.fill?.alpha ?? 0.3;
@@ -629,11 +584,11 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * 'point' - @see `PixiFeaturePoint.ts`
    * 'line'/'polygon' - @see `StyleSystem.ts`
    */
-  get style(): PolygonStyle {
-    return this._style as PolygonStyle;
+  get style(): Partial<MatchedStyle> {
+    return this._style as Partial<MatchedStyle>;
   }
-  set style(obj: Partial<PolygonStyle>) {
-    this._style = Object.assign({}, STYLE_DEFAULTS, obj) as PolygonStyle;
+  set style(obj: Partial<MatchedStyle>) {
+    this._style = Object.assign({}, STYLE_DEFAULTS, obj) as MatchedStyle;
     this._styleDirty = true;
   }
 
@@ -641,13 +596,14 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
 
 /** Default style for polygons */
-const STYLE_DEFAULTS: PolygonStyle = {
-  requireFill: false,      // allow partial fill or wireframe styles
-  lineMarkerName: '',
-  lineMarkerTint: 0x000000,
-  labelTint: 0xeeeeee,
-
-  fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3 },
+const STYLE_DEFAULTS: MatchedStyle = {
+  fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3, pattern: undefined },
   casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
-  stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' }
+  stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' },
+  marker: { name: 'smallCircle', color: 0xffffff, alpha: 1 },
+  icon: { name: undefined, color: 0x111111, alpha: 1, size: 11 },
+  lineMarker: { name: undefined, color: 0x000000 },
+  sidedMarker: { name: undefined, color: 0xffffff },
+  labelColor: 0xeeeeee,
+  requireFill: false
 };

@@ -1,10 +1,11 @@
 import * as PIXI from 'pixi.js';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeatureLine, type LineStyle } from './PixiFeatureLine.ts';
+import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
 
 import type { GeoJSON } from '../data/GeoJSON.ts';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -130,11 +131,11 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    *          "wall", "fence", "power", "stream", "drain", etc.
    * @return  A style object that can be given to the pixi renderer
    */
-  getLineStyle(props: Record<string, unknown>): LineStyle {
+  getLineStyle(props: Record<string, unknown>): Partial<MatchedStyle> {
     const lineStyle = {
       stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
-      labelTint: CUSTOM_COLOR
-    } as LineStyle;
+      labelColor: CUSTOM_COLOR
+    } as Partial<MatchedStyle>;
 
     const color = props.color ? new PIXI.Color(props.color as string).toNumber() : CUSTOM_COLOR;
     const thin = props.thin;
@@ -214,12 +215,11 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   renderPoints(frame: number, viewport: Viewport, zoom: number, points: GeoJSON[]): void {
     const parentContainer = this.scribblesContainer;
 
-    const pointStyle = {
-      markerName: 'largeCircle',
-      markerTint: CUSTOM_COLOR,
-      iconName: 'maki-circle-stroked',
-      labelTint: CUSTOM_COLOR
-    } as PointStyle;
+    const pointStyle: Partial<PointStyle> = {
+      marker: { name: 'largeCircle', color: CUSTOM_COLOR, alpha: 1 },
+      icon: { name: 'maki-circle-stroked', color: CUSTOM_COLOR, alpha: 1, size: 11 },
+      labelColor: CUSTOM_COLOR
+    };
 
     for (const d of points) {
       const dataID = d.id;

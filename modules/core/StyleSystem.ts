@@ -3,13 +3,14 @@ import { osmPavedTags } from '../lib/tags.ts';
 import { Style } from '../lib/Style.ts';
 import { StyleSelector } from '../lib/StyleSelector.ts';
 import { utilIterable } from '../util/iterable.ts';
-import { utilExtractValues, utilWildcard } from '../util/string.ts';
+import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
-import type { LineCap, LineJoin, StyleProps } from '../lib/Style.ts';
-import type { StyleMatchConditions } from '../lib/StyleSelector.ts';
+import type { StyleProps, FillStyleProps, LineStyleProps, PointStyleProps } from '../lib/Style.ts';
+import type { StyleMatchConditions, StyleSelectorProps } from '../lib/StyleSelector.ts';
 import type { OneOrMore } from '../util/iterable.ts';
+import type { GeometryType } from './SchemaSystem.ts';
 
 
 /**
@@ -39,39 +40,20 @@ export interface StyleData {
   selectors?: Record<StyleSelectorID, StyleSelectorInput | null>;
 }
 
-
-/**
- * Resolved fill style properties.
- */
-interface ResolvedFillProps {
-  width: number;
-  color: number;
-  alpha: number;
-  pattern?: string;
-}
-
-
-/**
- * Resolved line style properties.
- */
-interface ResolvedLineProps {
-  width: number;
-  color: number;
-  alpha: number;
-  cap: LineCap;
-  join: LineJoin;
-  dash?: number[];
-}
-
-
 /**
  * The resolved style object returned by styleMatch.
  */
 export interface MatchedStyle {
-  fill: ResolvedFillProps;
-  casing: ResolvedLineProps;
-  stroke: ResolvedLineProps;
-  /** Extra properties are allowed */
+  fill: FillStyleProps;
+  casing: LineStyleProps;
+  stroke: LineStyleProps;
+  marker: PointStyleProps;
+  icon: PointStyleProps;
+  lineMarker: PointStyleProps;
+  sidedMarker: PointStyleProps;
+  labelColor: number;
+  requireFill: boolean;
+  /** Extra properties are allowed for backward compatibility with PixiFeature styles */
   [key: string]: unknown;
 }
 
@@ -89,6 +71,18 @@ const lifecycleVals = new Set([
 
 // matches these things as a tag prefix
 const lifecycleRegex = new RegExp('^(' + Array.from(lifecycleVals).join('|') + '):');
+
+
+/**
+ * getTag
+ * Returns the value of the tag, but ignores 'no' values.
+ * @param tags - OSM tags object
+ * @param key - Tag key to look up
+ * @return Tag value, or undefined if not present or 'no'
+ */
+function getTag(tags: Tags, key: string): string | undefined {
+  return tags[key] === 'no' ? undefined : tags[key];
+}
 
 
 /**
@@ -133,7 +127,7 @@ export class StyleSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'styles';
-    this.optionalDependencies = new Set(['assets', 'gfx', 'urlhash']);
+    this.optionalDependencies = new Set(['assets', 'gfx', 'schema', 'urlhash']);
 
     this.styles = new Map();
     this.selectors = new Map();
@@ -363,7 +357,7 @@ export class StyleSystem extends AbstractSystem {
    * {
    *   assetID: '',           // A string asset identifier, e.g. 'rapid_style'
    *   assetVersion: '',      // A string version specifier, e.g. '1.0.0'  (defaults to 'unknown' if not present)
-   *   styles: {},            // Object<StyleID, Style>
+   *   styles: {},            // Object<StyleID, Partial<StyleProps>>
    *   selectors: {}          // Object<SelectorID, StyleSelector>
    * }
    *
@@ -381,6 +375,7 @@ export class StyleSystem extends AbstractSystem {
    * @throws Will throw if given data does not contain an `assetID`, or if the `assetID` has already been merged
    */
   merge(src: StyleData): void {
+    const context = this.context;
     const assetID = src.assetID;
     const assetVersion = src.assetVersion ?? 'unknown';
 
@@ -395,25 +390,19 @@ export class StyleSystem extends AbstractSystem {
 
     // Merge styles
     if (src.styles) {
-      for (const [styleID, input] of Object.entries(src.styles)) {
+      for (const [styleID, props] of Object.entries(src.styles)) {
         // Skip protected styles
         if (styleID === 'DEFAULTS' || styleID === 'LIFECYCLE') {
-          if (input === null) continue;  // can't delete these
+          if (props === null) continue;  // can't delete these
         }
 
-        if (input === null) {
+        if (props === null) {
           // Delete: supports wildcards
           this._deleteMatching(this.styles, styleID);
         } else {
           // Add/replace - create Style instance from input
-          const style = new Style({
-            id: styleID,
-            assetID: assetID,
-            assetVersion: assetVersion,
-            fill: input.fill,
-            casing: input.casing,
-            stroke: input.stroke
-          });
+          const setProps = { ...props, id: styleID, assetID, assetVersion } as Partial<StyleProps>;
+          const style = new Style(context, setProps);
           this.styles.set(styleID, style);
         }
       }
@@ -421,19 +410,14 @@ export class StyleSystem extends AbstractSystem {
 
     // Merge selectors
     if (src.selectors) {
-      for (const [selectorID, input] of Object.entries(src.selectors)) {
-        if (input === null) {
+      for (const [selectorID, props] of Object.entries(src.selectors)) {
+        if (props === null) {
           // Delete: supports wildcards
           this._deleteMatching(this.selectors, selectorID);
         } else {
           // Add/replace - create StyleSelector instance from input
-          const selector = new StyleSelector({
-            id: selectorID,
-            assetID: assetID,
-            assetVersion: assetVersion,
-            styleIDs: input.styleIDs,
-            match: input.match
-          });
+          const setProps = { ...props, id: selectorID, assetID, assetVersion } as Partial<StyleSelectorProps>;
+          const selector = new StyleSelector(context, setProps);
           this.selectors.set(selectorID, selector);
         }
       }
@@ -492,9 +476,10 @@ export class StyleSystem extends AbstractSystem {
   /**
    * styleMatch
    * @param tags - OSM tags to match to a display style
+   * @param geometry - Optional geometry type (if provided, will look up preset icon from SchemaSystem)
    * @return Styling info for the given tags
    */
-  styleMatch(tags: Tags): MatchedStyle {
+  styleMatch(tags: Tags, geometry?: GeometryType): MatchedStyle {
     const defaults = this.styles.get('DEFAULTS');
 
     // If DEFAULTS hasn't been loaded yet, return a minimal style
@@ -502,7 +487,13 @@ export class StyleSystem extends AbstractSystem {
       return {
         fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3 },
         casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
-        stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' }
+        stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' },
+        marker: { name: 'smallCircle', color: 0xffffff, alpha: 1 },
+        icon: { name: undefined, color: 0x111111, alpha: 1, size: 11 },
+        lineMarker: { name: undefined, color: 0xffffff },
+        sidedMarker: { name: undefined, color: 0xffffff },
+        labelColor: 0xeeeeee,
+        requireFill: false
       };
     }
 
@@ -536,39 +527,81 @@ export class StyleSystem extends AbstractSystem {
       }
     }
 
-    // Also scan for lifecycle keywords in any of their various forms.
-    // The feature will be drawn with dashed lines.
-    // see Rapid#1312, Rapid#1199, Rapid#791, Rapid#535
-    let hasLifecycleTag = false;
+    // Check for lifecycle tags
+    const hasLifecycleTag = this._hasLifecycleTag(tags, styleKey);
+
+    // Build result object
+    const result: MatchedStyle = {
+      fill: {} as FillStyleProps,
+      casing: {} as LineStyleProps,
+      stroke: {} as LineStyleProps,
+      marker: {} as PointStyleProps,
+      icon: {} as PointStyleProps,
+      lineMarker: {} as PointStyleProps,
+      sidedMarker: {} as PointStyleProps,
+      labelColor: 0xeeeeee,
+      requireFill: false
+    };
+
+    // Resolve base style properties (fill, casing, stroke)
+    this._resolveBaseStyle(result, matched, defaults);
+
+    // Resolve marker, icon, and related properties
+    this._resolveMarkerAndIcon(result, matched, defaults, tags, geometry);
+
+    // Apply structure overrides (bridge, tunnel, embankment, surface)
+    this._applyStructureOverrides(result, tags);
+
+    // Apply lifecycle overrides if applicable
+    if (hasLifecycleTag) {
+      this._applyLifecycleOverrides(result);
+    }
+
+    // Validate fill pattern
+    this._validateFillPattern(result, tags);
+
+    return result;
+  }
+
+
+  /**
+   * _hasLifecycleTag
+   * Scan tags for lifecycle keywords in any of their various forms.
+   * @param tags - OSM tags to scan
+   * @param styleKey - The primary style key (e.g. 'highway'), if any
+   * @return True if a lifecycle tag is found
+   * @see Rapid#1312, Rapid#1199, Rapid#791, Rapid#535
+   */
+  private _hasLifecycleTag(tags: Tags, styleKey: string | undefined): boolean {
     for (const [k, v] of Object.entries(tags)) {
       // Lifecycle key, e.g. `demolished=yes`
       // (applies to all tags, styleKey doesn't matter)
       if (lifecycleVals.has(k) && v !== 'no') {
-        hasLifecycleTag = true;
-        break;
+        return true;
 
       // Lifecycle value, e.g. `railway=demolished`
       // (applies only if `k` is styleKey or there is no styleKey controlling styling)
       } else if ((!styleKey || k === styleKey) && lifecycleVals.has(v)) {
-        hasLifecycleTag = true;
-        break;
+        return true;
 
       // Lifecycle key prefix, e.g. `demolished:railway=rail`
       // (applies only if there is no styleKey controlling the styling)
       } else if (!styleKey && lifecycleRegex.test(k) && v !== 'no') {
-        hasLifecycleTag = true;
-        break;
+        return true;
       }
     }
+    return false;
+  }
 
-    // Copy style properties from the matched style, fallback to defaults as needed..
-    // We use type assertions here since we're building the result object dynamically
-    const result: MatchedStyle = {
-      fill: {} as ResolvedFillProps,
-      casing: {} as ResolvedLineProps,
-      stroke: {} as ResolvedLineProps
-    };
 
+  /**
+   * _resolveBaseStyle
+   * Copy fill/casing/stroke properties from matched style, with fallback to defaults.
+   * @param result - The result object to populate
+   * @param matched - The matched Style
+   * @param defaults - The default Style
+   */
+  private _resolveBaseStyle(result: MatchedStyle, matched: Style, defaults: Style): void {
     for (const group of ['fill', 'casing', 'stroke'] as const) {
       const styleGroup = result[group] as unknown as Record<string, unknown>;
       const matchedGroup = matched[group] as Record<string, unknown> | undefined;
@@ -586,21 +619,80 @@ export class StyleSystem extends AbstractSystem {
         }
       }
     }
+  }
 
-    // Apply casing/stroke overrides
+
+  /**
+   * _resolveMarkerAndIcon
+   * Resolve marker, icon, lineMarker, sidedMarker, labelColor, and requireFill.
+   * @param result - The result object to populate
+   * @param matched - The matched Style
+   * @param defaults - The default Style
+   * @param tags - OSM tags (for preset lookup)
+   * @param geometry - Optional geometry type for preset icon lookup
+   */
+  private _resolveMarkerAndIcon(
+    result: MatchedStyle,
+    matched: Style,
+    defaults: Style,
+    tags: Tags,
+    geometry: GeometryType | undefined
+  ): void {
+    const schema = this.context.systems.schema;
+
+    // Resolve marker properties
+    result.marker = matched.resolvedMarker();
+
+    // Resolve icon properties
+    result.icon = matched.resolvedIcon();
+
+    // If icon.name is not set by the style, try to get it from the preset
+    if (!result.icon.name && geometry && schema) {
+      const preset = schema.matchTags(tags, geometry);
+      if (preset?.props.icon) {
+        result.icon.name = preset.props.icon;
+      }
+    }
+
+    // Resolve line marker and sided marker
+    result.lineMarker = {
+      name: matched.lineMarker?.name ?? defaults.lineMarker?.name,
+      color: matched.lineMarker?.color ?? defaults.lineMarker?.color ?? 0xffffff
+    };
+    result.sidedMarker = {
+      name: matched.sidedMarker?.name ?? defaults.sidedMarker?.name,
+      color: matched.sidedMarker?.color ?? defaults.sidedMarker?.color ?? 0xffffff
+    };
+
+    // Resolve labelColor and requireFill
+    result.labelColor = matched.resolvedLabelColor();
+    result.requireFill = matched.requireFill ?? defaults.requireFill ?? false;
+  }
+
+
+  /**
+   * _applyStructureOverrides
+   * Apply casing/stroke overrides for bridges, tunnels, embankments, cuttings, and unpaved surfaces.
+   * @param result - The result object to mutate
+   * @param tags - OSM tags
+   */
+  private _applyStructureOverrides(result: MatchedStyle, tags: Tags): void {
     const bridge = getTag(tags, 'bridge');
-    const building = getTag(tags, 'building');
     const cutting = getTag(tags, 'cutting');
     const embankment = getTag(tags, 'embankment');
     const highway = getTag(tags, 'highway');
     const tracktype = getTag(tags, 'tracktype');
     const tunnel = getTag(tags, 'tunnel');
     let surface = getTag(tags, 'surface');
+
+    // Assume unimproved (non-grade1) tracks have 'dirt' surface
     if (highway === 'track' && tracktype !== 'grade1') {
-      surface = surface || 'dirt';   // assume unimproved (non-grade1) tracks have 'dirt' surface
+      surface = surface || 'dirt';
     }
 
+    // Bridge/embankment/cutting: wider black casing
     if (bridge || embankment || cutting) {
+      result.casing.width ??= 1;  // make sure there is a casing
       result.casing.width += 7;
       result.casing.color = 0x000000;
       result.casing.cap = 'butt';
@@ -608,6 +700,8 @@ export class StyleSystem extends AbstractSystem {
         result.casing.dash = [2, 4];
       }
     }
+
+    // Tunnel: reduced stroke alpha
     if (tunnel) {
       result.stroke.alpha = 0.5;
     }
@@ -618,39 +712,43 @@ export class StyleSystem extends AbstractSystem {
       result.casing.cap = 'butt';
       result.casing.dash = [4, 4];
     }
+  }
 
-    // After applying all other styling rules and overrides, perform lifecycle overrides.
-    // (This is for features that are not really existing - "abandoned", "proposed", etc.)
-    if (hasLifecycleTag) {
-      const lifecycle = this.styles.get('LIFECYCLE');
-      if (lifecycle) {
-        for (const group of ['fill', 'casing', 'stroke'] as const) {
-          for (const prop of ['width', 'color', 'alpha', 'cap', 'dash'] as const) {
-            const lifecycleGroup = lifecycle[group] as Record<string, unknown> | undefined;
-            const value = lifecycleGroup?.[prop];
-            if (value !== undefined) {
-              (result[group] as unknown as Record<string, unknown>)[prop] = value;
-            }
-          }
+
+  /**
+   * _applyLifecycleOverrides
+   * Apply lifecycle overrides (dashed lines for abandoned, proposed, etc.).
+   * @param result - The result object to mutate
+   */
+  private _applyLifecycleOverrides(result: MatchedStyle): void {
+    const lifecycle = this.styles.get('LIFECYCLE');
+    if (!lifecycle) return;
+
+    for (const group of ['fill', 'casing', 'stroke'] as const) {
+      for (const prop of ['width', 'color', 'alpha', 'cap', 'dash'] as const) {
+        const lifecycleGroup = lifecycle[group] as Record<string, unknown> | undefined;
+        const value = lifecycleGroup?.[prop];
+        if (value !== undefined) {
+          (result[group] as unknown as Record<string, unknown>)[prop] = value;
         }
       }
     }
+  }
 
 
-    // Validate fill pattern (patterns come from styles/selectors via styleIDs array)
-    if (building) return result;   // exception: don't apply patterns to buildings
+  /**
+   * _validateFillPattern
+   * Validate and clear invalid fill patterns.
+   * @param result - The result object to validate
+   * @param tags - OSM tags (to check for building exception)
+   */
+  private _validateFillPattern(result: MatchedStyle, tags: Tags): void {
+    const building = getTag(tags, 'building');
+    if (building) return;  // exception: don't apply patterns to buildings
 
     if (result.fill.pattern && !this.patternIDs.has(result.fill.pattern)) {
       console.error(`invalid patternID: ${result.fill.pattern}`);  // eslint-disable-line
       result.fill.pattern = undefined;
-    }
-
-    return result;
-
-
-    // This just returns the value of the tag, but ignores 'no' values
-    function getTag(tags: Tags, key: string): string | undefined {
-      return tags[key] === 'no' ? undefined : tags[key];
     }
   }
 
