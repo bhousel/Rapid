@@ -396,22 +396,6 @@ describe('StyleSystem', () => {
           assert.isTrue(spyStyleChange.mock.calls.length > 0);
         });
       });
-
-
-      describe('merge delete protected', () => {
-        beforeAll(() => {
-          spyStyleChange.mockClear();
-          _styles.merge(sample.deleteProtectedData);
-        });
-
-        it('does not delete DEFAULTS style', () => {
-          assert.isTrue(_styles.styles.has('DEFAULTS'));
-        });
-
-        it('does not delete LIFECYCLE style', () => {
-          assert.isTrue(_styles.styles.has('LIFECYCLE'));
-        });
-      });
     });   // merge
 
 

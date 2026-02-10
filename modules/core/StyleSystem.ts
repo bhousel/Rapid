@@ -3,7 +3,7 @@ import { osmPavedTags } from '../lib/tags.ts';
 import { Style } from '../lib/Style.ts';
 import { StyleSelector } from '../lib/StyleSelector.ts';
 import { utilIterable } from '../util/iterable.ts';
-import { utilExtractValues } from '../util/string.ts';
+import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
@@ -362,7 +362,6 @@ export class StyleSystem extends AbstractSystem {
    *
    * When merging:
    *  - Items are processed in the order they appear.
-   *  - You can't replace the `DEFAULTS` or `LIFECYCLE` styles (these are required).
    *  - New items will replace existing items that have the same `id`.
    *     `"motorway": { casing: { color: 0xff0000 }, … }`    <-- `motorway` style replaced
    *  - If no new data supplied (null), this is treated as a delete.
@@ -390,19 +389,12 @@ export class StyleSystem extends AbstractSystem {
     // Merge styles
     if (src.styles) {
       for (const [styleID, props] of Object.entries(src.styles)) {
-        // Skip protected styles
-        if (styleID === 'DEFAULTS' || styleID === 'LIFECYCLE') {
-          if (props === null) continue;  // can't delete these
-        }
-
-        if (props === null) {
-          // Delete: supports wildcards
-          this._deleteMatching(this.styles, styleID);
-        } else {
-          // Add/replace - create Style instance from input
+        if (props) {   // add or replace
           const setProps = { ...props, id: styleID, assetID, assetVersion } as Partial<StyleProps>;
           const style = new Style(context, setProps);
           this.styles.set(styleID, style);
+        } else {   // remove
+          utilWildcardDelete(this.styles, styleID);
         }
       }
     }
@@ -410,43 +402,17 @@ export class StyleSystem extends AbstractSystem {
     // Merge selectors
     if (src.selectors) {
       for (const [selectorID, props] of Object.entries(src.selectors)) {
-        if (props === null) {
-          // Delete: supports wildcards
-          this._deleteMatching(this.selectors, selectorID);
-        } else {
-          // Add/replace - create StyleSelector instance from input
+        if (props) {  // add or replace
           const setProps = { ...props, id: selectorID, assetID, assetVersion } as Partial<StyleSelectorProps>;
           const selector = new StyleSelector(context, setProps);
           this.selectors.set(selectorID, selector);
+        } else {   // remove
+          utilWildcardDelete(this.selectors, selectorID);
         }
       }
     }
 
     this._styleChanged();
-  }
-
-
-  /**
-   * _deleteMatching
-   * Delete entries from a Map that match a pattern (supports '*' and '?' wildcards)
-   */
-  private _deleteMatching<V>(map: Map<string, V>, pattern: string): void {
-    if (pattern.includes('*') || pattern.includes('?')) {
-      // Convert wildcard pattern to regex
-      const regexPattern = pattern
-        .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape regex special chars
-        .replace(/\*/g, '.*')                   // * matches any characters
-        .replace(/\?/g, '.');                   // ? matches single character
-      const regex = new RegExp(`^${regexPattern}$`);
-
-      for (const key of map.keys()) {
-        if (regex.test(key)) {
-          map.delete(key);
-        }
-      }
-    } else {
-      map.delete(pattern);
-    }
   }
 
 

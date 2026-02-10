@@ -115,6 +115,31 @@ export function utilWildcard(str: string): RegExp | null {
 }
 
 
+interface KeyedCollection {
+  keys(): Iterable<string>;
+  delete(key: string): unknown
+};
+
+/**
+ * utilWildcardDelete
+ * Delete keys from a keyed collection (Map, Set, etc.) that match a wildcard pattern ('*' or '?').
+ */
+export function utilWildcardDelete(collection: KeyedCollection, pattern: string): void {
+  if (typeof pattern !== 'string') return;
+
+  const wildcard = utilWildcard(pattern);
+  if (wildcard) {
+    for (const k of collection.keys()) {
+      if (wildcard.test(k)) {
+        collection.delete(k);
+      }
+    }
+  } else {
+    collection.delete(pattern);
+  }
+}
+
+
 /**
  * utilExtractValues
  * This extracts multiple values from a string, typically used as a URL parameter.

@@ -84,49 +84,110 @@ describe('utilWildcard', () => {
     assert.instanceOf(result, RegExp);
     assert.strictEqual(result.toString(), '/^hello \\.\\+\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\ .*$/');
   });
+});
 
 
-  describe('utilExtractValues', () => {
-    it('returns empty Array if no input', () => {
-      assert.deepEqual(Rapid.utilExtractValues(), []);
-      assert.deepEqual(Rapid.utilExtractValues(null), []);
-      assert.deepEqual(Rapid.utilExtractValues({}), []);
-    });
-
-    it('splits on default separators [,/;\\|]', () => {
-      const expected = ['one', 'two', 'three'];
-      assert.deepEqual(Rapid.utilExtractValues('one,two,three'), expected);
-      assert.deepEqual(Rapid.utilExtractValues('one/two/three'), expected);
-      assert.deepEqual(Rapid.utilExtractValues('one;two;three'), expected);
-      assert.deepEqual(Rapid.utilExtractValues('one\\two\\three'), expected);
-      assert.deepEqual(Rapid.utilExtractValues('one|two|three'), expected);
-    });
-
-    it('ignores separators not in the list', () => {
-      assert.deepEqual(Rapid.utilExtractValues('one two three'), ['one two three']);
-      assert.deepEqual(Rapid.utilExtractValues('one.two.three'), ['one.two.three']);
-      assert.deepEqual(Rapid.utilExtractValues('one:two:three'), ['one:two:three']);
-      assert.deepEqual(Rapid.utilExtractValues('one-two-three'), ['one-two-three']);
-    });
-
-    it('trims whitespace from values', () => {
-      const expected = ['one', 'two', 'three'];
-      assert.deepEqual(Rapid.utilExtractValues(' one , two , three '), expected);
-      assert.deepEqual(Rapid.utilExtractValues(' one ; two ; three '), expected);
-    });
-
-    it('preserves empty values', () => {
-      const expected = ['', 'test', ''];
-      assert.deepEqual(Rapid.utilExtractValues('| test |'), expected);
-      assert.deepEqual(Rapid.utilExtractValues(', test ,'), expected);
-    });
-
-    it('supports custom separators', () => {
-      const input = 'imagery|https://example.com/imagery.json,schema|https://example.com/schema.json';
-      const expected = ['imagery', 'https://example.com/imagery.json', 'schema', 'https://example.com/schema.json'];
-      assert.deepEqual(Rapid.utilExtractValues(input, /[,;|]/), expected);
-    });
-
+describe('utilWildcardDelete', () => {
+  it('does nothing to a Set if if no valid pattern', () => {
+    const vals = ['hello one', 'hello two', 'okay three', ''];
+    const collection = new Set(vals);
+    Rapid.utilWildcardDelete(collection);
+    Rapid.utilWildcardDelete(collection, null);
+    Rapid.utilWildcardDelete(collection, {});
+    assert.deepEqual(collection, new Set(vals));  // set unchanged
   });
 
+  it('does nothing to a Map if if no valid pattern', () => {
+    const vals = [['hello one', 1], ['hello two', 2], ['okay three', 3], ['', null]];
+    const collection = new Map(vals);
+    Rapid.utilWildcardDelete(collection);
+    Rapid.utilWildcardDelete(collection, null);
+    Rapid.utilWildcardDelete(collection, {});
+    assert.deepEqual(collection, new Map(vals));  // set unchanged
+  });
+
+  it('deletes exact match from Set if no wildcard chars', () => {
+    const collection = new Set(['hello', 'jello', 'okay', '']);
+    const expected = new Set(['hello', 'okay', '']);
+    Rapid.utilWildcardDelete(collection, 'jello');
+    assert.deepEqual(collection, expected);
+  });
+
+  it('deletes exact match from Map if no wildcard chars', () => {
+    const collection = new Map([['hello', 1], ['jello', 2], ['okay', 3], ['', null]]);
+    const expected = new Map([['hello', 1], ['okay', 3], ['', null]]);
+    Rapid.utilWildcardDelete(collection, 'jello');
+    assert.deepEqual(collection, expected);
+  });
+
+  it(`deletes '*' match from Set`, () => {
+    const collection = new Set(['hello one', 'hello two', 'okay', '']);
+    const expected = new Set(['okay', '']);
+    Rapid.utilWildcardDelete(collection, 'hello*');
+    assert.deepEqual(collection, expected);
+  });
+
+  it(`deletes '*' match from Map`, () => {
+    const collection = new Map([['hello one', 1], ['hello two', 2], ['okay', 3], ['', null]]);
+    const expected = new Map([['okay', 3], ['', null]]);
+    Rapid.utilWildcardDelete(collection, 'hello*');
+    assert.deepEqual(collection, expected);
+  });
+
+  it(`deletes '?' match from Set`, () => {
+    const collection = new Set(['hello', 'jello', 'okay', '']);
+    const expected = new Set(['okay', '']);
+    Rapid.utilWildcardDelete(collection, '?ello');
+    assert.deepEqual(collection, expected);
+  });
+
+  it(`deletes '?' match from Map`, () => {
+    const collection = new Map([['hello', 1], ['jello', 2], ['okay', 3], ['', null]]);
+    const expected = new Map([['okay', 3], ['', null]]);
+    Rapid.utilWildcardDelete(collection, '?ello');
+    assert.deepEqual(collection, expected);
+  });
+});
+
+
+describe('utilExtractValues', () => {
+  it('returns empty Array if no input', () => {
+    assert.deepEqual(Rapid.utilExtractValues(), []);
+    assert.deepEqual(Rapid.utilExtractValues(null), []);
+    assert.deepEqual(Rapid.utilExtractValues({}), []);
+  });
+
+  it('splits on default separators [,/;\\|]', () => {
+    const expected = ['one', 'two', 'three'];
+    assert.deepEqual(Rapid.utilExtractValues('one,two,three'), expected);
+    assert.deepEqual(Rapid.utilExtractValues('one/two/three'), expected);
+    assert.deepEqual(Rapid.utilExtractValues('one;two;three'), expected);
+    assert.deepEqual(Rapid.utilExtractValues('one\\two\\three'), expected);
+    assert.deepEqual(Rapid.utilExtractValues('one|two|three'), expected);
+  });
+
+  it('ignores separators not in the list', () => {
+    assert.deepEqual(Rapid.utilExtractValues('one two three'), ['one two three']);
+    assert.deepEqual(Rapid.utilExtractValues('one.two.three'), ['one.two.three']);
+    assert.deepEqual(Rapid.utilExtractValues('one:two:three'), ['one:two:three']);
+    assert.deepEqual(Rapid.utilExtractValues('one-two-three'), ['one-two-three']);
+  });
+
+  it('trims whitespace from values', () => {
+    const expected = ['one', 'two', 'three'];
+    assert.deepEqual(Rapid.utilExtractValues(' one , two , three '), expected);
+    assert.deepEqual(Rapid.utilExtractValues(' one ; two ; three '), expected);
+  });
+
+  it('preserves empty values', () => {
+    const expected = ['', 'test', ''];
+    assert.deepEqual(Rapid.utilExtractValues('| test |'), expected);
+    assert.deepEqual(Rapid.utilExtractValues(', test ,'), expected);
+  });
+
+  it('supports custom separators', () => {
+    const input = 'imagery|https://example.com/imagery.json,schema|https://example.com/schema.json';
+    const expected = ['imagery', 'https://example.com/imagery.json', 'schema', 'https://example.com/schema.json'];
+    assert.deepEqual(Rapid.utilExtractValues(input, /[,;|]/), expected);
+  });
 });

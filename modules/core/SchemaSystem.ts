@@ -5,7 +5,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.ts';
 import { Category, Field, Preset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
-import { utilExtractValues, utilWildcard } from '../util/string.ts';
+import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
 import type { CategoryProps } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
@@ -502,16 +502,7 @@ export class SchemaSystem extends AbstractSystem {
           this.fields.set(fieldID, field);
 
         } else {   // remove
-          const wildcard = utilWildcard(fieldID);
-          if (wildcard) {
-            for (const k of this.fields.keys()) {
-              if (wildcard.test(k)) {
-                this.fields.delete(k);
-              }
-            }
-          } else {
-            this.fields.delete(fieldID);
-          }
+          utilWildcardDelete(this.fields, fieldID);
         }
       }
     }
@@ -543,16 +534,7 @@ export class SchemaSystem extends AbstractSystem {
           this.presets.set(presetID, preset);
 
         } else {   // remove
-          const wildcard = utilWildcard(presetID);
-          if (wildcard) {
-            for (const k of this.presets.keys()) {
-              if (wildcard.test(k)) {
-                this.presets.delete(k);
-              }
-            }
-          } else {
-            this.presets.delete(presetID);
-          }
+          utilWildcardDelete(this.presets, presetID);
         }
       }
     }
@@ -575,16 +557,7 @@ export class SchemaSystem extends AbstractSystem {
           this.categories.set(categoryID, category);
 
         } else {   // remove
-          const wildcard = utilWildcard(categoryID);
-          if (wildcard) {
-            for (const k of this.categories.keys()) {
-              if (wildcard.test(k)) {
-                this.categories.delete(k);
-              }
-            }
-          } else {
-            this.categories.delete(categoryID);
-          }
+          utilWildcardDelete(this.categories, categoryID);
         }
       }
     }

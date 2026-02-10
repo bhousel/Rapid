@@ -6,7 +6,7 @@ import {
   ImagerySource, ImagerySourceBing, ImagerySourceCustom,
   ImagerySourceEsri, ImagerySourceEsriWayback, ImagerySourceNone
 } from '../lib/ImagerySource.ts';
-import { utilExtractValues, utilWildcard } from '../util/string.ts';
+import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
@@ -378,18 +378,8 @@ export class ImagerySystem extends AbstractSystem {
           }
 
         } else {   // remove
-          const wildcard = utilWildcard(sourceID);
-          if (wildcard) {
-            for (const k of this.sources.keys()) {
-              if (wildcard.test(k)) {
-                this.sources.delete(k);
-                this.features.delete(k);
-              }
-            }
-          } else {
-            this.sources.delete(sourceKey);
-            this.features.delete(sourceKey);
-          }
+          utilWildcardDelete(this.sources, sourceKey);
+          utilWildcardDelete(this.features, sourceKey);
         }
       }
     }
