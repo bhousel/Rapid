@@ -83,18 +83,20 @@ export type LineJoin = 'bevel' | 'miter' | 'round';
 export type FillType = 'full' | 'partial';
 
 
-/** Properties for base styling (currently just a color). */
+/** Properties for base styling */
 export interface BaseStyleProps {
   /** The color as a hex number, e.g. 0xcf2081 */
   color?: number;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
 }
 
 /** Properties for fill styling (used for area features). */
 export interface FillStyleProps {
-  /** Opacity: 0 = transparent, 1 = opaque */
-  opacity?: number;
   /** The color as a hex number, e.g. 0xcf2081 */
   color?: number;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
   /** Line width in pixels (for the fill outline) */
   width?: number;
   /** Pattern ID for textured fills, e.g. 'grass', 'waves' */
@@ -105,10 +107,10 @@ export interface FillStyleProps {
 
 /** Properties for line styling (used for casing and stroke). */
 export interface LineStyleProps {
-  /** Opacity: 0 = transparent, 1 = opaque */
-  opacity?: number;
   /** The color as a hex number, e.g. 0xcf2081 */
   color?: number;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
   /** Line width in pixels */
   width?: number;
   /** Line cap style */
@@ -128,10 +130,10 @@ export interface LineStyleProps {
  * - `sidedMarker`: One-sided markers (e.g. cliffs, retaining walls)
  */
 export interface PointStyleProps {
-  /** Opacity: 0 = transparent, 1 = opaque */
-  opacity?: number;
   /** Display color applied to the graphic */
   color?: number;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
   /**
    * Image identifier - should be a symbol name from the spritesheet.
    * TODO: Support url(path/to/image.svg) syntax for external images.
@@ -145,10 +147,10 @@ export interface PointStyleProps {
  * Style properties for Labels
  */
 export interface LabelStyleProps {
-  /** Opacity: 0 = transparent, 1 = opaque */
-  opacity?: number;
   /** Display color applied to the graphic */
   color?: number;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
   /** Size in pixels (defaults vary by usage, typically 11 for icons) */
   size?: number;
 }
@@ -156,25 +158,25 @@ export interface LabelStyleProps {
 
 /** Default fill style values. */
 const DEFAULT_FILL: FillStyleProps = {
-  width: 2,
   color: 0xaaaaaa,
-  opacity: 0.3
+  opacity: 0.3,
+  width: 2
 };
 
 /** Default line style values. */
 const DEFAULT_LINE: LineStyleProps = {
-  width: 3,
   color: 0xcccccc,
   opacity: 1,
+  width: 3,
   cap: 'round',
   join: 'round'
 };
 
 /** Default marker style values. */
 const DEFAULT_MARKER: PointStyleProps = {
-  image: 'smallCircle',
   color: 0xffffff,
-  opacity: 1
+  opacity: 1,
+  image: 'smallCircle'
 };
 
 /** Default icon style values. */
@@ -288,7 +290,6 @@ export class Style {
     return this.props.sidedMarker;
   }
 
-
   /**
    * Label styling properties.
    */
@@ -305,13 +306,12 @@ export class Style {
   resolvedFill(): FillStyleProps {
     const fill = this.props.fill ?? {};
     return {
-      width: fill.width ?? DEFAULT_FILL.width,
       color: fill.color ?? DEFAULT_FILL.color,
       opacity: fill.opacity ?? DEFAULT_FILL.opacity,
+      width: fill.width ?? DEFAULT_FILL.width,
       pattern: fill.pattern
     };
   }
-
 
   /**
    * Get resolved casing properties with defaults applied.
@@ -321,15 +321,14 @@ export class Style {
   resolvedCasing(): LineStyleProps {
     const casing = this.props.casing ?? {};
     return {
-      width: casing.width ?? 5,  // Casing typically wider
       color: casing.color ?? 0x444444,
       opacity: casing.opacity ?? 1,
+      width: casing.width ?? 5,  // Casing typically wider
       cap: casing.cap ?? DEFAULT_LINE.cap,
       join: casing.join ?? DEFAULT_LINE.join,
       dash: casing.dash
     };
   }
-
 
   /**
    * Get resolved stroke properties with defaults applied.
@@ -339,15 +338,14 @@ export class Style {
   resolvedStroke(): LineStyleProps {
     const stroke = this.props.stroke ?? {};
     return {
-      width: stroke.width ?? DEFAULT_LINE.width,
       color: stroke.color ?? DEFAULT_LINE.color,
       opacity: stroke.opacity ?? DEFAULT_LINE.opacity,
+      width: stroke.width ?? DEFAULT_LINE.width,
       cap: stroke.cap ?? DEFAULT_LINE.cap,
       join: stroke.join ?? DEFAULT_LINE.join,
       dash: stroke.dash
     };
   }
-
 
   /**
    * Get resolved marker properties with defaults applied.
@@ -357,12 +355,11 @@ export class Style {
   resolvedMarker(): PointStyleProps {
     const marker = this.props.marker ?? {};
     return {
-      image: marker.image ?? DEFAULT_MARKER.image,
       color: marker.color ?? DEFAULT_MARKER.color,
-      opacity: marker.opacity ?? DEFAULT_MARKER.opacity
+      opacity: marker.opacity ?? DEFAULT_MARKER.opacity,
+      image: marker.image ?? DEFAULT_MARKER.image
     };
   }
-
 
   /**
    * Get resolved icon properties with defaults applied.
@@ -372,9 +369,9 @@ export class Style {
   resolvedIcon(): PointStyleProps {
     const icon = this.props.icon ?? {};
     return {
-      image: icon.image,  // undefined if not set (usually comes from preset)
       color: icon.color ?? DEFAULT_ICON.color,
       opacity: icon.opacity ?? DEFAULT_ICON.opacity,
+      image: icon.image,  // undefined if not set (usually comes from preset)
       size: icon.size ?? DEFAULT_ICON.size
     };
   }
@@ -421,6 +418,7 @@ export class Style {
       id: this.id,  // Keep original ID
 
       // Nested objects: spread merge
+      base: { ...this.props.base, ...other.props.base },
       fill: { ...this.props.fill, ...other.props.fill },
       casing: { ...this.props.casing, ...other.props.casing },
       stroke: { ...this.props.stroke, ...other.props.stroke },
@@ -432,6 +430,9 @@ export class Style {
     };
 
     // Clean up empty nested objects
+    if (merged.base && Object.keys(merged.base).length === 0) {
+      delete merged.base;
+    }
     if (merged.fill && Object.keys(merged.fill).length === 0) {
       delete merged.fill;
     }
@@ -470,62 +471,6 @@ export class Style {
       cloned.id = newID;
     }
     return new Style(this.context, cloned);
-  }
-
-
-  /**
-   * Check if this declaration has any fill properties.
-   */
-  hasFill(): boolean {
-    return this.props.fill !== undefined && Object.keys(this.props.fill).length > 0;
-  }
-
-
-  /**
-   * Check if this declaration has any casing properties.
-   */
-  hasCasing(): boolean {
-    return this.props.casing !== undefined && Object.keys(this.props.casing).length > 0;
-  }
-
-
-  /**
-   * Check if this declaration has any stroke properties.
-   */
-  hasStroke(): boolean {
-    return this.props.stroke !== undefined && Object.keys(this.props.stroke).length > 0;
-  }
-
-
-  /**
-   * Check if this declaration has any marker properties.
-   */
-  hasMarker(): boolean {
-    return this.props.marker !== undefined && Object.keys(this.props.marker).length > 0;
-  }
-
-
-  /**
-   * Check if this declaration has any icon properties.
-   */
-  hasIcon(): boolean {
-    return this.props.icon !== undefined && Object.keys(this.props.icon).length > 0;
-  }
-
-
-  /**
-   * Check if this declaration has any line marker properties.
-   */
-  hasLineMarker(): boolean {
-    return this.props.lineMarker !== undefined && Object.keys(this.props.lineMarker).length > 0;
-  }
-
-
-  /**
-   * Check if this declaration has any sided marker properties.
-   */
-  hasSidedMarker(): boolean {
-    return this.props.sidedMarker !== undefined && Object.keys(this.props.sidedMarker).length > 0;
   }
 
 
