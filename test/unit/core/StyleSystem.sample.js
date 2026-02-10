@@ -7,9 +7,9 @@ export const addStyleData = {
 
   styles: {
     'DEFAULTS': {
-      fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3 },
-      casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
-      stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' }
+      fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
+      casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+      stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' }
     },
     'LIFECYCLE': {
       stroke: { dash: [7, 3], cap: 'butt' }
@@ -31,13 +31,13 @@ export const addStyleData = {
       stroke: { width: 8, color: 0xF4CF58 }
     },
     'building_red': {
-      fill: { color: 0xE06050, alpha: 0.3 }
+      fill: { color: 0xE06050, opacity: 0.3 }
     },
     'building_rapid': {
-      fill: { color: 0xDA26D3, alpha: 0.3 }
+      fill: { color: 0xDA26D3, opacity: 0.3 }
     },
     'green': {
-      fill: { color: 0x8cd05f, alpha: 0.3 }
+      fill: { color: 0x8cd05f, opacity: 0.3 }
     },
     'pattern-forest': {
       fill: { pattern: 'forest' }
@@ -46,7 +46,7 @@ export const addStyleData = {
       fill: { pattern: 'grass' }
     },
     'blue': {
-      fill: { color: 0x77DDDD, alpha: 0.3 }
+      fill: { color: 0x77DDDD, opacity: 0.3 }
     },
     'footway': {
       casing: { width: 5, color: 0xffffff },
@@ -131,7 +131,7 @@ export const updateStyleData = {
       stroke: { width: 10, color: 0xff0000 }
     },
     'new-style': {
-      fill: { color: 0x123456, alpha: 0.5 }
+      fill: { color: 0x123456, opacity: 0.5 }
     }
   },
 
@@ -184,15 +184,14 @@ export const styleMatchData = {
 
   styles: {
     'DEFAULTS': {
-      fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3 },
-      casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
-      stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' },
-      marker: { name: 'smallCircle', color: 0xffffff, alpha: 1 },
-      icon: { color: 0x111111, alpha: 1, size: 11 },
-      lineMarker: { name: 'oneway', color: 0xffffff },
+      fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
+      casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+      stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
+      marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
+      icon: { color: 0x111111, opacity: 1, size: 11 },
+      lineMarker: { image: 'oneway', color: 0xffffff },
       sidedMarker: { color: 0xffffff },
-      labelColor: 0xeeeeee,
-      requireFill: false
+      label: { color: 0xeeeeee }
     },
     'LIFECYCLE': {
       stroke: { dash: [7, 3], cap: 'butt' }
@@ -202,19 +201,19 @@ export const styleMatchData = {
       stroke: { width: 8, color: 0xcf2081 }
     },
     'building_red': {
-      fill: { color: 0xE06050, alpha: 0.3 }
+      fill: { color: 0xE06050, opacity: 0.3 }
     },
     'building_rapid': {
-      fill: { color: 0xDA26D3, alpha: 0.3 }
+      fill: { color: 0xDA26D3, opacity: 0.3 }
     },
     'green': {
-      fill: { color: 0x8cd05f, alpha: 0.3 }
+      fill: { color: 0x8cd05f, opacity: 0.3 }
     },
     'pattern-forest': {
       fill: { pattern: 'forest' }
     },
     'blue': {
-      fill: { color: 0x77DDDD, alpha: 0.3 }
+      fill: { color: 0x77DDDD, opacity: 0.3 }
     },
     'track_style': {
       casing: { width: 4, color: 0xaa9944 },
@@ -229,13 +228,12 @@ export const styleMatchData = {
       stroke: { width: 3, color: 0x998888, dash: [6, 6], cap: 'butt' }
     },
     'poi_pin': {
-      marker: { name: 'pin', color: 0xff0000 },
-      icon: { name: 'maki-cafe', color: 0x333333, size: 15 },
-      labelColor: 0xdddddd
+      marker: { image: 'pin', color: 0xff0000 },
+      icon: { image: 'maki-cafe', color: 0x333333, size: 15 },
+      label: { color: 0xdddddd }
     },
     'cliff_style': {
-      sidedMarker: { name: 'cliff', color: 0x888888 },
-      requireFill: true
+      sidedMarker: { image: 'cliff', color: 0x888888 }
     },
     'invalid_pattern': {
       fill: { color: 0xff0000, pattern: 'nonexistent_pattern_xyz' }

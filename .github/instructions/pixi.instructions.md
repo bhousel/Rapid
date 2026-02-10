@@ -87,7 +87,7 @@ Key points:
 D3's `.data()` and other selection methods have complex generic signatures. TypeScript often can't infer the datum type in callbacks. Explicitly annotate callback parameters:
 ```typescript
 .data(blocks, (d: GeoJSON) => d.id)
-.text((d: GeoJSON) => d.properties.text as string)
+.text((d: GeoJSON) => d.props.text as string)
 ```
 
 ## ScaleLinear Import

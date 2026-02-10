@@ -226,12 +226,17 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       const flatCoords = coords.map(coord => viewport.project(coord)).flat();
 
       // line
-      const lineStyle = { alpha: 0.7, dash: [6, 3], width: 1, color: 0xffffff };
+      const lineStyle = {
+        alpha: 0.7,
+        dash: [6, 3],
+        width: 1,
+        color: 0xffffff
+      };
       line.clear();
       new DashLine(this.gfx, line, lineStyle).poly(flatCoords);
 
       // fill
-      const fillStyle = { alpha: 0.5, color: 0xaaaaaa };
+      const fillStyle = { opacity: 0.5, color: 0xaaaaaa };
       fill.clear().poly(flatCoords).fill(fillStyle);
 
     } else {  // no lasso data

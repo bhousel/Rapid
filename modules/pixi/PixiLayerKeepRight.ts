@@ -93,8 +93,8 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
       if (!feature) {
         const style: Partial<PointStyle> = {
-          marker: { name: 'xlargeCircle', color: 0x000000, alpha: 1 },
-          icon: { name: 'keepright', color: keepRight.getColor(d.props.parentIssueType), alpha: 1, size: 16 }
+          marker: { image: 'xlargeCircle', color: 0x000000, opacity: 1 },
+          icon: { image: 'keepright', color: keepRight.getColor(d.props.parentIssueType), opacity: 1, size: 16 }
         };
 
         feature = new PixiFeaturePoint(this, featureID);

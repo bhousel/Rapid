@@ -7,7 +7,7 @@ import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
-import type { StyleProps, FillStyleProps, LineStyleProps, PointStyleProps } from '../lib/Style.ts';
+import type { StyleProps, FillStyleProps, LineStyleProps, PointStyleProps, LabelStyleProps } from '../lib/Style.ts';
 import type { StyleMatchConditions, StyleSelectorProps } from '../lib/StyleSelector.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { GeometryType } from './SchemaSystem.ts';
@@ -51,8 +51,7 @@ export interface MatchedStyle {
   icon: PointStyleProps;
   lineMarker: PointStyleProps;
   sidedMarker: PointStyleProps;
-  labelColor: number;
-  requireFill: boolean;
+  label: LabelStyleProps;
   /** Extra properties are allowed for backward compatibility with PixiFeature styles */
   [key: string]: unknown;
 }
@@ -355,10 +354,10 @@ export class StyleSystem extends AbstractSystem {
    * merge
    * Accepts an object containing new style data (all properties except 'assetID' are optional):
    * {
-   *   assetID: '',           // A string asset identifier, e.g. 'rapid_style'
-   *   assetVersion: '',      // A string version specifier, e.g. '1.0.0'  (defaults to 'unknown' if not present)
-   *   styles: {},            // Object<StyleID, Partial<StyleProps>>
-   *   selectors: {}          // Object<SelectorID, StyleSelector>
+   *   assetID: '',       // A string asset identifier, e.g. 'rapid_style'
+   *   assetVersion: '',  // A string version specifier, e.g. '1.0.0'  (defaults to 'unknown' if not present)
+   *   styles: {},        // Object<StyleID, Partial<StyleProps>>
+   *   selectors: {}      // Object<SelectorID, StyleSelector>
    * }
    *
    * When merging:
@@ -485,15 +484,14 @@ export class StyleSystem extends AbstractSystem {
     // If DEFAULTS hasn't been loaded yet, return a minimal style
     if (!defaults) {
       return {
-        fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3 },
-        casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
-        stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' },
-        marker: { name: 'smallCircle', color: 0xffffff, alpha: 1 },
-        icon: { name: undefined, color: 0x111111, alpha: 1, size: 11 },
-        lineMarker: { name: undefined, color: 0xffffff },
-        sidedMarker: { name: undefined, color: 0xffffff },
-        labelColor: 0xeeeeee,
-        requireFill: false
+        fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
+        casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+        stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
+        marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
+        icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
+        lineMarker: { image: undefined, color: 0xffffff },
+        sidedMarker: { image: undefined, color: 0xffffff },
+        label: { color: 0xeeeeee }
       };
     }
 
@@ -539,8 +537,7 @@ export class StyleSystem extends AbstractSystem {
       icon: {} as PointStyleProps,
       lineMarker: {} as PointStyleProps,
       sidedMarker: {} as PointStyleProps,
-      labelColor: 0xeeeeee,
-      requireFill: false
+      label: {} as LabelStyleProps
     };
 
     // Resolve base style properties (fill, casing, stroke)
@@ -607,7 +604,7 @@ export class StyleSystem extends AbstractSystem {
       const matchedGroup = matched[group] as Record<string, unknown> | undefined;
       const defaultGroup = defaults[group] as Record<string, unknown> | undefined;
 
-      for (const prop of ['width', 'color', 'alpha', 'cap', 'join', 'dash', 'pattern']) {
+      for (const prop of ['width', 'color', 'opacity', 'cap', 'join', 'dash', 'pattern']) {
         const value = matchedGroup?.[prop];
         if (value !== undefined) {
           styleGroup[prop] = value;
@@ -624,7 +621,7 @@ export class StyleSystem extends AbstractSystem {
 
   /**
    * _resolveMarkerAndIcon
-   * Resolve marker, icon, lineMarker, sidedMarker, labelColor, and requireFill.
+   * Resolve marker, icon, lineMarker, sidedMarker, label.
    * @param result - The result object to populate
    * @param matched - The matched Style
    * @param defaults - The default Style
@@ -646,27 +643,27 @@ export class StyleSystem extends AbstractSystem {
     // Resolve icon properties
     result.icon = matched.resolvedIcon();
 
-    // If icon.name is not set by the style, try to get it from the preset
-    if (!result.icon.name && geometry && schema) {
+    // If icon.image is not set by the style, try to get it from the preset
+    if (!result.icon.image && geometry && schema) {
       const preset = schema.matchTags(tags, geometry);
       if (preset?.props.icon) {
-        result.icon.name = preset.props.icon;
+        result.icon.image = preset.props.icon;
       }
     }
 
+    // Resolve label
+    result.label = matched.resolvedLabel();
+
     // Resolve line marker and sided marker
     result.lineMarker = {
-      name: matched.lineMarker?.name ?? defaults.lineMarker?.name,
+      image: matched.lineMarker?.image ?? defaults.lineMarker?.image,
       color: matched.lineMarker?.color ?? defaults.lineMarker?.color ?? 0xffffff
     };
     result.sidedMarker = {
-      name: matched.sidedMarker?.name ?? defaults.sidedMarker?.name,
+      image: matched.sidedMarker?.image ?? defaults.sidedMarker?.image,
       color: matched.sidedMarker?.color ?? defaults.sidedMarker?.color ?? 0xffffff
     };
 
-    // Resolve labelColor and requireFill
-    result.labelColor = matched.resolvedLabelColor();
-    result.requireFill = matched.requireFill ?? defaults.requireFill ?? false;
   }
 
 
@@ -701,9 +698,9 @@ export class StyleSystem extends AbstractSystem {
       }
     }
 
-    // Tunnel: reduced stroke alpha
+    // Tunnel: reduced stroke opacity
     if (tunnel) {
-      result.stroke.alpha = 0.5;
+      result.stroke.opacity = 0.5;
     }
 
     // Bumpy casing for roads with unpaved surface
@@ -725,7 +722,7 @@ export class StyleSystem extends AbstractSystem {
     if (!lifecycle) return;
 
     for (const group of ['fill', 'casing', 'stroke'] as const) {
-      for (const prop of ['width', 'color', 'alpha', 'cap', 'dash'] as const) {
+      for (const prop of ['width', 'color', 'opacity', 'cap', 'dash'] as const) {
         const lifecycleGroup = lifecycle[group] as Record<string, unknown> | undefined;
         const value = lifecycleGroup?.[prop];
         if (value !== undefined) {

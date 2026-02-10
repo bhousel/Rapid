@@ -95,8 +95,8 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
       if (!feature) {
         const style: Partial<PointStyle> = {
-          marker: { name: 'osmose', color: osmose.getColor(d.props.item), alpha: 1 },
-          icon: { name: d.props.iconID, color: 0x000000, alpha: 1, size: 11 }
+          marker: { image: 'osmose', color: osmose.getColor(d.props.item), opacity: 1 },
+          icon: { image: d.props.iconID, color: 0x000000, opacity: 1, size: 11 }
         };
 
         feature = new PixiFeaturePoint(this, featureID);

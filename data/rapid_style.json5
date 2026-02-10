@@ -13,7 +13,7 @@
   // Available properties:
   //   `width` - line width in pixels (for fills, this is the width of the outline)
   //   `color` - the color as a hex literal, e.g. 0xcf2081
-  //   `alpha` - 0 = transparent/invisible, 1 = filled
+  //   `opacity` - 0 = transparent/invisible, 1 = filled
   //   `cap`   - one of 'butt', 'round', or 'square'
   //   `join`  - one of 'bevel', 'miter', or 'round'
   //   `dash`  - array of pixels on/off - e.g. [20, 5, 5, 5]
@@ -25,30 +25,30 @@
   "styles": {
     // Default styles - used as fallback when no other style matches
     "DEFAULTS": {
-      "fill":   { "width": 2, "color": 0xaaaaaa, "alpha": 0.3 },
-      "casing": { "width": 5, "color": 0x444444, "alpha": 1, "cap": "round", "join": "round" },
-      "stroke": { "width": 3, "color": 0xcccccc, "alpha": 1, "cap": "round", "join": "round" }
+      "fill":   { "width": 2, "color": 0xaaaaaa, "opacity": 0.3 },
+      "casing": { "width": 5, "color": 0x444444, "opacity": 1, "cap": "round", "join": "round" },
+      "stroke": { "width": 3, "color": 0xcccccc, "opacity": 1, "cap": "round", "join": "round" }
     },
 
     // Lifecycle styles - e.g. planned, proposed, abandoned, disused, razed
     "LIFECYCLE": {
-      "casing": { "alpha": 0 },  // disable casing
+      "casing": { "opacity": 0 },  // disable casing
       "stroke": { "dash": [7, 3], "cap": "butt" }
     },
 
     // Fill color styles - used for areas
-    "red":        { "fill": { "color": 0xe06e5f, "alpha": 0.3 } },   // rgb(224, 110, 95)
-    "green":      { "fill": { "color": 0x8cd05f, "alpha": 0.3 } },   // rgb(140, 208, 95)
-    "blue":       { "fill": { "color": 0x77d4de, "alpha": 0.3 } },   // rgb(119, 211, 222)
-    "yellow":     { "fill": { "color": 0xffff94, "alpha": 0.25 } },  // rgb(255, 255, 148)
-    "gold":       { "fill": { "color": 0xc4be19, "alpha": 0.3 } },   // rgb(196, 189, 25)
-    "orange":     { "fill": { "color": 0xd6881a, "alpha": 0.3 } },   // rgb(214, 136, 26)
-    "pink":       { "fill": { "color": 0xe3a4f5, "alpha": 0.3 } },   // rgb(228, 164, 245)
-    "teal":       { "fill": { "color": 0x99e1aa, "alpha": 0.3 } },   // rgb(153, 225, 170)
-    "lightgreen": { "fill": { "color": 0xbee83f, "alpha": 0.3 } },   // rgb(191, 232, 63)
-    "tan":        { "fill": { "color": 0xf5dcba, "alpha": 0.3 } },   // rgb(245, 220, 186)
-    "darkgray":   { "fill": { "color": 0x8c8c8c, "alpha": 0.5 } },   // rgb(140, 140, 140)
-    "lightgray":  { "fill": { "color": 0xaaaaaa, "alpha": 0.3 } },   // rgb(170, 170, 170)
+    "red":        { "fill": { "color": 0xe06e5f, "opacity": 0.3 } },   // rgb(224, 110, 95)
+    "green":      { "fill": { "color": 0x8cd05f, "opacity": 0.3 } },   // rgb(140, 208, 95)
+    "blue":       { "fill": { "color": 0x77d4de, "opacity": 0.3 } },   // rgb(119, 211, 222)
+    "yellow":     { "fill": { "color": 0xffff94, "opacity": 0.25 } },  // rgb(255, 255, 148)
+    "gold":       { "fill": { "color": 0xc4be19, "opacity": 0.3 } },   // rgb(196, 189, 25)
+    "orange":     { "fill": { "color": 0xd6881a, "opacity": 0.3 } },   // rgb(214, 136, 26)
+    "pink":       { "fill": { "color": 0xe3a4f5, "opacity": 0.3 } },   // rgb(228, 164, 245)
+    "teal":       { "fill": { "color": 0x99e1aa, "opacity": 0.3 } },   // rgb(153, 225, 170)
+    "lightgreen": { "fill": { "color": 0xbee83f, "opacity": 0.3 } },   // rgb(191, 232, 63)
+    "tan":        { "fill": { "color": 0xf5dcba, "opacity": 0.3 } },   // rgb(245, 220, 186)
+    "darkgray":   { "fill": { "color": 0x8c8c8c, "opacity": 0.5 } },   // rgb(140, 140, 140)
+    "lightgray":  { "fill": { "color": 0xaaaaaa, "opacity": 0.3 } },   // rgb(170, 170, 170)
 
     // Road styles - major roads
     "motorway": {
@@ -138,12 +138,12 @@
 
     // Waterway styles
     "river": {
-      "fill":   { "color": 0x77d4de, "alpha": 0.3 },   // rgb(119, 211, 222)
+      "fill":   { "color": 0x77d4de, "opacity": 0.3 },   // rgb(119, 211, 222)
       "casing": { "width": 10, "color": 0x444444 },
       "stroke": { "width": 8, "color": 0x77dddd }
     },
     "stream": {
-      "fill":   { "color": 0x77d4de, "alpha": 0.3 },   // rgb(119, 211, 222)
+      "fill":   { "color": 0x77d4de, "opacity": 0.3 },   // rgb(119, 211, 222)
       "casing": { "width": 7, "color": 0x444444 },
       "stroke": { "width": 5, "color": 0x77dddd }
     },
@@ -165,7 +165,7 @@
       "stroke": { "width": 2, "color": 0xeeeeee, "dash": [12, 12], "cap": "butt" }
     },
     "ferry": {
-      "casing": { "alpha": 0 },  // disable casing
+      "casing": { "opacity": 0 },  // disable casing
       "stroke": { "width": 3, "color": 0x58a9ed, "dash": [12, 8], "cap": "butt" }
     },
 
@@ -181,16 +181,16 @@
 
     // Barrier styles
     "barrier": {
-      "casing": { "alpha": 0 },  // disable casing
+      "casing": { "opacity": 0 },  // disable casing
       "stroke": { "width": 3, "color": 0xdddddd, "dash": [10, 5, 2, 5], "cap": "round" }
     },
     "barrier_wall": {
-      "casing": { "alpha": 0 },  // disable casing
+      "casing": { "opacity": 0 },  // disable casing
       "stroke": { "width": 3, "color": 0xdddddd, "dash": [10, 5, 2, 5], "cap": "round" }
     },
     "barrier_hedge": {
-      "fill":   { "color": 0x8cd05f, "alpha": 0.3 },   // rgb(140, 208, 95)
-      "casing": { "alpha": 0 },  // disable casing
+      "fill":   { "color": 0x8cd05f, "opacity": 0.3 },   // rgb(140, 208, 95)
+      "casing": { "opacity": 0 },  // disable casing
       "stroke": { "width": 3, "color": 0x8cd05f, "dash": [10, 5, 2, 5], "cap": "round" }
     },
 

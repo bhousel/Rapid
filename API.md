@@ -221,8 +221,8 @@ Each style asset should have the following structure:
   // Style declarations define how features look (fill, casing, stroke properties)
   declarations: {
     "my_style_id": {
-      fill:   { color: 0xff0000, alpha: 0.3 },          // fill properties
-      casing: { width: 10, color: 0x444444 },           // casing line properties
+      fill:   { color: 0xff0000, opacity: 0.3 },           // fill properties
+      casing: { width: 10, color: 0x444444 },              // casing line properties
       stroke: { width: 8, color: 0xffffff, dash: [8, 8] }  // stroke line properties
     },
     "forest": {
@@ -249,7 +249,7 @@ Each style asset should have the following structure:
 Available properties for style declarations:
 * `width` - line width in pixels
 * `color` - color as hex number, e.g. `0xcf2081`
-* `alpha` - opacity: 0 = transparent, 1 = opaque
+* `opacity` - opacity: 0 = transparent, 1 = opaque
 * `cap` - line cap: 'butt', 'round', or 'square'
 * `join` - line join: 'bevel', 'miter', or 'round'
 * `dash` - dash pattern array, e.g. `[8, 4]` for dashed line

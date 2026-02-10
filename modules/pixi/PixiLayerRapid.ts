@@ -372,8 +372,8 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (feature.dirty) {
           const colorNum = color.toNumber();
           const style: Partial<MatchedStyle> = {
-            labelColor: colorNum,
-            fill: { width: 2, color: colorNum, alpha: 0.3, pattern: undefined },
+            label: { color: colorNum },
+            fill: { width: 2, color: colorNum, opacity: 0.3, pattern: undefined },
           };
           feature.style = style;
           feature.label = l10n.displayName(entity.tags);
@@ -414,10 +414,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (feature.dirty) {
           const colorNum = color.toNumber();
           const style: Partial<MatchedStyle> = {
-            labelColor: colorNum,
-            casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
-            stroke: { width: 3, color: colorNum, alpha: 1, cap: 'round', join: 'round' },
-            lineMarker: { name: entity.isOneWay() ? 'oneway' : undefined, color: 0x000000 }
+            label: { color: colorNum },
+            casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+            stroke: { width: 3, color: colorNum, opacity: 1, cap: 'round', join: 'round' },
+            lineMarker: { image: entity.isOneWay() ? 'oneway' : undefined, color: 0x000000 }
           };
           feature.style = style;
           feature.label = l10n.displayName(entity.tags);
@@ -439,13 +439,13 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
     const colorNum = color.toNumber();
     const pointStyle: Partial<PointStyle> = {
-      marker: { name: 'largeCircle', color: colorNum, alpha: 1 },
-      icon: { name: 'maki-circle-stroked', color: colorNum, alpha: 1, size: 11 },
-      labelColor: colorNum
+      marker: { image: 'largeCircle', color: colorNum, opacity: 1 },
+      icon: { image: 'maki-circle-stroked', color: colorNum, opacity: 1, size: 11 },
+      label: { color: colorNum }
     };
     const vertexStyle: Partial<PointStyle> = {
-      marker: { name: 'smallCircle', color: colorNum, alpha: 1 },
-      labelColor: colorNum
+      marker: { image: 'smallCircle', color: colorNum, opacity: 1 },
+      label: { color: colorNum }
     };
 
     for (const entity of data.points) {

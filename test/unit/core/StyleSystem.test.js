@@ -321,7 +321,7 @@ describe('StyleSystem', () => {
         it('adds new styles in the update', () => {
           assert.isTrue(_styles.styles.has('new-style'));
           const newStyle = _styles.styles.get('new-style');
-          assert.deepEqual(newStyle.fill, { color: 0x123456, alpha: 0.5 });
+          assert.deepEqual(newStyle.fill, { color: 0x123456, opacity: 0.5 });
         });
 
         it('replaces existing selector with updated data', () => {
@@ -597,20 +597,20 @@ describe('StyleSystem', () => {
     it('matches building tags with fill properties', () => {
       const result = _styles.styleMatch({ building: 'yes' });
       assert.strictEqual(result.fill.color, 0xE06050);
-      assert.strictEqual(result.fill.alpha, 0.3);
+      assert.strictEqual(result.fill.opacity, 0.3);
     });
 
     it('matches landuse=forest with composed styles (color + pattern)', () => {
       const result = _styles.styleMatch({ landuse: 'forest' });
       assert.strictEqual(result.fill.color, 0x8cd05f);
-      assert.strictEqual(result.fill.alpha, 0.3);
+      assert.strictEqual(result.fill.opacity, 0.3);
       assert.strictEqual(result.fill.pattern, 'forest');
     });
 
     it('matches natural=water tags', () => {
       const result = _styles.styleMatch({ natural: 'water' });
       assert.strictEqual(result.fill.color, 0x77DDDD);
-      assert.strictEqual(result.fill.alpha, 0.3);
+      assert.strictEqual(result.fill.opacity, 0.3);
     });
 
     it('matches footway with dash patterns', () => {
@@ -644,7 +644,7 @@ describe('StyleSystem', () => {
 
       it('reduces stroke alpha for tunnels', () => {
         const result = _styles.styleMatch({ highway: 'motorway', tunnel: 'yes' });
-        assert.strictEqual(result.stroke.alpha, 0.5);
+        assert.strictEqual(result.stroke.opacity, 0.5);
       });
 
       it('ignores bridge=no', () => {
@@ -655,7 +655,7 @@ describe('StyleSystem', () => {
 
       it('ignores tunnel=no', () => {
         const result = _styles.styleMatch({ highway: 'motorway', tunnel: 'no' });
-        assert.strictEqual(result.stroke.alpha, 1);
+        assert.strictEqual(result.stroke.opacity, 1);
       });
     });
 
@@ -733,29 +733,29 @@ describe('StyleSystem', () => {
       it('returns default marker when no style-specific marker', () => {
         const result = _styles.styleMatch({ some_random_tag: 'xyz' });
         assert.isObject(result.marker);
-        assert.strictEqual(result.marker.name, 'smallCircle');
+        assert.strictEqual(result.marker.image, 'smallCircle');
         assert.strictEqual(result.marker.color, 0xffffff);
-        assert.strictEqual(result.marker.alpha, 1);
+        assert.strictEqual(result.marker.opacity, 1);
       });
 
       it('returns style-specific marker when defined', () => {
         const result = _styles.styleMatch({ amenity: 'cafe' });
-        assert.strictEqual(result.marker.name, 'pin');
+        assert.strictEqual(result.marker.image, 'pin');
         assert.strictEqual(result.marker.color, 0xff0000);
       });
 
       it('returns default icon when no style-specific icon', () => {
         const result = _styles.styleMatch({ some_random_tag: 'xyz' });
         assert.isObject(result.icon);
-        assert.isUndefined(result.icon.name);
+        assert.isUndefined(result.icon.image);
         assert.strictEqual(result.icon.color, 0x111111);
-        assert.strictEqual(result.icon.alpha, 1);
+        assert.strictEqual(result.icon.opacity, 1);
         assert.strictEqual(result.icon.size, 11);
       });
 
       it('returns style-specific icon when defined', () => {
         const result = _styles.styleMatch({ amenity: 'cafe' });
-        assert.strictEqual(result.icon.name, 'maki-cafe');
+        assert.strictEqual(result.icon.image, 'maki-cafe');
         assert.strictEqual(result.icon.color, 0x333333);
         assert.strictEqual(result.icon.size, 15);
       });
@@ -766,44 +766,34 @@ describe('StyleSystem', () => {
       it('returns default lineMarker', () => {
         const result = _styles.styleMatch({ highway: 'motorway' });
         assert.isObject(result.lineMarker);
-        assert.strictEqual(result.lineMarker.name, 'oneway');
+        assert.strictEqual(result.lineMarker.image, 'oneway');
         assert.strictEqual(result.lineMarker.color, 0xffffff);
       });
 
       it('returns default sidedMarker when no style-specific sidedMarker', () => {
         const result = _styles.styleMatch({ highway: 'motorway' });
         assert.isObject(result.sidedMarker);
-        assert.isUndefined(result.sidedMarker.name);
+        assert.isUndefined(result.sidedMarker.image);
         assert.strictEqual(result.sidedMarker.color, 0xffffff);
       });
 
       it('returns style-specific sidedMarker when defined', () => {
         const result = _styles.styleMatch({ natural: 'cliff' });
-        assert.strictEqual(result.sidedMarker.name, 'cliff');
+        assert.strictEqual(result.sidedMarker.image, 'cliff');
         assert.strictEqual(result.sidedMarker.color, 0x888888);
       });
     });
 
 
-    describe('labelColor and requireFill resolution', () => {
-      it('returns default labelColor when no style-specific labelColor', () => {
+    describe('label resolution', () => {
+      it('returns default label color when no style-specific label', () => {
         const result = _styles.styleMatch({ some_random_tag: 'xyz' });
-        assert.strictEqual(result.labelColor, 0xeeeeee);
+        assert.strictEqual(result.label.color, 0xeeeeee);
       });
 
-      it('returns style-specific labelColor when defined', () => {
+      it('returns style-specific label color when defined', () => {
         const result = _styles.styleMatch({ amenity: 'cafe' });
-        assert.strictEqual(result.labelColor, 0xdddddd);
-      });
-
-      it('returns default requireFill (false) when no style-specific value', () => {
-        const result = _styles.styleMatch({ highway: 'motorway' });
-        assert.strictEqual(result.requireFill, false);
-      });
-
-      it('returns style-specific requireFill when defined', () => {
-        const result = _styles.styleMatch({ natural: 'cliff' });
-        assert.strictEqual(result.requireFill, true);
+        assert.strictEqual(result.label.color, 0xdddddd);
       });
     });
 

@@ -129,7 +129,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 //    // Now render any extras, like gridlines in square bounding boxes or arbitrary WKT polygons/multipolys.
 //    const gridLines = this.createGridLines(lines);
-//    const gridStyle = { stroke: { width: 0.5, color: 0x0ffff, alpha: 0.5, cap: 'round' }} as LineStyle;
+//    const gridStyle = { stroke: { width: 0.5, color: 0x0ffff, opacity: 0.5, cap: 'round' }} as LineStyle;
 //    this.renderGridLines(frame, viewport, zoom, gridLines, gridStyle);
   }
 
@@ -214,9 +214,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const parentContainer = this.scene.groups.get('basemap')!;
 
     const polygonStyle = {
-      fill: { color: CUSTOM_COLOR, alpha: 0.3, },
-      stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
-      labelColor: CUSTOM_COLOR
+      fill: { color: CUSTOM_COLOR, opacity: 0.3, },
+      stroke: { width: 2, color: CUSTOM_COLOR, opacity: 1, cap: 'round' },
+      label: { color: CUSTOM_COLOR }
     } as Partial<MatchedStyle>;
 
     for (const d of polygons) {
@@ -273,8 +273,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const parentContainer = this.scene.groups.get('basemap')!;
 
     const lineStyle = styleOverride ?? {
-      stroke: { width: 2, color: CUSTOM_COLOR, alpha: 1, cap: 'round' },
-      labelColor: CUSTOM_COLOR
+      stroke: { width: 2, color: CUSTOM_COLOR, opacity: 1, cap: 'round' },
+      label: { color: CUSTOM_COLOR }
     } as Partial<MatchedStyle>;
 
     for (const d of lines) {
@@ -372,9 +372,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const parentContainer = this.scene.groups.get('points')!;
 
     const pointStyle: Partial<PointStyle> = {
-      marker: { name: 'largeCircle', color: CUSTOM_COLOR, alpha: 1 },
-      icon: { name: 'maki-circle-stroked', color: CUSTOM_COLOR, alpha: 1, size: 11 },
-      labelColor: CUSTOM_COLOR
+      marker: { image: 'largeCircle', color: CUSTOM_COLOR, opacity: 1 },
+      icon: { image: 'maki-circle-stroked', color: CUSTOM_COLOR, opacity: 1, size: 11 },
+      label: { color: CUSTOM_COLOR }
     };
 
     for (const d of points) {

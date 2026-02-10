@@ -87,12 +87,12 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
     $$explanationRow
       .append('span')
       .attr('class', 'explanation-item')
-      .text((d: GeoJSON) => d.properties.text as string);
+      .text((d: GeoJSON) => d.props.text as string);
 
     $$explanationRow
       .append('a')
       .attr('target', '_blank')
-      .attr('href', (d: GeoJSON) => d.properties.url as string)
+      .attr('href', (d: GeoJSON) => d.props.url as string)
       .text(l10n?.t('rapid_menu.more_info') || 'More Info');
   }
 
@@ -109,8 +109,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
     if (!parentContainer) return;
 
     const blockStyle = {
-      requireFill: true,    // no partial fill option - must fill fully
-      fill: { pattern: 'construction', color: 0x000001, alpha: 0.7 }
+      fill: { pattern: 'construction', color: 0x000001, opacity: 0.7, type: 'full' }  // always fill fully
     };
 
     for (const d of blocks) {

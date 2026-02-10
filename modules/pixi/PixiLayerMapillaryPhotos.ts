@@ -15,12 +15,12 @@ const MAPILLARY_GREEN = 0x05cb63;
 const SELECTED = 0xffee00;
 
 const LINESTYLE = {
-  casing: { alpha: 0 },  // disable
-  stroke: { alpha: 0.7, width: 4, color: MAPILLARY_GREEN }
+  casing: { opacity: 0 },  // disable
+  stroke: { opacity: 0.7, width: 4, color: MAPILLARY_GREEN }
 } as Partial<MatchedStyle>;
 
 const MARKERSTYLE: Partial<PointStyle> = {
-  marker: { name: 'mediumCircle', color: MAPILLARY_GREEN, alpha: 0.8 },
+  marker: { image: 'mediumCircle', color: MAPILLARY_GREEN, opacity: 0.8 },
   viewfieldAlpha:  0.7,
   viewfieldName:   'viewfield',
   viewfieldColor:   MAPILLARY_GREEN,

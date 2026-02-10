@@ -247,9 +247,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const style = this._style as MatchedStyle;
     const textureManager = this.gfx.textureManager!;
     const color = style.fill?.color ?? 0xaaaaaa;
-    const alpha = style.fill?.alpha ?? 0.3;
+    const opacity = style.fill?.opacity ?? 0.3;
     const pattern = style.fill?.pattern;
     const dash = style.stroke?.dash ?? null;
+
+    const fillPreference = storage?.getItem('area-fill') ?? 'partial';
+    let doFullFill = (style.fill?.type ?? fillPreference) === 'full';
 
     const lowRes = this.lowRes!;
     const fill = this.fill!;
@@ -263,8 +266,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 // I've noticed that we can't use textures from a spritesheet for patterns,
 // and it would be nice to figure out why
 
-    const fillstyle = storage?.getItem('area-fill') ?? 'partial';
-    let doFullFill = style.requireFill || (fillstyle === 'full');
 
     // If this shape is so small that partial filling makes no sense, fill fully (faster?)
     const cutoff = (2 * PARTIALFILLWIDTH) + 5;
@@ -396,7 +397,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
       const fillStyle = {
         color: color,
-        alpha: alpha,
+        alpha: opacity,
         texture: texture, // Optional: include only if texture is used
         matrix: textureMatrix // Optional: include only if texture is used
       };
@@ -597,13 +598,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
 /** Default style for polygons */
 const STYLE_DEFAULTS: MatchedStyle = {
-  fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3, pattern: undefined },
-  casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
-  stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' },
-  marker: { name: 'smallCircle', color: 0xffffff, alpha: 1 },
-  icon: { name: undefined, color: 0x111111, alpha: 1, size: 11 },
-  lineMarker: { name: undefined, color: 0x000000 },
-  sidedMarker: { name: undefined, color: 0xffffff },
-  labelColor: 0xeeeeee,
-  requireFill: false
+  fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3, pattern: undefined },
+  casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+  stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
+  marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
+  icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
+  lineMarker: { image: undefined, color: 0x000000 },
+  sidedMarker: { image: undefined, color: 0xffffff },
+  label: { color: 0xeeeeee }
 };

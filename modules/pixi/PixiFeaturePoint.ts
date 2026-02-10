@@ -175,7 +175,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const wireframeMode = map?.wireframeMode;
     const textureManager = this.gfx.textureManager!;
     const style = this._style as PointStyle;
-    const isPin = ['pin', 'boldPin', 'osmose'].includes(style.marker.name ?? '');
+    const isPin = ['pin', 'boldPin', 'osmose'].includes(style.marker.image ?? '');
 
     const marker = this.marker!;
     const icon = this.icon!;
@@ -187,9 +187,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this.container.rotation = -bearing;
 
     // Show marker, if any..
-    if (style.marker.name) {
+    if (style.marker.image) {
       // note - marker.texture gets set below in the effective zoom block
-      marker.alpha = style.marker.alpha ?? 1;
+      marker.alpha = style.marker.opacity ?? 1;
       marker.tint = style.marker.color ?? 0xffffff;
       marker.visible = true;
     } else {  // No marker
@@ -197,13 +197,13 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     }
 
     // Show icon, if any..
-    if (style.icon.name) {
-      icon.texture = textureManager.getTexture('symbol', style.icon.name) || PIXI.Texture.EMPTY;
+    if (style.icon.image) {
+      icon.texture = textureManager.getTexture('symbol', style.icon.image) || PIXI.Texture.EMPTY;
       icon.anchor.set(style.anchor?.x || 0.5, style.anchor?.y || 0.5);   // middle, middle by default, can be overridden in layer code
       const iconSize = style.icon.size || 11;
       icon.width = iconSize;
       icon.height = iconSize;
-      icon.alpha = style.icon.alpha ?? 1;
+      icon.alpha = style.icon.opacity ?? 1;
       icon.tint = style.icon.color ?? 0x111111;
       icon.visible = true;
     } else {  // No icon
@@ -289,7 +289,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
 
       // Replace pinlike markers with circles at lower zoom
-      const markerID = isPin ? 'largeCircle' : (style.marker.name ?? 'smallCircle');
+      const markerID = isPin ? 'largeCircle' : (style.marker.image ?? 'smallCircle');
       this._isCircular = /(circle|midpoint)$/i.test(markerID);
       marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
       marker.anchor.set(0.5, 0.5);  // middle, middle
@@ -304,7 +304,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
 
       // Replace pinlike markers with circles if viewfields are present
-      const markerID = (isPin && vfAngles.length) ? 'largeCircle' : (style.marker.name ?? 'smallCircle');
+      const markerID = (isPin && vfAngles.length) ? 'largeCircle' : (style.marker.image ?? 'smallCircle');
       this._isCircular = /(circle|midpoint)$/i.test(markerID);
       marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
       if (isPin && !this._isCircular) {
@@ -448,15 +448,14 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
 const STYLE_DEFAULTS: PointStyle = {
-  fill:   { width: 2, color: 0xaaaaaa, alpha: 0.3, pattern: undefined },
-  casing: { width: 5, color: 0x444444, alpha: 1, cap: 'round', join: 'round' },
-  stroke: { width: 3, color: 0xcccccc, alpha: 1, cap: 'round', join: 'round' },
-  marker: { name: 'smallCircle', color: 0xffffff, alpha: 1 },
-  icon: { name: undefined, color: 0x111111, alpha: 1, size: 11 },
-  lineMarker: { name: undefined, color: 0x000000 },
-  sidedMarker: { name: undefined, color: 0xffffff },
-  labelColor: 0xeeeeee,
-  requireFill: false,
+  fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3, pattern: undefined },
+  casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+  stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
+  marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
+  icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
+  lineMarker: { image: undefined, color: 0x000000 },
+  sidedMarker: { image: undefined, color: 0xffffff },
+  label: { color: 0xeeeeee },
   viewfieldAlpha: 0.75,
   viewfieldAngles: [],
   viewfieldName: 'viewfield',

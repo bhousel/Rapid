@@ -13,12 +13,12 @@ const KARTAVIEW_BLUE = 0x20c4ff;
 const SELECTED = 0xffee00;
 
 const LINESTYLE = {
-  casing: { alpha: 0 },  // disable
-  stroke: { alpha: 0.7, width: 4, color: KARTAVIEW_BLUE }
+  casing: { opacity: 0 },  // disable
+  stroke: { opacity: 0.7, width: 4, color: KARTAVIEW_BLUE }
 } as Partial<MatchedStyle>;
 
 const MARKERSTYLE: Partial<PointStyle> = {
-  marker: { name: 'mediumCircle', color: KARTAVIEW_BLUE, alpha: 0.8 },
+  marker: { image: 'mediumCircle', color: KARTAVIEW_BLUE, opacity: 0.8 },
   viewfieldAlpha:  0.7,
   viewfieldName:   'viewfield',
   viewfieldColor:   KARTAVIEW_BLUE,

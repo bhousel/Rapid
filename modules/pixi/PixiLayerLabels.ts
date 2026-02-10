@@ -798,7 +798,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           labelObj: labelObj,
           x: x,
           y: y,
-          tint: style?.labelColor ?? 0xeeeeee
+          tint: style?.label?.color ?? 0xeeeeee
         });
 
         this._labels.set(featureID, label);
@@ -1014,7 +1014,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         str: feature.label!,
         coords: scaledCoords,
         labelObj: labelObj,
-        tint: style?.labelColor ?? 0xeeeeee
+        tint: style?.label?.color ?? 0xeeeeee
       });
       this._labels.set(labelID, label);
     });

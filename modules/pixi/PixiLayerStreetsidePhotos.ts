@@ -15,12 +15,12 @@ const STREETSIDE_TEAL = 0x0fffc4;
 const SELECTED = 0xffee00;
 
 const LINESTYLE = {
-  casing: { alpha: 0 },  // disable
-  stroke: { alpha: 0.7, width: 4, color: STREETSIDE_TEAL }
+  casing: { opacity: 0 },  // disable
+  stroke: { opacity: 0.7, width: 4, color: STREETSIDE_TEAL }
 } as Partial<MatchedStyle>;
 
 const MARKERSTYLE: Partial<PointStyle> = {
-  marker: { name: 'mediumCircle', color: STREETSIDE_TEAL, alpha: 0.8 },
+  marker: { image: 'mediumCircle', color: STREETSIDE_TEAL, opacity: 0.8 },
   viewfieldAlpha:  0.7,
   viewfieldName:   'viewfield',
   viewfieldColor:   STREETSIDE_TEAL,

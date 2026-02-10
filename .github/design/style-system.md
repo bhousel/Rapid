@@ -29,14 +29,14 @@ interface StyleProps {
 interface FillStyle {
   width?: number;        // Outline width in pixels
   color?: number;        // Hex color, e.g. 0xcf2081
-  alpha?: number;        // Opacity: 0 = transparent, 1 = opaque
+  opacity?: number;      // Opacity: 0 = transparent, 1 = opaque
   pattern?: string;      // Fill pattern ID, e.g. 'grass', 'waves'
 }
 
 interface LineStyle {
   width?: number;        // Line width in pixels
   color?: number;        // Hex color
-  alpha?: number;        // Opacity
+  opacity?: number;      // Opacity
   cap?: 'butt' | 'round' | 'square';
   join?: 'bevel' | 'miter' | 'round';
   dash?: number[];       // Dash pattern, e.g. [10, 5] for 10px on, 5px off
@@ -47,7 +47,7 @@ interface LineStyle {
 ```json5
 // A simple fill color
 "green": {
-  "fill": { "color": 0x8cd05f, "alpha": 0.3 }
+  "fill": { "color": 0x8cd05f, "opacity": 0.3 }
 }
 
 // A road with casing and stroke

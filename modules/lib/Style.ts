@@ -12,14 +12,14 @@ import type { Context } from '../Context.ts';
  * - line decorations (oneway arrows, sided markers)
  * - labels
  *
- * The Icon name typically comes from SchemaSystem presets, but can be overridden
- * in a style file. Other visual properties (color, size, alpha) come from styles.
+ * The Icon image typically comes from SchemaSystem presets, but can be overridden
+ * in a style file. Other visual properties (color, size, opacity) come from styles.
  *
  * @example
  * // A simple fill color
  * const green = new Style(context, {
  *   id: 'green',
- *   fill: { color: 0x8cd05f, alpha: 0.3 }
+ *   fill: { color: 0x8cd05f, opacity: 0.3 }
  * });
  *
  * // A road with casing and stroke
@@ -32,41 +32,85 @@ import type { Context } from '../Context.ts';
  * // A point style with marker and icon properties
  * const poi = new Style(context, {
  *   id: 'poi_pin',
- *   marker: { name: 'pin', color: 0xffffff },
+ *   marker: { image: 'pin', color: 0xffffff },
  *   icon: { color: 0x111111, size: 11 },
- *   labelColor: 0xdddddd
+ *   label: { color: 0xdddddd }
  * });
  *
  * @module
  */
 
 
+/**
+ * Properties for creating a Style.
+ * All properties (except the StyleID) are optional.
+ * Any unassigned properties will be filled in with defaults.
+ */
+export interface StyleProps {
+  /** Unique identifier for this style */
+  id: StyleID;
+  /** The asset this declaration came from */
+  assetID?: AssetID;
+  /** Version of the asset */
+  assetVersion?: string;
+
+  /** Base properties (currently just a base color) */
+  base?: BaseStyleProps;
+  /** Properties for styling filled area */
+  fill?: FillStyleProps;
+  /** Properties for styling the casing (line outline, draws below stroke) */
+  casing?: LineStyleProps;
+  /** Properties for styling the stroke (line, draws above casing) */
+  stroke?: LineStyleProps;
+  /** Properties for styling the marker (point outer shape, for example a pin shape */
+  marker?: PointStyleProps;
+  /** Properties for styling the icon (point inner shape, draws within the marker) */
+  icon?: PointStyleProps;
+  /** Properties for styling the label */
+  label?: LabelStyleProps;
+
+  /** Line marker styling (repeating markers along lines, e.g. 'oneway') */
+  lineMarker?: PointStyleProps;
+  /** Sided marker styling (one-sided markers, e.g. for coastlines, retaining walls) */
+  sidedMarker?: PointStyleProps;
+}
+
 /** Line cap style */
 export type LineCap = 'butt' | 'round' | 'square';
 /** Line join style */
 export type LineJoin = 'bevel' | 'miter' | 'round';
+/** Fill style */
+export type FillType = 'full' | 'partial';
 
+
+/** Properties for base styling (currently just a color). */
+export interface BaseStyleProps {
+  /** The color as a hex number, e.g. 0xcf2081 */
+  color?: number;
+}
 
 /** Properties for fill styling (used for area features). */
 export interface FillStyleProps {
-  /** Line width in pixels (for the fill outline) */
-  width?: number;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
   /** The color as a hex number, e.g. 0xcf2081 */
   color?: number;
-  /** Opacity: 0 = transparent, 1 = opaque */
-  alpha?: number;
+  /** Line width in pixels (for the fill outline) */
+  width?: number;
   /** Pattern ID for textured fills, e.g. 'grass', 'waves' */
   pattern?: string;
+  /** Fill type - 'full' or 'partial' */
+  type?: FillType;
 }
 
 /** Properties for line styling (used for casing and stroke). */
 export interface LineStyleProps {
-  /** Line width in pixels */
-  width?: number;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
   /** The color as a hex number, e.g. 0xcf2081 */
   color?: number;
-  /** Opacity: 0 = transparent, 1 = opaque */
-  alpha?: number;
+  /** Line width in pixels */
+  width?: number;
   /** Line cap style */
   cap?: LineCap;
   /** Line join style */
@@ -84,70 +128,29 @@ export interface LineStyleProps {
  * - `sidedMarker`: One-sided markers (e.g. cliffs, retaining walls)
  */
 export interface PointStyleProps {
-  /** Texture name for the graphic */
-  name?: string;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
   /** Display color applied to the graphic */
   color?: number;
-  /** Opacity: 0 = transparent, 1 = opaque */
-  alpha?: number;
+  /**
+   * Image identifier - should be a symbol name from the spritesheet.
+   * TODO: Support url(path/to/image.svg) syntax for external images.
+   */
+  image?: string;
   /** Size in pixels (defaults vary by usage, typically 11 for icons) */
   size?: number;
 }
 
-
 /**
- * Properties for creating a Style.
+ * Style properties for Labels
  */
-export interface StyleProps {
-  /** Unique identifier for this style */
-  id: StyleID;
-  /** The asset this declaration came from */
-  assetID?: AssetID;
-  /** Version of the asset */
-  assetVersion?: string;
-
-  //
-  // Area and line rendering
-  //
-
-  /** Fill styling (areas) */
-  fill?: FillStyleProps;
-  /** Casing styling (line outline, draws below stroke) */
-  casing?: LineStyleProps;
-  /** Stroke styling (line, draws above casing) */
-  stroke?: LineStyleProps;
-
-  //
-  // Point/vertex marker appearance
-  //
-
-  /** Marker styling (point background shape) */
-  marker?: PointStyleProps;
-  /** Icon styling (rendered inside marker) */
-  icon?: PointStyleProps;
-
-  //
-  // Line decorations
-  //
-
-  /** Line marker styling (repeating markers along lines, e.g. 'oneway') */
-  lineMarker?: PointStyleProps;
-  /** Sided marker styling (one-sided markers, e.g. for coastlines, retaining walls) */
-  sidedMarker?: PointStyleProps;
-
-  //
-  // Shared properties
-  //
-
-  /** Label color (defaults to fill.color or stroke.color) */
-  labelColor?: number;
-
-  //
-  // Rendering hints
-  //
-
-  /** If true, always use full fill for polygons (not partial fill) */
-  requireFill?: boolean;
+export interface LabelStyleProps {
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
+  /** Display color applied to the graphic */
+  color?: number;
+  /** Size in pixels (defaults vary by usage, typically 11 for icons) */
+  size?: number;
 }
 
 
@@ -155,29 +158,36 @@ export interface StyleProps {
 const DEFAULT_FILL: FillStyleProps = {
   width: 2,
   color: 0xaaaaaa,
-  alpha: 0.3
+  opacity: 0.3
 };
 
 /** Default line style values. */
 const DEFAULT_LINE: LineStyleProps = {
   width: 3,
   color: 0xcccccc,
-  alpha: 1,
+  opacity: 1,
   cap: 'round',
   join: 'round'
 };
 
 /** Default marker style values. */
 const DEFAULT_MARKER: PointStyleProps = {
-  name: 'smallCircle',
+  image: 'smallCircle',
   color: 0xffffff,
-  alpha: 1
+  opacity: 1
 };
 
 /** Default icon style values. */
 const DEFAULT_ICON: PointStyleProps = {
   color: 0x111111,
-  alpha: 1,
+  opacity: 1,
+  size: 11
+};
+
+/** Default label style values. */
+const DEFAULT_LABEL: LabelStyleProps = {
+  color: 0xeeeeee,
+  opacity: 1,
   size: 11
 };
 
@@ -195,8 +205,6 @@ const DEFAULT_ICON: PointStyleProps = {
  *   `icon`        Icon style properties (rendered in marker)
  *   `lineMarker`  Line marker style (oneway arrows, etc.)
  *   `sidedMarker` Sided marker style (coastlines, retaining walls)
- *   `labelColor`   Label color
- *   `requireFill` Force full fill for polygons
  */
 export class Style {
   context: Context;
@@ -231,14 +239,12 @@ export class Style {
     return this.props.fill;
   }
 
-
   /**
    * Casing style properties.
    */
   get casing(): LineStyleProps | undefined {
     return this.props.casing;
   }
-
 
   /**
    * Stroke style properties.
@@ -247,14 +253,12 @@ export class Style {
     return this.props.stroke;
   }
 
-
   /**
    * The asset ID this style came from.
    */
   get assetID(): AssetID | undefined {
     return this.props.assetID;
   }
-
 
   /**
    * Marker style properties (point background shape).
@@ -263,7 +267,6 @@ export class Style {
     return this.props.marker;
   }
 
-
   /**
    * Icon style properties (rendered inside marker).
    */
@@ -271,14 +274,12 @@ export class Style {
     return this.props.icon;
   }
 
-
   /**
    * Line marker style properties (repeating markers along lines).
    */
   get lineMarker(): PointStyleProps | undefined {
     return this.props.lineMarker;
   }
-
 
   /**
    * Sided marker style properties (one-sided markers).
@@ -289,18 +290,10 @@ export class Style {
 
 
   /**
-   * Label color.
+   * Label styling properties.
    */
-  get labelColor(): number | undefined {
-    return this.props.labelColor;
-  }
-
-
-  /**
-   * Whether to force full fill for polygons.
-   */
-  get requireFill(): boolean | undefined {
-    return this.props.requireFill;
+  get label(): LabelStyleProps | undefined {
+    return this.props.label;
   }
 
 
@@ -314,7 +307,7 @@ export class Style {
     return {
       width: fill.width ?? DEFAULT_FILL.width,
       color: fill.color ?? DEFAULT_FILL.color,
-      alpha: fill.alpha ?? DEFAULT_FILL.alpha,
+      opacity: fill.opacity ?? DEFAULT_FILL.opacity,
       pattern: fill.pattern
     };
   }
@@ -330,7 +323,7 @@ export class Style {
     return {
       width: casing.width ?? 5,  // Casing typically wider
       color: casing.color ?? 0x444444,
-      alpha: casing.alpha ?? 1,
+      opacity: casing.opacity ?? 1,
       cap: casing.cap ?? DEFAULT_LINE.cap,
       join: casing.join ?? DEFAULT_LINE.join,
       dash: casing.dash
@@ -348,7 +341,7 @@ export class Style {
     return {
       width: stroke.width ?? DEFAULT_LINE.width,
       color: stroke.color ?? DEFAULT_LINE.color,
-      alpha: stroke.alpha ?? DEFAULT_LINE.alpha,
+      opacity: stroke.opacity ?? DEFAULT_LINE.opacity,
       cap: stroke.cap ?? DEFAULT_LINE.cap,
       join: stroke.join ?? DEFAULT_LINE.join,
       dash: stroke.dash
@@ -364,46 +357,54 @@ export class Style {
   resolvedMarker(): PointStyleProps {
     const marker = this.props.marker ?? {};
     return {
-      name: marker.name ?? DEFAULT_MARKER.name,
+      image: marker.image ?? DEFAULT_MARKER.image,
       color: marker.color ?? DEFAULT_MARKER.color,
-      alpha: marker.alpha ?? DEFAULT_MARKER.alpha
+      opacity: marker.opacity ?? DEFAULT_MARKER.opacity
     };
   }
 
 
   /**
    * Get resolved icon properties with defaults applied.
-   * Returns an object with all required icon properties (except name, which is optional).
+   * Returns an object with all required icon properties (except image, which is optional).
    * @return Resolved icon properties
    */
   resolvedIcon(): PointStyleProps {
     const icon = this.props.icon ?? {};
     return {
-      name: icon.name,  // undefined if not set (usually comes from preset)
+      image: icon.image,  // undefined if not set (usually comes from preset)
       color: icon.color ?? DEFAULT_ICON.color,
-      alpha: icon.alpha ?? DEFAULT_ICON.alpha,
+      opacity: icon.opacity ?? DEFAULT_ICON.opacity,
       size: icon.size ?? DEFAULT_ICON.size
     };
   }
 
 
   /**
-   * Get resolved label color with smart default.
-   * Falls back to fill.color, then stroke.color, then a default gray.
-   * @return Resolved label color
+   * Get resolved label properties with defaults applied.
+   * Color has a smart default that falls back to fill.color, then stroke.color, then gray.
+   * @return Resolved label properties
    */
-  resolvedLabelColor(): number {
-    if (this.props.labelColor !== undefined) {
-      return this.props.labelColor;
+  resolvedLabel(): LabelStyleProps {
+    const label = this.props.label ?? {};
+
+    // Smart default for color: follow the dominant color
+    let color = label.color;
+    if (color === undefined) {
+      if (this.props.fill?.color !== undefined) {
+        color = this.props.fill.color;
+      } else if (this.props.stroke?.color !== undefined) {
+        color = this.props.stroke.color;
+      } else {
+        color = DEFAULT_LABEL.color;
+      }
     }
-    // Smart default: follow the dominant color
-    if (this.props.fill?.color !== undefined) {
-      return this.props.fill.color;
-    }
-    if (this.props.stroke?.color !== undefined) {
-      return this.props.stroke.color;
-    }
-    return 0xeeeeee;  // default gray
+
+    return {
+      color: color,
+      opacity: label.opacity ?? DEFAULT_LABEL.opacity,
+      size: label.size ?? DEFAULT_LABEL.size
+    };
   }
 
 
@@ -425,12 +426,9 @@ export class Style {
       stroke: { ...this.props.stroke, ...other.props.stroke },
       marker: { ...this.props.marker, ...other.props.marker },
       icon: { ...this.props.icon, ...other.props.icon },
+      label: { ...this.props.label, ...other.props.label },
       lineMarker: { ...this.props.lineMarker, ...other.props.lineMarker },
       sidedMarker: { ...this.props.sidedMarker, ...other.props.sidedMarker },
-
-      // Scalar properties: other wins if defined
-      labelColor: other.props.labelColor ?? this.props.labelColor,
-      requireFill: other.props.requireFill ?? this.props.requireFill
     };
 
     // Clean up empty nested objects
@@ -536,38 +534,6 @@ export class Style {
    */
   toJSON(): StyleProps {
     return globalThis.structuredClone(this.props);
-  }
-
-
-  /**
-   * String representation for debugging.
-   */
-  toString(): string {
-    const parts: string[] = [];
-    if (this.hasFill()) {
-      const f = this.props.fill!;
-      parts.push(`fill(${f.color?.toString(16) ?? '?'})`);
-    }
-    if (this.hasCasing()) {
-      const c = this.props.casing!;
-      parts.push(`casing(w=${c.width ?? '?'})`);
-    }
-    if (this.hasStroke()) {
-      const s = this.props.stroke!;
-      parts.push(`stroke(w=${s.width ?? '?'})`);
-    }
-    if (this.hasMarker()) {
-      const m = this.props.marker!;
-      parts.push(`marker(${m.name ?? '?'})`);
-    }
-    if (this.hasIcon()) {
-      const i = this.props.icon!;
-      parts.push(`icon(${i.name ?? '?'})`);
-    }
-    if (this.props.labelColor !== undefined) {
-      parts.push(`labelColor(${this.props.labelColor.toString(16)})`);
-    }
-    return `Style[${this.id}]{${parts.join(', ')}}`;
   }
 
 }

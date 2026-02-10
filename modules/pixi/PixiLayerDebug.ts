@@ -56,10 +56,9 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     const spatial = context.systems.spatial!;
 
     const DEFAULTSTYLE = {
-      requireFill: true,     // disable partial filling effect
-      fill:   { width: 1, color: 0xffff00, alpha: 0.5 },
-      casing: { alpha: 0 },  // disable
-      stroke: { alpha: 0 }   // disable
+      fill: { width: 1, color: 0xffff00, opacity: 0.5, type: 'full' },  // always fill fully
+      casing: { opacity: 0 },  // disable
+      stroke: { opacity: 0 }   // disable
     };
     const POISTYLE = {
       markerName: 'smallCircle',
