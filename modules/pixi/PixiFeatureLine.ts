@@ -147,56 +147,55 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       // Todo: left/right markers (like for coastlines, retaining walls, etc)
       //
       let lineMarkers = container.getChildByLabel('lineMarkers');
+      const lineMarkerTextureID = style.stroke?.lineMarker?.image;
+      const sideMarkerTextureID = style.stroke?.sidedMarker?.image;
 
-      if (showMarkers && (style.stroke?.lineMarker?.image || style.stroke?.sidedMarker?.image)) {
+      if (showMarkers && (lineMarkerTextureID || sideMarkerTextureID)) {
         // Create line marker container, if necessary
         if (!lineMarkers) {
           lineMarkers = new PIXI.Container();
           lineMarkers.label = 'lineMarkers';
           lineMarkers.eventMode = 'none';
           lineMarkers.sortableChildren = false;
-          (lineMarkers as any).roundPixels = false;
           container.addChild(lineMarkers);
         }
 
-        const lineMarkerName = style.stroke?.lineMarker?.image;
-        const sidedMarkerName = style.stroke?.sidedMarker?.image;
-        const lineMarkerTexture = (lineMarkerName && textureManager.getTexture('symbol', lineMarkerName)) || PIXI.Texture.WHITE;
-        const sidedMarkerTexture = (sidedMarkerName && textureManager.getTexture('symbol', sidedMarkerName)) || PIXI.Texture.WHITE;
-        const sided = sidedMarkerName === 'sided';
-        const oneway = lineMarkerName === 'oneway';
         lineMarkers.removeChildren();
 
-        if (oneway) {
+        // Show line markers (e.g. oneway arrows)
+        if (lineMarkerTextureID) {
+          const lineMarkerTexture = textureManager.getTexture('symbol', lineMarkerTextureID) || PIXI.Texture.WHITE;
           const segments = getLineSegments(screen.coords as Vec2[], ONEWAY_SPACING, false, true);  /* sided = false, limited = true */
 
           segments.forEach(segment => {
             segment.coords.forEach(([x, y]) => {
-              const arrow = new PIXI.Sprite(lineMarkerTexture);
-              arrow.eventMode = 'none';
-              arrow.sortableChildren = false;
-              arrow.anchor.set(0.5, 0.5); // middle, middle
-              arrow.position.set(x, y);
-              arrow.rotation = segment.angle;
-              arrow.tint = style.stroke?.lineMarker?.color ?? 0x000000;
-              lineMarkers!.addChild(arrow);
+              const sprite = new PIXI.Sprite(lineMarkerTexture);
+              sprite.eventMode = 'none';
+              sprite.sortableChildren = false;
+              sprite.anchor.set(0.5, 0.5); // middle, middle
+              sprite.position.set(x, y);
+              sprite.rotation = segment.angle;
+              sprite.tint = style.stroke?.lineMarker?.color ?? 0x000000;
+              lineMarkers!.addChild(sprite);
             });
           });
         }
 
-        if (sided) {
+        // show side markers (e.g. sided triangles)
+        if (sideMarkerTextureID) {
+          const sideMarkerTexture = textureManager.getTexture('symbol', sideMarkerTextureID) || PIXI.Texture.WHITE;
           const segments = getLineSegments(screen.coords as Vec2[], SIDED_SPACING, true, true);  /* sided = true, limited = true */
 
           segments.forEach(segment => {
             segment.coords.forEach(([x, y]) => {
-              const arrow = new PIXI.Sprite(sidedMarkerTexture);
-              arrow.eventMode = 'none';
-              arrow.sortableChildren = false;
-              arrow.anchor.set(0.5, 0.5); // middle, middle
-              arrow.position.set(x, y);
-              arrow.rotation = segment.angle;
-              arrow.tint = style.stroke?.color ?? 0xcccccc;
-              lineMarkers!.addChild(arrow);
+              const sprite = new PIXI.Sprite(sideMarkerTexture);
+              sprite.eventMode = 'none';
+              sprite.sortableChildren = false;
+              sprite.anchor.set(0.5, 0.5); // middle, middle
+              sprite.position.set(x, y);
+              sprite.rotation = segment.angle;
+              sprite.tint = style.stroke?.color ?? 0xcccccc;
+              lineMarkers!.addChild(sprite);
             });
           });
         }

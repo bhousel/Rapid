@@ -139,6 +139,10 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   updateStyle(viewport: Viewport, zoom: number): void {
     if (!this._styleDirty) return;
 
+    function valIsNumber(val: unknown): boolean {
+      return !isNaN(val as number) && isFinite(val as number);
+    }
+
     const screen = this.geom.screen;
     if (!screen?.coords) return;  // can't render anything without screen coords
 
@@ -160,6 +164,24 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     // Show marker, if any..
     if (style.marker.image) {
+      // anchor, default to middle,middle
+      let [anchorX, anchorY] = style.marker.anchor || [];
+      if (!valIsNumber(anchorX)) anchorX = 0.5;
+      if (!valIsNumber(anchorY)) anchorY = 0.5;
+      marker.anchor.set(anchorX, anchorY);
+
+      // size, no default (size will be determined by the texture)
+      const markerSize = style.marker.size;
+      const markerScale = style.marker.scale || [];
+      let [scaleX, scaleY] = Array.isArray(markerScale) ? markerScale : [markerScale];
+      if (!valIsNumber(scaleX) || scaleX === 0) scaleX = 1;
+      if (!valIsNumber(scaleY) || scaleY === 0) scaleY = scaleX;
+      if (valIsNumber(markerSize)) {
+        marker.setSize(markerSize! * scaleX!, markerSize! * scaleY!);
+      } else {
+        marker.scale.set(scaleX, scaleY);
+      }
+
       // note - marker.texture gets set below in the effective zoom block
       marker.alpha = style.marker.opacity ?? 1;
       marker.tint = style.marker.color ?? 0xffffff;
@@ -170,11 +192,23 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     // Show icon, if any..
     if (style.icon.image) {
-      icon.texture = textureManager.getTexture('symbol', style.icon.image) || PIXI.Texture.EMPTY;
-      icon.anchor.set(style.icon.anchor?.x ?? 0.5, style.icon.anchor?.y ?? 0.5);   // middle, middle by default, can be overridden in style
+      // anchor, default to middle,middle
+      let [anchorX, anchorY] = style.icon.anchor || [];
+      if (!valIsNumber(anchorX)) anchorX = 0.5;
+      if (!valIsNumber(anchorY)) anchorY = 0.5;
+      icon.anchor.set(anchorX, anchorY);
+
+      // size, default to 11px to fit within the marker
       const iconSize = style.icon.size || 11;
-      icon.width = iconSize;
-      icon.height = iconSize;
+      const iconScale = style.icon.scale || [];
+      let [scaleX, scaleY] = Array.isArray(iconScale) ? iconScale : [iconScale];
+      if (!valIsNumber(scaleX) || scaleX === 0) scaleX = 1;
+      if (!valIsNumber(scaleY) || scaleY === 0) scaleY = scaleX;
+      // icon.setSize(iconSize * scaleX!, iconSize * scaleY!);
+      icon.width = iconSize * scaleX!;
+      icon.height = iconSize * scaleY!;
+
+      icon.texture = textureManager.getTexture('symbol', style.icon.image) || PIXI.Texture.EMPTY;
       icon.alpha = style.icon.opacity ?? 1;
       icon.tint = style.icon.color ?? 0x111111;
       icon.visible = true;
@@ -183,7 +217,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     }
 
     // Update viewfields, if any..
-    const vfAngles = style.viewfield.angles || [];
+    const vfAngles = style.viewfield?.angles || [];
     let vfTexture = PIXI.Texture.EMPTY;
     if (vfAngles.length > 0) {  // Should have viewfields
       vfTexture = textureManager.getTexture('symbol', style.viewfield.image || '') || PIXI.Texture.WHITE;
@@ -202,14 +236,14 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         this.container.addChildAt(this.viewfields, 0);
       }
 
-      // # of viewfields has changed, or if the texture name has changed, recreate them
+      // if # of viewfields has changed, or if the texture name has changed, recreate them
       const vfImage = style.viewfield.image;
       if (this._viewfieldCount !== vfAngles.length || this._viewfieldName !== vfImage) {
         this.viewfields.removeChildren();
+
         for (const _a of vfAngles) {
           const vfSprite = new PIXI.Sprite(vfTexture);
           vfSprite.eventMode = 'none';
-          vfSprite.anchor.set(0.5, 0.5);  // middle, middle
 
           // Make the active photo image pop out at the user
           if (this._classes.has('selectphoto') || this._classes.has('highlightphoto')) {
@@ -225,23 +259,30 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       // Apply bearing correction to the viewfield container
       this.viewfields.rotation = bearing;
 
+      // anchor, default to middle,middle
+      let [anchorX, anchorY] = style.viewfield.anchor || [];
+      if (!valIsNumber(anchorX)) anchorX = 0.5;
+      if (!valIsNumber(anchorY)) anchorY = 0.5;
+
+      // size, no default (size will be determined by the texture)
+      const viewfieldSize = style.viewfield.size;
+      const viewfieldScale = style.viewfield.scale || [];
+      let [scaleX, scaleY] = Array.isArray(viewfieldScale) ? viewfieldScale : [viewfieldScale];
+      if (!valIsNumber(scaleX) || scaleX === 0) scaleX = 1;
+      if (!valIsNumber(scaleY) || scaleY === 0) scaleY = scaleX;
+
       // Update viewfield angles and style
-      const vfScale = style.viewfield.scale;
-      let xScale: number, yScale: number;
-      if (typeof vfScale === 'object' && vfScale !== null) {
-        xScale = vfScale.x;
-        yScale = vfScale.y;
-      } else {
-        const s = (typeof vfScale === 'number') ? vfScale : 1;
-        xScale = s;
-        yScale = s;
-      }
       for (let i = 0; i < vfAngles.length; i++) {
-        const vfSprite = this.viewfields.getChildAt(i);
+        const vfSprite = this.viewfields.getChildAt(i) as PIXI.Sprite;
+        vfSprite.anchor.set(anchorX, anchorY);
         vfSprite.alpha = style.viewfield.opacity ?? 1;
         vfSprite.tint = style.viewfield.color ?? 0x333333;
-        vfSprite.scale.set(xScale, yScale);
         vfSprite.angle = vfAngles[i];
+        if (valIsNumber(viewfieldSize)) {
+          vfSprite.setSize(viewfieldSize! * scaleX!, viewfieldSize! * scaleY!);
+        } else {
+          vfSprite.scale.set(scaleX, scaleY);
+        }
       }
 
     } else if (this.viewfields) {  // Had viewfields before and now should not

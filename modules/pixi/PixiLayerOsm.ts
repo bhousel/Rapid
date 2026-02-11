@@ -527,8 +527,18 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             const style = styles.styleMatch(tags) as MatchedStyle;
             // Todo: handle alternating/two-way case too
             if (geom === 'line') {
-              style.stroke.lineMarker!.image = entity.isOneWay() ? 'oneway' : undefined;
-              style.stroke.sidedMarker!.image = entity.isSided() ? 'sided' : undefined;
+              if (entity.isOneWay()) {
+                style.stroke.lineMarker ??= {};
+                style.stroke.lineMarker.image = 'oneway';
+              } else {
+                delete style.stroke.lineMarker;
+              }
+              if (entity.isSided()) {
+                style.stroke.sidedMarker ??= {};
+                style.stroke.sidedMarker.image = 'sided';
+              } else {
+                delete style.stroke.sidedMarker;
+              }
 
             } else {  // an area
               style.casing.width = 0;

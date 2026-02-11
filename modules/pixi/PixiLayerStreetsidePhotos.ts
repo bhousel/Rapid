@@ -282,7 +282,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
           const s = 2.0;
           const fw = fovWidthInterp(fov);
           const fl = fovLengthInterp(fov);
-          style.viewfield!.scale = { x: s * fw, y: s * fl };
+          style.viewfield!.scale = [s * fw, s * fl];
 
         } else {
           style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle

@@ -1,5 +1,6 @@
 import { merge as deepMerge } from 'lodash-es';
 
+import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 
 /**
@@ -144,10 +145,10 @@ export interface PointStyleProps {
   image?: string;
   /** Size in pixels (defaults vary by usage, typically 11 for icons) */
   size?: number;
-  /** Anchor position { x, y } where 0.5, 0.5 = centered (default varies by marker type) */
-  anchor?: { x: number; y: number };
-  /** Scale multiplier: uniform number or per-axis { x, y } */
-  scale?: number | { x: number; y: number };
+  /** Anchor position [x, y] where [0.5, 0.5] = centered (default varies by marker type) */
+  anchor?: Vec2;
+  /** Scale multiplier: uniform number or per-axis [x, y] */
+  scale?: number | Vec2;
 }
 
 /**
