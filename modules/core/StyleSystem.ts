@@ -7,7 +7,7 @@ import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
-import type { StyleProps, FillStyleProps, LineStyleProps, PointStyleProps, LabelStyleProps } from '../lib/Style.ts';
+import type { StyleProps, FillStyleProps, LineStyleProps, PointStyleProps, LabelStyleProps, ViewfieldStyleProps } from '../lib/Style.ts';
 import type { StyleMatchConditions, StyleSelectorProps } from '../lib/StyleSelector.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { GeometryType } from './SchemaSystem.ts';
@@ -49,6 +49,7 @@ export interface MatchedStyle {
   stroke: LineStyleProps;
   marker: PointStyleProps;
   icon: PointStyleProps;
+  viewfield: ViewfieldStyleProps;
   lineMarker: PointStyleProps;
   sidedMarker: PointStyleProps;
   label: LabelStyleProps;
@@ -455,6 +456,7 @@ export class StyleSystem extends AbstractSystem {
         stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
         marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
         icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
+        viewfield: { angles: [], color: 0xffffff, opacity: 0.7, image: 'viewfield' },
         lineMarker: { image: undefined, color: 0xffffff },
         sidedMarker: { image: undefined, color: 0xffffff },
         label: { color: 0xeeeeee }
@@ -501,6 +503,7 @@ export class StyleSystem extends AbstractSystem {
       stroke: {} as LineStyleProps,
       marker: {} as PointStyleProps,
       icon: {} as PointStyleProps,
+      viewfield: {} as ViewfieldStyleProps,
       lineMarker: {} as PointStyleProps,
       sidedMarker: {} as PointStyleProps,
       label: {} as LabelStyleProps

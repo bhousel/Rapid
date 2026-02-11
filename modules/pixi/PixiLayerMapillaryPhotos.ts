@@ -20,13 +20,11 @@ const LINESTYLE = {
 } as Partial<MatchedStyle>;
 
 const MARKERSTYLE: Partial<PointStyle> = {
-  marker: { image: 'mediumCircle', color: MAPILLARY_GREEN, opacity: 0.8 },
-  viewfieldAlpha:  0.7,
-  viewfieldName:   'viewfield',
-  viewfieldColor:   MAPILLARY_GREEN,
-  scale:           1.0,
-  fovWidth:        1,
-  fovLength:       1
+  marker:    { color: MAPILLARY_GREEN, opacity: 0.8, image: 'mediumCircle' },
+  viewfield: { color: MAPILLARY_GREEN, opacity: 0.7, image: 'viewfield', angles: [] },
+  scale:     1.0,
+  fovWidth:  1,
+  fovLength: 1
 };
 
 const fovWidthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [1.3, 0.7]);
@@ -316,22 +314,22 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         const style: Partial<PointStyle> = Object.assign({}, MARKERSTYLE);
 
         if (feature.hasClass('selectphoto')) {  // selected photo style
-          style.viewfieldAngles = [this._viewerBearing ?? d.props.ca];
-          style.viewfieldName = 'viewfield';
-          style.viewfieldAlpha = 1;
-          style.viewfieldColor = SELECTED;
+          style.viewfield!.angles = [this._viewerBearing ?? d.props.ca];
+          style.viewfield!.image = 'viewfield';
+          style.viewfield!.opacity = 1;
+          style.viewfield!.color = SELECTED;
           style.marker = Object.assign({}, style.marker, { color: SELECTED });
           style.scale = 2.0;
           style.fovWidth = fovWidthInterp(this._viewerFov ?? 55);
           style.fovLength = fovLengthInterp(this._viewerFov ?? 55);
 
         } else {
-          style.viewfieldAngles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
-          style.viewfieldName = d.props.isPano ? 'pano' : 'viewfield';
+          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
+          style.viewfield!.image = d.props.isPano ? 'pano' : 'viewfield';
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
-            style.viewfieldAlpha = 1;
-            style.viewfieldColor = SELECTED;
+            style.viewfield!.opacity = 1;
+            style.viewfield!.color = SELECTED;
             style.marker = Object.assign({}, style.marker, { color: SELECTED });
           }
         }

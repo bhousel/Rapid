@@ -625,9 +625,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           icon: { image: iconName, color: 0x111111, opacity: 1, size: 11 },
           label: { color: 0xeeeeee },
           marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
-          viewfieldAngles: directions,
-          viewfieldName: 'viewfieldDark',
-          viewfieldColor: 0xffffff
+          viewfield: { angles: directions, color: 0xffffff, opacity: 0.8, image: 'viewfieldDark' }
         };
 
         if (iconName) {
@@ -715,9 +713,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const markerStyle: Partial<PointStyle> = {
           icon: { image: iconName, color: 0x111111, opacity: 1, size: 11 },
           marker: { image: 'pin', color: 0xffffff, opacity: 1 },
-          viewfieldAngles: directions,
-          viewfieldName: 'viewfieldDark',
-          viewfieldColor: 0xffffff
+          viewfield: { angles: directions, color: 0xffffff, opacity: 0.8, image: 'viewfieldDark' }
         };
         if (hasWikidata(node)) {
           markerStyle.icon!.color = 0x444444;
@@ -768,7 +764,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     // Generate midpoints from all the highlighted ways
     const midpoints = new Map<string, MidpointData>();
-    const MIDPOINT_STYLE = { markerName: 'midpoint' };
+    const midpointStyle = { marker: { image: 'midpoint' } };
     for (const [wayID, way] of entities) {
       // Include only ways that are selected, or descended from a relation that is selected
       if (!related.descendantIDs.has(wayID)) continue;
@@ -832,7 +828,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.style = MIDPOINT_STYLE;
+        feature.style = midpointStyle;
         feature.parentContainer = selectedContainer;
       }
 

@@ -61,8 +61,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
       stroke: { opacity: 0 }   // disable
     };
     const POISTYLE = {
-      markerName: 'smallCircle',
-      markerTint: 0xffff00,
+      marker: { image: 'smallCircle', color: 0xffff00 }
     };
 
 

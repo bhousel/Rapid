@@ -20,13 +20,11 @@ const LINESTYLE = {
 } as Partial<MatchedStyle>;
 
 const MARKERSTYLE: Partial<PointStyle> = {
-  marker: { image: 'mediumCircle', color: STREETSIDE_TEAL, opacity: 0.8 },
-  viewfieldAlpha:  0.7,
-  viewfieldName:   'viewfield',
-  viewfieldColor:   STREETSIDE_TEAL,
-  scale:           1.0,
-  fovWidth:        1,
-  fovLength:       1
+  marker: { color: STREETSIDE_TEAL, opacity: 0.8, image: 'mediumCircle' },
+  viewfield: { color: STREETSIDE_TEAL, opacity: 0.7, image: 'viewfield', angles: [] },
+  scale: 1.0,
+  fovWidth: 1,
+  fovLength: 1
 };
 
 const fovWidthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [1.3, 0.7]);
@@ -279,22 +277,22 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
           const yaw = viewer?.getYaw() ?? 0;
           const fov = viewer?.getHfov() ?? 45;
 
-          style.viewfieldAngles = [d.props.ca + yaw];
-          style.viewfieldName = 'viewfield';
-          style.viewfieldAlpha = 1;
-          style.viewfieldColor = SELECTED;
+          style.viewfield!.angles = [d.props.ca + yaw];
+          style.viewfield!.image = 'viewfield';
+          style.viewfield!.opacity = 1;
+          style.viewfield!.color = SELECTED;
           style.marker = Object.assign({}, style.marker, { color: SELECTED });
           style.scale = 2.0;
           style.fovWidth = fovWidthInterp(fov);
           style.fovLength = fovLengthInterp(fov);
 
         } else {
-          style.viewfieldAngles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
-          style.viewfieldName = d.props.isPano ? 'pano' : 'viewfield';
+          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
+          style.viewfield!.image = d.props.isPano ? 'pano' : 'viewfield';
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
-            style.viewfieldAlpha = 1;
-            style.viewfieldColor = SELECTED;
+            style.viewfield!.opacity = 1;
+            style.viewfield!.color = SELECTED;
             style.marker = Object.assign({}, style.marker, { color: SELECTED });
           }
         }

@@ -44,12 +44,6 @@ const MARKERSTYLE: Partial<PointStyle> = {
 };
 ```
 
-When creating dynamic styles, use `Object.assign()` with spread or mutation:
-```typescript
-const style: Partial<PointStyle> = Object.assign({}, MARKERSTYLE);
-style.viewfieldAngles = [bearing];
-```
-
 ## Type-Only Imports
 
 When importing data classes (`GeoJSON`, `Marker`) only for type annotations, use `import type`:

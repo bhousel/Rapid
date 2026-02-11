@@ -597,7 +597,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
 
 /** Default style for polygons */
-const STYLE_DEFAULTS: MatchedStyle = {
+const STYLE_DEFAULTS: Partial<MatchedStyle> = {
   fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3, pattern: undefined },
   casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
   stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },

@@ -26,14 +26,6 @@ export interface PointStyle extends MatchedStyle {
   fovLength?: number;
   /** Field of view width multiplier */
   fovWidth?: number;
-  /** Viewfield alpha/opacity (0-1) */
-  viewfieldAlpha?: number;
-  /** Array of viewfield angles in degrees */
-  viewfieldAngles?: number[];
-  /** Viewfield texture name to load */
-  viewfieldName?: string;
-  /** Viewfield color */
-  viewfieldColor?: number;
 }
 
 
@@ -211,10 +203,10 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     }
 
     // Update viewfields, if any..
-    const vfAngles = style.viewfieldAngles || [];
+    const vfAngles = style.viewfield.angles || [];
     let vfTexture = PIXI.Texture.EMPTY;
     if (vfAngles.length > 0) {  // Should have viewfields
-      vfTexture = textureManager.getTexture('symbol', style.viewfieldName || '') || PIXI.Texture.WHITE;
+      vfTexture = textureManager.getTexture('symbol', style.viewfield.image || '') || PIXI.Texture.WHITE;
 
       // Sort markers with viewfields above markers without viewfields
       // this.container.zIndex = -latitude + 1000;
@@ -257,8 +249,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       const yScale = scale * (style.fovLength || 1);
       for (let i = 0; i < vfAngles.length; i++) {
         const vfSprite = this.viewfields.getChildAt(i);
-        vfSprite.alpha = style.viewfieldAlpha ?? 1;
-        vfSprite.tint = style.viewfieldColor ?? 0x333333;
+        vfSprite.alpha = style.viewfield.opacity ?? 1;
+        vfSprite.tint = style.viewfield.color ?? 0x333333;
         vfSprite.scale.set(xScale, yScale);
         vfSprite.angle = vfAngles[i];
       }
@@ -453,11 +445,8 @@ const STYLE_DEFAULTS: PointStyle = {
   stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
   marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
   icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
+  viewfield: { angles: [], color: 0xffffff, opacity: 1, image: 'viewfield' },
   lineMarker: { image: undefined, color: 0x000000 },
   sidedMarker: { image: undefined, color: 0xffffff },
-  label: { color: 0xeeeeee },
-  viewfieldAlpha: 0.75,
-  viewfieldAngles: [],
-  viewfieldName: 'viewfield',
-  viewfieldColor: 0xffffff
+  label: { color: 0xeeeeee }
 };

@@ -43,7 +43,7 @@ import type { Context } from '../Context.ts';
 
 /**
  * Properties for creating a Style.
- * All properties (except the StyleID) are optional.
+ * All properties (except the id) are optional.
  * Any unassigned properties will be filled in with defaults.
  */
 export interface StyleProps {
@@ -66,6 +66,8 @@ export interface StyleProps {
   marker?: PointStyleProps;
   /** Properties for styling the icon (point inner shape, draws within the marker) */
   icon?: PointStyleProps;
+  /** Properties for styling Viewfields */
+  viewfield?: ViewfieldStyleProps;
   /** Properties for styling the label */
   label?: LabelStyleProps;
 
@@ -130,6 +132,30 @@ export interface LineStyleProps {
  * - `sidedMarker`: One-sided markers (e.g. cliffs, retaining walls)
  */
 export interface PointStyleProps {
+  /** Display color applied to the graphic */
+  color?: number;
+  /** Opacity: 0 = transparent, 1 = opaque */
+  opacity?: number;
+  /**
+   * Image identifier - should be a symbol name from the spritesheet.
+   * TODO: Support url(path/to/image.svg) syntax for external images.
+   */
+  image?: string;
+  /** Size in pixels (defaults vary by usage, typically 11 for icons) */
+  size?: number;
+}
+
+/**
+ * Style properties for point-like graphics (markers, icons, line markers, sided markers).
+ * Used for:
+ * - `marker`: Background shape behind an icon
+ * - `icon`: Symbol rendered inside a marker
+ * - `lineMarker`: Repeating markers along lines (e.g. oneway arrows)
+ * - `sidedMarker`: One-sided markers (e.g. cliffs, retaining walls)
+ */
+export interface ViewfieldStyleProps {
+  /** Angles (in degrees) that the viewfields should extend out from the point */
+  angles?: number[];
   /** Display color applied to the graphic */
   color?: number;
   /** Opacity: 0 = transparent, 1 = opaque */
@@ -277,6 +303,13 @@ export class Style {
   }
 
   /**
+   * Viewfield style properties
+   */
+  get viewfield(): ViewfieldStyleProps | undefined {
+    return this.props.viewfield;
+  }
+
+  /**
    * Line marker style properties (repeating markers along lines).
    */
   get lineMarker(): PointStyleProps | undefined {
@@ -414,45 +447,20 @@ export class Style {
    * @return A new Style with merged properties
    */
   merge(other: Style): Style {
-    const merged: StyleProps = {
-      id: this.id,  // Keep original ID
+    const nestedKeys = [
+      'base', 'fill', 'casing', 'stroke', 'marker', 'icon',
+      'viewfield', 'label', 'lineMarker', 'sidedMarker'
+    ] as const;
 
-      // Nested objects: spread merge
-      base: { ...this.props.base, ...other.props.base },
-      fill: { ...this.props.fill, ...other.props.fill },
-      casing: { ...this.props.casing, ...other.props.casing },
-      stroke: { ...this.props.stroke, ...other.props.stroke },
-      marker: { ...this.props.marker, ...other.props.marker },
-      icon: { ...this.props.icon, ...other.props.icon },
-      label: { ...this.props.label, ...other.props.label },
-      lineMarker: { ...this.props.lineMarker, ...other.props.lineMarker },
-      sidedMarker: { ...this.props.sidedMarker, ...other.props.sidedMarker },
+    const merged: StyleProps = {
+      id: this.id  // Keep original ID
     };
 
-    // Clean up empty nested objects
-    if (merged.base && Object.keys(merged.base).length === 0) {
-      delete merged.base;
-    }
-    if (merged.fill && Object.keys(merged.fill).length === 0) {
-      delete merged.fill;
-    }
-    if (merged.casing && Object.keys(merged.casing).length === 0) {
-      delete merged.casing;
-    }
-    if (merged.stroke && Object.keys(merged.stroke).length === 0) {
-      delete merged.stroke;
-    }
-    if (merged.marker && Object.keys(merged.marker).length === 0) {
-      delete merged.marker;
-    }
-    if (merged.icon && Object.keys(merged.icon).length === 0) {
-      delete merged.icon;
-    }
-    if (merged.lineMarker && Object.keys(merged.lineMarker).length === 0) {
-      delete merged.lineMarker;
-    }
-    if (merged.sidedMarker && Object.keys(merged.sidedMarker).length === 0) {
-      delete merged.sidedMarker;
+    for (const key of nestedKeys) {
+      const m = { ...this.props[key], ...other.props[key] };
+      if (Object.keys(m).length > 0) {
+        (merged as any)[key] = m;
+      }
     }
 
     return new Style(this.context, merged);
