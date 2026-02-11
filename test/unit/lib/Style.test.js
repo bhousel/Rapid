@@ -126,22 +126,22 @@ describe('Style', () => {
       assert.strictEqual(d.icon.size, 15);
     });
 
-    it('lineMarker returns line marker properties', () => {
+    it('stroke.lineMarker returns line marker properties', () => {
       const d = new Rapid.Style(context, {
         id: 'test',
-        lineMarker: { image: 'oneway', color: 0x000000 }
+        stroke: { lineMarker: { image: 'oneway', color: 0x000000 } }
       });
-      assert.strictEqual(d.lineMarker.image, 'oneway');
-      assert.strictEqual(d.lineMarker.color, 0x000000);
+      assert.strictEqual(d.stroke.lineMarker.image, 'oneway');
+      assert.strictEqual(d.stroke.lineMarker.color, 0x000000);
     });
 
-    it('sidedMarker returns sided marker properties', () => {
+    it('stroke.sidedMarker returns sided marker properties', () => {
       const d = new Rapid.Style(context, {
         id: 'test',
-        sidedMarker: { image: 'sided', color: 0xcccccc }
+        stroke: { sidedMarker: { image: 'sided', color: 0xcccccc } }
       });
-      assert.strictEqual(d.sidedMarker.image, 'sided');
-      assert.strictEqual(d.sidedMarker.color, 0xcccccc);
+      assert.strictEqual(d.stroke.sidedMarker.image, 'sided');
+      assert.strictEqual(d.stroke.sidedMarker.color, 0xcccccc);
     });
   });
 

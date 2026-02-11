@@ -186,11 +186,11 @@ export const styleMatchData = {
     'DEFAULTS': {
       fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
       casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-      stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
+      stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round',
+        lineMarker: { image: 'oneway', color: 0xffffff },
+        sidedMarker: { color: 0xffffff }
+      },
       marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
-      icon: { color: 0x111111, opacity: 1, size: 11 },
-      lineMarker: { image: 'oneway', color: 0xffffff },
-      sidedMarker: { color: 0xffffff },
       label: { color: 0xeeeeee }
     },
     'LIFECYCLE': {
@@ -233,7 +233,7 @@ export const styleMatchData = {
       label: { color: 0xdddddd }
     },
     'cliff_style': {
-      sidedMarker: { image: 'cliff', color: 0x888888 }
+      stroke: { sidedMarker: { image: 'cliff', color: 0x888888 } }
     },
     'invalid_pattern': {
       fill: { color: 0xff0000, pattern: 'nonexistent_pattern_xyz' }

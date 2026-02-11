@@ -1,6 +1,6 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
 import type { GeoJSON } from '../data/GeoJSON.ts';
 import type { Marker } from '../data/Marker.ts';
@@ -17,12 +17,9 @@ const LINESTYLE = {
   stroke: { opacity: 0.7, width: 4, color: KARTAVIEW_BLUE }
 } as Partial<MatchedStyle>;
 
-const MARKERSTYLE: Partial<PointStyle> = {
+const MARKERSTYLE: Partial<MatchedStyle> = {
   marker: { color: KARTAVIEW_BLUE, opacity: 0.8, image: 'mediumCircle' },
-  viewfield: { color: KARTAVIEW_BLUE, opacity: 0.7, image: 'viewfield', angles: [] },
-  scale: 1.0,
-  fovWidth: 1,
-  fovLength: 1
+  viewfield: { color: KARTAVIEW_BLUE, opacity: 0.7, image: 'viewfield', angles: [], scale: 1.0 }
 };
 
 
@@ -237,7 +234,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style: Partial<PointStyle> = Object.assign({}, MARKERSTYLE);
+        const style: Partial<MatchedStyle> = Object.assign({}, MARKERSTYLE);
 
 // todo handle pano
         if (feature.hasClass('selectphoto')) {  // selected photo style
@@ -247,9 +244,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
           style.viewfield!.opacity = 1;
           style.viewfield!.color = SELECTED;
           style.marker = Object.assign({}, style.marker, { color: SELECTED });
-          style.scale = 2.0;
-          //style.fovWidth = fovWidthInterp(this._viewerZoom);
-          //style.fovLength = fovLengthInterp(this._viewerZoom);
+          style.viewfield!.scale = 2.0;
 
         } else {
           style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle

@@ -10,26 +10,6 @@ import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 
 /**
- * PointStyle extends MatchedStyle with point-specific rendering properties.
- * The MatchedStyle contains everything needed to render any feature type.
- * Point rendering code uses marker, icon, and the viewfield properties defined here.
- * Line-specific properties like lineMarker, sidedMarker are ignored.
- */
-export interface PointStyle extends MatchedStyle {
-  /** Anchor position for icon { x, y } (0.5,0.5 = centered) */
-  anchor?: { x: number; y: number };
-  /** Scale multiplier */
-  scale?: number;
-
-  // Viewfield properties (specific to point features)
-  /** Field of view length multiplier */
-  fovLength?: number;
-  /** Field of view width multiplier */
-  fovWidth?: number;
-}
-
-
-/**
  * PixiFeaturePoint
  *
  * Properties you can access:
@@ -166,7 +146,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const map = context.systems.map!;
     const wireframeMode = map?.wireframeMode;
     const textureManager = this.gfx.textureManager!;
-    const style = this._style as PointStyle;
+    const style = this._style as MatchedStyle;
     const isPin = ['pin', 'boldPin', 'osmose'].includes(style.marker.image ?? '');
 
     const marker = this.marker!;
@@ -191,7 +171,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     // Show icon, if any..
     if (style.icon.image) {
       icon.texture = textureManager.getTexture('symbol', style.icon.image) || PIXI.Texture.EMPTY;
-      icon.anchor.set(style.anchor?.x || 0.5, style.anchor?.y || 0.5);   // middle, middle by default, can be overridden in layer code
+      icon.anchor.set(style.icon.anchor?.x ?? 0.5, style.icon.anchor?.y ?? 0.5);   // middle, middle by default, can be overridden in style
       const iconSize = style.icon.size || 11;
       icon.width = iconSize;
       icon.height = iconSize;
@@ -223,7 +203,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
 
       // # of viewfields has changed, or if the texture name has changed, recreate them
-      if (this._viewfieldCount !== vfAngles.length || this._viewfieldName !== style.viewfieldName) {
+      const vfImage = style.viewfield.image;
+      if (this._viewfieldCount !== vfAngles.length || this._viewfieldName !== vfImage) {
         this.viewfields.removeChildren();
         for (const _a of vfAngles) {
           const vfSprite = new PIXI.Sprite(vfTexture);
@@ -238,15 +219,23 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
           this.viewfields.addChild(vfSprite);
         }
         this._viewfieldCount = vfAngles.length;
+        this._viewfieldName = vfImage ?? null;
       }
 
       // Apply bearing correction to the viewfield container
       this.viewfields.rotation = bearing;
 
       // Update viewfield angles and style
-      const scale = style.scale || 1;
-      const xScale = scale * (style.fovWidth || 1);
-      const yScale = scale * (style.fovLength || 1);
+      const vfScale = style.viewfield.scale;
+      let xScale: number, yScale: number;
+      if (typeof vfScale === 'object' && vfScale !== null) {
+        xScale = vfScale.x;
+        yScale = vfScale.y;
+      } else {
+        const s = (typeof vfScale === 'number') ? vfScale : 1;
+        xScale = s;
+        yScale = s;
+      }
       for (let i = 0; i < vfAngles.length; i++) {
         const vfSprite = this.viewfields.getChildAt(i);
         vfSprite.alpha = style.viewfield.opacity ?? 1;
@@ -428,10 +417,10 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * 'point' - @see `PixiFeaturePoint.ts`
    * 'line'/'polygon' - @see `StyleSystem.ts`
    */
-  get style(): PointStyle {
-    return this._style as PointStyle;
+  get style(): MatchedStyle {
+    return this._style as MatchedStyle;
   }
-  set style(obj: Partial<PointStyle>) {
+  set style(obj: Partial<MatchedStyle>) {
     this._style = Object.assign({}, STYLE_DEFAULTS, obj);
     this._styleDirty = true;
   }
@@ -439,14 +428,12 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 }
 
 
-const STYLE_DEFAULTS: PointStyle = {
+const STYLE_DEFAULTS: MatchedStyle = {
   fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3, pattern: undefined },
   casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
   stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
   marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
   icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
   viewfield: { angles: [], color: 0xffffff, opacity: 1, image: 'viewfield' },
-  lineMarker: { image: undefined, color: 0x000000 },
-  sidedMarker: { image: undefined, color: 0xffffff },
   label: { color: 0xeeeeee }
 };

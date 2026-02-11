@@ -749,22 +749,22 @@ describe('StyleSystem', () => {
     describe('lineMarker and sidedMarker resolution', () => {
       it('returns default lineMarker', () => {
         const result = _styles.styleMatch({ highway: 'motorway' });
-        assert.isObject(result.lineMarker);
-        assert.strictEqual(result.lineMarker.image, 'oneway');
-        assert.strictEqual(result.lineMarker.color, 0xffffff);
+        assert.isObject(result.stroke.lineMarker);
+        assert.strictEqual(result.stroke.lineMarker.image, 'oneway');
+        assert.strictEqual(result.stroke.lineMarker.color, 0xffffff);
       });
 
       it('returns default sidedMarker when no style-specific sidedMarker', () => {
         const result = _styles.styleMatch({ highway: 'motorway' });
-        assert.isObject(result.sidedMarker);
-        assert.isUndefined(result.sidedMarker.image);
-        assert.strictEqual(result.sidedMarker.color, 0xffffff);
+        assert.isObject(result.stroke.sidedMarker);
+        assert.isUndefined(result.stroke.sidedMarker.image);
+        assert.strictEqual(result.stroke.sidedMarker.color, 0xffffff);
       });
 
       it('returns style-specific sidedMarker when defined', () => {
         const result = _styles.styleMatch({ natural: 'cliff' });
-        assert.strictEqual(result.sidedMarker.image, 'cliff');
-        assert.strictEqual(result.sidedMarker.color, 0x888888);
+        assert.strictEqual(result.stroke.sidedMarker.image, 'cliff');
+        assert.strictEqual(result.stroke.sidedMarker.color, 0x888888);
       });
     });
 

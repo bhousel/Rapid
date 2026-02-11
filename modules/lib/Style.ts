@@ -1,3 +1,5 @@
+import { merge as deepMerge } from 'lodash-es';
+
 import type { Context } from '../Context.ts';
 
 /**
@@ -70,11 +72,6 @@ export interface StyleProps {
   viewfield?: ViewfieldStyleProps;
   /** Properties for styling the label */
   label?: LabelStyleProps;
-
-  /** Line marker styling (repeating markers along lines, e.g. 'oneway') */
-  lineMarker?: PointStyleProps;
-  /** Sided marker styling (one-sided markers, e.g. for coastlines, retaining walls) */
-  sidedMarker?: PointStyleProps;
 }
 
 /** Line cap style */
@@ -121,10 +118,14 @@ export interface LineStyleProps {
   join?: LineJoin;
   /** Dash pattern as array of pixels on/off, e.g. [10, 5] */
   dash?: number[];
+  /** Repeating markers along the line (e.g. oneway arrows) */
+  lineMarker?: PointStyleProps;
+  /** One-sided markers (e.g. cliffs, retaining walls) */
+  sidedMarker?: PointStyleProps;
 }
 
 /**
- * Style properties for point-like graphics (markers, icons, line markers, sided markers).
+ * Properties for point styling (markers, icons, line markers, sided markers).
  * Used for:
  * - `marker`: Background shape behind an icon
  * - `icon`: Symbol rendered inside a marker
@@ -143,30 +144,19 @@ export interface PointStyleProps {
   image?: string;
   /** Size in pixels (defaults vary by usage, typically 11 for icons) */
   size?: number;
+  /** Anchor position { x, y } where 0.5, 0.5 = centered (default varies by marker type) */
+  anchor?: { x: number; y: number };
+  /** Scale multiplier: uniform number or per-axis { x, y } */
+  scale?: number | { x: number; y: number };
 }
 
 /**
- * Style properties for point-like graphics (markers, icons, line markers, sided markers).
- * Used for:
- * - `marker`: Background shape behind an icon
- * - `icon`: Symbol rendered inside a marker
- * - `lineMarker`: Repeating markers along lines (e.g. oneway arrows)
- * - `sidedMarker`: One-sided markers (e.g. cliffs, retaining walls)
+ * Viewfields accept all the style properties that can be applied to a point,
+ * with the addition of an `angles` array, to indicate the directions that the viewfields point.
  */
-export interface ViewfieldStyleProps {
+export interface ViewfieldStyleProps extends PointStyleProps {
   /** Angles (in degrees) that the viewfields should extend out from the point */
   angles?: number[];
-  /** Display color applied to the graphic */
-  color?: number;
-  /** Opacity: 0 = transparent, 1 = opaque */
-  opacity?: number;
-  /**
-   * Image identifier - should be a symbol name from the spritesheet.
-   * TODO: Support url(path/to/image.svg) syntax for external images.
-   */
-  image?: string;
-  /** Size in pixels (defaults vary by usage, typically 11 for icons) */
-  size?: number;
 }
 
 /**
@@ -189,15 +179,6 @@ const DEFAULT_FILL: FillStyleProps = {
   width: 2
 };
 
-/** Default line style values. */
-const DEFAULT_LINE: LineStyleProps = {
-  color: 0xcccccc,
-  opacity: 1,
-  width: 3,
-  cap: 'round',
-  join: 'round'
-};
-
 /** Default marker style values. */
 const DEFAULT_MARKER: PointStyleProps = {
   color: 0xffffff,
@@ -210,6 +191,23 @@ const DEFAULT_ICON: PointStyleProps = {
   color: 0x111111,
   opacity: 1,
   size: 11
+};
+
+/** Default viewfield style values. */
+const DEFAULT_VIEWFIELD: ViewfieldStyleProps = {
+  angles: [],
+  color: 0xffffff,
+  opacity: 0.7,
+  image: 'viewfield'
+};
+
+/** Default line style values. */
+const DEFAULT_LINE: LineStyleProps = {
+  color: 0xcccccc,
+  opacity: 1,
+  width: 3,
+  cap: 'round',
+  join: 'round'
 };
 
 /** Default label style values. */
@@ -231,8 +229,6 @@ const DEFAULT_LABEL: LabelStyleProps = {
  *   `stroke`      Stroke style properties (line)
  *   `marker`      Marker style properties (point background)
  *   `icon`        Icon style properties (rendered in marker)
- *   `lineMarker`  Line marker style (oneway arrows, etc.)
- *   `sidedMarker` Sided marker style (coastlines, retaining walls)
  */
 export class Style {
   context: Context;
@@ -260,72 +256,36 @@ export class Style {
   }
 
 
-  /**
-   * Fill style properties.
-   */
-  get fill(): FillStyleProps | undefined {
-    return this.props.fill;
-  }
-
-  /**
-   * Casing style properties.
-   */
-  get casing(): LineStyleProps | undefined {
-    return this.props.casing;
-  }
-
-  /**
-   * Stroke style properties.
-   */
-  get stroke(): LineStyleProps | undefined {
-    return this.props.stroke;
-  }
-
-  /**
-   * The asset ID this style came from.
-   */
+  /** The asset ID this Style came from. */
   get assetID(): AssetID | undefined {
     return this.props.assetID;
   }
 
-  /**
-   * Marker style properties (point background shape).
-   */
+  /** Fill style properties. */
+  get fill(): FillStyleProps | undefined {
+    return this.props.fill;
+  }
+  /** Casing style properties. */
+  get casing(): LineStyleProps | undefined {
+    return this.props.casing;
+  }
+  /** Stroke style properties. */
+  get stroke(): LineStyleProps | undefined {
+    return this.props.stroke;
+  }
+  /** Marker style properties (point background shape). */
   get marker(): PointStyleProps | undefined {
     return this.props.marker;
   }
-
-  /**
-   * Icon style properties (rendered inside marker).
-   */
+  /** Icon style properties (rendered inside marker). */
   get icon(): PointStyleProps | undefined {
     return this.props.icon;
   }
-
-  /**
-   * Viewfield style properties
-   */
+  /** Viewfield style properties */
   get viewfield(): ViewfieldStyleProps | undefined {
     return this.props.viewfield;
   }
-
-  /**
-   * Line marker style properties (repeating markers along lines).
-   */
-  get lineMarker(): PointStyleProps | undefined {
-    return this.props.lineMarker;
-  }
-
-  /**
-   * Sided marker style properties (one-sided markers).
-   */
-  get sidedMarker(): PointStyleProps | undefined {
-    return this.props.sidedMarker;
-  }
-
-  /**
-   * Label styling properties.
-   */
+  /** Label styling properties. */
   get label(): LabelStyleProps | undefined {
     return this.props.label;
   }
@@ -342,7 +302,7 @@ export class Style {
       color: fill.color ?? DEFAULT_FILL.color,
       opacity: fill.opacity ?? DEFAULT_FILL.opacity,
       width: fill.width ?? DEFAULT_FILL.width,
-      pattern: fill.pattern
+      pattern: fill.pattern ?? DEFAULT_FILL.pattern
     };
   }
 
@@ -359,7 +319,9 @@ export class Style {
       width: casing.width ?? 5,  // Casing typically wider
       cap: casing.cap ?? DEFAULT_LINE.cap,
       join: casing.join ?? DEFAULT_LINE.join,
-      dash: casing.dash
+      dash: casing.dash ?? DEFAULT_LINE.dash,
+      lineMarker: casing.lineMarker ?? DEFAULT_LINE.lineMarker,
+      sidedMarker: casing.sidedMarker ?? DEFAULT_LINE.sidedMarker
     };
   }
 
@@ -376,7 +338,9 @@ export class Style {
       width: stroke.width ?? DEFAULT_LINE.width,
       cap: stroke.cap ?? DEFAULT_LINE.cap,
       join: stroke.join ?? DEFAULT_LINE.join,
-      dash: stroke.dash
+      dash: stroke.dash ?? DEFAULT_LINE.dash,
+      lineMarker: stroke.lineMarker ?? DEFAULT_LINE.lineMarker,
+      sidedMarker: stroke.sidedMarker ?? DEFAULT_LINE.sidedMarker
     };
   }
 
@@ -390,7 +354,9 @@ export class Style {
     return {
       color: marker.color ?? DEFAULT_MARKER.color,
       opacity: marker.opacity ?? DEFAULT_MARKER.opacity,
-      image: marker.image ?? DEFAULT_MARKER.image
+      image: marker.image ?? DEFAULT_MARKER.image,
+      anchor: marker.anchor,
+      scale: marker.scale
     };
   }
 
@@ -405,10 +371,30 @@ export class Style {
       color: icon.color ?? DEFAULT_ICON.color,
       opacity: icon.opacity ?? DEFAULT_ICON.opacity,
       image: icon.image,  // undefined if not set (usually comes from preset)
-      size: icon.size ?? DEFAULT_ICON.size
+      size: icon.size ?? DEFAULT_ICON.size,
+      anchor: icon.anchor,
+      scale: icon.scale
     };
   }
 
+
+  /**
+   * Get resolved viewfield properties with defaults applied.
+   * Returns an object with all required viewfield properties.
+   * @return Resolved viewfield properties
+   */
+  resolvedViewfield(): ViewfieldStyleProps {
+    const viewfield = this.props.viewfield ?? {};
+    return {
+      angles: viewfield.angles ?? DEFAULT_VIEWFIELD.angles,
+      color: viewfield.color ?? DEFAULT_VIEWFIELD.color,
+      opacity: viewfield.opacity ?? DEFAULT_VIEWFIELD.opacity,
+      image: viewfield.image ?? DEFAULT_VIEWFIELD.image,
+      size: viewfield.size,
+      anchor: viewfield.anchor,
+      scale: viewfield.scale
+    };
+  }
 
   /**
    * Get resolved label properties with defaults applied.
@@ -447,22 +433,8 @@ export class Style {
    * @return A new Style with merged properties
    */
   merge(other: Style): Style {
-    const nestedKeys = [
-      'base', 'fill', 'casing', 'stroke', 'marker', 'icon',
-      'viewfield', 'label', 'lineMarker', 'sidedMarker'
-    ] as const;
-
-    const merged: StyleProps = {
-      id: this.id  // Keep original ID
-    };
-
-    for (const key of nestedKeys) {
-      const m = { ...this.props[key], ...other.props[key] };
-      if (Object.keys(m).length > 0) {
-        (merged as any)[key] = m;
-      }
-    }
-
+    const merged = deepMerge({}, this.props, other.props) as StyleProps;
+    merged.id = this.id;  // Keep original ID
     return new Style(this.context, merged);
   }
 

@@ -50,8 +50,6 @@ export interface MatchedStyle {
   marker: PointStyleProps;
   icon: PointStyleProps;
   viewfield: ViewfieldStyleProps;
-  lineMarker: PointStyleProps;
-  sidedMarker: PointStyleProps;
   label: LabelStyleProps;
   /** Extra properties are allowed for backward compatibility with PixiFeature styles */
   [key: string]: unknown;
@@ -446,21 +444,21 @@ export class StyleSystem extends AbstractSystem {
    * @return Styling info for the given tags
    */
   styleMatch(tags: Tags, geometry?: GeometryType): MatchedStyle {
-    const defaults = this.styles.get('DEFAULTS');
+    let defaults = this.styles.get('DEFAULTS');
 
-    // If DEFAULTS hasn't been loaded yet, return a minimal style
+    // If DEFAULTS doesn't exist, construct a minimal default style.
     if (!defaults) {
-      return {
+      const defaultProps = {
+        id: 'DEFAULTS',
         fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
         casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
         stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
         marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
         icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
         viewfield: { angles: [], color: 0xffffff, opacity: 0.7, image: 'viewfield' },
-        lineMarker: { image: undefined, color: 0xffffff },
-        sidedMarker: { image: undefined, color: 0xffffff },
         label: { color: 0xeeeeee }
-      };
+      } as Partial<StyleProps>;
+      defaults = new Style(this.context, defaultProps);
     }
 
     // Find all matching selectors, sorted by specificity (highest first)
@@ -493,32 +491,33 @@ export class StyleSystem extends AbstractSystem {
       }
     }
 
-    // Check for lifecycle tags
-    const hasLifecycleTag = this._hasLifecycleTag(tags, styleKey);
-
-    // Build result object
+    // Build result from resolved style properties
     const result: MatchedStyle = {
-      fill: {} as FillStyleProps,
-      casing: {} as LineStyleProps,
-      stroke: {} as LineStyleProps,
-      marker: {} as PointStyleProps,
-      icon: {} as PointStyleProps,
-      viewfield: {} as ViewfieldStyleProps,
-      lineMarker: {} as PointStyleProps,
-      sidedMarker: {} as PointStyleProps,
-      label: {} as LabelStyleProps
+      fill:      matched.resolvedFill(),
+      casing:    matched.resolvedCasing(),
+      stroke:    matched.resolvedStroke(),
+      marker:    matched.resolvedMarker(),
+      icon:      matched.resolvedIcon(),
+      viewfield: matched.resolvedViewfield(),
+      label:     matched.resolvedLabel()
     };
 
-    // Resolve base style properties (fill, casing, stroke)
-    this._resolveBaseStyle(result, matched, defaults);
-
-    // Resolve marker, icon, and related properties
-    this._resolveMarkerAndIcon(result, matched, defaults, tags, geometry);
+    // If icon.image is not set by the style, try to get it from the preset
+    if (!result.icon.image && geometry) {
+      const schema = this.context.systems.schema;
+      if (schema) {
+        const preset = schema.matchTags(tags, geometry);
+        if (preset?.props.icon) {
+          result.icon.image = preset.props.icon;
+        }
+      }
+    }
 
     // Apply structure overrides (bridge, tunnel, embankment, surface)
     this._applyStructureOverrides(result, tags);
 
     // Apply lifecycle overrides if applicable
+    const hasLifecycleTag = this._hasLifecycleTag(tags, styleKey);
     if (hasLifecycleTag) {
       this._applyLifecycleOverrides(result);
     }
@@ -557,82 +556,6 @@ export class StyleSystem extends AbstractSystem {
       }
     }
     return false;
-  }
-
-
-  /**
-   * _resolveBaseStyle
-   * Copy fill/casing/stroke properties from matched style, with fallback to defaults.
-   * @param result - The result object to populate
-   * @param matched - The matched Style
-   * @param defaults - The default Style
-   */
-  private _resolveBaseStyle(result: MatchedStyle, matched: Style, defaults: Style): void {
-    for (const group of ['fill', 'casing', 'stroke'] as const) {
-      const styleGroup = result[group] as unknown as Record<string, unknown>;
-      const matchedGroup = matched[group] as Record<string, unknown> | undefined;
-      const defaultGroup = defaults[group] as Record<string, unknown> | undefined;
-
-      for (const prop of ['width', 'color', 'opacity', 'cap', 'join', 'dash', 'pattern']) {
-        const value = matchedGroup?.[prop];
-        if (value !== undefined) {
-          styleGroup[prop] = value;
-        } else {
-          const fallback = defaultGroup?.[prop];
-          if (fallback !== undefined) {
-            styleGroup[prop] = fallback;
-          }
-        }
-      }
-    }
-  }
-
-
-  /**
-   * _resolveMarkerAndIcon
-   * Resolve marker, icon, lineMarker, sidedMarker, label.
-   * @param result - The result object to populate
-   * @param matched - The matched Style
-   * @param defaults - The default Style
-   * @param tags - OSM tags (for preset lookup)
-   * @param geometry - Optional geometry type for preset icon lookup
-   */
-  private _resolveMarkerAndIcon(
-    result: MatchedStyle,
-    matched: Style,
-    defaults: Style,
-    tags: Tags,
-    geometry: GeometryType | undefined
-  ): void {
-    const schema = this.context.systems.schema;
-
-    // Resolve marker properties
-    result.marker = matched.resolvedMarker();
-
-    // Resolve icon properties
-    result.icon = matched.resolvedIcon();
-
-    // If icon.image is not set by the style, try to get it from the preset
-    if (!result.icon.image && geometry && schema) {
-      const preset = schema.matchTags(tags, geometry);
-      if (preset?.props.icon) {
-        result.icon.image = preset.props.icon;
-      }
-    }
-
-    // Resolve label
-    result.label = matched.resolvedLabel();
-
-    // Resolve line marker and sided marker
-    result.lineMarker = {
-      image: matched.lineMarker?.image ?? defaults.lineMarker?.image,
-      color: matched.lineMarker?.color ?? defaults.lineMarker?.color ?? 0xffffff
-    };
-    result.sidedMarker = {
-      image: matched.sidedMarker?.image ?? defaults.sidedMarker?.image,
-      color: matched.sidedMarker?.color ?? defaults.sidedMarker?.color ?? 0xffffff
-    };
-
   }
 
 

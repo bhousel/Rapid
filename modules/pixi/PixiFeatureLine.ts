@@ -148,7 +148,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       //
       let lineMarkers = container.getChildByLabel('lineMarkers');
 
-      if (showMarkers && (style.lineMarker?.image || style.sidedMarker?.image)) {
+      if (showMarkers && (style.stroke?.lineMarker?.image || style.stroke?.sidedMarker?.image)) {
         // Create line marker container, if necessary
         if (!lineMarkers) {
           lineMarkers = new PIXI.Container();
@@ -159,8 +159,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
           container.addChild(lineMarkers);
         }
 
-        const lineMarkerName = style.lineMarker?.image;
-        const sidedMarkerName = style.sidedMarker?.image;
+        const lineMarkerName = style.stroke?.lineMarker?.image;
+        const sidedMarkerName = style.stroke?.sidedMarker?.image;
         const lineMarkerTexture = (lineMarkerName && textureManager.getTexture('symbol', lineMarkerName)) || PIXI.Texture.WHITE;
         const sidedMarkerTexture = (sidedMarkerName && textureManager.getTexture('symbol', sidedMarkerName)) || PIXI.Texture.WHITE;
         const sided = sidedMarkerName === 'sided';
@@ -178,7 +178,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
               arrow.anchor.set(0.5, 0.5); // middle, middle
               arrow.position.set(x, y);
               arrow.rotation = segment.angle;
-              arrow.tint = style.lineMarker?.color ?? 0x000000;
+              arrow.tint = style.stroke?.lineMarker?.color ?? 0x000000;
               lineMarkers!.addChild(arrow);
             });
           });
@@ -396,12 +396,12 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
 const STYLE_DEFAULTS: Partial<MatchedStyle> = {
-  lineMarker: { image: '', color: 0x000000 },
-  sidedMarker: { color: 0x000000 },
-  label: { color: 0xeeeeee },
-
   fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
   casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-  stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' }
+  stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round',
+    lineMarker: { image: '', color: 0x000000 },
+    sidedMarker: { color: 0x000000 }
+  },
+  label: { color: 0xeeeeee }
 };
 

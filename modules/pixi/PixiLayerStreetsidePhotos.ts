@@ -2,7 +2,7 @@ import { scaleLinear, type ScaleLinear } from 'd3-scale';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
 import type { GeoJSON } from '../data/GeoJSON.ts';
 import type { Marker } from '../data/Marker.ts';
@@ -19,12 +19,9 @@ const LINESTYLE = {
   stroke: { opacity: 0.7, width: 4, color: STREETSIDE_TEAL }
 } as Partial<MatchedStyle>;
 
-const MARKERSTYLE: Partial<PointStyle> = {
+const MARKERSTYLE: Partial<MatchedStyle> = {
   marker: { color: STREETSIDE_TEAL, opacity: 0.8, image: 'mediumCircle' },
-  viewfield: { color: STREETSIDE_TEAL, opacity: 0.7, image: 'viewfield', angles: [] },
-  scale: 1.0,
-  fovWidth: 1,
-  fovLength: 1
+  viewfield: { color: STREETSIDE_TEAL, opacity: 0.7, image: 'viewfield', angles: [], scale: 1.0 }
 };
 
 const fovWidthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [1.3, 0.7]);
@@ -270,7 +267,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style: Partial<PointStyle> = Object.assign({}, MARKERSTYLE);
+        const style: Partial<MatchedStyle> = Object.assign({}, MARKERSTYLE);
 
         if (feature.hasClass('selectphoto')) {  // selected photo style
           const viewer = streetside._viewer;
@@ -282,9 +279,10 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
           style.viewfield!.opacity = 1;
           style.viewfield!.color = SELECTED;
           style.marker = Object.assign({}, style.marker, { color: SELECTED });
-          style.scale = 2.0;
-          style.fovWidth = fovWidthInterp(fov);
-          style.fovLength = fovLengthInterp(fov);
+          const s = 2.0;
+          const fw = fovWidthInterp(fov);
+          const fl = fovLengthInterp(fov);
+          style.viewfield!.scale = { x: s * fw, y: s * fl };
 
         } else {
           style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle

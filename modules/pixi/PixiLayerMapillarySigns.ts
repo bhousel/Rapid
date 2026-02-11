@@ -1,8 +1,9 @@
 import type { Viewport } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { Marker } from '../data/Marker.ts';
 import type { PixiScene } from './PixiScene.ts';
 
@@ -125,7 +126,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
         // Some values we don't have icons for, check first - Rapid#1518
         const hasIcon = container.selectAll(`#rapid-defs #${d.props.value}`).size();
 
-        let style: Partial<PointStyle>;
+        let style: Partial<MatchedStyle>;
         if (hasIcon) {
           style = {
             marker: { image: d.props.value, color: 0xffffff, opacity: 1 }

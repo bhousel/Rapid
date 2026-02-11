@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { Viewport } from '@rapid-sdk/math';
@@ -414,10 +414,27 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (feature.dirty) {
           const colorNum = color.toNumber();
           const style: Partial<MatchedStyle> = {
-            label: { color: colorNum },
-            casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-            stroke: { width: 3, color: colorNum, opacity: 1, cap: 'round', join: 'round' },
-            lineMarker: { image: entity.isOneWay() ? 'oneway' : undefined, color: 0x000000 }
+            label: {
+              color: colorNum
+            },
+            casing: {
+              width: 5,
+              color: 0x444444,
+              opacity: 1,
+              cap: 'round',
+              join: 'round'
+            },
+            stroke: {
+              width: 3,
+              color: colorNum,
+              opacity: 1,
+              cap: 'round',
+              join: 'round',
+              lineMarker: {
+                image: entity.isOneWay() ? 'oneway' : undefined,
+                color: 0x000000
+              }
+            }
           };
           feature.style = style;
           feature.label = l10n.displayName(entity.tags);
@@ -433,17 +450,25 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * renderPoints
    */
-  renderPoints(parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, zoom: number, data: RapidData): void {
+  renderPoints(
+    parentContainer: PIXI.Container,
+    dataset: any,
+    graph: any,
+    frame: number,
+    viewport: Viewport,
+    zoom: number,
+    data: RapidData): void
+  {
     const color = new PIXI.Color(dataset.color);
     const l10n = this.context.systems.l10n!;
 
     const colorNum = color.toNumber();
-    const pointStyle: Partial<PointStyle> = {
+    const pointStyle: Partial<MatchedStyle> = {
       marker: { image: 'largeCircle', color: colorNum, opacity: 1 },
       icon: { image: 'maki-circle-stroked', color: colorNum, opacity: 1, size: 11 },
       label: { color: colorNum }
     };
-    const vertexStyle: Partial<PointStyle> = {
+    const vertexStyle: Partial<MatchedStyle> = {
       marker: { image: 'smallCircle', color: colorNum, opacity: 1 },
       label: { color: colorNum }
     };

@@ -1,8 +1,9 @@
 import type { Viewport } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { Marker } from '../data/Marker.ts';
 import type { PixiScene } from './PixiScene.ts';
 
@@ -138,7 +139,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
         const presetID = mapillary.getDetectionPresetID(d.props.value);
         const preset = presetID && schema.item(presetID);
 
-        const style: Partial<PointStyle> = {
+        const style: Partial<MatchedStyle> = {
           marker: { image: 'xlargeCircle', color: 0x000000, opacity: 1 },
           icon: { image: preset?.icon || 'fas-question', color: isSelected ? SELECTED : MAPILLARY_GREEN, opacity: 1, size: 16 }
         };

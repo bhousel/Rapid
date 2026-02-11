@@ -7,12 +7,11 @@ import { geojsonFeatures } from '../util/util.ts';
 import { GeoJSON } from '../data/GeoJSON.ts';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { MatchedStyle } from '../core/StyleSystem.ts';
-
 import type { PixiScene } from './PixiScene.ts';
 
 const CUSTOM_COLOR = 0x00ffff;
@@ -371,7 +370,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('points')!;
 
-    const pointStyle: Partial<PointStyle> = {
+    const pointStyle: Partial<MatchedStyle> = {
       marker: { image: 'largeCircle', color: CUSTOM_COLOR, opacity: 1 },
       icon: { image: 'maki-circle-stroked', color: CUSTOM_COLOR, opacity: 1, size: 11 },
       label: { color: CUSTOM_COLOR }

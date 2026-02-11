@@ -3,7 +3,7 @@ import { vecAngle, vecLength, vecInterp } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { Vec2, Viewport } from '@rapid-sdk/math';
@@ -410,7 +410,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           this.syncFeatureClasses(poiFeature);
 
           if (poiFeature.dirty) {
-            const markerStyle: Partial<PointStyle> = {
+            const markerStyle: Partial<MatchedStyle> = {
               icon: { image: (feature as any).poiPreset?.props?.icon, color: 0x111111, opacity: 1, size: 11 },
               marker: { image: 'pin', color: 0xffffff, opacity: 1 }
             };
@@ -517,7 +517,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
             // a line no tags - try to style match the tags of its parent relation
             if (!entity.hasInterestingTags()) {
-              const parent = graph.parentRelations(entity).find((relation: OsmRelation) => relation.isMultipolygon());
+              const parent = graph.parentRelations(entity).find(relation => relation.isMultipolygon());
               if (parent) {
                 tags = parent.tags;
                 geom = 'area';
@@ -527,13 +527,16 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             const style = styles.styleMatch(tags) as MatchedStyle;
             // Todo: handle alternating/two-way case too
             if (geom === 'line') {
-              style.lineMarker.image = entity.isOneWay() ? 'oneway' : undefined;
-              style.sidedMarker.image = entity.isSided() ? 'sided' : undefined;
+              style.stroke.lineMarker!.image = entity.isOneWay() ? 'oneway' : undefined;
+              style.stroke.sidedMarker!.image = entity.isSided() ? 'sided' : undefined;
+
             } else {  // an area
               style.casing.width = 0;
               style.stroke.color = style.fill.color;
               style.stroke.width = 2;
               style.stroke.opacity = 1;
+              delete style.stroke.lineMarker;
+              delete style.stroke.sidedMarker;
             }
             feature.style = style;
 
@@ -621,7 +624,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const directions = node.directions(graph, context.viewport);
 
         // set marker style
-        const markerStyle: Partial<PointStyle> = {
+        const markerStyle: Partial<MatchedStyle> = {
           icon: { image: iconName, color: 0x111111, opacity: 1, size: 11 },
           label: { color: 0xeeeeee },
           marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
@@ -710,7 +713,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const directions = node.directions(graph, context.viewport);
 
         // set marker style
-        const markerStyle: Partial<PointStyle> = {
+        const markerStyle: Partial<MatchedStyle> = {
           icon: { image: iconName, color: 0x111111, opacity: 1, size: 11 },
           marker: { image: 'pin', color: 0xffffff, opacity: 1 },
           viewfield: { angles: directions, color: 0xffffff, opacity: 0.8, image: 'viewfieldDark' }

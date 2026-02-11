@@ -1,8 +1,9 @@
 import type { Viewport } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 
 const MINZOOM = 12;
@@ -94,7 +95,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
-        const style: Partial<PointStyle> = {
+        const style: Partial<MatchedStyle> = {
           marker: { image: 'osmose', color: osmose.getColor(d.props.item), opacity: 1 },
           icon: { image: d.props.iconID, color: 0x000000, opacity: 1, size: 11 }
         };

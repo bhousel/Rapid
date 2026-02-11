@@ -603,7 +603,5 @@ const STYLE_DEFAULTS: Partial<MatchedStyle> = {
   stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
   marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
   icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
-  lineMarker: { image: undefined, color: 0x000000 },
-  sidedMarker: { image: undefined, color: 0xffffff },
   label: { color: 0xeeeeee }
 };

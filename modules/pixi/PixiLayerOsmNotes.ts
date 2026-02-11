@@ -1,8 +1,9 @@
 import type { Viewport } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 
 const MINZOOM = 12;
@@ -117,11 +118,10 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
           iconName = 'rapid-icon-plus';
         }
 
-        const style: Partial<PointStyle> = {
-          marker: { image: 'osmnote', color: color, opacity: 1 },
-          icon: { image: iconName, color: 0x000000, opacity: 1, size: 11 },
-          // override 'y' for better centering within the note balloon
-          anchor: { x: 0.5, y: 0.65 }
+        // override 'y' anchor for better centering within the note balloon
+        const style: Partial<MatchedStyle> = {
+          marker: { image: 'osmnote', color: color, opacity: 1, anchor: { x: 0.5, y: 0.65 } },
+          icon: { image: iconName, color: 0x000000, opacity: 1, size: 11, anchor: { x: 0.5, y: 0.65 } },
         };
 
         feature.style = style;

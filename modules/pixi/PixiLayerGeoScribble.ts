@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
 import type { GeoJSON } from '../data/GeoJSON.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
@@ -215,7 +215,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   renderPoints(frame: number, viewport: Viewport, zoom: number, points: GeoJSON[]): void {
     const parentContainer = this.scribblesContainer;
 
-    const pointStyle: Partial<PointStyle> = {
+    const pointStyle: Partial<MatchedStyle> = {
       marker: { image: 'largeCircle', color: CUSTOM_COLOR, opacity: 1 },
       icon: { image: 'maki-circle-stroked', color: CUSTOM_COLOR, opacity: 1, size: 11 },
       label: { color: CUSTOM_COLOR }
