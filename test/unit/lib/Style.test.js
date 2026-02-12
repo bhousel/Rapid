@@ -126,63 +126,72 @@ describe('Style', () => {
       assert.strictEqual(d.icon.size, 15);
     });
 
-    it('stroke.lineMarker returns line marker properties', () => {
+    it('lineMarker returns line marker properties', () => {
       const d = new Rapid.Style(context, {
         id: 'test',
-        stroke: { lineMarker: { image: 'oneway', color: 0x000000 } }
+        lineMarker: { image: 'oneway', color: 0x000000 }
       });
-      assert.strictEqual(d.stroke.lineMarker.image, 'oneway');
-      assert.strictEqual(d.stroke.lineMarker.color, 0x000000);
+      assert.strictEqual(d.lineMarker.image, 'oneway');
+      assert.strictEqual(d.lineMarker.color, 0x000000);
     });
 
-    it('stroke.sidedMarker returns sided marker properties', () => {
+    it('sidedMarker returns sided marker properties', () => {
       const d = new Rapid.Style(context, {
         id: 'test',
-        stroke: { sidedMarker: { image: 'sided', color: 0xcccccc } }
+        sidedMarker: { image: 'sided', color: 0xcccccc }
       });
-      assert.strictEqual(d.stroke.sidedMarker.image, 'sided');
-      assert.strictEqual(d.stroke.sidedMarker.color, 0xcccccc);
+      assert.strictEqual(d.sidedMarker.image, 'sided');
+      assert.strictEqual(d.sidedMarker.color, 0xcccccc);
     });
   });
 
 
-  describe('resolved methods', () => {
+  describe('resolvedStyle', () => {
 
-    describe('resolvedFill', () => {
-      it('resolvedFill returns defaults when no fill specified', () => {
+    describe('fill', () => {
+      it('returns defaults when no fill specified', () => {
         const d = new Rapid.Style(context, { id: 'test' });
-        const resolved = d.resolvedFill();
+        const resolved = d.resolvedStyle().fill;
         assert.strictEqual(resolved.width, 2);
         assert.strictEqual(resolved.color, 0xaaaaaa);
         assert.strictEqual(resolved.opacity, 0.3);
         assert.isUndefined(resolved.pattern);
       });
 
-      it('resolvedFill merges with defaults', () => {
+      it('merges with defaults', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           fill: { color: 0xff0000 }  // only specify color
         });
-        const resolved = d.resolvedFill();
+        const resolved = d.resolvedStyle().fill;
         assert.strictEqual(resolved.color, 0xff0000);  // specified
         assert.strictEqual(resolved.width, 2);  // default
         assert.strictEqual(resolved.opacity, 0.3);  // default
       });
 
-      it('resolvedFill includes pattern', () => {
+      it('includes pattern', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           fill: { pattern: 'grass' }
         });
-        const resolved = d.resolvedFill();
+        const resolved = d.resolvedStyle().fill;
         assert.strictEqual(resolved.pattern, 'grass');
+      });
+
+      it('cascades base.color into fill.color', () => {
+        const d = new Rapid.Style(context, {
+          id: 'test',
+          base: { color: 0x00ff00 }
+        });
+        const resolved = d.resolvedStyle().fill;
+        assert.strictEqual(resolved.color, 0x00ff00);
       });
     });
 
-    describe('resolvedCasing', () => {
-      it('resolvedCasing returns defaults when no casing specified', () => {
+    describe('casing', () => {
+      it('returns defaults when no casing specified', () => {
         const d = new Rapid.Style(context, { id: 'test' });
-        const resolved = d.resolvedCasing();
+        const resolved = d.resolvedStyle().casing;
         assert.strictEqual(resolved.width, 5);  // casing default
         assert.strictEqual(resolved.color, 0x444444);  // casing default
         assert.strictEqual(resolved.cap, 'round');
@@ -190,87 +199,131 @@ describe('Style', () => {
       });
     });
 
-    describe('resolvedStroke', () => {
-      it('resolvedStroke returns defaults when no stroke specified', () => {
+    describe('stroke', () => {
+      it('returns defaults when no stroke specified', () => {
         const d = new Rapid.Style(context, { id: 'test' });
-        const resolved = d.resolvedStroke();
+        const resolved = d.resolvedStyle().stroke;
         assert.strictEqual(resolved.width, 3);
         assert.strictEqual(resolved.color, 0xcccccc);
         assert.strictEqual(resolved.cap, 'round');
         assert.strictEqual(resolved.join, 'round');
       });
 
-      it('resolvedStroke includes dash pattern', () => {
+      it('includes dash pattern', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           stroke: { dash: [6, 6], cap: 'butt' }
         });
-        const resolved = d.resolvedStroke();
+        const resolved = d.resolvedStyle().stroke;
         assert.deepEqual(resolved.dash, [6, 6]);
         assert.strictEqual(resolved.cap, 'butt');
       });
+
+      it('cascades base.color into stroke.color', () => {
+        const d = new Rapid.Style(context, {
+          id: 'test',
+          base: { color: 0x00ff00 }
+        });
+        const resolved = d.resolvedStyle().stroke;
+        assert.strictEqual(resolved.color, 0x00ff00);
+      });
+
+      it('cascades base.opacity into stroke.opacity', () => {
+        const d = new Rapid.Style(context, {
+          id: 'test',
+          base: { opacity: 0.5 }
+        });
+        const resolved = d.resolvedStyle().stroke;
+        assert.strictEqual(resolved.opacity, 0.5);
+      });
     });
 
-    describe('resolvedMarker', () => {
-      it('resolvedMarker returns defaults when no marker specified', () => {
+    describe('marker', () => {
+      it('returns defaults when no marker specified', () => {
         const d = new Rapid.Style(context, { id: 'test' });
-        const resolved = d.resolvedMarker();
+        const resolved = d.resolvedStyle().marker;
         assert.strictEqual(resolved.image, 'smallCircle');
         assert.strictEqual(resolved.color, 0xffffff);
         assert.strictEqual(resolved.opacity, 1);
       });
 
-      it('resolvedMarker merges with defaults', () => {
+      it('merges with defaults', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           marker: { image: 'pin' }  // only specify name
         });
-        const resolved = d.resolvedMarker();
+        const resolved = d.resolvedStyle().marker;
         assert.strictEqual(resolved.image, 'pin');  // specified
         assert.strictEqual(resolved.color, 0xffffff);  // default
         assert.strictEqual(resolved.opacity, 1);  // default
       });
     });
 
-    describe('resolvedIcon', () => {
-      it('resolvedIcon returns defaults when no icon specified', () => {
+    describe('icon', () => {
+      it('returns defaults when no icon specified', () => {
         const d = new Rapid.Style(context, { id: 'test' });
-        const resolved = d.resolvedIcon();
+        const resolved = d.resolvedStyle().icon;
         assert.isUndefined(resolved.image);  // name is undefined by default
         assert.strictEqual(resolved.color, 0x111111);
         assert.strictEqual(resolved.opacity, 1);
         assert.strictEqual(resolved.size, 11);
       });
 
-      it('resolvedIcon includes image when specified', () => {
+      it('includes image when specified', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           icon: { image: 'maki-restaurant', size: 15 }
         });
-        const resolved = d.resolvedIcon();
+        const resolved = d.resolvedStyle().icon;
         assert.strictEqual(resolved.image, 'maki-restaurant');
         assert.strictEqual(resolved.size, 15);
         assert.strictEqual(resolved.color, 0x111111);  // default
       });
     });
 
-    describe('resolvedLabel', () => {
-
-      it('resolvedLabel returns defaults when no label specified', () => {
+    describe('label', () => {
+      it('returns defaults when no label specified', () => {
         const d = new Rapid.Style(context, { id: 'test' });
-        const resolved = d.resolvedLabel();
+        const resolved = d.resolvedStyle().label;
         assert.strictEqual(resolved.color, 0xeeeeee);
         assert.strictEqual(resolved.opacity, 1);
-        assert.strictEqual(resolved.size, 11);
       });
 
-      it('resolvedLabel returns explicit value', () => {
+      it('returns explicit value', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           label: { color: 0xdddddd }
         });
-        const resolved = d.resolvedLabel();
+        const resolved = d.resolvedStyle().label;
         assert.strictEqual(resolved.color, 0xdddddd);
+      });
+
+      it('cascades fill.color into label.color', () => {
+        const d = new Rapid.Style(context, {
+          id: 'test',
+          fill: { color: 0xff0000 }
+        });
+        const resolved = d.resolvedStyle().label;
+        assert.strictEqual(resolved.color, 0xff0000);
+      });
+
+      it('cascades stroke.color into label.color when no fill', () => {
+        const d = new Rapid.Style(context, {
+          id: 'test',
+          stroke: { color: 0x00ff00 }
+        });
+        const resolved = d.resolvedStyle().label;
+        assert.strictEqual(resolved.color, 0x00ff00);
+      });
+
+      it('prefers fill.color over stroke.color for label cascade', () => {
+        const d = new Rapid.Style(context, {
+          id: 'test',
+          fill: { color: 0xff0000 },
+          stroke: { color: 0x00ff00 }
+        });
+        const resolved = d.resolvedStyle().label;
+        assert.strictEqual(resolved.color, 0xff0000);
       });
     });
   });

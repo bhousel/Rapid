@@ -147,8 +147,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       // Todo: left/right markers (like for coastlines, retaining walls, etc)
       //
       let lineMarkers = container.getChildByLabel('lineMarkers');
-      const lineMarkerTextureID = style.stroke?.lineMarker?.image;
-      const sideMarkerTextureID = style.stroke?.sidedMarker?.image;
+      const lineMarkerTextureID = style.lineMarker?.image;
+      const sideMarkerTextureID = style.sidedMarker?.image;
 
       if (showMarkers && (lineMarkerTextureID || sideMarkerTextureID)) {
         // Create line marker container, if necessary
@@ -175,7 +175,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
               sprite.anchor.set(0.5, 0.5); // middle, middle
               sprite.position.set(x, y);
               sprite.rotation = segment.angle;
-              sprite.tint = style.stroke?.lineMarker?.color ?? 0x000000;
+              sprite.tint = style.lineMarker?.color ?? 0x000000;
               lineMarkers!.addChild(sprite);
             });
           });
@@ -395,12 +395,11 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
 const STYLE_DEFAULTS: Partial<MatchedStyle> = {
-  fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
-  casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-  stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round',
-    lineMarker: { image: '', color: 0x000000 },
-    sidedMarker: { color: 0x000000 }
-  },
-  label: { color: 0xeeeeee }
+  fill:        { width: 2, color: 0xaaaaaa, opacity: 0.3 },
+  casing:      { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+  stroke:      { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
+  lineMarker:  { image: '', color: 0x000000 },
+  sidedMarker: { color: 0x000000 },
+  label:       { color: 0xeeeeee }
 };
 

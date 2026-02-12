@@ -186,10 +186,9 @@ export const styleMatchData = {
     'DEFAULTS': {
       fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
       casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-      stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round',
-        lineMarker: { image: 'oneway', color: 0xffffff },
-        sidedMarker: { color: 0xffffff }
-      },
+      stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
+      lineMarker: { image: 'oneway', color: 0xffffff },
+      sidedMarker: { color: 0xffffff },
       marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
       label: { color: 0xeeeeee }
     },
@@ -233,7 +232,7 @@ export const styleMatchData = {
       label: { color: 0xdddddd }
     },
     'cliff_style': {
-      stroke: { sidedMarker: { image: 'cliff', color: 0x888888 } }
+      sidedMarker: { image: 'cliff', color: 0x888888 }
     },
     'invalid_pattern': {
       fill: { color: 0xff0000, pattern: 'nonexistent_pattern_xyz' }

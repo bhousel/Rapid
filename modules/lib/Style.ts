@@ -71,6 +71,10 @@ export interface StyleProps {
   icon?: PointStyleProps;
   /** Properties for styling Viewfields */
   viewfield?: ViewfieldStyleProps;
+  /** Properties for repeating markers along lines (e.g. oneway arrows) */
+  lineMarker?: PointStyleProps;
+  /** Properties for one-sided markers (e.g. cliffs, retaining walls) */
+  sidedMarker?: PointStyleProps;
   /** Properties for styling the label */
   label?: LabelStyleProps;
 }
@@ -81,7 +85,6 @@ export type LineCap = 'butt' | 'round' | 'square';
 export type LineJoin = 'bevel' | 'miter' | 'round';
 /** Fill style */
 export type FillType = 'full' | 'partial';
-
 
 /** Properties for base styling */
 export interface BaseStyleProps {
@@ -119,10 +122,6 @@ export interface LineStyleProps {
   join?: LineJoin;
   /** Dash pattern as array of pixels on/off, e.g. [10, 5] */
   dash?: number[];
-  /** Repeating markers along the line (e.g. oneway arrows) */
-  lineMarker?: PointStyleProps;
-  /** One-sided markers (e.g. cliffs, retaining walls) */
-  sidedMarker?: PointStyleProps;
 }
 
 /**
@@ -168,55 +167,26 @@ export interface LabelStyleProps {
   color?: number;
   /** Opacity: 0 = transparent, 1 = opaque */
   opacity?: number;
-  /** Size in pixels (defaults vary by usage, typically 11 for icons) */
+  /** Size in pixels (defaults vary by usage) */
   size?: number;
 }
 
+/** Just the props needed to make a bare-bones style */
+export type MinimalStyleProps = Required<Omit<StyleProps, 'id' | 'assetID' | 'assetVersion' | 'base'>>;
 
-/** Default fill style values. */
-const DEFAULT_FILL: FillStyleProps = {
-  color: 0xaaaaaa,
-  opacity: 0.3,
-  width: 2
+/** Some reasonable style default values */
+const DEFAULT_STYLE: MinimalStyleProps = {
+  fill:        { color: 0xaaaaaa, opacity: 0.3, width: 2 },
+  casing:      { color: 0x444444, opacity: 1, width: 5, cap: 'round', join: 'round' },
+  stroke:      { color: 0xcccccc, opacity: 1, width: 3, cap: 'round', join: 'round' },
+  marker:      { color: 0xffffff, opacity: 1, image: 'smallCircle' },
+  icon:        { color: 0x111111, opacity: 1, size: 11 },
+  viewfield:   { color: 0xffffff, opacity: 0.7, image: 'viewfield', angles: [] },
+  lineMarker:  {},
+  sidedMarker: {},
+  label:       { color: 0xeeeeee, opacity: 1 }
 };
 
-/** Default marker style values. */
-const DEFAULT_MARKER: PointStyleProps = {
-  color: 0xffffff,
-  opacity: 1,
-  image: 'smallCircle'
-};
-
-/** Default icon style values. */
-const DEFAULT_ICON: PointStyleProps = {
-  color: 0x111111,
-  opacity: 1,
-  size: 11
-};
-
-/** Default viewfield style values. */
-const DEFAULT_VIEWFIELD: ViewfieldStyleProps = {
-  angles: [],
-  color: 0xffffff,
-  opacity: 0.7,
-  image: 'viewfield'
-};
-
-/** Default line style values. */
-const DEFAULT_LINE: LineStyleProps = {
-  color: 0xcccccc,
-  opacity: 1,
-  width: 3,
-  cap: 'round',
-  join: 'round'
-};
-
-/** Default label style values. */
-const DEFAULT_LABEL: LabelStyleProps = {
-  color: 0xeeeeee,
-  opacity: 1,
-  size: 11
-};
 
 
 /**
@@ -286,6 +256,14 @@ export class Style {
   get viewfield(): ViewfieldStyleProps | undefined {
     return this.props.viewfield;
   }
+  /** Line marker style properties (e.g. oneway arrows). */
+  get lineMarker(): PointStyleProps | undefined {
+    return this.props.lineMarker;
+  }
+  /** Sided marker style properties (e.g. cliffs, retaining walls). */
+  get sidedMarker(): PointStyleProps | undefined {
+    return this.props.sidedMarker;
+  }
   /** Label styling properties. */
   get label(): LabelStyleProps | undefined {
     return this.props.label;
@@ -293,135 +271,40 @@ export class Style {
 
 
   /**
-   * Get resolved fill properties with defaults applied.
-   * Returns an object with all required fill properties.
-   * @return Resolved fill properties
+   * Get resolved style properties with defaults applied for all groups.
+   * Layers: DEFAULT_STYLE ← base cascade ← props (later values win).
+   *
+   * Special behaviors:
+   *  - `base.color` cascades into `fill.color` and `stroke.color`
+   *  - `base.opacity` cascades into `stroke.opacity`
+   *  - `label.color` cascades: label → fill → stroke → default
+   *  - `icon.image` is intentionally absent from defaults (usually comes from preset)
+   *
+   * @return Resolved style properties
    */
-  resolvedFill(): FillStyleProps {
-    const fill = this.props.fill ?? {};
-    return {
-      color: fill.color ?? DEFAULT_FILL.color,
-      opacity: fill.opacity ?? DEFAULT_FILL.opacity,
-      width: fill.width ?? DEFAULT_FILL.width,
-      pattern: fill.pattern ?? DEFAULT_FILL.pattern
-    };
-  }
+  resolvedStyle(): MinimalStyleProps {
+    // Build the base cascade layer — base.color/opacity flow into fill and stroke
+    const baseCascade: Partial<StyleProps> = {};
 
-  /**
-   * Get resolved casing properties with defaults applied.
-   * Returns an object with all required line properties.
-   * @return Resolved casing properties
-   */
-  resolvedCasing(): LineStyleProps {
-    const casing = this.props.casing ?? {};
-    return {
-      color: casing.color ?? 0x444444,
-      opacity: casing.opacity ?? 1,
-      width: casing.width ?? 5,  // Casing typically wider
-      cap: casing.cap ?? DEFAULT_LINE.cap,
-      join: casing.join ?? DEFAULT_LINE.join,
-      dash: casing.dash ?? DEFAULT_LINE.dash,
-      lineMarker: casing.lineMarker ?? DEFAULT_LINE.lineMarker,
-      sidedMarker: casing.sidedMarker ?? DEFAULT_LINE.sidedMarker
-    };
-  }
-
-  /**
-   * Get resolved stroke properties with defaults applied.
-   * Returns an object with all required line properties.
-   * @return Resolved stroke properties
-   */
-  resolvedStroke(): LineStyleProps {
-    const stroke = this.props.stroke ?? {};
-    return {
-      color: stroke.color ?? DEFAULT_LINE.color,
-      opacity: stroke.opacity ?? DEFAULT_LINE.opacity,
-      width: stroke.width ?? DEFAULT_LINE.width,
-      cap: stroke.cap ?? DEFAULT_LINE.cap,
-      join: stroke.join ?? DEFAULT_LINE.join,
-      dash: stroke.dash ?? DEFAULT_LINE.dash,
-      lineMarker: stroke.lineMarker ?? DEFAULT_LINE.lineMarker,
-      sidedMarker: stroke.sidedMarker ?? DEFAULT_LINE.sidedMarker
-    };
-  }
-
-  /**
-   * Get resolved marker properties with defaults applied.
-   * Returns an object with all required marker properties.
-   * @return Resolved marker properties
-   */
-  resolvedMarker(): PointStyleProps {
-    const marker = this.props.marker ?? {};
-    return {
-      color: marker.color ?? DEFAULT_MARKER.color,
-      opacity: marker.opacity ?? DEFAULT_MARKER.opacity,
-      image: marker.image ?? DEFAULT_MARKER.image,
-      anchor: marker.anchor,
-      scale: marker.scale
-    };
-  }
-
-  /**
-   * Get resolved icon properties with defaults applied.
-   * Returns an object with all required icon properties (except image, which is optional).
-   * @return Resolved icon properties
-   */
-  resolvedIcon(): PointStyleProps {
-    const icon = this.props.icon ?? {};
-    return {
-      color: icon.color ?? DEFAULT_ICON.color,
-      opacity: icon.opacity ?? DEFAULT_ICON.opacity,
-      image: icon.image,  // undefined if not set (usually comes from preset)
-      size: icon.size ?? DEFAULT_ICON.size,
-      anchor: icon.anchor,
-      scale: icon.scale
-    };
-  }
-
-
-  /**
-   * Get resolved viewfield properties with defaults applied.
-   * Returns an object with all required viewfield properties.
-   * @return Resolved viewfield properties
-   */
-  resolvedViewfield(): ViewfieldStyleProps {
-    const viewfield = this.props.viewfield ?? {};
-    return {
-      angles: viewfield.angles ?? DEFAULT_VIEWFIELD.angles,
-      color: viewfield.color ?? DEFAULT_VIEWFIELD.color,
-      opacity: viewfield.opacity ?? DEFAULT_VIEWFIELD.opacity,
-      image: viewfield.image ?? DEFAULT_VIEWFIELD.image,
-      size: viewfield.size,
-      anchor: viewfield.anchor,
-      scale: viewfield.scale
-    };
-  }
-
-  /**
-   * Get resolved label properties with defaults applied.
-   * Color has a smart default that falls back to fill.color, then stroke.color, then gray.
-   * @return Resolved label properties
-   */
-  resolvedLabel(): LabelStyleProps {
-    const label = this.props.label ?? {};
-
-    // Smart default for color: follow the dominant color
-    let color = label.color;
-    if (color === undefined) {
-      if (this.props.fill?.color !== undefined) {
-        color = this.props.fill.color;
-      } else if (this.props.stroke?.color !== undefined) {
-        color = this.props.stroke.color;
-      } else {
-        color = DEFAULT_LABEL.color;
-      }
+    const base = this.props.base;
+    if (base?.color !== undefined) {
+      baseCascade.fill = { color: base.color };
+      baseCascade.stroke = { color: base.color };
+    }
+    if (base?.opacity !== undefined) {
+      baseCascade.stroke = { ...baseCascade.stroke, opacity: base.opacity };
     }
 
-    return {
-      color: color,
-      opacity: label.opacity ?? DEFAULT_LABEL.opacity,
-      size: label.size ?? DEFAULT_LABEL.size
-    };
+    // Layer: defaults ← base cascade ← props
+    const result = deepMerge({}, DEFAULT_STYLE, baseCascade, this.props) as MinimalStyleProps;
+
+    // Label color cascade: if not explicitly set, follow the dominant feature color
+    if (this.props.label?.color === undefined) {
+      result.label.color = this.props.fill?.color ?? this.props.stroke?.color
+          ?? DEFAULT_STYLE.label.color;
+    }
+
+    return result;
   }
 
 

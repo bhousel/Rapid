@@ -50,6 +50,8 @@ export interface MatchedStyle {
   marker: PointStyleProps;
   icon: PointStyleProps;
   viewfield: ViewfieldStyleProps;
+  lineMarker?: PointStyleProps;
+  sidedMarker?: PointStyleProps;
   label: LabelStyleProps;
   /** Extra properties are allowed for backward compatibility with PixiFeature styles */
   [key: string]: unknown;
@@ -492,15 +494,7 @@ export class StyleSystem extends AbstractSystem {
     }
 
     // Build result from resolved style properties
-    const result: MatchedStyle = {
-      fill:      matched.resolvedFill(),
-      casing:    matched.resolvedCasing(),
-      stroke:    matched.resolvedStroke(),
-      marker:    matched.resolvedMarker(),
-      icon:      matched.resolvedIcon(),
-      viewfield: matched.resolvedViewfield(),
-      label:     matched.resolvedLabel()
-    };
+    const result: MatchedStyle = matched.resolvedStyle();
 
     // If icon.image is not set by the style, try to get it from the preset
     if (!result.icon.image && geometry) {

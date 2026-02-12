@@ -470,11 +470,13 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
 const STYLE_DEFAULTS: MatchedStyle = {
-  fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3, pattern: undefined },
-  casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-  stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
-  marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
-  icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
-  viewfield: { angles: [], color: 0xffffff, opacity: 1, image: 'viewfield' },
-  label: { color: 0xeeeeee }
+  fill:        { width: 2, color: 0xaaaaaa, opacity: 0.3, pattern: undefined },
+  casing:      { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+  stroke:      { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
+  marker:      { image: 'smallCircle', color: 0xffffff, opacity: 1 },
+  icon:        { image: undefined, color: 0x111111, opacity: 1, size: 11 },
+  viewfield:   { angles: [], color: 0xffffff, opacity: 1, image: 'viewfield' },
+  lineMarker:  {},
+  sidedMarker: {},
+  label:       { color: 0xeeeeee }
 };
