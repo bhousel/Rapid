@@ -426,7 +426,10 @@ describe('StyleSystem', () => {
         const prom = _styles.loadStyleAssetsAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(() => assert.isTrue(true))
+          .then(() => {
+            assert.isTrue(_styles.loadedAssetIDs.has('custom_style'));
+            assert.isFalse(_styles.loadedAssetIDs.has('rapid_style'));
+          })
           .finally(() => _styles.requestedAssetIDs = null);  // restore
       });
 
@@ -435,7 +438,10 @@ describe('StyleSystem', () => {
         const prom = _styles.loadStyleAssetsAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(() => assert.isTrue(true));
+          .then(() => {
+            // Default assetIDs includes 'rapid_style'
+            assert.isTrue(_styles.loadedAssetIDs.has('rapid_style'));
+          });
       });
 
       it('handles rejected asset loading gracefully', () => {

@@ -934,7 +934,11 @@ describe('SchemaSystem', () => {
         const prom = _schema.loadSchemaAssetsAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(() => assert.isTrue(true))
+          .then(() => {
+            assert.isTrue(_schema.loadedAssetIDs.has('custom_schema'));
+            assert.isFalse(_schema.loadedAssetIDs.has('id_tagging_schema'));
+            assert.isFalse(_schema.loadedAssetIDs.has('rapid_schema'));
+          })
           .finally(() => _schema.requestedAssetIDs = null);  // restore
       });
 
@@ -943,7 +947,11 @@ describe('SchemaSystem', () => {
         const prom = _schema.loadSchemaAssetsAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(() => assert.isTrue(true));
+          .then(() => {
+            // Default assetIDs includes 'id_tagging_schema' and 'rapid_schema'
+            assert.isTrue(_schema.loadedAssetIDs.has('id_tagging_schema'));
+            assert.isTrue(_schema.loadedAssetIDs.has('rapid_schema'));
+          });
       });
 
       it('handles rejected asset loading gracefully', () => {

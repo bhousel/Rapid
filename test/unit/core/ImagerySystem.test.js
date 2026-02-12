@@ -1072,7 +1072,11 @@ describe('ImagerySystem', () => {
         const prom = _imagery.loadImageryAssetsAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(() => assert.isTrue(true))
+          .then(() => {
+            assert.isTrue(_imagery.loadedAssetIDs.has('custom_imagery'));
+            assert.isFalse(_imagery.loadedAssetIDs.has('editor_layer_index'));
+            assert.isFalse(_imagery.loadedAssetIDs.has('rapid_imagery'));
+          })
           .finally(() => _imagery.requestedAssetIDs = null);  // restore
       });
 
@@ -1081,7 +1085,11 @@ describe('ImagerySystem', () => {
         const prom = _imagery.loadImageryAssetsAsync();
         assert.instanceOf(prom, Promise);
         return prom
-          .then(() => assert.isTrue(true));
+          .then(() => {
+            // Default assetIDs includes 'editor_layer_index' and 'rapid_imagery'
+            assert.isTrue(_imagery.loadedAssetIDs.has('editor_layer_index'));
+            assert.isTrue(_imagery.loadedAssetIDs.has('rapid_imagery'));
+          });
       });
 
       it('handles rejected asset loading gracefully', () => {
