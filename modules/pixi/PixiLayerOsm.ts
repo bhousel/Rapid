@@ -528,16 +528,17 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             // Todo: handle alternating/two-way case too
             if (geom === 'line') {
               if (entity.isOneWay()) {
-                style.stroke.lineMarker ??= {};
-                style.stroke.lineMarker.image = 'oneway';
+                style.lineMarker ??= {};
+                const isAlternating = (entity.tags.oneway === 'alternating' || entity.tags.oneway === 'reversible');
+                style.lineMarker.image = isAlternating ? 'twoway' : 'oneway';
               } else {
-                delete style.stroke.lineMarker;
+                delete style.lineMarker;
               }
               if (entity.isSided()) {
-                style.stroke.sidedMarker ??= {};
-                style.stroke.sidedMarker.image = 'sided';
+                style.sidedMarker ??= {};
+                style.sidedMarker.image = 'sided';
               } else {
-                delete style.stroke.sidedMarker;
+                delete style.sidedMarker;
               }
 
             } else {  // an area
@@ -545,8 +546,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
               style.stroke.color = style.fill.color;
               style.stroke.width = 2;
               style.stroke.opacity = 1;
-              delete style.stroke.lineMarker;
-              delete style.stroke.sidedMarker;
+              delete style.lineMarker;
+              delete style.sidedMarker;
             }
             feature.style = style;
 

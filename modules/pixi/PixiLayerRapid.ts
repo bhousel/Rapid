@@ -414,28 +414,25 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (feature.dirty) {
           const colorNum = color.toNumber();
           const style: Partial<MatchedStyle> = {
-            label: {
-              color: colorNum
-            },
-            casing: {
-              width: 5,
-              color: 0x444444,
-              opacity: 1,
-              cap: 'round',
-              join: 'round'
-            },
-            stroke: {
-              width: 3,
-              color: colorNum,
-              opacity: 1,
-              cap: 'round',
-              join: 'round',
-              lineMarker: {
-                image: entity.isOneWay() ? 'oneway' : undefined,
-                color: 0x000000
-              }
-            }
+            label: { color: colorNum },
+            casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+            stroke: { width: 3, color: colorNum, opacity: 1, cap: 'round', join: 'round' }
           };
+
+          if (entity.isOneWay()) {
+            style.lineMarker ??= {};
+            const isAlternating = (entity.tags.oneway === 'alternating' || entity.tags.oneway === 'reversible');
+            style.lineMarker.image = isAlternating ? 'twoway' : 'oneway';
+          } else {
+            delete style.lineMarker;
+          }
+          if (entity.isSided()) {
+            style.sidedMarker ??= {};
+            style.sidedMarker.image = 'sided';
+          } else {
+            delete style.sidedMarker;
+          }
+
           feature.style = style;
           feature.label = l10n.displayName(entity.tags);
           feature.update(viewport, zoom);
