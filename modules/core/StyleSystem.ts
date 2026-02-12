@@ -1,6 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { osmPavedTags } from '../lib/tags.ts';
-import { Style } from '../lib/Style.ts';
+import { Style, styleDefaults } from '../lib/Style.ts';
 import { StyleSelector } from '../lib/StyleSelector.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
@@ -450,17 +450,7 @@ export class StyleSystem extends AbstractSystem {
 
     // If DEFAULTS doesn't exist, construct a minimal default style.
     if (!defaults) {
-      const defaultProps = {
-        id: 'DEFAULTS',
-        fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
-        casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-        stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
-        marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
-        icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
-        viewfield: { angles: [], color: 0xffffff, opacity: 0.7, image: 'viewfield' },
-        label: { color: 0xeeeeee }
-      } as Partial<StyleProps>;
-      defaults = new Style(this.context, defaultProps);
+      defaults = new Style(this.context, { id: 'defaults', ...styleDefaults });
     }
 
     // Find all matching selectors, sorted by specificity (highest first)
