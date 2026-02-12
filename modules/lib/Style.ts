@@ -175,7 +175,7 @@ export interface LabelStyleProps {
 export type MinimalStyleProps = Required<Omit<StyleProps, 'id' | 'assetID' | 'assetVersion' | 'base'>>;
 
 /** Some reasonable style default values */
-const DEFAULT_STYLE: MinimalStyleProps = {
+export const styleDefaults: MinimalStyleProps = {
   fill:        { color: 0xaaaaaa, opacity: 0.3, width: 2 },
   casing:      { color: 0x444444, opacity: 1, width: 5, cap: 'round', join: 'round' },
   stroke:      { color: 0xcccccc, opacity: 1, width: 3, cap: 'round', join: 'round' },
@@ -183,10 +183,9 @@ const DEFAULT_STYLE: MinimalStyleProps = {
   icon:        { color: 0x111111, opacity: 1, size: 11 },
   viewfield:   { color: 0xffffff, opacity: 0.7, image: 'viewfield', angles: [] },
   label:       { color: 0xeeeeee, opacity: 1 },
-  lineMarker:  {},
-  sidedMarker: {}
+  lineMarker:  { color: 0x111111, opacity: 1 },
+  sidedMarker: { color: 0xcccccc, opacity: 1 }
 };
-
 
 
 /**
@@ -272,56 +271,40 @@ export class Style {
 
   /**
    * Get resolved style properties with defaults applied for all groups.
-   * Layers: DEFAULT_STYLE ← fallbacks ← props (later values win).
+   * Layers: defaults ← fallbacks ← props (later values win).
    * @return  Resolved style properties
    */
   resolvedStyle(): MinimalStyleProps {
-
-    const fallback: MinimalStyleProps = {
-      fill: {},
-      casing: {},
-      stroke: {},
-      marker: {},
-      icon: {},
-      viewfield: {},
-      label: {},
-      lineMarker: {},
-      sidedMarker: {}
-    };
-
+    // Look in several places for fallback color properties
     const base = this.props.base;
     const stroke = this.props.stroke;
     const fill = this.props.fill;
 
-    fallback.fill.color ??= base?.color;
-    fallback.stroke.color ??= base?.color;
-    fallback.marker.color ??= base?.color;
-    fallback.viewfield.color ??= base?.color;
-    fallback.label.color ??= base?.color ?? stroke?.color ?? fill?.color;
-    fallback.sidedMarker.color ??= base?.color;
+    const color = base?.color ?? stroke?.color ?? fill?.color;
+    const opacity = base?.opacity ?? stroke?.opacity;
 
-    fallback.stroke.opacity = base?.opacity;
-    fallback.casing.opacity = base?.opacity;
-    fallback.marker.opacity = base?.opacity;
-    fallback.icon.opacity = base?.opacity;
-    fallback.viewfield.opacity = base?.opacity;
-    fallback.label.opacity = base?.opacity ?? stroke?.opacity ?? fill?.opacity;
-    fallback.lineMarker.opacity = base?.opacity;
-    fallback.sidedMarker.opacity = base?.opacity;
+    const fallbacks: MinimalStyleProps = {
+      fill: { color },
+      casing: { opacity },
+      stroke: { color, opacity },
+      marker: { color, opacity },
+      icon: { opacity },
+      viewfield: { color, opacity },
+      label: { color, opacity },
+      lineMarker: { opacity },
+      sidedMarker: { color, opacity }
+    };
 
-    // Layer: defaults ← fallbacks ← props
-    const result = deepMerge({}, DEFAULT_STYLE, fallback, this.props) as MinimalStyleProps;
-
-    return result;
+    // result: defaults ← fallbacks ← this.props
+    return deepMerge({}, styleDefaults, fallbacks, this.props) as MinimalStyleProps;
   }
 
 
   /**
-   * Merge another style's properties into this one.
+   * Returns a new Style that is deep property merge of `other` and `this`.
    * Properties from `other` override properties from `this`.
    * Useful for applying modifiers (e.g., lifecycle styles) on top of base styles.
-   *
-   * @param other - Another Style to merge
+   * @param other - Another Style to merge with this one
    * @return A new Style with merged properties
    */
   merge(other: Style): Style {
@@ -333,7 +316,6 @@ export class Style {
 
   /**
    * Create a copy of this style with a different ID.
-   *
    * @param newID - The new ID for the copy
    * @return A new Style with the new ID
    */
