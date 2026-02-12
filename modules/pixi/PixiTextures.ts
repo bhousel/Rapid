@@ -658,12 +658,18 @@ export class PixiTextures {
       .poly([5,3, 0,3, 0,2, 5,2, 5,0, 10,2.5, 5,5])
       .fill({ color: 0xffffff, alpha: 1 });
 
+    const twoway = new PIXI.Graphics()
+      .poly([5,0, 5,2, 10,2, 10,0, 15,2.5,
+             10,5, 10,3, 5,3, 5,5, 0,2.5])
+      .fill({ color: 0xffffff, alpha: 1 });
+
     const sided = new PIXI.Graphics()
       .poly([0,5, 5,0, 0,-5])
       .fill({ color: 0xffffff, alpha: 1 });
 
     this.createTexture('symbol', 'midpoint', midpoint);
     this.createTexture('symbol', 'oneway', oneway);
+    this.createTexture('symbol', 'twoway', twoway);
     this.createTexture('symbol', 'sided', sided);
 
 
