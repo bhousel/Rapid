@@ -182,9 +182,9 @@ const DEFAULT_STYLE: MinimalStyleProps = {
   marker:      { color: 0xffffff, opacity: 1, image: 'smallCircle' },
   icon:        { color: 0x111111, opacity: 1, size: 11 },
   viewfield:   { color: 0xffffff, opacity: 0.7, image: 'viewfield', angles: [] },
+  label:       { color: 0xeeeeee, opacity: 1 },
   lineMarker:  {},
-  sidedMarker: {},
-  label:       { color: 0xeeeeee, opacity: 1 }
+  sidedMarker: {}
 };
 
 
@@ -272,37 +272,45 @@ export class Style {
 
   /**
    * Get resolved style properties with defaults applied for all groups.
-   * Layers: DEFAULT_STYLE ← base cascade ← props (later values win).
-   *
-   * Special behaviors:
-   *  - `base.color` cascades into `fill.color` and `stroke.color`
-   *  - `base.opacity` cascades into `stroke.opacity`
-   *  - `label.color` cascades: label → fill → stroke → default
-   *  - `icon.image` is intentionally absent from defaults (usually comes from preset)
-   *
-   * @return Resolved style properties
+   * Layers: DEFAULT_STYLE ← fallbacks ← props (later values win).
+   * @return  Resolved style properties
    */
   resolvedStyle(): MinimalStyleProps {
-    // Build the base cascade layer — base.color/opacity flow into fill and stroke
-    const baseCascade: Partial<StyleProps> = {};
+
+    const fallback: MinimalStyleProps = {
+      fill: {},
+      casing: {},
+      stroke: {},
+      marker: {},
+      icon: {},
+      viewfield: {},
+      label: {},
+      lineMarker: {},
+      sidedMarker: {}
+    };
 
     const base = this.props.base;
-    if (base?.color !== undefined) {
-      baseCascade.fill = { color: base.color };
-      baseCascade.stroke = { color: base.color };
-    }
-    if (base?.opacity !== undefined) {
-      baseCascade.stroke = { ...baseCascade.stroke, opacity: base.opacity };
-    }
+    const stroke = this.props.stroke;
+    const fill = this.props.fill;
 
-    // Layer: defaults ← base cascade ← props
-    const result = deepMerge({}, DEFAULT_STYLE, baseCascade, this.props) as MinimalStyleProps;
+    fallback.fill.color ??= base?.color;
+    fallback.stroke.color ??= base?.color;
+    fallback.marker.color ??= base?.color;
+    fallback.viewfield.color ??= base?.color;
+    fallback.label.color ??= base?.color ?? stroke?.color ?? fill?.color;
+    fallback.sidedMarker.color ??= base?.color;
 
-    // Label color cascade: if not explicitly set, follow the dominant feature color
-    if (this.props.label?.color === undefined) {
-      result.label.color = this.props.fill?.color ?? this.props.stroke?.color
-          ?? DEFAULT_STYLE.label.color;
-    }
+    fallback.stroke.opacity = base?.opacity;
+    fallback.casing.opacity = base?.opacity;
+    fallback.marker.opacity = base?.opacity;
+    fallback.icon.opacity = base?.opacity;
+    fallback.viewfield.opacity = base?.opacity;
+    fallback.label.opacity = base?.opacity ?? stroke?.opacity ?? fill?.opacity;
+    fallback.lineMarker.opacity = base?.opacity;
+    fallback.sidedMarker.opacity = base?.opacity;
+
+    // Layer: defaults ← fallbacks ← props
+    const result = deepMerge({}, DEFAULT_STYLE, fallback, this.props) as MinimalStyleProps;
 
     return result;
   }

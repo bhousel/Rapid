@@ -178,7 +178,7 @@ describe('Style', () => {
         assert.strictEqual(resolved.pattern, 'grass');
       });
 
-      it('cascades base.color into fill.color', () => {
+      it('fallbacks base.color into fill.color', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           base: { color: 0x00ff00 }
@@ -219,7 +219,7 @@ describe('Style', () => {
         assert.strictEqual(resolved.cap, 'butt');
       });
 
-      it('cascades base.color into stroke.color', () => {
+      it('fallbacks base.color into stroke.color', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           base: { color: 0x00ff00 }
@@ -228,7 +228,7 @@ describe('Style', () => {
         assert.strictEqual(resolved.color, 0x00ff00);
       });
 
-      it('cascades base.opacity into stroke.opacity', () => {
+      it('fallbacks base.opacity into stroke.opacity', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           base: { opacity: 0.5 }
@@ -294,36 +294,36 @@ describe('Style', () => {
           id: 'test',
           label: { color: 0xdddddd }
         });
-        const resolved = d.resolvedStyle().label;
-        assert.strictEqual(resolved.color, 0xdddddd);
+        const resolved = d.resolvedStyle();
+        assert.strictEqual(resolved.label.color, 0xdddddd);
       });
 
-      it('cascades fill.color into label.color', () => {
+      it('fallbacks fill.color into label.color', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           fill: { color: 0xff0000 }
         });
-        const resolved = d.resolvedStyle().label;
-        assert.strictEqual(resolved.color, 0xff0000);
+        const resolved = d.resolvedStyle();
+        assert.strictEqual(resolved.label.color, 0xff0000);
       });
 
-      it('cascades stroke.color into label.color when no fill', () => {
+      it('fallbacks stroke.color into label.color when no fill', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           stroke: { color: 0x00ff00 }
         });
-        const resolved = d.resolvedStyle().label;
-        assert.strictEqual(resolved.color, 0x00ff00);
+        const resolved = d.resolvedStyle();
+        assert.strictEqual(resolved.label.color, 0x00ff00);
       });
 
-      it('prefers fill.color over stroke.color for label cascade', () => {
+      it('prefers stroke.color over fill.color for label fallback', () => {
         const d = new Rapid.Style(context, {
           id: 'test',
           fill: { color: 0xff0000 },
           stroke: { color: 0x00ff00 }
         });
-        const resolved = d.resolvedStyle().label;
-        assert.strictEqual(resolved.color, 0xff0000);
+        const resolved = d.resolvedStyle();
+        assert.strictEqual(resolved.label.color, 0x00ff00);
       });
     });
   });
