@@ -442,3 +442,9 @@ After making changes:
 2. Run `bun run lint` to perform linting
 3. Run `bun run build:js` to verify build
 4. Run `bun test` for full test suite
+
+### Writing Meaningful Assertions
+- **Avoid `assert.isTrue(true)` in feature tests** — If a `.then()` callback only does `assert.isTrue(true)`, ask: "what is this test actually verifying?"
+- This pattern is fine in **lifecycle tests** where you just need to confirm a promise resolved without throwing (e.g. `initAsync`, `resetAsync`)
+- In **feature tests** (e.g. "uses requestedAssetIDs when set"), always assert on the actual outcome — for example, check `loadedAssetIDs` to verify which assets were loaded
+- When adding or reviewing tests, look for assertions that would pass even if the feature were completely broken

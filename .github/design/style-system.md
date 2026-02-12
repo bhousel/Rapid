@@ -18,28 +18,65 @@ The StyleSystem manages how map features are visually rendered. It determines co
 
 A **Style** describes *what something looks like*. It contains visual properties for rendering.
 
+Styles have property groups for each visual element: fill (areas), casing/stroke (lines), marker/icon (points), viewfield (photo directions), lineMarker/sidedMarker (line decorations), and label (text).
+
 ```typescript
 interface StyleProps {
   id: StyleID;
-  fill?: FillStyle;      // Area fill properties
-  casing?: LineStyle;    // Line casing (draws below stroke)
-  stroke?: LineStyle;    // Line stroke (draws above casing)
+  assetID?: AssetID;         // The asset this style came from
+  assetVersion?: string;     // Version of the asset
+
+  base?: BaseStyleProps;     // Base properties (fallback color)
+  fill?: FillStyleProps;     // Area fill properties
+  casing?: LineStyleProps;   // Line casing (draws below stroke)
+  stroke?: LineStyleProps;   // Line stroke (draws above casing)
+  marker?: PointStyleProps;  // Point marker (background shape)
+  icon?: PointStyleProps;    // Icon (rendered inside marker)
+  viewfield?: ViewfieldStyleProps;  // Viewfield (photo directions)
+  lineMarker?: PointStyleProps;     // Repeating line markers (e.g. oneway arrows)
+  sidedMarker?: PointStyleProps;    // One-sided markers (e.g. cliffs)
+  label?: LabelStyleProps;   // Label properties
 }
 
-interface FillStyle {
-  width?: number;        // Outline width in pixels
-  color?: number;        // Hex color, e.g. 0xcf2081
-  opacity?: number;      // Opacity: 0 = transparent, 1 = opaque
-  pattern?: string;      // Fill pattern ID, e.g. 'grass', 'waves'
+interface BaseStyleProps {
+  color?: number;            // Fallback color, used if fill/stroke don't specify one
+  opacity?: number;
 }
 
-interface LineStyle {
-  width?: number;        // Line width in pixels
-  color?: number;        // Hex color
-  opacity?: number;      // Opacity
+interface FillStyleProps {
+  color?: number;            // Hex color, e.g. 0xcf2081
+  opacity?: number;          // Opacity: 0 = transparent, 1 = opaque
+  width?: number;            // Outline width in pixels
+  pattern?: string;          // Fill pattern ID, e.g. 'grass', 'waves'
+  type?: 'full' | 'partial'; // Fill type
+}
+
+interface LineStyleProps {
+  color?: number;            // Hex color
+  opacity?: number;          // Opacity
+  width?: number;            // Line width in pixels
   cap?: 'butt' | 'round' | 'square';
   join?: 'bevel' | 'miter' | 'round';
-  dash?: number[];       // Dash pattern, e.g. [10, 5] for 10px on, 5px off
+  dash?: number[];           // Dash pattern, e.g. [10, 5] for 10px on, 5px off
+}
+
+interface PointStyleProps {
+  color?: number;            // Display color applied to the graphic
+  opacity?: number;          // Opacity
+  image?: string;            // Image identifier (symbol name from spritesheet)
+  size?: number;             // Size in pixels
+  anchor?: Vec2;             // Anchor position [x, y] where [0.5, 0.5] = centered
+  scale?: number | Vec2;     // Scale multiplier: uniform or per-axis [x, y]
+}
+
+interface ViewfieldStyleProps extends PointStyleProps {
+  angles?: number[];         // Angles (degrees) that viewfields extend from the point
+}
+
+interface LabelStyleProps {
+  color?: number;            // Display color
+  opacity?: number;          // Opacity
+  size?: number;             // Size in pixels
 }
 ```
 
@@ -60,6 +97,13 @@ interface LineStyle {
 "footway": {
   "casing": { "width": 5, "color": 0xffffff },
   "stroke": { "width": 3, "color": 0x998888, "dash": [6, 6], "cap": "butt" }
+}
+
+// A point style with marker and icon properties
+"poi_pin": {
+  "marker": { "image": "pin", "color": 0xffffff },
+  "icon": { "color": 0x111111, "size": 11 },
+  "label": { "color": 0xdddddd }
 }
 ```
 
@@ -195,9 +239,43 @@ function styleMatch(tags: Tags): MatchedStyle {
     }
   }
 
-  return matched;
+  return matched.resolvedStyle();  // applies defaults and fallbacks
 }
 ```
+
+### Style Resolution
+
+After matching, `resolvedStyle()` applies defaults using a three-layer deep merge:
+
+```
+result = defaults ← fallbacks ← matched props
+```
+
+- **Defaults** (`styleDefaults`): Reasonable values for every property group
+- **Fallbacks**: Properties that cascade — e.g. `base.color` falls back to `stroke.color` or `fill.color`
+- **Matched props**: The style properties from all matching selectors
+
+This ensures every property group is fully populated in the output.
+
+### MatchedStyle
+
+The resolved style object returned to renderers:
+
+```typescript
+interface MatchedStyle {
+  fill: FillStyleProps;
+  casing: LineStyleProps;
+  stroke: LineStyleProps;
+  marker: PointStyleProps;
+  icon: PointStyleProps;
+  viewfield: ViewfieldStyleProps;
+  lineMarker?: PointStyleProps;   // optional — deleted for area features
+  sidedMarker?: PointStyleProps;  // optional — deleted for area features
+  label: LabelStyleProps;
+}
+```
+
+`lineMarker` and `sidedMarker` are optional because they are removed from area features (areas don't need oneway arrows or cliff markers).
 
 ### Style Composition Example
 
@@ -292,9 +370,9 @@ Style data is stored in JSON5 format for human readability (supports comments, t
 |--------|--------|---------------|
 | ImagerySystem | `ImagerySource` | Class with methods (URL templating, attribution) |
 | SchemaSystem | `Preset`, `Field`, `Category` | Classes with methods (localization, matching) |
-| StyleSystem | `Style`, `StyleSelector` | Props bundles, logic on system |
+| StyleSystem | `Style`, `StyleSelector` | Classes with methods (`resolvedStyle`, `merge`, `clone`) |
 
-Unlike Presets which need localization, styles are purely visual and don't need l10n support. Keeping them lightweight avoids unnecessary dependencies.
+The Style class has `resolvedStyle()` for applying defaults and fallbacks, `merge()` for composing styles, and `clone()` for copying. StyleSelector has `findAll()` for matching.
 
 ## Inspiration
 

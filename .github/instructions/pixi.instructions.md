@@ -30,7 +30,7 @@ All style properties are **optional**. Use type assertions (`as`) when defining 
 
 ```typescript
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
-import { PixiFeaturePoint, type PointStyle } from './PixiFeaturePoint.ts';
+import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 
@@ -39,10 +39,20 @@ const LINESTYLE = {
   stroke: { alpha: 0.7, width: 4, color: 0x0fffc4 }
 } as Partial<MatchedStyle>;
 
-const MARKERSTYLE: Partial<PointStyle> = {
-  marker: { name: 'mediumCircle', tint: 0x0fffc4, alpha: 0.8 }
-};
+const MARKERSTYLE = {
+  marker: { image: 'mediumCircle', color: 0x0fffc4, opacity: 0.8 }
+} as Partial<MatchedStyle>;
 ```
+
+Style type interfaces are defined in `modules/lib/Style.ts`:
+- `StyleProps` — Full style with all property groups
+- `FillStyleProps` — Area fill (color, opacity, width, pattern)
+- `LineStyleProps` — Line casing/stroke (color, opacity, width, cap, join, dash)
+- `PointStyleProps` — Marker, icon, lineMarker, sidedMarker (color, opacity, image, size, anchor, scale)
+- `ViewfieldStyleProps` — Extends PointStyleProps with `angles` array
+- `LabelStyleProps` — Label (color, opacity, size)
+
+The resolved style returned by `StyleSystem.styleMatch()` is a `MatchedStyle` (defined in `modules/core/StyleSystem.ts`).
 
 ## Type-Only Imports
 

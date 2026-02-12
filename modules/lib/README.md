@@ -16,6 +16,14 @@ This module contains a mix of data structures, schema classes, and utility funct
 | `Field.ts` | Form fields for editing entity properties |
 | `Preset.ts` | Feature presets (templates for map features) |
 
+### Styling Classes
+
+| File | Description |
+|------|-------------|
+| `Style.ts` | Visual style properties for map features (fill, stroke, marker, etc.) |
+| `StyleSelector.ts` | Matching rules that determine when styles apply |
+| `PropMatcher.ts` | Declarative tag/property matching conditions |
+
 ### Data Structures
 
 | File | Description |
