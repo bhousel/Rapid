@@ -1,11 +1,13 @@
 import * as PIXI from 'pixi.js';
-
+import { merge as deepMerge } from 'lodash-es';
 import { PixiGeometryPart } from './PixiGeometryPart.ts';
+import { styleDefaults } from '../lib/Style.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Context } from '../Context.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+import type { MinimalStyleProps, StyleProps } from '../lib/Style.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { SingularGeometryType } from '../lib/types.ts';
 import type { Viewport } from '@rapid-sdk/math';
@@ -62,7 +64,7 @@ export class AbstractPixiFeature {
   /** Whether the Feature is allowed to be interactive */
   protected _allowInteraction: boolean;
   /** Style object (contents depends on the Feature type) */
-  protected _style: object | null;
+  protected _style: MinimalStyleProps;
   /** Whether the style needs to be reapplied */
   protected _styleDirty: boolean;
   /** Label string for this feature */
@@ -106,7 +108,7 @@ export class AbstractPixiFeature {
     this.halo = null;
 
     this.geom = new PixiGeometryPart(this.context);
-    this._style = null;
+    this._style = deepMerge({}, styleDefaults);
     this._styleDirty = true;
     this._label = null;
     this._labelDirty = true;
@@ -150,7 +152,7 @@ export class AbstractPixiFeature {
 
     this.geom.destroy();
     this.geom = null!;
-    this._style = null;
+    this._style = null!;
     this._label = null;
 
     this._dataID = null;
@@ -275,16 +277,14 @@ export class AbstractPixiFeature {
 
   /**
    * style
-   * @param obj - Style `Object` (contents depends on the Feature type)
-   *
-   * 'point' - @see PixiFeaturePoint.js
-   * 'line'/'polygon' - @see styles.js
+   * @param props - Style properties object, see `Style.ts`
    */
-  get style(): object | null {
+  get style(): MinimalStyleProps | null {
     return this._style;
   }
-  set style(obj: object | null) {
-    this._style = obj;
+  set style(props: Partial<StyleProps>) {
+    // result: defaults ← props
+    this._style = deepMerge({}, styleDefaults, props) as MinimalStyleProps;
     this._styleDirty = true;
   }
 

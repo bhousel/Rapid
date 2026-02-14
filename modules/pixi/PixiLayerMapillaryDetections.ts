@@ -140,8 +140,15 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
         const preset = presetID && schema.item(presetID);
 
         const style: Partial<MatchedStyle> = {
-          marker: { image: 'xlargeCircle', color: 0x000000, opacity: 1 },
-          icon: { image: preset?.icon || 'fas-question', color: isSelected ? SELECTED : MAPILLARY_GREEN, opacity: 1, size: 16 }
+          marker: {
+            color: 0x000000,
+            image: 'xlargeCircle'
+          },
+          icon: {
+            color: isSelected ? SELECTED : MAPILLARY_GREEN,
+            image: preset?.icon || 'fas-question',
+            size: 16
+          }
         };
 
         feature.style = style;

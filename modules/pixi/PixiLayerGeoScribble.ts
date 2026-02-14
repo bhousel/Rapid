@@ -132,24 +132,21 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @return  A style object that can be given to the pixi renderer
    */
   getLineStyle(props: Record<string, unknown>): Partial<MatchedStyle> {
-    const lineStyle = {
-      stroke: { width: 2, color: CUSTOM_COLOR, opacity: 1, cap: 'round' },
-      label: { color: CUSTOM_COLOR }
-    } as Partial<MatchedStyle>;
-
     const color = props.color ? new PIXI.Color(props.color as string).toNumber() : CUSTOM_COLOR;
-    const thin = props.thin;
-    const dashed = props.dashed;
+    const isThin = props.thin;
+    const isDashed = props.dashed;
 
-    // Modify the opacity down a bit to add to 'scribble' factor.
-    lineStyle.stroke!.opacity = 0.70;
-    lineStyle.stroke!.color = color;
-    lineStyle.stroke!.width = thin ? 4 : 8;
-    if (dashed) {
-      lineStyle.stroke!.dash = thin ? [12, 6] : [24, 12]; // Thinner lines get shorter dashes
-    }
-
-    return lineStyle;
+    return {
+      stroke: {
+        color: color,
+        opacity: 0.7,
+        width: isThin ? 4 : 8,
+        dash: isDashed ? (isThin ? [12, 6] : [24, 12]) : undefined
+      },
+      label: {
+        color: color
+      }
+    } as Partial<MatchedStyle>;
   }
 
 
@@ -216,8 +213,8 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     const parentContainer = this.scribblesContainer;
 
     const pointStyle: Partial<MatchedStyle> = {
-      marker: { image: 'largeCircle', color: CUSTOM_COLOR, opacity: 1 },
-      icon: { image: 'maki-circle-stroked', color: CUSTOM_COLOR, opacity: 1, size: 11 },
+      marker: { color: CUSTOM_COLOR, image: 'largeCircle' },
+      icon: { color: CUSTOM_COLOR, image: 'maki-circle-stroked' },
       label: { color: CUSTOM_COLOR }
     };
 

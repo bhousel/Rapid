@@ -213,8 +213,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const parentContainer = this.scene.groups.get('basemap')!;
 
     const polygonStyle = {
-      fill: { color: CUSTOM_COLOR, opacity: 0.3, },
-      stroke: { width: 2, color: CUSTOM_COLOR, opacity: 1, cap: 'round' },
+      fill: { color: CUSTOM_COLOR },
+      stroke: { color: CUSTOM_COLOR },
       label: { color: CUSTOM_COLOR }
     } as Partial<MatchedStyle>;
 
@@ -272,7 +272,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const parentContainer = this.scene.groups.get('basemap')!;
 
     const lineStyle = styleOverride ?? {
-      stroke: { width: 2, color: CUSTOM_COLOR, opacity: 1, cap: 'round' },
+      stroke: { color: CUSTOM_COLOR },
       label: { color: CUSTOM_COLOR }
     } as Partial<MatchedStyle>;
 
@@ -371,8 +371,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const parentContainer = this.scene.groups.get('points')!;
 
     const pointStyle: Partial<MatchedStyle> = {
-      marker: { image: 'largeCircle', color: CUSTOM_COLOR, opacity: 1 },
-      icon: { image: 'maki-circle-stroked', color: CUSTOM_COLOR, opacity: 1, size: 11 },
+      marker: { color: CUSTOM_COLOR, image: 'largeCircle'  },
+      icon: { color: CUSTOM_COLOR, image: 'maki-circle-stroked' },
       label: { color: CUSTOM_COLOR }
     };
 

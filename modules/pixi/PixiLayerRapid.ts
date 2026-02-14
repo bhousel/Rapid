@@ -373,7 +373,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           const colorNum = color.toNumber();
           const style: Partial<MatchedStyle> = {
             label: { color: colorNum },
-            fill: { width: 2, color: colorNum, opacity: 0.3, pattern: undefined },
+            fill: { color: colorNum },
           };
           feature.style = style;
           feature.label = l10n.displayName(entity.tags);
@@ -414,9 +414,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (feature.dirty) {
           const colorNum = color.toNumber();
           const style: Partial<MatchedStyle> = {
-            label: { color: colorNum },
-            casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-            stroke: { width: 3, color: colorNum, opacity: 1, cap: 'round', join: 'round' }
+            casing: { color: 0x444444, width: 5, cap: 'round', join: 'round' },
+            stroke: { color: colorNum, width: 3, cap: 'round', join: 'round' },
+            label: { color: colorNum }
           };
 
           if (entity.isOneWay()) {
@@ -461,12 +461,12 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
     const colorNum = color.toNumber();
     const pointStyle: Partial<MatchedStyle> = {
-      marker: { image: 'largeCircle', color: colorNum, opacity: 1 },
-      icon: { image: 'maki-circle-stroked', color: colorNum, opacity: 1, size: 11 },
+      marker: { color: colorNum, image: 'largeCircle' },
+      icon: { color: colorNum, image: 'maki-circle-stroked' },
       label: { color: colorNum }
     };
     const vertexStyle: Partial<MatchedStyle> = {
-      marker: { image: 'smallCircle', color: colorNum, opacity: 1 },
+      marker: { color: colorNum, image: 'smallCircle' },
       label: { color: colorNum }
     };
 

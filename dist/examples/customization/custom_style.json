@@ -1,0 +1,52 @@
+{
+  "assetID": "custom_style",
+  "assetVersion": "2026-02-12",
+
+  "styles": {
+    "survey_orange": {
+      "base": { "color": "#FF6600" }
+    },
+    "crossing_green": {
+      "base": { "color": "#00FF00" }
+    }
+  },
+
+  "selectors": {
+    "survey-point": {
+      "styleIDs": ["survey_orange"],
+      "match": { "tags": [{ "key": "survey", "value": "point" }] }
+    },
+    "survey-control_point": {
+      "styleIDs": ["survey_orange"],
+      "match": { "tags": [{ "key": "survey", "value": "control_point" }] }
+    },
+    "survey-boundary_marker": {
+      "styleIDs": ["survey_orange"],
+      "match": { "tags": [{ "key": "survey", "value": "boundary_marker" }] }
+    },
+    "project-feature": {
+      "styleIDs": ["survey_orange"],
+      "match": { "tags": [{ "key": "project_feature", "value": "yes" }] }
+    },
+    "crossing-marked-custom": {
+      "styleIDs": ["crossing_green"],
+      "match": { "tags": [{ "key": "crossing", "value": "marked" }] }
+    },
+    "crossing-traffic_signals-custom": {
+      "styleIDs": ["crossing_green"],
+      "match": { "tags": [{ "key": "crossing", "value": "traffic_signals" }] }
+    },
+    "crossing-uncontrolled-custom": {
+      "styleIDs": ["crossing_green"],
+      "match": { "tags": [{ "key": "crossing", "value": "uncontrolled" }] }
+    },
+    "crossing-zebra-custom": {
+      "styleIDs": ["crossing_green"],
+      "match": { "tags": [{ "key": "crossing", "value": "zebra" }] }
+    },
+    "crossing-any-custom": {
+      "styleIDs": ["crossing_green"],
+      "match": { "tags": [{ "key": "crossing" }] }
+    }
+  }
+}

@@ -7,7 +7,7 @@ import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { Vec2, Viewport } from '@rapid-sdk/math';
-import type { OsmEntity, OsmNode, OsmRelation, OsmRelationMember, Tags } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmRelationMember, Tags } from '../data/types.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
@@ -38,8 +38,8 @@ const HIGHWAYSTACK: Record<string, number> = {
 interface OsmData {
   polygons: Map<EntityID, any>;
   lines: Map<EntityID, any>;
-  points: Map<EntityID, any>;
-  vertices: Map<EntityID, any>;
+  points: Map<EntityID, OsmNode>;
+  vertices: Map<EntityID, OsmNode>;
 }
 
 /** Related entity IDs for selection/hover/drawing */
@@ -213,9 +213,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     for (const entity of entities) {
       const geom = entity.geometry(graph);
       if (geom === 'point') {
-        data.points.set(entity.id, entity);
+        data.points.set(entity.id, entity as OsmNode);
       } else if (geom === 'vertex') {
-        data.vertices.set(entity.id, entity);
+        data.vertices.set(entity.id, entity as OsmNode);
       } else if (geom === 'line') {
         data.lines.set(entity.id, entity);
       } else if (geom === 'area') {
@@ -368,8 +368,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         if (feature.dirty) {
           const preset = schema.match(entity, graph);
 
-          const style = styles.styleMatch(entity.tags) as MatchedStyle;
-          style.label.color = style.fill.color ?? style.stroke.color ?? 0xeeeeee;
+          const geometry = entity.geometry(graph);
+          const style = styles.styleMatch(entity.tags, geometry) as MatchedStyle;
           feature.style = style;
 
           const label = l10n.displayPOIName(entity.tags);
@@ -410,16 +410,20 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           this.syncFeatureClasses(poiFeature);
 
           if (poiFeature.dirty) {
-            const markerStyle: Partial<MatchedStyle> = {
-              icon: { image: (feature as any).poiPreset?.props?.icon, color: 0x111111, opacity: 1, size: 11 },
-              marker: { image: 'pin', color: 0xffffff, opacity: 1 }
-            };
+            // copy the polygon style, then apply customizations
+            const markerStyle = Object.assign({}, feature.style) as MatchedStyle;  // shallow copy
+            markerStyle.marker.image = 'pin';
+
+            const poiIcon = (feature as any).poiPreset?.props?.icon;
+            if (poiIcon) {
+              markerStyle.icon.image = poiIcon;
+            }
 
             if (hasWikidata(entity)) {
-              markerStyle.icon!.color = 0x444444;
-              markerStyle.label = { color: 0xdddddd };
-              markerStyle.marker!.image = 'boldPin';
-              markerStyle.marker!.color = 0xdddddd;
+              markerStyle.icon.color = 0x444444;
+              markerStyle.marker.image = 'boldPin';
+              markerStyle.marker.color = 0xdddddd;
+              markerStyle.label.color = 0xdddddd;
             }
             poiFeature.style = markerStyle;
             poiFeature.label = feature.label;
@@ -513,20 +517,20 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
           if (feature.dirty) {
             let tags = entity.tags;
-            let geom = entity.geometry(graph);
+            let geometry = entity.geometry(graph);
 
             // a line no tags - try to style match the tags of its parent relation
             if (!entity.hasInterestingTags()) {
               const parent = graph.parentRelations(entity).find(relation => relation.isMultipolygon());
               if (parent) {
                 tags = parent.tags;
-                geom = 'area';
+                geometry = 'area';
               }
             }
 
-            const style = styles.styleMatch(tags) as MatchedStyle;
+            const style = styles.styleMatch(tags, geometry) as MatchedStyle;
             // Todo: handle alternating/two-way case too
-            if (geom === 'line') {
+            if (geometry === 'line') {
               if (entity.isOneWay()) {
                 style.lineMarker ??= {};
                 const isAlternating = (entity.tags.oneway === 'alternating' || entity.tags.oneway === 'reversible');
@@ -542,10 +546,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
               }
 
             } else {  // an area
+// todo, consider whether we need these
               style.casing.width = 0;
               style.stroke.color = style.fill.color;
               style.stroke.width = 2;
-              style.stroke.opacity = 1;
               delete style.lineMarker;
               delete style.sidedMarker;
             }
@@ -575,7 +579,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
-    const schema = context.systems.schema!;
+    const styles = context.systems.styles!;
 
     // Vertices related to the selection/hover should be drawn above everything
     const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
@@ -630,33 +634,30 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       feature.parentContainer = parentContainer;   // change layer stacking if necessary
 
       if (feature.dirty) {
-        const preset = schema.match(node, graph);
-        const iconName = preset?.props?.icon;
-        const directions = node.directions(graph, context.viewport);
+        const markerStyle = styles.styleMatch(node.tags, 'vertex') as MatchedStyle;
 
-        // set marker style
-        const markerStyle: Partial<MatchedStyle> = {
-          icon: { image: iconName, color: 0x111111, opacity: 1, size: 11 },
-          label: { color: 0xeeeeee },
-          marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
-          viewfield: { angles: directions, color: 0xffffff, opacity: 0.8, image: 'viewfieldDark' }
-        };
-
-        if (iconName) {
-          markerStyle.marker!.image = 'largeCircle';
+        // If we have an icon, increase the size of the marker..
+        if (markerStyle.icon.image) {
+          markerStyle.marker.image = 'largeCircle';
         } else if (node.hasInterestingTags()) {
-          markerStyle.marker!.image = 'taggedCircle';
+          markerStyle.marker.image = 'taggedCircle';
+        } else {
+          markerStyle.marker.image = 'smallCircle';
         }
+
+        // Show viewfields, if any..
+        markerStyle.viewfield.angles = node.directions(graph);
+        markerStyle.viewfield.image = 'viewfieldDark';
 
         if (hasWikidata(node)) {
-          markerStyle.icon!.color = 0x444444;
-          markerStyle.label!.color = 0xdddddd;
-          markerStyle.marker!.color = 0xdddddd;
+          markerStyle.icon.color = 0x444444;
+          markerStyle.label.color = 0xdddddd;
+          markerStyle.marker.color = 0xdddddd;
         }
         if (node.isShared(graph)) {     // shared nodes / junctions are more grey
-          markerStyle.icon!.color = 0x111111;
-          markerStyle.label!.color = 0xbbbbbb;
-          markerStyle.marker!.color = 0xbbbbbb;
+          markerStyle.icon.color = 0x111111;
+          markerStyle.label.color = 0xbbbbbb;
+          markerStyle.marker.color = 0xbbbbbb;
         }
 
         feature.style = markerStyle;
@@ -681,6 +682,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
+    const styles = context.systems.styles!;
     const pointsContainer = this.scene.groups.get('points')!;
 
     const entities = data.points;
@@ -711,33 +713,25 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this.syncFeatureClasses(feature);
 
       if (feature.dirty) {
-        let preset = schema.match(node, graph);
-        let iconName = preset?.props?.icon;
+        const markerStyle = styles.styleMatch(node.tags, 'point') as MatchedStyle;
+        markerStyle.marker.image = 'pin';
 
-        // If we matched a generic preset without an icon, try matching it as a 'vertex'
-        // This is just to choose a better icon for an otherwise empty-looking pin.
-        if (!iconName) {
-          preset = schema.matchTags(node.tags, 'vertex');
-          iconName = preset?.props?.icon;
-        }
+        // Show viewfields, if any..
+        markerStyle.viewfield.angles = node.directions(graph);
+        markerStyle.viewfield.image = 'viewfieldDark';
 
-        const directions = node.directions(graph, context.viewport);
-
-        // set marker style
-        const markerStyle: Partial<MatchedStyle> = {
-          icon: { image: iconName, color: 0x111111, opacity: 1, size: 11 },
-          marker: { image: 'pin', color: 0xffffff, opacity: 1 },
-          viewfield: { angles: directions, color: 0xffffff, opacity: 0.8, image: 'viewfieldDark' }
-        };
         if (hasWikidata(node)) {
-          markerStyle.icon!.color = 0x444444;
-          markerStyle.label = { color: 0xdddddd };
-          markerStyle.marker!.image = 'boldPin';
-          markerStyle.marker!.color = 0xdddddd;
+          markerStyle.icon.color = 0x444444;
+          markerStyle.marker.image = 'boldPin';
+          markerStyle.marker.color = 0xdddddd;
+          markerStyle.label.color = 0xdddddd;
         }
+
+        // Override to style standalone addresses as circles, not pins.
+        const preset = schema.matchTags(node.tags, 'point');
         if (preset?.id === 'address') {
-          markerStyle.icon!.image = 'maki-circle-stroked';
-          markerStyle.marker!.image = 'largeCircle';
+          markerStyle.icon.image = 'maki-circle-stroked';
+          markerStyle.marker.image = 'largeCircle';
         }
 
         feature.style = markerStyle;
@@ -778,7 +772,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     // Generate midpoints from all the highlighted ways
     const midpoints = new Map<string, MidpointData>();
-    const midpointStyle = { marker: { image: 'midpoint' } };
+    const midpointStyle = {
+      marker: { color: 0xffffff, image: 'midpoint' }
+    };
+
     for (const [wayID, way] of entities) {
       // Include only ways that are selected, or descended from a relation that is selected
       if (!related.descendantIDs.has(wayID)) continue;

@@ -275,24 +275,44 @@ export class Style {
    * @return  Resolved style properties
    */
   resolvedStyle(): MinimalStyleProps {
-    // Look in several places for fallback color properties
+    // Look in several places for fallback color properties.
     const base = this.props.base;
     const stroke = this.props.stroke;
     const fill = this.props.fill;
 
-    const color = base?.color ?? stroke?.color ?? fill?.color;
-    const opacity = base?.opacity ?? stroke?.opacity;
-
     const fallbacks: MinimalStyleProps = {
-      fill: { color },
-      casing: { opacity },
-      stroke: { color, opacity },
-      marker: { color, opacity },
-      icon: { opacity },
-      viewfield: { color, opacity },
-      label: { color, opacity },
-      lineMarker: { opacity },
-      sidedMarker: { color, opacity }
+      fill: {
+        color: base?.color ?? stroke?.color
+      },
+      casing: {
+        opacity: base?.opacity ?? stroke?.opacity
+      },
+      stroke: {
+        color: base?.color ?? fill?.color,
+        opacity: base?.opacity,
+      },
+      marker: {
+        color: base?.color,
+        opacity: base?.opacity
+      },
+      icon: {
+        opacity: base?.opacity
+      },
+      viewfield: {
+        color: base?.color ?? stroke?.color ?? fill?.color,
+        opacity: base?.opacity ?? stroke?.opacity,
+      },
+      label: {
+        color: base?.color ?? stroke?.color ?? fill?.color,
+        opacity: base?.opacity ?? stroke?.opacity,
+      },
+      lineMarker: {
+        opacity: base?.opacity ?? stroke?.opacity
+      },
+      sidedMarker: {
+        color: base?.color ?? stroke?.color ?? fill?.color,
+        opacity: base?.opacity ?? stroke?.opacity,
+      }
     };
 
     // result: defaults ← fallbacks ← this.props

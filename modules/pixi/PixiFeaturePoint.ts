@@ -6,7 +6,6 @@ import { DashLine } from './lib/DashLine.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
-import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 
 /**
@@ -150,7 +149,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const map = context.systems.map!;
     const wireframeMode = map?.wireframeMode;
     const textureManager = this.gfx.textureManager!;
-    const style = this._style as MatchedStyle;
+    const style = this._style;
     const isPin = ['pin', 'boldPin', 'osmose'].includes(style.marker.image ?? '');
 
     const marker = this.marker!;
@@ -450,33 +449,4 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     }
   }
 
-
-  /**
-   * style
-   * @param obj - Style `Object` (contents depends on the Feature type)
-   *
-   * 'point' - @see `PixiFeaturePoint.ts`
-   * 'line'/'polygon' - @see `StyleSystem.ts`
-   */
-  get style(): MatchedStyle {
-    return this._style as MatchedStyle;
-  }
-  set style(obj: Partial<MatchedStyle>) {
-    this._style = Object.assign({}, STYLE_DEFAULTS, obj);
-    this._styleDirty = true;
-  }
-
 }
-
-
-const STYLE_DEFAULTS: MatchedStyle = {
-  fill:        { width: 2, color: 0xaaaaaa, opacity: 0.3, pattern: undefined },
-  casing:      { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-  stroke:      { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
-  marker:      { image: 'smallCircle', color: 0xffffff, opacity: 1 },
-  icon:        { image: undefined, color: 0x111111, opacity: 1, size: 11 },
-  viewfield:   { angles: [], color: 0xffffff, opacity: 1, image: 'viewfield' },
-  lineMarker:  {},
-  sidedMarker: {},
-  label:       { color: 0xeeeeee }
-};

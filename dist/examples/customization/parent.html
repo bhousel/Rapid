@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+  <head>
+<!--
+Rapid Customization Demo - Parent Frame
+This demonstrates how to customize Rapid's styles and presets after initialization.
+The parent frame controls the child iframe where Rapid runs.
+-->
+    <meta charset='utf-8'/>
+    <title>Rapid Customization Demo</title>
+    <link rel='icon' type='image/svg' href='https://cdn.jsdelivr.net/npm/@rapideditor/rapid/dist/img/rapid_favicon.svg'>
+    <link rel='stylesheet' href='./parent.css'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no'/>
+    <meta name='mobile-web-app-capable' content='yes'/>
+    <meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'/>
+  </head>
+
+  <body>
+    <script>var $buoop={required:{i:15,e:-4,f:-3,o:-3,s:-1,c:-3},reminder:0,noclose:true,no_permanent_hide:true,insecure:true,api:2021.06};</script>
+    <script src='https://browser-update.org/update.js'></script>
+
+    <div id='wrap'>
+      <div id='viewer'>
+      </div>
+
+      <div id='sidebar'>
+        <h1><img src="../iframe/rapid-logo.svg"/> Customization Demo</h1>
+
+        <div class='status-box' id='status-box'>
+        </div>
+
+        <div id='controls'>
+          <h3>Schema Customization</h3>
+          <div class='control-group'>
+            <label>
+              <input type='checkbox' id='toggle-schema' />
+              Enable Custom Presets
+            </label>
+            <p class='hint'>Survey points, control points, boundary markers</p>
+          </div>
+          <h3>Style Customization</h3>
+          <div class='control-group'>
+            <label>
+              <input type='checkbox' id='toggle-styles' />
+              Enable Custom Styles
+            </label>
+            <p class='hint'>Orange survey features, green crossings</p>
+          </div>
+        </div>
+
+        <div id='instructions'>
+          <h3>How It Works</h3>
+          <p>
+            This demo shows how to override Rapid's default styles and presets
+            after initialization. Toggle the checkboxes above to see the changes.
+          </p>
+          <h4>Custom Styles:</h4>
+          <ul>
+            <li>Survey features → <span class='color-sample' style='background:#FF6600'></span> Orange</li>
+            <li>Crossings → <span class='color-sample' style='background:#00FF00'></span> Green</li>
+          </ul>
+          <h4>Custom Presets:</h4>
+          <ul>
+            <li>Survey Point, Control Point, Boundary Marker</li>
+            <li>Custom fields: date, status, surveyor, method</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script>
+
+// DOM elements
+const viewer = document.getElementById('viewer');
+const statusBox = document.getElementById('status-box');
+const toggleStyles = document.getElementById('toggle-styles');
+const toggleSchema = document.getElementById('toggle-schema');
+
+// We will watch the url hash to keep it in sync between parent and child
+let _currhash = window.location.hash;
+window.addEventListener('hashchange', syncHashes);
+
+// Create the iframe, inject it into document
+// If the parent has a hash, share it with the child.
+const iframe = document.createElement('iframe');
+iframe.setAttribute('allowfullscreen', 'true');
+iframe.setAttribute('frameborder', '0');
+iframe.onload = iframeLoaded;
+iframe.src = './child.html' + _currhash;
+viewer.appendChild(iframe);
+
+// Properties in the inner iframe
+let _innerDocument;
+let _innerWindow
+let _rapidStarted = false;
+
+// Rapid systems we can work with
+let _context;
+let _assets;
+let _map;
+let _styles;
+let _schema;
+
+// Loaded custom data
+let _customStyleData = null;
+let _customSchemaData = null;
+
+
+// When the iframe is available,
+// 1. Get the Rapid context from the iframe window
+// 2. Wait for Rapid to finish initializing
+// 3. Load custom assets and setup controls
+function iframeLoaded() {
+  // Access stuff in the iframe
+  _innerDocument = iframe.contentDocument || iframe.contentWindow.document;
+  _innerWindow = iframe.contentWindow;
+  _context = window.rapidContext = _innerWindow.rapidContext;
+    updateStatus('Rapid is initializing...');
+
+  // Rapid should already be initting.
+  // We can chain off that Promise to know when it's done.
+  _context.initAsync()
+    .then(() => {
+      _rapidStarted = true;
+      _assets = _context.systems.assets;
+      _map = _context.systems.map;
+      _rapid = _context.systems.rapid;
+      _styles = _context.systems.styles;
+      _schema = _context.systems.schema;
+
+      // Disable Rapid layer for this demo
+      const scene = _context.systems.gfx.scene;
+      scene.disableLayers('rapid');
+
+      // Paths will be relative to the `/dist` folder
+      _assets.registerAsset('custom_style', { preferred: './examples/customization/custom_style.json' });
+      _assets.registerAsset('custom_schema', { preferred: './examples/customization/custom_schema.json' });
+
+      _map.setMapParams([-74.91763, 38.93067], 18.75, 0.131, 0);  // go to Cape May, NJ
+      _map.on('draw', () => syncHashes());
+
+      // Enable the controls
+      toggleStyles.disabled = false;
+      toggleSchema.disabled = false;
+      updateStatus('Rapid ' + _context.version + ' is ready.');
+    })
+    .catch(err => {
+      updateStatus('Error: ' + err.message, true);
+      console.error(err);
+    });
+}
+
+
+// Toggle custom styles on/off
+toggleStyles.addEventListener('change', () => {
+  if (!_styles) return;
+
+  if (toggleStyles.checked) {
+    _styles.requestedAssetIDs = ['custom_style'];
+    updateStatus('Custom styles ENABLED');
+  } else {
+    _styles.requestedAssetIDs = null;  // revert to default behavior
+    updateStatus('Custom styles DISABLED (using defaults)');
+  }
+  _styles.loadStyleAssetsAsync();
+});
+
+
+// Toggle custom schema on/off
+toggleSchema.addEventListener('change', () => {
+  if (!_schema) return;
+
+  if (toggleSchema.checked) {
+    _schema.requestedAssetIDs = ['default', 'custom_schema'];
+    updateStatus('Custom presets ENABLED - try adding a point!');
+  } else {
+    _schema.requestedAssetIDs = null;  // revert to default behavior
+    updateStatus('Custom presets DISABLED (using defaults)');
+  }
+  _schema.loadSchemaAssetsAsync();
+});
+
+
+// Keep the url hashes in sync between parent and child
+function syncHashes() {
+  // Parent hash changed, push change to child
+  if (window.location.hash !== _currhash) {
+    _currhash = window.location.hash;
+    if (_innerWindow) {
+      _innerWindow.location.hash = _currhash;
+    }
+  }
+
+  // Child hash has changed, update parent
+  // This updates the URL hash without affecting the browser navigation stack.
+  if (_innerWindow && _innerWindow.location.hash !== _currhash) {
+    _currhash = _innerWindow.location.hash;
+    window.history.replaceState(null, '', _currhash);
+  }
+}
+
+
+// Update the status box
+function updateStatus(message, isError = false) {
+  statusBox.textContent = message;
+  statusBox.className = 'status-box' + (isError ? ' error' : '');
+}
+
+    </script>
+  </body>
+</html>

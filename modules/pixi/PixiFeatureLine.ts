@@ -7,7 +7,6 @@ import { getLineSegments, lineToPoly, type LineToPolyResult } from './helpers.ts
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
-import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 const ONEWAY_SPACING = 35;
 const SIDED_SPACING = 30;
@@ -95,7 +94,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const textureManager = this.gfx.textureManager!;
     const container = this.container;
     const geom = this.geom;
-    const style = this._style as Partial<MatchedStyle>;
+    const style = this._style;
     let screen = geom.screen;
 
     //
@@ -147,8 +146,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       // Todo: left/right markers (like for coastlines, retaining walls, etc)
       //
       let lineMarkers = container.getChildByLabel('lineMarkers');
-      const lineMarkerTextureID = style.lineMarker?.image;
-      const sideMarkerTextureID = style.sidedMarker?.image;
+      const lineMarkerTextureID = style.lineMarker.image;
+      const sideMarkerTextureID = style.sidedMarker.image;
 
       if (showMarkers && (lineMarkerTextureID || sideMarkerTextureID)) {
         // Create line marker container, if necessary
@@ -175,7 +174,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
               sprite.anchor.set(0.5, 0.5); // middle, middle
               sprite.position.set(x, y);
               sprite.rotation = segment.angle;
-              sprite.tint = style.lineMarker?.color ?? 0x000000;
+              sprite.tint = style.lineMarker.color ?? 0x000000;
               lineMarkers!.addChild(sprite);
             });
           });
@@ -194,7 +193,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
               sprite.anchor.set(0.5, 0.5); // middle, middle
               sprite.position.set(x, y);
               sprite.rotation = segment.angle;
-              sprite.tint = style.stroke?.color ?? 0xcccccc;
+              sprite.tint = style.stroke.color ?? 0xcccccc;
               lineMarkers!.addChild(sprite);
             });
           });
@@ -209,7 +208,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       if (this.visible && !this._classes.has('drawing')) {  // Rapid#648 - If drawing, `hitArea = null`
         // what line width to use?? copied the 'casing' calculation from below, improve this later
         const minwidth = 3;
-        let width = style.casing?.width ?? 5;
+        let width = style.casing.width ?? 5;
 
         // Apply effectiveZoom style adjustments
         if (zoom < 16) {
@@ -245,10 +244,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
     if (this.casing!.renderable) {
-      this.updateGraphic('casing', this.casing!, screen!.coords as Vec2[], style, zoom, isWireframe);
+      this.updateGraphic('casing', this.casing!, screen!.coords as Vec2[], zoom, isWireframe);
     }
     if (this.stroke!.renderable) {
-      this.updateGraphic('stroke', this.stroke!, screen!.coords as Vec2[], style, zoom, isWireframe);
+      this.updateGraphic('stroke', this.stroke!, screen!.coords as Vec2[], zoom, isWireframe);
     }
 
     this.updateHalo();
@@ -258,7 +257,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
   /**
    * updateGraphic
    */
-  updateGraphic(which: 'casing' | 'stroke', graphic: PIXI.Graphics, points: Vec2[], style: Partial<MatchedStyle>, zoom: number, isWireframe: boolean): void {
+  updateGraphic(which: 'casing' | 'stroke', graphic: PIXI.Graphics, points: Vec2[], zoom: number, isWireframe: boolean): void {
+    const style = this._style;
     const partStyle = style[which];
     if (!partStyle) return;
 
@@ -280,12 +280,12 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     let g: PIXI.Graphics | DashLine = graphic.clear();
-    if (partStyle.opacity === 0) return;
+    if (partStyle?.opacity === 0) return;
 
     const strokeStyle = {
       color: partStyle.color,
       width: width,
-      alpha: partStyle.opacity || 1.0,
+      alpha: partStyle.opacity ?? 1.0,
       join: partStyle.join,
       cap:  partStyle.cap,
       dash: undefined as number[] | undefined
@@ -375,31 +375,4 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
   }
 
-
-  /**
-   * style
-   * @param obj - Style `Object` (contents depends on the Feature type)
-   *
-   * 'point' - @see `PixiFeaturePoint.ts`
-   * 'line'/'polygon' - @see `StyleSystem.ts`
-   */
-  get style(): Partial<MatchedStyle> {
-    return this._style as Partial<MatchedStyle>;
-  }
-  set style(obj: Partial<MatchedStyle>) {
-    this._style = Object.assign({}, STYLE_DEFAULTS, obj);
-    this._styleDirty = true;
-  }
-
 }
-
-
-const STYLE_DEFAULTS: Partial<MatchedStyle> = {
-  fill:        { width: 2, color: 0xaaaaaa, opacity: 0.3 },
-  casing:      { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-  stroke:      { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
-  lineMarker:  { image: '', color: 0x000000 },
-  sidedMarker: { color: 0x000000 },
-  label:       { color: 0xeeeeee }
-};
-

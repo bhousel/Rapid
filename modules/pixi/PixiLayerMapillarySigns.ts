@@ -129,12 +129,12 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
         let style: Partial<MatchedStyle>;
         if (hasIcon) {
           style = {
-            marker: { image: d.props.value, color: 0xffffff, opacity: 1 }
+            marker: { image: d.props.value }
           };
         } else {
           style = {
-            marker: { image: 'xlargeSquare', color: 0xffffff, opacity: 1 },
-            icon: { image: 'fas-question', color: 0x000000, opacity: 1, size: 16 }
+            marker: { image: 'xlargeSquare' },
+            icon: { image: 'fas-question', color: 0x000000, size: 16 }
           };
         }
 

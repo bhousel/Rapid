@@ -8,7 +8,6 @@ import { lineToPoly, type LineToPolyResult } from './helpers.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
-import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 const PARTIALFILLWIDTH = 32;
 
@@ -244,7 +243,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const w = screen.width ?? 0;
     const h = screen.height ?? 0;
 
-    const style = this._style as MatchedStyle;
+    const style = this._style;
     const textureManager = this.gfx.textureManager!;
     const color = style.fill?.color ?? 0xaaaaaa;
     const opacity = style.fill?.opacity ?? 0.3;
@@ -358,8 +357,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         alignment: 0.5,  // middle of line
         color: 0x000000,
         width: lineWidth + 10,
-        cap: 'butt' as PIXI.LineCap,
-        join: 'bevel' as PIXI.LineJoin
+        cap: 'butt',
+        join: 'bevel'
       };
 
       for (let i = 0; i < rings.length; i++) {
@@ -577,31 +576,4 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
   }
 
-
-  /**
-   * style
-   * @param obj - Style `Object` (contents depends on the Feature type)
-   *
-   * 'point' - @see `PixiFeaturePoint.ts`
-   * 'line'/'polygon' - @see `StyleSystem.ts`
-   */
-  get style(): Partial<MatchedStyle> {
-    return this._style as Partial<MatchedStyle>;
-  }
-  set style(obj: Partial<MatchedStyle>) {
-    this._style = Object.assign({}, STYLE_DEFAULTS, obj) as MatchedStyle;
-    this._styleDirty = true;
-  }
-
 }
-
-
-/** Default style for polygons */
-const STYLE_DEFAULTS: Partial<MatchedStyle> = {
-  fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3, pattern: undefined },
-  casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
-  stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' },
-  marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 },
-  icon: { image: undefined, color: 0x111111, opacity: 1, size: 11 },
-  label: { color: 0xeeeeee }
-};

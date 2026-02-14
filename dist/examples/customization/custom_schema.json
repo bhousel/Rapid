@@ -1,0 +1,152 @@
+{
+  "assetID": "custom_schema",
+  "assetVersion": "2026-02-12",
+
+  "fields": {
+    "survey/date": {
+      "label": "Survey Date",
+      "key": "survey:date",
+      "type": "text",
+      "placeholder": "YYYY-MM-DD"
+    },
+    "survey/status": {
+      "label": "Verification Status",
+      "key": "survey:status",
+      "type": "combo",
+      "options": ["verified", "unverified", "pending_review"],
+      "autoSuggestions": false,
+      "customValues": false
+    },
+    "survey/surveyor": {
+      "label": "Surveyor Name",
+      "key": "survey:surveyor",
+      "type": "text"
+    },
+    "survey/method": {
+      "label": "Survey Method",
+      "key": "survey:method",
+      "type": "combo",
+      "options": ["gps", "imagery", "field_visit", "interview"],
+      "autoSuggestions": false
+    },
+    "survey/notes": {
+      "label": "Survey Notes",
+      "key": "survey:notes",
+      "type": "textarea"
+    },
+    "custom/priority": {
+      "label": "Priority Level",
+      "key": "priority",
+      "type": "combo",
+      "options": ["high", "medium", "low"],
+      "autoSuggestions": false
+    },
+    "custom/project_id": {
+      "label": "Project ID",
+      "key": "project_id",
+      "type": "text"
+    }
+  },
+
+  "presets": {
+    "survey/point": {
+      "name": "CAPE MAY - Survey Point",
+      "icon": "temaki-pin",
+      "geometry": ["point", "vertex"],
+      "fields": [
+        "name",
+        "survey/date",
+        "survey/status",
+        "survey/surveyor",
+        "survey/method"
+      ],
+      "moreFields": [
+        "survey/notes",
+        "custom/priority",
+        "custom/project_id"
+      ],
+      "tags": {
+        "survey": "point"
+      },
+      "searchable": true,
+      "matchScore": 0.9
+    },
+    "survey/control_point": {
+      "name": "CAPE MAY - Control Point",
+      "icon": "temaki-pin",
+      "geometry": ["point", "vertex"],
+      "fields": [
+        "name",
+        "survey/date",
+        "survey/status",
+        "survey/surveyor"
+      ],
+      "moreFields": [
+        "survey/notes",
+        "custom/project_id"
+      ],
+      "tags": {
+        "survey": "control_point"
+      },
+      "searchable": true,
+      "matchScore": 0.9
+    },
+    "survey/boundary_marker": {
+      "name": "CAPE MAY - Boundary Marker",
+      "icon": "maki-monument",
+      "geometry": ["point", "vertex"],
+      "fields": [
+        "name",
+        "survey/date",
+        "survey/status"
+      ],
+      "tags": {
+        "survey": "boundary_marker",
+        "man_made": "survey_point"
+      },
+      "searchable": true,
+      "matchScore": 0.85
+    },
+    "custom/project_feature": {
+      "name": "CAPE MAY - Project Feature",
+      "icon": "maki-star",
+      "geometry": ["point", "line", "area"],
+      "fields": [
+        "name",
+        "custom/project_id",
+        "custom/priority",
+        "survey/notes"
+      ],
+      "tags": {
+        "project_feature": "yes"
+      },
+      "searchable": true
+    }
+  },
+
+  "categories": {
+    "category-survey": {
+      "name": "CAPE MAY Surveying",
+      "icon": "temaki-pin",
+      "members": [
+        "survey/point",
+        "survey/control_point",
+        "survey/boundary_marker"
+      ]
+    },
+    "category-project": {
+      "name": "CAPE MAY Projects",
+      "icon": "maki-star",
+      "members": [
+        "custom/project_feature"
+      ]
+    }
+  },
+
+  "defaults": {
+    "point": ["category-survey", "category-project"],
+    "vertex": ["category-survey", "category-project"],
+    "line": ["category-project"],
+    "area": ["category-project"]
+  }
+}

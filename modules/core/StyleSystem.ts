@@ -1,3 +1,4 @@
+import { merge as deepMerge } from 'lodash-es';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { osmPavedTags } from '../lib/tags.ts';
 import { Style, styleDefaults } from '../lib/Style.ts';
@@ -238,6 +239,8 @@ export class StyleSystem extends AbstractSystem {
   loadStyleAssetsAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets;
+const gfx = context.systems.gfx;
+gfx?.pause();  // block rendering
 
     // Clear out whatever was loaded before.
     this.resetAll();
@@ -276,6 +279,8 @@ export class StyleSystem extends AbstractSystem {
       }
 
       this._styleChanged();
+  gfx?.resume();  // block rendering
+  gfx?.scene?.reset();  // throw it all away
     });
   }
 
@@ -446,28 +451,32 @@ export class StyleSystem extends AbstractSystem {
    * @return Styling info for the given tags
    */
   styleMatch(tags: Tags, geometry?: GeometryType): MatchedStyle {
+    const context = this.context;
+    const schema = context.systems.schema;
+
     let defaults = this.styles.get('DEFAULTS');
 
     // If DEFAULTS doesn't exist, construct a minimal default style.
     if (!defaults) {
-      defaults = new Style(this.context, { id: 'defaults', ...styleDefaults });
+      defaults = new Style(context, { id: 'DEFAULTS', ...styleDefaults });
     }
 
     // Find all matching selectors, sorted by specificity (highest first)
     const featureInfo = { tags };
     const matchingSelectors = StyleSelector.findAll(this.selectors.values(), featureInfo);
 
-    // Start with defaults, then merge all matching selectors in order.
+    // Start with an empty style and apply all matching selectors in order.
     // We iterate in reverse (lowest specificity first) so higher specificity selectors win.
-    let matched: Style = defaults;
-    let styleKey: string | undefined;
+    let combinedProps: Partial<StyleProps> = {};
+    const combinedIDs = new Set<string>();
 
     for (let i = matchingSelectors.length - 1; i >= 0; i--) {
       const selector = matchingSelectors[i];
       for (const styleID of selector.styleIDs) {
         const style = this.styles.get(styleID);
         if (style) {
-          matched = matched.merge(style);
+          combinedProps = deepMerge(combinedProps, style.props) as StyleProps;
+          combinedIDs.add(styleID);
         } else {
           console.error(`invalid styleID: ${styleID}`);  // eslint-disable-line
         }
@@ -475,6 +484,7 @@ export class StyleSystem extends AbstractSystem {
     }
 
     // Extract styleKey from most specific selector (for lifecycle handling)
+    let styleKey: string | undefined;
     if (matchingSelectors.length > 0) {
       const bestSelector = matchingSelectors[0];
       const tagMatchers = bestSelector.tagMatchers;
@@ -484,15 +494,25 @@ export class StyleSystem extends AbstractSystem {
     }
 
     // Build result from resolved style properties
+    const combinedID = [...combinedIDs].join(',') || 'empty';
+    const matched = new Style(this.context, { id: combinedID, ...combinedProps });
     const result: MatchedStyle = matched.resolvedStyle();
 
     // If icon.image is not set by the style, try to get it from the preset
     if (!result.icon.image && geometry) {
-      const schema = this.context.systems.schema;
       if (schema) {
-        const preset = schema.matchTags(tags, geometry);
-        if (preset?.props.icon) {
-          result.icon.image = preset.props.icon;
+        let preset = schema.matchTags(tags, geometry);
+        let iconName = preset?.props.icon;
+
+        // If we didn't get an icon for a point, try matching it as a 'vertex'.
+        // This is just to choose a better icon for an otherwise empty-looking pin.
+        if (!iconName && geometry === 'point') {
+          preset = schema.matchTags(tags, 'vertex');
+          iconName = preset?.props?.icon;
+        }
+
+        if (iconName) {
+          result.icon.image = iconName;
         }
       }
     }
@@ -629,11 +649,13 @@ export class StyleSystem extends AbstractSystem {
   /**
    * _styleChanged
    * Called whenever the style changes.
-   * This will trigger a redraw and emit a 'stylechange' event.
+   * This will dirty all features so they get re-styled, then trigger a redraw.
    */
   _styleChanged(): void {
     const gfx = this.context.systems.gfx;
 
+    // Mark all features dirty so they re-fetch their styles on the next render
+    gfx?.scene?.dirtyScene();
     gfx?.immediateRedraw();
     this.emit('stylechange');
   }

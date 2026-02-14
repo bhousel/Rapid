@@ -270,6 +270,8 @@ export class SchemaSystem extends AbstractSystem {
   loadSchemaAssetsAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets;
+const gfx = context.systems.gfx;
+gfx?.pause();  // block rendering
 
     // Clear out whatever was loaded before.
     this.resetAll();
@@ -318,6 +320,8 @@ export class SchemaSystem extends AbstractSystem {
       for (const reason of rejectedReasons as string[]) {
         console.error(reason);   // eslint-disable-line no-console
       }
+  gfx?.resume();  // resume rendering
+
     });
   }
 
@@ -336,6 +340,46 @@ export class SchemaSystem extends AbstractSystem {
     this.categories.clear();
     this.universal.clear();
     this.defaults.clear();
+
+
+// HACK for demo
+const storage = context.systems.storage as any;
+this._recentIDs = [];
+storage?.setItem('preset_recents', JSON.stringify(this._recentIDs));
+
+// clear all entities cached transients
+const editor = context.systems.editor as any;
+if (editor) {
+  const base = editor.base?.graph;
+  if (base) {
+    for (const [_, v] of base.base.entities) {
+      if (!v) continue;
+      v.updateGeometry(base);
+    }
+  }
+
+  const staging = editor.staging?.graph;
+  if (staging) {
+    for (const [_, v] of staging.local.entities) {
+      if (!v) continue;
+      v.updateGeometry(staging);
+    }
+  }
+
+  const history = editor._history || [];
+  for (const edit of history) {
+    const graph = edit.graph;
+    if (graph) {
+      for (const [_, v] of graph.local.entities) {
+        if (!v) continue;
+        v.updateGeometry(graph);
+      }
+    }
+  }
+}
+const gfx = context.systems.gfx as any;
+gfx?.scene?.reset();  // throw it all away
+
 
     // Defaults are the Presets and Categories offered to the user when adding a new feature.
     // A fallback preset is appended to the list automatically so they dont need to be included here.

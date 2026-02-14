@@ -26,12 +26,42 @@ import type { Viewport } from '@rapid-sdk/math';
 
 ## Style Objects
 
-All style properties are **optional**. Use type assertions (`as`) when defining constant style objects:
+### Getting Styles from StyleSystem
+
+For OSM features (polygons, lines, vertices, points), always get the base style from `StyleSystem.styleMatch()`:
 
 ```typescript
-import { PixiFeatureLine } from './PixiFeatureLine.ts';
-import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
+const styles = context.systems.styles!;
+const style = styles.styleMatch(entity.tags, geometry) as MatchedStyle;
 
+// Then apply any necessary overrides
+if (node.hasInterestingTags()) {
+  style.marker.image = 'taggedCircle';
+}
+feature.style = style;
+```
+
+**Why:** `styleMatch()` returns a fully resolved style with:
+- Defaults filled in from `styleDefaults`
+- Fallback cascading (base.color → marker.color, etc.)
+- Selector-based style matching (highway=primary → road_primary style)
+- Structure overrides (bridge, tunnel, surface)
+- Lifecycle overrides (abandoned, proposed, etc.)
+
+**Don't** construct hardcoded style objects when `styleMatch()` could be used:
+```typescript
+// BAD - bypasses styleMatch(), ignores custom styles
+const markerStyle: Partial<MatchedStyle> = {
+  icon: { image: iconName, color: 0x111111, opacity: 1, size: 11 },
+  marker: { image: 'smallCircle', color: 0xffffff, opacity: 1 }
+};
+```
+
+### Constant Styles for Non-OSM Features
+
+For non-OSM layers (photos, QA issues, debug overlays), define constant style objects. All style properties are **optional** — use type assertions:
+
+```typescript
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 
 const LINESTYLE = {

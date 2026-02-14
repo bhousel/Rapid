@@ -4,9 +4,11 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
-import type { PixiScene } from './PixiScene.ts';
-import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
+import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { PixiScene } from './PixiScene.ts';
+import type { StyleProps } from '../lib/Style.ts';
+
 
 /**
  * PixiLayerDebug
@@ -56,13 +58,14 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     const spatial = context.systems.spatial!;
 
     const DEFAULTSTYLE = {
-      fill: { width: 1, color: 0xffff00, opacity: 0.5, type: 'full' },  // always fill fully
+      fill: { color: 0xffff00, opacity: 0.5, width: 1, type: 'full' },  // always fill fully
       casing: { opacity: 0 },  // disable
       stroke: { opacity: 0 }   // disable
-    };
+    } as Partial<StyleProps>;
+
     const POISTYLE = {
-      marker: { image: 'smallCircle', color: 0xffff00 }
-    };
+      marker: { color: 0xffff00, image: 'smallCircle' }
+    } as Partial<StyleProps>;
 
 
     const parentContainer = this.scene.groups.get('debug-under')!;
@@ -107,9 +110,9 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
           if (didHitBuilding) {
             // console.log(`${dataID} id hit osm building ${didHitBuilding.contents.id}`);
-            style.fill.color = 0xff0000;  // red
+            style.fill!.color = 0xff0000;  // red
           } else {
-            style.fill.color = 0x00ff00;  // green
+            style.fill!.color = 0x00ff00;  // green
           }
           feature.style = style;
         }

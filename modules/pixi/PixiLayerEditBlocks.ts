@@ -1,11 +1,11 @@
-import type { Viewport } from '@rapid-sdk/math';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { D3Selection, D3EnterSelection } from 'd3-selection';
 import type { GeoJSON } from '../data/GeoJSON.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { StyleProps } from '../lib/Style.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 4;
 
@@ -109,8 +109,8 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
     if (!parentContainer) return;
 
     const blockStyle = {
-      fill: { pattern: 'construction', color: 0x000001, opacity: 0.7, type: 'full' }  // always fill fully
-    };
+      fill: { pattern: 'construction', color: 0x000000, opacity: 0.7, type: 'full' }  // always fill fully
+    } as Partial<StyleProps>;
 
     for (const d of blocks) {
       const dataID = d.id;
