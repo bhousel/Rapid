@@ -16,6 +16,15 @@ There is a `.github/scratchpad.md` file (git-ignored) that serves as persistent 
 
 ## General Guidelines
 
+### Constructive Pushback
+- **Don't just implement what's asked** — briefly flag if you see a concern. The user values a 1-2 sentence heads-up over silent compliance.
+- This includes: unnecessary abstractions, deprecated patterns, simpler alternatives, or potential footguns.
+- Before creating utility functions, check whether a modern built-in API (ES2015+) already covers the use case. Wrappers that only delegate to a single built-in call add indirection without value.
+- When the user proposes a solution, briefly evaluate whether:
+  - A built-in language/platform API already does this (e.g. prefer `Number.isFinite()` over a custom wrapper)
+  - The abstraction adds meaningful value beyond the underlying call (type narrowing, better naming, composed logic)
+  - A more modern JS/TS feature has replaced the older pattern
+
 ### Comments
 - **Never remove comments** when modifying files unless:
   - The comment applies to code being removed
@@ -178,6 +187,21 @@ export class Category {
     }
   }
   ```
+
+### Narrowing `Partial<P>` in Subclasses with `declare`
+- `AbstractData.props` is typed as `Partial<P>` so the base class constructor can accept incomplete props (useful for tests and incremental construction)
+- Subclasses like `Marker` and `GeoJSON` represent real data that always has required properties set at construction time
+- Use `declare props: P;` to narrow the stored type from `Partial<P>` to `P`:
+  ```typescript
+  class Marker<P extends MarkerProps = MarkerProps> extends AbstractData<P> {
+    // `declare` emits no JavaScript — it only narrows the type for access sites.
+    // The constructor still accepts `Partial<P>` for flexibility.
+    declare props: P;
+  }
+  ```
+- **Why**: Eliminates `!` assertions at every access site (e.g. `props.loc!` → `props.loc`) by localizing the trust decision to the class definition
+- **Tradeoff**: If someone constructs `new Marker(context, {})` (no `loc`), TypeScript won't warn at access sites — but the constructor still accepts `Partial` so tests compile. In practice, real data paths always provide required props, and tests that skip them don't access them.
+- When constructing a Marker/GeoJSON with service-specific props, **specify the generic type param** on the constructor: `new Marker<KartaviewImageProps>(context, { ... })`
 
 ### Avoid Unnecessary Casts
 - Don't add type casts that TypeScript can already infer
@@ -375,12 +399,18 @@ import type { OsmNode, OsmWay } from '../core/index.ts';
 - `D3Selection` and `D3EnterSelection` are permissive type aliases defined in `global.d.ts`
 - Import directly from `'d3-selection'`, not from `types.ts`
 - The module augmentation makes D3 callbacks accept `any` datum type to reduce friction
+- These types are intentionally loose — they improve code clarity and are more self-documenting than `as any` casts or unwieldy built-in d3 generic types
 - **Naming conventions**:
   - Prefix variables holding a selection with `$`, e.g., `$parent`, `$child`
   - Prefix variables holding an _enter_ selection with `$$`, e.g., `$$items`
+- **When editing or reviewing TypeScript files**, look for `$`-prefixed variables without a type annotation and add `D3Selection`. Look for `$$`-prefixed variables and add `D3EnterSelection`.
+- Where `merge()` is used to combine a selection with an enter selection, type the result as `D3Selection` (no need for `as any`):
+  ```typescript
+  $label = $label.merge($$label) as D3Selection;
+  ```
 - Example:
   ```typescript
-  import type { D3Selection, D3EnterSelection } from 'd3-selection';
+  import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
   function render($parent: D3Selection): void {
     const $child: D3Selection = $parent.select('.child');
@@ -431,7 +461,7 @@ Track TypeScript conversion progress here:
 | `modules/data/` | ✅ Complete | All files converted |
 | `modules/geo/` | ✅ Complete | All files converted |
 | `modules/operations/` | ❌ Not started | |
-| `modules/services/` | ❌ Not started | |
+| `modules/services/` | ✅ Complete | All files converted |
 | `modules/ui/` | ❌ Not started | |
 | `modules/validations/` | ❌ Not started | |
 

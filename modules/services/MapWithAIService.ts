@@ -6,9 +6,42 @@ import { OsmNode, OsmWay } from '../data/index.ts';
 import { OsmXMLParser } from '../data/parsers/OsmXMLParser.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { ParsedWay } from '../data/parsers/types.ts';
+import type { Extent, Tile } from '@rapid-sdk/math';
 
+
+/** Base URL for the MapWithAI vector tile API endpoint */
 const APIROOT = 'https://mapwith.ai/maps/ml_roads';
+/** Zoom level used for tiling MapWithAI data requests */
 const TILEZOOM = 16;
+
+
+/**
+ * Internal cache structure for a single dataset.
+ * Each dataset has its own Graph, Tree, and tracking sets.
+ */
+interface DatasetCache {
+  /** Unique identifier for this dataset */
+  id: DatasetID;
+  /** Graph instance holding the loaded MapWithAI entity data */
+  graph: Graph;
+  /** Custom spatial tree for spatial queries on this dataset */
+  tree: Tree;
+  /** Map of in-flight tile requests keyed by tile ID, with their AbortControllers */
+  inflight: Record<string, AbortController>;
+  /** Set of tile IDs that have already been loaded */
+  loaded: Set<EntityID>;
+  /** Set of entity IDs already seen, to avoid processing duplicates */
+  seen: Set<EntityID>;
+  /** Set of first-node IDs used to detect duplicate buildings */
+  seenFirstNodeID: Set<EntityID>;
+  /** Map of original way IDs to sets of split way segments awaiting reassembly */
+  splitWays: Map<string, Set<ParsedWay>>;
+  /** Viewport version from the last data fetch, used to skip redundant loads */
+  lastv: number | null;
+}
 
 
 /**
@@ -16,20 +49,28 @@ const TILEZOOM = 16;
  * This service connects to the MapWithAI API to fetch data about Meta-hosted datasets.
  */
 export class MapWithAIService extends AbstractSystem {
+  /** Parser for converting OSM XML responses into entity props */
+  _XMLParser: OsmXMLParser;
+  /** Tiler instance used to compute tile coverage for the current viewport */
+  _tiler: Tiler;
+  /** Map of dataset IDs to their DatasetCache objects */
+  _datasets: Map<DatasetID, DatasetCache>;
+  /** Set of idle callback handles for deferred processing */
+  _deferred: Set<number>;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'mapwithai';
     this.requiredDependencies = new Set(['spatial']);
     this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash']);
 
     this._XMLParser = new OsmXMLParser();
-    this._tiler = new Tiler().zoomRange(TILEZOOM);
-    this._datasets = new Map();  // Map<datasetID, Object>
+    this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
+    this._datasets = new Map();
     this._deferred = new Set();
   }
 
@@ -37,9 +78,9 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -54,9 +95,9 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -64,9 +105,9 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * getAvailableDatasets
    * Called by `RapidSystem` to get the datasets that this service provides.
-   * @return  {Array<RapidDataset>}  The datasets this service provides
+   * @return The datasets this service provides
    */
-  getAvailableDatasets() {
+  getAvailableDatasets(): RapidDataset[] {
     const context = this.context;
 
     const fbRoads = new RapidDataset(context, {
@@ -145,9 +186,9 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     for (const handle of this._deferred) {
       window.cancelIdleCallback(handle);
       this._deferred.delete(handle);
@@ -178,10 +219,10 @@ export class MapWithAIService extends AbstractSystem {
    * getDataset
    * Get a dataset cache identified by the given datasetID.
    * Create it if it doesn't exist yet.
-   * @param   {string}  datasetID  - the cache to get (or create)
-   * @return  {Object}  dataset cache
+   * @param datasetID - the cache to get (or create)
+   * @return dataset cache
    */
-  getDataset(datasetID) {
+  getDataset(datasetID: DatasetID): DatasetCache {
     let ds = this._datasets.get(datasetID);
     if (!ds) {
       const graph = new Graph(this.context);
@@ -191,9 +232,9 @@ export class MapWithAIService extends AbstractSystem {
         graph: graph,
         tree: tree,
         inflight: {},
-        loaded: new Set(),           // Set<tileID>
-        seen: new Set(),             // Set<entityID>
-        seenFirstNodeID: new Set(),  // Set<entityID>
+        loaded: new Set(),           // Set<TileID>
+        seen: new Set(),             // Set<EntityID>
+        seenFirstNodeID: new Set(),  // Set<EntityID>
         splitWays: new Map(),        // Map<originalID, Set<Entity>>
         lastv: null
       };
@@ -206,10 +247,10 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @param   {string}  datasetID - datasetID to get data for
-   * @return  {Array}   Array of data (OSM Entities)
+   * @param datasetID - datasetID to get data for
+   * @return Array of data (OSM Entities)
    */
-  getData(datasetID) {
+  getData(datasetID: DatasetID): OsmEntity[] {
     const ds = this._datasets.get(datasetID);
     if (!ds || !ds.tree || !ds.graph) return [];
 
@@ -221,9 +262,9 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * loadTiles
    * Schedule any data requests needed to cover the current map view
-   * @param  {string}  datasetID - datasetID to load tiles for
+   * @param datasetID - datasetID to load tiles for
    */
-  loadTiles(datasetID) {
+  loadTiles(datasetID: DatasetID): void {
     if (this._paused) return;
 
     const context = this.context;
@@ -254,10 +295,10 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * loadTile
    * Load a single tile of data
-   * @param  {Object}  ds - the dataset info
-   * @param  {Tile}    tile - a tile object
+   * @param ds - the dataset info
+   * @param tile - a tile object
    */
-  loadTile(ds, tile) {
+  loadTile(ds: DatasetCache, tile: Tile): void {
     if (!ds || this._paused) return;
 
     const context = this.context;
@@ -296,11 +337,11 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * _gotTile
    * Process the response from the tile fetch.
-   * @param  {Document}  xml - the xml content to parse
-   * @param  {Object}    ds - the dataset info
-   * @param  {Tile}      tile - a tile object
+   * @param xml - the xml content to parse
+   * @param ds - the dataset info
+   * @param tile - a tile object
    */
-  _gotTile(xml, ds, tile) {
+  _gotTile(xml: Document, ds: DatasetCache, tile: Tile): void {
     if (!xml) return;  // ignore empty responses
 
     const context = this.context;
@@ -315,9 +356,9 @@ export class MapWithAIService extends AbstractSystem {
       filter: new Set(['node', 'way'])   // don't expect 'relation' from this service
     });
 
-    const entities = [];
+    const entities: OsmEntity[] = [];
     for (const props of results.data) {
-      const entityID = props.id;
+      const entityID = props.id as EntityID;
 
       // add some extra metadata properties
       Object.assign(props, {
@@ -341,14 +382,14 @@ export class MapWithAIService extends AbstractSystem {
 
         // If `orig_id` is present, it means that the way was split
         // by the server, and we will need to reassemble the pieces.
-        const origID = props.orig_id;
+        const origID = props.orig_id as string | undefined;
         if (origID) {
           let splitWays = ds.splitWays.get(origID);
           if (!splitWays) {
             splitWays = new Set();
             ds.splitWays.set(origID, splitWays);
           }
-          splitWays.add(props);
+          splitWays.add(props as ParsedWay);
           continue;  // bail out, `_connectSplitWays` will handle this instead
 
         } else {  // a normal unsplit way
@@ -369,7 +410,7 @@ export class MapWithAIService extends AbstractSystem {
     }
 
     // Try to reconnect split ways.
-    entities.push.apply(entities, this._connectSplitWays(ds));
+    entities.push(...this._connectSplitWays(ds));
 
     graph.rebase(entities, [graph], true);   // true = force replace entities
     tree.rebase(entities, true);
@@ -378,21 +419,40 @@ export class MapWithAIService extends AbstractSystem {
   }
 
 
-  graph(datasetID) {
+  /**
+   * graph
+   * Returns the Graph for the given dataset.
+   * @param datasetID - dataset to get the graph for
+   * @return the dataset's Graph
+   */
+  graph(datasetID: DatasetID): Graph {
     const ds = this.getDataset(datasetID);  // create caches, if needed
     return ds.graph;
   }
 
 
-  /* this is called to merge in the rapid_intro_graph */
-  merge(datasetID, entities) {
+  /**
+   * merge
+   * Merge entities directly into a dataset's graph and tree.
+   * Used to load the rapid_intro_graph.
+   * @param datasetID - dataset to merge into
+   * @param entities - entities to merge
+   */
+  merge(datasetID: DatasetID, entities: OsmEntity[]): void {
     const ds = this.getDataset(datasetID);  // create caches, if needed
     ds.graph.rebase(entities);
     ds.tree.rebase(entities);
   }
 
 
-  _tileURL(dataset, extent) {
+  /**
+   * _tileURL
+   * Build the MapWithAI API URL for a given dataset and extent.
+   * @param dataset - the dataset cache to build the URL for
+   * @param extent - geographic extent of the tile
+   * @return the fully-qualified API URL
+   */
+  _tileURL(dataset: DatasetCache, extent: Extent): string {
     const context = this.context;
     const rapid = context.systems.rapid;
     const urlhash = context.systems.urlhash;
@@ -401,7 +461,7 @@ export class MapWithAIService extends AbstractSystem {
     const isConflated = /-conflated$/.test(dataset.id);
     const datasetID = dataset.id.replace('-conflated', '');
 
-    const qs = {
+    const qs: Record<string, string | boolean> = {
       conflate_with_osm: isConflated,
       theme: 'ml_road_vector',
       collaborator: 'fbid',
@@ -438,16 +498,16 @@ export class MapWithAIService extends AbstractSystem {
 
 
     // This utilQsString does not sort the keys, because the MapWithAI service needs them to be ordered a certain way.
-    function MWAIQsString(obj, noencode) {
+    function MWAIQsString(obj: Record<string, string | boolean>, noencode: boolean): string {
       // encode everything except special characters used in certain hash parameters:
       // "/" in map states, ":", ",", {" and "}" in background
-      function softEncode(s) {
+      function softEncode(s: string): string {
         return encodeURIComponent(s).replace(/(%2F|%3A|%2C|%7B|%7D)/g, decodeURIComponent);
       }
 
       return Object.keys(obj).map(key => {  // NO SORT
         return encodeURIComponent(key) + '=' + (
-          noencode ? softEncode(obj[key]) : encodeURIComponent(obj[key]));
+          noencode ? softEncode(String(obj[key])) : encodeURIComponent(String(obj[key])));
       }).join('&');
     }
   }
@@ -456,12 +516,12 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * _connectSplitWays
    * Call this sometimes to reassemble ways that were split by the server.
-   * @param  {Object}  ds - the dataset info
+   * @param ds - the dataset info
    */
-  _connectSplitWays(ds) {
+  _connectSplitWays(ds: DatasetCache): OsmWay[] {
     const context = this.context;
     const graph = ds.graph;
-    const results = [];
+    const results: OsmWay[] = [];
 
     // Check each way that shares this `origID`.
     // Pick one to be the "survivor" (it doesn't matter which one).
@@ -475,7 +535,7 @@ export class MapWithAIService extends AbstractSystem {
     //  see examples below
 
     for (const [origID, ways] of ds.splitWays) {
-      let survivor = graph.hasEntity(origID);   // if we've done this before, the graph will have it
+      let survivor: OsmWay | undefined = graph.hasEntity(origID) as OsmWay | undefined;   // if we've done this before, the graph will have it
 
       for (const candidate of ways) {
         if (!survivor || !survivor.nodes.length) {   // first time, just pick first way we see.
@@ -493,7 +553,7 @@ export class MapWithAIService extends AbstractSystem {
         // candidate.nodes = [J, I, H, G], indexes = [6, -1, 5, 4]     (splice into middle)
         // candidate.nodes = [M, L, K, J], indexes = [-1, -1, 7, 6]    (append at end)
         // candidate.nodes = [N, O, P, Q], indexes = [-1, -1, -1, -1]  (discontinuity)
-        const indexes = [];
+        const indexes: number[] = [];
         for (const nodeID of candidate.nodes) {
          indexes.push(survivor.nodes.indexOf(nodeID));
         }
@@ -511,7 +571,7 @@ export class MapWithAIService extends AbstractSystem {
         // To determine direction - do the matched (not `-1`) indexes go up or down?
         let isReverse = false;
         let onlyOneIndex = false;  // if only one matched index, we expect it at start or end
-        let prev;
+        let prev: number | undefined;
         for (const curr of indexes) {
           if (curr === -1) continue;   // ignore these
 
@@ -536,7 +596,7 @@ export class MapWithAIService extends AbstractSystem {
         }
 
         // Take nodes from either survivor or candidate
-        const nodeIDs = [];
+        const nodeIDs: EntityID[] = [];
         let s = 0;  // s = survivor index
 
         for (let c = 0; c < indexes.length; c++) {   // c = candidate index

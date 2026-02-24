@@ -6,7 +6,7 @@ export * from './actions/index.js';
 export * from './data/index.ts';
 export * from './geo/index.ts';
 export * from './lib/index.ts';
-export * from './services/index.js';
+export * from './services/index.ts';
 export * from './util/index.ts';
 export * from './validations/index.js';
 export * from './mocks.ts';

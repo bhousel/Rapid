@@ -27,7 +27,13 @@ export interface MarkerProps extends AbstractDataProps {
  *   `geoms`   Geometry object (inherited from `AbstractData`)
  *   `props`   Properties object (inherited from `AbstractData`)
  */
-export class Marker extends AbstractData<MarkerProps> {
+export class Marker<P extends MarkerProps = MarkerProps> extends AbstractData<P> {
+
+  // Narrow `props` from `Partial<P>` to `P`.
+  // The constructor accepts `Partial<P>` for flexibility (e.g. tests),
+  // but access sites can trust that required properties exist.
+  // `declare` emits no JavaScript — it only refines the type.
+  declare props: P;
 
   /**
    * @constructor
@@ -36,7 +42,7 @@ export class Marker extends AbstractData<MarkerProps> {
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: Marker | Context, props: Partial<MarkerProps> = {}) {
+  constructor(otherOrContext: Marker<P> | Context, props: Partial<P> = {}) {
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one
@@ -89,7 +95,7 @@ export class Marker extends AbstractData<MarkerProps> {
    * Markers should have a `loc` property to represent the location in WGS84 lat/lon
    * @readonly
    */
-  get loc(): Vec2 | undefined {
+  get loc(): Vec2 {
     return this.props.loc;
   }
 
@@ -99,7 +105,7 @@ export class Marker extends AbstractData<MarkerProps> {
    * For example 'keepright', 'maproulette', 'mapillary', etc.
    * @readonly
    */
-  get serviceID(): ServiceID | undefined {
+  get serviceID(): ServiceID {
     return this.props.serviceID;
   }
 

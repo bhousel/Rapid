@@ -53,7 +53,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     this._fovchanged = this._fovchanged.bind(this);
 
     if (this.supported) {
-      const mapillary = this.context.services.mapillary;
+      const mapillary = this.context.services.mapillary!;
       mapillary.on('bearingChanged', this._bearingchanged);
       mapillary.on('fovChanged', this._fovchanged);
       mapillary.on('imageChanged', () => {
@@ -300,7 +300,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         feature.setData(dataID, d);
 
         if (d.props.sequenceID) {
-          feature.addChildData(d.props.sequenceID, dataID);
+          feature.addChildData(d.props.sequenceID as string, dataID);
         }
       }
 
@@ -311,7 +311,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         const style: Partial<MatchedStyle> = Object.assign({}, MARKERSTYLE);
 
         if (feature.hasClass('selectphoto')) {  // selected photo style
-          style.viewfield!.angles = [this._viewerBearing ?? d.props.ca];
+          style.viewfield!.angles = [this._viewerBearing ?? (d.props.ca as number)];
           style.viewfield!.image = 'viewfield';
           style.viewfield!.opacity = 1;
           style.viewfield!.color = SELECTED;
@@ -322,7 +322,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
           style.viewfield!.scale = [s * fw, s * fl];
 
         } else {
-          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
+          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca as number] : [];  // ca = camera angle
           style.viewfield!.image = d.props.isPano ? 'pano' : 'viewfield';
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style

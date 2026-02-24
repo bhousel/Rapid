@@ -851,8 +851,8 @@ export class ImagerySystem extends AbstractSystem {
       const oldOffset = prevParams.get('offset') || '';
       if (newOffset !== oldOffset) {
         let [x, y] = newOffset.split(/[;,]/).map(s => s.trim()).map(Number);
-        if (isNaN(x) || !isFinite(x)) x = 0;
-        if (isNaN(y) || !isFinite(y)) y = 0;
+        if (!Number.isFinite(x)) x = 0;
+        if (!Number.isFinite(y)) y = 0;
         this.offset = geoMetersToOffset([x, y]) as Vec2;
       }
     });

@@ -5,8 +5,103 @@ import { Marker } from '../data/Marker.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+import type { MarkerProps } from '../data/Marker.ts';
+import type { Tile } from '@rapid-sdk/math';
+
+
+/** Properties specific to MapRoulette task markers */
+export interface MapRouletteTaskProps extends MarkerProps {
+  /** The parent challenge ID for this task */
+  parentId: string;
+  /** Whether this task is currently visible on the map */
+  isVisible: boolean;
+  /** Display title for the task */
+  title?: string;
+  /** Name of the parent challenge */
+  parentName?: string;
+  /** Challenge description text (may contain Mustache templates) */
+  description?: string;
+  /** Challenge instruction text (may contain Mustache templates) */
+  instruction?: string;
+  /** GeoJSON features associated with this task */
+  taskFeatures?: any;
+  /** Primary GeoJSON feature for this task */
+  taskFeature?: any;
+  /** Numeric status code for the task (e.g. 1 = Fixed) */
+  taskStatus?: number;
+  /** User comment submitted with the task update */
+  comment?: string;
+  /** API key for authenticating MapRoulette API requests */
+  mapRouletteApiKey?: string;
+  /** Geographic coordinates of the task */
+  point?: { lng: number; lat: number };
+}
+
+/** A MapRoulette task Marker with typed props */
+export type MapRouletteTask = Marker<MapRouletteTaskProps>;
+
+/** Zoom level used to tile data requests */
 const TILEZOOM = 14;
+/** Base URL for the MapRoulette REST API v2 */
 const MAPROULETTE_API = 'https://maproulette.org/api/v2';
+
+
+/** Status of a tile or challenge request */
+interface RequestEntry {
+  /** Current request state: 'inflight', 'loaded', or 'error' */
+  status?: string;
+  /** AbortController for cancelling an in-flight request */
+  controller?: AbortController;
+  /** The URL being fetched */
+  url?: string;
+}
+
+/** Closed task record */
+interface ClosedEntry {
+  /** ID of the closed task */
+  taskID: string;
+  /** ID of the challenge the closed task belongs to */
+  challengeID: string;
+}
+
+/** Challenge data from the MapRoulette API */
+interface ChallengeData {
+  /** Unique challenge identifier */
+  id: string;
+  /** Human-readable challenge name */
+  name?: string;
+  /** Whether the challenge is currently enabled */
+  enabled?: boolean;
+  /** Whether the challenge has been deleted */
+  deleted?: boolean;
+  /** Derived visibility flag (enabled and not deleted) */
+  isVisible?: boolean;
+  /** Instructions for completing the challenge (may contain Mustache templates) */
+  instruction?: string;
+  /** Description of the challenge */
+  description?: string;
+  /** Additional API-provided properties */
+  [key: string]: any;
+}
+
+/** Internal cache for MapRoulette data */
+interface MapRouletteCache {
+  /** Last viewport version used for tile loading, to avoid redundant work */
+  lastv: number | null;
+  /** Cached task Markers keyed by task ID */
+  tasks: Map<string, Marker>;
+  /** Cached challenge data keyed by challenge ID */
+  challenges: Map<string, ChallengeData>;
+  /** Tile request statuses keyed by tile ID */
+  tileRequest: Map<TileID, RequestEntry>;
+  /** Challenge request statuses keyed by challenge ID */
+  challengeRequest: Map<string, RequestEntry>;
+  /** In-flight fetch controllers keyed by URL */
+  inflight: Map<string, AbortController>;
+  /** Tasks closed during this editing session */
+  closed: ClosedEntry[];
+}
 
 
 /**
@@ -18,11 +113,23 @@ const MAPROULETTE_API = 'https://maproulette.org/api/v2';
  */
 export class MapRouletteService extends AbstractSystem {
 
+  /** Set of challenge IDs to filter tasks by (empty means show all visible) */
+  _challengeIDs: Set<string>;
+  /** Internal data cache for tasks, challenges, and request tracking */
+  _cache: MapRouletteCache;
+  /** Tiler instance for computing tile coverage at the configured zoom level */
+  _tiler: Tiler;
+
+  /** Whether flying to nearby tasks is enabled */
+  nearbyTaskEnabled: boolean;
+  /** The currently selected task */
+  currentTask: MapRouletteTask | null;
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'maproulette';
     this.requiredDependencies = new Set(['spatial']);
@@ -30,9 +137,11 @@ export class MapRouletteService extends AbstractSystem {
     this.autoStart = false;
 
     this._challengeIDs = new Set();  // Set<string> - if we want to filter only a specific challengeID
+    this.nearbyTaskEnabled = false;
+    this.currentTask = null;
 
-    this._cache = {};
-    this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
+    this._cache = {} as MapRouletteCache;
+    this._tiler = (new Tiler().zoomRange(TILEZOOM) as Tiler).skipNullIsland(true) as Tiler;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -43,9 +152,9 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -65,9 +174,9 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -75,11 +184,11 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     if (this._cache.inflight) {
-      for (const controller of this._cache.inflight) {
+      for (const controller of this._cache.inflight.values()) {
         controller.abort();
       }
     }
@@ -94,7 +203,7 @@ export class MapRouletteService extends AbstractSystem {
       closed: []                    // Array<{ challengeID, taskID }>
     };
 
-    const spatial = this.context.systems.spatial;
+    const spatial = this.context.systems.spatial!;
     spatial.clearCache('maproulette');
 
     return Promise.resolve();
@@ -105,11 +214,11 @@ export class MapRouletteService extends AbstractSystem {
    * challengeID
    * set/get the challengeIDs (as a string of comma-separated values)
    */
-  get challengeIDs() {
+  get challengeIDs(): string {
     return [...this._challengeIDs].join(',');
   }
 
-  set challengeIDs(ids = '') {
+  set challengeIDs(ids: string) {
     const str = ids.toString();
     const vals = str.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
@@ -117,8 +226,7 @@ export class MapRouletteService extends AbstractSystem {
     this._challengeIDs.clear();
     for (const val of vals) {
       const num = +val;
-      const valIsNumber = (!isNaN(num) && isFinite(num));
-      if (valIsNumber) {
+      if (Number.isFinite(num)) {
         this._challengeIDs.add(val);  // keep the string
       }
     }
@@ -131,16 +239,16 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @return  {Array<Marker>}  Array of data
+   * @return Array of data
    */
-  getData() {
-    const spatial = this.context.systems.spatial;
+  getData(): MapRouletteTask[] {
+    const spatial = this.context.systems.spatial!;
 
-    return spatial.getVisibleData('maproulette')
-      .map(hit => hit.contents)
+    return (spatial.getVisibleData('maproulette')
+      .map(hit => hit.contents) as MapRouletteTask[])
       .filter(task => {
         if (this._challengeIDs.size) {
-          return this._challengeIDs.has(task.props.parentId);  // ignore isVisible if it's in the list
+          return this._challengeIDs.has(task.props.parentId as string);  // ignore isVisible if it's in the list
         } else {
           return task.props.isVisible;
         }
@@ -150,21 +258,21 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * getTask
-   * @param   {string}   dataID
-   * @return  {Marker?}  The task with that id, or `undefined` if not found
+   * @param dataID
+   * @return The task with that id, or `undefined` if not found
    */
-  getTask(dataID) {
-    const spatial = this.context.systems.spatial;
-    return spatial.getData('maproulette', dataID);
+  getTask(dataID: DataID): MapRouletteTask | undefined {
+    const spatial = this.context.systems.spatial!;
+    return spatial.getData<MapRouletteTask>('maproulette', dataID);
   }
 
 
   /**
    * getChallenge
-   * @param   {string}   challengeID
-   * @return  {Object?}  The challenge with that id, or `undefined` if not found
+   * @param challengeID
+   * @return The challenge with that id, or `undefined` if not found
    */
-  getChallenge(challengeID) {
+  getChallenge(challengeID: string): ChallengeData | undefined {
     return this._cache.challenges.get(challengeID);
   }
 
@@ -173,11 +281,11 @@ export class MapRouletteService extends AbstractSystem {
    * loadTiles
    * Schedule any data requests needed to cover the current map view
    */
-  loadTiles() {
+  loadTiles(): void {
     if (this._paused) return;
 
     const context = this.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
     const cache = this._cache;
 
@@ -192,8 +300,8 @@ export class MapRouletteService extends AbstractSystem {
       if (request.status !== 'inflight') continue;
       const isNeeded = tiles.some(tile => tile.id === tileID);
       if (!isNeeded) {
-        request.controller.abort();
-        cache.inflight.delete(request.url);
+        request.controller!.abort();
+        cache.inflight.delete(request.url!);
       }
     }
 
@@ -209,11 +317,11 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * loadTile
    * Load a single tile of data.
-   * @param  {Tile}  tile - Tile to load
+   * @param tile - Tile to load
    */
-  loadTile(tile) {
+  loadTile(tile: Tile): void {
     const context = this.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
 
     const cache = this._cache;
     if (cache.tileRequest.has(tile.id)) return;
@@ -257,12 +365,12 @@ export class MapRouletteService extends AbstractSystem {
    * loadChallenges
    * Schedule any data requests needed for challenges we are interested in
    */
-  loadChallenges() {
+  loadChallenges(): void {
     if (this._paused) return;
 
     const context = this.context;
     const gfx = context.systems.gfx;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
     const cache = this._cache;
 
     for (const [challengeID, val] of cache.challengeRequest) {
@@ -318,10 +426,10 @@ export class MapRouletteService extends AbstractSystem {
    * loadTaskDetailAsync
    * This loads the challenge instructions and adds it to an existing task.
    * @see https://maproulette.org/docs/swagger-ui/index.html#/Challenge/read
-   * @param   {Marker}  task
-   * @return  {Promise}
+   * @param task
+   * @return Promise resolved with the task
    */
-  loadTaskDetailAsync(task) {
+  loadTaskDetailAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
     if (task.props.description !== undefined) return Promise.resolve(task);  // already done
 
     const challengeID = task.props.parentId;
@@ -343,10 +451,10 @@ export class MapRouletteService extends AbstractSystem {
    * This loads the task features geojson and adds it to an existing task.
    * Those properties are used to replace the Mustache tags in the challenge.instruction/.description.
    * @see https://maproulette.org/docs/swagger-ui/index.html#/Task/read
-   * @param   {Marker}   task
-   * @return  {Promise}  Promise resolved when we've fetched the task details
+   * @param task
+   * @return Promise resolved when we've fetched the task details
    */
-  loadTaskFeaturesAsync(task) {
+  loadTaskFeaturesAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
     if (task.props.taskFeatures !== undefined) return Promise.resolve(task);  // already done
 
     const url = `${MAPROULETTE_API}/task/${task.id}`;
@@ -362,10 +470,10 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * postUpdate
-   * @param   {Marker}    task
-   * @param   {function}  callback
+   * @param task
+   * @param callback
    */
-  postUpdate(task, callback) {
+  postUpdate(task: MapRouletteTask, callback?: (err: string | null, task?: MapRouletteTask) => void): void {
     const cache = this._cache;
 
     const taskID = task.id;
@@ -384,7 +492,7 @@ export class MapRouletteService extends AbstractSystem {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apiKey': apikey
+          'apiKey': apikey as string
         },
         body: JSON.stringify({ actionId: 2, comment: taskComment }),
         signal: commentController.signal
@@ -416,7 +524,7 @@ export class MapRouletteService extends AbstractSystem {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'apiKey': apikey
+          'apiKey': apikey as string
         },
         signal: updateTaskController.signal
       })
@@ -425,7 +533,7 @@ export class MapRouletteService extends AbstractSystem {
         return fetch(releaseTaskUrl, {
           signal: releaseTaskController.signal,
           headers: {
-            'apiKey': apikey
+            'apiKey': apikey as string
           }
         });
       })
@@ -433,9 +541,9 @@ export class MapRouletteService extends AbstractSystem {
       .then(() => {
         // All requests completed successfully
         if (taskStatus === 1) {  // only counts if the use chose "I Fixed It".
-          this._cache.closed.push({ taskID: taskID, challengeID: challengeID });
+          this._cache.closed.push({ taskID: taskID as string, challengeID: challengeID as string });
         }
-        this.removeTask(task);
+        this.removeItem(task);
         this.context.enter('browse');
         if (callback) callback(null, task);
       })
@@ -458,13 +566,13 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * replaceItem
    * Replace a single item in the cache
-   * @param   {Marker}  item to replace
-   * @return  {Marker}  the item, or `null` if it couldn't be replaced
+   * @param item - item to replace
+   * @return the item, or `null` if it couldn't be replaced
    */
-  replaceItem(item) {
+  replaceItem(item: MapRouletteTask): MapRouletteTask | null {
     if (!(item instanceof Marker) || !item.id) return null;
 
-    const spatial = this.context.systems.spatial;
+    const spatial = this.context.systems.spatial!;
     spatial.replaceData('maproulette', item);
     return item;
   }
@@ -473,12 +581,12 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * removeItem
    * Remove a single item from the cache
-   * @param  {Marker}  item to remove
+   * @param item - item to remove
    */
-  removeItem(item) {
+  removeItem(item: MapRouletteTask): void {
     if (!(item instanceof Marker) || !item.id) return;
 
-    const spatial = this.context.systems.spatial;
+    const spatial = this.context.systems.spatial!;
     spatial.removeData('maproulette', item);
   }
 
@@ -486,9 +594,9 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * getClosed
    * Get details about all tasks closed in this session
-   * @return  {Array<*>}  Array of objects
+   * @return Array of closed task entries
    */
-  getClosed() {
+  getClosed(): ClosedEntry[] {
     return this._cache.closed;
   }
 
@@ -496,11 +604,11 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * flyToNearbyTask
    * Initiates the process to find and fly to a nearby task based on the current task's challenge ID and task ID.
-   * @param  {Marker}  task - The current task containing task details.
+   * @param task - The current task containing task details.
    */
-  flyToNearbyTask(task) {
+  flyToNearbyTask(task: MapRouletteTask): void {
     if (!this.nearbyTaskEnabled) return;
-    const challengeID = task.props.parentId;
+    const challengeID = task.props.parentId as string;
     const taskID = task.id;
     if (!challengeID || !taskID) return;
     this.filterNearbyTasks(challengeID, taskID);
@@ -510,10 +618,10 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * getChallengeDetails
    * Retrieves challenge details from cache or API.
-   * @param    {string}   challengeID - The ID of the challenge.
-   * @returns  {Promise}  Promise resolving with challenge data.
+   * @param challengeID - The ID of the challenge.
+   * @returns Promise resolving with challenge data.
    */
-  getChallengeDetails(challengeID) {
+  getChallengeDetails(challengeID: string): Promise<ChallengeData> {
 // Why is this different from what `loadChallenges()` does???
     const cachedChallenge = this._cache.challenges.get(challengeID);
     if (cachedChallenge) {
@@ -529,17 +637,17 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * filterNearbyTasks
    * Fetches nearby tasks for a given challenge and task ID, and flies to the nearest task.
-   * @param  {string}  challengeID - The ID of the challenge.
-   * @param  {string}  taskID - The ID of the current task.
-   * @param  {number}  [zoom] - Optional zoom level for the map.
+   * @param challengeID - The ID of the challenge.
+   * @param taskID - The ID of the current task.
+   * @param zoom - Optional zoom level for the map.
    */
-  filterNearbyTasks(challengeID, taskID, zoom) {
+  filterNearbyTasks(challengeID: string, taskID: string, zoom?: number): void {
     const nearbyTasksUrl = `${MAPROULETTE_API}/challenge/${challengeID}/tasksNearby/${taskID}?excludeSelfLocked=true&limit=1`;
     if (!taskID) return;
 
     fetch(nearbyTasksUrl)
       .then(utilFetchResponse)
-      .then(nearbyTasks => {
+      .then((nearbyTasks: any[]) => {
         if (!nearbyTasks?.length) return;  // no nearby tasks?
 
         const props = nearbyTasks[0];
@@ -558,7 +666,9 @@ export class MapRouletteService extends AbstractSystem {
             task.touch();
 
             const map = this.context.systems.map;
-            map?.centerZoomEase(task.loc, zoom);
+            if (task.loc && zoom !== undefined) {
+              map?.centerZoomEase(task.loc, zoom);
+            }
             this.selectAndDisplayTask(task);
           });
       })
@@ -571,13 +681,13 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * selectAndDisplayTask
    * Selects a task and updates the sidebar reflect the selection
-   * @param  {Marker}  task - The task to be selected
+   * @param task - The task to be selected
    */
-  selectAndDisplayTask(task) {
+  selectAndDisplayTask(task: MapRouletteTask): void {
     if (!(task instanceof Marker)) return;
 
     this.currentTask = task;
-    const selection = new Map().set(task.id, task);
+    const selection = new Map<string, Marker>().set(task.id, task);
     this.context.enter('select', { selection });
   }
 
@@ -585,10 +695,10 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * itemURL
    * Returns the URL for user to visit for information about the task and challenge.
-   * @param   {Marker}  task
-   * @return  {string}  the url
+   * @param task
+   * @return the url
    */
-  itemURL(task) {
+  itemURL(task: MapRouletteTask): string {
     const challengeID = task.props.parentId;
     return `https://maproulette.org/challenge/${challengeID}/task/${task.id}`;
   }
@@ -597,18 +707,18 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * _cacheTask
    * Store the given task in the cache
-   * @param   {Object}  props - the task properties
-   * @return  {Marker}  The task
+   * @param props - the task properties
+   * @return The task
    */
-  _cacheTask(props) {
+  _cacheTask(props: Record<string, any>): MapRouletteTask {
     const context = this.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
 
     const cache = this._cache;
     const taskID = props.id.toString();
     const challengeID = props.parentId.toString();
 
-    let task = spatial.getData('maproulette', taskID);
+    let task = spatial.getData<MapRouletteTask>('maproulette', taskID);
     if (task) return task;  // seen it already
 
     // Have we seen this challenge before?
@@ -626,7 +736,7 @@ export class MapRouletteService extends AbstractSystem {
     props.serviceID = this.id;
 
     // Create a Marker for the task
-    task = new Marker(context, props);
+    task = new Marker<MapRouletteTaskProps>(context, props as Partial<MapRouletteTaskProps>);
     spatial.addData('maproulette', task);
 
     return task;
@@ -636,10 +746,10 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * _hashChanged
    * Respond to any changes appearing in the url hash
-   * @param  {Map<string, string>}  currParams - The current hash parameters
-   * @param  {Map<string, string>}  prevParams - The previous hash parameters
+   * @param currParams - The current hash parameters
+   * @param prevParams - The previous hash parameters
    */
-  _hashChanged(currParams, prevParams) {
+  _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const scene = this.context.systems.gfx?.scene;
     if (!scene) return;  // test environment?
 
@@ -661,8 +771,7 @@ export class MapRouletteService extends AbstractSystem {
         }
         // Try the value as a number, but reject things like NaN, null, Infinity
         const num = +val;
-        const valIsNumber = (!isNaN(num) && isFinite(num));
-        if (valIsNumber) {
+        if (Number.isFinite(num)) {
           isEnabled = true;
           this._challengeIDs.add(val);  // keep the string
         }
@@ -681,7 +790,7 @@ export class MapRouletteService extends AbstractSystem {
    * _mapRouletteChanged
    * Push changes in MapRoulette state to the urlhash
    */
-  _mapRouletteChanged() {
+  _mapRouletteChanged(): void {
     const context = this.context;
     const urlhash = context.systems.urlhash;
     const scene = context.systems.gfx?.scene;

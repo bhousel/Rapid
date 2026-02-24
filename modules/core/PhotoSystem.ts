@@ -458,7 +458,7 @@ export class PhotoSystem extends AbstractSystem {
       scene?.setClass('selectphoto', layerID, photoID);
 
       // Try to show the viewer with the image selected..
-      service.selectImageAsync(photoID)
+      (service as any).selectImageAsync(photoID)
         .then((photo: any) => {
           if (!photo) return;
           if (photo.id !== this._currPhotoID) return;  // exit if something else is now selected
@@ -511,7 +511,7 @@ export class PhotoSystem extends AbstractSystem {
 
       // Try to highlight any photos that show this detection,
       // And try to select a photo in the viewer that shows it.
-      service.selectDetectionAsync(detectionID)
+      (service as any).selectDetectionAsync(detectionID)
         .then((detection: any) => {
           if (!detection) return;
           if (detection.id !== this._currDetectionID) return;  // exit if something else is now selected
@@ -547,7 +547,7 @@ export class PhotoSystem extends AbstractSystem {
           // (note: make sure the detection actually has a location, see Rapid#1557)
           if (detection.loc && (!this._currPhotoID || this._currPhotoID !== bestPhotoID)) {
             const extent = new Extent(detection.loc);
-            const bestPhoto = service.getImage(bestPhotoID);
+            const bestPhoto = (service as any).getImage(bestPhotoID);
             if (bestPhoto?.loc) {
               extent.extendSelf(bestPhoto.loc);
             }
@@ -678,7 +678,7 @@ export class PhotoSystem extends AbstractSystem {
     if (!layerID || !photoID) return;   // nothing to show
 
     const service = context.services[layerID];
-    service?.showViewer();
+    (service as any)?.showViewer();
   }
 
 
@@ -692,7 +692,7 @@ export class PhotoSystem extends AbstractSystem {
         this.selectPhoto();  // deselect
       }
       const service = this.context.services[layerID];
-      service?.hideViewer();
+      (service as any)?.hideViewer();
     }
   }
 

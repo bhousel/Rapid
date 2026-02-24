@@ -13,11 +13,11 @@ import type { DataConstructor } from './types.ts';
  */
 export interface AbstractDataProps {
   /** Unique identifier for this data element */
-  id: string;
+  id?: string;
   /** String describing what kind of data element this is (e.g. 'node', 'way', 'relation') */
-  type: string;
+  type?: string;
   /** Internal version number, used to detect changes */
-  v: number;
+  v?: number;
   /** Extra properties are allowed */
   [key: string]: unknown;
 }

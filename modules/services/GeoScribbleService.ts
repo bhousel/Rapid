@@ -5,9 +5,23 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { GeoJSON } from '../data/GeoJSON.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+import type { Tile } from '@rapid-sdk/math';
 
+
+/** Zoom level used for tiling GeoScribble data requests */
 const TILEZOOM = 14;
+/** Base URL for the GeoScribble GeoJSON API endpoint */
 const GEOSCRIBBLE_API = 'https://geoscribble.osmz.ru/geojson';
+
+
+/** Internal cache for GeoScribble tile data */
+interface GeoScribbleCache {
+  /** Map of in-progress tile requests, keyed by tile ID, with their AbortControllers */
+  inflight: Map<TileID, AbortController>;
+  /** Viewport version number from the last data fetch, used to skip redundant loads */
+  lastv: number | null;
+}
 
 
 /**
@@ -19,29 +33,33 @@ const GEOSCRIBBLE_API = 'https://geoscribble.osmz.ru/geojson';
  * @see https://github.com/Zverik/geoscribble
  */
 export class GeoScribbleService extends AbstractSystem {
+  /** Internal cache holding in-flight requests and viewport version tracking */
+  _cache: GeoScribbleCache;
+  /** Tiler instance used to compute which tiles cover the current viewport */
+  _tiler: Tiler;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'geoscribble';
     this.requiredDependencies = new Set(['spatial']);
     this.optionalDependencies = new Set(['gfx']);
     this.autoStart = false;
 
-    this._cache = {};
-    this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
+    this._cache = {} as GeoScribbleCache;
+    this._tiler = (new Tiler().zoomRange(TILEZOOM) as Tiler).skipNullIsland(true) as Tiler;
   }
 
 
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -52,9 +70,9 @@ export class GeoScribbleService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -62,9 +80,9 @@ export class GeoScribbleService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     if (this._cache.inflight) {
       for (const controller of this._cache.inflight.values()) {
         controller.abort();
@@ -76,7 +94,7 @@ export class GeoScribbleService extends AbstractSystem {
       lastv:     null         // viewport version last time we fetched data
     };
 
-    const spatial = this.context.systems.spatial;
+    const spatial = this.context.systems.spatial!;
     spatial.clearCache('geoscribble');
 
     return Promise.resolve();
@@ -86,10 +104,10 @@ export class GeoScribbleService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @return  {Array<GeoJSON>}  Array of data
+   * @return  Array of data
    */
-  getData() {
-    const spatial = this.context.systems.spatial;
+  getData(): any[] {
+    const spatial = this.context.systems.spatial!;
     return spatial.getVisibleData('geoscribble').map(hit => hit.contents);
   }
 
@@ -98,10 +116,10 @@ export class GeoScribbleService extends AbstractSystem {
    * loadTiles
    * Schedule any data requests needed to cover the current map view
    */
-  loadTiles() {
+  loadTiles(): void {
     const cache = this._cache;
     const context = this.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
 
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
@@ -124,7 +142,7 @@ export class GeoScribbleService extends AbstractSystem {
       if (spatial.hasTile('geoscribble', tileID) || cache.inflight.has(tileID)) continue;
 
       const rect = tile.wgs84Extent.rectangle().join(',');
-      const url = GEOSCRIBBLE_API + '?' + utilQsString({ bbox: rect });
+      const url = GEOSCRIBBLE_API + '?' + utilQsString({ bbox: rect }, false);
 
       const controller = new AbortController();
       cache.inflight.set(tileID, controller);
@@ -147,13 +165,13 @@ export class GeoScribbleService extends AbstractSystem {
   /**
    * _gotTile
    * Parse the response from the tile fetch
-   * @param  {Tile}    tile - Tile data
-   * @param  {Object}  response - Response data
+   * @param tile - Tile data
+   * @param response - Response data
    */
-  _gotTile(tile, response) {
+  _gotTile(tile: Tile, response: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
 
     spatial.addTiles('geoscribble', [tile]);   // mark as loaded
 
@@ -161,7 +179,7 @@ export class GeoScribbleService extends AbstractSystem {
       throw new Error('Invalid response');
     }
 
-    const toLoad = [];
+    const toLoad: GeoJSON[] = [];
     for (const feature of response.features) {
       toLoad.push(new GeoJSON(context, { serviceID: this.id, geojson: feature }));
     }

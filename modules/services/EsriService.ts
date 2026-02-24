@@ -6,11 +6,102 @@ import { Graph, RapidDataset, Tree } from '../lib/index.ts';
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { OsmNodeProps, OsmRelationProps, OsmWayProps, Tags } from '../data/types.ts';
+import type { Tile, Vec2 } from '@rapid-sdk/math';
 
+
+/** ArcGIS group ID for the OpenStreetMap community datasets */
 const GROUPID = 'bdf6c800b3ae453b9db239e03d7c1727';
+/** Base URL for the ArcGIS REST content API */
 const APIROOT = 'https://openstreetmap.maps.arcgis.com/sharing/rest/content';
+/** Base URL for the ArcGIS home web UI */
 const HOMEROOT = 'https://openstreetmap.maps.arcgis.com/home';
+/** Zoom level used by the tiler for fetching Esri data tiles */
 const TILEZOOM = 14;
+
+
+/**
+ * Internal cache structure for tracking tile fetching state per dataset.
+ */
+interface EsriTileCache {
+  /** In-flight tile requests, keyed by tileID, with their AbortControllers */
+  inflight: Map<string, AbortController>;
+  /** Tiles that have been fully loaded, keyed by tileID */
+  loaded: Map<string, Tile>;
+  /** Set of feature IDs already parsed, to avoid duplicates across tiles */
+  seen: Set<string>;
+}
+
+/**
+ * Internal structure for a single Esri dataset, including its metadata
+ * from ArcGIS, the local Graph/Tree, and tile cache.
+ */
+interface EsriDatasetEntry {
+  /** Unique dataset identifier from ArcGIS */
+  id: DatasetID;
+  /** Human-readable title of the dataset */
+  title: string;
+  /** Short description/summary of the dataset */
+  snippet: string;
+  /** Filename of the dataset's thumbnail image */
+  thumbnail: string;
+  /** Feature server URL for querying data */
+  url: string;
+  /** Internal name of the dataset (used in source tags) */
+  name: string;
+  /** Geographic bounding extent as [min, max] coordinates, or null if not set */
+  extent: Vec2[] | null;
+  /** ArcGIS group category paths for this dataset */
+  groupCategories: string[];
+  /** License/attribution information HTML from ArcGIS */
+  licenseInfo: string;
+  /** Local graph holding the parsed OSM entities for this dataset */
+  graph: Graph;
+  /** Spatial index tree for efficient extent-based lookups */
+  tree: Tree;
+  /** Tile fetch state tracking for this dataset */
+  cache: EsriTileCache;
+  /** Last viewport version number, used to skip redundant tile loads */
+  lastv: number | null;
+  /** Layer schema info (fields, tagmap) loaded from the feature server */
+  layer: EsriLayer | null;
+  /** Allow additional ArcGIS metadata fields */
+  [key: string]: any;
+}
+
+/**
+ * Layer schema information from the ArcGIS feature server.
+ */
+interface EsriLayer {
+  /** Numeric layer ID on the feature server */
+  id: number;
+  /** Array of field metadata describing the layer's schema */
+  fields: EsriField[];
+  /** Maximum number of records the server returns per request */
+  maxRecordCount?: number;
+  /** Mapping from Esri field names to OSM tag keys */
+  tagmap: Record<string, string>;
+  /** Name of the field used as the unique object identifier */
+  idfield: string;
+  /** Allow additional layer metadata fields */
+  [key: string]: any;
+}
+
+/**
+ * Field metadata from an Esri layer.
+ */
+interface EsriField {
+  /** Internal field name in the Esri layer */
+  name: string;
+  /** Display alias, used as the OSM tag key */
+  alias: string;
+  /** Esri field type (e.g. 'esriFieldTypeOID', 'esriFieldTypeString') */
+  type: string;
+  /** Whether this field is editable; non-editable fields are skipped in the tagmap */
+  editable: boolean;
+}
 
 
 /**
@@ -21,19 +112,25 @@ const TILEZOOM = 14;
  * @see https://developers.arcgis.com/rest/
  */
 export class EsriService extends AbstractSystem {
+  /** Tiler instance configured for the Esri tile zoom level */
+  _tiler: Tiler;
+  /** Map of all known Esri datasets, keyed by DatasetID */
+  _datasets: Map<DatasetID, EsriDatasetEntry>;
+  /** Cached promise for the initial dataset catalog load, to avoid duplicate fetches */
+  _datasetsPromise: Promise<Map<DatasetID, EsriDatasetEntry>> | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'esri';
     this.requiredDependencies = new Set(['spatial']);
     this.optionalDependencies = new Set(['gfx', 'locations']);
 
-    this._tiler = new Tiler().zoomRange(TILEZOOM);
-    this._datasets = new Map();  // Map<datasetID, Object>
+    this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
+    this._datasets = new Map();
 
     this._datasetsPromise = null;
   }
@@ -42,23 +139,24 @@ export class EsriService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
       .then(() => this.resetAsync())
-      .then(() => this._loadDatasetsAsync());
+      .then(() => this._loadDatasetsAsync())
+      .then(() => {});  // discard _loadDatasetsAsync result to return Promise<void>
   }
 
 
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -66,9 +164,9 @@ export class EsriService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     for (const [datasetID, ds] of this._datasets) {
       for (const controller of ds.cache.inflight.values()) {
         controller.abort();
@@ -91,9 +189,9 @@ export class EsriService extends AbstractSystem {
   /**
    * getAvailableDatasets
    * Called by `RapidSystem` to get the datasets that this service provides.
-   * @return  {Array<RapidDataset>}  The datasets this service provides
+   * @return The datasets this service provides
    */
-  getAvailableDatasets() {
+  getAvailableDatasets(): RapidDataset[] {
     // Convert the internal dataset objects into "Rapid" datasets for the catalog.
     // We expect them to be all loaded now because `_loadDatasetsAsync` is called by `initAsync`
     //  and `getAvailableDatasets` is called by RapidSystem's `startAsync`.
@@ -135,10 +233,10 @@ export class EsriService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @param   {string}         datasetID - datasetID to get data for
-   * @return  {Array<Entity>}  Array of data (OSM Entities)
+   * @param datasetID - datasetID to get data for
+   * @return Array of data (OSM Entities)
    */
-  getData(datasetID) {
+  getData(datasetID: DatasetID): OsmEntity[] {
     const ds = this._datasets.get(datasetID);
     if (!ds || !ds.tree || !ds.graph) return [];
 
@@ -150,10 +248,10 @@ export class EsriService extends AbstractSystem {
   /**
    * graph
    * Returns the graph for the given datasetID
-   * @param   {string}  datasetID - datasetID to get data for
-   * @return  {Graph?}  The graph holding the data, or `undefined` if not found
+   * @param datasetID - datasetID to get data for
+   * @return The graph holding the data, or `undefined` if not found
    */
-  graph(datasetID)  {
+  graph(datasetID: DatasetID): Graph | undefined {
     const ds = this._datasets.get(datasetID);
     return ds?.graph;
   }
@@ -165,10 +263,10 @@ export class EsriService extends AbstractSystem {
    * For Rapid#1309 we need to change the "data used" string from
    * 'Google Buildings for <Country>' to 'Google Open Buildings'.
    * All other titles are returned unmodified.
-   * @param   {string}  title - the title to consider
-   * @return  {string}  The same title in most cases, or the proper google buildings title if applicable.
+   * @param title - the title to consider
+   * @return The same title in most cases, or the proper google buildings title if applicable.
    */
-  getDataUsed(title) {
+  getDataUsed(title: string): string {
     if (title.startsWith('Google Buildings for')) {
       return 'Google Open Buildings';
     } else {
@@ -180,10 +278,10 @@ export class EsriService extends AbstractSystem {
   /**
    * loadTiles
    * Schedule any data requests needed to cover the current map view
-   * @param   {string}  datasetID - datasetID to load tiles for
-   * @throws  Will throw if the datasetID is not found
+   * @param datasetID - datasetID to load tiles for
+   * @throws Will throw if the datasetID is not found
    */
-  loadTiles(datasetID) {
+  loadTiles(datasetID: DatasetID): void {
     if (this._paused) return;
 
     const ds = this._datasets.get(datasetID);
@@ -240,14 +338,14 @@ export class EsriService extends AbstractSystem {
   /**
    * _loadDatasetsAsync
    * Loads all the available datasets from the Esri server
-   * @return  {Promise}  Promise resolved when all pages of datasets have been loaded
+   * @return Promise resolved when all pages of datasets have been loaded
    */
-  _loadDatasetsAsync() {
+  _loadDatasetsAsync(): Promise<Map<DatasetID, EsriDatasetEntry>> {
     if (this._datasetsPromise) return this._datasetsPromise;
 
     return this._datasetsPromise = new Promise((resolve, reject) => {
       // recursively fetch all pages of data
-      const fetchMore = (page) => {
+      const fetchMore = (page: number): void => {
         fetch(this._searchURL(page))
           .then(utilFetchResponse)
           .then(json => {
@@ -274,9 +372,9 @@ export class EsriService extends AbstractSystem {
   /**
    * _parseDataset
    * Add this dataset to the list of available datasets
-   * @param  {Object}  ds - the dataset metadata
+   * @param ds - the dataset metadata from ArcGIS
    */
-  _parseDataset(ds) {
+  _parseDataset(ds: any): void {
     if (this._datasets.has(ds.id)) return;  // unless we've seen it already
 
     this._datasets.set(ds.id, ds);
@@ -306,10 +404,10 @@ export class EsriService extends AbstractSystem {
    * _loadDatasetLayerAsync
    * Each dataset has a schema (aka "tagmap") which is available behind the "layerUrl".
    * Before we can use the dataset we need to load this information.
-   * @param   {Object}   ds - the dataset to load the schema informarion
-   * @return  {Promise}  Promise resolved with the layer data when the dataset schema has been loaded
+   * @param ds - the dataset to load the schema information
+   * @return Promise resolved with the layer data when the dataset schema has been loaded
    */
-  _loadDatasetLayerAsync(ds) {
+  _loadDatasetLayerAsync(ds: EsriDatasetEntry): Promise<EsriLayer | void> {
     if (!ds || !ds.url) {
       return Promise.reject(`No dataset`);
     } else if (ds.layer) {    // done already
@@ -323,19 +421,20 @@ export class EsriService extends AbstractSystem {
           throw new Error(`Missing layer info for datasetID: ${ds.id}`);
         }
 
-        ds.layer = json.layers[0];  // should return a single layer
+        const layer: EsriLayer = json.layers[0];  // should return a single layer
+        ds.layer = layer;
 
         // Use the field metadata to map to OSM tags
-        let tagmap = {};
-        for (const f of ds.layer.fields) {
+        const tagmap: Record<string, string> = {};
+        for (const f of layer.fields) {
           if (f.type === 'esriFieldTypeOID') {  // this is an id field, remember it
-            ds.layer.idfield = f.name;
+            layer.idfield = f.name;
           }
           if (!f.editable) continue;   // 1. keep "editable" fields only
           tagmap[f.name] = f.alias;    // 2. field `name` -> OSM tag (stored in `alias`)
         }
-        ds.layer.tagmap = tagmap;
-        return ds.layer;
+        layer.tagmap = tagmap;
+        return layer;
       })
       .catch(e => {
         if (e.name === 'AbortError') return;
@@ -348,10 +447,10 @@ export class EsriService extends AbstractSystem {
    * _searchURL
    * Returns the URL used to search ArcGIS for datasets.
    * @see https://developers.arcgis.com/rest/users-groups-and-items/search.htm
-   * @param   {number}  start - the starting page
-   * @return  {string}  the url to fetch the datasets
+   * @param start - the starting page
+   * @return the url to fetch the datasets
    */
-  _searchURL(start) {
+  _searchURL(start: number): string {
     const params = {
       f: 'json',
       sortField: 'title',
@@ -359,7 +458,7 @@ export class EsriService extends AbstractSystem {
       num: 100,
       start: start
     };
-    return `${APIROOT}/groups/${GROUPID}/search?` + utilQsString(params);
+    return `${APIROOT}/groups/${GROUPID}/search?` + utilQsString(params, false);
     // use to get
     // .results[]
     //   .extent
@@ -373,10 +472,10 @@ export class EsriService extends AbstractSystem {
   /**
    * _layerURL
    * Returns the URL used to get available layers from a ArcGIS feature server.
-   * @param   {string}  featureServerURL - The feature server URL
-   * @return  {string}  The url to fetch the layers
+   * @param featureServerURL - The feature server URL
+   * @return The url to fetch the layers
    */
-  _layerURL(featureServerURL) {
+  _layerURL(featureServerURL: string): string {
     return `${featureServerURL}/layers?f=json`;
     // should return single layer(?)
     // .layers[0]
@@ -388,14 +487,14 @@ export class EsriService extends AbstractSystem {
   /**
    * _tileURL
    * Returns the URL used to get available data on a given dataset and tile.
-   * @param   {Object}  ds - the dataset to fetch data for
-   * @param   {Object}  tile - the tile to fetch the data for
-   * @param   {number}  page - what page of data to fetch (zero-based)
-   * @return  {string}  The url to fetch the data
+   * @param ds - the dataset to fetch data for
+   * @param tile - the tile to fetch the data for
+   * @param page - what page of data to fetch (zero-based)
+   * @return The url to fetch the data
    */
-  _tileURL(ds, tile, page = 0) {
-    const layerID = ds.layer.id;
-    const maxRecordCount = ds.layer.maxRecordCount || 2000;
+  _tileURL(ds: EsriDatasetEntry, tile: Tile, page: number = 0): string {
+    const layerID = ds.layer!.id;
+    const maxRecordCount = ds.layer!.maxRecordCount || 2000;
     const extent = tile.wgs84Extent;
     const resultOffset = maxRecordCount * page;
 
@@ -408,19 +507,18 @@ export class EsriService extends AbstractSystem {
       resultOffset: resultOffset,
       resultRecordCount: maxRecordCount
     };
-    return `${ds.url}/${layerID}/query?` + utilQsString(params);
+    return `${ds.url}/${layerID}/query?` + utilQsString(params, false);
   }
 
 
   /**
    * _loadTilePage
    * Get available data for a given dataset from its feature server
-   * @param   {Object}  ds - the dataset to fetch data for
-   * @param   {Object}  tile - the tile to fetch the data for
-   * @param   {number}  page - what page of data to fetch (zero-based)
-   * @return  {string}  The url to fetch data from
+   * @param ds - the dataset to fetch data for
+   * @param tile - the tile to fetch the data for
+   * @param page - what page of data to fetch (zero-based)
    */
-  _loadTilePage(ds, tile, page) {
+  _loadTilePage(ds: EsriDatasetEntry, tile: Tile, page: number): void {
     const cache = ds.cache;
     const tileID = tile.id;
     if (cache.loaded.has(tileID)) return;
@@ -436,8 +534,10 @@ export class EsriService extends AbstractSystem {
 
         this._parseTile(ds, tile, geojson, (err, results) => {
           if (err) throw new Error(err);
-          ds.graph.rebase(results);
-          ds.tree.rebase(results);
+          if (results) {
+            ds.graph.rebase(results);
+            ds.tree.rebase(results);
+          }
         });
         return geojson.properties?.exceededTransferLimit;
       })
@@ -468,20 +568,20 @@ export class EsriService extends AbstractSystem {
   /**
    * _parseTile
    * Parse the results from a tiled data fetch.
-   * @param  {Object}    ds - the dataset we fetched
-   * @param  {Object}    tile - the tile we fetched
-   * @param  {Object}    geojson - the result GeoJSON data
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param ds - the dataset we fetched
+   * @param tile - the tile we fetched
+   * @param geojson - the result GeoJSON data
+   * @param callback - errback-style callback function to call with results
    */
-  _parseTile(ds, tile, geojson, callback) {
+  _parseTile(ds: EsriDatasetEntry, tile: Tile, geojson: GeoJSON.FeatureCollection, callback: (err: any, results?: OsmEntity[]) => void): void {
     if (!geojson) return callback({ message: 'No GeoJSON', status: -1 });
 
     // Expect a FeatureCollection with `features` array
-    let results = [];
+    const results: OsmEntity[] = [];
     for (const f of geojson.features ?? []) {
       const entities = this._parseFeature(ds, f);
       if (entities) {
-        results.push.apply(results, entities);
+        results.push(...entities);
       }
     }
 
@@ -492,17 +592,17 @@ export class EsriService extends AbstractSystem {
   /**
    * _parseFeature
    * Parse a single GeoJSON feature
-   * @param   {Object}  ds - the dataset we fetched
-   * @param   {Object}  feature - the GeoJSON feature that we fetched
-   * @return  {Array<OsmEntity>?}  An array of OSMEntities for that feature, or `null` if we skipped it
+   * @param ds - the dataset we fetched
+   * @param feature - the GeoJSON feature that we fetched
+   * @return An array of OSMEntities for that feature, or `null` if we skipped it
    */
-  _parseFeature(ds, feature) {
+  _parseFeature(ds: EsriDatasetEntry, feature: GeoJSON.Feature): OsmEntity[] | null {
     const context = this.context;
     const geom = feature.geometry;
     const properties = feature.properties;
     if (!geom || !properties) return null;
 
-    const featureID = properties[ds.layer.idfield] || properties.OBJECTID || properties.FID || properties.id;
+    const featureID = properties[ds.layer!.idfield] || properties.OBJECTID || properties.FID || properties.id;
     if (!featureID) return null;
 
     // skip if we've seen this feature already on another tile
@@ -511,12 +611,12 @@ export class EsriService extends AbstractSystem {
 
     const id = `${ds.id}-${featureID}`;
     const metadata = { __fbid__: id, __service__: 'esri', __datasetid__: ds.id };
-    let entities = [];
-    let nodemap = new Map();
+    const entities: OsmEntity[] = [];
+    const nodemap = new Map<string, OsmNode>();
 
     // Point:  make a single node
     if (geom.type === 'Point') {
-      const props = Object.assign({ loc: geom.coordinates, tags: parseTags(properties) }, metadata);
+      const props = Object.assign({ loc: geom.coordinates as Vec2, tags: parseTags(properties) }, metadata) as OsmNodeProps;
       return [ new OsmNode(context, props) ];
 
     // LineString:  make nodes, single way
@@ -524,20 +624,20 @@ export class EsriService extends AbstractSystem {
       const nodelist = parseCoordinates(geom.coordinates);
       if (nodelist.length < 2) return null;
 
-      const props = Object.assign({ nodes: nodelist, tags: parseTags(properties) }, metadata);
+      const props = Object.assign({ nodes: nodelist, tags: parseTags(properties) }, metadata) as OsmWayProps;
       const w = new OsmWay(context, props);
       entities.push(w);
       return entities;
 
     // Polygon:  make nodes, way(s), possibly a relation
     } else if (geom.type === 'Polygon') {
-      let ways = [];
+      const ways: OsmWay[] = [];
       for (const ring of geom.coordinates ?? []) {
         const nodelist = parseCoordinates(ring);
         if (nodelist.length < 3) continue;
 
-        const first = nodelist.at(0);
-        const last = nodelist.at(-1);
+        const first = nodelist.at(0)!;
+        const last = nodelist.at(-1)!;
         if (first !== last) nodelist.push(first);   // sanity check, ensure rings are closed
 
         const w = new OsmWay(context, { nodes: nodelist });
@@ -551,10 +651,14 @@ export class EsriService extends AbstractSystem {
       } else {  // multiple rings, make a multipolygon relation with inner/outer members
         const members = ways.map((w, i) => {
           entities.push(w);
-          return { id: w.id, role: (i === 0 ? 'outer' : 'inner'), type: 'way' };
+          return {
+            id: w.id,
+            role: (i === 0 ? 'outer' : 'inner'),
+            type: 'way'
+          };
         });
-        const tags = Object.assign(parseTags(properties), { type: 'multipolygon' });
-        const props = Object.assign({ members: members, tags: tags }, metadata);
+        const tags = Object.assign(parseTags(properties), { type: 'multipolygon' }) as Tags;
+        const props = Object.assign({ members: members, tags: tags }, metadata) as OsmRelationProps;
         const r = new OsmRelation(context, props);
         entities.push(r);
       }
@@ -562,14 +666,16 @@ export class EsriService extends AbstractSystem {
       return entities;
     }
 
+    return null;
+
     // no Multitypes for now (maybe not needed)
-    function parseCoordinates(coords) {
-      let nodelist = [];
+    function parseCoordinates(coords: number[][]): EntityID[] {
+      const nodelist: EntityID[] = [];
       for (const coord of coords) {
         const key = coord.toString();
         let n = nodemap.get(key);
         if (!n) {
-          n = new OsmNode(this.context, { loc: coord });
+          n = new OsmNode(context, { loc: coord as Vec2 });
           entities.push(n);
           nodemap.set(key, n);
         }
@@ -578,10 +684,10 @@ export class EsriService extends AbstractSystem {
       return nodelist;
     }
 
-    function parseTags(properties) {
-      let tags = {};
+    function parseTags(properties: Record<string, any>): Tags {
+      const tags: Record<string, string> = {};
       for (const prop of Object.keys(properties)) {
-        const k = clean(ds.layer.tagmap[prop]);
+        const k = clean(ds.layer!.tagmap[prop]);
         const v = clean(properties[prop]);
         if (k && v) {
           tags[k] = v;
@@ -599,7 +705,7 @@ export class EsriService extends AbstractSystem {
       return tags;
     }
 
-    function clean(val) {
+    function clean(val: any): string | null {
       return val ? val.toString().trim() : null;
     }
   }

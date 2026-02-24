@@ -2,8 +2,23 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { RapidDataset } from '../lib/RapidDataset.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+import type { GeoJSON } from '../data/GeoJSON.ts';
+import type { VectorTileService } from './VectorTileService.ts';
+
+/** Base URL for Overture PMTiles hosted on S3 */
 const PMTILES_ROOT_URL = 'https://overturemaps-tiles-us-west-2-beta.s3.us-west-2.amazonaws.com/';
+/** Path to the PMTiles catalog JSON file */
 const PMTILES_CATALOG_PATH = 'pmtiles_catalog.json';
+
+/** Catalog file structure from S3 */
+interface PMTilesCatalog {
+  /** Available PMTiles releases with their file listings */
+  releases: Array<{
+    release_id: string;
+    files: Array<{ theme: string; href: string }>;
+  }>;
+}
 
 
 /**
@@ -17,15 +32,19 @@ const PMTILES_CATALOG_PATH = 'pmtiles_catalog.json';
  */
 export class OvertureService extends AbstractSystem {
 
+  /** Parsed PMTiles catalog data from S3 */
+  pmTilesCatalog: PMTilesCatalog;
+  /** The most recent release entry from the catalog */
+  latestRelease: any;
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'overture';
-    this.pmTilesCatalog = {};
-
+    this.pmTilesCatalog = { releases: [] };
     this.latestRelease = '';
   }
 
@@ -33,17 +52,17 @@ export class OvertureService extends AbstractSystem {
   /**
    * _loadS3CatalogAsync
    * Load and parse the overture catalog data
-   * @return  {Promise}  Promise resolved when the data has been loaded
+   * @return  Promise resolved when the data has been loaded
    */
-  _loadS3CatalogAsync() {
+  _loadS3CatalogAsync(): Promise<void> {
     return fetch(PMTILES_ROOT_URL + PMTILES_CATALOG_PATH)
       .then(utilFetchResponse)
-      .then(json => {
+      .then((json: PMTilesCatalog) => {
         this.pmTilesCatalog = json;
 
         // Grab the very latest date stamp and keep track of the release associated with it.
         const dateStrings = this.pmTilesCatalog.releases.map(release => release.release_id);
-        dateStrings.sort((a, b) => new Date(b) - new Date(a));
+        dateStrings.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
         this.latestRelease = this.pmTilesCatalog.releases.find(release => release.release_id === dateStrings[0]);
       })
       .catch(error => {
@@ -55,12 +74,12 @@ export class OvertureService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
-    const vtService = this.context.services.vectortile;
+    const vtService = this.context.services.vectortile as VectorTileService;
 
     return this._initPromise = super.initAsync()
       .then(() => vtService.initAsync())
@@ -71,25 +90,25 @@ export class OvertureService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
-    const vtService = this.context.services.vectortile;
+    const vtService = this.context.services.vectortile as VectorTileService;
 
     return this._startPromise = Promise.resolve()
       .then(() => vtService.startAsync())
-      .then(() => this._started = true);
+      .then(() => { this._started = true; });
   }
 
 
   /**
    * getAvailableDatasets
    * Called by `RapidSystem` to get the datasets that this service provides.
-   * @return  {Array<RapidDataset>}  The datasets this service provides
+   * @return  The datasets this service provides
    */
-  getAvailableDatasets() {
+  getAvailableDatasets(): RapidDataset[] {
     // just this one for now
     const places = new RapidDataset(this.context, {
       id: 'overture-places',
@@ -111,14 +130,14 @@ export class OvertureService extends AbstractSystem {
   /**
    * loadTiles
    * Use the vector tile service to schedule any data requests needed to cover the current map view
-   * @param  {string}  template - template to load tiles for
+   * @param  datasetID - dataset to load tiles for
    */
-  loadTiles(datasetID) {
-    const vtService = this.context.services.vectortile;
+  loadTiles(datasetID: DatasetID): void {
+    const vtService = this.context.services.vectortile as VectorTileService;
 
     //TODO: Revisit the id-to-url mapping once we're done.
     if (datasetID.includes('places')) {
-      const file = this.latestRelease.files.find(file => file.theme === 'places');
+      const file = this.latestRelease.files.find((file: any) => file.theme === 'places');
       const url = PMTILES_ROOT_URL + file.href;
 
       vtService.loadTiles(url);
@@ -129,14 +148,14 @@ export class OvertureService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @param   {string}          datasetID - datasetID to get data for
-   * @return  {Array<GeoJSON>}  Array of data
+   * @param  datasetID - datasetID to get data for
+   * @return Array of data
    */
-  getData(datasetID) {
-    const vtService = this.context.services.vectortile;
+  getData(datasetID: DatasetID): GeoJSON[] {
+    const vtService = this.context.services.vectortile as VectorTileService;
 
     if (datasetID.includes('places')) {
-      const file = this.latestRelease.files.find(file => file.theme === 'places');
+      const file = this.latestRelease.files.find((file: any) => file.theme === 'places');
       const url = PMTILES_ROOT_URL + file.href;
       return vtService.getData(url);
     } else {

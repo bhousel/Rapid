@@ -1,22 +1,24 @@
-import { EsriService } from './EsriService.js';
-import { GeoScribbleService } from './GeoScribbleService.js';
-import { KartaviewService } from './KartaviewService.js';
-import { KeepRightService } from './KeepRightService.js';
-import { MapillaryService } from './MapillaryService.js';
-import { MapRouletteService } from './MapRouletteService.js';
-import { MapWithAIService } from './MapWithAIService.js';
-import { NominatimService } from './NominatimService.js';
-import { NsiService } from './NsiService.js';
-import { OsmService } from './OsmService.js';
-import { OsmoseService } from './OsmoseService.js';
-import { OsmWikibaseService } from './OsmWikibaseService.js';
-import { OvertureService } from './OvertureService.js';
-import { StreetsideService } from './StreetsideService.js';
-import { TaginfoService } from './TaginfoService.js';
-import { VectorTileService } from './VectorTileService.js';
-import { WaybackService } from './WaybackService.js';
-import { WikidataService } from './WikidataService.js';
-import { WikipediaService } from './WikipediaService.js';
+import { EsriService } from './EsriService.ts';
+import { GeoScribbleService } from './GeoScribbleService.ts';
+import { KartaviewService } from './KartaviewService.ts';
+import { KeepRightService } from './KeepRightService.ts';
+import { MapillaryService } from './MapillaryService.ts';
+import { MapRouletteService } from './MapRouletteService.ts';
+import { MapWithAIService } from './MapWithAIService.ts';
+import { NominatimService } from './NominatimService.ts';
+import { NsiService } from './NsiService.ts';
+import { OsmService } from './OsmService.ts';
+import { OsmoseService } from './OsmoseService.ts';
+import { OsmWikibaseService } from './OsmWikibaseService.ts';
+import { OvertureService } from './OvertureService.ts';
+import { StreetsideService } from './StreetsideService.ts';
+import { TaginfoService } from './TaginfoService.ts';
+import { VectorTileService } from './VectorTileService.ts';
+import { WaybackService } from './WaybackService.ts';
+import { WikidataService } from './WikidataService.ts';
+import { WikipediaService } from './WikipediaService.ts';
+
+import type { ServiceConstructor } from './types.ts';
 
 export {
   EsriService,
@@ -40,9 +42,16 @@ export {
   WikipediaService
 };
 
+export type { Services, ServiceConstructor } from './types.ts';
+
+/** Registry for available service constructors */
+interface ServiceRegistry {
+  available: Map<ServiceID, ServiceConstructor>;
+}
+
 // At init time, we will instantiate any that are in the 'available' collection.
-export const services = {
-  available: new Map()  // Map<serviceID, Service constructor>
+export const services: ServiceRegistry = {
+  available: new Map<ServiceID, ServiceConstructor>()
 };
 
 services.available.set('esri', EsriService);
@@ -64,10 +73,3 @@ services.available.set('vectortile', VectorTileService);
 services.available.set('wayback', WaybackService);
 services.available.set('wikidata', WikidataService);
 services.available.set('wikipedia', WikipediaService);
-
-/**
- *  Some type aliases - we sometimes refer to these in JSDoc throughout the code.
- *  (services also inherit from AbstractSystem)
- *  @typedef  {string}          serviceID
- *  @typedef  {AbstractSystem}  Service
- */

@@ -5,14 +5,16 @@ import { utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
 import { behaviors } from './behaviors/index.ts';
 import { modes } from './modes/index.ts';
-import { services } from './services/index.js';
+import { services } from './services/index.ts';
 import { systems } from './core/index.ts';
 
 import type { AbstractMode } from './modes/AbstractMode.ts';
+import type { AbstractSystem } from './core/AbstractSystem.ts';
 import type { Behaviors } from './behaviors/types.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from './lib/Graph.ts';
 import type { Modes } from './modes/types.ts';
+import type { Services } from './services/types.ts';
 import type { Systems } from './core/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from './util/iterable.ts';
@@ -63,8 +65,8 @@ export interface ApiConnection {
 }
 
 /**
- * Service interface - external data sources and APIs.
- * Services are still in JavaScript, so this is a loose interface.
+ * Service interface - for lifecycle management.
+ * Services are now TypeScript, but this interface is used for loose lifecycle access.
  */
 export interface Service {
   id: string;
@@ -125,8 +127,8 @@ export class Context extends EventEmitter {
   private _currMode: AbstractMode | null;
   /** All initialized behaviors */
   behaviors: Behaviors;
-  /** All initialized services (not yet converted to TypeScript) */
-  services: Record<ServiceID, any>;
+  /** All initialized services */
+  services: Services;
 
   /** Promise for initialization */
   private _initPromise: Promise<void> | null;
@@ -324,7 +326,7 @@ export class Context extends EventEmitter {
     // Initialize all the core classes
     // ---------------------------------
     const allSystems = Object.values(this.systems);
-    const allServices = Object.values(this.services);
+    const allServices = Object.values(this.services).filter((s): s is AbstractSystem => !!s);
 
     return this._initPromise = Promise.resolve()
       .then(() => Promise.all( allSystems.map(s => s!.initAsync()) ))
@@ -349,7 +351,7 @@ export class Context extends EventEmitter {
     if (this._resetPromise) return this._resetPromise;
 
     const allSystems = Object.values(this.systems);
-    const allServices = Object.values(this.services);
+    const allServices = Object.values(this.services).filter((s): s is AbstractSystem => !!s);
 
     return this._resetPromise = Promise.resolve()
       .then(() => Promise.all( allSystems.map(s => s!.resetAsync()) ))

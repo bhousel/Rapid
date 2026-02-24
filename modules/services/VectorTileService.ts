@@ -12,6 +12,62 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { GeoJSON } from '../data/GeoJSON.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Tile } from '@rapid-sdk/math';
+import type { Context } from '../Context.ts';
+
+
+/** RBush box with associated data */
+interface RBushBox {
+  /** Minimum X coordinate (longitude) of the bounding box */
+  minX: number;
+  /** Minimum Y coordinate (latitude) of the bounding box */
+  minY: number;
+  /** Maximum X coordinate (longitude) of the bounding box */
+  maxX: number;
+  /** Maximum Y coordinate (latitude) of the bounding box */
+  maxY: number;
+  /** The GeoJSON feature contained within this bounding box */
+  data: GeoJSON;
+}
+
+/** Per-zoom cache for vector tile features */
+interface VTZoomCache {
+  /** Map of GeoJSON features keyed by feature ID */
+  features: Map<string, GeoJSON>;
+  /** Map of RBush bounding boxes keyed by feature ID */
+  boxes: Map<string, RBushBox>;
+  /** Queue of pending merge operations: edge ID → property hash → set of feature IDs */
+  toMerge: Map<string, Map<string, Set<string>>>;
+  /** Set of edge IDs that have already been merged */
+  didMerge: Set<string>;
+  /** RBush spatial index for efficient geographic querying of features at this zoom */
+  rbush: RBush<RBushBox>;
+}
+
+/** Source for vector tile data */
+interface VTSource {
+  /** Unique identifier derived from the URL template hash */
+  id: string;
+  /** Human-readable name for this source (hostname or filename) */
+  displayName: string;
+  /** URL template for fetching vector tiles (contains {x}, {y}, {z} placeholders) */
+  template: string;
+  /** Map of in-flight tile requests keyed by tile ID, with their AbortControllers */
+  inflight: Map<string, AbortController>;
+  /** Map of loaded tile IDs to their tile metadata */
+  loaded: Map<string, Tile>;
+  /** Map of zoom levels to their per-zoom feature caches */
+  zoomCache: Map<number, VTZoomCache>;
+  /** Viewport version from the last data fetch, used to skip redundant loads */
+  lastv: number | null;
+  /** PMTiles header metadata, if this source is a PMTiles archive */
+  header?: any;
+  /** PMTiles instance for reading .pmtiles archives */
+  pmtiles?: PMTiles;
+  /** Promise that resolves when this source is ready to use */
+  readyPromise?: Promise<VTSource>;
+}
+
 
 /**
  * `VectorTileService`
@@ -27,27 +83,32 @@ import { utilFetchResponse } from '../util/fetch_response.ts';
  */
 export class VectorTileService extends AbstractSystem {
 
+  /** Map of URL templates to their VTSource objects */
+  _sources: Map<string, VTSource>;
+  /** Tiler instance used to compute tile coverage for the current viewport */
+  _tiler: Tiler;
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'vectortile';
     this.optionalDependencies = new Set(['gfx']);
 
     // Sources are identified by their URL template..
-    this._sources = new Map();   // Map<template, source>
-    this._tiler = new Tiler().tileSize(512).margin(1);
+    this._sources = new Map();
+    this._tiler = (new Tiler().tileSize(512) as Tiler).margin(1) as Tiler;
   }
 
 
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -55,9 +116,9 @@ export class VectorTileService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -65,9 +126,9 @@ export class VectorTileService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     for (const source of this._sources.values()) {
       for (const controller of source.inflight.values()) {
         controller.abort();
@@ -76,7 +137,7 @@ export class VectorTileService extends AbstractSystem {
       // free memory
       source.inflight.clear();
       source.loaded.clear();
-      source.readyPromise = null;
+      source.readyPromise = undefined;
       for (const cache of source.zoomCache.values()) {
         cache.features.clear();
         cache.boxes.clear();
@@ -96,10 +157,10 @@ export class VectorTileService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @param   {string}          template - template to get data for
-   * @return  {Array<GeoJSON>}  Array of data
+   * @param  template - template to get data for
+   * @return Array of data
    */
-  getData(template) {
+  getData(template: string): GeoJSON[] {
     const source = this._sources.get(template);
     if (!source) return [];
 
@@ -133,9 +194,9 @@ export class VectorTileService extends AbstractSystem {
   /**
    * loadTiles
    * Schedule any data requests needed to cover the current map view
-   * @param   {string}  template - template to load tiles for
+   * @param  template - template to load tiles for
    */
-  loadTiles(template) {
+  loadTiles(template: string): void {
     this._getSourceAsync(template)
       .then(source => {
         const header = source.header;
@@ -172,10 +233,10 @@ export class VectorTileService extends AbstractSystem {
   /**
    * _getSourceAsync
    * Create a new cache to hold data for the given template
-   * @param   {string}   template - A url template for fetching data (e.g. a z/x/y tileserver or .pmtiles)
-   * @return  {Promise}  Promise resolved to the source object once it is ready to use
+   * @param  template - A url template for fetching data (e.g. a z/x/y tileserver or .pmtiles)
+   * @return Promise resolved to the source object once it is ready to use
    */
-  _getSourceAsync(template) {
+  _getSourceAsync(template: string): Promise<VTSource> {
     if (!template) return Promise.reject(new Error('No template'));
 
     let source = this._sources.get(template);
@@ -203,15 +264,15 @@ export class VectorTileService extends AbstractSystem {
         source.displayName = filename;
         source.pmtiles = new PMTiles(template);
         source.readyPromise = source.pmtiles.getHeader()
-          .then(header => source.header = header)
-          .then(() => Promise.resolve(source));
+          .then(header => source!.header = header)
+          .then(() => Promise.resolve(source!));
 
       } else {
         source.readyPromise = Promise.resolve(source);
       }
     }
 
-    return source.readyPromise;
+    return source.readyPromise!;
   }
 
 
@@ -220,11 +281,11 @@ export class VectorTileService extends AbstractSystem {
    * Because vector tiled data can be different at different zooms,
    * the caches and indexes need to be setup "per-zoom".
    * This function will return the existing zoom cache, or create one if needed.
-   * @param   {string}  source
-   * @param   {number}  zoom
-   * @return  {Object}  the cache for the given zoom
+   * @param  source
+   * @param  zoom
+   * @return the cache for the given zoom
    */
-  _getZoomCache(source, zoom) {
+  _getZoomCache(source: VTSource, zoom: number): VTZoomCache {
     let cache = source.zoomCache.get(zoom);
 
     if (!cache) {
@@ -245,11 +306,11 @@ export class VectorTileService extends AbstractSystem {
 
   /**
    * _loadTileAsync
-   * @param   {*}  source
-   * @param   {*}  tile
-   * @return  {Promise} returns the fetch promise
+   * @param  source
+   * @param  tile
+   * @return the fetch promise
    */
-  _loadTileAsync(source, tile) {
+  _loadTileAsync(source: VTSource, tile: Tile): Promise<void> | undefined {
     const tileID = tile.id;
     if (source.loaded.has(tileID) || source.inflight.has(tileID)) return;
 
@@ -266,11 +327,11 @@ export class VectorTileService extends AbstractSystem {
 
     } else {
       const url = source.template
-        .replace('{x}', x)
-        .replace('{y}', y)
-        .replace(/\{[t-]y\}/, Math.pow(2, z) - y - 1)  // TMS-flipped y coordinate
-        .replace(/\{z(oom)?\}/, z)
-        .replace(/\{switch:([^}]+)\}/, function(s, r) {
+        .replace('{x}', x.toString())
+        .replace('{y}', y.toString())
+        .replace(/\{[t-]y\}/, (Math.pow(2, z) - y - 1).toString())  // TMS-flipped y coordinate
+        .replace(/\{z(oom)?\}/, z.toString())
+        .replace(/\{switch:([^}]+)\}/, function(s: string, r: string) {
           const subdomains = r.split(',');
           return subdomains[(x + y) % subdomains.length];
         });
@@ -296,11 +357,11 @@ export class VectorTileService extends AbstractSystem {
 
   /**
    * _parseTileBuffer
-   * @param  {*}  source
-   * @param  {*}  tile
-   * @param  {*}  buffer
+   * @param  source
+   * @param  tile
+   * @param  buffer
    */
-  _parseTileBuffer(source, tile, buffer) {
+  _parseTileBuffer(source: VTSource, tile: Tile, buffer: ArrayBuffer | undefined): void {
     if (!buffer) return;  // 'no data' is ok
 
     // Get some info about this tile and its neighbors
@@ -398,12 +459,12 @@ export class VectorTileService extends AbstractSystem {
   /**
    * _queueMerge
    * Mark this data as eligible for merging across given tile edge
-   * @param  {Object}  cache
-   * @param  {string}  featureID
-   * @param  {number}  prophash
-   * @param  {string}  edgeID
+   * @param  cache
+   * @param  featureID
+   * @param  prophash
+   * @param  edgeID
    */
-  _queueMerge(cache, featureID, prophash, edgeID) {
+  _queueMerge(cache: VTZoomCache, featureID: string, prophash: string, edgeID: string): void {
     if (cache.didMerge.has(edgeID)) return;  // we merged this edge already
 
     let mergemap = cache.toMerge.get(edgeID);
@@ -424,7 +485,7 @@ export class VectorTileService extends AbstractSystem {
    * _processMergeQueue
    * Call this sometimes to merge polygons across tile edges
    */
-  _processMergeQueue(source) {
+  _processMergeQueue(source: VTSource): void {
     for (const cache of source.zoomCache.values()) {
       for (const [edgeID, mergemap] of cache.toMerge) {  // for each edge
 
@@ -449,10 +510,10 @@ export class VectorTileService extends AbstractSystem {
 
   /**
    * _cacheFeatures
-   * @param  {Object}          cache
-   * @param  {Array<GeoJSON>}  features
+   * @param  cache
+   * @param  features
    */
-  _cacheFeatures(cache, features) {
+  _cacheFeatures(cache: VTZoomCache, features: GeoJSON[]): void {
     const boxes = [];
     for (const feature of features) {
       cache.features.set(feature.id, feature);  // cache feature
@@ -460,8 +521,7 @@ export class VectorTileService extends AbstractSystem {
       const extent = feature.extent();
       if (!extent) continue;
 
-      const box = extent.bbox();
-      box.data = feature;
+      const box: RBushBox = { ...extent.bbox(), data: feature };
       cache.boxes.set(feature.id, box);   // cache box
       boxes.push(box);
     }
@@ -472,10 +532,10 @@ export class VectorTileService extends AbstractSystem {
 
   /**
    * _uncacheFeatureIDs
-   * @param  {Object}       cache
-   * @param  {Set<string>}  featureIDs - Set<featureIDs>
+   * @param  cache
+   * @param  featureIDs
    */
-  _uncacheFeatureIDs(cache, featureIDs) {
+  _uncacheFeatureIDs(cache: VTZoomCache, featureIDs: Set<string>): void {
     for (const featureID of featureIDs) {
       const box = cache.boxes.get(featureID);
       if (box) {
@@ -490,14 +550,14 @@ export class VectorTileService extends AbstractSystem {
   /**
    * _mergePolygons
    * Merge the given features across the given edge (defined by lowTile/highTile)
-   * @param  {Object}       cache
-   * @param  {number}       prophash
-   * @param  {Set<string>}  featureIDs - featureIDs to merge
-   * @param  {Tile}         lowTile
-   * @param  {Tile}         highTile
+   * @param  cache
+   * @param  prophash
+   * @param  featureIDs - featureIDs to merge
+   * @param  lowTile
+   * @param  highTile
    */
-  _mergePolygons(cache, prophash, featureIDs, lowTile, highTile) {
-    const features = Array.from(featureIDs).map(featureID => cache.features.get(featureID)).filter(Boolean);
+  _mergePolygons(cache: VTZoomCache, prophash: string, featureIDs: Set<string>, lowTile: Tile, highTile: Tile): void {
+    const features = Array.from(featureIDs).map(featureID => cache.features.get(featureID)).filter((f): f is GeoJSON => !!f);
     if (!features.length) return;
 
     // We have more edges to keep track of now..
@@ -531,14 +591,14 @@ export class VectorTileService extends AbstractSystem {
     const highBottomEdge = `${highTileID}-${hx},${hy+1},${hz}`;
 
     // The merged feature(s) can copy some properties from the first one
-    const source = features[0];
+    const source = features[0]!;
 
     this._uncacheFeatureIDs(cache, featureIDs);
 
     // Union the coordinates together
     // (I believe these should all be single part Polygons)
-    const sourceCoords = features.map(feature => feature.geoms.parts[0].orig.coords);
-    const mergedCoords = Polyclip.union(...sourceCoords);
+    const sourceCoords = features.map(feature => feature.geoms.parts[0].orig!.coords as Polyclip.Geom);
+    const mergedCoords = Polyclip.union(sourceCoords[0], ...sourceCoords.slice(1));
     if (!mergedCoords || !mergedCoords.length) {
       throw new Error(`Failed to merge`);  // shouldn't happen
     }
@@ -595,10 +655,10 @@ export class VectorTileService extends AbstractSystem {
 
   /**
    * _calcExtent
-   * @param  {Object}  geojson - a GeoJSON Feature
-   * @return {Extent}
+   * @param  geojson - a GeoJSON Feature
+   * @return the extent
    */
-  _calcExtent(geojson) {
+  _calcExtent(geojson: any): Extent {
     const extent = new Extent();
     const geometry = geojson?.geometry;
     if (!geojson || !geometry) return extent;
@@ -636,9 +696,9 @@ export class VectorTileService extends AbstractSystem {
    * _dedupePoints
    * The union operation often leaves points which are essentially coincident
    * This will remove them in-place
-   * @param  {Object}  geojson - a GeoJSON Feature
+   * @param  geojson - a GeoJSON Feature
    */
-  _dedupePoints(geojson) {
+  _dedupePoints(geojson: any): void {
     const geometry = geojson?.geometry;
     if (!geojson || !geometry) return;
     if (geometry.type !== 'Polygon') return;
@@ -647,8 +707,8 @@ export class VectorTileService extends AbstractSystem {
     const coords = geometry.coordinates;
 
     for (let i = 0; i < coords.length; i++) {
-      let ring = coords[i];
-      let cleaned = [];
+      const ring = coords[i];
+      const cleaned = [];
       let prevPoint = null;
       for (let j = 0; j < ring.length; j++) {
         const point = ring[j];
@@ -669,11 +729,11 @@ export class VectorTileService extends AbstractSystem {
    * Call this to convert a multi feature to an array of single features
    * (e.g. convert MultiPolygon to array of Polygons)
    * (If passed a single feature, this will just return the single feature in an array)
-   * @param  {Object}  geojson - any GeoJSON Feature
-   * @return {Array}   array of single GeoJSON features
+   * @param  geojson - any GeoJSON Feature
+   * @return array of single GeoJSON features
    */
-  _toSingleFeatures(geojson) {
-    const result = [];
+  _toSingleFeatures(geojson: any): any[] {
+    const result: any[] = [];
     const geometry = geojson?.geometry;
     if (!geojson || !geometry) return result;
 

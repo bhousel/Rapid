@@ -326,9 +326,10 @@ export class SpatialSystem extends AbstractSystem {
    * @param dataID - the dataID to lookup
    * @return The data if found, or `undefined` if not found
    */
-  getData(datasetID: DatasetID, dataID: DataID): AbstractData | undefined {
+  getData<T extends AbstractData = AbstractData>(datasetID: Nullable<DatasetID>, dataID: Nullable<DataID>): T | undefined {
+    if (!datasetID || !dataID) return undefined;
     const cache = this.getCache(datasetID);
-    return cache.data.get(dataID);
+    return cache.data.get(dataID) as T | undefined;
   }
 
   /**

@@ -331,10 +331,10 @@ export class MapSystem extends AbstractSystem {
       let ang = 0;
       if (typeof newMap === 'string') {
         const parts = newMap.split('/', 4).map(Number);
-        if (!isNaN(parts[0]) && isFinite(parts[0])) zoom = parts[0];
-        if (!isNaN(parts[1]) && isFinite(parts[1])) lat = parts[1];
-        if (!isNaN(parts[2]) && isFinite(parts[2])) lon = parts[2];
-        if (!isNaN(parts[3]) && isFinite(parts[3])) ang = parts[3];
+        if (Number.isFinite(parts[0])) zoom = parts[0];
+        if (Number.isFinite(parts[1])) lat = parts[1];
+        if (Number.isFinite(parts[2])) lon = parts[2];
+        if (Number.isFinite(parts[3])) ang = parts[3];
       }
 
       zoom = numClamp(zoom, MIN_Z, MAX_Z);
@@ -377,8 +377,7 @@ export class MapSystem extends AbstractSystem {
         }
         // Try the value as a number, but reject things like NaN, null, Infinity
         const num = +val;
-        const valIsNumber = (!isNaN(num) && isFinite(num));
-        if (valIsNumber) {
+        if (Number.isFinite(num)) {
           isEnabled = true;
           noteID = num;  // for now, just select the first one
           break;

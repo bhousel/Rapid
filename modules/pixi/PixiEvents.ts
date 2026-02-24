@@ -432,7 +432,7 @@ export class PixiEvents extends EventEmitter {
     // Fractional numbers
     //   - 2-finger pinch-zooms on a trackpad (`e.ctrlKey` will be true in this case)
     //   - mouse wheels (usually)
-    const isRoundNumber = (typeof dY === 'number' && isFinite(dY) && Math.floor(dY) === dY);
+    const isRoundNumber = (Number.isFinite(dY) && Math.floor(dY) === dY);
 
     // On a multitouch trackpad, this 'wheel' event came from a pinch/unpinch gesture IF:
     // - dY is a fractional number, AND
@@ -518,8 +518,8 @@ export class PixiEvents extends EventEmitter {
     // Fractional numbers are generated from wheel events on many mouse types, but notably by
     // 2-finger pinch/unpinch gestues on a trackpad. Because we want to handle these specially,
     // we'll try to keep the round numbers round and the fractional numbers fractional.
-    const isRoundX = (typeof mY === 'number' && isFinite(mX) && Math.floor(mX) === mX);
-    const isRoundY = (typeof mY === 'number' && isFinite(mY) && Math.floor(mY) === mY);
+    const isRoundX = (Number.isFinite(mX) && Math.floor(mX) === mX);
+    const isRoundY = (Number.isFinite(mY) && Math.floor(mY) === mY);
     const fuzzX = isRoundX ? 0 : 0.001;
     const fuzzY = isRoundY ? 0 : 0.001;
 

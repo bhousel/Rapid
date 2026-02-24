@@ -3,7 +3,14 @@ import { utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+
+/** Base URL for the Wikidata MediaWiki API */
 const WIKIDATA_API = 'https://www.wikidata.org/w/api.php?';
+
+
+/** Internal cache for Wikidata service */
+type WikidataCache = Map<string, Record<string, any>>;
 
 
 /**
@@ -12,12 +19,14 @@ const WIKIDATA_API = 'https://www.wikidata.org/w/api.php?';
  * @see https://www.mediawiki.org/wiki/API:Main_page
  */
 export class WikidataService extends AbstractSystem {
+  /** Cache of fetched Wikidata entities keyed by QID */
+  _cache: WikidataCache;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'wikidata';
     this.optionalDependencies = new Set(['l10n']);
@@ -29,9 +38,9 @@ export class WikidataService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -39,9 +48,9 @@ export class WikidataService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -49,9 +58,9 @@ export class WikidataService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     this._cache.clear();
     return Promise.resolve();
   }
@@ -60,10 +69,10 @@ export class WikidataService extends AbstractSystem {
   /**
    * itemsForSearchQuery
    * Search for Wikidata items matching the query
-   * @param  {string}    query - string to search for
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param query - string to search for
+   * @param callback - errback-style callback function to call with results
    */
-  itemsForSearchQuery(query, callback) {
+  itemsForSearchQuery(query: string, callback: (err: any, result: Record<string, any>) => void): void {
     if (!query) {
       if (callback) callback('No query', {});
       return;
@@ -80,7 +89,7 @@ export class WikidataService extends AbstractSystem {
       uselang: lang,    // the language for the label and description in the result
       limit: 10,
       origin: '*'
-    });
+    }, false);
 
     fetch(url)
       .then(utilFetchResponse)
@@ -100,11 +109,11 @@ export class WikidataService extends AbstractSystem {
    * itemsByTitle
    * Given a Wikipedia language and article title,
    *  retrieve an array of corresponding Wikidata entities.
-   * @param  {string}    lang - language code
-   * @param  {string}    title - article title
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param lang - language code
+   * @param title - article title
+   * @param callback - errback-style callback function to call with results
    */
-  itemsByTitle(lang, title, callback) {
+  itemsByTitle(lang: string, title: string, callback: (err: any, result: Record<string, any>) => void): void {
     if (!title) {
       if (callback) callback('No title', {});
       return;
@@ -119,7 +128,7 @@ export class WikidataService extends AbstractSystem {
       titles: title,
       languages: 'en', // shrink response by filtering to one language
       origin: '*'
-    });
+    }, false);
 
     fetch(url)
       .then(utilFetchResponse)
@@ -138,7 +147,7 @@ export class WikidataService extends AbstractSystem {
   /**
    * languagesToQuery
    */
-  languagesToQuery() {
+  languagesToQuery(): string[] {
     const l10n = this.context.systems.l10n;
     const localeCodes = l10n?.localeCodes || ['en'];
 
@@ -153,10 +162,10 @@ export class WikidataService extends AbstractSystem {
 
   /**
    * entityByQID
-   * @param  {string}    qid - qid to query
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param qid - qid to query
+   * @param callback - errback-style callback function to call with results
    */
-  entityByQID(qid, callback) {
+  entityByQID(qid: string, callback: (err: any, result?: Record<string, any>) => void): void {
     if (!qid) {
       callback('No qid', {});
       return;
@@ -177,7 +186,7 @@ export class WikidataService extends AbstractSystem {
       languages: langs.join('|'),
       languagefallback: 1,
       origin: '*'
-    });
+    }, false);
 
     fetch(url)
       .then(utilFetchResponse)
@@ -209,19 +218,19 @@ export class WikidataService extends AbstractSystem {
    *   imageURL:     'string',
    *   wiki:         { title: 'string', text: 'string', url: 'string' }
    * }
-   * @param  {Object}    params
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param params
+   * @param callback - errback-style callback function to call with results
   */
-  getDocs(params, callback) {
+  getDocs(params: Record<string, any>, callback: (err: any, result?: Record<string, any>) => void): void {
     const langs = this.languagesToQuery();
 
-    this.entityByQID(params.qid, function(err, entity) {
+    this.entityByQID(params.qid, (err: any, entity: Record<string, any> | undefined) => {
       if (err || !entity) {
         callback(err || 'No entity');
         return;
       }
 
-      let description;
+      let description: Record<string, any> | undefined;
       for (const code of langs) {
         if (entity.descriptions[code] && entity.descriptions[code].language === code) {
           description = entity.descriptions[code];
@@ -229,11 +238,11 @@ export class WikidataService extends AbstractSystem {
         }
       }
       if (!description && Object.values(entity.descriptions).length) {
-        description = Object.values(entity.descriptions)[0];
+        description = Object.values(entity.descriptions)[0] as Record<string, any>;
       }
 
       // prepare result
-      const result = {
+      const result: Record<string, any> = {
         title: entity.id,
         description: description?.value ?? '',
         descriptionLocaleCode: description?.language ?? '',
@@ -251,7 +260,7 @@ export class WikidataService extends AbstractSystem {
               result.imageURL = imageroot + utilQsString({
                 title: `Special:Redirect/file/${image}`,
                 width: 400
-              });
+              }, false);
               break;
             }
           }

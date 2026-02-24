@@ -14,17 +14,17 @@ import type { Tags } from './types.ts';
  */
 export interface OsmEntityProps extends AbstractDataProps {
   /** OSM tags as key-value string pairs */
-  tags: Tags;
+  tags?: Tags;
   /** OSM visibility attribute - objects with visible=false are considered deleted */
-  visible: boolean;
+  visible?: boolean;
   /** OSM version attribute, used for conflict detection */
-  version: number;
+  version?: number;
   /** OSM user who last edited this entity */
-  user: string;
+  user?: string;
   /** OSM changeset ID */
-  changeset: string;
+  changeset?: string;
   /** Timestamp of last edit */
-  timestamp: string;
+  timestamp?: string;
 }
 
 

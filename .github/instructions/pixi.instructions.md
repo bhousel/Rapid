@@ -6,10 +6,12 @@ applyTo: "modules/pixi/**"
 
 Guidelines for working with the `modules/pixi/` folder during TypeScript conversion.
 
-## Working with Untyped Services
+## Working with Services
 
-All services are still JavaScript and should be cast `as any`:
-- Example: `const mapillary = context.services.mapillary as any;`
+All services are now TypeScript. Access them via `context.services` with proper types:
+- Use optional chaining since services may not be instantiated: `const mapillary = context.services.mapillary;`
+- Or use non-null assertion if you know the service exists: `const osm = context.services.osm!;`
+- Import the service type if needed: `import type { MapillaryService } from '../services/MapillaryService.ts';`
 
 All core systems ARE now TypeScript - use non-null assertion:
 - `const photos = context.systems.photos!;`
@@ -83,6 +85,18 @@ Style type interfaces are defined in `modules/lib/Style.ts`:
 - `LabelStyleProps` — Label (color, opacity, size)
 
 The resolved style returned by `StyleSystem.styleMatch()` is a `MatchedStyle` (defined in `modules/core/StyleSystem.ts`).
+
+## D3 Selection Types
+
+D3 selection variables follow a naming + typing convention:
+- Variables prefixed with `$` are D3 selections — type them as `D3Selection`
+- Variables prefixed with `$$` are D3 _enter_ selections — type them as `D3EnterSelection`
+- Import from `'d3-selection'`: `import type { D3EnterSelection, D3Selection } from 'd3-selection';`
+- For `merge()` calls combining a selection with an enter selection, cast to `D3Selection`:
+  ```typescript
+  $label = $label.merge($$label) as D3Selection;
+  ```
+- Avoid using `as any` for D3 selection code — use these types instead
 
 ## Type-Only Imports
 

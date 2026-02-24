@@ -7,9 +7,61 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Marker } from '../data/Marker.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+import type { MarkerProps } from '../data/Marker.ts';
+import type { Tile } from '@rapid-sdk/math';
 
+
+/** Properties for Osmose issue markers */
+export interface OsmoseIssueProps extends MarkerProps {
+  /** Osmose class identifier (integer) */
+  class: number;
+  /** Osmose item identifier (integer) */
+  item: number;
+  /** Icon identifier (looked up from osmose data) */
+  iconID: string;
+  /** Associated OSM elements (for highlighting) */
+  elems?: string[];
+  /** Issue detail from subtitle (HTML string) */
+  detail?: string;
+  /** New status to set: 'done' or 'false' */
+  newStatus?: string;
+}
+
+/** An Osmose issue Marker with typed props */
+export type OsmoseIssue = Marker<OsmoseIssueProps>;
+
+
+/** Zoom level used for tiling Osmose data requests */
 const TILEZOOM = 14;
+/** Base URL for the Osmose API */
 const OSMOSE_API = 'https://osmose.openstreetmap.fr/api/0.3';
+
+
+/** Internal cache for Osmose tile data */
+interface OsmoseCache {
+  /** Map of in-flight tile requests keyed by tile ID, with their AbortControllers */
+  inflightTile: Map<TileID, AbortController>;
+  /** Map of in-flight POST requests (issue updates), keyed by entity ID */
+  inflightPost: Map<DataID, AbortController>;
+  /** Map of issues marked as closed, keyed by entity ID */
+  closed: Record<string, number>;
+  lastv: number | null;
+}
+
+/** Persistent Osmose data loaded at startup */
+interface OsmoseData {
+  icons: Record<string, string>;
+  types: string[];
+}
+
+/** Osmose issue string data */
+interface OsmoseIssueStrings {
+  title?: string;
+  detail?: string;
+  trap?: string;
+  fix?: string;
+}
 
 
 /**
@@ -19,11 +71,21 @@ const OSMOSE_API = 'https://osmose.openstreetmap.fr/api/0.3';
  */
 export class OsmoseService extends AbstractSystem {
 
+  // persistent data - loaded at start
+  _osmoseColors: Map<number, number>;
+  _osmoseStrings: Map<string, Record<string, OsmoseIssueStrings>>;
+  _osmoseData: OsmoseData;
+
+  /** Internal cache for Osmose data, spatial index, and request tracking */
+  _cache: OsmoseCache;
+  /** Tiler instance used to compute tile coverage for the current viewport */
+  _tiler: Tiler;
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'osmose';
     this.requiredDependencies = new Set(['assets', 'spatial']);
@@ -35,17 +97,17 @@ export class OsmoseService extends AbstractSystem {
     this._osmoseStrings = new Map();   // Map<locale, Object containing strings>
     this._osmoseData = { icons: {}, types: [] };
 
-    this._cache = {};
-    this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
+    this._cache = {} as OsmoseCache;
+    this._tiler = (new Tiler().zoomRange(TILEZOOM) as Tiler).skipNullIsland(true) as Tiler;
   }
 
 
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -56,22 +118,22 @@ export class OsmoseService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
-    const assets = this.context.systems.assets;
+    const assets = this.context.systems.assets!;
 
     return this._startPromise = assets.loadAssetAsync('qa_data')
-      .then(d => {
+      .then((d: any) => {
         this._osmoseData.icons = d.osmose.icons;
         this._osmoseData.types = Object.keys(d.osmose.icons)
           .map(s => s.split('-')[0])
-          .reduce((unique, item) => unique.indexOf(item) !== -1 ? unique : [...unique, item], []);
+          .reduce((unique: string[], item: string) => unique.indexOf(item) !== -1 ? unique : [...unique, item], [] as string[]);
       })
       .then(() => this._loadStringsAsync())
-      .then(() => this._started = true)
+      .then(() => { this._started = true; })
       .catch(err => {
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         this._startPromise = null;
@@ -82,9 +144,9 @@ export class OsmoseService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     if (this._cache.inflightTile) {
       for (const controller of this._cache.inflightTile.values()) {
         controller.abort();
@@ -97,6 +159,9 @@ export class OsmoseService extends AbstractSystem {
       lastv:         null         // viewport version last time we fetched data
     };
 
+    const spatial = this.context.systems.spatial!;
+    spatial.clearCache('osmose');
+
     return Promise.resolve();
   }
 
@@ -104,11 +169,11 @@ export class OsmoseService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @return  {Array<Marker>}  Array of data
+   * @return Array of data
    */
-  getData() {
-    const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('osmose').map(hit => hit.contents);
+  getData(): Marker[] {
+    const spatial = this.context.systems.spatial!;
+    return spatial.getVisibleData('osmose').map(hit => hit.contents) as Marker[];
   }
 
 
@@ -116,9 +181,9 @@ export class OsmoseService extends AbstractSystem {
    * loadTiles
    * Schedule any data requests needed to cover the current map view
    */
-  loadTiles() {
+  loadTiles(): void {
     const context = this.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
     const cache = this._cache;
 
@@ -148,16 +213,16 @@ export class OsmoseService extends AbstractSystem {
   /**
    * loadTile
    * Load a single tile of data.
-   * @param  {Tile}  tile - Tile data
+   * @param tile - Tile data
    */
-  loadTile(tile) {
-    const spatial = this.context.systems.spatial;
+  loadTile(tile: Tile): void {
+    const spatial = this.context.systems.spatial!;
     const cache = this._cache;
     const tileID = tile.id;
 
     const [x, y, z] = tile.xyz;
     const params = { item: this._osmoseData.types };   // Only request the types that we support
-    const url = `${OSMOSE_API}/issues/${z}/${x}/${y}.geojson?` + utilQsString(params);
+    const url = `${OSMOSE_API}/issues/${z}/${x}/${y}.geojson?` + utilQsString(params, false);
 
     const controller = new AbortController();
     cache.inflightTile.set(tileID, controller);
@@ -179,13 +244,13 @@ export class OsmoseService extends AbstractSystem {
   /**
    * _gotTile
    * Parse the response from the tile fetch
-   * @param  {Tile}  tile - Tile data
-   * @param  {Object}  response - Response data
+   * @param tile - Tile data
+   * @param response - Response data
    */
-  _gotTile(tile, response) {
+  _gotTile(tile: Tile, response: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
 
     spatial.addTiles('osmose', [tile]);   // mark as loaded
 
@@ -200,7 +265,7 @@ export class OsmoseService extends AbstractSystem {
       if (!iconID) continue;
 
       const loc = spatial.preventCoincidentLoc('osmose', feature.geometry.coordinates);
-      const props = {
+      const props: Record<string, any> = {
         id:        id,
         class:     cl,
         item:      item,
@@ -225,10 +290,10 @@ export class OsmoseService extends AbstractSystem {
   /**
    * loadIssueDetailAsync
    * Fetch additional issue details when needed.
-   * @param   {Marker}   issue
-   * @return  {Promise}  Promise resolved once the data has been fetched
+   * @param issue
+   * @return Promise resolved once the data has been fetched
    */
-  loadIssueDetailAsync(issue) {
+  loadIssueDetailAsync(issue: Marker): Promise<Marker> {
     // Issue details only need to be fetched once
     if (issue.props.elems !== undefined) return Promise.resolve(issue);
 
@@ -239,12 +304,12 @@ export class OsmoseService extends AbstractSystem {
 
     return fetch(url)
       .then(utilFetchResponse)
-      .then(data => {
+      .then((data: any) => {
         // Associated elements used for highlighting
         // Assign directly for immediate use in the callback
-        const elems = data.elems.map(e => e.type.substring(0,1) + e.id);
+        const elems = data.elems.map((e: any) => e.type.substring(0,1) + e.id);
         // Some issues have instance specific detail in a subtitle
-        const detail = data.subtitle ? marked.parse(data.subtitle.auto) : '';
+        const detail = data.subtitle ? marked.parse(data.subtitle.auto) as string : '';
 
         issue.props.elems = elems;
         issue.props.detail = detail;
@@ -257,11 +322,11 @@ export class OsmoseService extends AbstractSystem {
 
   /**
    * getStrings
-   * @param   {string}  itemType
-   * @param   {string}  locale
-   * @return  {Object}  stringdata
+   * @param itemType
+   * @param locale
+   * @return stringdata
    */
-  getStrings(itemType, locale) {
+  getStrings(itemType: string, locale?: string): OsmoseIssueStrings {
     const l10n = this.context.systems.l10n;
     locale = locale || l10n?.localeCode || 'en-US';
 
@@ -273,10 +338,10 @@ export class OsmoseService extends AbstractSystem {
   /**
    * getColor
    * Get the color associated with this issue type
-   * @param   {number}  itemInt
-   * @return  {number}  hex color
+   * @param itemInt
+   * @return hex color
    */
-  getColor(itemInt) {
+  getColor(itemInt: number): number {
     return this._osmoseColors.get(itemInt) ?? 0xffffff;
   }
 
@@ -284,10 +349,10 @@ export class OsmoseService extends AbstractSystem {
   /**
    * getIcon
    * Get the icon to use for the given itemType
-   * @param   itemType
-   * @return  icon name
+   * @param itemType
+   * @return icon name
    */
-  getIcon(itemType) {
+  getIcon(itemType: string): string {
     return this._osmoseData.icons[itemType];
   }
 
@@ -296,14 +361,14 @@ export class OsmoseService extends AbstractSystem {
    * postUpdate
    * Called to change some properies (status, comments) about the Osmose data item.
    * Will send the update to the Osmose API and refresh the local data cache.
-   * @param  {Marker}    item
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param issue
+   * @param callback - errback-style callback function to call with results
    */
-  postUpdate(issue, callback) {
+  postUpdate(issue: Marker, callback: (err: any, issue: Marker) => void): void {
     const cache = this._cache;
     const issueID = issue.id;
-    const status = issue.props.newStatus;
-    const item = issue.props.item;
+    const status = issue.props.newStatus as string;
+    const item = issue.props.item as string;
 
     if (cache.inflightPost.has(issueID)) {
       return callback({ message: 'Issue update already inflight', status: -2 }, issue);
@@ -314,7 +379,7 @@ export class OsmoseService extends AbstractSystem {
     const controller = new AbortController();
     cache.inflightPost.set(issueID, controller);
 
-    let gotErr;
+    let gotErr: any;
     fetch(url, { signal: controller.signal })
       .catch(err => {
         gotErr = err;  // capture any error but continue to `finally` block.
@@ -342,39 +407,40 @@ export class OsmoseService extends AbstractSystem {
   /**
    * getError
    * Get item with given id from cache
-   * @param   {string}   dataID
-   * @return  {Marker?}  the cached item, or `undefined` if not found
+   * @param dataID
+   * @return the cached item, or `undefined` if not found
    */
-  getError(dataID) {
-    const spatial = this.context.systems.spatial;
-    return spatial.getData('osmose', dataID);
+  getError(dataID: DataID): OsmoseIssue | undefined {
+    const spatial = this.context.systems.spatial!;
+    return spatial.getData<OsmoseIssue>('osmose', dataID);
   }
 
 
   /**
    * replaceItem
    * Replace a single item in the cache
-   * @param   {Marker}  item to replace
-   * @return  {Marker}  the item, or `null` if it couldn't be replaced
+   * @param item - item to replace
+   * @return the item, or `null` if it couldn't be replaced
    */
-  replaceItem(item) {
+  replaceItem(item: Marker): Marker | null {
     if (!(item instanceof Marker) || !item.id) return null;
 
-    const spatial = this.context.systems.spatial;
-    return spatial.replaceData('osmose', item);
+    const spatial = this.context.systems.spatial!;
+    spatial.replaceData('osmose', item);
+    return item;
   }
 
 
   /**
    * removeItem
    * Remove a single item from the cache
-   * @param  {Marker}  item to remove
+   * @param item - item to remove
    */
-  removeItem(item) {
+  removeItem(item: Marker): void {
     if (!(item instanceof Marker) || !item.id) return;
 
-    const spatial = this.context.systems.spatial;
-    return spatial.removeData('osmose', item);
+    const spatial = this.context.systems.spatial!;
+    spatial.removeData('osmose', item);
   }
 
 
@@ -382,9 +448,9 @@ export class OsmoseService extends AbstractSystem {
   /**
    * getClosedCounts
    * Used to populate `closed:osmose:*` changeset tags
-   * @return  {Object}  the closed cache
+   * @return the closed cache
    */
-  getClosedCounts() {
+  getClosedCounts(): Record<string, number> {
     return this._cache.closed;
   }
 
@@ -392,10 +458,10 @@ export class OsmoseService extends AbstractSystem {
   /**
    * itemURL
    * Returns the URL to link to details about an item
-   * @param   {Marker}  item
-   * @return  {string}  the url
+   * @param item
+   * @return the url
    */
-  itemURL(item) {
+  itemURL(item: Marker): string {
     return `https://osmose.openstreetmap.fr/en/error/${item.id}`;
   }
 
@@ -403,15 +469,15 @@ export class OsmoseService extends AbstractSystem {
   /**
    * _loadStringsAsync
    * Load the strings for the types of issues that we support
-   * @return  Promise
+   * @return Promise
    */
-  _loadStringsAsync() {
+  _loadStringsAsync(): Promise<any[]> {
     // Only need to cache strings for supported issue types
     const itemTypes = Object.keys(this._osmoseData.icons);
 
     // For now, we only do this one time at init.
     // Todo: support switching locales
-    let stringData = {};
+    const stringData: Record<string, OsmoseIssueStrings> = {};
 
     const l10n = this.context.systems.l10n;
     const localeCode = l10n?.localeCode || 'en-US';
@@ -420,7 +486,7 @@ export class OsmoseService extends AbstractSystem {
     // Using multiple individual item + class requests to reduce fetched data size
     const allRequests = itemTypes.map(itemType => {
 
-      const handleResponse = (data) => {
+      const handleResponse = (data: any): void => {
         // Bunch of nested single value arrays of objects
         const [ cat = { items:[] } ] = data.categories;
         const [ item = { class:[] } ] = cat.items;
@@ -442,12 +508,12 @@ export class OsmoseService extends AbstractSystem {
         // If string exists, value is an object with key 'auto' for string
         const { title, detail, fix, trap } = cl;
 
-        let issueStrings = {};
+        const issueStrings: OsmoseIssueStrings = {};
         // Force title to begin with an uppercase letter
         if (title)  issueStrings.title = title.auto.charAt(0).toUpperCase() + title.auto.slice(1);
-        if (detail) issueStrings.detail = marked.parse(detail.auto);
-        if (trap)   issueStrings.trap = marked.parse(trap.auto);
-        if (fix)    issueStrings.fix = marked.parse(fix.auto);
+        if (detail) issueStrings.detail = marked.parse(detail.auto) as string;
+        if (trap)   issueStrings.trap = marked.parse(trap.auto) as string;
+        if (fix)    issueStrings.fix = marked.parse(fix.auto) as string;
 
         stringData[itemType] = issueStrings;
       };

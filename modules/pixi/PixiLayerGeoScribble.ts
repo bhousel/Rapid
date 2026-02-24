@@ -107,6 +107,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     if (!this.enabled) return;
 
     const service = this.context.services.geoscribble;
+    if (!service) return;
     service.loadTiles();
 
     const geoData: GeoJSON[] = service.getData();

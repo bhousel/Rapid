@@ -97,7 +97,7 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
       if (!feature) {
         const style: Partial<MatchedStyle> = {
           marker: { color: 0x00ff00, image: 'osmose' },
-          icon: { color: 0x000000, image: d.icon }
+          icon: { color: 0x000000, image: (d as any).icon }
         };
 
         feature = new PixiFeaturePoint(this, featureID);

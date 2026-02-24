@@ -3,6 +3,9 @@ import { utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+
+/** Base URL template for the Wikipedia API — language code is substituted at call time */
 const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php?';
 
 
@@ -15,9 +18,9 @@ export class WikipediaService extends AbstractSystem {
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'wikipedia';
   }
@@ -26,9 +29,9 @@ export class WikipediaService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -36,9 +39,9 @@ export class WikipediaService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -46,20 +49,20 @@ export class WikipediaService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
 
   /**
    * search
-   * @param  {string}    lang - language code
-   * @param  {string}    query - string to search for
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param lang - language code
+   * @param query - string to search for
+   * @param callback - errback-style callback function to call with results
    */
-  search(lang, query, callback) {
+  search(lang: string, query: string, callback: (err: any, results: string[]) => void): void {
     if (!query) {
       if (callback) callback('No Query', []);
       return;
@@ -75,7 +78,7 @@ export class WikipediaService extends AbstractSystem {
         format: 'json',
         origin: '*',
         srsearch: query
-      });
+      }, false);
 
     fetch(url)
       .then(utilFetchResponse)
@@ -86,7 +89,7 @@ export class WikipediaService extends AbstractSystem {
           throw new Error('No Results');
         }
         if (callback) {
-          const titles = result.query.search.map(d => d.title);
+          const titles = result.query.search.map((d: any) => d.title);
           callback(null, titles);
         }
       })
@@ -98,11 +101,11 @@ export class WikipediaService extends AbstractSystem {
 
   /**
    * suggestions
-   * @param  {string}    lang - language code
-   * @param  {string}    query - string to search for
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param lang - language code
+   * @param query - string to search for
+   * @param callback - errback-style callback function to call with results
    */
-  suggestions(lang, query, callback) {
+  suggestions(lang: string, query: string, callback: (err: any, results: string[]) => void): void {
     if (!query) {
       if (callback) callback('', []);
       return;
@@ -117,7 +120,7 @@ export class WikipediaService extends AbstractSystem {
         format: 'json',
         origin: '*',
         search: query
-      });
+      }, false);
 
     fetch(url)
       .then(utilFetchResponse)
@@ -137,11 +140,11 @@ export class WikipediaService extends AbstractSystem {
 
   /**
    * translations
-   * @param  {string}    lang - language code
-   * @param  {string}    title - string to search for
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param lang - language code
+   * @param title - string to search for
+   * @param callback - errback-style callback function to call with results
    */
-  translations(lang, title, callback) {
+  translations(lang: string, title: string, callback: (err: any, translations?: Record<string, string>) => void): void {
     if (!title) {
       if (callback) callback('No Title');
       return;
@@ -156,7 +159,7 @@ export class WikipediaService extends AbstractSystem {
         origin: '*',
         lllimit: 500,
         titles: title
-      });
+      }, false);
 
     fetch(url)
       .then(utilFetchResponse)
@@ -168,9 +171,9 @@ export class WikipediaService extends AbstractSystem {
         }
         if (callback) {
           const list = result.query.pages[Object.keys(result.query.pages)[0]];
-          const translations = {};
+          const translations: Record<string, string> = {};
           if (list && list.langlinks) {
-            list.langlinks.forEach(function(d) { translations[d.lang] = d['*']; });
+            list.langlinks.forEach(function(d: any) { translations[d.lang] = d['*']; });
           }
           callback(null, translations);
         }

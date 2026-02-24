@@ -12,9 +12,124 @@ import { Marker, GeoJSON } from '../data/index.ts';
 import { uiIcon } from '../ui/icon.js';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { GeoJSONProps } from '../data/GeoJSON.ts';
+import type { MarkerProps } from '../data/Marker.ts';
+import type { Tile, Vec2 } from '@rapid-sdk/math';
+
+
+/** Properties for Streetside bubble (photo) markers */
+export interface StreetsideBubbleProps extends MarkerProps {
+  /** Compass angle (heading) in degrees */
+  ca: number;
+  /** When the bubble was captured */
+  captured_at: string;
+  /** Who captured the bubble (always 'microsoft') */
+  captured_by: string;
+  /** Previous bubble ID in the sequence */
+  pr?: PhotoID;
+  /** Next bubble ID in the sequence */
+  ne?: PhotoID;
+  /** Whether this is a panoramic image */
+  isPano: boolean;
+}
+
+/** Properties for Streetside sequence GeoJSON data */
+export interface StreetsideSequenceProps extends GeoJSONProps {
+  /** Ordered array of bubble IDs in this sequence */
+  bubbleIDs: PhotoID[];
+  /** Whether this sequence contains panoramic images */
+  isPano: boolean;
+  /** Capture date, copied from the first bubble */
+  captured_at?: string;
+  /** Capture author, copied from the first bubble */
+  captured_by?: string;
+}
+
+/** A Streetside bubble Marker with typed props */
+export type StreetsideBubble = Marker<StreetsideBubbleProps>;
+
+/** A Streetside sequence GeoJSON with typed props */
+export type StreetsideSequence = GeoJSON<StreetsideSequenceProps>;
+
+/** Zoom level used by the tiler for loading Streetside bubble data */
 const TILEZOOM = 16.5;
-// By default: request 2 nearby tiles so we can connect sequences.
+/** Number of extra tiles to request around the viewport to allow connecting sequences */
 const TILEMARGIN = 2;
+
+
+/** Inflight request tracking */
+interface InflightEntry {
+  /** The pending fetch promise */
+  promise: Promise<void>;
+  /** Controller to abort the inflight request */
+  controller: AbortController;
+}
+
+/** Internal cache for Streetside tile data */
+interface StreetsideCache {
+  /** Map of TileID to inflight request info */
+  inflight: Map<string, InflightEntry>;
+  /** Set of bubble PhotoIDs not yet assigned to a sequence */
+  unattachedBubbles: Set<PhotoID>;
+  /** Map of bubble PhotoID to the set of SequenceIDs it belongs to */
+  bubbleHasSequences: Map<PhotoID, Set<SequenceID>>;
+  /** Cached metadata fetch promise (fetched only once) */
+  metadataPromise: Promise<unknown> | null;
+  /** Last viewport version that was processed, avoids redundant work */
+  lastv: number | null;
+}
+
+/** Options for Pannellum scene configuration */
+interface SceneOptions {
+  /** Panorama type, e.g. 'cubemap' */
+  type: string;
+  /** Array of 6 data URLs for cubemap faces */
+  cubeMap: string[];
+  /** Whether to disable keyboard controls in the viewer */
+  disableKeyboardCtrl: boolean;
+  /** Whether to show the fullscreen button */
+  showFullscreenCtrl: boolean;
+  /** Whether the panorama loads automatically */
+  autoLoad: boolean;
+  /** Whether to show the compass indicator */
+  compass: boolean;
+  /** Momentum friction after interaction stops (1 = stop immediately) */
+  friction: number;
+  /** Minimum horizontal field of view in degrees (max zoom in) */
+  minHfov: number;
+  /** Maximum horizontal field of view in degrees (max zoom out) */
+  maxHfov: number;
+  /** Default horizontal field of view in degrees */
+  hfov: number;
+  /** Default compass yaw angle in degrees */
+  yaw: number;
+  /** Offset to align north, set from the bubble's compass angle */
+  northOffset?: number;
+  /** Initial pitch angle in degrees */
+  pitch?: number;
+}
+
+/** Info about a single image tile to be loaded */
+interface ImgInfo {
+  /** Cubemap face code (e.g. '01' for front, '02' for right) */
+  face: string;
+  /** URL to fetch the image tile from */
+  url: string;
+  /** X pixel offset for drawing on the canvas */
+  x: number;
+  /** Y pixel offset for drawing on the canvas */
+  y: number;
+}
+
+/** Result from loading a single image */
+interface ImageLoadResult {
+  /** The image info that was loaded */
+  imgInfo: ImgInfo;
+  /** Load status: 'ok' or 'error' */
+  status: string;
+}
 
 
 /**
@@ -32,11 +147,32 @@ const TILEMARGIN = 2;
  */
 export class StreetsideService extends AbstractSystem {
 
+  /** Promise tracking Pannellum asset loading */
+  _loadPromise: Promise<void> | null;
+  /** Internal cache for tile data, inflight requests, and sequence state */
+  _cache: StreetsideCache;
+  /** Whether high-resolution imagery is enabled */
+  _hires: boolean;
+  /** Canvas resolution in pixels per face (512, 1024, 2048, or 4096) */
+  _resolution: number;
+  /** Counter for the current Pannellum scene ID */
+  _currScene: number;
+  /** The Pannellum viewer instance */
+  _viewer: any;
+  /** Auto-incrementing counter for generating sequence IDs */
+  _nextSequenceID: number;
+  /** Photo ID to select once its data has been fetched */
+  _waitingForPhotoID: PhotoID | null;
+  /** Configuration options passed to Pannellum when creating scenes */
+  _sceneOptions: SceneOptions;
+  /** Tiler instance configured for Streetside tile requests */
+  _tiler: Tiler;
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'streetside';
     this.requiredDependencies = new Set(['assets', 'l10n', 'photos', 'spatial']);
@@ -45,7 +181,7 @@ export class StreetsideService extends AbstractSystem {
 
     this._loadPromise = null;
 
-    this._cache = {};
+    this._cache = {} as StreetsideCache;
     this._hires = false;
     this._resolution = 512;    // higher numbers are slower - 512, 1024, 2048, 4096
     this._currScene = 0;
@@ -73,16 +209,16 @@ export class StreetsideService extends AbstractSystem {
     this._step = this._step.bind(this);
     this._setupCanvas = this._setupCanvas.bind(this);
 
-    this._tiler = new Tiler().zoomRange(TILEZOOM).margin(TILEMARGIN).skipNullIsland(true);
+    this._tiler = ((new Tiler().zoomRange(TILEZOOM) as Tiler).margin(TILEMARGIN) as Tiler).skipNullIsland(true) as Tiler;
   }
 
 
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -93,9 +229,9 @@ export class StreetsideService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
@@ -103,11 +239,11 @@ export class StreetsideService extends AbstractSystem {
     const ui = context.systems.ui;
 
     // create ms-wrapper, a photo wrapper class
-    let $wrapper = context.container().select('.photoviewer .middle-middle')
+    let $wrapper: D3Selection = context.container().select('.photoviewer .middle-middle')
       .selectAll('.ms-wrapper')
       .data([0]);
 
-    const $$wrapper = $wrapper.enter()
+    const $$wrapper: D3EnterSelection = $wrapper.enter()
       .append('div')
       .attr('class', 'photo-wrapper ms-wrapper')
       .classed('hide', true);
@@ -117,7 +253,7 @@ export class StreetsideService extends AbstractSystem {
       .attr('id', 'rapideditor-viewer-streetside');
 
     // add .photo-footer
-    const $$footer = $$wrapper
+    const $$footer: D3EnterSelection = $$wrapper
       .append('div')
       .attr('class', 'photo-footer');
 
@@ -130,7 +266,7 @@ export class StreetsideService extends AbstractSystem {
       .attr('class', 'photo-attribution');
 
     // add .photo-controls
-    const $$controls = $$wrapper
+    const $$controls: D3EnterSelection = $$wrapper
       .append('div')
       .attr('class', 'photo-controls-wrap')
       .append('div')
@@ -148,8 +284,8 @@ export class StreetsideService extends AbstractSystem {
 
 
     // create working canvas for stitching together images
-    $wrapper = $wrapper.merge($$wrapper)
-      .call(this._setupCanvas);
+    $wrapper = $wrapper.merge($$wrapper) as D3Selection;
+    $wrapper.call(this._setupCanvas);
 
     // Register viewer resize handler
     ui?.PhotoViewer.on('resize', () => {
@@ -159,7 +295,7 @@ export class StreetsideService extends AbstractSystem {
     eventManager?.on('keydown', this._keydown);
 
     return this._startPromise = this._loadAssetsAsync()
-      .then(() => this._started = true);
+      .then(() => { this._started = true; });
 //      .catch(err => {
 //        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
 //        this._startPromise = null;
@@ -170,9 +306,9 @@ export class StreetsideService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     if (this._cache.inflight) {
       for (const inflight of this._cache.inflight.values()) {
         inflight.controller.abort();
@@ -181,13 +317,13 @@ export class StreetsideService extends AbstractSystem {
 
     this._cache = {
       inflight:            new Map(),  // Map<TileID, {Promise, AbortController}>
-      unattachedBubbles:   new Set(),  // Set<BubbleID>
-      bubbleHasSequences:  new Map(),  // Map<BubbleID, Set<SequenceID>>
+      unattachedBubbles:   new Set(),  // Set<PhotoID>
+      bubbleHasSequences:  new Map(),  // Map<PhotoID, Set<SequenceID>>
       metadataPromise:     null,
       lastv:               null
     };
 
-    const spatial = this.context.systems.spatial;
+    const spatial = this.context.systems.spatial!;
     spatial.clearCache('streetside-images');
     spatial.clearCache('streetside-sequences');
 
@@ -198,22 +334,22 @@ export class StreetsideService extends AbstractSystem {
   /**
    * getImages
    * Get already loaded image data that appears in the current map view
-   * @return  {Array<Marker>}  Array of image data
+   * @return Array of image data
    */
-  getImages() {
-    const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('streetside-images').map(hit => hit.contents);
+  getImages(): Marker[] {
+    const spatial = this.context.systems.spatial!;
+    return spatial.getVisibleData('streetside-images').map(hit => hit.contents) as Marker[];
   }
 
 
   /**
    * getSequences
    * Get already loaded sequence data that appears in the current map view
-   * @return  {Array<GeoJSON>}  Array of sequence data
+   * @return Array of sequence data
    */
-  getSequences() {
-    const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('streetside-sequences').map(hit => hit.contents);
+  getSequences(): GeoJSON[] {
+    const spatial = this.context.systems.spatial!;
+    return spatial.getVisibleData('streetside-sequences').map(hit => hit.contents) as GeoJSON[];
   }
 
 
@@ -221,9 +357,9 @@ export class StreetsideService extends AbstractSystem {
    * loadTiles
    * Schedule any data requests needed to cover the current map view
    */
-  loadTiles() {
+  loadTiles(): void {
     const context = this.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
     const cache = this._cache;
 
@@ -256,8 +392,8 @@ export class StreetsideService extends AbstractSystem {
    * showViewer
    * Shows the photo viewer, and hides all other photo viewers
    */
-  showViewer() {
-    const $viewer = this.context.container().select('.photoviewer')
+  showViewer(): void {
+    const $viewer: D3Selection = this.context.container().select('.photoviewer')
       .classed('hide', false);
 
     const isHidden = $viewer.selectAll('.photo-wrapper.ms-wrapper.hide').size();
@@ -278,11 +414,11 @@ export class StreetsideService extends AbstractSystem {
    * hideViewer
    * Hides the photo viewer and clears the currently selected image
    */
-  hideViewer() {
+  hideViewer(): void {
     const context = this.context;
-    context.systems.photos.selectPhoto(null);
+    context.systems.photos!.selectPhoto(null);
 
-    const $viewer = context.container().select('.photoviewer');
+    const $viewer: D3Selection = context.container().select('.photoviewer');
     $viewer
       .classed('hide', true)
       .selectAll('.photo-wrapper')
@@ -296,32 +432,32 @@ export class StreetsideService extends AbstractSystem {
    * selectImageAsync
    * Note:  most code should call `PhotoSystem.selectPhoto(layerID, photoID)` instead.
    * That will manage the state of what the user clicked on, and then call this function.
-   * @param   {string}   imageID - the id of the image to select
-   * @return  {Promise}  Promise that resolves to the image after it has been selected
+   * @param imageID - the id of the image to select
+   * @return Promise that resolves to the image after it has been selected
    */
-  selectImageAsync(bubbleID) {
+  selectImageAsync(bubbleID: Nullable<PhotoID>): Promise<Marker | void> {
     if (!bubbleID) {
       this._updatePhotoFooter(null);  // reset
       return Promise.resolve();  // do nothing
     }
 
     const context = this.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
 
-    const $wrapper = context.container().select('.photoviewer .ms-wrapper');
+    const $wrapper: D3Selection = context.container().select('.photoviewer .ms-wrapper');
     $wrapper.selectAll('.pnlm-load-box')   // display "loading.."
       .style('display', 'block')
       .style('transform', 'translate(-50%, -50%)');
 
     // It's possible we could be trying to show a photo that hasn't been fetched yet
     // (e.g. if we are starting up with a photoID specified in the url hash)
-    const bubble = spatial.getData('streetside-images', bubbleID);
+    const bubble = spatial.getData<Marker<StreetsideBubbleProps>>('streetside-images', bubbleID);
     if (!bubble) {
       this._waitingForPhotoID = bubbleID;
       return Promise.resolve();
     }
 
-    this._sceneOptions.northOffset = bubble.props.ca;
+    this._sceneOptions.northOffset = bubble.props?.ca ?? 0;
 
     this._updatePhotoFooter(bubbleID);
 
@@ -382,24 +518,24 @@ export class StreetsideService extends AbstractSystem {
   /**
    * _updatePhotoFooter
    * Update the photo attribution section of the image viewer
-   * @param  {string}  bubbleID - the new bubbleID
+   * @param bubbleID - the new bubbleID
    */
-  _updatePhotoFooter(bubbleID) {
+  _updatePhotoFooter(bubbleID: Nullable<PhotoID>): void {
     const context = this.context;
-    const l10n = context.systems.l10n;
-    const photos = context.systems.photos;
-    const spatial = context.systems.spatial;
-    const $wrapper = context.container().select('.photoviewer .ms-wrapper');
+    const l10n = context.systems.l10n!;
+    const photos = context.systems.photos!;
+    const spatial = context.systems.spatial!;
+    const $wrapper: D3Selection = context.container().select('.photoviewer .ms-wrapper');
 
     // Options Section
-    const $options = $wrapper.selectAll('.photo-options');
+    const $options: D3Selection = $wrapper.selectAll('.photo-options');
 
     // .hires checkbox
-    let $label = $options.selectAll('.hires')
+    let $label: D3Selection = $options.selectAll('.hires')
       .data([0]);
 
     // enter
-    const $$label = $label.enter()
+    const $$label: D3EnterSelection = $label.enter()
       .append('label')
       .attr('for', 'ms-hires-input')
       .attr('class', 'hires');
@@ -429,7 +565,7 @@ export class StreetsideService extends AbstractSystem {
       .append('span');
 
     // update
-    $label = $label.merge($$label);
+    $label = $label.merge($$label) as D3Selection;
     $label.selectAll('#ms-hires-input')
       .property('checked', this._hires);
 
@@ -438,9 +574,9 @@ export class StreetsideService extends AbstractSystem {
 
 
     // Attribution Section
-    const $attribution = $wrapper.selectAll('.photo-attribution').html('&nbsp;');  // clear DOM content
+    const $attribution: D3Selection = $wrapper.selectAll('.photo-attribution').html('&nbsp;');  // clear DOM content
 
-    const bubble = spatial.getData('streetside-images', bubbleID);
+    const bubble = spatial.getData<StreetsideBubble>('streetside-images', bubbleID as string);
     if (!bubble) return;
 
     const props = bubble.props;
@@ -467,11 +603,13 @@ export class StreetsideService extends AbstractSystem {
         .text('|');
     }
 
+    const loc = props.loc;
+
     $attribution
       .append('a')
       .attr('class', 'image-link')
       .attr('target', '_blank')
-      .attr('href', `https://www.bing.com/maps?cp=${props.loc[1]}~${props.loc[0]}&lvl=17&dir=${props.ca}&style=x&v=2&sV=1`)
+      .attr('href', `https://www.bing.com/maps?cp=${loc[1]}~${loc[0]}&lvl=17&dir=${props.ca}&style=x&v=2&sV=1`)
       .text('bing.com');
   }
 
@@ -479,12 +617,12 @@ export class StreetsideService extends AbstractSystem {
   /**
    * _loadAssetsAsync
    * Load the Pannellum JS and CSS files into the document head
-   * @return  {Promise}  Promise resolved when both files have been loaded
+   * @return Promise resolved when both files have been loaded
    */
-  _loadAssetsAsync() {
+  _loadAssetsAsync(): Promise<void> {
     if (this._loadPromise) return this._loadPromise;
 
-    const assets = this.context.systems.assets;
+    const assets = this.context.systems.assets!;
 
     // Tell the AssetSystem what to load..
     const latestPath = 'https://cdn.jsdelivr.net/npm/pannellum@2/build';
@@ -499,13 +637,13 @@ export class StreetsideService extends AbstractSystem {
       local:  `${localPath}/pannellum.js`  // note no .min
     });
 
-    return this._loadPromise = new Promise((resolve, reject) => {
+    return this._loadPromise = new Promise<void>((resolve, reject) => {
       let count = 0;
       const loaded = () => {
         if (++count === 2) resolve();
       };
 
-      const $head = d3_select('head');
+      const $head: D3Selection = d3_select('head');
 
       $head.selectAll('#rapideditor-pannellum-css')
         .data([0])
@@ -535,15 +673,15 @@ export class StreetsideService extends AbstractSystem {
    * _initViewer
    * Initializes the Pannellum viewer
    */
-  _initViewer() {
-    if (!window.pannellum) throw new Error('pannellum not loaded');
+  _initViewer(): void {
+    if (!('pannellum' in globalThis)) throw new Error('pannellum not loaded');
     if (this._viewer) return;  // already initted
 
     this._currScene++;
     const sceneID = this._currScene.toString();
     const options = {
       'default': { firstScene: sceneID },
-      scenes: {}
+      scenes: {} as Record<string, SceneOptions>
     };
     options.scenes[sceneID] = this._sceneOptions;
 
@@ -556,7 +694,7 @@ export class StreetsideService extends AbstractSystem {
       this.emit('fovChanged', this._viewer.getHfov());
     };
 
-    this._viewer = window.pannellum.viewer('rapideditor-viewer-streetside', options);
+    this._viewer = (globalThis as any).pannellum.viewer('rapideditor-viewer-streetside', options);
     this._viewer.on('load', imageChanged);
     this._viewer.on('zoomchange', fovChanged);
 
@@ -577,12 +715,12 @@ export class StreetsideService extends AbstractSystem {
   /**
    * _keydown
    * Handler for keydown events on the window, but only if the photo viewer is visible.
-   * @param  {KeyboardEvent}  e - A DOM KeyboardEvent
+   * @param e - A DOM KeyboardEvent
    */
-  _keydown(e) {
+  _keydown(e: KeyboardEvent): void {
     const context = this.context;
     const eventManager = context.systems.gfx?.eventManager;
-    const photos = context.systems.photos;
+    const photos = context.systems.photos!;
 
     // Test environment?
     if (!eventManager) return;
@@ -607,45 +745,45 @@ export class StreetsideService extends AbstractSystem {
   /**
    * _step
    * Step to the next bubble in the sequence
-   * @param  {number}  stepBy - 1 to step forward, -1 to step backward
+   * @param stepBy - 1 to step forward, -1 to step backward
    */
-  _step(stepBy) {
+  _step(stepBy: number): void {
     const context = this.context;
-    const photos = context.systems.photos;
-    const spatial = context.systems.spatial;
+    const photos = context.systems.photos!;
+    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
 
     const currBubbleID = photos.currPhotoID;
-    const selected = spatial.getData('streetside-images', currBubbleID);
+    const selected = spatial.getData<StreetsideBubble>('streetside-images', currBubbleID);
     if (!selected) return;
 
-    let nextID = (stepBy === 1 ? selected.props.ne : selected.props.pr);
-    const yaw = this._viewer.getYaw();
+    let nextID = (stepBy === 1 ? selected.props.ne : selected.props.pr) as PhotoID;
+    const yaw = this._viewer.getYaw() as number;
     this._sceneOptions.yaw = yaw;
 
-    const ca = selected.props.ca + yaw;
+    const ca = (selected.props.ca ?? 0) + yaw;
     const origin = selected.props.loc;
 
     // construct a search trapezoid pointing out from current bubble
     const meters = 35;
-    const p1 = [
+    const p1: Vec2 = [
       origin[0] + geoMetersToLon(meters / 5, origin[1]),
       origin[1]
     ];
-    const p2 = [
+    const p2: Vec2 = [
       origin[0] + geoMetersToLon(meters / 2, origin[1]),
       origin[1] + geoMetersToLat(meters)
     ];
-    const p3 = [
+    const p3: Vec2 = [
       origin[0] - geoMetersToLon(meters / 2, origin[1]),
       origin[1] + geoMetersToLat(meters)
     ];
-    const p4 = [
+    const p4: Vec2 = [
       origin[0] - geoMetersToLon(meters / 5, origin[1]),
       origin[1]
     ];
 
-    let poly = [p1, p2, p3, p4, p1];
+    let poly: Vec2[] = [p1, p2, p3, p4, p1];
 
     // rotate it to face forward/backward
     const angle = (stepBy === 1 ? ca : ca + 180) * DEG2RAD;
@@ -660,12 +798,12 @@ export class StreetsideService extends AbstractSystem {
     let minDist = Infinity;
     const hits = spatial.getDataAtBox('streetside-images', extent.bbox());
     for (const hit of hits) {
-      const bubble = hit.contents;
+      const bubble = hit.contents as StreetsideBubble;
       if (bubble.id === selected.id) continue;
-      if (!geomPointInPolygon(bubble.loc, poly)) continue;
+      if (!geomPointInPolygon(bubble.loc!, poly)) continue;
 
-      let dist = vecLength(bubble.loc, selected.loc);
-      const theta = selected.props.ca - bubble.props.ca;
+      let dist = vecLength(bubble.loc!, selected.loc);
+      const theta = (selected.props.ca ?? 0) - (bubble.props.ca ?? 0);
       const minTheta = Math.min(Math.abs(theta), 360 - Math.abs(theta));
       if (minTheta > 20) {
         dist += 5;  // penalize distance if camera angles don't match
@@ -688,27 +826,27 @@ export class StreetsideService extends AbstractSystem {
   /**
    * _gotTile
    * Process the response from the tile fetch.
-   * @param  {Tile}    tile - Tile data
-   * @param  {Object}  bubbles - Response data
+   * @param tile - Tile data
+   * @param bubbles - Response data
    */
-  _gotTile(tile, bubbles) {
+  _gotTile(tile: Tile, bubbles: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
-    const photos = context.systems.photos;
-    const spatial = context.systems.spatial;
+    const photos = context.systems.photos!;
+    const spatial = context.systems.spatial!;
     const cache = this._cache;
 
     spatial.addTiles('streetside-images', [tile]);   // mark as loaded
 
     if (!Array.isArray(bubbles)) return;
-    if (bubbles.error) throw new Error(bubbles.error);
+    if ((bubbles as any).error) throw new Error((bubbles as any).error);
 
     // [].shift() removes the first element, some statistics info, not a bubble point
     bubbles.shift();
     if (!bubbles.length) return;
 
-    let selectBubbleID = null;
-    const toLoad = [];
+    let selectBubbleID: PhotoID | null = null;
+    const toLoad: Marker[] = [];
     for (const bubble of bubbles) {
       const bubbleID = bubble.id.toString();
       if (this._waitingForPhotoID === bubbleID) {
@@ -717,6 +855,7 @@ export class StreetsideService extends AbstractSystem {
       }
 
       if (spatial.hasData('streetside-images', bubbleID))  continue;  // skip duplicates
+      if (!Number.isFinite(bubble.lo) || !Number.isFinite(bubble.la)) continue;  // skip bubbles without valid coordinates
 
       const loc = spatial.preventCoincidentLoc('streetside-images', [bubble.lo, bubble.la]);
       const props = {
@@ -754,19 +893,19 @@ export class StreetsideService extends AbstractSystem {
    * Note that this algorithm has changed, as we seem to get different data.
    * The API we are using is undocumented :(
    */
-  _connectSequences() {
+  _connectSequences(): void {
     const context = this.context;
-    const spatial = context.systems.spatial;
-    const unattachedBubbles = this._cache.unattachedBubbles;     // Set<bubbleID>
-    const bubbleHasSequences = this._cache.bubbleHasSequences;   // Map<bubbleID, Set<sequenceID>>
-    const touchedSequenceIDs = new Set();  // sequences that we touched will need recalculation
+    const spatial = context.systems.spatial!;
+    const unattachedBubbles = this._cache.unattachedBubbles;     // Set<PhotoID>
+    const bubbleHasSequences = this._cache.bubbleHasSequences;   // Map<PhotoID, Set<SequenceID>>
+    const touchedSequenceIDs = new Set<SequenceID>();  // sequences that we touched will need recalculation
 
     // Get bubbles that haven't been added to a sequence yet.
     // Note: sort numerically to minimize the chance that we'll start assembling mid-sequence.
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
     const toAttach = Array.from(unattachedBubbles).sort(collator.compare);
 
-    const _updateCaches = (sequence, bubble) => {
+    const _updateCaches = (sequence: any, bubble: any): void => {
       const sequenceID = sequence.id;
       const bubbleID = bubble.id;
       touchedSequenceIDs.add(sequenceID);
@@ -785,7 +924,7 @@ export class StreetsideService extends AbstractSystem {
       if (!unattachedBubbles.has(currBubbleID)) continue;  // done already
 
       // Get current bubble (the one we are trying to attach)
-      const currBubble = spatial.getData('streetside-images', currBubbleID);
+      const currBubble = spatial.getData<StreetsideBubble>('streetside-images', currBubbleID);
       if (!currBubble) {  // missing? shouldn't happen
         unattachedBubbles.delete(currBubbleID);
         continue;
@@ -793,9 +932,9 @@ export class StreetsideService extends AbstractSystem {
 
       // Get adjacent bubbles (if possible)
       const prevBubbleID = currBubble.props.pr;
-      const prevBubble = prevBubbleID && spatial.getData('streetside-images', prevBubbleID);
+      const prevBubble = prevBubbleID && spatial.getData<StreetsideBubble>('streetside-images', prevBubbleID);
       const nextBubbleID = currBubble.props.ne;
-      const nextBubble = nextBubbleID && spatial.getData('streetside-images', nextBubbleID);
+      const nextBubble = nextBubbleID && spatial.getData<StreetsideBubble>('streetside-images', nextBubbleID);
 
       // Try to link current bubble to the previous bubble's sequence.
       // Prefer a sequence where the current bubble follows the previous bubble at the end of the sequnce.
@@ -803,7 +942,8 @@ export class StreetsideService extends AbstractSystem {
       if (prevBubbleID && prevBubble) {
         const trySequenceIDs = bubbleHasSequences.get(prevBubbleID) || new Set();
         for (const sequenceID of trySequenceIDs) {
-          const sequence = spatial.getData('streetside-sequences', sequenceID);
+          const sequence = spatial.getData<StreetsideSequence>('streetside-sequences', sequenceID);
+          if (!sequence) continue;
           const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
           const beginID = bubbleIDs.at(0);
           const endID = bubbleIDs.at(-1);
@@ -825,7 +965,8 @@ export class StreetsideService extends AbstractSystem {
       if (nextBubbleID && nextBubble) {
         const trySequenceIDs = bubbleHasSequences.get(nextBubbleID) || new Set();
         for (const sequenceID of trySequenceIDs) {
-          const sequence = spatial.getData('streetside-sequences', sequenceID);
+          const sequence = spatial.getData<StreetsideSequence>('streetside-sequences', sequenceID);
+          if (!sequence) continue;
           const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
           const beginID = bubbleIDs.at(0);
           const endID = bubbleIDs.at(-1);
@@ -853,15 +994,16 @@ export class StreetsideService extends AbstractSystem {
           bubbleIDs:  [],
           isPano:     true,
           geojson: {
-            type: 'Feature',
+            type: 'Feature' as const,
+            properties: {},
             geometry: {
-              type: 'LineString',
-              coordinates: []
+              type: 'LineString' as const,
+              coordinates: [] as number[][]
             }
           }
         };
 
-        const sequence = new GeoJSON(this.context, props);
+        const sequence: StreetsideSequence = new GeoJSON(this.context, props as Partial<StreetsideSequenceProps>);
         spatial.addData('streetside-sequences', sequence);
 
         const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
@@ -882,14 +1024,16 @@ export class StreetsideService extends AbstractSystem {
 
     // Any sequences that we touched, bump version number and recompute the coordinate array
     for (const sequenceID of touchedSequenceIDs) {
-      const sequence = spatial.getData('streetside-sequences', sequenceID);
+      const sequence = spatial.getData<StreetsideSequence>('streetside-sequences', sequenceID);
+      if (!sequence) continue;
       const bubbles = sequence.props.bubbleIDs
-        .map(bubbleID => spatial.getData('streetside-images', bubbleID));
+        .map((bubbleID: PhotoID) => spatial.getData<StreetsideBubble>('streetside-images', bubbleID));
 
       // We will update the properties in-place.. hope this is ok.
-      sequence.props.captured_at = bubbles[0].props.captured_at;
-      sequence.props.captured_by = bubbles[0].props.captured_by;
-      sequence.props.geojson.geometry.coordinates = bubbles.map(bubble => bubble.loc);
+      sequence.props.captured_at = bubbles[0]?.props.captured_at;
+      sequence.props.captured_by = bubbles[0]?.props.captured_by;
+      const feature = sequence.props.geojson as GeoJSON.Feature;
+      feature.geometry = { type: 'LineString', coordinates: bubbles.map(bubble => bubble?.loc ?? [0, 0]) };
 
       sequence.updateGeometry().touch();
       spatial.replaceData('streetside-sequences', sequence);
@@ -901,7 +1045,7 @@ export class StreetsideService extends AbstractSystem {
    * _fetchMetadataAsync
    * https://learn.microsoft.com/en-us/bingmaps/rest-services/imagery/get-imagery-metadata
    */
-  _fetchMetadataAsync(tile) {
+  _fetchMetadataAsync(tile: Tile): Promise<unknown> | void {
     const cache = this._cache;
     if (cache.metadataPromise) return cache.metadataPromise;  // only fetch it once
 
@@ -924,7 +1068,7 @@ export class StreetsideService extends AbstractSystem {
    * bubbles:   undocumented / unsupported API?
    * see Rapid#1305, iD#10100
    */
-  _loadTileAsync(tile) {
+  _loadTileAsync(tile: Tile): Promise<void> {
     const cache = this._cache;
     const inflight = cache.inflight.get(tile.id);
     if (inflight) return inflight.promise;
@@ -934,7 +1078,7 @@ export class StreetsideService extends AbstractSystem {
 
     const bubbleURLBase = 'https://t.ssl.ak.tiles.virtualearth.net/tiles/cmd/StreetSideBubbleMetaData?';
     const bubbleKey = 'AuftgJsO0Xs8Ts4M1xZUQJQXJNsvmh3IV8DkNieCiy3tCwCUMq76-WpkrBtNAuEm';
-    const bubbleURL = bubbleURLBase + utilQsString({ north: n, south: s, east: e, west: w, count: MAXRESULTS, key: bubbleKey });
+    const bubbleURL = bubbleURLBase + utilQsString({ north: n, south: s, east: e, west: w, count: MAXRESULTS, key: bubbleKey }, false);
 
     const controller = new AbortController();
     const promise = fetch(bubbleURL, { signal: controller.signal })
@@ -956,12 +1100,15 @@ export class StreetsideService extends AbstractSystem {
 
   /**
    * _loadImageAsync
+   * Loads a single image tile and draws it onto the corresponding face canvas.
+   * @param imgInfo - Info about the image tile to load
+   * @return Promise resolving with the load result status
    */
-  _loadImageAsync(imgInfo) {
+  _loadImageAsync(imgInfo: ImgInfo): Promise<ImageLoadResult> {
     return new Promise(resolve => {
       const face = imgInfo.face;
-      const canvas = document.getElementById(`rapideditor-canvas${face}`);
-      const ctx = canvas.getContext('2d');
+      const canvas = document.getElementById(`rapideditor-canvas${face}`) as HTMLCanvasElement;
+      const ctx = canvas.getContext('2d')!;
 
       const img = new Image();
       img.onload = () => {
@@ -980,13 +1127,16 @@ export class StreetsideService extends AbstractSystem {
 
   /**
    * _loadFaceAsync
+   * Loads all image tiles for one cubemap face and assembles them into a data URL.
+   * @param imageGroup - Array of image tile infos for a single face
+   * @return Promise resolving when the face has been stitched
    */
-  _loadFaceAsync(imageGroup) {
+  _loadFaceAsync(imageGroup: ImgInfo[]): Promise<{ status: string }> {
     return Promise.all(imageGroup.map(d => this._loadImageAsync(d)))
       .then(data => {
         const face = data[0].imgInfo.face;
-        const canvas = document.getElementById(`rapideditor-canvas${face}`);
-        const which = { '01': 0, '02': 1, '03': 2, '10': 3, '11': 4, '12': 5 };
+        const canvas = document.getElementById(`rapideditor-canvas${face}`) as HTMLCanvasElement;
+        const which: Record<string, number> = { '01': 0, '02': 1, '03': 2, '10': 3, '11': 4, '12': 5 };
         this._sceneOptions.cubeMap[which[face]] = canvas.toDataURL('image/jpeg', 1.0);
         return { status: `face ${face} ok` };
       });
@@ -995,8 +1145,11 @@ export class StreetsideService extends AbstractSystem {
 
   /**
    * _loadFacesAsync
+   * Loads all six cubemap faces in parallel.
+   * @param faceGroup - Array of 6 face image groups
+   * @return Promise resolving when all faces have been loaded
    */
-  _loadFacesAsync(faceGroup) {
+  _loadFacesAsync(faceGroup: ImgInfo[][]): Promise<{ status: string }> {
     return Promise.all(faceGroup.map(d => this._loadFaceAsync(d)))
       .then(() => { return { status: 'this._loadFacesAsync done' }; });
   }
@@ -1007,7 +1160,7 @@ export class StreetsideService extends AbstractSystem {
    * Called when setting up the viewer, creates 6 canvas elements to load image data into,
    * so that it can be stitched together into a photosphere.
    */
-  _setupCanvas($selection) {
+  _setupCanvas($selection: D3Selection): void {
     $selection.selectAll('#rapideditor-stitcher-canvases')
       .remove();
 
@@ -1023,13 +1176,19 @@ export class StreetsideService extends AbstractSystem {
       .data(['canvas01', 'canvas02', 'canvas03', 'canvas10', 'canvas11', 'canvas12'])
       .enter()
       .append('canvas')
-      .attr('id', d => `rapideditor-${d}`)
+      .attr('id', (d: string) => `rapideditor-${d}`)
       .attr('width', this._resolution)
       .attr('height', this._resolution);
   }
 
 
-  _qkToXY(qk) {
+  /**
+   * _qkToXY
+   * Converts a quadkey string to pixel coordinates for canvas placement.
+   * @param qk - Quadkey string (e.g. '0123')
+   * @return [x, y] pixel coordinates
+   */
+  _qkToXY(qk: string): Vec2 {
     let x = 0;
     let y = 0;
     let scale = 256;
@@ -1043,9 +1202,15 @@ export class StreetsideService extends AbstractSystem {
   }
 
 
-  _getQuadKeys() {
+  /**
+   * _getQuadKeys
+   * Returns an ordered array of quadkey strings for tiling a cubemap face
+   * at the current resolution. The number of tiles scales with resolution.
+   * @return Array of quadkey strings
+   */
+  _getQuadKeys(): string[] {
     const dim = this._resolution / 256;
-    let quadKeys;
+    let quadKeys: string[];
 
     if (dim === 16) {
       quadKeys = [

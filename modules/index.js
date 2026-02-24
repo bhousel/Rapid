@@ -8,7 +8,7 @@ export * from './lib/index.ts';
 export * from './modes/index.ts';
 export * from './operations/index.js';
 export * from './pixi/index.ts';
-export * from './services/index.js';
+export * from './services/index.ts';
 export * from './types/ids.ts';
 export * from './ui/index.js';
 export * from './util/index.ts';

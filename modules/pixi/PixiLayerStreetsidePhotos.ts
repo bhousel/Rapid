@@ -47,7 +47,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     this._dirtyCurrentPhoto = this._dirtyCurrentPhoto.bind(this);
 
     if (this.supported) {
-      const streetside = this.context.services.streetside;
+      const streetside = this.context.services.streetside!;
       streetside.on('bearingChanged', this._dirtyCurrentPhoto);
       streetside.on('fovChanged', this._dirtyCurrentPhoto);
     }
@@ -237,7 +237,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
         feature.setData(dataID, d);
         feature.setCoords(part);
         feature.clearChildData(dataID);
-        feature.addChildData(dataID, d.props.bubbleIDs);
+        feature.addChildData(dataID, d.props.bubbleIDs as string);
       }
 
       this.syncFeatureClasses(feature);
@@ -274,7 +274,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
           const yaw = viewer?.getYaw() ?? 0;
           const fov = viewer?.getHfov() ?? 45;
 
-          style.viewfield!.angles = [d.props.ca + yaw];
+          style.viewfield!.angles = [(d.props.ca as number) + yaw];
           style.viewfield!.image = 'viewfield';
           style.viewfield!.opacity = 1;
           style.viewfield!.color = SELECTED;
@@ -285,7 +285,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
           style.viewfield!.scale = [s * fw, s * fl];
 
         } else {
-          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
+          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca as number] : [];  // ca = camera angle
           style.viewfield!.image = d.props.isPano ? 'pano' : 'viewfield';
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style

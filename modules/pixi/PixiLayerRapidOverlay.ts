@@ -84,9 +84,9 @@ return; // not yet
         const overlay = dataset.overlay as any;  // this code is dead (see return above), overlay type may change
         if (vtService) {
           if ((zoom >= overlay.minZoom ) && (zoom <= overlay.maxZoom)) {  // avoid firing off too many API requests
-            vtService.loadTiles(overlay.url);
+            vtService!.loadTiles(overlay.url);
           }
-          const overlayData = vtService.getData(overlay.url).map((d: any) => d.geojson);
+          const overlayData = vtService!.getData(overlay.url).map((d: any) => d.geojson);
           const points = overlayData.filter((d: any) => d.geometry.type === 'Point' || d.geometry.type === 'MultiPoint');
           this.renderPoints(frame, viewport, zoom, points, customColor);
         }

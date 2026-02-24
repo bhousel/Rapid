@@ -4,6 +4,45 @@ import debounce from 'lodash-es/debounce.js';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { DebouncedFunc } from 'lodash-es';
+import type { Context } from '../Context.ts';
+
+
+/** Errback-style callback for Wikibase results */
+type WikibaseCallback = (err: Error | string | null, result?: any) => void;
+
+/** Parameters for getEntity */
+interface GetEntityParams {
+  key?: string;
+  value?: string;
+  langCodes?: string[];
+  debounce?: boolean;
+}
+
+/** Parameters for getDocs */
+interface GetDocsParams {
+  key: string;
+  value?: string;
+  langCodes?: string[];
+}
+
+/** Result object returned by getDocs */
+interface DocsResult {
+  title: string;
+  description: string;
+  descriptionLocaleCode: string;
+  editURL: string;
+  imageURL?: string;
+  wiki?: WikiInfo;
+}
+
+/** Wiki reference info */
+interface WikiInfo {
+  title: string;
+  text: string;
+  url: string;
+}
+
 
 /**
  * `OsmWikibaseService`
@@ -13,11 +52,22 @@ import { utilFetchResponse } from '../util/fetch_response.ts';
  */
 export class OsmWikibaseService extends AbstractSystem {
 
+  /** Base URL for the OSM Wikibase API */
+  apibase: string;
+  /** Internal cache for Wikibase entity data, keyed by sitelink title */
+  _cache: Record<string, any>;
+  /** Map of in-flight requests keyed by URL to their AbortControllers */
+  _inflight: Map<string, AbortController>;
+  /** Cache of locale language codes to their Wikibase entity QIDs (or `false` if not found) */
+  _localeIDs: Record<string, string | false>;
+  /** Debounced version of `_request`, used when callers opt into request batching */
+  _debouncedRequest: DebouncedFunc<typeof OsmWikibaseService.prototype._request>;
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'osmwikibase';
     this.optionalDependencies = new Set(['l10n']);
@@ -41,9 +91,9 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -51,9 +101,9 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -61,9 +111,9 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     this._debouncedRequest.cancel();
 
     for (const controller of this._inflight.values()) {
@@ -78,12 +128,12 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * claimToValue
    * Get the best value for the property, or undefined if not found
-   * @param   {Object}  entity - entity object from wikibase
-   * @param   {string}  property - string e.g. 'P4' for image
-   * @param   {string}  langCode - string e.g. 'fr' for French
-   * @return  {string}  The requested value, or undefined
+   * @param entity - entity object from wikibase
+   * @param property - string e.g. 'P4' for image
+   * @param langCode - string e.g. 'fr' for French
+   * @return The requested value, or undefined
    */
-  claimToValue(entity, property, langCode) {
+  claimToValue(entity: any, property: string, langCode: string): string | undefined {
     if (!entity.claims[property]) return undefined;
     const locale = this._localeIDs[langCode];
     let preferredPick, localePick;
@@ -113,15 +163,15 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * monolingualClaimToValueObj
    * Convert monolingual property into a key-value object (language -> value)
-   * @param   {Object}  entity - entity object from wikibase
-   * @param   {string}  property - string e.g. 'P31' for monolingual wiki page title
-   * @return  The requested object, or undefined
+   * @param entity - entity object from wikibase
+   * @param property - string e.g. 'P31' for monolingual wiki page title
+   * @return The requested object, or undefined
    */
-  monolingualClaimToValueObj(entity, property) {
+  monolingualClaimToValueObj(entity: any, property: string): Record<string, string> | undefined {
     if (!entity?.claims[property]) return undefined;
 
-    return entity.claims[property].reduce(function(acc, obj) {
-      var value = obj.mainsnak.datavalue.value;
+    return entity.claims[property].reduce(function(acc: Record<string, string>, obj: any) {
+      const value = obj.mainsnak.datavalue.value;
       acc[value.language] = value.text;
       return acc;
     }, {});
@@ -131,12 +181,12 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * toSitelink
    * Generate a sitelink for the given key/value pair
-   * @param   {string}  key
-   * @param   {string}  value
-   * @return  {string}  sitelink
+   * @param key
+   * @param value
+   * @return sitelink
    */
-  toSitelink(key, value) {
-    let result = value ? `Tag:${key}=${value}` : `Key:${key}`;
+  toSitelink(key: string, value?: string): string {
+    const result = value ? `Tag:${key}=${value}` : `Key:${key}`;
     return result.replace(/_/g, ' ').trim();
   }
 
@@ -149,17 +199,17 @@ export class OsmWikibaseService extends AbstractSystem {
    *   value: 'string',
    *   langCodes: ['string']
    * }
-   * @param  {Object}    params
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param params
+   * @param callback - errback-style callback function to call with results
    */
-  getEntity(params, callback) {
+  getEntity(params: GetEntityParams, callback: WikibaseCallback): void {
     const doRequest = params.debounce ? this._debouncedRequest : this._request;
-    const rtypeSitelink = (params.key === 'type' && params.value) ? (`Relation:${params.value}`).replace(/_/g, ' ').trim() : false;
-    const keySitelink = params.key ? this.toSitelink(params.key) : false;
-    const tagSitelink = (params.key && params.value) ? this.toSitelink(params.key, params.value) : false;
-    let titles = [];
-    let result = {};
-    let localeSitelink;
+    const rtypeSitelink: string | false = (params.key === 'type' && params.value) ? (`Relation:${params.value}`).replace(/_/g, ' ').trim() : false;
+    const keySitelink: string | false = params.key ? this.toSitelink(params.key) : false;
+    const tagSitelink: string | false = (params.key && params.value) ? this.toSitelink(params.key, params.value) : false;
+    const titles: string[] = [];
+    const result: Record<string, any> = {};
+    let localeSitelink: string | undefined;
 
     if (params.langCodes) {
       for (const langCode of params.langCodes) {
@@ -211,7 +261,7 @@ export class OsmWikibaseService extends AbstractSystem {
       action: 'wbgetentities',
       sites: 'wiki',
       titles: titles.join('|'),
-      languages: params.langCodes.join('|'),
+      languages: params.langCodes!.join('|'),
       languagefallback: 1,
       origin: '*',
       format: 'json',
@@ -220,25 +270,25 @@ export class OsmWikibaseService extends AbstractSystem {
       // formatversion: 2,
     };
 
-    const url = this.apibase + '?' + utilQsString(obj);
+    const url = this.apibase + '?' + utilQsString(obj, false);
     doRequest(url, (err, d) => {
       if (err) {
         callback(err);
       } else if (!d.success || d.error) {
-        callback(d.error.messages.map(msg => msg.html['*']).join('<br>'));
+        callback(d.error.messages.map((msg: any) => msg.html['*']).join('<br>'));
       } else {
-        let localeID = false;
-        for (const res of Object.values(d.entities)) {
+        let localeID: string | false = false;
+        for (const res of Object.values(d.entities) as any[]) {
           if (res.missing !== '') {
             const title = res.sitelinks.wiki.title;
             if (title === rtypeSitelink) {
-              this._cache[rtypeSitelink] = res;
+              this._cache[rtypeSitelink as string] = res;
               result.rtype = res;
             } else if (title === keySitelink) {
-              this._cache[keySitelink] = res;
+              this._cache[keySitelink as string] = res;
               result.key = res;
             } else if (title === tagSitelink) {
-              this._cache[tagSitelink] = res;
+              this._cache[tagSitelink as string] = res;
               result.tag = res;
             } else if (title === localeSitelink) {
               localeID = res.id;
@@ -250,7 +300,7 @@ export class OsmWikibaseService extends AbstractSystem {
 
         if (localeSitelink) {
           // If locale ID is not found, store false to prevent repeated queries
-          this.addLocale(params.langCodes[0], localeID);
+          this.addLocale(params.langCodes![0], localeID);
         }
 
         callback(null, result);
@@ -275,10 +325,10 @@ export class OsmWikibaseService extends AbstractSystem {
    *   imageURL:     'string',
    *   wiki:         { title: 'string', text: 'string', url: 'string' }
    * }
-   * @param  {Object}    params
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param params
+   * @param callback - errback-style callback function to call with results
    */
-  getDocs(params, callback) {
+  getDocs(params: GetDocsParams, callback: WikibaseCallback): void {
     const l10n = this.context.systems.l10n;
     const langCodes = l10n?.localeCodes || ['en-US', 'en'];
     params.langCodes = langCodes.map(code => code.toLowerCase());
@@ -295,7 +345,7 @@ export class OsmWikibaseService extends AbstractSystem {
         return;
       }
 
-      let description;
+      let description: any;
       for (const code of langCodes) {
         if (entity.descriptions[code]?.language === code) {
           description = entity.descriptions[code];
@@ -307,7 +357,7 @@ export class OsmWikibaseService extends AbstractSystem {
       }
 
       // prepare result
-      let result = {
+      const result: Partial<DocsResult> = {
         title: entity.title,
         description: description?.value ?? '',
         descriptionLocaleCode: description?.language ?? '',
@@ -330,16 +380,16 @@ export class OsmWikibaseService extends AbstractSystem {
           result.imageURL = imageroot + '?' + utilQsString({
             title: `Special:Redirect/file/${image}`,
             width: 400
-          });
+          }, false);
         }
       }
 
       // Try to get a wiki page from tag data item first, followed by the corresponding key data item.
       // If neither tag nor key data item contain a wiki page in the needed language nor English,
       // get the first found wiki page from either the tag or the key item.
-      const rtypeWiki = this.monolingualClaimToValueObj(data.rtype, 'P31');
-      const tagWiki = this.monolingualClaimToValueObj(data.tag, 'P31');
-      const keyWiki = this.monolingualClaimToValueObj(data.key, 'P31');
+      const rtypeWiki: Record<string, string> | undefined = this.monolingualClaimToValueObj(data.rtype, 'P31');
+      const tagWiki: Record<string, string> | undefined = this.monolingualClaimToValueObj(data.tag, 'P31');
+      const keyWiki: Record<string, string> | undefined = this.monolingualClaimToValueObj(data.key, 'P31');
 
       for (const wiki of [rtypeWiki, tagWiki, keyWiki]) {
         for (const code of langCodes) {
@@ -358,7 +408,7 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
       // Helper method to get wiki info if a given language exists
-      function getWikiInfo(wiki, langCode, tKey) {
+      function getWikiInfo(wiki: Record<string, string> | undefined, langCode: string, tKey: string): WikiInfo | undefined {
         if (wiki && wiki[langCode]) {
           return {
             title: wiki[langCode],
@@ -374,10 +424,10 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * addLocale
    * Add a locale to the cache (for unit testing)
-   * @param  {string}  langCode
-   * @param  {string}  qid
+   * @param langCode
+   * @param qid
    */
-  addLocale(langCode, qid) {
+  addLocale(langCode: string, qid: string | false): void {
     this._localeIDs[langCode] = qid;
   }
 
@@ -385,10 +435,10 @@ export class OsmWikibaseService extends AbstractSystem {
   /**
    * _request
    * Perform a request
-   * @param  {string}    url - the URL to request
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param url - the URL to request
+   * @param callback - errback-style callback function to call with results
    */
-  _request(url, callback) {
+  _request(url: string, callback: WikibaseCallback): void {
     if (this._inflight.has(url)) return;
 
     const controller = new AbortController();

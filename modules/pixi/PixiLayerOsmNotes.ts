@@ -144,7 +144,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     const osm = this.context.services.osm;
     if (!this.enabled || !osm?.started || zoom < MINZOOM) return;
 
-    osm.loadNotes(this.context.viewport);  // note: context.viewport !== pixi viewport
+    osm.loadNotes();
     this.renderMarkers(frame, viewport, zoom);
   }
 

@@ -5,6 +5,27 @@ import RBush from 'rbush';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Vec2 } from '@rapid-sdk/math';
+import type { Context } from '../Context.ts';
+
+
+/** RBush item with associated Nominatim result data */
+interface NominatimCacheItem {
+  /** Minimum longitude of the bounding box */
+  minX: number;
+  /** Minimum latitude of the bounding box */
+  minY: number;
+  /** Maximum longitude of the bounding box */
+  maxX: number;
+  /** Maximum latitude of the bounding box */
+  maxY: number;
+  /** Associated Nominatim result data */
+  data: any;
+}
+
+/** Errback-style callback for Nominatim results */
+type NominatimCallback = (err: Error | string | null, result?: any) => void;
+
 
 /**
  * `NominatimService`
@@ -13,18 +34,25 @@ import { utilFetchResponse } from '../util/fetch_response.ts';
  */
 export class NominatimService extends AbstractSystem {
 
+  /** Base URL for the Nominatim API */
+  apibase: string;
+  /** Map of inflight request URLs to their AbortControllers */
+  _inflight: Record<string, AbortController>;
+  /** Spatial index cache of previously fetched Nominatim results */
+  _nominatimCache: RBush<NominatimCacheItem>;
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'nominatim';
     this.optionalDependencies = new Set(['l10n']);
 
     this.apibase = 'https://nominatim.openstreetmap.org/';
     this._inflight = {};
-    this._nominatimCache = new RBush();
+    this._nominatimCache = new RBush<NominatimCacheItem>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.countryCode = this.countryCode.bind(this);
@@ -36,9 +64,9 @@ export class NominatimService extends AbstractSystem {
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return  Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -46,9 +74,9 @@ export class NominatimService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return  Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -56,12 +84,12 @@ export class NominatimService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     Object.values(this._inflight).forEach(controller => controller.abort());
     this._inflight = {};
-    this._nominatimCache = new RBush();
+    this._nominatimCache = new RBush<NominatimCacheItem>();
     return Promise.resolve();
   }
 
@@ -69,10 +97,10 @@ export class NominatimService extends AbstractSystem {
   /**
    * countryCode
    * Get the country code for the given location.
-   * @param  {Array<number>}  loc - location to lookup [lon,lat]
-   * @param  {function}       callback - errback-style callback function to call with results
+   * @param loc - location to lookup [lon,lat]
+   * @param callback - errback-style callback function to call with results
    */
-  countryCode(loc, callback) {
+  countryCode(loc: Vec2, callback: NominatimCallback): void {
     this.reverse(loc, (err, result) => {
       if (err) {
         return callback(err);
@@ -88,10 +116,10 @@ export class NominatimService extends AbstractSystem {
   /**
    * reverse
    * Reverse Geocode:  Get the address for the given location.
-   * @param  {Array<number>}  loc - location to lookup [lon,lat]
-   * @param  {function}       callback - errback-style callback function to call with results
+   * @param loc - location to lookup [lon,lat]
+   * @param callback - errback-style callback function to call with results
    */
-  reverse(loc, callback) {
+  reverse(loc: Vec2, callback: NominatimCallback): void {
     const cached = this._nominatimCache.search(
       { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] }
     );
@@ -102,7 +130,7 @@ export class NominatimService extends AbstractSystem {
     }
 
     const params = { zoom: 13, format: 'json', addressdetails: 1, lat: loc[1], lon: loc[0] };
-    const url = this.apibase + 'reverse?' + utilQsString(params);
+    const url = this.apibase + 'reverse?' + utilQsString(params, false);
     if (this._inflight[url]) return;
 
     const controller = new AbortController();
@@ -139,10 +167,10 @@ export class NominatimService extends AbstractSystem {
   /**
    * search
    * Search nominatum for things with the given name
-   * @param  {string}    val - value to search for
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param val - value to search for
+   * @param callback - errback-style callback function to call with results
    */
-  search(val, callback) {
+  search(val: string, callback: NominatimCallback): void {
     const searchVal = encodeURIComponent(val);
     const url = this.apibase + `search?q=${searchVal}&limit=10&format=json`;
     if (this._inflight[url]) return;

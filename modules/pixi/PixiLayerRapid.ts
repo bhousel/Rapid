@@ -223,7 +223,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const dsEnabled = (dataset.added && dataset.enabled);
     if (!dsEnabled) return;
 
-    const service = context.services[dataset.serviceID];  // 'mapwithai', 'esri', 'overture'
+    const service = context.services[dataset.serviceID] as any;  // 'mapwithai', 'esri', 'overture'
     if (!service?.started) return;
 
     const useConflation = dataset.conflated;

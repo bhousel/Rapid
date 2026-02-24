@@ -141,7 +141,7 @@ export function actionReverse(entityID: EntityID, options?: ReverseOptions): Rev
       if (compassReplacements[value]) return compassReplacements[value];
 
       let degrees: number = parseFloat(value);
-      if (typeof degrees === 'number' && !isNaN(degrees)) {
+      if (Number.isFinite(degrees)) {
         if (degrees < 180) {
           degrees += 180;
         } else {

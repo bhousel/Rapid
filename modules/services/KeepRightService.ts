@@ -5,8 +5,50 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Marker } from '../data/Marker.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Context } from '../Context.ts';
+import type { MarkerProps } from '../data/Marker.ts';
+import type { Tile } from '@rapid-sdk/math';
 
+
+/** Properties for KeepRight issue markers */
+export interface KeepRightIssueProps extends MarkerProps {
+  /** KeepRight item type code */
+  itemType: string;
+  /** Comment on the issue */
+  comment: string;
+  /** Human-readable description of the issue */
+  description: string;
+  /** Which type (e.g. 'node', 'way') */
+  whichType: string;
+  /** Parent issue type key */
+  parentIssueType: string;
+  /** Severity: 'error' or 'warning' */
+  severity: string;
+  /** OSM object ID */
+  objectId: string;
+  /** OSM object type */
+  objectType: string;
+  /** KeepRight schema identifier */
+  schema: number;
+  /** Human-readable title */
+  title: string;
+  /** Token replacements for description templating */
+  replacements: Record<string, string>;
+  /** New status to set (e.g. 'ignore', 'ignore_t') */
+  newStatus?: string;
+  /** New comment to add */
+  newComment?: string;
+  /** New state (used internally) */
+  newState?: string;
+}
+
+/** A KeepRight issue Marker with typed props */
+export type KeepRightIssue = Marker<KeepRightIssueProps>;
+
+
+/** Base URL for the KeepRight API */
 const KEEPRIGHT_API = 'https://www.keepright.at';
+/** Zoom level used for tiling KeepRight data requests */
 const TILEZOOM = 14;
 
 const KR_RULES = [
@@ -19,8 +61,8 @@ const KR_RULES = [
   320, 350, 360, 370, 380, 390, 400, 401, 402, 410, 411, 412, 413
 ];
 
-// A mapping of KeepRight rule numbers to their respective colors.
-const KR_COLORS = new Map();
+/** Map of KeepRight item numbers to their display colors */
+const KR_COLORS = new Map<string, number>();
 ['20', '40', '210', '270', '310', '320', '350'].forEach(key => KR_COLORS.set(key, 0xffff99));
 ['60', '70', '90', '100', '110', '150', '220', '380'].forEach(key => KR_COLORS.set(key, 0x55dd00));
 ['360', '370', '410'].forEach(key => KR_COLORS.set(key, 0xff99bb));
@@ -40,6 +82,37 @@ KR_COLORS.set('390', 0x009900);
 KR_COLORS.set('400', 0xcc3355);
 
 
+/** Internal cache for KeepRight tile data */
+interface KeepRightCache {
+  /** Map of in-flight tile requests keyed by tile ID, with their AbortControllers */
+  inflightTile: Map<TileID, AbortController>;
+  /** Map of in-flight POST requests (issue updates), keyed by entity ID */
+  inflightPost: Map<DataID, AbortController>;
+  /** Map of issues marked as closed, keyed by entity ID */
+  closed: Record<string, boolean>;
+  /** Last viewport version number used for change detection */
+  lastv: number | null;
+}
+
+/** Error type template from QA data */
+interface KRErrorType {
+  /** Severity level (e.g. 'error', 'warning') */
+  severity?: string;
+  /** Regex pattern for matching and parsing error descriptions */
+  regex?: string;
+  /** Ordered list of ID type codes for captured groups in the regex */
+  IDs?: string[];
+}
+
+/** Persistent KeepRight data loaded at startup */
+interface KRData {
+  /** Map of error type codes to their template definitions */
+  errorTypes: Record<string, KRErrorType>;
+  /** Map of lowercase strings to their localization keys */
+  localizeStrings: Record<string, string>;
+}
+
+
 /**
  * `KeepRightService`
  * This service connects to the KeepRight API to fetch detected QA issues.
@@ -48,11 +121,19 @@ KR_COLORS.set('400', 0xcc3355);
  */
 export class KeepRightService extends AbstractSystem {
 
+  /** Persistent KeepRight QA data (error templates and localization strings) loaded at startup */
+  _krData: KRData;
+
+  /** Internal cache for KeepRight data, spatial index, and request tracking */
+  _cache: KeepRightCache;
+  /** Tiler instance used to compute tile coverage for the current viewport */
+  _tiler: Tiler;
+
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param context - Global shared application context
    */
-  constructor(context) {
+  constructor(context: Context) {
     super(context);
     this.id = 'keepright';
     this.requiredDependencies = new Set(['assets', 'l10n', 'spatial']);
@@ -62,17 +143,17 @@ export class KeepRightService extends AbstractSystem {
     // persistent data - loaded at init
     this._krData = { errorTypes: {}, localizeStrings: {} };
 
-    this._cache = {};
-    this._tiler = new Tiler().zoomRange(TILEZOOM).skipNullIsland(true);
+    this._cache = {} as KeepRightCache;
+    this._tiler = (new Tiler().zoomRange(TILEZOOM) as Tiler).skipNullIsland(true) as Tiler;
   }
 
 
   /**
    * initAsync
    * Called after all core objects have been constructed.
-   * @return  {Promise}  Promise resolved when this component has completed initialization
+   * @return Promise resolved when this component has completed initialization
    */
-  initAsync() {
+  initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -83,14 +164,14 @@ export class KeepRightService extends AbstractSystem {
   /**
    * startAsync
    * Called after all core objects have been initialized.
-   * @return  {Promise}  Promise resolved when this component has completed startup
+   * @return Promise resolved when this component has completed startup
    */
-  startAsync() {
+  startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
-    const assets = this.context.systems.assets;
+    const assets = this.context.systems.assets!;
     return this._startPromise = assets.loadAssetAsync('qa_data')
-      .then(data => {
+      .then((data: any) => {
         this._krData = data.keepRight;
         this._started = true;
       });
@@ -100,9 +181,9 @@ export class KeepRightService extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state
-   * @return  {Promise}  Promise resolved when this component has completed resetting
+   * @return Promise resolved when this component has completed resetting
    */
-  resetAsync() {
+  resetAsync(): Promise<void> {
     if (this._cache.inflightTile) {
       for (const controller of this._cache.inflightTile.values()) {
         controller.abort();
@@ -110,13 +191,13 @@ export class KeepRightService extends AbstractSystem {
     }
 
     this._cache = {
-      inflightTile:  new Map(),   // Map<tileID, AbortController>
-      inflightPost:  new Map(),   // Map<dataID, AbortController>
+      inflightTile:  new Map(),   // Map<TileID, AbortController>
+      inflightPost:  new Map(),   // Map<DataID, AbortController>
       closed:        {},
-      lastv:         null         // viewport version last time we fetched data
+      lastv:         null
     };
 
-    const spatial = this.context.systems.spatial;
+    const spatial = this.context.systems.spatial!;
     spatial.clearCache('keepright');
 
     return Promise.resolve();
@@ -126,11 +207,11 @@ export class KeepRightService extends AbstractSystem {
   /**
    * getData
    * Get already loaded data that appears in the current map view
-   * @return  {Array}  Array of data
+   * @return Array of data
    */
-  getData() {
-    const spatial = this.context.systems.spatial;
-    return spatial.getVisibleData('keepright').map(hit => hit.contents);
+  getData(): Marker[] {
+    const spatial = this.context.systems.spatial!;
+    return spatial.getVisibleData('keepright').map(hit => hit.contents) as Marker[];
   }
 
 
@@ -139,14 +220,14 @@ export class KeepRightService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view.
    * KeepRight API:  http://osm.mueschelsoft.de/keepright/interfacing.php
    */
-  loadTiles() {
+  loadTiles(): void {
     const context = this.context;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
     const cache = this._cache;
 
-    if (cache._lastv === viewport.v) return;  // exit early if the view is unchanged
-    cache._lastv = viewport.v;
+    if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
+    cache.lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
@@ -171,17 +252,17 @@ export class KeepRightService extends AbstractSystem {
   /**
    * loadTile
    * Load a single tile of data.
-   * @param  {Tile}  tile - Tile data
+   * @param tile - Tile data
    */
-  loadTile(tile) {
-    const spatial = this.context.systems.spatial;
+  loadTile(tile: Tile): void {
+    const spatial = this.context.systems.spatial!;
     const cache = this._cache;
     const tileID = tile.id;
 
     const options = { format: 'geojson', ch: KR_RULES };
     const [ left, top, right, bottom ] = tile.wgs84Extent.rectangle();
     const params = Object.assign({}, options, { left, bottom, right, top });
-    const url = `${KEEPRIGHT_API}/export.php?` + utilQsString(params);
+    const url = `${KEEPRIGHT_API}/export.php?` + utilQsString(params, false);
 
     const controller = new AbortController();
     cache.inflightTile.set(tileID, controller);
@@ -203,13 +284,13 @@ export class KeepRightService extends AbstractSystem {
   /**
    * _gotTile
    * Parse the response from the tile fetch.
-   * @param  {Tile}    tile - Tile data
-   * @param  {Object}  response - Response data
+   * @param tile - Tile data
+   * @param response - Response data
    */
-  _gotTile(tile, response) {
+  _gotTile(tile: Tile, response: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
-    const spatial = context.systems.spatial;
+    const spatial = context.systems.spatial!;
 
     spatial.addTiles('keepright', [tile]);   // mark as loaded
 
@@ -273,7 +354,7 @@ export class KeepRightService extends AbstractSystem {
 
       loc = spatial.preventCoincidentLoc('keepright', loc);
 
-      const props = {
+      const props: Record<string, any> = {
         id:              id,
         loc:             loc,
         itemType:        itemType,
@@ -281,7 +362,7 @@ export class KeepRightService extends AbstractSystem {
         description:     description,
         whichType:       whichType,
         parentIssueType: parentIssueType,
-        severity:        whichTemplate.severity || 'error',
+        severity:        whichTemplate?.severity || 'error',
         objectId:        objectId,
         objectType:      objectType,
         schema:          schema,
@@ -302,17 +383,17 @@ export class KeepRightService extends AbstractSystem {
    * postUpdate
    * Called to change some properies (status, comments) about the KeepRight data item.
    * Will send the update to the KeepRight API and refresh the local data cache.
-   * @param  {Marker}    item
-   * @param  {function}  callback - errback-style callback function to call with results
+   * @param item - the Marker item to update
+   * @param callback - errback-style callback function to call with results
    */
-  postUpdate(item, callback) {
+  postUpdate(item: Marker, callback: (err: any, item: Marker) => void): void {
     const cache = this._cache;
     const dataID = item.id;
     if (cache.inflightPost.has(dataID)) {
       return callback({ message: 'Error update already inflight', status: -2 }, item);
     }
 
-    const params = { schema: item.props.schema, id: dataID };
+    const params: Record<string, any> = { schema: item.props.schema, id: dataID };
 
     if (item.props.newStatus) {
       params.st = item.props.newStatus;
@@ -323,7 +404,7 @@ export class KeepRightService extends AbstractSystem {
 
     // NOTE: We'll send a no-cors request to avoid the CORS error.
     // We don't care about the response, so this is fine.
-    const url = `${KEEPRIGHT_API}/comment.php?` + utilQsString(params);
+    const url = `${KEEPRIGHT_API}/comment.php?` + utilQsString(params, false);
 
     const controller = new AbortController();
     cache.inflightPost.set(dataID, controller);
@@ -339,11 +420,12 @@ export class KeepRightService extends AbstractSystem {
           this.removeItem(item);
           cache.closed[`${item.props.schema}:${dataID}`] = true;
         } else {
-          item = this.replaceItem(item.update({
+          const replaced = this.replaceItem(item.update({
             comment: item.props.newComment,
             newComment: undefined,
             newState: undefined
           }));
+          if (replaced) item = replaced;
         }
 
         if (callback) callback(null, item);
@@ -354,22 +436,22 @@ export class KeepRightService extends AbstractSystem {
   /**
    * getError
    * Get item with given id from cache
-   * @param   {string}   dataID
-   * @return  {Marker?}  the cached item, or `undefined` if not found
+   * @param dataID - the data ID to look up
+   * @return the cached item, or `undefined` if not found
    */
-  getError(dataID) {
-    const spatial = this.context.systems.spatial;
-    return spatial.getData('keepright', dataID);
+  getError(dataID: DataID): KeepRightIssue | undefined {
+    const spatial = this.context.systems.spatial!;
+    return spatial.getData<KeepRightIssue>('keepright', dataID);
   }
 
 
   /**
    * getColor
    * Get the color associated with this issue type
-   * @param   parentIssueType
-   * @return  hex color
+   * @param parentIssueType - the parent issue type key
+   * @return hex color
    */
-  getColor(parentIssueType) {
+  getColor(parentIssueType: string): number {
     return KR_COLORS.get(parentIssueType) ?? 0xffffff;
   }
 
@@ -377,13 +459,13 @@ export class KeepRightService extends AbstractSystem {
   /**
    * replaceItem
    * Replace a single item in the cache
-   * @param   {Marker}  item to replace
-   * @return  {Marker}  the item, or `null` if it couldn't be replaced
+   * @param item - Marker to replace
+   * @return the item, or `null` if it couldn't be replaced
    */
-  replaceItem(item) {
+  replaceItem(item: Marker): Marker | null {
     if (!(item instanceof Marker) || !item.id) return null;
 
-    const spatial = this.context.systems.spatial;
+    const spatial = this.context.systems.spatial!;
     spatial.replaceData('keepright', item);
     return item;
   }
@@ -392,12 +474,12 @@ export class KeepRightService extends AbstractSystem {
   /**
    * removeItem
    * Remove a single item from the cache
-   * @param  {Marker}  item to remove
+   * @param item - Marker to remove
    */
-  removeItem(item) {
+  removeItem(item: Marker): void {
     if (!(item instanceof Marker) || !item.id) return;
 
-    const spatial = this.context.systems.spatial;
+    const spatial = this.context.systems.spatial!;
     spatial.removeData('keepright', item);
   }
 
@@ -405,10 +487,10 @@ export class KeepRightService extends AbstractSystem {
   /**
    * issueURL
    * Returns the URL to link to details about an item
-   * @param  {Marker}  item
-   * @return {string}  the url
+   * @param item - the Marker item
+   * @return the url
    */
-  issueURL(item) {
+  issueURL(item: Marker): string {
     return `${KEEPRIGHT_API}/report_map.php?schema=${item.props.schema}&error=${item.id}`;
   }
 
@@ -416,17 +498,24 @@ export class KeepRightService extends AbstractSystem {
    * getClosedIDs
    * Get an array of issues closed during this session.
    * Used to populate `closed:keepright` changeset tag
-   * @return  {Array<dataID>}  Array of closed item ids
+   * @return Array of closed item ids
    */
-  getClosedIDs() {
+  getClosedIDs(): string[] {
     return Object.keys(this._cache.closed).sort();
   }
 
 
-  _tokenReplacements(props) {
-    const l10n = this.context.systems.l10n;
+  /**
+   * _tokenReplacements
+   * Build a map of token replacements for templating a KeepRight error description.
+   * Parses the description using the error type's regex and links any captured IDs.
+   * @param props - Properties of the KeepRight issue
+   * @return Map of replacement tokens, or `undefined` if the template is missing or unmatched
+   */
+  _tokenReplacements(props: Record<string, any>): Record<string, string> | undefined {
+    const l10n = this.context.systems.l10n!;
     const htmlRegex = new RegExp(/<\/[a-z][\s\S]*>/);
-    const replacements = {};
+    const replacements: Record<string, string> = {};
 
     const issueTemplate = this._krData.errorTypes[props.whichType];
     if (!issueTemplate) {
@@ -454,9 +543,7 @@ export class KeepRightService extends AbstractSystem {
 
     for (let i = 1; i < errorMatch.length; i++) {   // skip first
       let capture = errorMatch[i];
-      let idType;
-
-      idType = 'IDs' in issueTemplate ? issueTemplate.IDs[i-1] : '';
+      const idType = 'IDs' in issueTemplate ? issueTemplate.IDs![i-1] : '';
       if (idType && capture) {   // link IDs if present in the capture
         capture = this._parseError(capture, idType);
       } else if (htmlRegex.test(capture)) {   // escape any html in non-IDs
@@ -475,8 +562,16 @@ export class KeepRightService extends AbstractSystem {
   }
 
 
-  _parseError(capture, idType) {
-    const l10n = this.context.systems.l10n;
+  /**
+   * _parseError
+   * Parse a single captured group from an error description regex match.
+   * Localizes known strings and wraps IDs/URLs in linkable HTML elements.
+   * @param capture - The captured text to parse
+   * @param idType - The ID type code indicating how to interpret the capture
+   * @return Parsed and linkified string
+   */
+  _parseError(capture: string, idType: string): string {
+    const l10n = this.context.systems.l10n!;
     const compare = capture.toLowerCase();
 
     if (this._krData.localizeStrings[compare]) {   // some replacement strings can be localized
@@ -521,21 +616,21 @@ export class KeepRightService extends AbstractSystem {
     return capture;
 
 
-    function linkErrorObject(d) {
+    function linkErrorObject(d: string): string {
       return `<a class="error_object_link">${d}</a>`;
     }
 
-    function linkEntity(d) {
+    function linkEntity(d: string): string {
       return `<a class="error_entity_link">${d}</a>`;
     }
 
-    function linkURL(d) {
+    function linkURL(d: string): string {
       return `<a class="kr_external_link" target="_blank" href="${d}">${d}</a>`;
     }
 
     // arbitrary node list of form: #ID, #ID, #ID...
-    function parse211(capture) {
-      let newList = [];
+    function parse211(capture: string): string {
+      const newList: string[] = [];
 
       const items = capture.split(', ');
       for (const item of items) {
@@ -547,8 +642,8 @@ export class KeepRightService extends AbstractSystem {
     }
 
     // arbitrary way list of form: #ID(layer),#ID(layer),#ID(layer)...
-    function parse231(capture) {
-      let newList = [];
+    function parse231(capture: string): string {
+      const newList: string[] = [];
 
       // unfortunately 'layer' can itself contain commas, so we split on '),'
       const items = capture.split('),');
@@ -565,8 +660,8 @@ export class KeepRightService extends AbstractSystem {
     }
 
     // arbitrary node/relation list of form: from node #ID,to relation #ID,to node #ID...
-    function parse294(capture) {
-      let newList = [];
+    function parse294(capture: string): string {
+      const newList: string[] = [];
       const items = capture.split(',');
 
       for (const item of items) {
@@ -584,19 +679,19 @@ export class KeepRightService extends AbstractSystem {
     }
 
     // may or may not include the string "(including the name 'name')"
-    function parse370(capture) {
+    function parse370(capture: string): string {
       if (!capture) return '';
 
       const match = capture.match(/\(including the name (\'.+\')\)/);
       if (match?.length) {
-        return l10n.t('QA.keepRight.errorTypes.370.including_the_name', { name: match[1] });
+        return l10n!.t('QA.keepRight.errorTypes.370.including_the_name', { name: match[1] });
       }
       return '';
     }
 
     // arbitrary node list of form: #ID,#ID,#ID...
-    function parse20(capture) {
-      let newList = [];
+    function parse20(capture: string): string {
+      const newList: string[] = [];
       const items = capture.split(',');
 
       for (const item of items) {

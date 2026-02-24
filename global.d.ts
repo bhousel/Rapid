@@ -17,6 +17,9 @@ declare global {
   /** A type that can be T, null, or undefined */
   type Nullable<T> = T | null | undefined;
 
+  /** Errback-style callback: `(err, result?) => void` */
+  type Errback = (err: any, result?: any) => void;
+
   // String ID types are defined in modules/types/ids.ts
   // They are both exported (for external consumers) and declared globally (for internal use)
 }

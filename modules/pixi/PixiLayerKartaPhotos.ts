@@ -226,7 +226,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
         feature.setData(dataID, d);
 
         if (d.props.sequenceID) {
-          feature.addChildData(d.props.sequenceID, dataID);
+          feature.addChildData(d.props.sequenceID as string, dataID);
         }
       }
 
@@ -239,7 +239,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 // todo handle pano
         if (feature.hasClass('selectphoto')) {  // selected photo style
           // style.viewfield!.angles = [this._viewerCompassAngle ?? d.props.ca];
-          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];
+          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca as number] : [];
           style.viewfield!.image = 'viewfield';
           style.viewfield!.opacity = 1;
           style.viewfield!.color = SELECTED;
@@ -247,7 +247,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
           style.viewfield!.scale = 2.0;
 
         } else {
-          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca] : [];  // ca = camera angle
+          style.viewfield!.angles = Number.isFinite(d.props.ca) ? [d.props.ca as number] : [];  // ca = camera angle
           style.viewfield!.image = d.props.isPano ? 'pano' : 'viewfield';
 
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style

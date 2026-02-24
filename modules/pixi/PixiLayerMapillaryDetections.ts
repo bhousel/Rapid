@@ -136,7 +136,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
       if (feature.dirty) {
         const isSelected = feature.hasClass('selectdetection');
-        const presetID = mapillary.getDetectionPresetID(d.props.value);
+        const presetID = mapillary.getDetectionPresetID(d.props.value as string);
         const preset = presetID && schema.item(presetID);
 
         const style: Partial<MatchedStyle> = {
@@ -146,7 +146,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
           },
           icon: {
             color: isSelected ? SELECTED : MAPILLARY_GREEN,
-            image: preset?.icon || 'fas-question',
+            image: (preset as any)?.icon || 'fas-question',
             size: 16
           }
         };

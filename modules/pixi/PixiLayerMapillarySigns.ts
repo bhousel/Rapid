@@ -129,7 +129,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
         let style: Partial<MatchedStyle>;
         if (hasIcon) {
           style = {
-            marker: { image: d.props.value }
+            marker: { image: d.props.value as string }
           };
         } else {
           style = {
