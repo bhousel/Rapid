@@ -27,18 +27,37 @@ interface StyleSelectorInput {
 
 
 /**
+ * A scope binds a set of styles and selectors to a scope identifier.
+ * When matching features, only styles/selectors from the relevant scope are used.
+ */
+export interface StyleScopeInput {
+  /** Scope identifier this applies to (defaults to 'osm') */
+  scope?: ScopeID;
+  /** Object mapping styleID to style (or null to delete) */
+  styles?: Record<StyleID, Partial<StyleProps> | null>;
+  /** Object mapping selectorID to style selector (or null to delete) */
+  selectors?: Record<StyleSelectorID, StyleSelectorInput | null>;
+}
+
+/**
+ * Per-dataset scope data stored internally.
+ */
+export interface ScopeData {
+  styles: Map<StyleID, Style>;
+  selectors: Map<StyleSelectorID, StyleSelector>;
+}
+
+/**
  * Style asset data to merge into the system.
- * Contains styles and selectors.
+ * Contains scopes, each binding styles/selectors to a scope identifier.
  */
 export interface StyleData {
   /** An asset identifier, e.g. 'rapid_style' (required) */
   assetID: AssetID;
   /** A string version specifier, e.g. '1.0.0' */
   assetVersion?: string;
-  /** Object mapping styleID to style (or null to delete) */
-  styles?: Record<StyleID, Partial<StyleProps> | null>;
-  /** Object mapping selectorID to style selector (or null to delete) */
-  selectors?: Record<StyleSelectorID, StyleSelectorInput | null>;
+  /** Scoped style definitions */
+  scopes: StyleScopeInput[];
 }
 
 /**
@@ -90,8 +109,6 @@ function getTag(tags: Tags, key: string): string | undefined {
  * `StyleSystem` maintains the the rules about how map data should look.
  *
  * Properties available:
- *   `styles`           Map of styleID → Style
- *   `selectors`        Map of selectorID → StyleSelector
  *   `defaultAssetIDs`  Default assetIDs that are loaded if no custom assets are requested
  *   `loadedAssetIDs`   Map<AssetID, string> - assetIDs that have been loaded (maps to version string)
  *
@@ -106,10 +123,8 @@ export class StyleSystem extends AbstractSystem {
   /** Tritanopia color blindness simulation matrix */
   tritanopiaMatrix: number[];
 
-  /** Map of styleID to Style */
-  styles: Map<StyleID, Style>;
-  /** Map of selectorID to StyleSelector */
-  selectors: Map<StyleSelectorID, StyleSelector>;
+  /** Per-scope storage */
+  private _scopes: Map<ScopeID, ScopeData>;
   /** List of supported pattern IDs (hardcoded, must match patterns loaded by PixiTextures) */
   patternIDs: Set<string>;
 
@@ -130,8 +145,7 @@ export class StyleSystem extends AbstractSystem {
     this.id = 'styles';
     this.optionalDependencies = new Set(['assets', 'gfx', 'schema', 'urlhash']);
 
-    this.styles = new Map();
-    this.selectors = new Map();
+    this._scopes = new Map();
 
     this._defaultAssetIDs = new Set(['rapid_style']);
     this._loadedAssetIDs = new Map();
@@ -291,8 +305,7 @@ gfx?.pause();  // block rendering
    */
   resetAll(): void {
     this._loadedAssetIDs.clear();
-    this.styles.clear();
-    this.selectors.clear();
+    this._scopes.clear();
 
     this._styleChanged();
   }
@@ -358,12 +371,15 @@ gfx?.pause();  // block rendering
 
   /**
    * merge
-   * Accepts an object containing new style data (all properties except 'assetID' are optional):
+   * Accepts an object containing new style data in scoped format:
    * {
    *   assetID: '',       // A string asset identifier, e.g. 'rapid_style'
    *   assetVersion: '',  // A string version specifier, e.g. '1.0.0'  (defaults to 'unknown' if not present)
-   *   styles: {},        // Object<StyleID, Partial<StyleProps>>
-   *   selectors: {}      // Object<SelectorID, StyleSelector>
+   *   scopes: [{
+   *     scope: 'osm',       // Which scope this applies to
+   *     styles: {},          // Object<StyleID, Partial<StyleProps>>
+   *     selectors: {}        // Object<SelectorID, StyleSelector>
+   *   }]
    * }
    *
    * When merging:
@@ -392,28 +408,41 @@ gfx?.pause();  // block rendering
 
     this._loadedAssetIDs.set(assetID, assetVersion);
 
-    // Merge styles
-    if (src.styles) {
-      for (const [styleID, props] of Object.entries(src.styles)) {
-        if (props) {   // add or replace
-          const setProps = { ...props, id: styleID, assetID, assetVersion } as Partial<StyleProps>;
-          const style = new Style(context, setProps);
-          this.styles.set(styleID, style);
-        } else {   // remove
-          utilWildcardDelete(this.styles, styleID);
+    // Process each scope
+    const scopes = src.scopes ?? [];
+    for (const scopeInput of scopes) {
+      const scopeID = scopeInput.scope ?? 'osm';
+
+      // Get or create the scope data for this scopeID
+      let scopeData = this._scopes.get(scopeID);
+      if (!scopeData) {
+        scopeData = { styles: new Map(), selectors: new Map() };
+        this._scopes.set(scopeID, scopeData);
+      }
+
+      // Merge styles into per-scope map
+      if (scopeInput.styles) {
+        for (const [styleID, props] of Object.entries(scopeInput.styles)) {
+          if (props) {   // add or replace
+            const setProps = { ...props, id: styleID, assetID, assetVersion } as Partial<StyleProps>;
+            const style = new Style(context, setProps);
+            scopeData.styles.set(styleID, style);
+          } else {   // remove
+            utilWildcardDelete(scopeData.styles, styleID);
+          }
         }
       }
-    }
 
-    // Merge selectors
-    if (src.selectors) {
-      for (const [selectorID, props] of Object.entries(src.selectors)) {
-        if (props) {  // add or replace
-          const setProps = { ...props, id: selectorID, assetID, assetVersion } as Partial<StyleSelectorProps>;
-          const selector = new StyleSelector(context, setProps);
-          this.selectors.set(selectorID, selector);
-        } else {   // remove
-          utilWildcardDelete(this.selectors, selectorID);
+      // Merge selectors into per-scope map
+      if (scopeInput.selectors) {
+        for (const [selectorID, props] of Object.entries(scopeInput.selectors)) {
+          if (props) {  // add or replace
+            const setProps = { ...props, id: selectorID, assetID, assetVersion } as Partial<StyleSelectorProps>;
+            const selector = new StyleSelector(context, setProps);
+            scopeData.selectors.set(selectorID, selector);
+          } else {   // remove
+            utilWildcardDelete(scopeData.selectors, selectorID);
+          }
         }
       }
     }
@@ -445,16 +474,34 @@ gfx?.pause();  // block rendering
 
 
   /**
+   * getScope
+   * Get the scope data for a specific scope ID.
+   * @param scopeID - ID of the scope to look up
+   * @return The scope data, or undefined if none exists
+   */
+  getScope(scopeID: ScopeID): ScopeData | undefined {
+    return this._scopes.get(scopeID);
+  }
+
+
+  /**
    * styleMatch
    * @param tags - OSM tags to match to a display style
    * @param geometry - Optional geometry type (if provided, will look up preset icon from SchemaSystem)
+   * @param scopeID - Optional scope ID for scoped matching (defaults to 'osm')
    * @return Styling info for the given tags
    */
-  styleMatch(tags: Tags, geometry?: GeometryType): MatchedStyle {
+  styleMatch(tags: Tags, geometry?: GeometryType, scopeID: ScopeID = 'osm'): MatchedStyle {
     const context = this.context;
     const schema = context.systems.schema;
 
-    let defaults = this.styles.get('DEFAULTS');
+    // Use per-scope data for the requested scope, falling back to '*' common scope.
+    const scopeData = this._scopes.get(scopeID);
+    const commonData = this._scopes.get('*');
+    const scopeStyles = scopeData?.styles ?? commonData?.styles ?? new Map<StyleID, Style>();
+    const scopeSelectors = scopeData?.selectors ?? commonData?.selectors ?? new Map<StyleSelectorID, StyleSelector>();
+
+    let defaults = scopeStyles.get('DEFAULTS') ?? commonData?.styles.get('DEFAULTS');
 
     // If DEFAULTS doesn't exist, construct a minimal default style.
     if (!defaults) {
@@ -463,17 +510,17 @@ gfx?.pause();  // block rendering
 
     // Find all matching selectors, sorted by specificity (highest first)
     const featureInfo = { tags };
-    const matchingSelectors = StyleSelector.findAll(this.selectors.values(), featureInfo);
+    const matchingSelectors = StyleSelector.findAll(scopeSelectors.values(), featureInfo);
 
-    // Start with an empty style and apply all matching selectors in order.
-    // We iterate in reverse (lowest specificity first) so higher specificity selectors win.
+    // Start with an empty style and apply matching selectors in order of increasing specificity.
+    // DEFAULTS is passed to resolvedStyle() separately so it doesn't block cascade fallbacks.
     let combinedProps: Partial<StyleProps> = {};
     const combinedIDs = new Set<string>();
 
     for (let i = matchingSelectors.length - 1; i >= 0; i--) {
       const selector = matchingSelectors[i];
       for (const styleID of selector.styleIDs) {
-        const style = this.styles.get(styleID);
+        const style = scopeStyles.get(styleID);
         if (style) {
           combinedProps = deepMerge(combinedProps, style.props) as StyleProps;
           combinedIDs.add(styleID);
@@ -493,10 +540,11 @@ gfx?.pause();  // block rendering
       }
     }
 
-    // Build result from resolved style properties
+    // Build result from resolved style properties.
+    // Pass defaults so resolvedStyle() can layer it between styleDefaults and fallbacks.
     const combinedID = [...combinedIDs].join(',') || 'empty';
     const matched = new Style(this.context, { id: combinedID, ...combinedProps });
-    const result: MatchedStyle = matched.resolvedStyle();
+    const result: MatchedStyle = matched.resolvedStyle(defaults);
 
     // If icon.image is not set by the style, try to get it from the preset
     if (!result.icon.image && geometry) {
@@ -523,7 +571,7 @@ gfx?.pause();  // block rendering
     // Apply lifecycle overrides if applicable
     const hasLifecycleTag = this._hasLifecycleTag(tags, styleKey);
     if (hasLifecycleTag) {
-      this._applyLifecycleOverrides(result);
+      this._applyLifecycleOverrides(result, scopeStyles);
     }
 
     // Validate fill pattern
@@ -612,9 +660,10 @@ gfx?.pause();  // block rendering
    * _applyLifecycleOverrides
    * Apply lifecycle overrides (dashed lines for abandoned, proposed, etc.).
    * @param result - The result object to mutate
+   * @param scopeStyles - The scoped styles map to look up LIFECYCLE style from
    */
-  private _applyLifecycleOverrides(result: MatchedStyle): void {
-    const lifecycle = this.styles.get('LIFECYCLE');
+  private _applyLifecycleOverrides(result: MatchedStyle, scopeStyles: Map<StyleID, Style>): void {
+    const lifecycle = scopeStyles.get('LIFECYCLE');
     if (!lifecycle) return;
 
     for (const group of ['fill', 'casing', 'stroke'] as const) {

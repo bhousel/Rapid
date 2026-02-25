@@ -19,7 +19,8 @@ export function uiIntroPoint(context, curtain) {
   const EditMenu = ui.EditMenu;
 
   const buildingExtent = new Extent([-85.63261, 41.94391], [-85.63222, 41.94419]);
-  const cafePreset = schema.item('amenity/cafe');
+  const scope = schema.getScope('osm');
+  const cafePreset = scope?.presets.get('amenity/cafe');
 
   let _chapterCancelled = false;
   let _rejectStep = null;

@@ -21,8 +21,9 @@ export function uiIntroNavigation(context, curtain) {
   const townHallExtent = new Extent([-85.63654, 41.94290], [-85.63632, 41.94307]);
   const springStreetID = 'w397';
   const springStreetExtent = new Extent([-85.63588, 41.94155], [-85.63574, 41.94278]);
-  const onewayField = schema.field('oneway');
-  const maxspeedField = schema.field('maxspeed');
+  const scope = schema.getScope('osm');
+  const onewayField = scope?.fields.get('oneway');
+  const maxspeedField = scope?.fields.get('maxspeed');
 
   let _chapterCancelled = false;
   let _rejectStep = null;

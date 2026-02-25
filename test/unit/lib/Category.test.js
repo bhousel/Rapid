@@ -16,12 +16,15 @@ describe('Category', () => {
     return schema.initAsync().then(() => {
       const presetData = {
         assetID: 'test',
-        presets: {
-          'highway/residential': {
-            tags: { highway: 'residential' },
-            geometry: ['line']
+        scopes: [{
+          scope: 'osm',
+          presets: {
+            'highway/residential': {
+              tags: { highway: 'residential' },
+              geometry: ['line']
+            }
           }
-        }
+        }]
       };
       schema.merge(presetData);
     });
@@ -47,13 +50,13 @@ describe('Category', () => {
 
     beforeAll(() => {
       _category = new Rapid.Category(context, sample.categoryProps);
-      schema.categories.set(_category.id, _category);
+      schema.getScope('osm').categories.set(_category.id, _category);
       _category.reset();
     });
 
     describe('presets', () => {
       it('maps members presetIDs to known presets', () => {
-        const residential = schema.item('highway/residential');
+        const residential = schema.getScope('osm').presets.get('highway/residential');
         assert.isArray(_category.presets);
         assert.deepEqual(_category.presets, [residential]);
       });

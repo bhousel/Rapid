@@ -275,13 +275,14 @@ export class Field {
    * @return the Field to get the property from (either this Field or another Field)
    */
   private _resolveReference(prop: keyof FieldProps): Field {
-    const schema = this.context.systems.schema!;
+    const schema = this.context.systems.schema;
 
     const val = this.props[prop];
     if (val && (typeof val === 'string')) {   // This will only work for strings
       const match = val.match(/^\{(.*)\}$/);
       if (match) {
-        const field = schema.fields.get(match[1]);
+        const field = schema?.getScope('osm')?.fields.get(match[1])
+          ?? schema?.getScope('*')?.fields.get(match[1]);
         if (field) {
           return field;
         }

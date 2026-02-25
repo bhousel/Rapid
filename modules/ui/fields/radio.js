@@ -11,6 +11,7 @@ export { uiFieldRadio as uiFieldStructureRadio };
 export function uiFieldRadio(context, uifield) {
     const l10n = context.systems.l10n;
     const schema = context.systems.schema;
+    const scope = schema.getScope('osm');
 
     const dispatch = d3_dispatch('change');
     var placeholder = d3_select(null);
@@ -79,8 +80,8 @@ export function uiFieldRadio(context, uifield) {
 
     function structureExtras(selection, tags) {
         var selected = selectedKey() || tags.layer !== undefined;
-        var type = schema.field(selected);
-        var layer = schema.field('layer');
+        var type = scope?.fields.get(selected);
+        var layer = scope?.fields.get('layer');
         var showLayer = (selected === 'bridge' || selected === 'tunnel' || tags.layer !== undefined);
 
         var extrasWrap = selection.selectAll('.structure-extras-wrap')

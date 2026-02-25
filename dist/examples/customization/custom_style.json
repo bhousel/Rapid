@@ -2,7 +2,10 @@
   "assetID": "custom_style",
   "assetVersion": "2026-02-12",
 
-  "styles": {
+  "scopes": [{
+    "scope": "osm",
+
+    "styles": {
     "survey_orange": {
       "base": { "color": "#FF6600" }
     },
@@ -49,4 +52,5 @@
       "match": { "tags": [{ "key": "crossing" }] }
     }
   }
+  }]
 }

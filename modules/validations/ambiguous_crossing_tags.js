@@ -42,7 +42,7 @@ export function validationAmbiguousCrossingTags(context) {
       const entity = graph.entity(entityID);
       const currPreset = schema.match(entity, graph);
       const replacementID = currPreset?.props?.replacement;
-      const replacement = replacementID && schema.item(replacementID);
+      const replacement = replacementID && schema.getScope('osm')?.presets.get(replacementID);
 
       if (replacement) {
         graph = actionChangePreset(entityID, currPreset, replacement, true /* skip field defaults */)(graph);

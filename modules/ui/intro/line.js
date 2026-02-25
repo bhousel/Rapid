@@ -21,8 +21,9 @@ export function uiIntroLine(context, curtain) {
   const tulipRoadStartExtent = new Extent([-85.63016, 41.95749], [-85.62937, 41.95843]);
   const tulipRoadMidExtent = new Extent([-85.63044, 41.95686], [-85.62900, 41.95843]);
   const tulipRoadIntersection = [-85.629745, 41.95742];
-  const roadCategory = schema.item('category-road_minor');
-  const residentialPreset = schema.item('highway/residential');
+  const scope = schema.getScope('osm');
+  const roadCategory = scope?.categories.get('category-road_minor');
+  const residentialPreset = scope?.presets.get('highway/residential');
 
   const woodStreetID = 'w525';
   const woodStreetEndID = 'n2862';

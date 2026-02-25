@@ -5,7 +5,10 @@ export const addStyleData = {
   assetID: 'add-style-data',
   assetVersion: '2026-01-01',
 
-  styles: {
+  scopes: [{
+    scope: 'osm',
+
+    styles: {
     'DEFAULTS': {
       fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
       casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
@@ -84,10 +87,6 @@ export const addStyleData = {
       styleIDs: ['building_red'],
       match: { tags: [{ key: 'building' }] }
     },
-    'rapid-building': {
-      styleIDs: ['building_rapid'],
-      match: { dataset: 'rapid', tags: [{ key: 'building' }] }
-    },
     'landuse-forest': {
       styleIDs: ['green', 'pattern-forest'],
       match: { tags: [{ key: 'landuse', value: 'forest' }] }
@@ -117,6 +116,7 @@ export const addStyleData = {
       match: { tags: [{ key: 'test', value: 'bar' }] }
     }
   }
+  }]
 };
 
 
@@ -125,7 +125,10 @@ export const updateStyleData = {
   assetID: 'update-style-data',
   assetVersion: '2026-01-02',
 
-  styles: {
+  scopes: [{
+    scope: 'osm',
+
+    styles: {
     'motorway': {
       casing: { width: 12, color: 0x70372f },
       stroke: { width: 10, color: 0xff0000 }
@@ -145,6 +148,7 @@ export const updateStyleData = {
       match: { tags: [{ key: 'amenity', value: 'new_thing' }] }
     }
   }
+  }]
 };
 
 
@@ -153,15 +157,19 @@ export const deleteStyleData = {
   assetID: 'delete-style-data',
   assetVersion: '2026-01-03',
 
-  styles: {
-    'foo-*': null,       // delete all foo-* styles
-    'bar-style': null    // delete specific style
-  },
+  scopes: [{
+    scope: 'osm',
 
-  selectors: {
-    'foo-*': null,       // delete all foo-* selectors
-    'bar-selector': null // delete specific selector
-  }
+    styles: {
+      'foo-*': null,       // delete all foo-* styles
+      'bar-style': null    // delete specific style
+    },
+
+    selectors: {
+      'foo-*': null,       // delete all foo-* selectors
+      'bar-selector': null // delete specific selector
+    }
+  }]
 };
 
 
@@ -170,10 +178,14 @@ export const deleteProtectedData = {
   assetID: 'delete-protected-data',
   assetVersion: '2026-01-04',
 
-  styles: {
-    'DEFAULTS': null,    // should be ignored
-    'LIFECYCLE': null    // should be ignored
-  }
+  scopes: [{
+    scope: 'osm',
+
+    styles: {
+      'DEFAULTS': null,    // should be ignored
+      'LIFECYCLE': null    // should be ignored
+    }
+  }]
 };
 
 
@@ -182,7 +194,10 @@ export const styleMatchData = {
   assetID: 'style-match-data',
   assetVersion: '2026-02-01',
 
-  styles: {
+  scopes: [{
+    scope: 'osm',
+
+    styles: {
     'DEFAULTS': {
       fill:   { width: 2, color: 0xaaaaaa, opacity: 0.3 },
       casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
@@ -260,10 +275,6 @@ export const styleMatchData = {
       styleIDs: ['building_red'],
       match: { tags: [{ key: 'building' }] }
     },
-    'rapid-building': {
-      styleIDs: ['building_rapid'],
-      match: { dataset: 'rapid', tags: [{ key: 'building' }] }
-    },
     'landuse-forest': {
       styleIDs: ['green', 'pattern-forest'],
       match: { tags: [{ key: 'landuse', value: 'forest' }] }
@@ -285,4 +296,5 @@ export const styleMatchData = {
       match: { tags: [{ key: 'landuse', value: 'invalid_test' }] }
     }
   }
+  }]
 };

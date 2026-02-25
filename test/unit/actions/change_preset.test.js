@@ -17,15 +17,19 @@ describe('actionChangePreset', () => {
     return schema.initAsync().then(() => {
       const presetData = {
         assetID: 'test',
-        presets: {
-          'old': { tags: { old: 'true' } },
-          'new': { tags: { new: 'true' } },
-          'crossing': { tags: { highway: 'footway', footway: 'crossing', 'crossing:markings': 'zebra' } }
-        }
+        scopes: [{
+          scope: 'osm',
+          presets: {
+            'old': { tags: { old: 'true' } },
+            'new': { tags: { new: 'true' } },
+            'crossing': { tags: { highway: 'footway', footway: 'crossing', 'crossing:markings': 'zebra' } }
+          }
+        }]
       };
       schema.merge(presetData);
-      oldPreset = schema.item('old');
-      newPreset = schema.item('new');
+      const scope = schema.getScope('osm');
+      oldPreset = scope.presets.get('old');
+      newPreset = scope.presets.get('new');
     });
   });
 
@@ -75,7 +79,7 @@ describe('actionChangePreset', () => {
     const w2before = { highway: 'primary' };
 
     const schema = context.systems.schema;
-    const crossingPreset = schema.item('crossing');
+    const crossingPreset = schema.getScope('osm').presets.get('crossing');
 
     const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'n1', loc: [-1,  0], tags: {} }),

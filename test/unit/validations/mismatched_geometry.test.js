@@ -31,17 +31,20 @@ describe('validationMismatchedGeometry', () => {
 
     const testPresets = {
       assetID: 'geometry-test',
-      presets: {
-        building: {
-          tags: { building: '*' },
-          geometry: ['area']
-        },
-        desert_library: {
-          tags: { amenity: 'library' },
-          geometry: ['point'],
-          locationSet: { include: ['Q620634'] }
+      scopes: [{
+        scope: 'osm',
+        presets: {
+          building: {
+            tags: { building: '*' },
+            geometry: ['area']
+          },
+          desert_library: {
+            tags: { amenity: 'library' },
+            geometry: ['point'],
+            locationSet: { include: ['Q620634'] }
+          }
         }
-      }
+      }]
     };
 
     return schema.initAsync()

@@ -11,6 +11,7 @@ export function uiSectionPresetFields(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
+  const scope = schema.getScope('osm');
 
   let section = uiSection(context, 'preset-fields')
     .label(l10n.t('inspector.fields'))
@@ -67,12 +68,12 @@ export function uiSectionPresetFields(context) {
       }
 
 //    let singularEntity = _entityIDs.length === 1 && graph.hasEntity(_entityIDs[0]);
-//    const restrictions = schema.field('restrictions');
+//    const restrictions = scope?.fields.get('restrictions');
 //    if (restrictions && singularEntity?.isHighwayIntersection(graph)) {
 //      _uifields.push(new UiField(context, restrictions, _entityIDs));
 //    }
 
-      const additionalFields = utilArrayUnion(sharedMoreFields, [...schema.universal.values()]);
+      const additionalFields = utilArrayUnion(sharedMoreFields, [...(scope?.universal?.values() ?? [])]);
       additionalFields.sort((field1, field2) => {
         return field1.label.localeCompare(field2.label, localeCode);
       });

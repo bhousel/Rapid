@@ -20,9 +20,10 @@ export function uiIntroBuilding(context, curtain) {
 
   const houseExtent = new Extent([-85.62836, 41.95622], [-85.62791, 41.95654]);
   const tankExtent = new Extent([-85.62766, 41.95324], [-85.62695, 41.95372]);
-  const buildingCatetory = schema.item('category-building');
-  const housePreset = schema.item('building/house');
-  const tankPreset = schema.item('man_made/storage_tank');
+  const scope = schema.getScope('osm');
+  const buildingCatetory = scope?.categories.get('category-building');
+  const housePreset = scope?.presets.get('building/house');
+  const tankPreset = scope?.presets.get('man_made/storage_tank');
 
   let _chapterCancelled = false;
   let _rejectStep = null;

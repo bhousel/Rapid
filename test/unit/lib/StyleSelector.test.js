@@ -29,9 +29,8 @@ describe('StyleSelector', () => {
       const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['motorway'],
-        match: { dataset: 'osm', tags: [{ key: 'highway' }] }
+        match: { tags: [{ key: 'highway' }] }
       });
-      assert.deepEqual(s.match.dataset, 'osm');
       assert.deepEqual(s.match.tags, [{ key: 'highway' }]);
     });
 
@@ -65,52 +64,6 @@ describe('StyleSelector', () => {
       // Modify original should not affect selector
       props.match.tags[0].value = 'trunk';
       assert.strictEqual(s.props.match.tags[0].value, 'motorway');
-    });
-  });
-
-
-  describe('matching - dataset', () => {
-    it('matches when dataset not specified', () => {
-      const s = new Rapid.StyleSelector(context, {
-        id: 'test',
-        styleIDs: ['style'],
-        match: {}
-      });
-      assert.isTrue(s.matches({ dataset: 'osm' }));
-      assert.isTrue(s.matches({ dataset: 'rapid' }));
-      assert.isTrue(s.matches({}));
-    });
-
-    it('matches single dataset', () => {
-      const s = new Rapid.StyleSelector(context, {
-        id: 'test',
-        styleIDs: ['style'],
-        match: { dataset: 'osm' }
-      });
-      assert.isTrue(s.matches({ dataset: 'osm' }));
-      assert.isFalse(s.matches({ dataset: 'rapid' }));
-    });
-
-    it('matches multiple datasets', () => {
-      const s = new Rapid.StyleSelector(context, {
-        id: 'test',
-        styleIDs: ['style'],
-        match: { dataset: ['osm', 'rapid'] }
-      });
-      assert.isTrue(s.matches({ dataset: 'osm' }));
-      assert.isTrue(s.matches({ dataset: 'rapid' }));
-      assert.isFalse(s.matches({ dataset: 'custom' }));
-    });
-
-    it('matches wildcard dataset', () => {
-      const s = new Rapid.StyleSelector(context, {
-        id: 'test',
-        styleIDs: ['style'],
-        match: { dataset: '*' }
-      });
-      assert.isTrue(s.matches({ dataset: 'osm' }));
-      assert.isTrue(s.matches({ dataset: 'rapid' }));
-      assert.isTrue(s.matches({ dataset: 'anything' }));
     });
   });
 
@@ -236,13 +189,12 @@ describe('StyleSelector', () => {
 
 
   describe('matching - combined conditions', () => {
-    it('matches dataset + geometry + tags', () => {
+    it('matches geometry + tags', () => {
       const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['rapid_building'],
         priority: 10,
         match: {
-          dataset: 'rapid',
           geometry: 'area',
           tags: [{ key: 'building' }]
         }
@@ -250,28 +202,18 @@ describe('StyleSelector', () => {
 
       // All conditions match
       assert.isTrue(s.matches({
-        dataset: 'rapid',
-        geometry: 'area',
-        tags: { building: 'yes' }
-      }));
-
-      // Wrong dataset
-      assert.isFalse(s.matches({
-        dataset: 'osm',
         geometry: 'area',
         tags: { building: 'yes' }
       }));
 
       // Wrong geometry
       assert.isFalse(s.matches({
-        dataset: 'rapid',
         geometry: 'point',
         tags: { building: 'yes' }
       }));
 
       // Wrong tags
       assert.isFalse(s.matches({
-        dataset: 'rapid',
         geometry: 'area',
         tags: { highway: 'motorway' }
       }));
@@ -287,15 +229,6 @@ describe('StyleSelector', () => {
         match: {}
       });
       assert.strictEqual(s.specificity(), 0);
-    });
-
-    it('adds 100 for dataset condition', () => {
-      const s = new Rapid.StyleSelector(context, {
-        id: 'test',
-        styleIDs: ['style'],
-        match: { dataset: 'osm' }
-      });
-      assert.strictEqual(s.specificity(), 100);
     });
 
     it('adds 50 for geometry condition', () => {
@@ -333,7 +266,6 @@ describe('StyleSelector', () => {
         id: 'test',
         styleIDs: ['style'],
         match: {
-          dataset: 'osm',     // +100
           geometry: 'line',   // +50
           tags: [             // +20
             { key: 'highway', value: 'motorway' },
@@ -341,23 +273,16 @@ describe('StyleSelector', () => {
           ]
         }
       });
-      assert.strictEqual(s.specificity(), 170);
+      assert.strictEqual(s.specificity(), 70);
     });
 
     it('does not count wildcard as specific', () => {
-      const s1 = new Rapid.StyleSelector(context, {
-        id: 'test',
-        styleIDs: ['style'],
-        match: { dataset: '*' }
-      });
-      assert.strictEqual(s1.specificity(), 0);
-
-      const s2 = new Rapid.StyleSelector(context, {
+      const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['style'],
         match: { geometry: '*' }
       });
-      assert.strictEqual(s2.specificity(), 0);
+      assert.strictEqual(s.specificity(), 0);
     });
   });
 
@@ -373,7 +298,7 @@ describe('StyleSelector', () => {
         id: 'more',
         styleIDs: ['style'],
         match: {
-          dataset: 'osm',  // specificity: 100 + 10 = 110
+          geometry: 'line',  // specificity: 50 + 10 = 60
           tags: [{ key: 'highway' }]
         }
       });
@@ -432,7 +357,6 @@ describe('StyleSelector', () => {
         id: 'test',
         styleIDs: ['motorway'],
         match: {
-          dataset: 'osm',
           tags: [{ key: 'highway', value: 'motorway' }]
         }
       });
@@ -442,7 +366,6 @@ describe('StyleSelector', () => {
         id: 'test',
         styleIDs: ['motorway'],
         match: {
-          dataset: 'osm',
           tags: [{ key: 'highway', value: 'motorway' }]
         }
       });
@@ -453,7 +376,6 @@ describe('StyleSelector', () => {
         id: 'highway-motorway',
         styleIDs: ['motorway'],
         match: {
-          dataset: 'osm',
           geometry: 'line',
           tags: [{ key: 'highway', value: 'motorway' }]
         }
@@ -506,13 +428,13 @@ describe('StyleSelector', () => {
             id: 'specific',
             styleIDs: ['specific'],
             match: {
-              dataset: 'osm',  // specificity: 100 + 10 = 110
+              geometry: 'line',  // specificity: 50 + 10 = 60
               tags: [{ key: 'highway', value: 'motorway' }]
             }
           })
         ];
         const result = Rapid.StyleSelector.findBest(selectors, {
-          dataset: 'osm',
+          geometry: 'line',
           tags: { highway: 'motorway' }
         });
         assert.strictEqual(result.id, 'specific');
@@ -531,13 +453,13 @@ describe('StyleSelector', () => {
             styleIDs: ['more'],
             priority: 5,
             match: {
-              dataset: 'osm',
-              tags: [{ key: 'highway' }]  // specificity: 110
+              geometry: 'line',
+              tags: [{ key: 'highway' }]  // specificity: 60
             }
           })
         ];
         const result = Rapid.StyleSelector.findBest(selectors, {
-          dataset: 'osm',
+          geometry: 'line',
           tags: { highway: 'motorway' }
         });
         assert.strictEqual(result.id, 'more-specific');
@@ -570,24 +492,25 @@ describe('StyleSelector', () => {
             id: 'high',
             styleIDs: ['high'],
             match: {
-              dataset: 'osm',
               geometry: 'line',
-              tags: [{ key: 'highway' }]  // specificity: 160
+              tags: [
+                { key: 'highway' },
+                { key: 'tunnel', value: 'yes' }
+              ]  // specificity: 50 + 20 = 70
             }
           }),
           new Rapid.StyleSelector(context, {
             id: 'medium',
             styleIDs: ['medium'],
             match: {
-              dataset: 'osm',
-              tags: [{ key: 'highway' }]  // specificity: 110
+              geometry: 'line',
+              tags: [{ key: 'highway' }]  // specificity: 50 + 10 = 60
             }
           })
         ];
         const result = Rapid.StyleSelector.findAll(selectors, {
-          dataset: 'osm',
           geometry: 'line',
-          tags: { highway: 'motorway' }
+          tags: { highway: 'motorway', tunnel: 'yes' }
         });
 
         assert.lengthOf(result, 3);

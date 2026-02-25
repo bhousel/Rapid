@@ -64,6 +64,8 @@ export type PhotoLayerID = string;
 export type PhotoType = string;
 /** Preset ID - unique identifier for presets (e.g. 'highway/residential') */
 export type PresetID = string;
+/** Scope ID - identifier for style/schema scopes (e.g. 'osm') */
+export type ScopeID = string;
 /** Script Code - ISO 15924 script code (e.g. 'Latn', 'Cyrl', 'Hans') */
 export type ScriptCode = string;
 /** Sequence ID - identifier for sequence counters (e.g. 'node', 'way', 'relation') */
@@ -118,6 +120,7 @@ declare global {
   type PresetID = string;
   type ServiceID = string;
   type SequenceID = string;
+  type ScopeID = string;
   type ScriptCode = string;
   type StringID = string;
   type StyleID = string;

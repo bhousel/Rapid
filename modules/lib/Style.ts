@@ -274,8 +274,10 @@ export class Style {
    * Layers: defaults ← fallbacks ← props (later values win).
    * @return  Resolved style properties
    */
-  resolvedStyle(): MinimalStyleProps {
+  resolvedStyle(userDefaults?: Style): MinimalStyleProps {
     // Look in several places for fallback color properties.
+    // Only the matched style's own props are used here — userDefaults are applied as a
+    // separate layer so they don't interfere with the cascade computation.
     const base = this.props.base;
     const stroke = this.props.stroke;
     const fill = this.props.fill;
@@ -310,13 +312,17 @@ export class Style {
         opacity: base?.opacity ?? stroke?.opacity
       },
       sidedMarker: {
-        color: base?.color ?? stroke?.color ?? fill?.color,
+        // Only cascade from base - not from stroke/fill, so user DEFAULTS can set
+        // a meaningful default color that isn't overridden by a nearby road stroke.
+        color: base?.color,
         opacity: base?.opacity ?? stroke?.opacity,
       }
     };
 
-    // result: defaults ← fallbacks ← this.props
-    return deepMerge({}, styleDefaults, fallbacks, this.props) as MinimalStyleProps;
+    // result: styleDefaults ← userDefaults ← fallbacks ← this.props
+    // userDefaults (e.g. DEFAULTS style from the asset file) fills the gap between hardcoded
+    // styleDefaults and the semantic fallbacks, so base.color and stroke/fill cascades still win.
+    return deepMerge({}, styleDefaults, userDefaults?.props ?? {}, fallbacks, this.props) as MinimalStyleProps;
   }
 
 

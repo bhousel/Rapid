@@ -167,29 +167,29 @@ describe('SchemaSystem', () => {
       });
 
       it('presets', () => {
-        assert.instanceOf(_schema.presets, Map);
+        assert.instanceOf(_schema.getScope('osm').presets, Map);
       });
 
       it('fields', () => {
-        assert.instanceOf(_schema.fields, Map);
+        assert.instanceOf(_schema.getScope('osm').fields, Map);
       });
 
       it('categories', () => {
-        assert.instanceOf(_schema.categories, Map);
+        assert.instanceOf(_schema.getScope('osm').categories, Map);
       });
 
       it('universal', () => {
-        assert.instanceOf(_schema.universal, Map);
+        assert.instanceOf(_schema.getScope('osm').universal, Map);
       });
 
       it('defaults', () => {
-        assert.instanceOf(_schema.defaults, Map);
-        assert.hasAllKeys(_schema.defaults, ['point', 'vertex', 'line', 'area', 'relation']);
+        assert.instanceOf(_schema.getScope('osm').defaults, Map);
+        assert.hasAllKeys(_schema.getScope('osm').defaults, ['point', 'vertex', 'line', 'area', 'relation']);
       });
 
-      it('_matchIndex', () => {
-        assert.instanceOf(_schema._matchIndex, Map);
-        assert.hasAllKeys(_schema._matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
+      it('matchIndex', () => {
+        assert.instanceOf(_schema.getScope('osm').matchIndex, Map);
+        assert.hasAllKeys(_schema.getScope('osm').matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
       });
     });
 
@@ -272,7 +272,7 @@ describe('SchemaSystem', () => {
 
         describe('fields', () => {
           it('adds a new field', () => {
-            const surfField = _schema.fields.get('surf/type');
+            const surfField = _schema.getScope('osm').fields.get('surf/type');
             assert.instanceOf(surfField, Rapid.Field);
             assert.deepInclude(surfField.props, {
               assetID: 'add-surf-data',
@@ -284,13 +284,13 @@ describe('SchemaSystem', () => {
           });
 
           it('ignores unrecognized field types', () => {
-            assert.isUndefined(_schema.fields.get('weather'));
+            assert.isUndefined(_schema.getScope('osm').fields.get('weather'));
           });
         });
 
         describe('presets', () => {
           it('adds a new preset', () => {
-            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            const surfPreset = _schema.getScope('osm').presets.get('amenity/shop/surf');
             assert.instanceOf(surfPreset, Rapid.Preset);
             assert.deepInclude(surfPreset.props, {
               assetID: 'add-surf-data',
@@ -300,26 +300,28 @@ describe('SchemaSystem', () => {
           });
 
           it('rewrites icon names from iD- to rapid-', () => {
-            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            const surfPreset = _schema.getScope('osm').presets.get('amenity/shop/surf');
             assert.deepEqual(surfPreset.props.icon, 'rapid-surfing');
           });
 
           it('references merged fields', () => {
-            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            const surfPreset = _schema.getScope('osm').presets.get('amenity/shop/surf');
             const fields = surfPreset.fields();
-            assert.deepEqual(fields, [ _schema.fields.get('name'), _schema.fields.get('surf/type') ]);
+            const scope = _schema.getScope('osm');
+            assert.deepEqual(fields, [ scope.fields.get('name'), scope.fields.get('surf/type') ]);
           });
 
           it('references merged morefields', () => {
-            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            const surfPreset = _schema.getScope('osm').presets.get('amenity/shop/surf');
             const fields = surfPreset.moreFields();
-            assert.deepEqual(fields, [ _schema.fields.get('board/type') ]);
+            const scope = _schema.getScope('osm');
+            assert.deepEqual(fields, [ scope.fields.get('board/type') ]);
           });
         });
 
         describe('categories', () => {
           it('adds a new category', () => {
-            const surfCategory = _schema.categories.get('category-surfing');
+            const surfCategory = _schema.getScope('osm').categories.get('category-surfing');
             assert.instanceOf(surfCategory, Rapid.Category);
             assert.deepInclude(surfCategory.props, {
               assetID: 'add-surf-data',
@@ -329,25 +331,25 @@ describe('SchemaSystem', () => {
           });
 
           it('rewrites icon names from iD- to rapid-', () => {
-            const surfCategory = _schema.categories.get('category-surfing');
+            const surfCategory = _schema.getScope('osm').categories.get('category-surfing');
             assert.deepEqual(surfCategory.props.icon, 'rapid-surfing');
           });
 
           it('references merged presets, ignores unknown presets', () => {
-            const surfCategory = _schema.categories.get('category-surfing');
+            const surfCategory = _schema.getScope('osm').categories.get('category-surfing');
             const presets = surfCategory.presets;
-            assert.deepEqual(presets, [ _schema.presets.get('amenity/shop/surf') ]);
+            assert.deepEqual(presets, [ _schema.getScope('osm').presets.get('amenity/shop/surf') ]);
           });
         });
 
         describe('defaults', () => {
           it('adds itemIDs to the specified Sets', () => {
             const expected = ['amenity/shop/surf', 'club/surf'];
-            assert.containsAllKeys(_schema.defaults.get('point'), expected);
-            assert.containsAllKeys(_schema.defaults.get('area'), expected);
+            assert.containsAllKeys(_schema.getScope('osm').defaults.get('point'), expected);
+            assert.containsAllKeys(_schema.getScope('osm').defaults.get('area'), expected);
           });
           it('ignores invalid geometry types', () => {
-            assert.isUndefined(_schema.defaults.get('dummy'));
+            assert.isUndefined(_schema.getScope('osm').defaults.get('dummy'));
           });
         });
 
@@ -358,17 +360,17 @@ describe('SchemaSystem', () => {
           });
 
           it('resolved custom locations on fields', () => {
-            const surfField = _schema.fields.get('surf/type');
+            const surfField = _schema.getScope('osm').fields.get('surf/type');
             assert.deepEqual(surfField.props.locationSetID, '+[surf-city-nj.geojson]');
           });
 
           it('resolved custom locations on presets', () => {
-            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            const surfPreset = _schema.getScope('osm').presets.get('amenity/shop/surf');
             assert.deepEqual(surfPreset.props.locationSetID, '+[surf-city-nj.geojson]');
           });
 
           it('resolved custom locations on fields', () => {
-            const surfCategory = _schema.categories.get('category-surfing');
+            const surfCategory = _schema.getScope('osm').categories.get('category-surfing');
             assert.deepEqual(surfCategory.props.locationSetID, '+[surf-city-nj.geojson]');
           });
         });
@@ -392,7 +394,7 @@ describe('SchemaSystem', () => {
 
         describe('fields', () => {
           it('updates an existing field', () => {
-            const surfField = _schema.fields.get('surf/type');
+            const surfField = _schema.getScope('osm').fields.get('surf/type');
             assert.instanceOf(surfField, Rapid.Field);
             assert.deepInclude(surfField.props, {
               assetID: 'update-surf-data',  // new assetID
@@ -406,7 +408,7 @@ describe('SchemaSystem', () => {
 
         describe('presets', () => {
           it('updates an existing preset', () => {
-            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            const surfPreset = _schema.getScope('osm').presets.get('amenity/shop/surf');
             assert.instanceOf(surfPreset, Rapid.Preset);
             assert.deepInclude(surfPreset.props, {
               assetID: 'update-surf-data',  // new assetID
@@ -418,7 +420,8 @@ describe('SchemaSystem', () => {
 
         describe('categories', () => {
           it('updates an existing category', () => {
-            const surfCategory = _schema.categories.get('category-surfing');
+            const scope = _schema.getScope('osm');
+            const surfCategory = scope.categories.get('category-surfing');
             assert.instanceOf(surfCategory, Rapid.Category);
             assert.deepInclude(surfCategory.props, {
               assetID: 'update-surf-data',   // new assetID
@@ -428,11 +431,12 @@ describe('SchemaSystem', () => {
           });
 
           it('references merged presets, ignores unknown presets', () => {
-            const surfCategory = _schema.categories.get('category-surfing');
+            const scope = _schema.getScope('osm');
+            const surfCategory = scope.categories.get('category-surfing');
             const presets = surfCategory.presets;
             assert.deepEqual(presets, [
-              _schema.presets.get('amenity/shop/surf'),
-              _schema.presets.get('club/surf')   // newly added
+              scope.presets.get('amenity/shop/surf'),
+              scope.presets.get('club/surf')   // newly added
             ]);
           });
         });
@@ -444,17 +448,17 @@ describe('SchemaSystem', () => {
           });
 
           it('resolved custom locations on fields', () => {
-            const surfField = _schema.fields.get('surf/type');
+            const surfField = _schema.getScope('osm').fields.get('surf/type');
             assert.deepEqual(surfField.props.locationSetID, '+[surf-city-nc.geojson,surf-city-nj.geojson]');
           });
 
           it('resolved custom locations on presets', () => {
-            const surfPreset = _schema.presets.get('amenity/shop/surf');
+            const surfPreset = _schema.getScope('osm').presets.get('amenity/shop/surf');
             assert.deepEqual(surfPreset.props.locationSetID, '+[surf-city-nc.geojson,surf-city-nj.geojson]');
           });
 
           it('resolved custom locations on fields', () => {
-            const surfCategory = _schema.categories.get('category-surfing');
+            const surfCategory = _schema.getScope('osm').categories.get('category-surfing');
             assert.deepEqual(surfCategory.props.locationSetID, '+[surf-city-nc.geojson,surf-city-nj.geojson]');
           });
         });
@@ -477,83 +481,81 @@ describe('SchemaSystem', () => {
 
         describe('fields', () => {
           it('deletes an existing fieldID', () => {
-            assert.isUndefined(_schema.fields.get('board/type'));
+            assert.isUndefined(_schema.getScope('osm').fields.get('board/type'));
           });
 
           it(`deletes wildcard fieldIDs containing '?'`, () => {
-            assert.isUndefined(_schema.fields.get('field/foo1'));
-            assert.isUndefined(_schema.fields.get('field/foo2'));
+            assert.isUndefined(_schema.getScope('osm').fields.get('field/foo1'));
+            assert.isUndefined(_schema.getScope('osm').fields.get('field/foo2'));
           });
 
           it(`deletes wildcard fieldIDs containing '*'`, () => {
-            assert.isUndefined(_schema.fields.get('field/ban'));
-            assert.isUndefined(_schema.fields.get('field/bun'));
+            assert.isUndefined(_schema.getScope('osm').fields.get('field/ban'));
+            assert.isUndefined(_schema.getScope('osm').fields.get('field/bun'));
           });
         });
 
         describe('presets', () => {
           it('deletes an existing presetID', () => {
-            assert.isUndefined(_schema.presets.get('club/surf'));
+            assert.isUndefined(_schema.getScope('osm').presets.get('club/surf'));
           });
 
           it(`deletes wildcard presetIDs containing '?'`, () => {
-            assert.isUndefined(_schema.fields.get('preset/foo1'));
-            assert.isUndefined(_schema.fields.get('preset/foo2'));
+            assert.isUndefined(_schema.getScope('osm').presets.get('preset/foo1'));
+            assert.isUndefined(_schema.getScope('osm').presets.get('preset/foo2'));
           });
 
           it(`deletes wildcard presetIDs containing '*'`, () => {
-            assert.isUndefined(_schema.fields.get('preset/ban'));
-            assert.isUndefined(_schema.fields.get('preset/bun'));
+            assert.isUndefined(_schema.getScope('osm').presets.get('preset/ban'));
+            assert.isUndefined(_schema.getScope('osm').presets.get('preset/bun'));
           });
         });
 
         describe('categories', () => {
           it('deletes an existing categoryID', () => {
-            assert.isUndefined(_schema.categories.get('category-shopping'));
+            assert.isUndefined(_schema.getScope('osm').categories.get('category-shopping'));
           });
 
           it(`deletes wildcard categoryIDs containing '?'`, () => {
-            assert.isUndefined(_schema.fields.get('category-foo1'));
-            assert.isUndefined(_schema.fields.get('category-foo2'));
+            assert.isUndefined(_schema.getScope('osm').categories.get('category-foo1'));
+            assert.isUndefined(_schema.getScope('osm').categories.get('category-foo2'));
           });
 
           it(`deletes wildcard categoryIDs containing '*'`, () => {
-            assert.isUndefined(_schema.fields.get('category-ban'));
-            assert.isUndefined(_schema.fields.get('category-bun'));
+            assert.isUndefined(_schema.getScope('osm').categories.get('category-ban'));
+            assert.isUndefined(_schema.getScope('osm').categories.get('category-bun'));
           });
         });
       });
     });   // merge
 
 
-    describe('item', () => {
-      it('gets a preset by its presetID', () => {
-        const result = _schema.item('amenity/shop/surf');
+    describe('getScope collections', () => {
+      it('gets a preset by its presetID from scope.presets', () => {
+        const result = _schema.getScope('osm').presets.get('amenity/shop/surf');
         assert.instanceOf(result, Rapid.Preset);
         assert.deepEqual(result.id, 'amenity/shop/surf');
       });
 
-      it('gets a category by its categoryID', () => {
-        const result = _schema.item('category-surfing');
+      it('gets a category by its categoryID from scope.categories', () => {
+        const result = _schema.getScope('osm').categories.get('category-surfing');
         assert.instanceOf(result, Rapid.Category);
         assert.deepEqual(result.id, 'category-surfing');
       });
 
-      it('returns undefined if no presetID or categoryID found', () => {
-        assert.isUndefined(_schema.item('invalid'));
+      it('returns undefined for unknown IDs', () => {
+        assert.isUndefined(_schema.getScope('osm').presets.get('invalid'));
+        assert.isUndefined(_schema.getScope('osm').categories.get('invalid'));
       });
-    });
 
-
-    describe('field', () => {
-      it('gets a field by its fieldID', () => {
-        const result = _schema.field('surf/type');
+      it('gets a field by its fieldID from scope.fields', () => {
+        const result = _schema.getScope('osm').fields.get('surf/type');
         assert.instanceOf(result, Rapid.Field);
         assert.deepEqual(result.id, 'surf/type');
       });
 
-      it('returns undefined if no fieldID found', () => {
-        assert.isUndefined(_schema.field('invalid'));
+      it('returns undefined for unknown fieldID', () => {
+        assert.isUndefined(_schema.getScope('osm').fields.get('invalid'));
       });
     });
 
@@ -692,7 +694,7 @@ describe('SchemaSystem', () => {
       });
 
       it('throws if no search index available', () => {  // run this test last!
-        _schema._currSearchIndex = null;
+        _schema.getScope('osm').currSearchIndex = null;
         assert.throws(() => _schema.search('grass'), /not ready/i);
       });
 
@@ -754,21 +756,22 @@ describe('SchemaSystem', () => {
       });
 
       it('ignores unsearchable presets', () => {
-        const excluded = _schema.item('amenity/excluded');
+        const excluded = _schema.getScope('osm').presets.get('amenity/excluded');
         _schema.setMostRecent(excluded);
         assert.isNull(_schema._recentIDs);
       });
 
       it('adds searchable presets in reverse order', () => {
-        const sandpit = _schema.item('amenity/grit_bin');
-        const surfing = _schema.item('amenity/shop/surf');
+        const scope = _schema.getScope('osm');
+        const sandpit = scope.presets.get('amenity/grit_bin');
+        const surfing = scope.presets.get('amenity/shop/surf');
         _schema.setMostRecent(sandpit);
         _schema.setMostRecent(surfing);
         assert.deepEqual(_schema._recentIDs, ['amenity/shop/surf', 'amenity/grit_bin']);
       });
 
       it('removes seen duplicates', () => {
-        const sandpit = _schema.item('amenity/grit_bin');
+        const sandpit = _schema.getScope('osm').presets.get('amenity/grit_bin');
         _schema.setMostRecent(sandpit);   // Prepend "Sandpit" back to the beginning of the list
         assert.deepEqual(_schema._recentIDs, ['amenity/grit_bin', 'amenity/shop/surf']);
       });
@@ -789,8 +792,9 @@ describe('SchemaSystem', () => {
       });
 
       it('converts recognized recentIDs to Presets', () => {
-        const sandpit = _schema.item('amenity/grit_bin');
-        const surfing = _schema.item('amenity/shop/surf');
+        const scope = _schema.getScope('osm');
+        const sandpit = scope.presets.get('amenity/grit_bin');
+        const surfing = scope.presets.get('amenity/shop/surf');
         _schema._recentIDs = [surfing.id, sandpit.id];
         const result = _schema.getRecents();
         assert.deepEqual(result, [surfing, sandpit]);
@@ -816,89 +820,96 @@ describe('SchemaSystem', () => {
       });
 
       it('no recents and no defaults, returns only the fallback preset', () => {
+        const scope = _schema.getScope('osm');
         _schema._recentIDs = [];
-        _schema.defaults.set('point', []);
+        scope.defaults.set('point', []);
         _schema.addablePresetIDs = null;
 
-        const point = _schema.item('point');
+        const point = _schema.getFallback('point');
 
         const result = _schema.getDefaults('point');
         assert.deepEqual(result, [point]);
       });
 
       it('has recents but no defaults, returns recents and fallback preset', () => {
+        const scope = _schema.getScope('osm');
         _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
-        _schema.defaults.set('point', []);
+        scope.defaults.set('point', []);
         _schema.addablePresetIDs = null;
 
-        const sandpit = _schema.item('amenity/grit_bin');
-        const surfing = _schema.item('amenity/shop/surf');
-        const point = _schema.item('point');
+        const sandpit = scope.presets.get('amenity/grit_bin');
+        const surfing = scope.presets.get('amenity/shop/surf');
+        const point = _schema.getFallback('point');
 
         const result = _schema.getDefaults('point');
         assert.deepEqual(result, [sandpit, surfing, point]);
       });
 
       it('has defaults but no recents, returns defaults and fallback preset', () => {
+        const scope = _schema.getScope('osm');
         _schema._recentIDs = [];
-        _schema.defaults.set('point', ['amenity/bbq']);
+        scope.defaults.set('point', ['amenity/bbq']);
         _schema.addablePresetIDs = null;
 
-        const bbq = _schema.item('amenity/bbq');
-        const point = _schema.item('point');
+        const bbq = scope.presets.get('amenity/bbq');
+        const point = _schema.getFallback('point');
 
         const result = _schema.getDefaults('point');
         assert.deepEqual(result, [bbq, point]);
       });
 
       it('has recents and defaults, returns recents, then defaults, then fallback preset', () => {
+        const scope = _schema.getScope('osm');
         _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
-        _schema.defaults.set('point', ['amenity/bbq']);
+        scope.defaults.set('point', ['amenity/bbq']);
         _schema.addablePresetIDs = null;
 
-        const sandpit = _schema.item('amenity/grit_bin');
-        const surfing = _schema.item('amenity/shop/surf');
-        const bbq = _schema.item('amenity/bbq');
-        const point = _schema.item('point');
+        const sandpit = scope.presets.get('amenity/grit_bin');
+        const surfing = scope.presets.get('amenity/shop/surf');
+        const bbq = scope.presets.get('amenity/bbq');
+        const point = _schema.getFallback('point');
 
         const result = _schema.getDefaults('point');
         assert.deepEqual(result, [sandpit, surfing, bbq, point]);
       });
 
       it('optionally uses the addablePresetIDs instead of the defaults', () => {
+        const scope = _schema.getScope('osm');
         _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
-        _schema.defaults.set('point', ['amenity/bbq']);
+        scope.defaults.set('point', ['amenity/bbq']);
         _schema.addablePresetIDs = new Set(['amenity/parking']);
 
-        const sandpit = _schema.item('amenity/grit_bin');
-        const surfing = _schema.item('amenity/shop/surf');
-        const parking = _schema.item('amenity/parking');
-        const point = _schema.item('point');
+        const sandpit = scope.presets.get('amenity/grit_bin');
+        const surfing = scope.presets.get('amenity/shop/surf');
+        const parking = scope.presets.get('amenity/parking');
+        const point = _schema.getFallback('point');
 
         const result = _schema.getDefaults('point');
         assert.deepEqual(result, [sandpit, surfing, parking, point]);
       });
 
       it('optionally skips the recents', () => {
+        const scope = _schema.getScope('osm');
         _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
-        _schema.defaults.set('point', ['amenity/bbq']);
+        scope.defaults.set('point', ['amenity/bbq']);
         _schema.addablePresetIDs = new Set(['amenity/parking']);
 
-        const parking = _schema.item('amenity/parking');
-        const point = _schema.item('point');
+        const parking = scope.presets.get('amenity/parking');
+        const point = _schema.getFallback('point');
 
         const result = _schema.getDefaults('point', false  /* no recents */);
         assert.deepEqual(result, [parking, point]);
       });
 
       it('optionally filters by location, if location provided', () => {
+        const scope = _schema.getScope('osm');
         _schema._recentIDs = ['amenity/grit_bin', 'amenity/shop/surf'];
-        _schema.defaults.set('point', ['amenity/bbq']);
+        scope.defaults.set('point', ['amenity/bbq']);
         _schema.addablePresetIDs = null;
 
-        const sandpit = _schema.item('amenity/grit_bin');
-        const bbq = _schema.item('amenity/bbq');
-        const point = _schema.item('point');
+        const sandpit = scope.presets.get('amenity/grit_bin');
+        const bbq = scope.presets.get('amenity/bbq');
+        const point = _schema.getFallback('point');
 
         const result = _schema.getDefaults('point', true, [-75.1638, 39.9526]);
         assert.deepEqual(result, [sandpit, bbq, point]);
@@ -983,9 +994,9 @@ describe('SchemaSystem', () => {
         presetSpy = spyOn(preset, 'setLocale');
         categorySpy = spyOn(category, 'setLocale');
 
-        _schema.fields.set(field.id, field);
-        _schema.presets.set(preset.id, preset);
-        _schema.categories.set(category.id, category);
+        _schema.getScope('osm').fields.set(field.id, field);
+        _schema.getScope('osm').presets.set(preset.id, preset);
+        _schema.getScope('osm').categories.set(category.id, category);
       });
 
       it(`defaults to en-US, calls 'setLocale' on Fields, Presets, Categories`, () => {
@@ -1030,37 +1041,37 @@ describe('SchemaSystem', () => {
 
     describe('_prepareSearchIndex', () => {
       it(`defaults to 'en-US', creates a search index`, () => {
-        _schema._searchIndexes.clear();
+        _schema.getScope('osm').searchIndexes.clear();
+        _schema.getScope('osm').currSearchIndex = null;
         _schema._currLocaleCode = null;
-        _schema._currSearchIndex = null;
 
         _schema._prepareSearchIndex();
 
         assert.strictEqual(_schema._currLocaleCode, 'en-US');
-        const index = _schema._searchIndexes.get('en-US');
+        const index = _schema.getScope('osm').searchIndexes.get('en-US');
         assert.strictEqual(index.constructor.name, 'MiniSearch');
-        assert.strictEqual(_schema._currSearchIndex, index);
+        assert.strictEqual(_schema.getScope('osm').currSearchIndex, index);
       });
 
       it(`reuses an existing search index when changing locales`, () => {
-        _schema._searchIndexes.clear();
-        _schema._currSearchIndex = null;
+        _schema.getScope('osm').searchIndexes.clear();
+        _schema.getScope('osm').currSearchIndex = null;
 
         _schema._currLocaleCode = 'en-US';
         _schema._prepareSearchIndex();
 
         assert.strictEqual(_schema._currLocaleCode, 'en-US');
-        const index1 = _schema._currSearchIndex;
+        const index1 = _schema.getScope('osm').currSearchIndex;
 
         _schema._currLocaleCode = 'de';
         _schema._prepareSearchIndex();
 
         assert.strictEqual(_schema._currLocaleCode, 'de');
-        const index2 = _schema._currSearchIndex;
+        const index2 = _schema.getScope('osm').currSearchIndex;
 
         _schema._currLocaleCode = 'en-US';
         _schema._prepareSearchIndex();
-        const index3 = _schema._currSearchIndex;
+        const index3 = _schema.getScope('osm').currSearchIndex;
 
         assert.notStrictEqual(index1, index2);
         assert.strictEqual(index1, index3);
@@ -1070,29 +1081,29 @@ describe('SchemaSystem', () => {
 
     describe('_rebuildSearchIndex', () => {
       it(`calls '_prepareSearchIndex' if needed`, () => {
-        _schema._searchIndexes.clear();
+        _schema.getScope('osm').searchIndexes.clear();
+        _schema.getScope('osm').currSearchIndex = null;
         _schema._currLocaleCode = null;
-        _schema._currSearchIndex = null;
 
-        _schema._rebuildSearchIndex();
+        _schema._rebuildSearchIndex(_schema.getScope('osm'));
 
         assert.strictEqual(_schema._currLocaleCode, 'en-US');
-        const index = _schema._currSearchIndex;
+        const index = _schema.getScope('osm').currSearchIndex;
         assert.strictEqual(index.constructor.name, 'MiniSearch');
       });
 
       it(`rebuilds the search index`, () => {
-        _schema._searchIndexes.clear();
-        _schema._currSearchIndex = null;
+        _schema.getScope('osm').searchIndexes.clear();
+        _schema.getScope('osm').currSearchIndex = null;
 
         _schema._currLocaleCode = 'en-US';
         _schema._prepareSearchIndex();
 
-        const index = _schema._currSearchIndex;
+        const index = _schema.getScope('osm').currSearchIndex;
         index.removeAll();  // clear it
         assert.strictEqual(index.documentCount, 0);  // has no documents
 
-        _schema._rebuildSearchIndex();
+        _schema._rebuildSearchIndex(_schema.getScope('osm'));
         assert.isAbove(index.documentCount, 0);  // has documents
       });
     });
@@ -1153,9 +1164,9 @@ describe('SchemaSystem', () => {
         presetSpy = spyOn(preset, 'reset');
         categorySpy = spyOn(category, 'reset');
 
-        _schema.fields.set(field.id, field);
-        _schema.presets.set(preset.id, preset);
-        _schema.categories.set(category.id, category);
+        _schema.getScope('osm').fields.set(field.id, field);
+        _schema.getScope('osm').presets.set(preset.id, preset);
+        _schema.getScope('osm').categories.set(category.id, category);
 
         _schema._schemaChanged();
       });
@@ -1167,7 +1178,7 @@ describe('SchemaSystem', () => {
       });
 
       it('updates the universal field cache', () => {
-        assert.strictEqual(_schema.universal.get('wikidata'), field);
+        assert.strictEqual(_schema.getScope('osm').universal.get('wikidata'), field);
       });
     });
 
@@ -1184,33 +1195,38 @@ describe('SchemaSystem', () => {
       });
 
       it('resets fields', () => {
-        assert.instanceOf(_schema.fields, Map);
-        assert.isEmpty(_schema.fields);
+        assert.instanceOf(_schema.getScope('osm').fields, Map);
+        assert.isEmpty(_schema.getScope('osm').fields);
       });
 
       it('resets presets', () => {
-        assert.instanceOf(_schema.presets, Map);
-        assert.hasAllKeys(_schema.presets, ['point', 'line', 'area', 'relation']);
+        assert.instanceOf(_schema.getScope('osm').presets, Map);
+        assert.isEmpty(_schema.getScope('osm').presets);
+      });
+
+      it('creates common scope with fallback presets', () => {
+        assert.instanceOf(_schema.getScope('*').presets, Map);
+        assert.hasAllKeys(_schema.getScope('*').presets, ['point', 'line', 'area', 'relation']);
       });
 
       it('resets categories', () => {
-        assert.instanceOf(_schema.categories, Map);
-        assert.isEmpty(_schema.categories);
+        assert.instanceOf(_schema.getScope('osm').categories, Map);
+        assert.isEmpty(_schema.getScope('osm').categories);
       });
 
       it('resets universal', () => {
-        assert.instanceOf(_schema.universal, Map);
-        assert.isEmpty(_schema.universal);
+        assert.instanceOf(_schema.getScope('osm').universal, Map);
+        assert.isEmpty(_schema.getScope('osm').universal);
       });
 
       it('resets defaults', () => {
-        assert.instanceOf(_schema.defaults, Map);
-        assert.hasAllKeys(_schema.defaults, ['point', 'vertex', 'line', 'area', 'relation']);
+        assert.instanceOf(_schema.getScope('osm').defaults, Map);
+        assert.hasAllKeys(_schema.getScope('osm').defaults, ['point', 'vertex', 'line', 'area', 'relation']);
       });
 
-      it('resets _matchIndex', () => {
-        assert.instanceOf(_schema._matchIndex, Map);
-        assert.hasAllKeys(_schema._matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
+      it('resets matchIndex', () => {
+        assert.instanceOf(_schema.getScope('osm').matchIndex, Map);
+        assert.hasAllKeys(_schema.getScope('osm').matchIndex, ['point', 'vertex', 'line', 'area', 'relation']);
       });
 
       it('emits schemachange', () => {
@@ -1224,10 +1240,13 @@ describe('SchemaSystem', () => {
   describe('match', () => {
     const testPresets = {
       assetID: 'match-test-1',
-      presets: {
-        residential: { tags: { highway: 'residential' }, geometry: ['line'] },
-        park: { tags: { leisure: 'park' }, geometry: ['point', 'area'] }
-      }
+      scopes: [{
+        scope: 'osm',
+        presets: {
+          residential: { tags: { highway: 'residential' }, geometry: ['line'] },
+          park: { tags: { leisure: 'park' }, geometry: ['point', 'area'] }
+        }
+      }]
     };
 
     it('returns a collection containing presets matching a geometry and tags', () => {
@@ -1279,15 +1298,18 @@ describe('SchemaSystem', () => {
   describe('areaKeys', () => {
     const testPresets = {
       assetID: 'areakeys-test',
-      presets: {
-        'amenity/fuel/shell': { tags: { 'amenity': 'fuel' }, geometry: ['point', 'area'], suggestion: true },
-        'highway/foo': { tags: { 'highway': 'foo' }, geometry: ['area'] },
-        'leisure/track': { tags: { 'leisure': 'track' }, geometry: ['line', 'area'] },
-        'natural': { tags: { 'natural': '*' }, geometry: ['point', 'vertex', 'area'] },
-        'natural/peak': { tags: { 'natural': 'peak' }, geometry: ['point', 'vertex'] },
-        'natural/tree_row': { tags: { 'natural': 'tree_row' }, geometry: ['line'] },
-        'natural/wood': { tags: { 'natural': 'wood' }, geometry: ['point', 'area'] }
-      }
+      scopes: [{
+        scope: 'osm',
+        presets: {
+          'amenity/fuel/shell': { tags: { 'amenity': 'fuel' }, geometry: ['point', 'area'], suggestion: true },
+          'highway/foo': { tags: { 'highway': 'foo' }, geometry: ['area'] },
+          'leisure/track': { tags: { 'leisure': 'track' }, geometry: ['line', 'area'] },
+          'natural': { tags: { 'natural': '*' }, geometry: ['point', 'vertex', 'area'] },
+          'natural/peak': { tags: { 'natural': 'peak' }, geometry: ['point', 'vertex'] },
+          'natural/tree_row': { tags: { 'natural': 'tree_row' }, geometry: ['line'] },
+          'natural/wood': { tags: { 'natural': 'wood' }, geometry: ['point', 'area'] }
+        }
+      }]
     };
 
     it('includes keys for presets with area geometry', () => {
@@ -1352,31 +1374,34 @@ describe('SchemaSystem', () => {
   describe('match', () => {
     const testPresets = {
       assetID: 'match-test-2',
-      presets: {
-        building: {
-          name: 'Building',
-          tags: { building: 'yes' },
-          geometry: ['area']
-        },
-        'type/multipolygon': {
-          name: 'Multipolygon',
-          geometry: ['area', 'relation'],
-          tags: { 'type': 'multipolygon' },
-          searchable: false,
-          matchScore: 0.1
-        },
-        address: {
-          name: 'Address',
-          geometry: ['point', 'vertex', 'area'],
-          tags: { 'addr:*': '*' },
-          matchScore: 0.15
-        },
-        'highway/pedestrian_area': {
-          name: 'Pedestrian Area',
-          geometry: ['area'],
-          tags: { highway: 'pedestrian', area: 'yes' }
+      scopes: [{
+        scope: 'osm',
+        presets: {
+          building: {
+            name: 'Building',
+            tags: { building: 'yes' },
+            geometry: ['area']
+          },
+          'type/multipolygon': {
+            name: 'Multipolygon',
+            geometry: ['area', 'relation'],
+            tags: { 'type': 'multipolygon' },
+            searchable: false,
+            matchScore: 0.1
+          },
+          address: {
+            name: 'Address',
+            geometry: ['point', 'vertex', 'area'],
+            tags: { 'addr:*': '*' },
+            matchScore: 0.15
+          },
+          'highway/pedestrian_area': {
+            name: 'Pedestrian Area',
+            geometry: ['area'],
+            tags: { highway: 'pedestrian', area: 'yes' }
+          }
         }
-      }
+      }]
     };
 
     it('prefers building to multipolygon', () => {

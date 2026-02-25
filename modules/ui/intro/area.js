@@ -18,9 +18,10 @@ export function uiIntroArea(context, curtain) {
   const ui = context.systems.ui;
 
   const playgroundExtent = new Extent([-85.63575, 41.94137], [-85.63526, 41.94180]);
-  const playgroundPreset = schema.item('leisure/playground');
-  const nameField = schema.field('name');
-  const descriptionField = schema.field('description');
+  const scope = schema.getScope('osm');
+  const playgroundPreset = scope?.presets.get('leisure/playground');
+  const nameField = scope?.fields.get('name');
+  const descriptionField = scope?.fields.get('description');
 
   let _chapterCancelled = false;
   let _rejectStep = null;

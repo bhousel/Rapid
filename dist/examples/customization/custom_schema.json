@@ -2,7 +2,10 @@
   "assetID": "custom_schema",
   "assetVersion": "2026-02-12",
 
-  "fields": {
+  "scopes": [{
+    "scope": "osm",
+
+    "fields": {
     "survey/date": {
       "label": "Survey Date",
       "key": "survey:date",
@@ -149,4 +152,6 @@
     "line": ["category-project"],
     "area": ["category-project"]
   }
+
+  }]
 }

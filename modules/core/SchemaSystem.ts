@@ -37,14 +37,12 @@ export type FieldType =
 
 
 /**
- * Schema asset data to merge into the system.
- * Contains categories, presets, fields, and defaults.
+ * Input format for a single schema scope.
+ * Each scope targets a scope identifier and contains field/preset/category definitions.
  */
-export interface SchemaData {
-  /** An asset identifier, e.g. 'id-tagging-schema@6.13.0' (required) */
-  assetID: AssetID;
-  /** A string version specifier, e.g. '6.13.0' */
-  assetVersion?: string;
+export interface SchemaScopeInput {
+  /** Scope identifier this applies to (defaults to 'osm') */
+  scope?: ScopeID;
   /** Object mapping fieldID to field data (or null to delete) */
   fields?: Record<string, Partial<FieldProps> | null>;
   /** Object mapping presetID to preset data (or null to delete) */
@@ -53,6 +51,33 @@ export interface SchemaData {
   categories?: Record<string, Partial<CategoryProps> | null>;
   /** Object mapping geometry type to array of default preset/category IDs */
   defaults?: Record<string, string[]>;
+}
+
+/**
+ * Internal per-scope storage for schema data.
+ */
+export interface SchemaScopeData {
+  fields: Map<FieldID, Field>;
+  presets: Map<PresetID, Preset>;
+  categories: Map<CategoryID, Category>;
+  defaults: Map<GeometryType, Set<PresetID | CategoryID>>;
+  universal: Map<FieldID, Field>;
+  matchIndex: Map<string, Record<string, Record<string, Preset[]>>>;
+  searchIndexes: Map<LocaleCode, MiniSearch>;
+  currSearchIndex: MiniSearch | null;
+}
+
+/**
+ * Schema asset data to merge into the system.
+ * Uses scoped format: `scopes: [{ scope: 'osm', fields: {...}, presets: {...}, ... }]`
+ */
+export interface SchemaData {
+  /** An asset identifier, e.g. 'id-tagging-schema' (required) */
+  assetID: AssetID;
+  /** A string version specifier, e.g. '6.13.0' */
+  assetVersion?: string;
+  /** Array of scoped data, each targeting a scope identifier */
+  scopes?: SchemaScopeInput[];
   /** Custom GeoJSON features for locationSets */
   featureCollection?: GeoJSON.FeatureCollection;
 }
@@ -92,11 +117,6 @@ interface SearchResult {
  *   `fieldTypes`       The supported field types (see also `ui/fields/index.js`)
  *   `defaultAssetIDs`  Default assetIDs that are loaded if no custom assets are requested
  *   `loadedAssetIDs`   Map<AssetID, string> - assetIDs that have been loaded (maps to version string)
- *   `fields`           The Fields
- *   `presets`          The Presets
- *   `categories`       The Categories
- *   `universal`        The "universal" fields (fields that can go with any Preset)
- *   `defaults`         Default items that are suggested for each geometry
  *
  * Events available:
  *   `schemachange`    Fires on any change in the available schemas
@@ -110,17 +130,6 @@ export class SchemaSystem extends AbstractSystem {
   /** Set of presetIDs that the user can add (if `null`, all are normally addable) */
   addablePresetIDs: Set<PresetID> | null;
 
-  /** The Categories, keyed by categoryID */
-  categories: Map<CategoryID, Category>;
-  /** The Presets, keyed by presetID */
-  presets: Map<PresetID, Preset>;
-  /** The Fields, keyed by fieldID */
-  fields: Map<FieldID, Field>;
-  /** The "universal" fields that can go with any Preset */
-  universal: Map<FieldID, Field>;
-  /** Default preset/category IDs for each geometry type */
-  defaults: Map<GeometryType, Set<PresetID | CategoryID>>;
-
   /** Default schema file assetIDs */
   private _defaultAssetIDs: Set<AssetID>;
   /** Currently loaded schema file assetIDs, maps to the version string that was loaded, if known */
@@ -128,13 +137,12 @@ export class SchemaSystem extends AbstractSystem {
   /** Requested schema file assetIDs - optional, these can be different than the default files */
   private _requestedAssetIDs: Set<AssetID> | null;
 
-  private _matchIndex: Map<string, Record<string, Record<string, Preset[]>>>;
   private _recentIDs: PresetID[] | null;
 
-  // MiniSearch fulltext search indexes, one per locale
-  private _searchIndexes: Map<LocaleCode, MiniSearch>;
+  /** Per-scope data */
+  private _scopes: Map<ScopeID, SchemaScopeData>;
+
   private _currLocaleCode: LocaleCode | null;
-  private _currSearchIndex: MiniSearch | null;
 
 
   /**
@@ -162,11 +170,7 @@ export class SchemaSystem extends AbstractSystem {
     // Set of presetIDs that the user can add (if `null`, all are normally addable)
     this.addablePresetIDs = null;
 
-    this.categories = new Map();   // Map<CategoryID, Category>
-    this.presets = new Map();      // Map<PresetID, Preset>
-    this.fields = new Map();       // Map<FieldID, Field>
-    this.universal = new Map();    // Map<FieldID, Field>  (for universal fields)
-    this.defaults = new Map();     // Map<GeometryType, Set<PresetID|CategoryID>>
+    this._scopes = new Map();      // Map<ScopeID, SchemaScopeData>
 
     // The default schema assets.
     // 'id_tagging_schema' is a "bundle" that combines multiple id_tagging_schema files.
@@ -175,15 +179,9 @@ export class SchemaSystem extends AbstractSystem {
     this._loadedAssetIDs = new Map();
     this._requestedAssetIDs = null;
 
-    this._matchIndex = new Map();  // Map<GeometryType, Object>
     this._recentIDs = null;
 
-    // We will keep a MiniSearch fulltext search index for each needed locale code.
-    // Most of the time people would just use Rapid in one language.
-    // But this allows users to switch their locale/language while Rapid is running.
-    this._searchIndexes = new Map();  // Map<LocaleCode, MiniSearch>
-    this._currLocaleCode = null;      // The current locale code
-    this._currSearchIndex = null;     // The current search index
+    this._currLocaleCode = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -307,13 +305,31 @@ gfx?.pause();  // block rendering
 
       // Process the loaded data
       const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
-      for (const value of fulfilledValues as SchemaData[]) {
+      for (const value of fulfilledValues as Record<string, any>[]) {
+        let schemaData: SchemaData;
+
         if (value.assetID === 'id_tagging_schema') {
-          value.assetVersion ||= idSchemaVersion;
-        } else if (value.assetID === 'rapid_schema') {
-          value.assetVersion ||= context.version;
+          // The bundle returns flat parts (fields, presets, categories, defaults, deprecated, discarded).
+          // Wrap the schema parts into scoped format for merge().
+          schemaData = {
+            assetID: value.assetID as AssetID,
+            assetVersion: value.assetVersion ?? idSchemaVersion,
+            scopes: [{
+              scope: 'osm',
+              fields: value.fields,
+              presets: value.presets,
+              categories: value.categories,
+              defaults: value.defaults,
+            }],
+          };
+        } else {
+          // Other assets (e.g. 'rapid_schema') are already in scoped format
+          schemaData = value as SchemaData;
+          if (schemaData.assetID === 'rapid_schema') {
+            schemaData.assetVersion ||= context.version;
+          }
         }
-        this.merge(value);
+        this.merge(schemaData);
       }
 
       const rejectedReasons = results.filter(isRejected).map(p => p.reason);
@@ -335,11 +351,8 @@ gfx?.pause();  // block rendering
     const context = this.context;
 
     this._loadedAssetIDs.clear();
-    this.presets.clear();
-    this.fields.clear();
-    this.categories.clear();
-    this.universal.clear();
-    this.defaults.clear();
+    this._scopes.clear();
+    this._currLocaleCode = null;
 
 
 // HACK for demo
@@ -381,22 +394,30 @@ const gfx = context.systems.gfx as any;
 gfx?.scene?.reset();  // throw it all away
 
 
-    // Defaults are the Presets and Categories offered to the user when adding a new feature.
-    // A fallback preset is appended to the list automatically so they dont need to be included here.
-    for (const geometry of this.geometryTypes) {
-      this.defaults.set(geometry, new Set());
-    }
+    // Create the '*' common scope with geometry fallback presets.
+    // These live outside any data scope so they're always available.
+    const commonScope = this._createEmptyScopeData();
+    this._scopes.set('*', commonScope);
 
-    // Create geometry fallback presets
     const point = new Preset(context, { id: 'point', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
     const line = new Preset(context, { id: 'line', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
     const area = new Preset(context, { id: 'area', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
     const relation = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
 
-    this.presets.set('point', point);
-    this.presets.set('line', line);
-    this.presets.set('area', area);
-    this.presets.set('relation', relation);
+    commonScope.presets.set('point', point);
+    commonScope.presets.set('line', line);
+    commonScope.presets.set('area', area);
+    commonScope.presets.set('relation', relation);
+
+    // Create the 'osm' scope with default geometry defaults (empty, no data loaded yet).
+    const osmScope = this._createEmptyScopeData();
+    this._scopes.set('osm', osmScope);
+
+    // Defaults are the Presets and Categories offered to the user when adding a new feature.
+    // A fallback preset is appended to the list automatically so they dont need to be included here.
+    for (const geometry of this.geometryTypes) {
+      osmScope.defaults.set(geometry, new Set());
+    }
 
     this._schemaChanged();  // this will reset the search index too
   }
@@ -461,39 +482,43 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * item
-   * Returns the Preset or Catetory with the given id.
-   * @param   id - a Preset or Category id
-   * @return  The Preset or Catetory, or `undefined` if not found
+   * _createEmptyScopeData
+   * Creates a new, empty SchemaScopeData.
+   * @return A fresh SchemaScopeData with all Maps initialized empty
    */
-  item(id: PresetID | CategoryID): Preset | Category | undefined {
-    return this.presets.get(id) || this.categories.get(id);
+  private _createEmptyScopeData(): SchemaScopeData {
+    return {
+      fields: new Map(),
+      presets: new Map(),
+      categories: new Map(),
+      defaults: new Map(),
+      universal: new Map(),
+      matchIndex: new Map(),
+      searchIndexes: new Map(),
+      currSearchIndex: null,
+    };
   }
 
 
-  /**
-   * field
-   * Returns the Field with the given id.
-   * @param   id - a Field id
-   * @return  The Field, or `undefined` if not found
-   */
-  field(id: FieldID): Field | undefined {
-    return this.fields.get(id);
-  }
+
 
 
   /**
    * merge
-   * Accepts an object containing new schema data (all properties except 'id' are optional):
+   * Accepts schema data in scoped format:
+   * ```
    * {
-   *   assetID: '',            // A string asset identifier, e.g. 'id-tagging-schema'
-   *   assetVersion: '',       // A string version specifier, e.g. '6.13.0'  (defaults to 'unknown' if not present)
-   *   fields: {},             // Object<FieldID, Partial<FieldProps>>
-   *   presets: {},            // Object<PresetID, Partial<PresetProps>>
-   *   categories: {},         // Object<CategoryID, Partial<CategoryProps>>
-   *   defaults: {},           // Object<geometry, Array<PresetID>>
-   *   featureCollection: {}   // Custom GeoJSON, possibly referenced by locationSets
+   *   assetID: 'my_schema',
+   *   scopes: [{
+   *     scope: 'osm',
+   *     fields: { ... },
+   *     presets: { ... },
+   *     categories: { ... },
+   *     defaults: { ... }
+   *   }],
+   *   featureCollection: { ... }    // optional, for locationSets
    * }
+   * ```
    *
    * When merging:
    *  - Items are processed in the order they appear.
@@ -525,99 +550,117 @@ gfx?.scene?.reset();  // throw it all away
 
     this._loadedAssetIDs.set(assetID, assetVersion);
 
+    const scopes: SchemaScopeInput[] = src.scopes ?? [];
+
     const checkLocationSets: Array<{ locationSet?: object; locationSetID?: string }> = [];
 
-    // Merge Fields
-    if (src.fields) {
-      for (const [fieldID, props] of Object.entries(src.fields)) {
-        const existing = this.fields.get(fieldID);
-        if (existing?.isBuiltin()) continue;  // don't override a builtin Field
+    // Process each scope
+    for (const scopeInput of scopes) {
+      const scopeID = scopeInput.scope ?? 'osm';
 
-        if (props) {   // add or replace
-          if (!this.fieldTypes.has(props.type as FieldType)) {
-            if (VERBOSE) console.warn(`"${props.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
-            continue;
-          }
-          const setProps = { ...props, id: fieldID, assetID, assetVersion } as Partial<FieldProps>;
-          const field = new Field(context, setProps);
-          if (field.props.locationSet) {
-            checkLocationSets.push(field.props);
-          }
-          this.fields.set(fieldID, field);
+      // Get or create the scope data for this scopeID
+      let scopeData = this._scopes.get(scopeID);
+      if (!scopeData) {
+        scopeData = this._createEmptyScopeData();
+        this._scopes.set(scopeID, scopeData);
+      }
 
-        } else {   // remove
-          utilWildcardDelete(this.fields, fieldID);
+      // Merge Fields into per-scope map
+      if (scopeInput.fields) {
+        for (const [fieldID, props] of Object.entries(scopeInput.fields)) {
+          const existing = scopeData.fields.get(fieldID);
+          if (existing?.isBuiltin()) continue;  // don't override a builtin Field
+
+          if (props) {   // add or replace
+            if (!this.fieldTypes.has(props.type as FieldType)) {
+              if (VERBOSE) console.warn(`"${props.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
+              continue;
+            }
+            const setProps = { ...props, id: fieldID, assetID, assetVersion } as Partial<FieldProps>;
+            const field = new Field(context, setProps);
+            if (field.props.locationSet) {
+              checkLocationSets.push(field.props);
+            }
+            scopeData.fields.set(fieldID, field);
+
+          } else {   // remove
+            utilWildcardDelete(scopeData.fields, fieldID);
+          }
         }
       }
-    }
 
-    // Merge Presets
-    if (src.presets) {
-      for (const [presetID, props] of Object.entries(src.presets)) {
-        const existing = this.presets.get(presetID);
-        if (existing?.isBuiltin()) continue;  // don't override a builtin Preset
+      // Merge Presets into per-scope map
+      if (scopeInput.presets) {
+        for (const [presetID, props] of Object.entries(scopeInput.presets)) {
+          const existing = scopeData.presets.get(presetID);
+          if (existing?.isBuiltin()) continue;  // don't override a builtin Preset
 
-        if (props) {   // add or replace
-          // Rename icon identifiers to match the rapid spritesheet
-          if (props.icon)  props.icon = props.icon.replace(/^iD-/, 'rapid-');
+          if (props) {   // add or replace
+            // Rename icon identifiers to match the rapid spritesheet
+            if (props.icon)  props.icon = props.icon.replace(/^iD-/, 'rapid-');
 
-          // A few overrides to use better icons than the ones provided by the id-tagging-schema project
-          if (presetID === 'address')                        props.icon = 'maki-circle-stroked';
-          if (presetID === 'highway/turning_loop')           props.icon = 'maki-circle';
-          if (props.icon === 'roentgen-needleleaved_tree')   props.icon = 'temaki-tree_needleleaved';
-          if (props.icon === 'roentgen-tree')                props.icon = 'temaki-tree_broadleaved';
-          // fix: FontAwesome v7 no longer has 'fas-vector-square'
-          // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
-          if (props.icon === 'fas-vector-square')            props.icon = 'temaki-portrait_framed';
+            // A few overrides to use better icons than the ones provided by the id-tagging-schema project
+            if (presetID === 'address')                        props.icon = 'maki-circle-stroked';
+            if (presetID === 'highway/turning_loop')           props.icon = 'maki-circle';
+            if (props.icon === 'roentgen-needleleaved_tree')   props.icon = 'temaki-tree_needleleaved';
+            if (props.icon === 'roentgen-tree')                props.icon = 'temaki-tree_broadleaved';
+            // fix: FontAwesome v7 no longer has 'fas-vector-square'
+            // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
+            if (props.icon === 'fas-vector-square')            props.icon = 'temaki-portrait_framed';
 
-          const setProps = { ...props, id: presetID, assetID, assetVersion } as Partial<PresetProps>;
-          const preset = new Preset(context, setProps);
-          if (preset.props.locationSet) {
-            checkLocationSets.push(preset.props);
+            const setProps = { ...props, id: presetID, assetID, assetVersion } as Partial<PresetProps>;
+            const preset = new Preset(context, setProps);
+            if (preset.props.locationSet) {
+              checkLocationSets.push(preset.props);
+            }
+            scopeData.presets.set(presetID, preset);
+
+          } else {   // remove
+            utilWildcardDelete(scopeData.presets, presetID);
           }
-          this.presets.set(presetID, preset);
-
-        } else {   // remove
-          utilWildcardDelete(this.presets, presetID);
         }
       }
-    }
 
-    // Merge Categories
-    if (src.categories) {
-      for (const [categoryID, props] of Object.entries(src.categories)) {
-        const existing = this.categories.get(categoryID);
-        if (existing?.isBuiltin()) continue;  // don't override a builtin Category
+      // Merge Categories into per-scope map
+      if (scopeInput.categories) {
+        for (const [categoryID, props] of Object.entries(scopeInput.categories)) {
+          const existing = scopeData.categories.get(categoryID);
+          if (existing?.isBuiltin()) continue;  // don't override a builtin Category
 
-        if (props) {   // add or replace
-          // Rename icon identifiers to match the rapid spritesheet
-          if (props.icon)  props.icon = props.icon.replace(/^iD-/, 'rapid-');
+          if (props) {   // add or replace
+            // Rename icon identifiers to match the rapid spritesheet
+            if (props.icon)  props.icon = props.icon.replace(/^iD-/, 'rapid-');
 
-          const setProps = { ...props, id: categoryID, assetID, assetVersion } as Partial<CategoryProps>;
-          const category = new Category(context, setProps);
-          if (category.props.locationSet) {
-            checkLocationSets.push(category.props);
+            const setProps = { ...props, id: categoryID, assetID, assetVersion } as Partial<CategoryProps>;
+            const category = new Category(context, setProps);
+            if (category.props.locationSet) {
+              checkLocationSets.push(category.props);
+            }
+            scopeData.categories.set(categoryID, category);
+
+          } else {   // remove
+            utilWildcardDelete(scopeData.categories, categoryID);
           }
-          this.categories.set(categoryID, category);
-
-        } else {   // remove
-          utilWildcardDelete(this.categories, categoryID);
         }
       }
-    }
 
-    // Merge Defaults
-    if (src.defaults) {
-      for (const [geometry, itemIDs] of Object.entries(src.defaults)) {
-        const currIDs = this.defaults.get(geometry as GeometryType);
-        if (!currIDs) continue;   // not a valid geometry type?
+      // Merge Defaults into per-scope map
+      if (scopeInput.defaults) {
+        for (const [geometry, itemIDs] of Object.entries(scopeInput.defaults)) {
+          if (!this.geometryTypes.has(geometry as GeometryType)) continue;
 
-        const newIDs = Array.isArray(itemIDs) ? itemIDs : [];
-        for (const newID of newIDs) {
-          if (!newID || this.geometryTypes.has(newID as GeometryType)) continue;  // skip if empty or fallback
-          currIDs.add(newID);
+          let defaultIDs = scopeData.defaults.get(geometry as GeometryType);
+          if (!defaultIDs) {
+            defaultIDs = new Set();
+            scopeData.defaults.set(geometry as GeometryType, defaultIDs);
+          }
+
+          const newIDs = Array.isArray(itemIDs) ? itemIDs : [];
+          for (const newID of newIDs) {
+            if (!newID || this.geometryTypes.has(newID as GeometryType)) continue;  // skip if empty or fallback
+            defaultIDs.add(newID);
+          }
         }
-        this.defaults.set(geometry as GeometryType, currIDs);
       }
     }
 
@@ -638,8 +681,19 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
+   * getScope
+   * Get the scope data for a specific scope ID.
+   * @param scopeID - ID of the scope to look up
+   * @return The scope data, or undefined if none exists
+   */
+  getScope(scopeID: ScopeID): SchemaScopeData | undefined {
+    return this._scopes.get(scopeID);
+  }
+
+
+  /**
    * search
-   * Performs a full-text search across all Presets and Categories.
+   * Performs a full-text search across Presets and Categories for a given scope.
    * This is powered by the Minisearch library and returns a result like:
    *  {
    *    id: string;
@@ -654,11 +708,13 @@ gfx?.scene?.reset();  // throw it all away
    * @param   query - the value to search
    * @param   geometries - geometries to include in the results
    * @param   loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
+   * @param   scopeID - Scope to search in (defaults to 'osm')
    * @return  A Minisearch `SearchResult`, containing the score and information about the match
    * @throws  Will throw if the search index is not ready
    */
-  search(query: string = '', geometries: GeometryType | GeometryType[] = [], loc: Vec2 | null = null): SearchResult[] {
-    if (!this._currSearchIndex) {   // shouldn't happen
+  search(query: string = '', geometries: GeometryType | GeometryType[] = [], loc: Vec2 | null = null, scopeID: ScopeID = 'osm'): SearchResult[] {
+    const scope = this._scopes.get(scopeID);
+    if (!scope?.currSearchIndex) {   // shouldn't happen
       throw new Error('Search index not ready');
     }
 
@@ -675,7 +731,7 @@ gfx?.scene?.reset();  // throw it all away
     const filterLocationSets = Array.isArray(loc) ? locations?.locationSetsAt(loc) : null;
 
     const _filter = (result: SearchResult): boolean => {
-      const item = this.item(result.id);
+      const item = scope.presets.get(result.id) ?? scope.categories.get(result.id);
       if (!item) return false;
       if (!filterGeometries.isSubsetOf(item.geometries)) return false;
 
@@ -698,7 +754,7 @@ gfx?.scene?.reset();  // throw it all away
     // For example:   query = "shop"
     //   "Shop" should be the top result.  "Shoe Shop" should never outrank it.
     //
-    const exactResults = this._currSearchIndex.search(query, {
+    const exactResults = scope.currSearchIndex.search(query, {
       boost: { primary: 20, alternate: 10 },
       boostDocument: _boostDocument,
       combineWith: 'AND',
@@ -707,7 +763,7 @@ gfx?.scene?.reset();  // throw it all away
       prefix: false   // no prefix (partial match beginning of a string)
     }) as SearchResult[];
 
-    const fuzzyResults = this._currSearchIndex.search(query, {
+    const fuzzyResults = scope.currSearchIndex.search(query, {
       boost: { primary: 2, alternate: 1 },
       boostDocument: _boostDocument,
       combineWith: 'AND',
@@ -759,13 +815,18 @@ gfx?.scene?.reset();  // throw it all away
    * @param   tags
    * @param   geometry
    * @param   loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
+   * @param   loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
+   * @param   scopeID - Scope to match in (defaults to 'osm')
    * @return  Preset that best matches
    */
-  matchTags(tags: Tags, geometry: GeometryType, loc?: Vec2): Preset | null {
+  matchTags(tags: Tags, geometry: GeometryType, loc?: Vec2, scopeID: ScopeID = 'osm'): Preset | null {
     const context = this.context;
     const locations = context.systems.locations;
 
-    const keyIndex = this._matchIndex.get(geometry);
+    const scope = this._scopes.get(scopeID);
+    if (!scope) return null;
+
+    const keyIndex = scope.matchIndex.get(geometry);
     if (!keyIndex) return null;  // invalid geometry option?
 
     // If we care about location, gather the locationSets allowed at this location
@@ -814,7 +875,7 @@ gfx?.scene?.reset();  // throw it all away
       }
     }
 
-    return bestMatch || this.getFallback(geometry) || null;
+    return bestMatch || this.getFallback(geometry, scopeID) || null;
   }
 
 
@@ -855,15 +916,19 @@ gfx?.scene?.reset();  // throw it all away
    * (see `Way#isArea()`). In other words, the keys of L form the keeplist,
    * and the subkeys form the discardlist.
    *
+   * @param   scopeID - Scope to query (defaults to 'osm')
    * @returns  areaKeys Object
    */
-  areaKeys(): Record<string, Record<string, boolean>> {
+  areaKeys(scopeID: ScopeID = 'osm'): Record<string, Record<string, boolean>> {
+    const scope = this._scopes.get(scopeID);
+    if (!scope) return {};
+
     // The ignore list is for keys that imply lines. (We always add `area=yes` for exceptions)
     const ignore = new Set(['barrier', 'highway', 'footway', 'railway', 'junction', 'type']);
     const areaKeys: Record<string, Record<string, boolean>> = {};
 
     // ignore name-suggestion-index and deprecated presets
-    const presets = [...this.presets.values()]
+    const presets = [...scope.presets.values()]
       .filter(p => !p.props.suggestion && !p.props.replacement);
 
     // keeplist
@@ -893,11 +958,14 @@ gfx?.scene?.reset();  // throw it all away
   }
 
 
-  pointTags(): Record<string, Record<string, boolean>> {
+  pointTags(scopeID: ScopeID = 'osm'): Record<string, Record<string, boolean>> {
+    const scope = this._scopes.get(scopeID);
+    if (!scope) return {};
+
     const pointTags: Record<string, Record<string, boolean>> = {};
 
     // ignore name-suggestion-index and deprecated presets
-    const presets = [...this.presets.values()]
+    const presets = [...scope.presets.values()]
       .filter(p => !p.props.suggestion && !p.props.replacement && p.props.searchable);
 
     for (const p of presets) {
@@ -915,11 +983,14 @@ gfx?.scene?.reset();  // throw it all away
   }
 
 
-  vertexTags(): Record<string, Record<string, boolean>> {
+  vertexTags(scopeID: ScopeID = 'osm'): Record<string, Record<string, boolean>> {
+    const scope = this._scopes.get(scopeID);
+    if (!scope) return {};
+
     const vertexTags: Record<string, Record<string, boolean>> = {};
 
     // ignore name-suggestion-index and deprecated presets
-    const presets = [...this.presets.values()]
+    const presets = [...scope.presets.values()]
       .filter(p => !p.props.suggestion && !p.props.replacement && p.props.searchable);
 
     for (const p of presets) {
@@ -942,11 +1013,13 @@ gfx?.scene?.reset();  // throw it all away
    * Gets the fallback preset for the given geometry.
    * For most geometries we just return the Preset with that `id`, but for `vertex' we return 'point'.
    * @param   geometry - 'point', 'vertex', 'line', 'area', or 'relation'
+   * @param   scopeID - Scope to query (defaults to 'osm')
    * @return  The fallback preset, or `undefined` if not found
    */
-  getFallback(geometry: GeometryType): Preset | undefined {
+  getFallback(geometry: GeometryType, scopeID: ScopeID = 'osm'): Preset | undefined {
     if (geometry === 'vertex')  geometry = 'point';
-    return this.presets.get(geometry);
+    return this._scopes.get(scopeID)?.presets.get(geometry)
+      ?? this._scopes.get('*')?.presets.get(geometry);
   }
 
 
@@ -958,18 +1031,21 @@ gfx?.scene?.reset();  // throw it all away
    * @param   geometry
    * @param   includeRecents - `true` to start with recently used presets
    * @param   loc - WGS84 [lon,lat] where we are editing
+   * @param   scopeID - Scope to query (defaults to 'osm')
    * @return  Array of Categories and Presets
    */
-  getDefaults(geometry: GeometryType, includeRecents: boolean = true, loc: [number, number] | null = null): Array<Category | Preset> {
+  getDefaults(geometry: GeometryType, includeRecents: boolean = true, loc: [number, number] | null = null, scopeID: ScopeID = 'osm'): Array<Category | Preset> {
     if (!geometry) return [];
 
     const context = this.context;
     const locations = context.systems.locations;
+    const scope = this._scopes.get(scopeID);
+    if (!scope) return [];
 
     const results = new Map<string, Category | Preset>();   // Map<itemID, item>  (may be a Preset or a Category)
 
     if (includeRecents) {
-      for (const preset of this.getRecents()) {
+      for (const preset of this.getRecents(scopeID)) {
         if (results.size < MAXRECENTS_SHOW && preset.geometries.has(geometry)) {
           results.set(preset.id, preset);
         }
@@ -979,16 +1055,16 @@ gfx?.scene?.reset();  // throw it all away
     // If there is a set of addable presetIDs, use that instead of defaults
     if (this.addablePresetIDs instanceof Set) {
       for (const itemID of this.addablePresetIDs) {
-        const item = this.item(itemID);
+        const item = scope.presets.get(itemID) ?? scope.categories.get(itemID);
         if (item?.geometries.has(geometry)) {
           results.set(itemID, item);
         }
       }
     } else {
-      const itemIDs = this.defaults.get(geometry);
+      const itemIDs = scope.defaults.get(geometry);
       if (itemIDs) {
         for (const itemID of itemIDs) {
-          const item = this.item(itemID);
+          const item = scope.presets.get(itemID) ?? scope.categories.get(itemID);
           if (item?.geometries.has(geometry)) {
             results.set(itemID, item);
           }
@@ -996,7 +1072,7 @@ gfx?.scene?.reset();  // throw it all away
       }
     }
 
-    const fallback = this.getFallback(geometry);
+    const fallback = this.getFallback(geometry, scopeID);
     if (fallback && !results.has(fallback.id)) {
       results.set(fallback.id, fallback);
     }
@@ -1020,11 +1096,14 @@ gfx?.scene?.reset();  // throw it all away
    * getRecents
    * Returns the recently used presets.
    * If this._recentIDs is unset, try to load them from localStorage
+   * @param   scopeID - Scope to query (defaults to 'osm')
    * @return  An Array of recent presets
    */
-  getRecents(): Preset[] {
+  getRecents(scopeID: ScopeID = 'osm'): Preset[] {
     const context = this.context;
     const storage = context.systems.storage;
+    const scope = this._scopes.get(scopeID);
+    if (!scope) return [];
 
     let itemIDs = this._recentIDs;
     if (!Array.isArray(itemIDs)) {  // first time, try to get them from localStorage
@@ -1038,7 +1117,7 @@ gfx?.scene?.reset();  // throw it all away
     const presets = (itemIDs ?? [])
       .map(item => {
         const id = (item as any)?.id || item;  // previously we stored preset, now we just store presetID
-        return this.presets.get(id);
+        return scope.presets.get(id);
       })
       .filter(Boolean) as Preset[];
 
@@ -1154,15 +1233,17 @@ gfx?.scene?.reset();  // throw it all away
     localeCode ||= l10n?.localeCode || 'en-US';
     this._currLocaleCode = localeCode;
 
-    // Re-localize the Category, Preset, Field strings, if needed.
-    for (const field of this.fields.values()) {
-      field.setLocale(localeCode);
-    }
-    for (const preset of this.presets.values()) {
-      preset.setLocale(localeCode);
-    }
-    for (const category of this.categories.values()) {
-      category.setLocale(localeCode);
+    // Re-localize the Category, Preset, Field strings across all scopes.
+    for (const scope of this._scopes.values()) {
+      for (const field of scope.fields.values()) {
+        field.setLocale(localeCode);
+      }
+      for (const preset of scope.presets.values()) {
+        preset.setLocale(localeCode);
+      }
+      for (const category of scope.categories.values()) {
+        category.setLocale(localeCode);
+      }
     }
 
     this._prepareSearchIndex();
@@ -1171,7 +1252,7 @@ gfx?.scene?.reset();  // throw it all away
 
   /**
    * _prepareSearchIndex
-   * This prepares a MiniSearch index for the current locale code.
+   * Prepares a MiniSearch index for the current locale code, per scope.
    * These are cached, so switching back to an already-seen locale should be fast.
    */
   private _prepareSearchIndex(): void {
@@ -1180,46 +1261,48 @@ gfx?.scene?.reset();  // throw it all away
     // Ensure that we have a current locale code.
     this._currLocaleCode ||= l10n?.localeCode || 'en-US';
 
-    // Switch the search index, create a new one if needed.
-    this._currSearchIndex = this._searchIndexes.get(this._currLocaleCode) ?? null;
+    // Prepare/switch search index for each scope
+    for (const scope of this._scopes.values()) {
+      scope.currSearchIndex = scope.searchIndexes.get(this._currLocaleCode) ?? null;
 
-    if (!this._currSearchIndex) {
-      this._currSearchIndex = new MiniSearch({
-        autoVacuum: false,
-        idField: 'id',
-        fields: ['primary', 'alternate'],
-        storeFields: ['type', 'suggestion'],
-        extractField: (item: any, fieldName: string) => item._currStrings[fieldName]
-      });
+      if (!scope.currSearchIndex) {
+        scope.currSearchIndex = new MiniSearch({
+          autoVacuum: false,
+          idField: 'id',
+          fields: ['primary', 'alternate'],
+          storeFields: ['type', 'suggestion'],
+          extractField: (item: any, fieldName: string) => item._currStrings[fieldName]
+        });
 
-      this._searchIndexes.set(this._currLocaleCode, this._currSearchIndex);
-      this._rebuildSearchIndex();
+        scope.searchIndexes.set(this._currLocaleCode, scope.currSearchIndex);
+        this._rebuildSearchIndex(scope);
+      }
     }
   }
 
 
   /**
    * _rebuildSearchIndex
-   * Rebuild the current MiniSearch full-text search index.
+   * Rebuild the MiniSearch full-text search index for a given scope.
    * This happens when we switch to a new search index for the first time.
    * This may be a bit slow, so consider making this async.
+   * @param scope - The scope to rebuild the search index for
    */
-  private _rebuildSearchIndex(): void {
-    // Ensure that we have a current serach index.
-    if (!this._currSearchIndex) {
-      this._prepareSearchIndex();
+  private _rebuildSearchIndex(scope: SchemaScopeData): void {
+    if (!scope.currSearchIndex) {
+      this._prepareSearchIndex();  // sets up currSearchIndex for all scopes
     }
+    if (!scope.currSearchIndex) return;  // still null — bail
 
-    // Gather "searchable" Presets and Categories..
-    this._currSearchIndex!.removeAll();
+    scope.currSearchIndex.removeAll();
 
-    for (const preset of this.presets.values()) {
+    for (const preset of scope.presets.values()) {
       if (!preset.props.searchable) continue;
-      this._currSearchIndex!.add(preset);
+      scope.currSearchIndex.add(preset);
     }
-    for (const category of this.categories.values()) {
+    for (const category of scope.categories.values()) {
       if (!category.props.searchable) continue;
-      this._currSearchIndex!.add(category);
+      scope.currSearchIndex.add(category);
     }
   }
 
@@ -1236,49 +1319,55 @@ gfx?.scene?.reset();  // throw it all away
     const context = this.context;
     const gfx = context.systems.gfx;
 
-    // Reset the Category, Preset, Field cached data
-    for (const field of this.fields.values()) {
-      field.reset();
-    }
-    for (const preset of this.presets.values()) {
-      preset.reset();
-    }
-    for (const category of this.categories.values()) {
-      category.reset();
-    }
-
-    // Reset and rebuild the search index
-    this._searchIndexes.clear();
-    this._prepareSearchIndex();
-
-
-    // Gather "universal" fields..
-    this.universal.clear();
-    for (const field of this.fields.values()) {
-      if (field.props.universal) {
-        this.universal.set(field.id, field);
+    // Reset and rebuild per-scope derived data
+    for (const scope of this._scopes.values()) {
+      // Reset the Category, Preset, Field cached data
+      for (const field of scope.fields.values()) {
+        field.reset();
       }
-    }
+      for (const preset of scope.presets.values()) {
+        preset.reset();
+      }
+      for (const category of scope.categories.values()) {
+        category.reset();
+      }
 
-    // Rebuild geometry match index..
-    this._matchIndex.clear();
-    for (const geometry of this.geometryTypes) {
-      this._matchIndex.set(geometry, {});
-    }
-    for (const preset of this.presets.values()) {
-      if (preset.isFallback()) continue;   // skip these ones
+      // Reset search indexes for this scope
+      scope.searchIndexes.clear();
+      scope.currSearchIndex = null;
 
-      for (const geometry of preset.geometries) {
-        const obj = this._matchIndex.get(geometry);
-        if (!obj) continue;
-        const tags = preset.tags || {};
-        for (const [k, v] of Object.entries(tags)) {
-          obj[k] ||= {};
-          (obj[k][v] = obj[k][v] || []).push(preset);
+      // Gather "universal" fields
+      scope.universal.clear();
+      for (const field of scope.fields.values()) {
+        if (field.props.universal) {
+          scope.universal.set(field.id, field);
+        }
+      }
+
+      // Rebuild geometry match index
+      scope.matchIndex.clear();
+      for (const geometry of this.geometryTypes) {
+        scope.matchIndex.set(geometry, {});
+      }
+      for (const preset of scope.presets.values()) {
+        if (preset.isFallback()) continue;   // skip these ones
+
+        for (const geometry of preset.geometries) {
+          const obj = scope.matchIndex.get(geometry);
+          if (!obj) continue;
+          const tags = preset.tags || {};
+          for (const [k, v] of Object.entries(tags)) {
+            obj[k] ||= {};
+            (obj[k][v] = obj[k][v] || []).push(preset);
+          }
         }
       }
     }
 
+    // Prepare search indexes
+    this._prepareSearchIndex();
+
+    // Update OSM-specific global state from the 'osm' scope
     osmSetAreaKeys(this.areaKeys());
     osmSetPointTags(this.pointTags());
     osmSetVertexTags(this.vertexTags());

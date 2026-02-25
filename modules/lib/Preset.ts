@@ -369,13 +369,15 @@ export class Preset {
   subtitle(): string | null {
     if (!this.props.suggestion) return null;
 
-    const schema = this.context.systems.schema!;
+    const schema = this.context.systems.schema;
+    const scope = schema?.getScope('osm');
+    const commonScope = schema?.getScope('*');
 
     const path = this.id.split('/');
     path.pop();  // remove brand name
 
     const parentID = path.join('/');
-    const parentPreset = schema.presets.get(parentID);
+    const parentPreset = scope?.presets.get(parentID) ?? commonScope?.presets.get(parentID);
 
     return parentPreset?.name || parentID;
   }
@@ -530,13 +532,14 @@ export class Preset {
    * @return the Preset to get the name from (either this Preset or another Preset)
    */
   private _resolveReference(prop: keyof PresetProps): Preset {
-    const schema = this.context.systems.schema!;
+    const schema = this.context.systems.schema;
 
     const val = this.props[prop];
     if (val && (typeof val === 'string')) {   // This will only work for strings
       const match = val.match(/^\{(.*)\}$/);
       if (match) {
-        const preset = schema.presets.get(match[1]);
+        const preset = schema?.getScope('osm')?.presets.get(match[1])
+          ?? schema?.getScope('*')?.presets.get(match[1]);
         if (preset) {
           return preset;
         } else {
@@ -556,14 +559,16 @@ export class Preset {
    * @return the resolved fields or moreFields
    */
   private _resolveFields(prop: 'fields' | 'moreFields'): Field[] {
-    const schema = this.context.systems.schema!;
+    const schema = this.context.systems.schema;
+    const scope = schema?.getScope('osm');
+    const commonScope = schema?.getScope('*');
 
     const fieldIDs = this.props[prop] ?? [];  // always lookup original properties, don't use the functions
     let resolved: Field[] = [];
 
     // Returns an Array of fields to inherit from the given presetID, if found
     const inheritFields = (presetID: string, prop: 'fields' | 'moreFields'): Field[] => {
-      const other = schema.presets.get(presetID);
+      const other = scope?.presets.get(presetID) ?? commonScope?.presets.get(presetID);
       if (!other) {
         console.warn(`Unable to resolve referenced presetID: ${this.id}.${prop} -> ${presetID}`);  // eslint-disable-line no-console
         return [];
@@ -581,8 +586,8 @@ export class Preset {
       const match = fieldID.match(/^\{(.*)\}$/);
       if (match !== null) {    // a presetID wrapped in braces {}
         resolved = resolved.concat(inheritFields(match[1], prop));
-      } else if (schema.fields.has(fieldID)) {    // a normal fieldID
-        resolved.push(schema.fields.get(fieldID)!);
+      } else if (scope?.fields.get(fieldID) ?? commonScope?.fields.get(fieldID)) {    // a normal fieldID
+        resolved.push((scope?.fields.get(fieldID) ?? commonScope?.fields.get(fieldID))!);
       } else {
         console.warn(`Unable to resolve referenced fieldID: ${this.id}.${prop} -> ${fieldID}`);  // eslint-disable-line no-console
       }

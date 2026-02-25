@@ -137,7 +137,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
       if (feature.dirty) {
         const isSelected = feature.hasClass('selectdetection');
         const presetID = mapillary.getDetectionPresetID(d.props.value as string);
-        const preset = presetID && schema.item(presetID);
+        const preset = presetID && schema.getScope('osm')?.presets.get(presetID);
 
         const style: Partial<MatchedStyle> = {
           marker: {

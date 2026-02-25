@@ -45,11 +45,13 @@ describe('Field', () => {
     let _one, _two;
 
     beforeAll(() => {
+      const common = schema.getScope('osm');
+
       _one = new Rapid.Field(context, sample.field1Props);
       _two = new Rapid.Field(context, sample.field2Props);
 
-      schema.fields.set(_one.id, _one);
-      schema.fields.set(_two.id, _two);
+      common.fields.set(_one.id, _one);
+      common.fields.set(_two.id, _two);
 
       _one.reset();
       _two.reset();

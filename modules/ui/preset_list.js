@@ -182,7 +182,10 @@ export function uiPresetList(context) {
         const results = schema.search(query, _allGeometries, _currLoc);
 
         messageText = l10n.t('inspector.results', { n: results.length, search: query });
-        items = results.map(result => schema.item(result.id)).slice(0, maxCount);
+        items = results.map(result => {
+          const scope = schema.getScope('osm');
+          return scope?.presets.get(result.id) ?? scope?.categories.get(result.id);
+        }).slice(0, maxCount);
 
         // Append fallback preset(s)
         for (const geom of _allGeometries) {

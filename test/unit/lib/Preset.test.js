@@ -46,16 +46,18 @@ describe('Preset', () => {
     let _shop, _thrift, _coffee, _starbucks;
 
     beforeAll(() => {
+      const common = schema.getScope('osm');
+
       // Fields
       _name = new Rapid.Field(context, sample.nameProps);
       _phone = new Rapid.Field(context, sample.phoneProps);
       _shopping = new Rapid.Field(context, sample.shoppingProps);
       _secondhand = new Rapid.Field(context, sample.secondhandProps);
 
-      schema.fields.set(_name.id, _name);
-      schema.fields.set(_phone.id, _phone);
-      schema.fields.set(_shopping.id, _shopping);
-      schema.fields.set(_secondhand.id, _secondhand);
+      common.fields.set(_name.id, _name);
+      common.fields.set(_phone.id, _phone);
+      common.fields.set(_shopping.id, _shopping);
+      common.fields.set(_secondhand.id, _secondhand);
 
       _name.reset();
       _phone.reset();
@@ -68,10 +70,10 @@ describe('Preset', () => {
       _coffee = new Rapid.Preset(context, sample.coffeeProps);
       _starbucks = new Rapid.Preset(context, sample.starbucksProps);
 
-      schema.presets.set(_shop.id, _shop);
-      schema.presets.set(_thrift.id, _thrift);
-      schema.presets.set(_coffee.id, _coffee);
-      schema.presets.set(_starbucks.id, _starbucks);
+      common.presets.set(_shop.id, _shop);
+      common.presets.set(_thrift.id, _thrift);
+      common.presets.set(_coffee.id, _coffee);
+      common.presets.set(_starbucks.id, _starbucks);
 
       _shop.reset();
       _thrift.reset();
@@ -346,11 +348,11 @@ describe('Preset', () => {
 
   describe('isFallback', () => {
     it('returns true for the special fallback presets', () => {
-      const presets = schema.presets;
-      assert.isTrue(presets.get('point')?.isFallback());
-      assert.isTrue(presets.get('line')?.isFallback());
-      assert.isTrue(presets.get('area')?.isFallback());
-      assert.isTrue(presets.get('relation')?.isFallback());
+      const common = schema.getScope('*');
+      assert.isTrue(common.presets.get('point')?.isFallback());
+      assert.isTrue(common.presets.get('line')?.isFallback());
+      assert.isTrue(common.presets.get('area')?.isFallback());
+      assert.isTrue(common.presets.get('relation')?.isFallback());
     });
 
     it('returns false for other presets', () => {
@@ -401,7 +403,7 @@ describe('Preset', () => {
 
     it('adds default tags of fields with matching geometry', () => {
       const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
-      schema.fields.set(field.id, field);
+      schema.getScope('osm').fields.set(field.id, field);
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.setTags({}, 'area'), { area: 'yes', building: 'yes' });
@@ -409,7 +411,7 @@ describe('Preset', () => {
 
     it('adds no default tags of fields with non-matching geometry', () => {
       const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
-      schema.fields.set(field.id, field);
+      schema.getScope('osm').fields.set(field.id, field);
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.setTags({}, 'point'), {});
@@ -451,7 +453,7 @@ describe('Preset', () => {
 
     it('removes tags that match field default tags', () => {
       const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
-      schema.fields.set(field.id, field);
+      schema.getScope('osm').fields.set(field.id, field);
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.unsetTags({ building: 'yes' }, 'area'), {});
@@ -464,7 +466,7 @@ describe('Preset', () => {
 
     it('preserves tags that do not match field default tags', () => {
       const field = new Rapid.Field(context, { id: 'field', key: 'building', geometry: ['area'], default: 'yes' });
-      schema.fields.set(field.id, field);
+      schema.getScope('osm').fields.set(field.id, field);
 
       const preset = new Rapid.Preset(context, { id: 'test', fields: ['field'] });
       assert.deepEqual(preset.unsetTags({ building: 'yep' }, 'area'), { building: 'yep' });

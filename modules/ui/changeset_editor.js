@@ -11,6 +11,7 @@ import { utilRebind } from '../util/index.ts';
 export function uiChangesetEditor(context) {
     const l10n = context.systems.l10n;
     const schema = context.systems.schema;
+    const scope = schema.getScope('osm');
 
     const dispatch = d3_dispatch('change');
     var formFields = uiFormFields(context);
@@ -32,9 +33,9 @@ export function uiChangesetEditor(context) {
             initial = true;
 
             _uifields = [
-                new UiField(context, schema.field('comment'), null, { show: true, revert: false }),
-                new UiField(context, schema.field('source'), null, { show: false, revert: false }),
-                new UiField(context, schema.field('hashtags'), null, { show: false, revert: false }),
+                new UiField(context, scope?.fields.get('comment'), null, { show: true, revert: false }),
+                new UiField(context, scope?.fields.get('source'), null, { show: false, revert: false }),
+                new UiField(context, scope?.fields.get('hashtags'), null, { show: false, revert: false }),
             ];
 
             _uifields.forEach(function(field) {

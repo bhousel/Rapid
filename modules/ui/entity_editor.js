@@ -377,7 +377,7 @@ export function uiEntityEditor(context) {
 
     const matches = Object.keys(counts)
       .sort((p1, p2) => counts[p2] - counts[p1])
-      .map(presetID => schema.item(presetID));
+      .map(presetID => schema.getScope('osm')?.presets.get(presetID));
 
     if (!isForNewSelection) {
       // A "weak" preset doesn't set any tags. (e.g. "Address")

@@ -30,21 +30,21 @@ export class UiDrawModesTool {
     this.commands = [{
       id: 'add-point',
       icon: 'point',
-      preset: schema.item('point'),
+      preset: schema.getFallback('point'),
       getTitle: () => l10n.t('modes.add_point.title'),
       getDescription: () => l10n.t('modes.add_point.description'),
       getKey: () => l10n.t('shortcuts.command.add_point.key')
     }, {
       id: 'draw-line',
       icon: 'line',
-      preset: schema.item('line'),
+      preset: schema.getFallback('line'),
       getTitle: () => l10n.t('modes.add_line.title'),
       getDescription: () => l10n.t('modes.add_line.description'),
       getKey: () => l10n.t('shortcuts.command.add_line.key')
     }, {
       id: 'draw-area',
       icon: 'area',
-      preset: schema.item('area'),
+      preset: schema.getFallback('area'),
       getTitle: () => l10n.t('modes.add_area.title'),
       getDescription: () => l10n.t('modes.add_area.description'),
       getKey: () => l10n.t('shortcuts.command.add_area.key')

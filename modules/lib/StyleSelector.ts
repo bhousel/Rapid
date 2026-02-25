@@ -7,28 +7,18 @@ import type { PropMatcherProps } from './PropMatcher.ts';
  * StyleSelector - Matching conditions for applying styles to features.
  *
  * A StyleSelector describes *when to apply a style*. It contains matching
- * conditions (dataset, geometry, tags) and references one or more Styles.
+ * conditions (geometry, tags) and references one or more Styles.
  *
  * All matching selectors are applied in specificity order (more conditions = higher specificity).
  * Selectors with the same specificity are applied in the order they were added.
  *
  * @example
- * // Match highway=motorway on any dataset
+ * // Match highway=motorway
  * const hwMotorway = new StyleSelector(context, {
  *   id: 'highway-motorway',
  *   styleIDs: ['motorway'],
  *   match: {
  *     tags: [{ key: 'highway', value: 'motorway' }]
- *   }
- * });
- *
- * // Match buildings on the Rapid dataset (more specific due to dataset condition)
- * const rapidBuilding = new StyleSelector(context, {
- *   id: 'rapid-building',
- *   styleIDs: ['building_rapid'],
- *   match: {
- *     dataset: 'rapid',
- *     tags: [{ key: 'building' }]
  *   }
  * });
  *
@@ -53,8 +43,6 @@ export type StyleGeometry = 'point' | 'vertex' | 'line' | 'area' | 'relation';
  * Match conditions for a StyleSelector.
  */
 export interface StyleMatchConditions {
-  /** Dataset ID(s) to match. Use '*' or omit to match all datasets. */
-  dataset?: DatasetID | DatasetID[];
   /** Geometry type(s) to match. Use '*' or omit to match all geometries. */
   geometry?: StyleGeometry | StyleGeometry[] | '*';
   /** Tag conditions to match (AND logic - all must match). */
@@ -81,8 +69,6 @@ export interface StyleSelectorProps {
  * Information about a feature to match against selectors.
  */
 export interface FeatureMatchInfo {
-  /** The dataset the feature belongs to */
-  dataset?: DatasetID;
   /** The geometry type of the feature */
   geometry?: StyleGeometry;
   /** The tags/properties of the feature */
@@ -169,14 +155,6 @@ export class StyleSelector {
   matches(feature: FeatureMatchInfo): boolean {
     const { match } = this.props;
 
-    // Check dataset condition
-    if (match.dataset !== undefined && match.dataset !== '*') {
-      const datasets = Array.isArray(match.dataset) ? match.dataset : [match.dataset];
-      if (feature.dataset === undefined || !datasets.includes(feature.dataset)) {
-        return false;
-      }
-    }
-
     // Check geometry condition
     if (match.geometry !== undefined && match.geometry !== '*') {
       const geometries = Array.isArray(match.geometry) ? match.geometry : [match.geometry];
@@ -207,11 +185,6 @@ export class StyleSelector {
   specificity(): number {
     let score = 0;
     const { match } = this.props;
-
-    // Dataset specificity
-    if (match.dataset !== undefined && match.dataset !== '*') {
-      score += 100;
-    }
 
     // Geometry specificity
     if (match.geometry !== undefined && match.geometry !== '*') {
@@ -267,11 +240,6 @@ export class StyleSelector {
   toString(): string {
     const parts: string[] = [];
     const { match } = this.props;
-
-    if (match.dataset !== undefined && match.dataset !== '*') {
-      const ds = Array.isArray(match.dataset) ? match.dataset.join('|') : match.dataset;
-      parts.push(`dataset=${ds}`);
-    }
 
     if (match.geometry !== undefined && match.geometry !== '*') {
       const geom = Array.isArray(match.geometry) ? match.geometry.join('|') : match.geometry;

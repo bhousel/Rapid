@@ -111,12 +111,8 @@ describe('StyleSystem', () => {
         // The merge tests below verify that merge() properly adds to loadedAssetIDs.
       });
 
-      it('styles', () => {
-        assert.instanceOf(_styles.styles, Map);
-      });
-
-      it('selectors', () => {
-        assert.instanceOf(_styles.selectors, Map);
+      it('getScope returns undefined for unknown scopeID', () => {
+        assert.isUndefined(_styles.getScope('nonexistent'));
       });
 
       it('patternIDs', () => {
@@ -209,31 +205,34 @@ describe('StyleSystem', () => {
           assert.strictEqual(version, '2026-01-01');
         });
 
-        it('adds styles to the styles Map', () => {
-          assert.isTrue(_styles.styles.has('DEFAULTS'));
-          assert.isTrue(_styles.styles.has('LIFECYCLE'));
-          assert.isTrue(_styles.styles.has('motorway'));
-          assert.isTrue(_styles.styles.has('trunk'));
-          assert.isTrue(_styles.styles.has('primary'));
-          assert.isTrue(_styles.styles.has('secondary'));
-          assert.isTrue(_styles.styles.has('building_red'));
-          assert.isTrue(_styles.styles.has('green'));
-          assert.isTrue(_styles.styles.has('pattern-forest'));
-          assert.isTrue(_styles.styles.has('blue'));
-          assert.isTrue(_styles.styles.has('footway'));
-          assert.isTrue(_styles.styles.has('foo-style1'));
-          assert.isTrue(_styles.styles.has('foo-style2'));
-          assert.isTrue(_styles.styles.has('bar-style'));
+        it('adds styles to the scope', () => {
+          const scope = _styles.getScope('osm');
+          assert.isTrue(scope.styles.has('DEFAULTS'));
+          assert.isTrue(scope.styles.has('LIFECYCLE'));
+          assert.isTrue(scope.styles.has('motorway'));
+          assert.isTrue(scope.styles.has('trunk'));
+          assert.isTrue(scope.styles.has('primary'));
+          assert.isTrue(scope.styles.has('secondary'));
+          assert.isTrue(scope.styles.has('building_red'));
+          assert.isTrue(scope.styles.has('green'));
+          assert.isTrue(scope.styles.has('pattern-forest'));
+          assert.isTrue(scope.styles.has('blue'));
+          assert.isTrue(scope.styles.has('footway'));
+          assert.isTrue(scope.styles.has('foo-style1'));
+          assert.isTrue(scope.styles.has('foo-style2'));
+          assert.isTrue(scope.styles.has('bar-style'));
         });
 
         it('creates Style instances', () => {
-          const motorway = _styles.styles.get('motorway');
+          const scope = _styles.getScope('osm');
+          const motorway = scope.styles.get('motorway');
           assert.instanceOf(motorway, Rapid.Style);
           assert.strictEqual(motorway.id, 'motorway');
         });
 
         it('preserves style properties', () => {
-          const motorway = _styles.styles.get('motorway');
+          const scope = _styles.getScope('osm');
+          const motorway = scope.styles.get('motorway');
           assert.deepInclude(motorway.props, {
             id: 'motorway',
             assetID: 'add-style-data',
@@ -244,54 +243,53 @@ describe('StyleSystem', () => {
         });
 
         it('preserves fill properties including patterns', () => {
-          const forest = _styles.styles.get('pattern-forest');
+          const scope = _styles.getScope('osm');
+          const forest = scope.styles.get('pattern-forest');
           assert.instanceOf(forest, Rapid.Style);
           assert.deepEqual(forest.fill, { pattern: 'forest' });
         });
 
         it('preserves dash patterns', () => {
-          const footway = _styles.styles.get('footway');
+          const scope = _styles.getScope('osm');
+          const footway = scope.styles.get('footway');
           assert.instanceOf(footway, Rapid.Style);
           assert.deepEqual(footway.stroke.dash, [6, 6]);
           assert.strictEqual(footway.stroke.cap, 'butt');
         });
 
-        it('adds selectors to the selectors Map', () => {
-          assert.isTrue(_styles.selectors.has('highway-motorway'));
-          assert.isTrue(_styles.selectors.has('highway-trunk'));
-          assert.isTrue(_styles.selectors.has('highway-primary'));
-          assert.isTrue(_styles.selectors.has('highway-secondary'));
-          assert.isTrue(_styles.selectors.has('building-default'));
-          assert.isTrue(_styles.selectors.has('rapid-building'));
-          assert.isTrue(_styles.selectors.has('landuse-forest'));
-          assert.isTrue(_styles.selectors.has('natural-water'));
-          assert.isTrue(_styles.selectors.has('highway-footway'));
-          assert.isTrue(_styles.selectors.has('foo-selector1'));
-          assert.isTrue(_styles.selectors.has('foo-selector2'));
-          assert.isTrue(_styles.selectors.has('bar-selector'));
+        it('adds selectors to the scope', () => {
+          const scope = _styles.getScope('osm');
+          assert.isTrue(scope.selectors.has('highway-motorway'));
+          assert.isTrue(scope.selectors.has('highway-trunk'));
+          assert.isTrue(scope.selectors.has('highway-primary'));
+          assert.isTrue(scope.selectors.has('highway-secondary'));
+          assert.isTrue(scope.selectors.has('building-default'));
+          assert.isTrue(scope.selectors.has('landuse-forest'));
+          assert.isTrue(scope.selectors.has('natural-water'));
+          assert.isTrue(scope.selectors.has('highway-footway'));
+          assert.isTrue(scope.selectors.has('foo-selector1'));
+          assert.isTrue(scope.selectors.has('foo-selector2'));
+          assert.isTrue(scope.selectors.has('bar-selector'));
         });
 
         it('creates StyleSelector instances', () => {
-          const hwMotorway = _styles.selectors.get('highway-motorway');
+          const scope = _styles.getScope('osm');
+          const hwMotorway = scope.selectors.get('highway-motorway');
           assert.instanceOf(hwMotorway, Rapid.StyleSelector);
           assert.strictEqual(hwMotorway.id, 'highway-motorway');
         });
 
         it('preserves selector properties', () => {
-          const hwMotorway = _styles.selectors.get('highway-motorway');
+          const scope = _styles.getScope('osm');
+          const hwMotorway = scope.selectors.get('highway-motorway');
           assert.deepEqual(hwMotorway.styleIDs, ['motorway']);
           assert.deepEqual(hwMotorway.match, { tags: [{ key: 'highway', value: 'motorway' }] });
         });
 
         it('supports multi-style selectors', () => {
-          const forest = _styles.selectors.get('landuse-forest');
+          const scope = _styles.getScope('osm');
+          const forest = scope.selectors.get('landuse-forest');
           assert.deepEqual(forest.styleIDs, ['green', 'pattern-forest']);
-        });
-
-        it('supports dataset-aware selectors', () => {
-          const rapid = _styles.selectors.get('rapid-building');
-          assert.deepEqual(rapid.match.dataset, 'rapid');
-          assert.isTrue(rapid.specificity() >= 110);  // dataset(100) + tag(10)
         });
 
         it('emits stylechange after merging', () => {
@@ -312,34 +310,39 @@ describe('StyleSystem', () => {
         });
 
         it('replaces existing style with updated data', () => {
-          const motorway = _styles.styles.get('motorway');
+          const scope = _styles.getScope('osm');
+          const motorway = scope.styles.get('motorway');
           assert.strictEqual(motorway.props.assetID, 'update-style-data');
           assert.deepEqual(motorway.stroke, { width: 10, color: 0xff0000 });
           assert.deepEqual(motorway.casing, { width: 12, color: 0x70372f });
         });
 
         it('adds new styles in the update', () => {
-          assert.isTrue(_styles.styles.has('new-style'));
-          const newStyle = _styles.styles.get('new-style');
+          const scope = _styles.getScope('osm');
+          assert.isTrue(scope.styles.has('new-style'));
+          const newStyle = scope.styles.get('new-style');
           assert.deepEqual(newStyle.fill, { color: 0x123456, opacity: 0.5 });
         });
 
         it('replaces existing selector with updated data', () => {
-          const hwMotorway = _styles.selectors.get('highway-motorway');
+          const scope = _styles.getScope('osm');
+          const hwMotorway = scope.selectors.get('highway-motorway');
           assert.strictEqual(hwMotorway.props.assetID, 'update-style-data');
         });
 
         it('adds new selectors in the update', () => {
-          assert.isTrue(_styles.selectors.has('new-selector'));
-          const newSel = _styles.selectors.get('new-selector');
+          const scope = _styles.getScope('osm');
+          assert.isTrue(scope.selectors.has('new-selector'));
+          const newSel = scope.selectors.get('new-selector');
           assert.deepEqual(newSel.styleIDs, ['new-style']);
         });
 
         it('does not remove unrelated styles', () => {
-          assert.isTrue(_styles.styles.has('trunk'));
-          assert.isTrue(_styles.styles.has('primary'));
-          assert.isTrue(_styles.styles.has('green'));
-          assert.isTrue(_styles.styles.has('DEFAULTS'));
+          const scope = _styles.getScope('osm');
+          assert.isTrue(scope.styles.has('trunk'));
+          assert.isTrue(scope.styles.has('primary'));
+          assert.isTrue(scope.styles.has('green'));
+          assert.isTrue(scope.styles.has('DEFAULTS'));
         });
 
         it('emits stylechange after merging', () => {
@@ -360,36 +363,42 @@ describe('StyleSystem', () => {
         });
 
         it('removes styles using wildcard patterns', () => {
-          assert.isFalse(_styles.styles.has('foo-style1'));
-          assert.isFalse(_styles.styles.has('foo-style2'));
+          const scope = _styles.getScope('osm');
+          assert.isFalse(scope.styles.has('foo-style1'));
+          assert.isFalse(scope.styles.has('foo-style2'));
         });
 
         it('removes styles using exact match', () => {
-          assert.isFalse(_styles.styles.has('bar-style'));
+          const scope = _styles.getScope('osm');
+          assert.isFalse(scope.styles.has('bar-style'));
         });
 
         it('does not remove unrelated styles', () => {
-          assert.isTrue(_styles.styles.has('motorway'));
-          assert.isTrue(_styles.styles.has('trunk'));
-          assert.isTrue(_styles.styles.has('green'));
-          assert.isTrue(_styles.styles.has('DEFAULTS'));
-          assert.isTrue(_styles.styles.has('new-style'));
+          const scope = _styles.getScope('osm');
+          assert.isTrue(scope.styles.has('motorway'));
+          assert.isTrue(scope.styles.has('trunk'));
+          assert.isTrue(scope.styles.has('green'));
+          assert.isTrue(scope.styles.has('DEFAULTS'));
+          assert.isTrue(scope.styles.has('new-style'));
         });
 
         it('removes selectors using wildcard patterns', () => {
-          assert.isFalse(_styles.selectors.has('foo-selector1'));
-          assert.isFalse(_styles.selectors.has('foo-selector2'));
+          const scope = _styles.getScope('osm');
+          assert.isFalse(scope.selectors.has('foo-selector1'));
+          assert.isFalse(scope.selectors.has('foo-selector2'));
         });
 
         it('removes selectors using exact match', () => {
-          assert.isFalse(_styles.selectors.has('bar-selector'));
+          const scope = _styles.getScope('osm');
+          assert.isFalse(scope.selectors.has('bar-selector'));
         });
 
         it('does not remove unrelated selectors', () => {
-          assert.isTrue(_styles.selectors.has('highway-motorway'));
-          assert.isTrue(_styles.selectors.has('building-default'));
-          assert.isTrue(_styles.selectors.has('landuse-forest'));
-          assert.isTrue(_styles.selectors.has('new-selector'));
+          const scope = _styles.getScope('osm');
+          assert.isTrue(scope.selectors.has('highway-motorway'));
+          assert.isTrue(scope.selectors.has('building-default'));
+          assert.isTrue(scope.selectors.has('landuse-forest'));
+          assert.isTrue(scope.selectors.has('new-selector'));
         });
 
         it('emits stylechange after merging', () => {
@@ -522,14 +531,8 @@ describe('StyleSystem', () => {
         assert.isEmpty(_styles.loadedAssetIDs);
       });
 
-      it('clears styles', () => {
-        assert.instanceOf(_styles.styles, Map);
-        assert.isEmpty(_styles.styles);
-      });
-
-      it('clears selectors', () => {
-        assert.instanceOf(_styles.selectors, Map);
-        assert.isEmpty(_styles.selectors);
+      it('clears all scopes', () => {
+        assert.isUndefined(_styles.getScope('osm'));
       });
 
       it('emits stylechange', () => {

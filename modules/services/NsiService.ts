@@ -488,7 +488,10 @@ export class NsiService extends AbstractSystem {
         const nsiVersion = vals[0]._meta?.version || 'unknown';
         schema.merge({
           assetID: `name-suggestion-index@${nsiVersion}`,
-          presets: vals[0].presets,
+          scopes: [{
+            scope: 'osm',
+            presets: vals[0].presets,
+          }],
           featureCollection: vals[1]
         });
       })

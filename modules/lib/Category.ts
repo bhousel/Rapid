@@ -122,8 +122,8 @@ export class Category {
 
     // Include only Presets that are currently known to the SchemaSystem.
     this.presets = (this.props.members ?? [])
-      .map(presetID => (schema as any).presets.get(presetID))
-      .filter(Boolean);
+      .map(presetID => schema?.getScope('osm')?.presets.get(presetID))
+      .filter((p): p is Preset => !!p);
 
     // The geometries available for this category will include all geometries of its presets.
     this.geometries = new Set();
