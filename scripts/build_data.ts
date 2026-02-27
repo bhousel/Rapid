@@ -5,7 +5,78 @@ import stringify from 'json-stringify-pretty-compact';
 import { styleText } from 'node:util';
 
 import * as CLDR from './cldr.ts';
+
+import type { ImagerySourceProps } from '../modules/lib/ImagerySource.ts';
+import type { SchemaData } from '../modules/core/SchemaSystem.ts';
+
 const localeCompare = new Intl.Collator('en').compare;
+
+
+// Interfaces for external data sources that lack their own type definitions
+
+/** Minimal shape of items in id-tagging-schema JSON (presets, categories, fields) */
+interface TaggingSchemaItem {
+  icon?: string;
+  [key: string]: unknown;
+}
+
+/** QA service entry — only osmose has `icons` */
+interface QAService {
+  icons?: Record<string, string>;
+  localizeStrings?: Record<string, string>;
+  errorTypes?: Record<string, unknown>;
+}
+
+/** CLDR territory info JSON structure */
+interface TerritoryLanguagePopulation {
+  _populationPercent: string;
+  _officialStatus?: string;
+}
+interface TerritoryEntry {
+  _gdp?: string;
+  _literacyPercent?: string;
+  _population?: string;
+  languagePopulation?: Record<string, TerritoryLanguagePopulation>;
+}
+interface TerritoriesJSON {
+  supplemental: {
+    territoryInfo: Record<string, TerritoryEntry>;
+  };
+}
+
+/** Locale JSON for core translations (core.yaml → core.en.json) */
+interface CoreLocale {
+  en: {
+    languageNames?: Record<string, string>;
+    scriptNames?: Record<string, string>;
+    [key: string]: unknown;
+  };
+}
+
+/** Locale JSON for imagery translations */
+interface ImageryLocale {
+  en: {
+    imagery: Record<string, { attribution?: { text: string }; name?: string; description?: string }>;
+  };
+}
+
+/** Rapid imagery JSON5 top-level structure */
+interface RapidImageryData {
+  assetID: string;
+  imagery: Record<string, Partial<ImagerySourceProps>>;
+}
+
+/** Locale JSON for tagging translations */
+interface TaggingLocale {
+  en: {
+    presets: {
+      categories: Record<string, unknown>;
+      presets: Record<string, unknown>;
+      fields: Record<string, unknown>;
+      [key: string]: Record<string, unknown>;
+    };
+  };
+}
 
 // Load source data
 const categoriesFile = './node_modules/@openstreetmap/id-tagging-schema/dist/preset_categories.min.json';
@@ -14,11 +85,11 @@ const presetsFile = './node_modules/@openstreetmap/id-tagging-schema/dist/preset
 const qaDataFile = './data/qa_data.json5';
 const territoriesFile = './node_modules/cldr-core/supplemental/territoryInfo.json';
 
-const categoriesJSON = await Bun.file(categoriesFile).json();
-const fieldsJSON = await Bun.file(fieldsFile).json();
-const presetsJSON = await Bun.file(presetsFile).json();
-const qaDataJSON = Bun.JSON5.parse(await Bun.file(qaDataFile).text()) as any;
-const territoriesJSON = await Bun.file(territoriesFile).json();
+const categoriesJSON = await Bun.file(categoriesFile).json() as Record<string, TaggingSchemaItem>;
+const fieldsJSON = await Bun.file(fieldsFile).json() as Record<string, TaggingSchemaItem>;
+const presetsJSON = await Bun.file(presetsFile).json() as Record<string, TaggingSchemaItem>;
+const qaDataJSON = Bun.JSON5.parse(await Bun.file(qaDataFile).text()) as Record<string, QAService>;
+const territoriesJSON = await Bun.file(territoriesFile).json() as TerritoriesJSON;
 
 
 await buildData();
@@ -105,9 +176,9 @@ async function buildData() {
 
 
 function gatherQAIssueIcons(icons: Set<string>): void {
-  for (const service of Object.values(qaDataJSON) as any[]) {
+  for (const service of Object.values(qaDataJSON)) {
     if (!service.icons) continue;
-    for (const icon of Object.values(service.icons) as string[]) {
+    for (const icon of Object.values(service.icons)) {
       if (icon) {
         icons.add(icon);
       }
@@ -118,7 +189,7 @@ function gatherQAIssueIcons(icons: Set<string>): void {
 
 function gatherPresetIcons(icons: Set<string>): void {
   for (const source of [presetsJSON, categoriesJSON, fieldsJSON]) {
-    for (const item of Object.values(source) as any[]) {
+    for (const item of Object.values(source)) {
       if (item.icon) {
         // fix: FontAwesome v7 no longer has 'fas-vector-square'
         // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
@@ -164,10 +235,10 @@ async function writeIcons(icons: Set<string>): Promise<void> {
 
 
 function gatherTerritoryLanguages(): Record<string, string[]> {
-  const allRawInfo = (territoriesJSON as any).supplemental.territoryInfo;
+  const allRawInfo = territoriesJSON.supplemental.territoryInfo;
   const territoryLanguages: Record<string, string[]> = {};
 
-  for (const [territoryCode, territoryData] of Object.entries(allRawInfo) as [string, any][]) {
+  for (const [territoryCode, territoryData] of Object.entries(allRawInfo)) {
     const territoryLangInfo = territoryData.languagePopulation;
     if (!territoryLangInfo) continue;
     const langCodes = Object.keys(territoryLangInfo);
@@ -190,7 +261,7 @@ function gatherTerritoryLanguages(): Record<string, string[]> {
 // This generates the English language localization files
 async function writeEnJson(): Promise<void> {
   // core.yaml
-  const core = Bun.YAML.parse(await Bun.file('./data/core.yaml').text()) as any;
+  const core = Bun.YAML.parse(await Bun.file('./data/core.yaml').text()) as CoreLocale;
   core.en.languageNames = Object.fromEntries(await CLDR.languageNamesInLanguageOf('en'));
   core.en.scriptNames = Object.fromEntries(await CLDR.scriptNamesInLanguageOf('en'));
   await Bun.write('./data/l10n/core.en.json', JSON.stringify(core, null, 2) + '\n');
@@ -200,14 +271,14 @@ async function writeEnJson(): Promise<void> {
   await Bun.write('./data/l10n/community.en.json', JSON.stringify(community, null, 2) + '\n');
 
   // imagery
-  const imagery = Bun.YAML.parse(await Bun.file('./node_modules/editor-layer-index/i18n/en.yaml').text()) as any;
+  const imagery = Bun.YAML.parse(await Bun.file('./node_modules/editor-layer-index/i18n/en.yaml').text()) as ImageryLocale;
 
   // Gather strings for Rapid imagery not included in the imagery index
-  const rapidImagery = (Bun.JSON5.parse(await Bun.file('./data/rapid_imagery.json5').text()) as any).imagery;
+  const rapidImageryData = Bun.JSON5.parse(await Bun.file('./data/rapid_imagery.json5').text()) as RapidImageryData;
 
-  for (const [id, props] of Object.entries(rapidImagery) as [string, any][]) {
+  for (const [id, props] of Object.entries(rapidImageryData.imagery)) {
     if (!props) continue;
-    const target: any = {};
+    const target: ImageryLocale['en']['imagery'][string] = {};
     if (props.terms_text)   target.attribution = { text: props.terms_text };
     if (props.name)         target.name = props.name;
     if (props.description)  target.description = props.description;
@@ -221,45 +292,51 @@ async function writeEnJson(): Promise<void> {
 
   // tagging
   const taggingFile = './node_modules/@openstreetmap/id-tagging-schema/dist/translations/en.json';
-  const tagging = await Bun.file(taggingFile).json();
+  const tagging = await Bun.file(taggingFile).json() as TaggingLocale;
 
   // Gather strings for Rapid schema not included in the tagging index
-  const rapidSchema = Bun.JSON5.parse(await Bun.file('./data/rapid_schema.json5').text()) as any;
+  const rapidSchema = Bun.JSON5.parse(await Bun.file('./data/rapid_schema.json5').text()) as SchemaData;
 
-  // categories, presets
-  for (const group of ['categories', 'presets']) {
-    const obj = rapidSchema[group] || {};
-    for (const [id, props] of Object.entries(obj) as [string, any][]) {
-      if (!props) continue;
-      const target: any = {};
-      if (props.name)                    target.name = props.name;
-      if (Array.isArray(props.terms))    target.terms = props.terms.join(',');
-      if (Array.isArray(props.aliases))  target.aliases = props.aliases.join('\n');
+  // Schema data is scoped now - look for the osm scope
+  for (const data of rapidSchema.scopes ?? []) {
+    if (data?.scope !== 'osm') continue;
 
-      if (Object.keys(target).length) {
-        tagging.en.presets[group][id] = target;
+    // categories, presets
+    for (const group of ['categories', 'presets'] as const) {
+      const obj = data[group] ?? {};
+      for (const [id, props] of Object.entries(obj)) {
+        if (!props) continue;
+        const target: Record<string, unknown> = {};
+        if (props.name)                    target.name = props.name;
+        if (Array.isArray(props.terms))    target.terms = props.terms.join(',');
+        if (Array.isArray(props.aliases))  target.aliases = props.aliases.join('\n');
+
+        if (Object.keys(target).length) {
+          tagging.en.presets[group][id] = target;
+        }
       }
     }
-  }
 
-  // fields
-  const obj = rapidSchema.fields || {};
-  for (const [id, props] of Object.entries(obj) as [string, any][]) {
-    if (!props) continue;
-    const target: any = {};
-    if (props.label && !props.label.startsWith('{')) {
-      target.label = props.label;
-    }
-    if (props.placeholder && !props.placeholder.startsWith('{')) {
-      target.placeholder = props.placeholder;
-    }
-    if (props.strings?.options) {
-      target.options = props.strings.options;
+    // fields
+    const obj = data.fields ?? {};
+    for (const [id, props] of Object.entries(obj)) {
+      if (!props) continue;
+      const target: Record<string, unknown> = {};
+      if (props.label && !props.label.startsWith('{')) {
+        target.label = props.label;
+      }
+      if (props.placeholder && !props.placeholder.startsWith('{')) {
+        target.placeholder = props.placeholder;
+      }
+      if (props.strings?.options) {
+        target.options = props.strings.options;
+      }
+
+      if (Object.keys(target).length) {
+        tagging.en.presets.fields[id] = target;
+      }
     }
 
-    if (Object.keys(target).length) {
-      tagging.en.presets.fields[id] = target;
-    }
   }
 
   await Bun.write('./data/l10n/tagging.en.json', JSON.stringify(tagging, null, 2) + '\n');
