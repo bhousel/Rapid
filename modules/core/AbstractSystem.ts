@@ -44,14 +44,21 @@ import type { Context } from '../Context.ts';
  *   connection between live/dev OSM API.  Each system is responsible for clearing out any
  *   stored state during reset.
  *
- * `pause()` / `resume()` - Call these methods from other parts of the application to pause or resume.
+ * `pause() / _resume()` - Call `pause()` to pause the system.
  *   The meaning of "pause" / "resume" is dependent on the system - they may not be used at all.
  *   It may be used to prevent network fetches, background work, or rendering.
- *   (Note: they are currently sync - may need to be made async in the future?)
+ *   Pause uses reference counting — `pause()` returns a release token, and the system
+ *   only fully unpauses when all outstanding pauses have been released.
+ *   `_resume()` is private — callers must hold onto the release token and call it when done.
+ *   Emits `'paused'` / `'resumed'` events on state transitions.
  *
  * Properties you can access:
  *   `id`         `String`   Identifier for the system (e.g. 'l10n')
  *   `autoStart`  `Boolean`  True to start automatically when initializing the Context
+ *
+ * Events available:
+ *   `paused`     Fires when the system transitions from unpaused to paused
+ *   `resumed`    Fires when the system transitions from paused to unpaused
  */
 export class AbstractSystem extends EventEmitter {
   /** Identifier for the system (e.g. 'l10n') */
@@ -69,6 +76,7 @@ export class AbstractSystem extends EventEmitter {
   protected _startPromise: Promise<void> | null;
   protected _started: boolean;
   protected _paused: boolean;
+  private _pauseCount: number;
 
   /**
    * @constructor
@@ -87,6 +95,7 @@ export class AbstractSystem extends EventEmitter {
 
     this._started = false;
     this._paused = false;
+    this._pauseCount = 0;
   }
 
 
@@ -176,23 +185,57 @@ export class AbstractSystem extends EventEmitter {
 
   /**
    * pause
-   * Pauses this system
+   * Pauses this system using reference counting.
    * The meaning of "pause" / "resume" is dependent on the system - they may not be used at all.
    * It may be used to prevent network fetches, background work, or rendering.
+   *
+   * Multiple callers can pause independently — the system stays paused
+   * until all callers have released their pause.
+   *
+   * Returns a release function (token). Call it when your work is done.
+   * The token is idempotent — safe to call multiple times.
+   *
+   * Emits `'paused'` when transitioning from unpaused to paused.
+   *
+   * @return A release function that decrements the pause count
    */
-  pause(): void {
+  pause(): () => void {
+    this._pauseCount++;
+    const wasPaused = this._paused;
     this._paused = true;
+
+    if (!wasPaused) {
+      this.emit('paused');
+    }
+
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this._resume();
+    };
   }
 
 
   /**
-   * resume
-   * Resumes (unpauses) this system.
+   * _resume
+   * Resumes (unpauses) this system by decrementing the pause count.
    * The meaning of "pause" / "resume" is dependent on the system - they may not be used at all.
    * It may be used to prevent network fetches, background work, or rendering.
+   *
+   * The system only actually unpauses when all outstanding pauses have been released.
+   * This is called internally by the release token returned from `pause()`.
+   *
+   * Emits `'resumed'` when transitioning from paused to unpaused.
    */
-  resume(): void {
-    this._paused = false;
+  private _resume(): void {
+    this._pauseCount = Math.max(0, this._pauseCount - 1);
+    const wasPaused = this._paused;
+    this._paused = this._pauseCount > 0;
+
+    if (wasPaused && !this._paused) {
+      this.emit('resumed');
+    }
   }
 
 }

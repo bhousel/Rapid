@@ -76,6 +76,7 @@ export class GraphicsSystem extends AbstractSystem {
   private _appPending: boolean;
   private _drawPending: boolean;
   private _isContextLost: boolean;
+  private _unpauseFn: (() => void) | null;
 
   /**
    * @constructor
@@ -124,6 +125,10 @@ export class GraphicsSystem extends AbstractSystem {
     this._handleGLContextLost = this._handleGLContextLost.bind(this);
     this._handleGLContextRestored = this._handleGLContextRestored.bind(this);
     this._isContextLost = false;
+    this._unpauseFn = null;
+
+    // Schedule an immediate redraw whenever this system is resumed.
+    this.on('resumed', () => { this.immediateRedraw(); });
 
     // Anything involving PIXI globals can be set up here, to ensure it only happens one time.
     // We'll use the Pixi shared ticker, but we don't want it started yet.
@@ -223,28 +228,6 @@ export class GraphicsSystem extends AbstractSystem {
   resetAsync(): Promise<void> {
     this.immediateRedraw();
     return Promise.resolve();
-  }
-
-
-  /**
-   * pause
-   * Pauses this system
-   * When paused, the GraphicsSystem will not render
-   */
-  pause(): void {
-    this._paused = true;
-  }
-
-
-  /**
-   * resume
-   * Resumes (unpauses) this system.
-   * When paused, the GraphicsSystem will not render
-   * Note that calling `resume` schedules an "immediate" redraw (on the next available tick).
-   */
-  resume(): void {
-    this._paused = false;
-    this.immediateRedraw();
   }
 
 
@@ -853,10 +836,10 @@ export class GraphicsSystem extends AbstractSystem {
     this._isContextLost = true;
     this._drawPending = false;
 
-    this.ticker.stop();         // stop ticking
-    this.pause();               // stop rendering
-    this.eventManager?.disable(); // stop listening for events
-    this.highQuality = false;   // back off when we get the context restored..
+    this.ticker.stop();               // stop ticking
+    this._unpauseFn = this.pause();   // stop rendering, and preserve the unpause function.
+    this.eventManager?.disable();     // stop listening for events
+    this.highQuality = false;         // back off when we get the context restored..
 
     // We'll try to keep the Pixi environment around, so that code elsewhere
     // that references things like `scene`, `events`, etc has a chance of working.
@@ -908,7 +891,8 @@ export class GraphicsSystem extends AbstractSystem {
 
         this._isContextLost = false;
         this.eventManager?.enable();   // resume listening
-        this.resume();                 // resume rendering
+        this._unpauseFn!();            // resume rendering
+        this._unpauseFn = null;
         this.ticker.start();           // resume ticking
         this.emit('statuschange', 'contextrestored');
       });

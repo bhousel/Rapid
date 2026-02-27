@@ -454,8 +454,8 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     frame: number,
     viewport: Viewport,
     zoom: number,
-    data: RapidData): void
-  {
+    data: RapidData
+  ): void {
     const color = new PIXI.Color(dataset.color);
     const l10n = this.context.systems.l10n!;
 

@@ -269,7 +269,7 @@ export class SchemaSystem extends AbstractSystem {
     const context = this.context;
     const assets = context.systems.assets;
 const gfx = context.systems.gfx;
-gfx?.pause();  // block rendering
+const unpause = gfx?.pause();  // block rendering
 
     // Clear out whatever was loaded before.
     this.resetAll();
@@ -336,7 +336,7 @@ gfx?.pause();  // block rendering
       for (const reason of rejectedReasons as string[]) {
         console.error(reason);   // eslint-disable-line no-console
       }
-  gfx?.resume();  // resume rendering
+  unpause?.();  // resume rendering
 
     });
   }

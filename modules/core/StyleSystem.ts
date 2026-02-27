@@ -254,7 +254,7 @@ export class StyleSystem extends AbstractSystem {
     const context = this.context;
     const assets = context.systems.assets;
 const gfx = context.systems.gfx;
-gfx?.pause();  // block rendering
+const unpause = gfx?.pause();  // block rendering
 
     // Clear out whatever was loaded before.
     this.resetAll();
@@ -293,7 +293,7 @@ gfx?.pause();  // block rendering
       }
 
       this._styleChanged();
-  gfx?.resume();  // block rendering
+  unpause?.();  // resume rendering
   gfx?.scene?.reset();  // throw it all away
     });
   }

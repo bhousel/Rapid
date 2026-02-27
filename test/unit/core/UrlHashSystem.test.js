@@ -1,4 +1,4 @@
-import { beforeAll, describe, it } from 'bun:test';
+import { beforeAll, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -159,23 +159,144 @@ describe('UrlHashSystem', () => {
       });
     });
 
-    describe('pause / resume', () => {
-      it('can be paused', () => {
-        _urlhash.pause();
-        // System is paused - setting params shouldn't trigger updates
-        _urlhash.setParam('paused-key', 'paused-value');
-        assert.strictEqual(_urlhash.getParam('paused-key'), 'paused-value');
-        _urlhash.resume(); // restore
-        _urlhash.setParam('paused-key', undefined); // cleanup
+    describe('hashchange events', () => {
+      it('emits hashchange when _hashChanged is called', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            const spy = mock();
+            urlhash.on('hashchange', spy);
+            urlhash._hashChanged();
+            assert.lengthOf(spy.mock.calls, 1, 'hashchange event should fire once');
+          });
       });
 
-      it('can be resumed after pausing', () => {
-        _urlhash.pause();
-        _urlhash.resume();
-        // Should work normally after resume
-        _urlhash.setParam('resumed-key', 'resumed-value');
-        assert.strictEqual(_urlhash.getParam('resumed-key'), 'resumed-value');
-        _urlhash.setParam('resumed-key', undefined); // cleanup
+      it('provides current and previous params as Maps', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            const spy = mock();
+            urlhash.on('hashchange', spy);
+            urlhash._hashChanged();
+            const [curr, prev] = spy.mock.calls[0];
+            assert.instanceOf(curr, Map, 'current params is a Map');
+            assert.instanceOf(prev, Map, 'previous params is a Map');
+          });
+      });
+
+      it('sets previous params to empty Map on first hashchange', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            const spy = mock();
+            urlhash.on('hashchange', spy);
+            urlhash._hashChanged();
+            const [, prev] = spy.mock.calls[0];
+            assert.instanceOf(prev, Map);
+            assert.strictEqual(prev.size, 0, 'previous params starts empty');
+          });
+      });
+
+      it('copies current to previous on subsequent calls', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            const spy = mock();
+            urlhash.on('hashchange', spy);
+
+            // First call: sets current params from hash, prev is empty (first time)
+            urlhash._hashChanged();
+            // Second call: previous becomes what was current
+            urlhash._hashChanged();
+
+            assert.lengthOf(spy.mock.calls, 2);
+            // In the mock environment, both calls parse the same empty hash,
+            // but we can verify the previous and current are separate Map instances.
+            const [currFirst] = spy.mock.calls[0];
+            const [, prevSecond] = spy.mock.calls[1];
+            assert.notStrictEqual(currFirst, prevSecond,
+              'previous on second call is a copy, not the same reference');
+          });
+      });
+
+      it('provides copies of params, not internal references', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            const spy = mock();
+            urlhash.on('hashchange', spy);
+            urlhash._hashChanged();
+            urlhash._hashChanged();
+            assert.lengthOf(spy.mock.calls, 2);
+            const [currFirst] = spy.mock.calls[0];
+            const [currSecond] = spy.mock.calls[1];
+            assert.notStrictEqual(currFirst, currSecond,
+              'each emission provides a new current Map');
+          });
+      });
+    });
+
+    describe('pause / resume', () => {
+      it('does not emit hashchange when paused', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            const release = urlhash.pause();
+            const spy = mock();
+            urlhash.on('hashchange', spy);
+            urlhash._hashChanged();
+            assert.lengthOf(spy.mock.calls, 0, 'hashchange should not fire when paused');
+            release();  // cleanup
+          });
+      });
+
+      it('emits hashchange when pause token is released', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            const release = urlhash.pause();
+            const spy = mock();
+            urlhash.on('hashchange', spy);
+            release();
+            assert.lengthOf(spy.mock.calls, 1, 'hashchange should fire when released');
+          });
+      });
+
+      it('does not emit hashchange until all pauses are released', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            const r1 = urlhash.pause();
+            const r2 = urlhash.pause();
+            const spy = mock();
+            urlhash.on('hashchange', spy);
+            r1();
+            assert.lengthOf(spy.mock.calls, 0, 'still paused — r2 outstanding');
+            r2();
+            assert.lengthOf(spy.mock.calls, 1, 'hashchange fires when fully unpaused');
+          });
+      });
+
+      it('setParam still updates internal state when paused', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            const release = urlhash.pause();
+            urlhash.setParam('paused-key', 'paused-value');
+            assert.strictEqual(urlhash.getParam('paused-key'), 'paused-value',
+              'getParam still reflects setParam changes while paused');
+            release();
+            urlhash.setParam('paused-key', undefined);  // cleanup
+          });
       });
     });
 

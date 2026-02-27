@@ -55,6 +55,7 @@ export function uiIntro(context, skipToRapid) {
   let _introGraph = {};
   let _rapidGraph = {};
   let _original = {};
+  let _resume = {};
   let _progress = [];
   let _currChapter;
   let _buttons;
@@ -98,9 +99,12 @@ export function uiIntro(context, skipToRapid) {
    * @param  selection  D3-selection to render the walkthrough content into (the root container)
    */
   function _startIntro(selection) {
-    urlhash.pause();       // disable updates
-    osm?.pause();          // disable network
-    mapwithai?.pause();    // disable network
+    // Pause several systems, preserving the resume functions.
+    _resume = {
+      urlhash:    urlhash.pause(),       // disable updates
+      osm:        osm?.pause(),          // disable network
+      mapwithai:  mapwithai?.pause()     // disable network
+    };
 
     context.container().classed('inIntro', true);
     context.inIntro = true;
@@ -266,9 +270,11 @@ export function uiIntro(context, skipToRapid) {
 
     context.container().classed('inIntro', false);
     context.inIntro = false;
-    osm?.resume();
-    mapwithai?.resume();
-    urlhash.resume();
+
+    // Resume paused systems
+    _resume.osm?.();
+    _resume.mapwithai?.();
+    _resume.urlhash();
 
     // Reset, then restore the user's edits, if any...
     context.resetAsync()

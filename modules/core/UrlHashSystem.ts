@@ -36,7 +36,8 @@ let _document: DocumentLike;
  * `UrlHashSystem` is responsible for managing the url hash and query parameters.
  * It updates the `window.location.hash` and document title.
  * It also binds to the hashchange event and responds to changes made by the user directly to the url.
- * Supports `pause()` / `resume()` - when paused, url hash will not emit events or do anything
+ * Supports `pause()` / `resume()` — when paused, url hash will not respond to changes or emit events.
+ * On pause, pending throttled updates are cancelled. On resume, the hash and title are synced.
  *
  * Please see [API.md] for the current list of supported URL parameters.
  *
@@ -46,7 +47,9 @@ let _document: DocumentLike;
  *   `titleBase`         The document title to use (default `Rapid`)
  *
  * Events available:
- *   `hashchange`   Fires on hashchange and when enable is called, receives Map(currParams), Map(prevParams)
+ *   `hashchange`   Fires on hashchange and when resumed, receives Map(currParams), Map(prevParams)
+ *   `paused`       Fires when paused (inherited) — cancels pending hash/title updates
+ *   `resumed`      Fires when resumed (inherited) — syncs hash and title, emits `hashchange`
  */
 export class UrlHashSystem extends AbstractSystem {
   /** Whether to update the document title */
@@ -66,6 +69,8 @@ export class UrlHashSystem extends AbstractSystem {
   private _currHash: string | null;
   /** Previous URL hash parameters */
   private _prevParams: Map<string, string> | null;
+  /** Release token from initial pause(), called during init to unpause */
+  private _unpauseFn: (() => void) | null;
 
 
   /**
@@ -128,9 +133,25 @@ export class UrlHashSystem extends AbstractSystem {
     this.deferredUpdateHash = throttle(this._updateHash, 500, { leading: false }) as DebouncedFunc<() => void>;
     this.deferredUpdateTitle = throttle(this._updateTitle, 500, { leading: false }) as DebouncedFunc<() => void>;
 
+    // When paused, cancel any pending throttled updates.
+    this.on('paused', () => {
+      this._currHash = null;
+      this.deferredUpdateHash.cancel();
+      this.deferredUpdateTitle.cancel();
+    });
+
+    // When resumed, sync the hash and title, and emit 'hashchange'
+    // so other code knows what the hash contains.
+    this.on('resumed', () => {
+      this._currHash = null;
+      this._hashChanged();
+      this._updateHash();
+      this._updateTitle();
+    });
+
     // Start paused, we will resume after all other components
     // are started and ready to receive the hashchange event.
-    this.pause();
+    this._unpauseFn = this.pause();
   }
 
 
@@ -156,7 +177,10 @@ export class UrlHashSystem extends AbstractSystem {
         // first hashchange event.  Chain off Context's initAsync Promise
         // to know when everything has started up and it is ok to do this.
         context.initAsync()
-          .then(() => this.resume());  // Emits 'hashchange'
+          .then(() => {
+            this._unpauseFn?.();
+            this._unpauseFn = null;
+          });
       });
   }
 
@@ -178,35 +202,6 @@ export class UrlHashSystem extends AbstractSystem {
    */
   resetAsync(): Promise<void> {
     return Promise.resolve();
-  }
-
-
-  /**
-   * pause
-   * Pauses this system
-   * When paused, the UrlHashSystem will not respond to changes or emit events.
-   */
-  pause(): void {
-    this._paused = true;
-    this._currHash = null;
-    this.deferredUpdateHash.cancel();
-    this.deferredUpdateTitle.cancel();
-  }
-
-
-  /**
-   * resume
-   * Resumes (unpauses) this system.
-   * When paused, the UrlHashSystem will not respond to changes or emit events.
-   * Calling `resume()` updates the hash and title, and will emit a `hashchange` event.
-   */
-  resume(): void {
-    this._paused = false;
-    this._currHash = null;
-
-    this._hashChanged();   // emit 'hashchange' so other code knows what the hash contains
-    this._updateHash();   // make sure hash matches the _currParams
-    this._updateTitle();
   }
 
 

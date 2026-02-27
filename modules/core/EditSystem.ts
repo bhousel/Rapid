@@ -1159,7 +1159,7 @@ export class EditSystem extends AbstractSystem {
     // should we assert that the history has been reset?
     // we expect to chain after context.resetAsync() ? we could just call this._reset() ?
 
-    gfx?.pause();  // block rendering
+    const unpause = gfx?.pause();  // block rendering
 
     let loading: any;
     const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
@@ -1317,7 +1317,7 @@ export class EditSystem extends AbstractSystem {
       this._index = backup.index;
       this._replaceStaging();
 
-      gfx?.resume();       // unbock rendering, events will start firing now
+      unpause?.();        // unblock rendering, events will start firing now
       loading?.close();   // unblock ui
 
       // emit events
