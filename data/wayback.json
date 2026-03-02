@@ -984,6 +984,14 @@
       "metadataLayerItemID": "23574da8bb654caf81abb433ab0a7406",
       "layerIdentifier": "WB_2016_R20"
     },
+    "22252": {
+      "itemID": "470ba60866e74ae7accc91ffe341f8b8",
+      "itemTitle": "World Imagery (Wayback 2026-01-29)",
+      "itemURL": "https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/22252/{level}/{row}/{col}",
+      "metadataLayerUrl": "https://metadata.maptiles.arcgis.com/arcgis/rest/services/World_Imagery_Metadata_2026_r01/MapServer",
+      "metadataLayerItemID": "1dcae789f9c946368a6731ecf8ba5a75",
+      "layerIdentifier": "WB_2026_R01"
+    },
     "22692": {
       "itemID": "e23fe831aea34b1b87cfe0fd9073d319",
       "itemTitle": "World Imagery (Wayback 2014-10-01)",
@@ -1503,6 +1511,14 @@
       "metadataLayerUrl": "https://metadata.maptiles.arcgis.com/arcgis/rest/services/World_Imagery_Metadata_2024_r02/MapServer",
       "metadataLayerItemID": "6a67e3058b6740b494c2db7a70ba7200",
       "layerIdentifier": "WB_2024_R02"
+    },
+    "64001": {
+      "itemID": "146c020d3baa4e67ae0198bbb4f4dee8",
+      "itemTitle": "World Imagery (Wayback 2026-02-26)",
+      "itemURL": "https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/64001/{level}/{row}/{col}",
+      "metadataLayerUrl": "https://metadata.maptiles.arcgis.com/arcgis/rest/services/World_Imagery_Metadata_2026_r02/MapServer",
+      "metadataLayerItemID": "d0081a5b81234eabb38da5aa1e84bf78",
+      "layerIdentifier": "WB_2026_R02"
     },
     "64776": {
       "itemID": "c98ec6ff1b26457db28dfa9ca27f144a",

@@ -17,27 +17,33 @@ import type { Vec2, Vec4 } from '../data/types.ts';
 
 
 /**
- * Input format for a single imagery scope.
- * Each scope targets a scope identifier and contains imagery source definitions.
+ * Input format for data to merge into the ImagerySystem.
  */
-export interface ImageryScopeInput {
-  /** Scope identifier this applies to (defaults to 'osm') */
-  scope?: ScopeID;
-  /** Object mapping sourceID to imagery data (or null to delete) */
-  imagery?: Record<ImagerySourceID, Partial<ImagerySourceProps> | null>;
-}
-
-/**
- * Imagery asset data to merge into the system.
- * Uses scoped format: `scopes: [{ scope: 'osm', imagery: {...} }]`
- */
-export interface ImageryData {
+export interface ImageryInput {
   /** An asset identifier, e.g. 'editor_layer_index' (required) */
   assetID: AssetID;
   /** A string version specifier, e.g. '2026-01-01' */
   assetVersion?: string;
-  /** Array of scoped data, each targeting a scope identifier */
-  scopes?: ImageryScopeInput[];
+  /** Array of scoped imagery input data, each must contain a scope identifier */
+  scopes?: ImageryInputScope[];
+}
+
+/**
+ * Input format for a single scope of imagery data.
+ */
+export interface ImageryInputScope {
+  /** Scope identifier that this input data applies to (required - defaults to 'osm') */
+  scope: ScopeID;
+  /** Object mapping ImagerySourceID to ImagerySource props (or null to delete) */
+  imagery?: Record<ImagerySourceID, Partial<ImagerySourceProps> | null>;
+}
+
+/**
+ * Internal per-scope storage for loaded imagery data.
+ */
+export interface ImageryScopeData {
+  /** Map of ImagerySourceIDs to instantiated ImagerySources */
+  sources: Map<ImagerySourceID, ImagerySource>;
 }
 
 
@@ -47,8 +53,8 @@ export interface ImageryData {
  * At init time, Rapid will attempt to load the imagery.
  *
  * Properties available:
- *   `sources`     Map<ImagerySourceID, ImagerySource> - Imagery sources
- *   `features`    Map<ImagerySourceID, GeoJSON.Feature> - Imagery geofences
+ *   `sources`     `Map<ImagerySourceID, ImagerySource>` - Computed aggregate of all scopes
+ *   `features`    `Map<ImagerySourceID, GeoJSON.Feature>` - Imagery geofences
  *   `offset`
  *   `brightness`
  *   `contrast`
@@ -60,10 +66,11 @@ export interface ImageryData {
  *   `imagerychange`   Fires on any change in imagery or display options
  */
 export class ImagerySystem extends AbstractSystem {
-  /** Imagery sources, keyed by ImagerySourceID (lowercase) */
-  sources: Map<ImagerySourceID, ImagerySource>;
   /** Imagery geofences, keyed by ImagerySourceID (lowercase) */
   features: Map<ImagerySourceID, GeoJSON.Feature>;
+
+  /** Per-scope storage */
+  private _scopes: Map<ScopeID, ImageryScopeData>;
 
   /** Default imagery file assetIDs */
   private _defaultAssetIDs: Set<AssetID>;
@@ -94,7 +101,7 @@ export class ImagerySystem extends AbstractSystem {
     this.id = 'imagery';
     this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'storage', 'urlhash']);
 
-    this.sources = new Map();    // Map<ImagerySourceID, ImagerySource>
+    this._scopes = new Map();    // Map<ScopeID, ImageryScopeData>
     this.features = new Map();   // Map<ImagerySourceID, GeoJSON.Feature>
 
     this._defaultAssetIDs = new Set(['editor_layer_index', 'rapid_imagery']);
@@ -217,7 +224,7 @@ export class ImagerySystem extends AbstractSystem {
     .then(results => {
       const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
       for (const value of fulfilledValues as Record<string, any>[]) {
-        let imageryData: ImageryData;
+        let imageryData: ImageryInput;
 
         if (value.assetID === 'editor_layer_index') {
           // The bundle returns flat format with top-level `imagery` key.
@@ -232,7 +239,7 @@ export class ImagerySystem extends AbstractSystem {
           };
         } else {
           // Other assets (e.g. 'rapid_imagery') are already in scoped format
-          imageryData = value as ImageryData;
+          imageryData = value as ImageryInput;
           if (imageryData.assetID === 'rapid_imagery') {
             imageryData.assetVersion ||= context.version;
           }
@@ -264,16 +271,21 @@ export class ImagerySystem extends AbstractSystem {
 
     this._loadedAssetIDs.clear();
     this.features.clear();
-    this.sources.clear();
+    this._scopes.clear();
+
+    // Create the '*' common scope with builtin imagery sources.
+    // These live outside any data scope so they're always available.
+    const commonScope: ImageryScopeData = { sources: new Map() };
+    this._scopes.set('*', commonScope);
 
     // Add 'None'
     const none = new ImagerySourceNone(context);
-    this.sources.set(none.id.toLowerCase(), none);
+    commonScope.sources.set(none.id.toLowerCase(), none);
 
     // Add 'Custom' - seed it with whatever template the user has used previously
     const custom = new ImagerySourceCustom(context);
     custom.template = storage?.getItem('background-custom-template') ?? '';
-    this.sources.set(custom.id.toLowerCase(), custom);
+    commonScope.sources.set(custom.id.toLowerCase(), custom);
 
     this._baseLayer = none;
     this._overlayLayers.clear();
@@ -283,8 +295,37 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
+   * sources
+   * Returns an aggregate Map of all ImagerySource objects across all scopes.
+   * Sources from later scopes override sources from earlier scopes with the same key.
+   * @return  Aggregate map of all sources
+   * @readonly
+   */
+  get sources(): Map<ImagerySourceID, ImagerySource> {
+    const all = new Map<ImagerySourceID, ImagerySource>();
+    for (const scopeData of this._scopes.values()) {
+      for (const [id, source] of scopeData.sources) {
+        all.set(id, source);
+      }
+    }
+    return all;
+  }
+
+
+  /**
+   * getScope
+   * Get the scope data for a specific scope ID.
+   * @param scopeID - ID of the scope to look up
+   * @return The scope data, or undefined if none exists
+   */
+  getScope(scopeID: ScopeID): ImageryScopeData | undefined {
+    return this._scopes.get(scopeID);
+  }
+
+
+  /**
    * defaultAssetIDs
-   * Returns the default assetIDs
+   * Returns the default assetIDs. These are the imagery assets that Rapid will load by default.
    * @return  Default assetIDs
    * @readonly
    */
@@ -362,15 +403,15 @@ export class ImagerySystem extends AbstractSystem {
    *  - Wildcard characters '*' and '?' are allowed when deleting.
    *     `"US-TIGER*": null`                 <-- all `US-TIGER*` sources deleted
    *
-   * @param src - imagery data to merge
+   * @param input - imagery data to merge
    * @throws Will throw if given data does not contain an `assetID`, or if the `assetID` has already been merged
    */
-  merge(src: ImageryData): void {
+  merge(input: ImageryInput): void {
     const context = this.context;
     const wayback = context.services.wayback;
 
-    const assetID = src.assetID;
-    const assetVersion = src.assetVersion ?? 'unknown';
+    const assetID = input.assetID;
+    const assetVersion = input.assetVersion ?? 'unknown';
 
     if (!assetID) {
       throw new Error('Imagery missing assetID property');
@@ -382,15 +423,22 @@ export class ImagerySystem extends AbstractSystem {
     this._loadedAssetIDs.set(assetID, assetVersion);
 
     // Process each scope
-    const scopes = src.scopes ?? [];
-    for (const scopeInput of scopes) {
-      const scopeID = scopeInput.scope ?? 'osm';
+    const inputScopes = input.scopes ?? [];
+    for (const inputScope of inputScopes) {
+      const scopeID = inputScope.scope ?? 'osm';
+
+      // Get or create a data cache for this scopeID
+      let scopeData = this._scopes.get(scopeID);
+      if (!scopeData) {
+        scopeData = { sources: new Map() };
+        this._scopes.set(scopeID, scopeData);
+      }
 
       // Merge Imagery Sources
-      if (scopeInput.imagery) {
-        for (const [sourceID, props] of Object.entries(scopeInput.imagery)) {
+      if (inputScope.imagery) {
+        for (const [sourceID, props] of Object.entries(inputScope.imagery)) {
           const sourceKey = sourceID.toLowerCase();
-          const existing = this.sources.get(sourceKey);
+          const existing = scopeData.sources.get(sourceKey);
           if (existing?.isBuiltin()) continue;  // don't override a builtin ImagerySource
 
           if (props) {   // add or replace
@@ -407,7 +455,7 @@ export class ImagerySystem extends AbstractSystem {
             } else {
               source = new ImagerySource(context, setProps);
             }
-            this.sources.set(sourceKey, source);
+            scopeData.sources.set(sourceKey, source);
 
             // Save the GeoJSON feature too, if there is one.
             if (props.feature) {
@@ -415,7 +463,7 @@ export class ImagerySystem extends AbstractSystem {
             }
 
           } else {   // remove
-            utilWildcardDelete(this.sources, sourceKey);
+            utilWildcardDelete(scopeData.sources, sourceKey);
             utilWildcardDelete(this.features, sourceKey);
           }
         }
@@ -434,7 +482,7 @@ export class ImagerySystem extends AbstractSystem {
    */
   source(sourceID?: ImagerySourceID): ImagerySource | undefined {
     if (!sourceID) return undefined;
-    return this.sources.get(sourceID.toLowerCase());
+    return this._findSource(sourceID.toLowerCase());
   }
 
 
@@ -583,7 +631,7 @@ export class ImagerySystem extends AbstractSystem {
     if (/^EsriWayback/i.test(sourceID)) {   // ignore start date, if any
       sourceID = 'EsriWayback';
     }
-    return this.sources.get(sourceID.toLowerCase());
+    return this._findSource(sourceID.toLowerCase());
   }
 
 
@@ -823,8 +871,10 @@ export class ImagerySystem extends AbstractSystem {
    */
   private _rebuildIndex(): void {
     // Reset and localize the ImagerySources
-    for (const source of this.sources.values()) {
-      source.reset();
+    for (const scopeData of this._scopes.values()) {
+      for (const source of scopeData.sources.values()) {
+        source.reset();
+      }
     }
 
     // Reset and rebuild the whichPolygon index
@@ -952,9 +1002,26 @@ export class ImagerySystem extends AbstractSystem {
     localeCode ||= l10n?.localeCode ?? 'en-US';
 
     // Reset and localize the ImagerySources
-    for (const source of this.sources.values()) {
-      source.setLocale(localeCode);
+    for (const scopeData of this._scopes.values()) {
+      for (const source of scopeData.sources.values()) {
+        source.setLocale(localeCode);
+      }
     }
+  }
+
+
+  /**
+   * _findSource
+   * Searches across all scopes for an ImagerySource with the given key.
+   * @param sourceKey - Lowercase source key to find
+   * @return The ImagerySource, or `undefined` if not found in any scope
+   */
+  private _findSource(sourceKey: ImagerySourceID): ImagerySource | undefined {
+    for (const scopeData of this._scopes.values()) {
+      const source = scopeData.sources.get(sourceKey);
+      if (source) return source;
+    }
+    return undefined;
   }
 
 }

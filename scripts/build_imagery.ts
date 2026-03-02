@@ -1,6 +1,10 @@
 import stringify from 'json-stringify-pretty-compact';
 import { stat } from 'node:fs/promises';
 import { styleText } from 'node:util';
+
+import type { ImageryInput } from '../modules/core/ImagerySystem.ts';
+import type { ImagerySourceProps } from '../modules/lib/ImagerySource.ts';
+
 const localeCompare = new Intl.Collator('en').compare;
 
 // This script processes files related to the available imagery:
@@ -78,7 +82,7 @@ async function buildImagery() {
     'EPSG:4326'
   ]);
 
-  const imagery = {} as any;
+  const imagery: Record<string, Partial<ImagerySourceProps>> = {};
 
   // Gather the imagery sources
   for (const source of imageryJSON) {
@@ -99,12 +103,12 @@ async function buildImagery() {
       continue;
     }
 
-    const props = {
+    const props: Partial<ImagerySourceProps> = {
       id: sourceID,
       name: source.name,
       type: source.type,
       template: source.url
-    } as any;
+    };
 
     // Some sources support 512px tiles
     if (sourceID === 'mtbmap-no') {
@@ -136,7 +140,7 @@ async function buildImagery() {
           // console.log(`discarding ${sourceID}  (${endDate.toDateString()} too old)`);
           continue;
         }
-        props.endDate = endDate;
+        props.endDate = endDate.toISOString().slice(0, 10);  // YYYY-MM-DD
       }
     }
 
@@ -144,7 +148,7 @@ async function buildImagery() {
       startDate = new Date(source.start_date);
       isValid = !isNaN(startDate.getTime());
       if (isValid) {
-        props.startDate = startDate;
+        props.startDate = startDate.toISOString().slice(0, 10);  // YYYY-MM-DD
       }
     }
 
@@ -194,14 +198,14 @@ async function buildImagery() {
     }
 
     const attribution = source.attribution || {};
-    if (attribution.url) {
-      props.terms_url = attribution.url;
+    if (attribution.html) {
+      props.terms_html = attribution.html;
     }
     if (attribution.text) {
       props.terms_text = attribution.text;
     }
-    if (attribution.html) {
-      props.terms_html = attribution.html;
+    if (attribution.url) {
+      props.terms_url = attribution.url;
     }
 
     for (const prop of ['best', 'default', 'description', 'encrypted', 'icon', 'overlay', 'tileSize']) {
@@ -213,10 +217,13 @@ async function buildImagery() {
     imagery[sourceID] = props;
   };
 
-  const data = {
+  const data: ImageryInput = {
     assetID: `editor_layer_index`,
     assetVersion: imageryDate,
-    imagery: sortObject(imagery)
+    scopes: [{
+      scope: 'osm',
+      imagery: sortObject(imagery)
+    }]
   };
 
   await Bun.write('./data/editor_layer_index.json', stringify(data) + '\n');
@@ -253,10 +260,10 @@ async function buildWayback() {
 
 // Returns an object with sorted keys and sorted values.
 // (This is useful for file diffing)
-function sortObject(obj: Record<string, unknown>): Record<string, unknown> | null {
-  if (!obj) return null;
+function sortObject<T>(obj: Record<string, T>): Record<string, T> {
+  if (!obj) return {};
 
-  const sorted: Record<string, unknown> = {};
+  const sorted: Record<string, T> = {};
   const keys = Object.keys(obj).sort(localeCompare);
   for (const k of keys) {
     sorted[k] = obj[k];

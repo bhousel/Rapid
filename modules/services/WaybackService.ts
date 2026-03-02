@@ -5,8 +5,9 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilDateString } from '../util/date.ts';
 import { FetchError, utilFetchResponse } from '../util/fetch_response.ts';
 
-import type { Tile } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
+import type { DateLike } from '../util/date.ts';
+import type { Tile } from '@rapid-sdk/math';
 
 /** Base URL for the ArcGIS Wayback imagery production service */
 const WAYBACK_SERVICE_BASE_PROD = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';
@@ -228,7 +229,7 @@ export class WaybackService extends AbstractSystem {
    * @param val - Requested date, as YYYY-MM-DD
    * @return Closest supported date, as YYYY-MM-DD
    */
-  chooseClosestDate(val: string): string {
+  chooseClosestDate(val: Nullable<DateLike>): string {
     let chooseDate = this.allDates[0];  // start with earliest date
 
     const requestDate = utilDateString(val);

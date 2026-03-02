@@ -6,8 +6,8 @@ import { styleText } from 'node:util';
 
 import * as CLDR from './cldr.ts';
 
-import type { ImageryData } from '../modules/core/ImagerySystem.ts';
-import type { SchemaData } from '../modules/core/SchemaSystem.ts';
+import type { ImageryInput } from '../modules/core/ImagerySystem.ts';
+import type { SchemaInput } from '../modules/core/SchemaSystem.ts';
 import type { CategoryProps } from '../modules/lib/Category.ts';
 import type { PresetProps } from '../modules/lib/Preset.ts';
 
@@ -262,7 +262,7 @@ async function writeEnJson(): Promise<void> {
   const imagery = Bun.YAML.parse(await Bun.file('./node_modules/editor-layer-index/i18n/en.yaml').text()) as ImageryLocale;
 
   // Gather strings for Rapid imagery not included in the imagery index
-  const rapidImageryData = Bun.JSON5.parse(await Bun.file('./data/rapid_imagery.json5').text()) as ImageryData;
+  const rapidImageryData = Bun.JSON5.parse(await Bun.file('./data/rapid_imagery.json5').text()) as ImageryInput;
 
   // Imagery data is scoped now - look for the osm scope
   for (const scopeInput of rapidImageryData.scopes ?? []) {
@@ -288,7 +288,7 @@ async function writeEnJson(): Promise<void> {
   const tagging = await Bun.file(taggingFile).json() as TaggingLocale;
 
   // Gather strings for Rapid schema not included in the tagging index
-  const rapidSchema = Bun.JSON5.parse(await Bun.file('./data/rapid_schema.json5').text()) as SchemaData;
+  const rapidSchema = Bun.JSON5.parse(await Bun.file('./data/rapid_schema.json5').text()) as SchemaInput;
 
   // Schema data is scoped now - look for the osm scope
   for (const data of rapidSchema.scopes ?? []) {

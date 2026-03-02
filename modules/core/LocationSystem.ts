@@ -1,4 +1,4 @@
-import LocationConflation, { type LocationSet } from '@rapideditor/location-conflation';
+import LocationConflation from '@rapideditor/location-conflation';
 import whichPolygon from 'which-polygon';
 import calcArea from '@mapbox/geojson-area';
 
@@ -7,6 +7,7 @@ import { GeoJSON } from '../data/GeoJSON.ts';
 
 import type { Context } from '../Context.ts';
 import type { Extent } from '@rapid-sdk/math';
+import type { LocationSet } from '@rapideditor/location-conflation';
 import type { Vec2, Vec4 } from '../data/types.ts';
 
 
@@ -14,12 +15,12 @@ import type { Vec2, Vec4 } from '../data/types.ts';
  * An object that has a locationSet property.
  * After validation, it will also have a locationSetID.
  */
-interface HasLocationSet {
+export interface HasLocationSet {
   locationSet?: LocationSet;
   locationSetID?: LocationSetID;
 }
 
-type HasLocationSetID = Required<HasLocationSet>;
+export type HasLocationSetID = Required<HasLocationSet>;
 
 /**
  * A blocked region definition.

@@ -1,8 +1,9 @@
 import { utilSafeString } from '@rapid-sdk/util';
+import { utilGatherTokens } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { Preset } from './Preset.ts';
-import { utilGatherTokens } from '../util/string.ts';
+import type { LocationSet } from '@rapideditor/location-conflation';
 
 
 /**
@@ -31,9 +32,11 @@ export interface CategoryProps {
   /** URL of a remote image that is more specific than 'icon' */
   imageURL: string;
   /** Region IDs where this category is or isn't valid. See: https://github.com/ideditor/location-conflation */
-  locationSet?: { include?: string[]; exclude?: string[] };
+  locationSet?: LocationSet;
   /** Resolved locationSet ID (added by SchemaSystem after processing locationSet) */
   locationSetID?: LocationSetID;
+  /** Extra properties are allowed */
+  [key: string]: unknown;
 }
 
 

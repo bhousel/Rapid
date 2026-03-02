@@ -1,6 +1,7 @@
 import { utilSafeString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
+import type { LocationSet } from '@rapideditor/location-conflation';
 
 
 /**
@@ -60,10 +61,6 @@ export interface FieldProps {
   strings: { options?: Record<string, string | { title: string; description: string }>; types?: Record<string, string>; placeholders?: Record<string, string> };
   /** A field can reference strings of another field */
   stringsCrossReference: string;
-  /** Region IDs where this field is or isn't valid */
-  locationSet: { include?: string[]; exclude?: string[] };
-  /** Resolved locationSet ID (added by SchemaSystem after processing) */
-  locationSetID: LocationSetID;
   /** Permalink URL for identifier fields. Must contain a {value} placeholder */
   urlFormat: string;
   /** Regular expression that a valid identifier value is expected to match */
@@ -74,6 +71,12 @@ export interface FieldProps {
   icons: Record<string, string>;
   /** A field can reference icons of another field */
   iconsCrossReference: string;
+  /** Region IDs where this field is or isn't valid */
+  locationSet: LocationSet;
+  /** Resolved locationSet ID (added by SchemaSystem after processing) */
+  locationSetID: LocationSetID;
+  /** Extra properties are allowed */
+  [key: string]: unknown;
 }
 
 

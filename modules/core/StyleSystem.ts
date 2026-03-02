@@ -9,55 +9,43 @@ import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
 import type { StyleProps, FillStyleProps, LineStyleProps, PointStyleProps, LabelStyleProps, ViewfieldStyleProps } from '../lib/Style.ts';
-import type { StyleMatchConditions, StyleSelectorProps } from '../lib/StyleSelector.ts';
+import type { StyleSelectorProps } from '../lib/StyleSelector.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { GeometryType } from './SchemaSystem.ts';
 
 
 /**
- * Style selector input - the format used in style data files.
- * The `id` is provided separately as the object key.
+ * Input format for data to merge into the StyleSystem.
  */
-interface StyleSelectorInput {
-  /** IDs of Styles to apply when this selector matches (merged in order) */
-  styleIDs: StyleID[];
-  /** Conditions that must be met for this selector to match */
-  match: StyleMatchConditions;
-}
-
-
-/**
- * A scope binds a set of styles and selectors to a scope identifier.
- * When matching features, only styles/selectors from the relevant scope are used.
- */
-export interface StyleScopeInput {
-  /** Scope identifier this applies to (defaults to 'osm') */
-  scope?: ScopeID;
-  /** Object mapping styleID to style (or null to delete) */
-  styles?: Record<StyleID, Partial<StyleProps> | null>;
-  /** Object mapping selectorID to style selector (or null to delete) */
-  selectors?: Record<StyleSelectorID, StyleSelectorInput | null>;
-}
-
-/**
- * Per-dataset scope data stored internally.
- */
-export interface ScopeData {
-  styles: Map<StyleID, Style>;
-  selectors: Map<StyleSelectorID, StyleSelector>;
-}
-
-/**
- * Style asset data to merge into the system.
- * Contains scopes, each binding styles/selectors to a scope identifier.
- */
-export interface StyleData {
+export interface StyleInput {
   /** An asset identifier, e.g. 'rapid_style' (required) */
   assetID: AssetID;
   /** A string version specifier, e.g. '1.0.0' */
   assetVersion?: string;
-  /** Scoped style definitions */
-  scopes: StyleScopeInput[];
+  /** Array of scoped style input data, each must contain a scope identifier */
+  scopes?: StyleInputScope[];
+}
+
+/**
+ * Input format for a single scope of style data.
+ */
+export interface StyleInputScope {
+  /** Scope identifier that this input data applies to (required - defaults to 'osm') */
+  scope: ScopeID;
+  /** Object mapping StyleID to Style props (or null to delete) */
+  styles?: Record<StyleID, Partial<StyleProps> | null>;
+  /** Object mapping StyleSelectorID to StyleSelector props (or null to delete) */
+  selectors?: Record<StyleSelectorID, Partial<StyleSelectorProps> | null>;
+}
+
+/**
+ * Internal per-scope storage for loaded style data.
+ */
+export interface StyleScopeData {
+  /** Map of StyleIDs to instantiated Styles */
+  styles: Map<StyleID, Style>;
+  /** Map of StyleSelectorIDs to instantiated StyleSelectors */
+  selectors: Map<StyleSelectorID, StyleSelector>;
 }
 
 /**
@@ -124,7 +112,7 @@ export class StyleSystem extends AbstractSystem {
   tritanopiaMatrix: number[];
 
   /** Per-scope storage */
-  private _scopes: Map<ScopeID, ScopeData>;
+  private _scopes: Map<ScopeID, StyleScopeData>;
   /** List of supported pattern IDs (hardcoded, must match patterns loaded by PixiTextures) */
   patternIDs: Set<string>;
 
@@ -279,7 +267,7 @@ const unpause = gfx?.pause();  // block rendering
     .then(results => {
       // Process the loaded data
       const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
-      for (const value of fulfilledValues as StyleData[]) {
+      for (const value of fulfilledValues as StyleInput[]) {
         if (value.assetID === 'rapid_style') {
           value.assetVersion ||= context.version;
         }
@@ -313,7 +301,7 @@ const unpause = gfx?.pause();  // block rendering
 
   /**
    * defaultAssetIDs
-   * Returns the default assetIDs
+   * Returns the default assetIDs. These are the style assets that Rapid will load by default.
    * @return  Default assetIDs
    * @readonly
    */
@@ -376,9 +364,9 @@ const unpause = gfx?.pause();  // block rendering
    *   assetID: '',       // A string asset identifier, e.g. 'rapid_style'
    *   assetVersion: '',  // A string version specifier, e.g. '1.0.0'  (defaults to 'unknown' if not present)
    *   scopes: [{
-   *     scope: 'osm',       // Which scope this applies to
-   *     styles: {},          // Object<StyleID, Partial<StyleProps>>
-   *     selectors: {}        // Object<SelectorID, StyleSelector>
+   *     scope: 'osm',       // A string identifier, which scope these declarations apply to.
+   *     styles: { … },      // Object<StyleID, Partial<StyleProps>>
+   *     selectors: { … }    // Object<SelectorID, Partial<StyleSelectorProps>>
    *   }]
    * }
    *
@@ -391,13 +379,13 @@ const unpause = gfx?.pause();  // block rendering
    *  - Wildcard characters '*' and '?' are allowed when deleting.
    *     `"motor*": null`                                     <-- all `motor*` styles deleted
    *
-   * @param src - style data to merge into the system
+   * @param input - style data to merge into the system
    * @throws Will throw if given data does not contain an `assetID`, or if the `assetID` has already been merged
    */
-  merge(src: StyleData): void {
+  merge(input: StyleInput): void {
     const context = this.context;
-    const assetID = src.assetID;
-    const assetVersion = src.assetVersion ?? 'unknown';
+    const assetID = input.assetID;
+    const assetVersion = input.assetVersion ?? 'unknown';
 
     if (!assetID) {
       throw new Error('StyleSystem.merge(): data must include assetID');
@@ -409,20 +397,20 @@ const unpause = gfx?.pause();  // block rendering
     this._loadedAssetIDs.set(assetID, assetVersion);
 
     // Process each scope
-    const scopes = src.scopes ?? [];
-    for (const scopeInput of scopes) {
-      const scopeID = scopeInput.scope ?? 'osm';
+    const inputScopes = input.scopes ?? [];
+    for (const inputScope of inputScopes) {
+      const scopeID = inputScope.scope ?? 'osm';
 
-      // Get or create the scope data for this scopeID
+      // Get or create a data cache for this scopeID
       let scopeData = this._scopes.get(scopeID);
       if (!scopeData) {
         scopeData = { styles: new Map(), selectors: new Map() };
         this._scopes.set(scopeID, scopeData);
       }
 
-      // Merge styles into per-scope map
-      if (scopeInput.styles) {
-        for (const [styleID, props] of Object.entries(scopeInput.styles)) {
+      // Merge Styles
+      if (inputScope.styles) {
+        for (const [styleID, props] of Object.entries(inputScope.styles)) {
           if (props) {   // add or replace
             const setProps = { ...props, id: styleID, assetID, assetVersion, scopeID } as Partial<StyleProps>;
             const style = new Style(context, setProps);
@@ -433,9 +421,9 @@ const unpause = gfx?.pause();  // block rendering
         }
       }
 
-      // Merge selectors into per-scope map
-      if (scopeInput.selectors) {
-        for (const [selectorID, props] of Object.entries(scopeInput.selectors)) {
+      // Merge StyleSelectors
+      if (inputScope.selectors) {
+        for (const [selectorID, props] of Object.entries(inputScope.selectors)) {
           if (props) {  // add or replace
             const setProps = { ...props, id: selectorID, assetID, assetVersion, scopeID } as Partial<StyleSelectorProps>;
             const selector = new StyleSelector(context, setProps);
@@ -479,7 +467,7 @@ const unpause = gfx?.pause();  // block rendering
    * @param scopeID - ID of the scope to look up
    * @return The scope data, or undefined if none exists
    */
-  getScope(scopeID: ScopeID): ScopeData | undefined {
+  getScope(scopeID: ScopeID): StyleScopeData | undefined {
     return this._scopes.get(scopeID);
   }
 

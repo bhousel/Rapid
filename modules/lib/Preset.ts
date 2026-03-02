@@ -1,11 +1,12 @@
 import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 import diacritics from 'diacritics';
+import { utilGatherTokens } from '../util/string.ts';
+import { osmAreaKeys } from './tags.js';
 
 import type { Context } from '../Context.ts';
 import type { Field } from './Field.ts';
+import type { LocationSet } from '@rapideditor/location-conflation';
 import type { Tags } from '../data/types.ts';
-import { utilGatherTokens } from '../util/string.ts';
-import { osmAreaKeys } from './tags.js';
 
 
 /**
@@ -54,9 +55,11 @@ export interface PresetProps {
   /** The ID of a preset that is preferable to this one (for deprecated presets) */
   replacement: string;
   /** Region IDs where this preset is or isn't valid. See: https://github.com/ideditor/location-conflation */
-  locationSet: { include?: string[]; exclude?: string[] };
+  locationSet: LocationSet;
   /** Resolved locationSet ID (added by SchemaSystem after processing locationSet) */
   locationSetID: LocationSetID;
+  /** Extra properties are allowed */
+  [key: string]: unknown;
 }
 
 

@@ -10,6 +10,7 @@ import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 import type { CategoryProps } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
 import type { FieldProps } from '../lib/Field.ts';
+import type { HasLocationSet } from '../core/LocationSystem.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, Tags, Vec2 } from '../data/types.ts';
 import type { OneOrMore } from '../util/iterable.ts';
@@ -37,28 +38,44 @@ export type FieldType =
 
 
 /**
- * Input format for a single schema scope.
- * Each scope targets a scope identifier and contains field/preset/category definitions.
+ * Input format for data to merge into the SchemaSystem.
  */
-export interface SchemaScopeInput {
-  /** Scope identifier this applies to (defaults to 'osm') */
-  scope?: ScopeID;
-  /** Object mapping fieldID to field data (or null to delete) */
-  fields?: Record<string, Partial<FieldProps> | null>;
-  /** Object mapping presetID to preset data (or null to delete) */
-  presets?: Record<string, Partial<PresetProps> | null>;
-  /** Object mapping categoryID to category data (or null to delete) */
-  categories?: Record<string, Partial<CategoryProps> | null>;
-  /** Object mapping geometry type to array of default preset/category IDs */
-  defaults?: Record<string, string[]>;
+export interface SchemaInput {
+  /** An asset identifier, e.g. 'id-tagging-schema' (required) */
+  assetID: AssetID;
+  /** A string version specifier, e.g. '6.13.0' */
+  assetVersion?: string;
+  /** Array of scoped schema input data, each must contain a scope identifier */
+  scopes?: SchemaInputScope[];
+  /** Custom GeoJSON features for locationSets */
+  featureCollection?: GeoJSON.FeatureCollection;
 }
 
 /**
- * Internal per-scope storage for schema data.
+ * Input format for a single scope of schema data.
+ */
+export interface SchemaInputScope {
+  /** Scope identifier that this input data applies to (required - defaults to 'osm') */
+  scope: ScopeID;
+  /** Object mapping FieldID to Field props (or null to delete) */
+  fields?: Record<FieldID, Partial<FieldProps> | null>;
+  /** Object mapping PresetID to Preset props (or null to delete) */
+  presets?: Record<PresetID, Partial<PresetProps> | null>;
+  /** Object mapping CategoryID to Category props (or null to delete) */
+  categories?: Record<CategoryID, Partial<CategoryProps> | null>;
+  /** Object mapping geometry type to array of default preset/category IDs */
+  defaults?: Record<GeometryType, string[]>;
+}
+
+/**
+ * Internal per-scope cache for loaded schema data.
  */
 export interface SchemaScopeData {
+  /** Map of FieldIDs to instantiated Fields */
   fields: Map<FieldID, Field>;
+  /** Map of PresetIDs to instantiated Presets */
   presets: Map<PresetID, Preset>;
+  /** Map of CategoryID to instantiated Categories */
   categories: Map<CategoryID, Category>;
   defaults: Map<GeometryType, Set<PresetID | CategoryID>>;
   universal: Map<FieldID, Field>;
@@ -68,22 +85,8 @@ export interface SchemaScopeData {
 }
 
 /**
- * Schema asset data to merge into the system.
- * Uses scoped format: `scopes: [{ scope: 'osm', fields: {...}, presets: {...}, ... }]`
+ * MiniSearch search result
  */
-export interface SchemaData {
-  /** An asset identifier, e.g. 'id-tagging-schema' (required) */
-  assetID: AssetID;
-  /** A string version specifier, e.g. '6.13.0' */
-  assetVersion?: string;
-  /** Array of scoped data, each targeting a scope identifier */
-  scopes?: SchemaScopeInput[];
-  /** Custom GeoJSON features for locationSets */
-  featureCollection?: GeoJSON.FeatureCollection;
-}
-
-
-/** MiniSearch search result */
 interface SearchResult {
   id: string;
   match: Record<string, string[]>;
@@ -178,9 +181,7 @@ export class SchemaSystem extends AbstractSystem {
     this._defaultAssetIDs = new Set(['id_tagging_schema', 'rapid_schema']);
     this._loadedAssetIDs = new Map();
     this._requestedAssetIDs = null;
-
     this._recentIDs = null;
-
     this._currLocaleCode = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -306,12 +307,12 @@ const unpause = gfx?.pause();  // block rendering
       // Process the loaded data
       const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
       for (const value of fulfilledValues as Record<string, any>[]) {
-        let schemaData: SchemaData;
+        let schemaInput: SchemaInput;
 
         if (value.assetID === 'id_tagging_schema') {
           // The bundle returns flat parts (fields, presets, categories, defaults, deprecated, discarded).
           // Wrap the schema parts into scoped format for merge().
-          schemaData = {
+          schemaInput = {
             assetID: value.assetID as AssetID,
             assetVersion: value.assetVersion ?? idSchemaVersion,
             scopes: [{
@@ -324,12 +325,12 @@ const unpause = gfx?.pause();  // block rendering
           };
         } else {
           // Other assets (e.g. 'rapid_schema') are already in scoped format
-          schemaData = value as SchemaData;
-          if (schemaData.assetID === 'rapid_schema') {
-            schemaData.assetVersion ||= context.version;
+          schemaInput = value as SchemaInput;
+          if (schemaInput.assetID === 'rapid_schema') {
+            schemaInput.assetVersion ||= context.version;
           }
         }
-        this.merge(schemaData);
+        this.merge(schemaInput);
       }
 
       const rejectedReasons = results.filter(isRejected).map(p => p.reason);
@@ -393,16 +394,23 @@ if (editor) {
 const gfx = context.systems.gfx as any;
 gfx?.scene?.reset();  // throw it all away
 
-
     // Create the '*' common scope with geometry fallback presets.
-    // These live outside any data scope so they're always available.
+    // Items in the common scope are always available.
     const commonScope = this._createEmptyScopeData();
     this._scopes.set('*', commonScope);
 
-    const point = new Preset(context, { id: 'point', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1 } );
-    const line = new Preset(context, { id: 'line', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1 } );
-    const area = new Preset(context, { id: 'area', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1 } );
-    const relation = new Preset(context, { id: 'relation', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1 } );
+    const point = new Preset(context, {
+      id: 'point', scopeID: '*', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1
+    });
+    const line = new Preset(context, {
+      id: 'line', scopeID: '*', name: 'Line', tags: {}, geometry: ['line'], matchScore: 0.1
+    });
+    const area = new Preset(context, {
+      id: 'area', scopeID: '*', name: 'Area', tags: { area: 'yes' }, geometry: ['area'], matchScore: 0.1
+    });
+    const relation = new Preset(context, {
+      id: 'relation', scopeID: '*', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1
+    });
 
     commonScope.presets.set('point', point);
     commonScope.presets.set('line', line);
@@ -425,7 +433,7 @@ gfx?.scene?.reset();  // throw it all away
 
   /**
    * defaultAssetIDs
-   * Returns the default assetIDs
+   * Returns the default assetIDs. These are the schema assets that Rapid will load by default.
    * @return  Default assetIDs
    * @readonly
    */
@@ -500,23 +508,21 @@ gfx?.scene?.reset();  // throw it all away
   }
 
 
-
-
-
   /**
    * merge
    * Accepts schema data in scoped format:
    * ```
    * {
-   *   assetID: 'my_schema',
+   *   assetID: '',       // A string asset identifier, e.g. 'rapid_schema'
+   *   assetVersion: '',  // A string version specifier, e.g. '1.0.0'  (defaults to 'unknown' if not present)
    *   scopes: [{
-   *     scope: 'osm',
-   *     fields: { ... },
-   *     presets: { ... },
-   *     categories: { ... },
-   *     defaults: { ... }
+   *     scope: 'osm',        // A string identifier, which scope these declarations apply to.
+   *     fields: { … },       // Object<FieldID, Partial<FieldProps>>
+   *     presets: { … },      // Object<PresetID, Partial<PresetProps>>
+   *     categories: { … },   // Object<CategoryID, Partial<CategoryProps>>
+   *     defaults: { … }
    *   }],
-   *   featureCollection: { ... }    // optional, for locationSets
+   *   featureCollection: { … }    // optional, for locationSets
    * }
    * ```
    *
@@ -531,15 +537,15 @@ gfx?.scene?.reset();  // throw it all away
    *  - Wildcard characters '*' and '?' are allowed when deleting.
    *     `"barrier/*": null,`                           <-- all `barrier/*` presets deleted
    *
-   * @param  src - preset data to merge into the caches
+   * @param  input - schema data to merge into the SchemaSystem
    * @throws  Will throw if given data does not contain a `assetID`, or if the `assetID` has already been merged
    */
-  merge(src: SchemaData): void {
+  merge(input: SchemaInput): void {
     const context = this.context;
     const locations = context.systems.locations;
 
-    const assetID = src.assetID;
-    const assetVersion = src.assetVersion ?? 'unknown';
+    const assetID = input.assetID;
+    const assetVersion = input.assetVersion ?? 'unknown';
 
     if (!assetID) {
       throw new Error('Schema missing assetID property');
@@ -550,24 +556,23 @@ gfx?.scene?.reset();  // throw it all away
 
     this._loadedAssetIDs.set(assetID, assetVersion);
 
-    const scopes: SchemaScopeInput[] = src.scopes ?? [];
-
-    const checkLocationSets: Array<{ locationSet?: object; locationSetID?: string }> = [];
+    const inputScopes: SchemaInputScope[] = input.scopes ?? [];
+    const checkLocationSets: HasLocationSet[] = [];
 
     // Process each scope
-    for (const scopeInput of scopes) {
-      const scopeID = scopeInput.scope ?? 'osm';
+    for (const inputScope of inputScopes) {
+      const scopeID = inputScope.scope ?? 'osm';
 
-      // Get or create the scope data for this scopeID
+      // Get or create a data cache for this scopeID
       let scopeData = this._scopes.get(scopeID);
       if (!scopeData) {
         scopeData = this._createEmptyScopeData();
         this._scopes.set(scopeID, scopeData);
       }
 
-      // Merge Fields into per-scope map
-      if (scopeInput.fields) {
-        for (const [fieldID, props] of Object.entries(scopeInput.fields)) {
+      // Merge Fields
+      if (inputScope.fields) {
+        for (const [fieldID, props] of Object.entries(inputScope.fields)) {
           const existing = scopeData.fields.get(fieldID);
           if (existing?.isBuiltin()) continue;  // don't override a builtin Field
 
@@ -589,9 +594,9 @@ gfx?.scene?.reset();  // throw it all away
         }
       }
 
-      // Merge Presets into per-scope map
-      if (scopeInput.presets) {
-        for (const [presetID, props] of Object.entries(scopeInput.presets)) {
+      // Merge Presets
+      if (inputScope.presets) {
+        for (const [presetID, props] of Object.entries(inputScope.presets)) {
           const existing = scopeData.presets.get(presetID);
           if (existing?.isBuiltin()) continue;  // don't override a builtin Preset
 
@@ -621,9 +626,9 @@ gfx?.scene?.reset();  // throw it all away
         }
       }
 
-      // Merge Categories into per-scope map
-      if (scopeInput.categories) {
-        for (const [categoryID, props] of Object.entries(scopeInput.categories)) {
+      // Merge Categories
+      if (inputScope.categories) {
+        for (const [categoryID, props] of Object.entries(inputScope.categories)) {
           const existing = scopeData.categories.get(categoryID);
           if (existing?.isBuiltin()) continue;  // don't override a builtin Category
 
@@ -645,8 +650,8 @@ gfx?.scene?.reset();  // throw it all away
       }
 
       // Merge Defaults into per-scope map
-      if (scopeInput.defaults) {
-        for (const [geometry, itemIDs] of Object.entries(scopeInput.defaults)) {
+      if (inputScope.defaults) {
+        for (const [geometry, itemIDs] of Object.entries(inputScope.defaults)) {
           if (!this.geometryTypes.has(geometry as GeometryType)) continue;
 
           let defaultIDs = scopeData.defaults.get(geometry as GeometryType);
@@ -666,8 +671,8 @@ gfx?.scene?.reset();  // throw it all away
 
     if (locations) {
       // Merge Custom Features
-      if (src.featureCollection && Array.isArray(src.featureCollection.features)) {
-        locations.mergeCustomGeoJSON(src.featureCollection);
+      if (input.featureCollection && Array.isArray(input.featureCollection.features)) {
+        locations.mergeCustomGeoJSON(input.featureCollection);
       }
 
       // Resolve all locationSet features.

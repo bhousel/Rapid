@@ -776,9 +776,10 @@ describe('ImagerySystem', () => {
       });
 
       it('returns first available source if Bing not available', () => {
-        // Remove Bing from sources temporarily
-        const bing = _imagery.sources.get('testbing');
-        _imagery.sources.delete('testbing');
+        // Remove Bing from the 'osm' scope temporarily
+        const osmScope = _imagery.getScope('osm');
+        const bing = osmScope.sources.get('testbing');
+        osmScope.sources.delete('testbing');
 
         context.viewport = {
           visibleExtent: () => ({
@@ -793,15 +794,17 @@ describe('ImagerySystem', () => {
         assert.isTrue(_imagery.sources.has(chosen.id));
 
         // Restore Bing
-        if (bing) _imagery.sources.set('testbing', bing);
+        if (bing) osmScope.sources.set('testbing', bing);
       });
 
       it('returns "none" source as last resort', () => {
-        // Clear all sources except 'none'
-        const sourcesBackup = new Map(_imagery.sources);
-        _imagery.sources.clear();
-        const none = sourcesBackup.get('none');
-        if (none) _imagery.sources.set('none', none);
+        // Save and clear all scopes' sources except 'none'
+        const osmScope = _imagery.getScope('osm');
+        const commonScope = _imagery.getScope('*');
+        const osmBackup = new Map(osmScope.sources);
+        const custom = commonScope.sources.get('custom');
+        osmScope.sources.clear();
+        commonScope.sources.delete('custom');
 
         context.viewport = {
           visibleExtent: () => ({
@@ -814,7 +817,12 @@ describe('ImagerySystem', () => {
         assert.strictEqual(chosen.props.id, 'none');
 
         // Restore sources
-        _imagery.sources = sourcesBackup;
+        for (const [id, source] of osmBackup) {
+          osmScope.sources.set(id, source);
+        }
+        if (custom) {
+          commonScope.sources.set('custom', custom);
+        }
       });
     });
 

@@ -79,6 +79,8 @@ export interface ImagerySourceProps {
   feature?: GeoJSON.Feature;
   /** Icon url for the source */
   icon?: string;
+  /** Terms of service HTML (avoid using this, or ensure sanitization) */
+  terms_html?: string;
   /** Terms of service text */
   terms_text?: string;
   /** Terms of service URL */
@@ -91,6 +93,8 @@ export interface ImagerySourceProps {
   projection?: string;
   /** Whether the imagery is blocked */
   isBlocked?: boolean;
+  /** Extra properties are allowed */
+  [key: string]: unknown;
 }
 
 
@@ -307,8 +311,8 @@ export class ImagerySource {
    */
   getMetadata(tile: any, callback?: (err: string | null, metadata: any) => void): void {
     const vintage: VintageRange = {
-      start: utilDateString(this.props.startDate as any),
-      end: utilDateString(this.props.endDate as any)
+      start: utilDateString(this.props.startDate),
+      end: utilDateString(this.props.endDate)
     };
     vintage.range = this._vintageRange(vintage);
 
@@ -880,7 +884,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * @return The date string
    */
   set date(val: string | undefined) {
-    const wayback = (this.context.services as any).wayback;
+    const wayback = this.context.services.wayback!;
     const chooseDate = wayback.chooseClosestDate(val);
 
     this.props.startDate = chooseDate;
