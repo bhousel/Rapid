@@ -56,6 +56,8 @@ export interface StyleProps {
   assetID?: AssetID;
   /** Version of the asset */
   assetVersion?: string;
+  /** The scope that this Style applies to (e.g. 'osm') */
+  scopeID?: ScopeID;
 
   /** Base properties (currently just a base color) */
   base?: BaseStyleProps;
@@ -172,7 +174,7 @@ export interface LabelStyleProps {
 }
 
 /** Just the props needed to make a bare-bones style */
-export type MinimalStyleProps = Required<Omit<StyleProps, 'id' | 'assetID' | 'assetVersion' | 'base'>>;
+export type MinimalStyleProps = Required<Omit<StyleProps, 'id' | 'assetID' | 'assetVersion' | 'scopeID' | 'base'>>;
 
 /** Some reasonable style default values */
 export const styleDefaults: MinimalStyleProps = {

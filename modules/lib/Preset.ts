@@ -19,6 +19,8 @@ export interface PresetProps {
   assetID?: AssetID;
   /** The asset version that this Preset came from (e.g. '^6.6.0') */
   assetVersion?: string;
+  /** The scope that this Preset applies to (e.g. 'osm') */
+  scopeID?: ScopeID;
   /** Display name */
   name: string;
   /** Alternate names that may be displayed in the UI */

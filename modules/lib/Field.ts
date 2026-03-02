@@ -14,6 +14,8 @@ export interface FieldProps {
   assetID?: AssetID;
   /** The asset version that this Field came from (e.g. '^6.6.0') */
   assetVersion?: string;
+  /** The scope that this Field applies to (e.g. 'osm') */
+  scopeID?: ScopeID;
   /** Type of field (e.g., 'text', 'combo', 'check', 'number', etc.) */
   type: string;
   /** English label for the field caption */

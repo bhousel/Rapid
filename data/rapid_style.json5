@@ -1,12 +1,6 @@
 {
+  // This file contains the Rapid style definitions.
   "assetID": "rapid_style",
-
-  //
-  // Scopes
-  // Each scope binds a set of styles and selectors to a scope identifier.
-  // A scope with "scope": "osm" applies to OpenStreetMap data.
-  // New scopes can be added for other identifiers (e.g. "rapid", "custom").
-  //
 
   "scopes": [{
     "scope": "*",

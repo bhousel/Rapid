@@ -424,7 +424,7 @@ const unpause = gfx?.pause();  // block rendering
       if (scopeInput.styles) {
         for (const [styleID, props] of Object.entries(scopeInput.styles)) {
           if (props) {   // add or replace
-            const setProps = { ...props, id: styleID, assetID, assetVersion } as Partial<StyleProps>;
+            const setProps = { ...props, id: styleID, assetID, assetVersion, scopeID } as Partial<StyleProps>;
             const style = new Style(context, setProps);
             scopeData.styles.set(styleID, style);
           } else {   // remove
@@ -437,7 +437,7 @@ const unpause = gfx?.pause();  // block rendering
       if (scopeInput.selectors) {
         for (const [selectorID, props] of Object.entries(scopeInput.selectors)) {
           if (props) {  // add or replace
-            const setProps = { ...props, id: selectorID, assetID, assetVersion } as Partial<StyleSelectorProps>;
+            const setProps = { ...props, id: selectorID, assetID, assetVersion, scopeID } as Partial<StyleSelectorProps>;
             const selector = new StyleSelector(context, setProps);
             scopeData.selectors.set(selectorID, selector);
           } else {   // remove

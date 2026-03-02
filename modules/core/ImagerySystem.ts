@@ -17,16 +17,27 @@ import type { Vec2, Vec4 } from '../data/types.ts';
 
 
 /**
- * Data to merge into the imagery system.
- * Contains imagery sources to add, replace, or remove.
+ * Input format for a single imagery scope.
+ * Each scope targets a scope identifier and contains imagery source definitions.
+ */
+export interface ImageryScopeInput {
+  /** Scope identifier this applies to (defaults to 'osm') */
+  scope?: ScopeID;
+  /** Object mapping sourceID to imagery data (or null to delete) */
+  imagery?: Record<ImagerySourceID, Partial<ImagerySourceProps> | null>;
+}
+
+/**
+ * Imagery asset data to merge into the system.
+ * Uses scoped format: `scopes: [{ scope: 'osm', imagery: {...} }]`
  */
 export interface ImageryData {
-  /** A string identifier, e.g. 'editor_layer_index' (required) */
+  /** An asset identifier, e.g. 'editor_layer_index' (required) */
   assetID: AssetID;
   /** A string version specifier, e.g. '2026-01-01' */
   assetVersion?: string;
-  /** Object mapping sourceID to imagery data (or null to delete) */
-  imagery?: Record<ImagerySourceID, Partial<ImagerySourceProps> | null>;
+  /** Array of scoped data, each targeting a scope identifier */
+  scopes?: ImageryScopeInput[];
 }
 
 
@@ -205,11 +216,28 @@ export class ImagerySystem extends AbstractSystem {
     )
     .then(results => {
       const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
-      for (const value of fulfilledValues as ImageryData[]) {
-        if (value.assetID === 'rapid_imagery') {
-          value.assetVersion ||= context.version;
+      for (const value of fulfilledValues as Record<string, any>[]) {
+        let imageryData: ImageryData;
+
+        if (value.assetID === 'editor_layer_index') {
+          // The bundle returns flat format with top-level `imagery` key.
+          // Wrap into scoped format for merge().
+          imageryData = {
+            assetID: value.assetID as AssetID,
+            assetVersion: value.assetVersion ?? 'unknown',
+            scopes: [{
+              scope: 'osm',
+              imagery: value.imagery,
+            }],
+          };
+        } else {
+          // Other assets (e.g. 'rapid_imagery') are already in scoped format
+          imageryData = value as ImageryData;
+          if (imageryData.assetID === 'rapid_imagery') {
+            imageryData.assetVersion ||= context.version;
+          }
         }
-        this.merge(value);
+        this.merge(imageryData);
       }
 
       const rejectedReasons = results.filter(isRejected).map(p => p.reason);
@@ -314,12 +342,16 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * merge
-   * Accepts an object containing new imagery data (all properties except 'assetID' are optional):
+   * Accepts imagery data contained in scope blocks:
+   * ```
    * {
-   *   assetID: '',       // A string identifier, e.g. 'editor_layer_index'
-   *   assetVersion: ''   // A string version specifier, e.g. '2026-01-01'  (defaults to 'unknown' if not present)
-   *   imagery: {},       // Object<ImagerySourceID, Partial<ImagerySourceProps>>
+   *   assetID: 'my_imagery',
+   *   scopes: [{
+   *     scope: 'osm',
+   *     imagery: { ... }
+   *   }]
    * }
+   * ```
    *
    * When merging:
    *  - Items are processed in the order they appear.
@@ -331,7 +363,7 @@ export class ImagerySystem extends AbstractSystem {
    *     `"US-TIGER*": null`                 <-- all `US-TIGER*` sources deleted
    *
    * @param src - imagery data to merge
-   * @throws Will throw if given data does not contain a `assetID`, or if the `assetID` has already been merged
+   * @throws Will throw if given data does not contain an `assetID`, or if the `assetID` has already been merged
    */
   merge(src: ImageryData): void {
     const context = this.context;
@@ -349,37 +381,43 @@ export class ImagerySystem extends AbstractSystem {
 
     this._loadedAssetIDs.set(assetID, assetVersion);
 
-    // Merge Imagery Sources
-    if (src.imagery) {
-      for (const [sourceID, props] of Object.entries(src.imagery)) {
-        const sourceKey = sourceID.toLowerCase();
-        const existing = this.sources.get(sourceKey);
-        if (existing?.isBuiltin()) continue;  // don't override a builtin ImagerySource
+    // Process each scope
+    const scopes = src.scopes ?? [];
+    for (const scopeInput of scopes) {
+      const scopeID = scopeInput.scope ?? 'osm';
 
-        if (props) {   // add or replace
-          const setProps = { ...props, id: sourceID, assetID, assetVersion } as Partial<ImagerySourceProps>;
+      // Merge Imagery Sources
+      if (scopeInput.imagery) {
+        for (const [sourceID, props] of Object.entries(scopeInput.imagery)) {
+          const sourceKey = sourceID.toLowerCase();
+          const existing = this.sources.get(sourceKey);
+          if (existing?.isBuiltin()) continue;  // don't override a builtin ImagerySource
 
-          // Instantiate the appropriate `ImagerySource` class
-          let source: ImagerySource;
-          if (props.type === 'bing') {
-            source = new ImagerySourceBing(context, setProps);
-          } else if (props.type === 'wayback' && wayback) {    // if the WaybackService exists..
-            source = new ImagerySourceEsriWayback(context, setProps);
-          } else if (/^EsriWorldImagery/.test(sourceID)) {
-            source = new ImagerySourceEsri(context, setProps);
-          } else {
-            source = new ImagerySource(context, setProps);
+          if (props) {   // add or replace
+            const setProps = { ...props, id: sourceID, assetID, assetVersion, scopeID } as Partial<ImagerySourceProps>;
+
+            // Instantiate the appropriate `ImagerySource` class
+            let source: ImagerySource;
+            if (props.type === 'bing') {
+              source = new ImagerySourceBing(context, setProps);
+            } else if (props.type === 'wayback' && wayback) {    // if the WaybackService exists..
+              source = new ImagerySourceEsriWayback(context, setProps);
+            } else if (/^EsriWorldImagery/.test(sourceID)) {
+              source = new ImagerySourceEsri(context, setProps);
+            } else {
+              source = new ImagerySource(context, setProps);
+            }
+            this.sources.set(sourceKey, source);
+
+            // Save the GeoJSON feature too, if there is one.
+            if (props.feature) {
+              this.features.set(sourceKey, props.feature);
+            }
+
+          } else {   // remove
+            utilWildcardDelete(this.sources, sourceKey);
+            utilWildcardDelete(this.features, sourceKey);
           }
-          this.sources.set(sourceKey, source);
-
-          // Save the GeoJSON feature too, if there is one.
-          if (props.feature) {
-            this.features.set(sourceKey, props.feature);
-          }
-
-        } else {   // remove
-          utilWildcardDelete(this.sources, sourceKey);
-          utilWildcardDelete(this.features, sourceKey);
         }
       }
     }

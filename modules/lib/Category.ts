@@ -16,6 +16,8 @@ export interface CategoryProps {
   assetID?: AssetID;
   /** The asset version that this Category came from (e.g. '^6.6.0') */
   assetVersion?: string;
+  /** The scope that this Category applies to (e.g. 'osm') */
+  scopeID?: ScopeID;
   /** Display name (fallback if localization unavailable) */
   name: string;
   /** Array of preset IDs that belong to this Category */

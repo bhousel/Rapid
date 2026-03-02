@@ -47,6 +47,8 @@ export interface ImagerySourceProps {
   assetID?: AssetID;
   /** The asset version that this ImagerySource came from (e.g. '2026-01-01') */
   assetVersion?: string;
+  /** The scope that this ImagerySource applies to (e.g. 'osm') */
+  scopeID?: ScopeID;
   /** URL template for fetching tiles */
   template?: string;
   /** Whether the imagery source is considered "best" in the area it is available */

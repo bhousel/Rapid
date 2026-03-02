@@ -576,7 +576,7 @@ gfx?.scene?.reset();  // throw it all away
               if (VERBOSE) console.warn(`"${props.type}" type not supported for ${fieldID}`);  // eslint-disable-line no-console
               continue;
             }
-            const setProps = { ...props, id: fieldID, assetID, assetVersion } as Partial<FieldProps>;
+            const setProps = { ...props, id: fieldID, assetID, assetVersion, scopeID } as Partial<FieldProps>;
             const field = new Field(context, setProps);
             if (field.props.locationSet) {
               checkLocationSets.push(field.props);
@@ -608,7 +608,7 @@ gfx?.scene?.reset();  // throw it all away
             // see https://github.com/openstreetmap/id-tagging-schema/pull/1707 and previous
             if (props.icon === 'fas-vector-square')            props.icon = 'temaki-portrait_framed';
 
-            const setProps = { ...props, id: presetID, assetID, assetVersion } as Partial<PresetProps>;
+            const setProps = { ...props, id: presetID, assetID, assetVersion, scopeID } as Partial<PresetProps>;
             const preset = new Preset(context, setProps);
             if (preset.props.locationSet) {
               checkLocationSets.push(preset.props);
@@ -631,7 +631,7 @@ gfx?.scene?.reset();  // throw it all away
             // Rename icon identifiers to match the rapid spritesheet
             if (props.icon)  props.icon = props.icon.replace(/^iD-/, 'rapid-');
 
-            const setProps = { ...props, id: categoryID, assetID, assetVersion } as Partial<CategoryProps>;
+            const setProps = { ...props, id: categoryID, assetID, assetVersion, scopeID } as Partial<CategoryProps>;
             const category = new Category(context, setProps);
             if (category.props.locationSet) {
               checkLocationSets.push(category.props);

@@ -59,6 +59,8 @@ export interface StyleSelectorProps {
   assetID?: AssetID;
   /** Version of the asset */
   assetVersion?: string;
+  /** The scope that this StyleSelector applies to (e.g. 'osm') */
+  scopeID?: ScopeID;
   /** IDs of Styles to apply when this selector matches (merged in order) */
   styleIDs: StyleID[];
   /** Conditions that must be met for this selector to match */

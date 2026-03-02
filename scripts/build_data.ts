@@ -6,19 +6,15 @@ import { styleText } from 'node:util';
 
 import * as CLDR from './cldr.ts';
 
-import type { ImagerySourceProps } from '../modules/lib/ImagerySource.ts';
+import type { ImageryData } from '../modules/core/ImagerySystem.ts';
 import type { SchemaData } from '../modules/core/SchemaSystem.ts';
+import type { CategoryProps } from '../modules/lib/Category.ts';
+import type { PresetProps } from '../modules/lib/Preset.ts';
 
 const localeCompare = new Intl.Collator('en').compare;
 
 
 // Interfaces for external data sources that lack their own type definitions
-
-/** Minimal shape of items in id-tagging-schema JSON (presets, categories, fields) */
-interface TaggingSchemaItem {
-  icon?: string;
-  [key: string]: unknown;
-}
 
 /** QA service entry — only osmose has `icons` */
 interface QAService {
@@ -60,12 +56,6 @@ interface ImageryLocale {
   };
 }
 
-/** Rapid imagery JSON5 top-level structure */
-interface RapidImageryData {
-  assetID: string;
-  imagery: Record<string, Partial<ImagerySourceProps>>;
-}
-
 /** Locale JSON for tagging translations */
 interface TaggingLocale {
   en: {
@@ -80,14 +70,12 @@ interface TaggingLocale {
 
 // Load source data
 const categoriesFile = './node_modules/@openstreetmap/id-tagging-schema/dist/preset_categories.min.json';
-const fieldsFile = './node_modules/@openstreetmap/id-tagging-schema/dist/fields.min.json';
 const presetsFile = './node_modules/@openstreetmap/id-tagging-schema/dist/presets.min.json';
 const qaDataFile = './data/qa_data.json5';
 const territoriesFile = './node_modules/cldr-core/supplemental/territoryInfo.json';
 
-const categoriesJSON = await Bun.file(categoriesFile).json() as Record<string, TaggingSchemaItem>;
-const fieldsJSON = await Bun.file(fieldsFile).json() as Record<string, TaggingSchemaItem>;
-const presetsJSON = await Bun.file(presetsFile).json() as Record<string, TaggingSchemaItem>;
+const categoriesJSON = await Bun.file(categoriesFile).json() as Record<string, Partial<CategoryProps>>;
+const presetsJSON = await Bun.file(presetsFile).json() as Record<string, Partial<PresetProps>>;
 const qaDataJSON = Bun.JSON5.parse(await Bun.file(qaDataFile).text()) as Record<string, QAService>;
 const territoriesJSON = await Bun.file(territoriesFile).json() as TerritoriesJSON;
 
@@ -188,7 +176,7 @@ function gatherQAIssueIcons(icons: Set<string>): void {
 
 
 function gatherPresetIcons(icons: Set<string>): void {
-  for (const source of [presetsJSON, categoriesJSON, fieldsJSON]) {
+  for (const source of [presetsJSON, categoriesJSON]) {
     for (const item of Object.values(source)) {
       if (item.icon) {
         // fix: FontAwesome v7 no longer has 'fas-vector-square'
@@ -274,17 +262,22 @@ async function writeEnJson(): Promise<void> {
   const imagery = Bun.YAML.parse(await Bun.file('./node_modules/editor-layer-index/i18n/en.yaml').text()) as ImageryLocale;
 
   // Gather strings for Rapid imagery not included in the imagery index
-  const rapidImageryData = Bun.JSON5.parse(await Bun.file('./data/rapid_imagery.json5').text()) as RapidImageryData;
+  const rapidImageryData = Bun.JSON5.parse(await Bun.file('./data/rapid_imagery.json5').text()) as ImageryData;
 
-  for (const [id, props] of Object.entries(rapidImageryData.imagery)) {
-    if (!props) continue;
-    const target: ImageryLocale['en']['imagery'][string] = {};
-    if (props.terms_text)   target.attribution = { text: props.terms_text };
-    if (props.name)         target.name = props.name;
-    if (props.description)  target.description = props.description;
+  // Imagery data is scoped now - look for the osm scope
+  for (const scopeInput of rapidImageryData.scopes ?? []) {
+    if (scopeInput?.scope !== 'osm') continue;
 
-    if (Object.keys(target).length) {
-      imagery.en.imagery[id] = target;
+    for (const [id, props] of Object.entries(scopeInput.imagery ?? {})) {
+      if (!props) continue;
+      const target: ImageryLocale['en']['imagery'][string] = {};
+      if (props.terms_text)   target.attribution = { text: props.terms_text };
+      if (props.name)         target.name = props.name;
+      if (props.description)  target.description = props.description;
+
+      if (Object.keys(target).length) {
+        imagery.en.imagery[id] = target;
+      }
     }
   }
 
