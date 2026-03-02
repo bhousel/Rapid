@@ -41,7 +41,7 @@ export interface StyleInputScope {
 /**
  * Internal per-scope storage for loaded style data.
  */
-export interface StyleScopeData {
+export interface StyleScope {
   /** Map of StyleIDs to instantiated Styles */
   styles: Map<StyleID, Style>;
   /** Map of StyleSelectorIDs to instantiated StyleSelectors */
@@ -112,7 +112,7 @@ export class StyleSystem extends AbstractSystem {
   tritanopiaMatrix: number[];
 
   /** Per-scope storage */
-  private _scopes: Map<ScopeID, StyleScopeData>;
+  private _scopes: Map<ScopeID, StyleScope>;
   /** List of supported pattern IDs (hardcoded, must match patterns loaded by PixiTextures) */
   patternIDs: Set<string>;
 
@@ -402,11 +402,7 @@ const unpause = gfx?.pause();  // block rendering
       const scopeID = inputScope.scope ?? 'osm';
 
       // Get or create a data cache for this scopeID
-      let scopeData = this._scopes.get(scopeID);
-      if (!scopeData) {
-        scopeData = { styles: new Map(), selectors: new Map() };
-        this._scopes.set(scopeID, scopeData);
-      }
+      const scope = this.getScope(scopeID);
 
       // Merge Styles
       if (inputScope.styles) {
@@ -414,9 +410,9 @@ const unpause = gfx?.pause();  // block rendering
           if (props) {   // add or replace
             const setProps = { ...props, id: styleID, assetID, assetVersion, scopeID } as Partial<StyleProps>;
             const style = new Style(context, setProps);
-            scopeData.styles.set(styleID, style);
+            scope.styles.set(styleID, style);
           } else {   // remove
-            utilWildcardDelete(scopeData.styles, styleID);
+            utilWildcardDelete(scope.styles, styleID);
           }
         }
       }
@@ -427,9 +423,9 @@ const unpause = gfx?.pause();  // block rendering
           if (props) {  // add or replace
             const setProps = { ...props, id: selectorID, assetID, assetVersion, scopeID } as Partial<StyleSelectorProps>;
             const selector = new StyleSelector(context, setProps);
-            scopeData.selectors.set(selectorID, selector);
+            scope.selectors.set(selectorID, selector);
           } else {   // remove
-            utilWildcardDelete(scopeData.selectors, selectorID);
+            utilWildcardDelete(scope.selectors, selectorID);
           }
         }
       }
@@ -464,11 +460,17 @@ const unpause = gfx?.pause();  // block rendering
   /**
    * getScope
    * Get the scope data for a specific scope ID.
+   * If the scope doesn't exist yet, it is created and cached automatically.
    * @param scopeID - ID of the scope to look up
-   * @return The scope data, or undefined if none exists
+   * @return The scope data
    */
-  getScope(scopeID: ScopeID): StyleScopeData | undefined {
-    return this._scopes.get(scopeID);
+  getScope(scopeID: ScopeID): StyleScope {
+    let scope = this._scopes.get(scopeID);
+    if (!scope) {
+      scope = { styles: new Map(), selectors: new Map() };
+      this._scopes.set(scopeID, scope);
+    }
+    return scope;
   }
 
 
@@ -484,12 +486,12 @@ const unpause = gfx?.pause();  // block rendering
     const schema = context.systems.schema;
 
     // Use per-scope data for the requested scope, falling back to '*' common scope.
-    const scopeData = this._scopes.get(scopeID);
-    const commonData = this._scopes.get('*');
-    const scopeStyles = scopeData?.styles ?? commonData?.styles ?? new Map<StyleID, Style>();
-    const scopeSelectors = scopeData?.selectors ?? commonData?.selectors ?? new Map<StyleSelectorID, StyleSelector>();
+    const scope = this.getScope(scopeID);
+    const common = this.getScope('*');
+    const scopeStyles = scope.styles.size ? scope.styles : common.styles;
+    const scopeSelectors = scope.selectors.size ? scope.selectors : common.selectors;
 
-    let defaults = scopeStyles.get('DEFAULTS') ?? commonData?.styles.get('DEFAULTS');
+    let defaults = scopeStyles.get('DEFAULTS') ?? common.styles.get('DEFAULTS');
 
     // If DEFAULTS doesn't exist, construct a minimal default style.
     if (!defaults) {

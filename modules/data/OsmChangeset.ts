@@ -1,7 +1,8 @@
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
+import { GeoJSONObject } from '../lib/types.ts';
 
 import type { Context } from '../Context.ts';
-import { GeoJSONObject } from '../lib/types.ts';
+import type { GeometryType } from '../core/SchemaSystem.ts';
 
 
 /**
@@ -89,13 +90,13 @@ export class OsmChangeset extends OsmEntity {
 
   /**
    * geometry
-   * Returns 'changeset'
-   * @return 'changeset'
+   * Returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type.
+   * @param graph - the Graph that holds the topology needed
+   * @returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type
    */
-  geometry(): 'changeset' {
-    return 'changeset';
+  geometry(): GeometryType {
+    throw new Error(`Do not call 'geometry' on OsmChangeset`);
   }
-
 
   /**
    * osmChangeJXON
@@ -118,7 +119,6 @@ export class OsmChangeset extends OsmEntity {
       }
       return ordered;
     }
-
 
     // sort relations in a changeset by dependencies
     function sort(changes: Record<string, any[]>): Record<string, any[]> {

@@ -83,7 +83,7 @@ graph = new Graph(graph);
 
     // Upgrade preset, if a replacement is available..
     if (preset.props.replacement) {
-      const newPreset = schema.getScope('osm')?.presets.get(preset.props.replacement);
+      const newPreset = schema.getScope('osm').presets.get(preset.props.replacement);
       graph = actionChangePreset(entity.id, preset, newPreset, true /* skip field defaults */)(graph);
       entity = graph.entity(entity.id);
       preset = newPreset;

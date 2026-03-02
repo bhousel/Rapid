@@ -33,7 +33,7 @@ export interface Segment {
   wayId: string;
   index: number;
   nodes: [EntityID, EntityID];
-  extent: (graph: Graph) => Extent | false;
+  extent: (graph: Graph) => Extent | undefined;
 }
 
 
@@ -57,7 +57,7 @@ export class OsmWay extends OsmEntity {
    * @param props - Properties to assign to the data element
    */
   constructor(otherOrContext: OsmWay | Context, props: Partial<OsmWayProps> = {}) {
-    super(otherOrContext as any, props);
+    super(otherOrContext, props);
     this.props.type = 'way';
 
     if (!this.props.id) {  // no ID provided - generate one
@@ -319,8 +319,7 @@ export class OsmWay extends OsmEntity {
 
     // implied oneway tag..
     for (const key in this.tags) {
-      if (key in osmOneWayTags &&
-        (this.tags[key] in (osmOneWayTags as any)[key])) {
+      if (key in osmOneWayTags && (this.tags[key] in osmOneWayTags[key])) {
         return true;
       }
     }
@@ -330,21 +329,20 @@ export class OsmWay extends OsmEntity {
   /**
    * sidednessIdentifier
    * Returns some identifier for tag that implies that this way is "sided",
-   *  i.e. the right side is the 'inside' (e.g. the right side of a
-   *   natural=cliff is lower).
+   *  i.e. the right side is the 'inside' (e.g. the right side of a `natural=cliff` is lower).
    * @return The tag that indicates the sidedness
    */
-  sidednessIdentifier(): string | null {
+  sidednessIdentifier(): string | false | null {
     for (const realKey in this.tags) {
       const value = this.tags[realKey];
       const key = osmRemoveLifecyclePrefix(realKey);
-      if (key in osmRightSideIsInsideTags && (value in (osmRightSideIsInsideTags as any)[key])) {
-        if ((osmRightSideIsInsideTags as any)[key][value] === true) {
+      if (key in osmRightSideIsInsideTags && (value in osmRightSideIsInsideTags[key])) {
+        if (osmRightSideIsInsideTags[key][value] === true) {
           return key;
         } else {
           // if the value is something other than a literal true, we should use it so we can
           // special case some keys (e.g. natural=coastline is handled differently to other naturals).
-          return (osmRightSideIsInsideTags as any)[key][value];
+          return osmRightSideIsInsideTags[key][value];
         }
       }
     }
@@ -476,12 +474,11 @@ export class OsmWay extends OsmEntity {
    * @return Array of segment data
    */
   segments(graph: Graph): Segment[] {
-    const self = this;
 
-    function segmentExtent(this: Segment, graph: Graph): Extent | false {
-      const n1 = graph.hasEntity(this.nodes[0]) as any;
-      const n2 = graph.hasEntity(this.nodes[1]) as any;
-      return n1 && n2 && new Extent(
+    function segmentExtent(this: Segment, graph: Graph): Extent | undefined {
+      const n1 = graph.hasEntity(this.nodes[0]) as OsmNode;
+      const n2 = graph.hasEntity(this.nodes[1]) as OsmNode;
+      return n1?.loc && n2?.loc && new Extent(
         [ Math.min(n1.loc[0], n2.loc[0]), Math.min(n1.loc[1], n2.loc[1]) ],
         [ Math.max(n1.loc[0], n2.loc[0]), Math.max(n1.loc[1], n2.loc[1]) ]
       );
@@ -489,12 +486,12 @@ export class OsmWay extends OsmEntity {
 
     return this.transient('segments', () => {
       const segments: Segment[] = [];
-      for (let i = 0; i < self.nodes.length - 1; i++) {
+      for (let i = 0; i < this.nodes.length - 1; i++) {
         segments.push({
-          id: self.id + '-' + i,
-          wayId: self.id,
+          id: this.id + '-' + i,
+          wayId: this.id,
           index: i,
-          nodes: [self.nodes[i], self.nodes[i + 1]],
+          nodes: [this.nodes[i], this.nodes[i + 1]],
           extent: segmentExtent
         });
       }

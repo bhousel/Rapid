@@ -119,7 +119,7 @@ export class OsmNode extends OsmEntity {
    * @param graph - the Graph that holds the topology needed
    * @returns 'point' or 'vertex'
    */
-  geometry(graph: Graph): string {
+  geometry(graph: Graph): 'point' | 'vertex' {
     return this.transient('geometry', () => {
       const parents = graph.parentWays(this);
       return parents.length === 0 ? 'point' : 'vertex';

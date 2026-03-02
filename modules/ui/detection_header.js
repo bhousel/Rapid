@@ -26,7 +26,7 @@ export function uiDetectionHeader(context) {
     } else {
       const service = context.services[d.props.serviceID];
       const presetID = service && service.getDetectionPresetID(d.props.value);
-      const preset = presetID && schema.getScope('osm')?.presets.get(presetID);
+      const preset = presetID && schema.getScope('osm').presets.get(presetID);
       iconName = preset?.icon || 'fas-question';
     }
 

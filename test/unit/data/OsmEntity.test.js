@@ -122,6 +122,13 @@ describe('OsmEntity', () => {
     });
   });
 
+  describe('geometry', () => {
+    it('throws when calling OsmEntity.geometry', () => {
+      const a = new Rapid.OsmEntity(context);
+      assert.throws(() => a.geometry(), /do not call/i);
+    });
+  });
+
   describe('updateGeometry', () => {
     it('updates the geometry', () => {
       const a = new Rapid.OsmEntity(context);

@@ -104,9 +104,9 @@ describe('OsmChangeset', () => {
   });
 
   describe('geometry', () => {
-    it(`returns 'changeset'`, () => {
+    it('throws when calling OsmChangeset.geometry', () => {
       const a = new Rapid.OsmChangeset(context);
-      assert.deepEqual(a.geometry(), 'changeset');
+      assert.throws(() => a.geometry(), /do not call/i);
     });
   });
 

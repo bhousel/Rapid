@@ -124,7 +124,7 @@ export function operationCycleHighwayTag(context, selectedIDs) {
     const currPreset = schema.match(_entities[0], graph);
     const index = currPreset ? _presetIDs.indexOf(currPreset.id) : -1;
     const newPresetID = _presetIDs[(index + 1) % _presetIDs.length];
-    const newPreset = schema.getScope('osm')?.presets.get(newPresetID);
+    const newPreset = schema.getScope('osm').presets.get(newPresetID);
 
     editor.beginTransaction();
 

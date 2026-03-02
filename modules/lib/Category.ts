@@ -2,6 +2,7 @@ import { utilSafeString } from '@rapid-sdk/util';
 import { utilGatherTokens } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
+import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { Preset } from './Preset.ts';
 import type { LocationSet } from '@rapideditor/location-conflation';
 
@@ -63,7 +64,7 @@ interface CategoryStrings {
  *   `id` (or `categoryID`)  Unique string to identify this Category.
  *   `safeid`                The id, but safe for use in classes, DOM element ids, css selectors..
  *   `props`                 Properties object
- *   `geometries`            `Set<string>` Geometries that this Category works with
+ *   `geometries`            `Set<GeometryType>` Geometries that this Category works with
  *   `presets`               `Array<Preset>` Presets in this Category
  */
 export class Category {
@@ -73,7 +74,7 @@ export class Category {
   safeid: string;
   categoryID: CategoryID;
   props: CategoryProps;
-  geometries: Set<string>;
+  geometries: Set<GeometryType>;
   presets: Preset[];
 
   private _strings: Map<string, CategoryStrings>;
@@ -127,7 +128,7 @@ export class Category {
 
     // Include only Presets that are currently known to the SchemaSystem.
     this.presets = (this.props.members ?? [])
-      .map(presetID => schema?.getScope('osm')?.presets.get(presetID))
+      .map(presetID => schema?.getScope('osm').presets.get(presetID))
       .filter((p): p is Preset => !!p);
 
     // The geometries available for this category will include all geometries of its presets.

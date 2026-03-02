@@ -5,6 +5,7 @@ import { osmAreaKeys } from './tags.js';
 
 import type { Context } from '../Context.ts';
 import type { Field } from './Field.ts';
+import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { LocationSet } from '@rapideditor/location-conflation';
 import type { Tags } from '../data/types.ts';
 
@@ -39,7 +40,7 @@ export interface PresetProps {
   /** Additional Field IDs shown in "more fields" */
   moreFields: FieldID[];
   /** Geometry types this Preset works with */
-  geometry: string[];
+  geometry: GeometryType[];
   /** Score for ranking search results */
   matchScore: number;
   /** Whether this Preset appears in search results */
@@ -94,7 +95,7 @@ interface ResolvedFields {
  *   `id` (or `presetID`)   Unique string to identify this Preset.
  *   `safeid`               The id, but safe for use in classes, DOM element ids, css selectors..
  *   `props`                Properties object
- *   `geometries`           `Set<string>` Geometries that this Preset works with
+ *   `geometries`           `Set<GeometryType>` Geometries that this Preset works with
  */
 export class Preset {
   context: Context;
@@ -103,7 +104,7 @@ export class Preset {
   safeid: string;
   presetID: PresetID;
   props: PresetProps;
-  geometries: Set<string>;
+  geometries: Set<GeometryType>;
   tags: Tags;
   addTags: Tags;
   removeTags: Tags;
@@ -453,7 +454,7 @@ export class Preset {
    * @param skipFieldDefaults - `true` to ignore tags controlled by the Fields
    * @return The final tags for the Entity, after removal has happened.
    */
-  unsetTags(tags: Tags, geometry: string, ignoreKeys?: string[], skipFieldDefaults?: boolean): Tags {
+  unsetTags(tags: Tags, geometry: GeometryType, ignoreKeys?: string[], skipFieldDefaults?: boolean): Tags {
     // allow manually keeping some tags
     const removeTags = ignoreKeys ? utilObjectOmit(this.removeTags, ignoreKeys) : this.removeTags;
     tags = utilObjectOmit(tags, Object.keys(removeTags));
@@ -479,7 +480,7 @@ export class Preset {
    * @param skipFieldDefaults - `true` to ignore tags controlled by the Fields
    * @return The final tags for the Entity, after adding has happened.
    */
-  setTags(tags: Tags, geometry: string, skipFieldDefaults?: boolean): Tags {
+  setTags(tags: Tags, geometry: GeometryType, skipFieldDefaults?: boolean): Tags {
     const addTags = this.addTags;
     tags = Object.assign({}, tags);   // shallow copy
 
@@ -543,8 +544,8 @@ export class Preset {
     if (val && (typeof val === 'string')) {   // This will only work for strings
       const match = val.match(/^\{(.*)\}$/);
       if (match) {
-        const preset = schema?.getScope('osm')?.presets.get(match[1])
-          ?? schema?.getScope('*')?.presets.get(match[1]);
+        const preset = schema?.getScope('osm').presets.get(match[1])
+          ?? schema?.getScope('*').presets.get(match[1]);
         if (preset) {
           return preset;
         } else {

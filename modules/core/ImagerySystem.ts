@@ -41,7 +41,7 @@ export interface ImageryInputScope {
 /**
  * Internal per-scope storage for loaded imagery data.
  */
-export interface ImageryScopeData {
+export interface ImageryScope {
   /** Map of ImagerySourceIDs to instantiated ImagerySources */
   sources: Map<ImagerySourceID, ImagerySource>;
 }
@@ -70,7 +70,7 @@ export class ImagerySystem extends AbstractSystem {
   features: Map<ImagerySourceID, GeoJSON.Feature>;
 
   /** Per-scope storage */
-  private _scopes: Map<ScopeID, ImageryScopeData>;
+  private _scopes: Map<ScopeID, ImageryScope>;
 
   /** Default imagery file assetIDs */
   private _defaultAssetIDs: Set<AssetID>;
@@ -101,7 +101,7 @@ export class ImagerySystem extends AbstractSystem {
     this.id = 'imagery';
     this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'storage', 'urlhash']);
 
-    this._scopes = new Map();    // Map<ScopeID, ImageryScopeData>
+    this._scopes = new Map();    // Map<ScopeID, ImageryScope>
     this.features = new Map();   // Map<ImagerySourceID, GeoJSON.Feature>
 
     this._defaultAssetIDs = new Set(['editor_layer_index', 'rapid_imagery']);
@@ -273,19 +273,18 @@ export class ImagerySystem extends AbstractSystem {
     this.features.clear();
     this._scopes.clear();
 
-    // Create the '*' common scope with builtin imagery sources.
-    // These live outside any data scope so they're always available.
-    const commonScope: ImageryScopeData = { sources: new Map() };
-    this._scopes.set('*', commonScope);
+    // Create the '*' common scope with geometry fallback imagery.
+    // Items in the common scope are always available.
+    const common = this.getScope('*');
 
     // Add 'None'
     const none = new ImagerySourceNone(context);
-    commonScope.sources.set(none.id.toLowerCase(), none);
+    common.sources.set(none.id.toLowerCase(), none);
 
     // Add 'Custom' - seed it with whatever template the user has used previously
     const custom = new ImagerySourceCustom(context);
     custom.template = storage?.getItem('background-custom-template') ?? '';
-    commonScope.sources.set(custom.id.toLowerCase(), custom);
+    common.sources.set(custom.id.toLowerCase(), custom);
 
     this._baseLayer = none;
     this._overlayLayers.clear();
@@ -303,8 +302,8 @@ export class ImagerySystem extends AbstractSystem {
    */
   get sources(): Map<ImagerySourceID, ImagerySource> {
     const all = new Map<ImagerySourceID, ImagerySource>();
-    for (const scopeData of this._scopes.values()) {
-      for (const [id, source] of scopeData.sources) {
+    for (const scope of this._scopes.values()) {
+      for (const [id, source] of scope.sources) {
         all.set(id, source);
       }
     }
@@ -315,11 +314,17 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * getScope
    * Get the scope data for a specific scope ID.
+   * If the scope doesn't exist yet, it is created and cached automatically.
    * @param scopeID - ID of the scope to look up
-   * @return The scope data, or undefined if none exists
+   * @return The scope data
    */
-  getScope(scopeID: ScopeID): ImageryScopeData | undefined {
-    return this._scopes.get(scopeID);
+  getScope(scopeID: ScopeID): ImageryScope {
+    let scope = this._scopes.get(scopeID);
+    if (!scope) {
+      scope = { sources: new Map() };
+      this._scopes.set(scopeID, scope);
+    }
+    return scope;
   }
 
 
@@ -428,17 +433,13 @@ export class ImagerySystem extends AbstractSystem {
       const scopeID = inputScope.scope ?? 'osm';
 
       // Get or create a data cache for this scopeID
-      let scopeData = this._scopes.get(scopeID);
-      if (!scopeData) {
-        scopeData = { sources: new Map() };
-        this._scopes.set(scopeID, scopeData);
-      }
+      const scope = this.getScope(scopeID);
 
       // Merge Imagery Sources
       if (inputScope.imagery) {
         for (const [sourceID, props] of Object.entries(inputScope.imagery)) {
           const sourceKey = sourceID.toLowerCase();
-          const existing = scopeData.sources.get(sourceKey);
+          const existing = scope.sources.get(sourceKey);
           if (existing?.isBuiltin()) continue;  // don't override a builtin ImagerySource
 
           if (props) {   // add or replace
@@ -455,7 +456,7 @@ export class ImagerySystem extends AbstractSystem {
             } else {
               source = new ImagerySource(context, setProps);
             }
-            scopeData.sources.set(sourceKey, source);
+            scope.sources.set(sourceKey, source);
 
             // Save the GeoJSON feature too, if there is one.
             if (props.feature) {
@@ -463,7 +464,7 @@ export class ImagerySystem extends AbstractSystem {
             }
 
           } else {   // remove
-            utilWildcardDelete(scopeData.sources, sourceKey);
+            utilWildcardDelete(scope.sources, sourceKey);
             utilWildcardDelete(this.features, sourceKey);
           }
         }
@@ -535,7 +536,7 @@ export class ImagerySystem extends AbstractSystem {
     const sources = [...this.sources.values()];
 
     // Recheck blocked sources only if we detect new blocklists pulled from the OSM API.
-    const osm = context.services.osm as any;
+    const osm = context.services.osm;
     const blocklists: RegExp[] = osm?.imageryBlocklists ?? [];
     const blocklistChanged = (blocklists.length !== this._checkedBlocklists.length) ||
       blocklists.some((regex, index) => String(regex) !== this._checkedBlocklists[index]);
@@ -567,7 +568,7 @@ export class ImagerySystem extends AbstractSystem {
     if (!arguments.length) return this._baseLayer;
 
     // test source against OSM imagery blocklists..
-    const osm = this.context.services.osm as any;
+    const osm = this.context.services.osm;
     if (!osm) return this;
 
     const blocklists: RegExp[] = osm?.imageryBlocklists ?? [];
@@ -871,8 +872,8 @@ export class ImagerySystem extends AbstractSystem {
    */
   private _rebuildIndex(): void {
     // Reset and localize the ImagerySources
-    for (const scopeData of this._scopes.values()) {
-      for (const source of scopeData.sources.values()) {
+    for (const scope of this._scopes.values()) {
+      for (const source of scope.sources.values()) {
         source.reset();
       }
     }
@@ -1002,8 +1003,8 @@ export class ImagerySystem extends AbstractSystem {
     localeCode ||= l10n?.localeCode ?? 'en-US';
 
     // Reset and localize the ImagerySources
-    for (const scopeData of this._scopes.values()) {
-      for (const source of scopeData.sources.values()) {
+    for (const scope of this._scopes.values()) {
+      for (const source of scope.sources.values()) {
         source.setLocale(localeCode);
       }
     }
@@ -1017,8 +1018,8 @@ export class ImagerySystem extends AbstractSystem {
    * @return The ImagerySource, or `undefined` if not found in any scope
    */
   private _findSource(sourceKey: ImagerySourceID): ImagerySource | undefined {
-    for (const scopeData of this._scopes.values()) {
-      const source = scopeData.sources.get(sourceKey);
+    for (const scope of this._scopes.values()) {
+      const source = scope.sources.get(sourceKey);
       if (source) return source;
     }
     return undefined;

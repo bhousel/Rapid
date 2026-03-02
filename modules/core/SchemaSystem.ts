@@ -70,7 +70,7 @@ export interface SchemaInputScope {
 /**
  * Internal per-scope cache for loaded schema data.
  */
-export interface SchemaScopeData {
+export interface SchemaScope {
   /** Map of FieldIDs to instantiated Fields */
   fields: Map<FieldID, Field>;
   /** Map of PresetIDs to instantiated Presets */
@@ -79,7 +79,7 @@ export interface SchemaScopeData {
   categories: Map<CategoryID, Category>;
   defaults: Map<GeometryType, Set<PresetID | CategoryID>>;
   universal: Map<FieldID, Field>;
-  matchIndex: Map<string, Record<string, Record<string, Preset[]>>>;
+  matchIndex: Map<GeometryType, Record<string, Record<string, Preset[]>>>;
   searchIndexes: Map<LocaleCode, MiniSearch>;
   currSearchIndex: MiniSearch | null;
 }
@@ -143,7 +143,7 @@ export class SchemaSystem extends AbstractSystem {
   private _recentIDs: PresetID[] | null;
 
   /** Per-scope data */
-  private _scopes: Map<ScopeID, SchemaScopeData>;
+  private _scopes: Map<ScopeID, SchemaScope>;
 
   private _currLocaleCode: LocaleCode | null;
 
@@ -173,7 +173,7 @@ export class SchemaSystem extends AbstractSystem {
     // Set of presetIDs that the user can add (if `null`, all are normally addable)
     this.addablePresetIDs = null;
 
-    this._scopes = new Map();      // Map<ScopeID, SchemaScopeData>
+    this._scopes = new Map();    // Map<ScopeID, SchemaScope>
 
     // The default schema assets.
     // 'id_tagging_schema' is a "bundle" that combines multiple id_tagging_schema files.
@@ -396,8 +396,7 @@ gfx?.scene?.reset();  // throw it all away
 
     // Create the '*' common scope with geometry fallback presets.
     // Items in the common scope are always available.
-    const commonScope = this._createEmptyScopeData();
-    this._scopes.set('*', commonScope);
+    const common = this.getScope('*');
 
     const point = new Preset(context, {
       id: 'point', scopeID: '*', name: 'Point', tags: {}, geometry: ['point', 'vertex'], matchScore: 0.1
@@ -412,20 +411,10 @@ gfx?.scene?.reset();  // throw it all away
       id: 'relation', scopeID: '*', name: 'Relation', tags: {}, geometry: ['relation'], matchScore: 0.1
     });
 
-    commonScope.presets.set('point', point);
-    commonScope.presets.set('line', line);
-    commonScope.presets.set('area', area);
-    commonScope.presets.set('relation', relation);
-
-    // Create the 'osm' scope with default geometry defaults (empty, no data loaded yet).
-    const osmScope = this._createEmptyScopeData();
-    this._scopes.set('osm', osmScope);
-
-    // Defaults are the Presets and Categories offered to the user when adding a new feature.
-    // A fallback preset is appended to the list automatically so they dont need to be included here.
-    for (const geometry of this.geometryTypes) {
-      osmScope.defaults.set(geometry, new Set());
-    }
+    common.presets.set('point', point);
+    common.presets.set('line', line);
+    common.presets.set('area', area);
+    common.presets.set('relation', relation);
 
     this._schemaChanged();  // this will reset the search index too
   }
@@ -489,23 +478,7 @@ gfx?.scene?.reset();  // throw it all away
   }
 
 
-  /**
-   * _createEmptyScopeData
-   * Creates a new, empty SchemaScopeData.
-   * @return A fresh SchemaScopeData with all Maps initialized empty
-   */
-  private _createEmptyScopeData(): SchemaScopeData {
-    return {
-      fields: new Map(),
-      presets: new Map(),
-      categories: new Map(),
-      defaults: new Map(),
-      universal: new Map(),
-      matchIndex: new Map(),
-      searchIndexes: new Map(),
-      currSearchIndex: null,
-    };
-  }
+
 
 
   /**
@@ -564,16 +537,12 @@ gfx?.scene?.reset();  // throw it all away
       const scopeID = inputScope.scope ?? 'osm';
 
       // Get or create a data cache for this scopeID
-      let scopeData = this._scopes.get(scopeID);
-      if (!scopeData) {
-        scopeData = this._createEmptyScopeData();
-        this._scopes.set(scopeID, scopeData);
-      }
+      const scope = this.getScope(scopeID);
 
       // Merge Fields
       if (inputScope.fields) {
         for (const [fieldID, props] of Object.entries(inputScope.fields)) {
-          const existing = scopeData.fields.get(fieldID);
+          const existing = scope.fields.get(fieldID);
           if (existing?.isBuiltin()) continue;  // don't override a builtin Field
 
           if (props) {   // add or replace
@@ -586,10 +555,10 @@ gfx?.scene?.reset();  // throw it all away
             if (field.props.locationSet) {
               checkLocationSets.push(field.props);
             }
-            scopeData.fields.set(fieldID, field);
+            scope.fields.set(fieldID, field);
 
           } else {   // remove
-            utilWildcardDelete(scopeData.fields, fieldID);
+            utilWildcardDelete(scope.fields, fieldID);
           }
         }
       }
@@ -597,7 +566,7 @@ gfx?.scene?.reset();  // throw it all away
       // Merge Presets
       if (inputScope.presets) {
         for (const [presetID, props] of Object.entries(inputScope.presets)) {
-          const existing = scopeData.presets.get(presetID);
+          const existing = scope.presets.get(presetID);
           if (existing?.isBuiltin()) continue;  // don't override a builtin Preset
 
           if (props) {   // add or replace
@@ -618,10 +587,10 @@ gfx?.scene?.reset();  // throw it all away
             if (preset.props.locationSet) {
               checkLocationSets.push(preset.props);
             }
-            scopeData.presets.set(presetID, preset);
+            scope.presets.set(presetID, preset);
 
           } else {   // remove
-            utilWildcardDelete(scopeData.presets, presetID);
+            utilWildcardDelete(scope.presets, presetID);
           }
         }
       }
@@ -629,7 +598,7 @@ gfx?.scene?.reset();  // throw it all away
       // Merge Categories
       if (inputScope.categories) {
         for (const [categoryID, props] of Object.entries(inputScope.categories)) {
-          const existing = scopeData.categories.get(categoryID);
+          const existing = scope.categories.get(categoryID);
           if (existing?.isBuiltin()) continue;  // don't override a builtin Category
 
           if (props) {   // add or replace
@@ -641,10 +610,10 @@ gfx?.scene?.reset();  // throw it all away
             if (category.props.locationSet) {
               checkLocationSets.push(category.props);
             }
-            scopeData.categories.set(categoryID, category);
+            scope.categories.set(categoryID, category);
 
           } else {   // remove
-            utilWildcardDelete(scopeData.categories, categoryID);
+            utilWildcardDelete(scope.categories, categoryID);
           }
         }
       }
@@ -654,10 +623,10 @@ gfx?.scene?.reset();  // throw it all away
         for (const [geometry, itemIDs] of Object.entries(inputScope.defaults)) {
           if (!this.geometryTypes.has(geometry as GeometryType)) continue;
 
-          let defaultIDs = scopeData.defaults.get(geometry as GeometryType);
+          let defaultIDs = scope.defaults.get(geometry as GeometryType);
           if (!defaultIDs) {
             defaultIDs = new Set();
-            scopeData.defaults.set(geometry as GeometryType, defaultIDs);
+            scope.defaults.set(geometry as GeometryType, defaultIDs);
           }
 
           const newIDs = Array.isArray(itemIDs) ? itemIDs : [];
@@ -688,11 +657,33 @@ gfx?.scene?.reset();  // throw it all away
   /**
    * getScope
    * Get the scope data for a specific scope ID.
+   * If the scope doesn't exist yet, it is created and cached automatically.
    * @param scopeID - ID of the scope to look up
-   * @return The scope data, or undefined if none exists
+   * @return The scope data
    */
-  getScope(scopeID: ScopeID): SchemaScopeData | undefined {
-    return this._scopes.get(scopeID);
+  getScope(scopeID: ScopeID): SchemaScope {
+    let scope = this._scopes.get(scopeID);
+    if (!scope) {
+      // Doesn't exist yet - create.
+      scope = {
+        fields: new Map(),
+        presets: new Map(),
+        categories: new Map(),
+        defaults: new Map(),
+        universal: new Map(),
+        matchIndex: new Map(),
+        searchIndexes: new Map(),
+        currSearchIndex: null,
+      };
+      // Initialize per-geometry caches
+      for (const geometry of this.geometryTypes) {
+        scope.defaults.set(geometry, new Set());
+        scope.matchIndex.set(geometry, {});
+      }
+
+      this._scopes.set(scopeID, scope);
+    }
+    return scope;
   }
 
 
@@ -717,9 +708,14 @@ gfx?.scene?.reset();  // throw it all away
    * @return  A Minisearch `SearchResult`, containing the score and information about the match
    * @throws  Will throw if the search index is not ready
    */
-  search(query: string = '', geometries: GeometryType | GeometryType[] = [], loc: Vec2 | null = null, scopeID: ScopeID = 'osm'): SearchResult[] {
-    const scope = this._scopes.get(scopeID);
-    if (!scope?.currSearchIndex) {   // shouldn't happen
+  search(
+    query: string = '',
+    geometries: GeometryType | GeometryType[] = [],
+    loc: Vec2 | null = null,
+    scopeID: ScopeID = 'osm'
+  ): SearchResult[] {
+    const scope = this.getScope(scopeID);
+    if (!scope.currSearchIndex) {   // shouldn't happen
       throw new Error('Search index not ready');
     }
 
@@ -828,8 +824,7 @@ gfx?.scene?.reset();  // throw it all away
     const context = this.context;
     const locations = context.systems.locations;
 
-    const scope = this._scopes.get(scopeID);
-    if (!scope) return null;
+    const scope = this.getScope(scopeID);
 
     const keyIndex = scope.matchIndex.get(geometry);
     if (!keyIndex) return null;  // invalid geometry option?
@@ -925,8 +920,7 @@ gfx?.scene?.reset();  // throw it all away
    * @returns  areaKeys Object
    */
   areaKeys(scopeID: ScopeID = 'osm'): Record<string, Record<string, boolean>> {
-    const scope = this._scopes.get(scopeID);
-    if (!scope) return {};
+    const scope = this.getScope(scopeID);
 
     // The ignore list is for keys that imply lines. (We always add `area=yes` for exceptions)
     const ignore = new Set(['barrier', 'highway', 'footway', 'railway', 'junction', 'type']);
@@ -963,9 +957,11 @@ gfx?.scene?.reset();  // throw it all away
   }
 
 
+  /**
+   * pointTags
+   */
   pointTags(scopeID: ScopeID = 'osm'): Record<string, Record<string, boolean>> {
-    const scope = this._scopes.get(scopeID);
-    if (!scope) return {};
+    const scope = this.getScope(scopeID);
 
     const pointTags: Record<string, Record<string, boolean>> = {};
 
@@ -988,9 +984,11 @@ gfx?.scene?.reset();  // throw it all away
   }
 
 
+  /**
+   * vertexTags
+   */
   vertexTags(scopeID: ScopeID = 'osm'): Record<string, Record<string, boolean>> {
-    const scope = this._scopes.get(scopeID);
-    if (!scope) return {};
+    const scope = this.getScope(scopeID);
 
     const vertexTags: Record<string, Record<string, boolean>> = {};
 
@@ -1022,9 +1020,11 @@ gfx?.scene?.reset();  // throw it all away
    * @return  The fallback preset, or `undefined` if not found
    */
   getFallback(geometry: GeometryType, scopeID: ScopeID = 'osm'): Preset | undefined {
-    if (geometry === 'vertex')  geometry = 'point';
-    return this._scopes.get(scopeID)?.presets.get(geometry)
-      ?? this._scopes.get('*')?.presets.get(geometry);
+    if (geometry === 'vertex') {
+      geometry = 'point';
+    }
+    return this.getScope(scopeID).presets.get(geometry)
+      ?? this.getScope('*').presets.get(geometry);
   }
 
 
@@ -1039,13 +1039,17 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to query (defaults to 'osm')
    * @return  Array of Categories and Presets
    */
-  getDefaults(geometry: GeometryType, includeRecents: boolean = true, loc: [number, number] | null = null, scopeID: ScopeID = 'osm'): Array<Category | Preset> {
+  getDefaults(
+    geometry: GeometryType,
+    includeRecents: boolean = true,
+    loc: Vec2 | null = null,
+    scopeID: ScopeID = 'osm'
+  ): Array<Category | Preset> {
     if (!geometry) return [];
 
     const context = this.context;
     const locations = context.systems.locations;
-    const scope = this._scopes.get(scopeID);
-    if (!scope) return [];
+    const scope = this.getScope(scopeID);
 
     const results = new Map<string, Category | Preset>();   // Map<itemID, item>  (may be a Preset or a Category)
 
@@ -1107,8 +1111,7 @@ gfx?.scene?.reset();  // throw it all away
   getRecents(scopeID: ScopeID = 'osm'): Preset[] {
     const context = this.context;
     const storage = context.systems.storage;
-    const scope = this._scopes.get(scopeID);
-    if (!scope) return [];
+    const scope = this.getScope(scopeID);
 
     let itemIDs = this._recentIDs;
     if (!Array.isArray(itemIDs)) {  // first time, try to get them from localStorage
@@ -1293,7 +1296,7 @@ gfx?.scene?.reset();  // throw it all away
    * This may be a bit slow, so consider making this async.
    * @param scope - The scope to rebuild the search index for
    */
-  private _rebuildSearchIndex(scope: SchemaScopeData): void {
+  private _rebuildSearchIndex(scope: SchemaScope): void {
     if (!scope.currSearchIndex) {
       this._prepareSearchIndex();  // sets up currSearchIndex for all scopes
     }

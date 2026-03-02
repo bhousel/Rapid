@@ -111,8 +111,11 @@ describe('StyleSystem', () => {
         // The merge tests below verify that merge() properly adds to loadedAssetIDs.
       });
 
-      it('getScope returns undefined for unknown scopeID', () => {
-        assert.isUndefined(_styles.getScope('nonexistent'));
+      it('getScope auto-creates scope for unknown scopeID', () => {
+        const scope = _styles.getScope('nonexistent');
+        assert.isDefined(scope);
+        assert.instanceOf(scope.styles, Map);
+        assert.instanceOf(scope.selectors, Map);
       });
 
       it('patternIDs', () => {
@@ -532,7 +535,9 @@ describe('StyleSystem', () => {
       });
 
       it('clears all scopes', () => {
-        assert.isUndefined(_styles.getScope('osm'));
+        const scope = _styles.getScope('osm');
+        assert.strictEqual(scope.styles.size, 0);
+        assert.strictEqual(scope.selectors.size, 0);
       });
 
       it('emits stylechange', () => {

@@ -4,6 +4,7 @@ import { AbstractData, AbstractDataProps } from './AbstractData.ts';
 import { osmIsInterestingTag } from '../lib/tags.ts';
 
 import type { Context } from '../Context.ts';
+import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Tags } from './types.ts';
@@ -155,8 +156,8 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param graph - the Graph that holds the topology needed
    * @returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type
    */
-  geometry(graph: Graph): string {
-    throw new Error(`Do not call 'geometry' on OSMEntity`);
+  geometry(graph: Graph): GeometryType {
+    throw new Error(`Do not call 'geometry' on OsmEntity`);
   }
 
   /**

@@ -1,6 +1,7 @@
 import { utilSafeString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
+import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { LocationSet } from '@rapideditor/location-conflation';
 
 
@@ -26,7 +27,7 @@ export interface FieldProps {
   /** Tag keys whose value is to be displayed (for multi-key fields) */
   keys: string[];
   /** Geometry types this Field works with */
-  geometry: string[];
+  geometry: GeometryType[];
   /** The default value for this field */
   default: string;
   /** Placeholder text for this field */
@@ -109,7 +110,7 @@ export class Field {
   fieldID: FieldID;
   type: string;
   props: FieldProps;
-  geometries: Set<string>;
+  geometries: Set<GeometryType>;
 
   private _strings: Map<string, FieldStrings>;
   private _currLocaleCode: LocaleCode | null;
@@ -286,8 +287,8 @@ export class Field {
     if (val && (typeof val === 'string')) {   // This will only work for strings
       const match = val.match(/^\{(.*)\}$/);
       if (match) {
-        const field = schema?.getScope('osm')?.fields.get(match[1])
-          ?? schema?.getScope('*')?.fields.get(match[1]);
+        const field = schema?.getScope('osm').fields.get(match[1])
+          ?? schema?.getScope('*').fields.get(match[1]);
         if (field) {
           return field;
         }

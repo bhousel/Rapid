@@ -58,7 +58,7 @@ export class OsmRelation extends OsmEntity {
    * @param props - Properties to assign to the data element
    */
   constructor(otherOrContext: OsmRelation | Context, props: Partial<OsmRelationProps> = {}) {
-    super(otherOrContext as any, props);
+    super(otherOrContext, props);
     this.props.type = 'relation';
 
     if (!this.props.id) {  // no ID provided - generate one

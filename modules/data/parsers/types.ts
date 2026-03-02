@@ -1,4 +1,4 @@
-import type { Tags } from '../types.ts';
+import type { Tags, Vec2 } from '../types.ts';
 
 
 /** Supported types that can be parsed from OSM data */
@@ -34,7 +34,7 @@ export interface ParsedNode {
   id: string;
   visible: boolean;
   tags: Tags;
-  loc: [number, number];
+  loc: Vec2;
   [key: string]: unknown;
 }
 
@@ -77,7 +77,7 @@ export interface ParsedChangeset {
 /** Parsed note data */
 export interface ParsedNote {
   type: 'note';
-  loc: [number, number];
+  loc: Vec2;
   comments?: ParsedComment[];
   [key: string]: unknown;
 }
