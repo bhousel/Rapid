@@ -547,7 +547,7 @@ describe('OsmWay', () => {
       let way = new Rapid.OsmWay(context, { tags: { natural: 'cliff' } });
       assert.strictEqual(way.sidednessIdentifier(), 'natural');
       way = new Rapid.OsmWay(context, { tags: { natural: 'coastline' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'coastline');
+      assert.strictEqual(way.sidednessIdentifier(), 'natural');
       way = new Rapid.OsmWay(context, { tags: { barrier: 'retaining_wall' } });
       assert.strictEqual(way.sidednessIdentifier(), 'barrier');
       way = new Rapid.OsmWay(context, { tags: { barrier: 'kerb' } });
@@ -557,6 +557,8 @@ describe('OsmWay', () => {
       way = new Rapid.OsmWay(context, { tags: { barrier: 'city_wall' } });
       assert.strictEqual(way.sidednessIdentifier(), 'barrier');
       way = new Rapid.OsmWay(context, { tags: { man_made: 'embankment' } });
+      assert.strictEqual(way.sidednessIdentifier(), 'man_made');
+      way = new Rapid.OsmWay(context, { tags: { man_made: 'quay' } });
       assert.strictEqual(way.sidednessIdentifier(), 'man_made');
       way = new Rapid.OsmWay(context, { tags: { 'abandoned:barrier': 'guard_rail' } });
       assert.strictEqual(way.sidednessIdentifier(), 'barrier');

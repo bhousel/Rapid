@@ -328,22 +328,16 @@ export class OsmWay extends OsmEntity {
 
   /**
    * sidednessIdentifier
-   * Returns some identifier for tag that implies that this way is "sided",
+   * Returns the tag key that implies this way is "sided",
    *  i.e. the right side is the 'inside' (e.g. the right side of a `natural=cliff` is lower).
-   * @return The tag that indicates the sidedness
+   * @return The tag key indicating the sidedness, or `null` if not sided
    */
-  sidednessIdentifier(): string | false | null {
+  sidednessIdentifier(): string | null {
     for (const realKey in this.tags) {
       const value = this.tags[realKey];
       const key = osmRemoveLifecyclePrefix(realKey);
       if (key in osmRightSideIsInsideTags && (value in osmRightSideIsInsideTags[key])) {
-        if (osmRightSideIsInsideTags[key][value] === true) {
-          return key;
-        } else {
-          // if the value is something other than a literal true, we should use it so we can
-          // special case some keys (e.g. natural=coastline is handled differently to other naturals).
-          return osmRightSideIsInsideTags[key][value];
-        }
+        return key;
       }
     }
 

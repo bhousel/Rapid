@@ -1,3 +1,5 @@
+import { merge as deepMerge } from 'lodash-es';
+
 import type { Tags } from '../data/types.ts';
 
 
@@ -45,6 +47,18 @@ export function osmSetAreaKeys(value: TagKeyValueLookup): void {
   osmAreaKeys = value;
 }
 
+/** Tags that indicate a feature is typically linear (used to avoid false "connect the ends" suggestions) */
+export let osmLineTags: TagKeyValueLookup = {};
+
+/**
+ * Sets the line tags lookup table.
+ * Called by SchemaSystem at startup.
+ * @param value - The line tags lookup table
+ */
+export function osmSetLineTags(value: TagKeyValueLookup): void {
+  osmLineTags = value;
+}
+
 /** Tags that indicate a node can be a standalone point, e.g. `{ amenity: { bar: true, parking: true, ... } ... }` */
 export let osmPointTags: TagKeyValueLookup = {};
 
@@ -86,21 +100,29 @@ export function osmSetDeprecatedTags(value: DeprecatedTagEntry[]): void {
 // Tag Utility Functions
 // ============================================================================
 
+/** Patterns matching tag keys that are metadata/import-related and not "interesting" for feature display */
+const _uninterestingPatterns: RegExp[] = [
+  /^attribution$/,
+  /^created_by$/,
+  /^import_uuid$/,
+  /^geobase:(datasetName|uuid)$/,
+  /^KSJ2:(curve_id|lat|long)$/,
+  /^lat(itude)?$/,
+  /^lon(gitude)?$/,
+  /^odbl(:note)?$/,
+  /^source(_ref)?(:|$)/,
+  /^tiger:/,
+];
+
 /**
  * Checks whether a tag key is "interesting" (not metadata or import-related).
- * Filters out keys like 'attribution', 'created_by', 'source', 'tiger:', etc.
+ * Filters out keys like 'attribution', 'created_by', 'source', 'source:*', 'tiger:*', etc.
  *
  * @param key - The tag key to check
  * @returns True if the key is interesting, false otherwise
  */
 export function osmIsInterestingTag(key: string): boolean {
-  return key !== 'attribution' &&
-    key !== 'created_by' &&
-    key !== 'source' &&
-    key !== 'odbl' &&
-    key.indexOf('source:') !== 0 &&
-    key.indexOf('source_ref') !== 0 && // purposely exclude colon
-    key.indexOf('tiger:') !== 0;
+  return !_uninterestingPatterns.some(pattern => pattern.test(key));
 }
 
 /** Lifecycle prefixes that can be applied to tag keys (e.g., 'disused:', 'abandoned:') */
@@ -142,10 +164,26 @@ export function osmRemoveLifecyclePrefix(key: string): string {
   return key;
 }
 
-/** Exceptions to osmAreaKeys - tags that are NOT areas despite matching area keys */
-export const osmAreaKeysExceptions: TagKeyValueLookup = {
+/**
+ * Exceptions to osmAreaKeys - tags that should be treated as areas even if their
+ * primary key is typically linear (value `true`), OR tags that should NOT be treated
+ * as areas even though their primary key is typically an area key (value `false`).
+ *
+ * For example, `highway=elevator` is an area exception (`true`), while
+ * `emergency=yes` on a road is NOT an area (`false`) even though `emergency`
+ * is an area key in the schema.
+ */
+export const osmAreaKeysExceptions: Record<string, Record<string, boolean>> = {
   amenity: {
     bicycle_parking: true
+  },
+  emergency: {
+    yes: false,
+    no: false,
+    private: false,
+    designated: false,
+    destination: false,
+    official: false
   },
   highway: {
     elevator: true,
@@ -186,6 +224,10 @@ export function osmTagSuggestingArea(tags: Tags): Tags | null {
   const returnTags: Tags = {};
   for (const realKey in tags) {
     const key = osmRemoveLifecyclePrefix(realKey);
+    // Skip tags whose exception value is explicitly `false` (e.g. `emergency=yes` on a road)
+    if (key in osmAreaKeysExceptions && osmAreaKeysExceptions[key][tags[realKey]] === false) {
+      continue;
+    }
     if (key in osmAreaKeys && !(tags[realKey] in osmAreaKeys[key])) {
       returnTags[realKey] = tags[realKey];
       return returnTags;
@@ -321,8 +363,8 @@ export function deprecatedTagValuesByKey(): Record<string, string[]> {
 }
 
 
-/** Tags that imply a way is one-way by default */
-export const osmOneWayTags: TagKeyValueLookup = {
+/** Tags that imply a way is one-way in the forward direction */
+export const osmOneWayForwardTags: TagKeyValueLookup = {
   'aerialway': {
     'chair_lift': true,
     'drag_lift': true,
@@ -334,6 +376,9 @@ export const osmOneWayTags: TagKeyValueLookup = {
     't-bar': true,
     'zip_line': true
   },
+  'conveying': {
+    'forward': true
+  },
   'highway': {
     'motorway': true
   },
@@ -344,6 +389,9 @@ export const osmOneWayTags: TagKeyValueLookup = {
   'man_made': {
     'goods_conveyor': true,
     'piste:halfpipe': true
+  },
+  'oneway': {
+    'yes': true
   },
   'piste:type': {
     'downhill': true,
@@ -373,6 +421,35 @@ export const osmOneWayTags: TagKeyValueLookup = {
   }
 };
 
+/** Tags that imply a way is one-way in the backward direction */
+export const osmOneWayBackwardTags: TagKeyValueLookup = {
+  'conveying': {
+    'backward': true
+  },
+  'oneway': {
+    '-1': true
+  }
+};
+
+/** Tags that imply a way is bidirectional (alternating/reversible) */
+export const osmOneWayBiDirectionalTags: TagKeyValueLookup = {
+  'conveying': {
+    'reversible': true
+  },
+  'oneway': {
+    'alternating': true,
+    'reversible': true
+  }
+};
+
+/** All tags that imply a way is one-way (forward + backward + bidirectional) */
+export const osmOneWayTags: TagKeyValueLookup = deepMerge(
+  {},
+  osmOneWayForwardTags,
+  osmOneWayBackwardTags,
+  osmOneWayBiDirectionalTags
+);
+
 /** Solid and smooth surfaces akin to the assumed default road surface in OSM */
 export const osmPavedTags: TagKeyValueLookup = {
   'surface': {
@@ -381,7 +458,8 @@ export const osmPavedTags: TagKeyValueLookup = {
     'concrete': true,
     'chipseal': true,
     'concrete:lanes': true,
-    'concrete:plates': true
+    'concrete:plates': true,
+    'tiles': true
   },
   'tracktype': {
     'grade1': true
@@ -391,21 +469,25 @@ export const osmPavedTags: TagKeyValueLookup = {
 /** Solid, if somewhat uncommon surfaces with a high range of smoothness */
 export const osmSemipavedTags: TagKeyValueLookup = {
   'surface': {
+    'bricks': true,
     'cobblestone': true,
     'cobblestone:flattened': true,
     'unhewn_cobblestone': true,
     'sett': true,
     'paving_stones': true,
+    'grass_paver': true,
     'metal': true,
+    'metal_grid': true,
+    'fibre_reinforced_polymer_grate': true,
     'wood': true
   }
 };
 
 /** Tags where the right side of the way represents the "inside" (e.g., cliffs, retaining walls) */
-export const osmRightSideIsInsideTags: Record<string, Record<string, boolean | string>> = {
+export const osmRightSideIsInsideTags: TagKeyValueLookup = {
   'natural': {
     'cliff': true,
-    'coastline': 'coastline',
+    'coastline': true,
   },
   'barrier': {
     'retaining_wall': true,
@@ -414,7 +496,8 @@ export const osmRightSideIsInsideTags: Record<string, Record<string, boolean | s
     'city_wall': true,
   },
   'man_made': {
-    'embankment': true
+    'embankment': true,
+    'quay': true
   },
   'waterway': {
     'weir': true
@@ -447,7 +530,8 @@ export const osmRoutableHighwayTagValues: TagValueLookup = {
   bridleway: true,
   pedestrian: true,
   corridor: true,
-  steps: true
+  steps: true,
+  ladder: true
 };
 
 /** aeroway tags that are treated as routable for aircraft */
@@ -464,7 +548,8 @@ export const osmPathHighwayTagValues: TagValueLookup = {
   bridleway: true,
   pedestrian: true,
   corridor: true,
-  steps: true
+  steps: true,
+  ladder: true
 };
 
 /** Railway tag values representing existing railroad tracks (purposely does not include 'abandoned') */
@@ -492,3 +577,57 @@ export const osmFlowingWaterwayTagValues: TagValueLookup = {
   stream: true,
   tidal_channel: true
 };
+
+/**
+ * Tag values that represent actual land use (areas).
+ * In iD, this powers the `_isLanduse` filter matcher. Rapid's FilterSystem
+ * currently uses a broader heuristic instead (area geometry minus buildings,
+ * water, etc.). We may revisit which approach is better in the future.
+ */
+export const osmLanduseTags: TagKeyValueLookup = {
+  'amenity': {
+    'bicycle_parking': true,
+    'college': true,
+    'grave_yard': true,
+    'hospital': true,
+    'marketplace': true,
+    'motorcycle_parking': true,
+    'parking': true,
+    'place_of_worship': true,
+    'prison': true,
+    'school': true,
+    'university': true
+  },
+  'landuse': { '*': true },
+  'leisure': { '*': true },
+  'natural': { '*': true }
+};
+
+/** Tags whose values should be summed (not conflict-resolved) when joining ways */
+export const osmSummableTags = new Set([
+  'step_count',
+  'parking:both:capacity',
+  'parking:left:capacity',
+  'parking:right:capacity'
+]);
+
+/** Tag pairs that should not coexist on the same feature */
+export const osmMutuallyExclusiveTagPairs: [string, string][] = [
+  ['noname', 'name'],
+  ['noref', 'ref'],
+  ['nohousenumber', 'addr:housenumber'],
+  ['noaddress', 'addr:housenumber'],
+  ['noaddress', 'addr:housename'],
+  ['noaddress', 'addr:unit'],
+  ['addr:nostreet', 'addr:street']
+];
+
+/** Tag value patterns that should be treated as case-sensitive when offering tag suggestions */
+export const allowUpperCaseTagValues =
+  /network|taxon|genus|species|brand|grape_variety|royal_cypher|listed_status|booth|rating|stars|:output|_hours|_times|_ref|manufacturer|country|target|brewery|cai_scale|traffic_sign/;
+
+/** ISO country code tag keys */
+export const osmIsoCountryKeys = new Set([
+  'country',
+  'target'
+]);
