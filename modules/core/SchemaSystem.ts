@@ -2,7 +2,7 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 import MiniSearch from 'minisearch';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.ts';
+import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetUninterestingRuleset, osmSetVertexTags } from '../lib/tags.ts';
 import { Category, Field, Preset, Ruleset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
@@ -1440,6 +1440,10 @@ gfx?.scene?.reset();  // throw it all away
     osmSetAreaKeys(this.areaKeys());
     osmSetPointTags(this.pointTags());
     osmSetVertexTags(this.vertexTags());
+
+    // Update uninteresting ruleset from the 'osm' scope
+    const osmScope = this._scopes.get('osm');
+    osmSetUninterestingRuleset(osmScope?.rulesets?.get('uninteresting') ?? null);
 
     gfx?.immediateRedraw();
     this.emit('schemachange');

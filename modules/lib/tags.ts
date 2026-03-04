@@ -1,5 +1,6 @@
 import { merge as deepMerge } from 'lodash-es';
 
+import type { Ruleset } from './Ruleset.ts';
 import type { Tags } from '../data/types.ts';
 
 
@@ -114,14 +115,30 @@ const _uninterestingPatterns: RegExp[] = [
   /^tiger:/,
 ];
 
+/** Scope-owned ruleset for uninteresting tag keys, set by SchemaSystem */
+let _uninterestingRuleset: Ruleset | null = null;
+
+/**
+ * Sets the uninteresting tags ruleset.
+ * Called by SchemaSystem when schemaChanged.
+ * @param value - The uninteresting ruleset, or null to clear
+ */
+export function osmSetUninterestingRuleset(value: Ruleset | null): void {
+  _uninterestingRuleset = value;
+}
+
 /**
  * Checks whether a tag key is "interesting" (not metadata or import-related).
  * Filters out keys like 'attribution', 'created_by', 'source', 'source:*', 'tiger:*', etc.
+ * Uses the scope-owned `uninteresting` ruleset when available, falling back to hardcoded patterns.
  *
  * @param key - The tag key to check
  * @returns True if the key is interesting, false otherwise
  */
 export function osmIsInterestingTag(key: string): boolean {
+  if (_uninterestingRuleset) {
+    return !_uninterestingRuleset.matchAny({ [key]: true });
+  }
   return !_uninterestingPatterns.some(pattern => pattern.test(key));
 }
 

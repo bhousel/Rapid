@@ -10,7 +10,6 @@ import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
 
 export function uiSectionRawTagEditor(context, id) {
-  const assets = context.systems.assets;
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
@@ -33,14 +32,9 @@ export function uiSectionRawTagEditor(context, id) {
 
 
   let _discardKeys = new Set();
-  if (assets && schema) {
-    // todo, actually store discarded tags with the SchemaSystem
-    assets.loadAssetAsync('id_tagging_schema')
-      .then(result => {
-        const discarded = result?.discarded ?? {};
-        _discardKeys = new Set(Object.keys(discarded));
-      })
-      .catch(() => { /* ignore */ });
+  if (schema) {
+    const osmScope = schema.getScope('osm');
+    _discardKeys = new Set(Object.keys(osmScope.discarded));
   }
 
   let _tagView = storage?.getItem('raw-tag-editor-view') || 'list';   // 'list, 'text'

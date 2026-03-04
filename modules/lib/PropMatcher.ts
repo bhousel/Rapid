@@ -13,9 +13,23 @@
  * const anyHighway = new PropMatcher({ key: 'highway', op: 'exists' });
  * anyHighway.matches({ highway: 'residential' });  // true
  *
- * // Match with regex
+ * // Match with regex on value
  * const trunkOrPrimary = new PropMatcher({ key: 'highway', op: '~', value: '^(trunk|primary)$' });
  * trunkOrPrimary.matches({ highway: 'trunk' });  // true
+ *
+ * // Match with regex on key (key pattern matching)
+ * const tigerKey = new PropMatcher({ key: '^tiger:', keyOp: '~' });
+ * tigerKey.matches({ 'tiger:source': 'census' });  // true
+ * tigerKey.matches({ highway: 'motorway' });       // false
+ *
+ * // Match with RegExp key (keyOp inferred as '~')
+ * const tigerKey2 = new PropMatcher({ key: /^tiger:/ });
+ * tigerKey2.matches({ 'tiger:source': 'census' });  // true
+ *
+ * // Match any of several keys (keyOp inferred as 'in')
+ * const coords = new PropMatcher({ key: ['lat', 'lon', 'latitude', 'longitude'] });
+ * coords.matches({ lat: '35.6' });  // true
+ * coords.matches({ longitude: '139.7' });  // true
  *
  * @module
  */
@@ -42,8 +56,20 @@ export type PropMatcherOp =
  * Properties for creating a PropMatcher.
  */
 export interface PropMatcherProps {
-  /** The property key to match against */
-  key: string;
+  /**
+   * The property key(s) to match against.
+   * - `string` — exact key (default) or regex pattern (when `keyOp: '~'`)
+   * - `string[]` — match any of several exact keys (infers `keyOp: 'in'`)
+   * - `RegExp` — regex key pattern (infers `keyOp: '~'`; normalized to source string internally)
+   */
+  key: string | string[] | RegExp;
+  /**
+   * Key matching mode (inferred from `key` type when omitted).
+   * - `'='` (default for `string`): exact key match — checks `obj[key]` directly
+   * - `'~'` (default for `RegExp`): regex key match — iterates all keys of `obj` and tests each against the key pattern
+   * - `'in'` (default for `string[]`): list key match — checks each key in the array against `obj`
+   */
+  keyOp?: '=' | '~' | 'in';
   /**
    * Comparison operator.
    * Defaults to '=' if value is provided, 'exists' if no value.
@@ -72,12 +98,16 @@ export interface PropMatcherProps {
 export class PropMatcher {
   props: PropMatcherProps;
 
-  /** The property key to match */
-  readonly key: string;
+  /** The property key(s) to match (exact string, regex pattern string, or array of exact strings) */
+  readonly key: string | string[];
+  /** Key matching mode: '=' for exact, '~' for regex, 'in' for list */
+  readonly keyOp: '=' | '~' | 'in';
   /** The comparison operator */
   readonly op: PropMatcherOp;
-  /** Cached RegExp for regex operations */
-  private _regex: RegExp | null = null;
+  /** Cached RegExp for regex operations on key (when keyOp is '~') */
+  private _keyRegex: RegExp | null = null;
+  /** Cached RegExp for regex operations on value */
+  private _valueRegex: RegExp | null = null;
 
   /**
    * @constructor
@@ -86,12 +116,31 @@ export class PropMatcher {
    * @throws Error if regex pattern is invalid (for `~` or `!~` operators)
    */
   constructor(props: PropMatcherProps) {
-    if (!props.key) {
-      throw new Error('PropMatcher: key is required');
+    // Validate and normalize the key
+    const rawKey = props.key;
+    if (rawKey instanceof RegExp) {
+      this.key = rawKey.source;
+      this.keyOp = props.keyOp ?? '~';
+      this._keyRegex = rawKey;
+    } else if (Array.isArray(rawKey)) {
+      if (rawKey.length === 0) {
+        throw new Error('PropMatcher: key is required');
+      }
+      this.key = rawKey;
+      this.keyOp = props.keyOp ?? 'in';
+    } else {
+      if (!rawKey) {
+        throw new Error('PropMatcher: key is required');
+      }
+      this.key = rawKey;
+      this.keyOp = props.keyOp ?? '=';
     }
 
+    // Shallow clone props, normalizing RegExp key to its source string for serialization
     this.props = { ...props };
-    this.key = props.key;
+    if (rawKey instanceof RegExp) {
+      this.props.key = rawKey.source;
+    }
 
     // Determine default operator based on whether value is provided
     if (props.op !== undefined) {
@@ -102,13 +151,22 @@ export class PropMatcher {
       this.op = 'exists';
     }
 
-    // Pre-compile regex if needed
+    // Pre-compile key regex if needed (and not already set from RegExp input)
+    if (this.keyOp === '~' && !this._keyRegex) {
+      try {
+        this._keyRegex = new RegExp(this.key as string);
+      } catch (e) {
+        throw new Error(`PropMatcher: invalid key regex pattern '${this.key}'`);
+      }
+    }
+
+    // Pre-compile value regex if needed
     if ((this.op === '~' || this.op === '!~') && props.value !== undefined) {
       if (props.value instanceof RegExp) {
-        this._regex = props.value;
+        this._valueRegex = props.value;
       } else if (typeof props.value === 'string') {
         try {
-          this._regex = new RegExp(props.value, 'i');  // Case-insensitive by default
+          this._valueRegex = new RegExp(props.value, 'i');  // Case-insensitive by default
         } catch (e) {
           throw new Error(`PropMatcher: invalid regex pattern '${props.value}'`);
         }
@@ -137,49 +195,24 @@ export class PropMatcher {
       return this.op === '!exists';
     }
 
-    const hasKey = Object.prototype.hasOwnProperty.call(obj, this.key);
-    const actualValue = obj[this.key];
-
-    switch (this.op) {
-      case 'exists':
-        return hasKey && actualValue !== undefined && actualValue !== null;
-
-      case '!exists':
-        return !hasKey || actualValue === undefined || actualValue === null;
-
-      case '=':
-        return this._matchEquals(actualValue);
-
-      case '!=':
-        return !this._matchEquals(actualValue);
-
-      case '~':
-        return this._matchRegex(actualValue);
-
-      case '!~':
-        return !this._matchRegex(actualValue);
-
-      case 'in':
-        return this._matchIn(actualValue);
-
-      case '!in':
-        return !this._matchIn(actualValue);
-
-      case '>':
-        return this._compareNumeric(actualValue, (a, b) => a > b);
-
-      case '>=':
-        return this._compareNumeric(actualValue, (a, b) => a >= b);
-
-      case '<':
-        return this._compareNumeric(actualValue, (a, b) => a < b);
-
-      case '<=':
-        return this._compareNumeric(actualValue, (a, b) => a <= b);
-
-      default:
-        return false;
+    // Key-pattern matching: iterate all keys and find one matching the regex
+    if (this.keyOp === '~' && this._keyRegex) {
+      return this._matchKeyPattern(obj);
     }
+
+    // Key-list matching: check each candidate key
+    if (this.keyOp === 'in' && Array.isArray(this.key)) {
+      return this._matchKeyList(obj);
+    }
+
+    // Exact key matching
+    const key = this.key as string;
+    const hasKey = Object.prototype.hasOwnProperty.call(obj, key);
+    const actualValue = obj[key];
+
+    if (this.op === 'exists') return hasKey && actualValue !== undefined && actualValue !== null;
+    if (this.op === '!exists') return !hasKey || actualValue === undefined || actualValue === null;
+    return this._checkValueOp(actualValue);
   }
 
 
@@ -210,11 +243,11 @@ export class PropMatcher {
    * Test regex match.
    */
   private _matchRegex(actualValue: unknown): boolean {
-    if (!this._regex) return false;
+    if (!this._valueRegex) return false;
     if (actualValue === undefined || actualValue === null) return false;
 
     const str = String(actualValue);
-    return this._regex.test(str);
+    return this._valueRegex.test(str);
   }
 
 
@@ -249,6 +282,91 @@ export class PropMatcher {
     }
 
     return compareFn(actual, expected);
+  }
+
+
+  /**
+   * Apply a value-side check for a single actual value.
+   * Handles all ops except 'exists' and '!exists' (which are handled by the caller).
+   */
+  private _checkValueOp(actualValue: unknown): boolean {
+    switch (this.op) {
+      case '=':   return this._matchEquals(actualValue);
+      case '!=':  return !this._matchEquals(actualValue);
+      case '~':   return this._matchRegex(actualValue);
+      case '!~':  return !this._matchRegex(actualValue);
+      case 'in':  return this._matchIn(actualValue);
+      case '!in': return !this._matchIn(actualValue);
+      case '>':   return this._compareNumeric(actualValue, (a, b) => a > b);
+      case '>=':  return this._compareNumeric(actualValue, (a, b) => a >= b);
+      case '<':   return this._compareNumeric(actualValue, (a, b) => a < b);
+      case '<=':  return this._compareNumeric(actualValue, (a, b) => a <= b);
+      default:    return false;
+    }
+  }
+
+
+  /**
+   * Match by key pattern: iterate all keys of the object and test each
+   * against the pre-compiled key regex. For the first matching key, apply
+   * the value check (op + value). For 'exists', just check that any key matches.
+   */
+  private _matchKeyPattern(obj: Record<string, unknown>): boolean {
+    const keyRegex = this._keyRegex!;
+
+    // For '!exists', ALL keys must not match the pattern
+    if (this.op === '!exists') {
+      for (const k of Object.keys(obj)) {
+        if (keyRegex.test(k)) {
+          const v = obj[k];
+          if (v !== undefined && v !== null) return false;
+        }
+      }
+      return true;
+    }
+
+    // For all other ops, find the first matching key and test its value
+    for (const k of Object.keys(obj)) {
+      if (keyRegex.test(k)) {
+        const actualValue = obj[k];
+        if (this.op === 'exists') {
+          if (actualValue !== undefined && actualValue !== null) return true;
+        } else {
+          if (this._checkValueOp(actualValue)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+
+  /**
+   * Match by key list: check each key in the array against the object.
+   * For 'exists', returns true if any listed key exists. For '!exists',
+   * returns true only if none of the listed keys exist.
+   */
+  private _matchKeyList(obj: Record<string, unknown>): boolean {
+    const keys = this.key as string[];
+
+    // For '!exists', ALL listed keys must not exist
+    if (this.op === '!exists') {
+      return keys.every(k => {
+        const v = obj[k];
+        return !Object.prototype.hasOwnProperty.call(obj, k) || v === undefined || v === null;
+      });
+    }
+
+    // For all other ops, find the first listed key that exists and test its value
+    for (const k of keys) {
+      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+      const actualValue = obj[k];
+      if (this.op === 'exists') {
+        if (actualValue !== undefined && actualValue !== null) return true;
+      } else {
+        if (this._checkValueOp(actualValue)) return true;
+      }
+    }
+    return false;
   }
 
 
@@ -308,6 +426,12 @@ export class PropMatcher {
   toJSON(): PropMatcherProps {
     const result: PropMatcherProps = { key: this.key };
 
+    // Only include keyOp if it's not the inferred default
+    const defaultKeyOp = Array.isArray(this.key) ? 'in' : '=';
+    if (this.keyOp !== defaultKeyOp) {
+      result.keyOp = this.keyOp;
+    }
+
     // Only include op if it's not the default
     const defaultOp = this.props.value !== undefined ? '=' : 'exists';
     if (this.op !== defaultOp) {
@@ -332,18 +456,27 @@ export class PropMatcher {
    */
   toString(): string {
     const value = this.props.value;
+    let keyStr: string;
+    if (this.keyOp === '~') {
+      keyStr = `/${this.key}/`;
+    } else if (Array.isArray(this.key)) {
+      keyStr = `(${this.key.join(', ')})`;
+    } else {
+      keyStr = this.key;
+    }
+
     if (this.op === 'exists') {
-      return `[${this.key}]`;
+      return `[${keyStr}]`;
     }
     if (this.op === '!exists') {
-      return `[!${this.key}]`;
+      return `[!${keyStr}]`;
     }
     if (value instanceof RegExp) {
-      return `[${this.key}${this.op}/${value.source}/]`;
+      return `[${keyStr}${this.op}/${value.source}/]`;
     }
     if (Array.isArray(value)) {
-      return `[${this.key} ${this.op} (${value.join(', ')})]`;
+      return `[${keyStr} ${this.op} (${value.join(', ')})]`;
     }
-    return `[${this.key}${this.op}${value}]`;
+    return `[${keyStr}${this.op}${value}]`;
   }
 }

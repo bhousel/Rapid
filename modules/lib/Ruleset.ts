@@ -151,8 +151,24 @@ export class Ruleset {
     for (const key of Object.keys(obj)) {
       // Check if any rule's key matches this property key AND the rule matches the object
       for (const rule of this.rules) {
-        if (rule.key === key && rule.matches(obj)) {
+        const ruleKey = rule.key;
+        const isKeyMatch = Array.isArray(ruleKey)
+          ? ruleKey.includes(key)
+          : ruleKey === key;
+
+        if (isKeyMatch && rule.matches(obj)) {
           return key;
+        }
+      }
+    }
+
+    // Also check regex-keyed rules that may have matched
+    for (const rule of this.rules) {
+      if (rule.keyOp === '~' && rule.matches(obj)) {
+        // Find which key in obj actually matched the pattern
+        const keyRegex = new RegExp(rule.key as string);
+        for (const key of Object.keys(obj)) {
+          if (keyRegex.test(key)) return key;
         }
       }
     }
@@ -167,7 +183,16 @@ export class Ruleset {
    * @return Set of all unique keys referenced by rules
    */
   ruleKeys(): Set<string> {
-    return new Set(this.rules.map(r => r.key));
+    const keys = new Set<string>();
+    for (const rule of this.rules) {
+      const ruleKey = rule.key;
+      if (Array.isArray(ruleKey)) {
+        for (const k of ruleKey) keys.add(k);
+      } else {
+        keys.add(ruleKey);  // string (exact or regex pattern)
+      }
+    }
+    return keys;
   }
 
 

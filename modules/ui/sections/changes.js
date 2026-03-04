@@ -9,7 +9,6 @@ import { utilHighlightEntities } from '../../util/util.ts';
 
 
 export function uiSectionChanges(context) {
-  const assets = context.systems.assets;
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
@@ -17,11 +16,9 @@ export function uiSectionChanges(context) {
 
   let _discardTags = {};
 
-  if (assets && schema) {
-    // todo, actually store discarded tags with the SchemaSystem
-    assets.loadAssetAsync('id_tagging_schema')
-      .then(result => _discardTags = result?.discarded)
-      .catch (() => { /* ignore */ });
+  if (schema) {
+    const osmScope = schema.getScope('osm');
+    _discardTags = osmScope.discarded;
   }
 
   let section = uiSection(context, 'changes-list')

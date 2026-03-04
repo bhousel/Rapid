@@ -526,7 +526,8 @@ const unpause = gfx?.pause();  // block rendering
       const bestSelector = matchingSelectors[0];
       const tagMatchers = bestSelector.tagMatchers;
       if (tagMatchers.length > 0) {
-        styleKey = tagMatchers[0].key;
+        const k = tagMatchers[0].key;
+        styleKey = Array.isArray(k) ? k[0] : k;
       }
     }
 
