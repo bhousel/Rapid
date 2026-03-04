@@ -17,6 +17,7 @@ export * from './multipolygon.ts';
 export * from './Preset.ts';
 export * from './PropMatcher.ts';
 export * from './RapidDataset.ts';
+export * from './Ruleset.ts';
 export * from './Style.ts';
 export * from './StyleSelector.ts';
 export * from './tags.ts';
