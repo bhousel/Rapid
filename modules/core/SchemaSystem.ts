@@ -65,6 +65,10 @@ export interface SchemaInputScope {
   categories?: Record<CategoryID, Partial<CategoryProps> | null>;
   /** Object mapping geometry type to array of default preset/category IDs */
   defaults?: Record<GeometryType, string[]>;
+
+  // improve:
+  deprecated?: DeprecationRule[];
+  discarded?: Record<string, true>;
 }
 
 /**
@@ -82,12 +86,16 @@ export interface SchemaScope {
   matchIndex: Map<GeometryType, Record<string, Record<string, Preset[]>>>;
   searchIndexes: Map<LocaleCode, MiniSearch>;
   currSearchIndex: MiniSearch | null;
+
+  // improve:
+  deprecated: DeprecationRule[];
+  discarded: Record<string, true>;
 }
 
 /**
  * MiniSearch search result
  */
-interface SearchResult {
+export interface SearchResult {
   id: string;
   match: Record<string, string[]>;
   queryTerms: string[];
@@ -95,6 +103,17 @@ interface SearchResult {
   terms: string[];
   [key: string]: any;
 }
+
+/**
+ * A deprecation rule describes an old tag pattern and its replacement.
+ */
+export interface DeprecationRule {
+  /** The old tag pattern to match. Value of '*' matches any value. */
+  old: Record<string, string>;
+  /** Optional replacement tags */
+  replace?: Record<string, string>;
+}
+
 
 
 /**
@@ -321,6 +340,8 @@ const unpause = gfx?.pause();  // block rendering
               presets: value.presets,
               categories: value.categories,
               defaults: value.defaults,
+              deprecated: value.deprecated,
+              discarded: value.discarded
             }],
           };
         } else {
@@ -478,9 +499,6 @@ gfx?.scene?.reset();  // throw it all away
   }
 
 
-
-
-
   /**
    * merge
    * Accepts schema data in scoped format:
@@ -493,7 +511,9 @@ gfx?.scene?.reset();  // throw it all away
    *     fields: { … },       // Object<FieldID, Partial<FieldProps>>
    *     presets: { … },      // Object<PresetID, Partial<PresetProps>>
    *     categories: { … },   // Object<CategoryID, Partial<CategoryProps>>
-   *     defaults: { … }
+   *     defaults: { … },
+   *     deprecated: { … },
+   *     discarded: { … },
    *   }],
    *   featureCollection: { … }    // optional, for locationSets
    * }
@@ -636,6 +656,16 @@ gfx?.scene?.reset();  // throw it all away
           }
         }
       }
+
+      // TODO:  These just do simple overwrites right now
+      // Merge deprecated
+      if (inputScope.deprecated) {
+        scope.deprecated = inputScope.deprecated;
+      }
+      // Merge discarded
+      if (inputScope.discarded) {
+        scope.discarded = inputScope.discarded;
+      }
     }
 
     if (locations) {
@@ -674,7 +704,12 @@ gfx?.scene?.reset();  // throw it all away
         matchIndex: new Map(),
         searchIndexes: new Map(),
         currSearchIndex: null,
+
+        // improve
+        deprecated: [],
+        discarded: {}
       };
+
       // Initialize per-geometry caches
       for (const geometry of this.geometryTypes) {
         scope.defaults.set(geometry, new Set());
@@ -1172,14 +1207,6 @@ gfx?.scene?.reset();  // throw it all away
 
     // Register id_schema as a bundle - multiple files fetched together
     assets.registerBundleAsset('id_tagging_schema', {
-      deprecated: {
-        latest: `${latestPath}/deprecated.min.json`,
-        local:  `${localPath}/deprecated.min.json`
-      },
-      discarded: {
-        latest: `${latestPath}/discarded.min.json`,
-        local:  `${localPath}/discarded.min.json`
-      },
       categories: {
         latest: `${latestPath}/preset_categories.min.json`,
         local:  `${localPath}/preset_categories.min.json`
@@ -1195,6 +1222,14 @@ gfx?.scene?.reset();  // throw it all away
       fields: {
         latest: `${latestPath}/fields.min.json`,
         local:  `${localPath}/fields.min.json`
+      },
+      deprecated: {
+        latest: `${latestPath}/deprecated.min.json`,
+        local: `${localPath}/deprecated.min.json`
+      },
+      discarded: {
+        latest: `${latestPath}/discarded.min.json`,
+        local: `${localPath}/discarded.min.json`
       }
     });
 
