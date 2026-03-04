@@ -3,18 +3,19 @@ import MiniSearch from 'minisearch';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetDeprecatedTags, osmSetPointTags, osmSetVertexTags } from '../lib/tags.ts';
-import { Category, Field, Preset } from '../lib/index.ts';
+import { Category, Field, Preset, Ruleset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
 import type { CategoryProps } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
 import type { FieldProps } from '../lib/Field.ts';
-import type { HasLocationSet } from '../core/LocationSystem.ts';
 import type { Graph } from '../lib/Graph.ts';
+import type { HasLocationSet } from '../core/LocationSystem.ts';
 import type { OsmEntity, OsmNode, Tags, Vec2 } from '../data/types.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { PresetProps } from '../lib/Preset.ts';
+import type { RulesetProps } from '../lib/Ruleset.ts';
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
@@ -63,6 +64,8 @@ export interface SchemaInputScope {
   presets?: Record<PresetID, Partial<PresetProps> | null>;
   /** Object mapping CategoryID to Category props (or null to delete) */
   categories?: Record<CategoryID, Partial<CategoryProps> | null>;
+  /** Object mapping RulesetID to Ruleset props (or null to delete) */
+  rulesets?: Record<RulesetID, Partial<RulesetProps> | null>;
   /** Object mapping geometry type to array of default preset/category IDs */
   defaults?: Record<GeometryType, string[]>;
 
@@ -81,6 +84,9 @@ export interface SchemaScope {
   presets: Map<PresetID, Preset>;
   /** Map of CategoryID to instantiated Categories */
   categories: Map<CategoryID, Category>;
+  /** Map of RulesetIDs to instantiated Rulesets */
+  rulesets: Map<RulesetID, Ruleset>;
+
   defaults: Map<GeometryType, Set<PresetID | CategoryID>>;
   universal: Map<FieldID, Field>;
   matchIndex: Map<GeometryType, Record<string, Record<string, Preset[]>>>;
@@ -197,7 +203,7 @@ export class SchemaSystem extends AbstractSystem {
     // The default schema assets.
     // 'id_tagging_schema' is a "bundle" that combines multiple id_tagging_schema files.
     // 'rapid_schema' is Rapid's customizations to merge in after.
-    this._defaultAssetIDs = new Set(['id_tagging_schema', 'rapid_schema']);
+    this._defaultAssetIDs = new Set(['id_tagging_schema', 'osm_rulesets', 'rapid_schema']);
     this._loadedAssetIDs = new Map();
     this._requestedAssetIDs = null;
     this._recentIDs = null;
@@ -666,6 +672,20 @@ gfx?.scene?.reset();  // throw it all away
       if (inputScope.discarded) {
         scope.discarded = inputScope.discarded;
       }
+
+      // Merge Rulesets
+      if (inputScope.rulesets) {
+        for (const [rulesetID, props] of Object.entries(inputScope.rulesets)) {
+          if (props) {   // add or replace
+            const setProps = { ...props, id: rulesetID, assetID, assetVersion, scopeID } as Partial<RulesetProps>;
+            const ruleset = new Ruleset(context, setProps);
+            scope.rulesets.set(rulesetID, ruleset);
+
+          } else {   // remove
+            utilWildcardDelete(scope.rulesets, rulesetID);
+          }
+        }
+      }
     }
 
     if (locations) {
@@ -701,6 +721,7 @@ gfx?.scene?.reset();  // throw it all away
         categories: new Map(),
         defaults: new Map(),
         universal: new Map(),
+        rulesets: new Map(),
         matchIndex: new Map(),
         searchIndexes: new Map(),
         currSearchIndex: null,
@@ -1231,6 +1252,11 @@ gfx?.scene?.reset();  // throw it all away
         latest: `${latestPath}/discarded.min.json`,
         local: `${localPath}/discarded.min.json`
       }
+    });
+
+    // 'osm_rulesets' = tag classification rulesets for OSM data
+    assets.registerAsset('osm_rulesets', {
+      preferred: 'data/osm_rulesets.min.json5'
     });
 
     // 'rapid_schema' = customizations to merge in after the id-tagging-schema

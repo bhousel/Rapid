@@ -1,0 +1,167 @@
+// osm_rulesets.json5
+// Tag classification rulesets for OSM data.
+// These define which tag combinations belong to various categories
+// (e.g. "paved" surfaces, "routable" highways, "one-way" roads).
+//
+// Each ruleset is a named collection of PropMatcher rules with OR semantics:
+// a feature matches the ruleset if ANY of its rules match.
+//
+// Rule format (PropMatcherProps):
+//   key     - the tag key to match
+//   op      - comparison operator ('=', '!=', 'exists', '!exists', '~', '!~', 'in', '!in', '>', '>=', '<', '<=')
+//             defaults to '=' if value is a string, 'exists' if no value
+//   value   - the tag value to match (string, number, or string[] for 'in'/'!in')
+
+{
+  assetID: "osm_rulesets",
+  scopes: [{
+    scope: "osm",
+    rulesets: {
+
+      // --- Surface classification ---
+
+      // Solid and smooth surfaces akin to the assumed default road surface in OSM
+      paved: {
+        rules: [
+          { key: "surface", op: "in", value: ["paved", "asphalt", "concrete", "chipseal", "concrete:lanes", "concrete:plates", "tiles"] },
+          { key: "tracktype", value: "grade1" }
+        ]
+      },
+
+      // Solid, if somewhat uncommon surfaces with a high range of smoothness
+      semipaved: {
+        rules: [
+          { key: "surface", op: "in", value: [
+            "bricks", "cobblestone", "cobblestone:flattened", "unhewn_cobblestone",
+            "sett", "paving_stones", "grass_paver", "metal", "metal_grid",
+            "fibre_reinforced_polymer_grate", "wood"
+          ]}
+        ]
+      },
+
+      // --- One-way tags ---
+
+      // Tags that imply a way is one-way in the forward direction
+      one_way_forward: {
+        rules: [
+          { key: "aerialway", op: "in", value: ["chair_lift", "drag_lift", "j-bar", "magic_carpet", "mixed_lift", "platter", "rope_tow", "t-bar", "zip_line"] },
+          { key: "conveying", value: "forward" },
+          { key: "highway", value: "motorway" },
+          { key: "junction", op: "in", value: ["circular", "roundabout"] },
+          { key: "man_made", op: "in", value: ["goods_conveyor", "piste:halfpipe"] },
+          { key: "oneway", value: "yes" },
+          { key: "piste:type", op: "in", value: ["downhill", "sled", "yes"] },
+          { key: "roller_coaster", value: "track" },
+          { key: "seamark:type", op: "in", value: ["two-way_route", "recommended_traffic_lane", "separation_lane", "separation_roundabout"] },
+          { key: "waterway", op: "in", value: ["canal", "ditch", "drain", "fish_pass", "flowline", "pressurised", "river", "spillway", "stream", "tidal_channel"] }
+        ]
+      },
+
+      // Tags that imply a way is one-way in the backward direction
+      one_way_backward: {
+        rules: [
+          { key: "conveying", value: "backward" },
+          { key: "oneway", value: "-1" }
+        ]
+      },
+
+      // Tags that imply a way is bidirectional (alternating/reversible)
+      one_way_bidirectional: {
+        rules: [
+          { key: "conveying", value: "reversible" },
+          { key: "oneway", op: "in", value: ["alternating", "reversible"] }
+        ]
+      },
+
+      // --- Sidedness ---
+
+      // Tags where the right side of the way represents the "inside" (e.g. cliffs, retaining walls)
+      right_side_is_inside: {
+        rules: [
+          { key: "natural", op: "in", value: ["cliff", "coastline"] },
+          { key: "barrier", op: "in", value: ["retaining_wall", "kerb", "guard_rail", "city_wall"] },
+          { key: "man_made", op: "in", value: ["embankment", "quay"] },
+          { key: "waterway", value: "weir" }
+        ]
+      },
+
+      // --- Highway classification ---
+
+      // Highway tag values for pedestrian or vehicle right-of-ways that make up the routable network
+      // (does not include 'raceway')
+      routable_highway: {
+        rules: [
+          { key: "highway", op: "in", value: [
+            "motorway", "trunk", "primary", "secondary", "tertiary", "residential",
+            "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link",
+            "unclassified", "road", "service", "track", "living_street",
+            "bus_guideway", "busway",
+            "path", "footway", "cycleway", "bridleway", "pedestrian", "corridor",
+            "steps", "ladder"
+          ]}
+        ]
+      },
+
+      // Highway tag values that generally do not allow motor vehicles
+      path_highway: {
+        rules: [
+          { key: "highway", op: "in", value: [
+            "path", "footway", "cycleway", "bridleway", "pedestrian", "corridor",
+            "steps", "ladder"
+          ]}
+        ]
+      },
+
+      // --- Aeroway classification ---
+
+      // Aeroway tags that are treated as routable for aircraft
+      routable_aeroway: {
+        rules: [
+          { key: "aeroway", op: "in", value: ["runway", "taxiway"] }
+        ]
+      },
+
+      // --- Railway classification ---
+
+      // Railway tag values representing existing railroad tracks (purposely does not include 'abandoned')
+      railway_track: {
+        rules: [
+          { key: "railway", op: "in", value: [
+            "rail", "light_rail", "tram", "subway", "monorail", "funicular",
+            "miniature", "narrow_gauge", "disused", "preserved"
+          ]}
+        ]
+      },
+
+      // --- Waterway classification ---
+
+      // Waterway tag values for line features representing water flow
+      flowing_waterway: {
+        rules: [
+          { key: "waterway", op: "in", value: [
+            "canal", "ditch", "drain", "fish_pass", "flowline",
+            "river", "stream", "tidal_channel"
+          ]}
+        ]
+      },
+
+      // --- Land use ---
+
+      // Tag values that represent actual land use (areas).
+      // In iD, this powers the `_isLanduse` filter matcher.
+      landuse: {
+        rules: [
+          { key: "amenity", op: "in", value: [
+            "bicycle_parking", "college", "grave_yard", "hospital", "marketplace",
+            "motorcycle_parking", "parking", "place_of_worship", "prison",
+            "school", "university"
+          ]},
+          { key: "landuse", op: "exists" },
+          { key: "leisure", op: "exists" },
+          { key: "natural", op: "exists" }
+        ]
+      }
+
+    }
+  }]
+}

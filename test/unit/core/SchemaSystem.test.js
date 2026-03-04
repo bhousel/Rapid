@@ -17,6 +17,7 @@ describe('SchemaSystem', () => {
   // Setup mock asset data that SchemaSystem attempts to load at init time.
   const assets = context.systems.assets;
   assets._loaded.id_tagging_schema = { assetID: 'id_tagging_schema' };
+  assets._loaded.osm_rulesets = { assetID: 'osm_rulesets' };
   assets._loaded.rapid_schema = { assetID: 'rapid_schema' };
   assets._loaded.custom_schema = { assetID: 'custom_schema' };
 
@@ -157,7 +158,7 @@ describe('SchemaSystem', () => {
       });
 
       it('defaultAssetIDs', () => {
-        assert.deepEqual(_schema.defaultAssetIDs, new Set(['id_tagging_schema', 'rapid_schema']));
+        assert.deepEqual(_schema.defaultAssetIDs, new Set(['id_tagging_schema', 'osm_rulesets', 'rapid_schema']));
       });
 
       it('loadedAssetIDs', () => {
@@ -525,6 +526,121 @@ describe('SchemaSystem', () => {
             assert.isUndefined(_schema.getScope('osm').categories.get('category-ban'));
             assert.isUndefined(_schema.getScope('osm').categories.get('category-bun'));
           });
+        });
+      });
+
+
+      describe('merge add rulesets', () => {
+        beforeAll(() => {
+          spySchemaChange.mockClear();
+          _schema.merge(sample.addRulesetData);
+        });
+
+        it('emits schemachange after merging', () => {
+          assert.lengthOf(spySchemaChange.mock.calls, 1);
+        });
+
+        it('adds assetID and assetVersion to loadedAssetIDs Map', () => {
+          const version = _schema.loadedAssetIDs.get('add-ruleset-data');
+          assert.strictEqual(version, '2026-03-01');
+        });
+
+        it('adds a paved ruleset', () => {
+          const scope = _schema.getScope('osm');
+          const paved = scope.rulesets.get('paved');
+          assert.instanceOf(paved, Rapid.Ruleset);
+          assert.strictEqual(paved.id, 'paved');
+        });
+
+        it('paved ruleset has correct rules count', () => {
+          const paved = _schema.getScope('osm').rulesets.get('paved');
+          assert.lengthOf(paved.rules, 2);   // 'in' rule + exact match rule
+        });
+
+        it('paved ruleset matches surface=asphalt', () => {
+          const paved = _schema.getScope('osm').rulesets.get('paved');
+          assert.isTrue(paved.matchAny({ surface: 'asphalt' }));
+        });
+
+        it('paved ruleset matches tracktype=grade1', () => {
+          const paved = _schema.getScope('osm').rulesets.get('paved');
+          assert.isTrue(paved.matchAny({ tracktype: 'grade1' }));
+        });
+
+        it('paved ruleset does not match surface=gravel', () => {
+          const paved = _schema.getScope('osm').rulesets.get('paved');
+          assert.isFalse(paved.matchAny({ surface: 'gravel' }));
+        });
+
+        it('one_way_forward ruleset matches highway=motorway', () => {
+          const forward = _schema.getScope('osm').rulesets.get('one_way_forward');
+          assert.isTrue(forward.matchAny({ highway: 'motorway' }));
+        });
+
+        it('routable_highway ruleset matches highway=trunk', () => {
+          const routable = _schema.getScope('osm').rulesets.get('routable_highway');
+          assert.isTrue(routable.matchAny({ highway: 'trunk' }));
+        });
+
+        it('routable_highway ruleset does not match highway=raceway', () => {
+          const routable = _schema.getScope('osm').rulesets.get('routable_highway');
+          assert.isFalse(routable.matchAny({ highway: 'raceway' }));
+        });
+
+        it('sets assetID on ruleset props', () => {
+          const paved = _schema.getScope('osm').rulesets.get('paved');
+          assert.strictEqual(paved.props.assetID, 'add-ruleset-data');
+        });
+
+        it('sets scopeID on ruleset props', () => {
+          const paved = _schema.getScope('osm').rulesets.get('paved');
+          assert.strictEqual(paved.props.scopeID, 'osm');
+        });
+      });
+
+
+      describe('merge update rulesets', () => {
+        beforeAll(() => {
+          spySchemaChange.mockClear();
+          _schema.merge(sample.updateRulesetData);
+        });
+
+        it('replaces the paved ruleset', () => {
+          const paved = _schema.getScope('osm').rulesets.get('paved');
+          assert.instanceOf(paved, Rapid.Ruleset);
+          assert.strictEqual(paved.props.assetID, 'update-ruleset-data');
+        });
+
+        it('updated paved ruleset matches surface=chipseal', () => {
+          const paved = _schema.getScope('osm').rulesets.get('paved');
+          assert.isTrue(paved.matchAny({ surface: 'chipseal' }));
+        });
+
+        it('does not affect other rulesets', () => {
+          const forward = _schema.getScope('osm').rulesets.get('one_way_forward');
+          assert.instanceOf(forward, Rapid.Ruleset);
+          assert.strictEqual(forward.props.assetID, 'add-ruleset-data');  // still the original
+        });
+      });
+
+
+      describe('merge delete rulesets', () => {
+        beforeAll(() => {
+          spySchemaChange.mockClear();
+          _schema.merge(sample.deleteRulesetData);
+        });
+
+        it('deletes an exact rulesetID', () => {
+          assert.isUndefined(_schema.getScope('osm').rulesets.get('routable_highway'));
+        });
+
+        it(`deletes wildcard rulesetIDs containing '*'`, () => {
+          assert.isUndefined(_schema.getScope('osm').rulesets.get('one_way_forward'));
+        });
+
+        it('does not delete non-matching rulesets', () => {
+          const paved = _schema.getScope('osm').rulesets.get('paved');
+          assert.instanceOf(paved, Rapid.Ruleset);
         });
       });
     });   // merge

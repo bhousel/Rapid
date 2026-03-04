@@ -255,3 +255,62 @@ export const searchData = {
     }
   }]
 };
+
+
+export const addRulesetData = {
+  assetID: 'add-ruleset-data',
+  assetVersion: '2026-03-01',
+  scopes: [{
+    scope: 'osm',
+    rulesets: {
+      'paved': {
+        rules: [
+          { key: 'surface', op: 'in', value: ['paved', 'asphalt', 'concrete'] },
+          { key: 'tracktype', value: 'grade1' }
+        ]
+      },
+      'one_way_forward': {
+        rules: [
+          { key: 'highway', value: 'motorway' },
+          { key: 'oneway', value: 'yes' },
+          { key: 'junction', op: 'in', value: ['circular', 'roundabout'] }
+        ]
+      },
+      'routable_highway': {
+        rules: [
+          { key: 'highway', op: 'in', value: ['motorway', 'trunk', 'primary', 'residential'] }
+        ]
+      }
+    }
+  }]
+};
+
+
+export const updateRulesetData = {
+  assetID: 'update-ruleset-data',
+  assetVersion: '2026-03-02',
+  scopes: [{
+    scope: 'osm',
+    rulesets: {
+      'paved': {
+        rules: [
+          { key: 'surface', op: 'in', value: ['paved', 'asphalt', 'concrete', 'chipseal'] },
+          { key: 'tracktype', value: 'grade1' }
+        ]
+      }
+    }
+  }]
+};
+
+
+export const deleteRulesetData = {
+  assetID: 'delete-ruleset-data',
+  assetVersion: '2026-03-03',
+  scopes: [{
+    scope: 'osm',
+    rulesets: {
+      'one_way_*': null,
+      'routable_highway': null
+    }
+  }]
+};
