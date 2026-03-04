@@ -608,6 +608,9 @@ const unpause = gfx?.pause();  // block rendering
    * @param tags - OSM tags
    */
   private _applyStructureOverrides(result: MatchedStyle, tags: Tags): void {
+    const context = this.context;
+    const schema = context.systems.schema;
+
     const bridge = getTag(tags, 'bridge');
     const cutting = getTag(tags, 'cutting');
     const embankment = getTag(tags, 'embankment');
@@ -638,10 +641,14 @@ const unpause = gfx?.pause();  // block rendering
     }
 
     // Bumpy casing for roads with unpaved surface
-    if (surface && highway && roadVals.has(highway) && !osmPavedTags.surface[surface]) {
-      if (!bridge) result.casing.color = 0xcccccc;
-      result.casing.cap = 'butt';
-      result.casing.dash = [4, 4];
+    if (surface && highway && roadVals.has(highway)) {
+      const paved = schema?.getScope('osm')?.rulesets?.get('paved');
+      const isPaved = paved ? paved.matchKV('surface', surface) : osmPavedTags.surface?.[surface];
+      if (!isPaved) {
+        if (!bridge) result.casing.color = 0xcccccc;
+        result.casing.cap = 'butt';
+        result.casing.dash = [4, 4];
+      }
     }
   }
 

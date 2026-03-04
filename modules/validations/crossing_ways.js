@@ -18,6 +18,7 @@ export function validationCrossingWays(context) {
   const type = 'crossing_ways';
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const schema = context.systems.schema;
 
   // helpers
   function hasTag(v) {
@@ -161,16 +162,23 @@ export function validationCrossingWays(context) {
     if (geometry !== 'line' && geometry !== 'area') return null;
 
     const tags = entity.tags;
+    const rulesets = schema?.getScope('osm')?.rulesets;
 
-    if (osmRoutableAerowayTags[tags.aeroway]) return 'aeroway';
+    const routeAero = rulesets?.get('routable_aeroway');
+    if (routeAero ? routeAero.matchKV('aeroway', tags.aeroway) : osmRoutableAerowayTags[tags.aeroway]) return 'aeroway';
     if (hasTag(tags.building) && !ignoreBuilding.has(tags.building)) return 'building';
-    if (hasTag(tags.highway) && osmRoutableHighwayTagValues[tags.highway]) return 'highway';
+
+    const routeHwy = rulesets?.get('routable_highway');
+    if (hasTag(tags.highway) && (routeHwy ? routeHwy.matchKV('highway', tags.highway) : osmRoutableHighwayTagValues[tags.highway])) return 'highway';
 
     // don't check railway or waterway areas
     if (geometry !== 'line') return null;
 
-    if (hasTag(tags.railway) && osmRailwayTrackTagValues[tags.railway]) return 'railway';
-    if (hasTag(tags.waterway) && osmFlowingWaterwayTagValues[tags.waterway]) return 'waterway';
+    const railTrack = rulesets?.get('railway_track');
+    if (hasTag(tags.railway) && (railTrack ? railTrack.matchKV('railway', tags.railway) : osmRailwayTrackTagValues[tags.railway])) return 'railway';
+
+    const flowWater = rulesets?.get('flowing_waterway');
+    if (hasTag(tags.waterway) && (flowWater ? flowWater.matchKV('waterway', tags.waterway) : osmFlowingWaterwayTagValues[tags.waterway])) return 'waterway';
 
     return null;
   }
@@ -241,12 +249,15 @@ export function validationCrossingWays(context) {
     const geometry2 = entity2.geometry(graph);
     const bothLines = geometry1 === 'line' && geometry2 === 'line';
 
+    const pathHighway = schema?.getScope('osm')?.rulesets?.get('path_highway');
+    const isPathHighway = (val) => pathHighway ? pathHighway.matchKV('highway', val) : osmPathHighwayTagValues[val];
+
     if (crossingType === 'aeroway-aeroway') {
       return {};  // allowed, no tag suggestion
 
     } else if (crossingType === 'aeroway-highway') {
       const isService = entity1.tags.highway === 'service' || entity2.tags.highway === 'service';
-      const isPath = osmPathHighwayTagValues[entity1.tags.highway] || osmPathHighwayTagValues[entity2.tags.highway];
+      const isPath = isPathHighway(entity1.tags.highway) || isPathHighway(entity2.tags.highway);
       // Only significant roads get the `aeroway=aircraft_crossing` tag
       return (isService || isPath) ? {} : { aeroway: 'aircraft_crossing' };
 
@@ -257,8 +268,8 @@ export function validationCrossingWays(context) {
       return null;  // not allowed
 
     } else if (crossingType === 'highway-highway') {
-      const entity1IsPath = osmPathHighwayTagValues[entity1.tags.highway];
-      const entity2IsPath = osmPathHighwayTagValues[entity2.tags.highway];
+      const entity1IsPath = isPathHighway(entity1.tags.highway);
+      const entity2IsPath = isPathHighway(entity2.tags.highway);
 
       // One feature is a path but not both
       if ((entity1IsPath || entity2IsPath) && entity1IsPath !== entity2IsPath) {
@@ -283,7 +294,7 @@ export function validationCrossingWays(context) {
       }
 
       const isTram = entity1.tags.railway === 'tram' || entity2.tags.railway === 'tram';
-      const isPath = osmPathHighwayTagValues[entity1.tags.highway] || osmPathHighwayTagValues[entity2.tags.highway];
+      const isPath = isPathHighway(entity1.tags.highway) || isPathHighway(entity2.tags.highway);
 
       if (isPath) {
         if (isTram) {

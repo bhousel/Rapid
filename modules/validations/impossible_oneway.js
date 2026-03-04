@@ -10,6 +10,7 @@ export function validationImpossibleOneway(context) {
   const type = 'impossible_oneway';
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const schema = context.systems.schema;
 
   let validation = function checkImpossibleOneway(entity, graph) {
     if (entity.type !== 'way' || entity.geometry(graph) !== 'line') return [];
@@ -35,8 +36,13 @@ export function validationImpossibleOneway(context) {
      */
     function typeForWay(way) {
       if (way.geometry(graph) !== 'line') return null;
-      if (osmRoutableHighwayTagValues[way.tags.highway]) return 'highway';
-      if (osmFlowingWaterwayTagValues[way.tags.waterway]) return 'waterway';
+
+      const rulesets = schema?.getScope('osm')?.rulesets;
+      const routable = rulesets?.get('routable_highway');
+      const flowing = rulesets?.get('flowing_waterway');
+
+      if (routable ? routable.matchKV('highway', way.tags.highway) : osmRoutableHighwayTagValues[way.tags.highway]) return 'highway';
+      if (flowing ? flowing.matchKV('waterway', way.tags.waterway) : osmFlowingWaterwayTagValues[way.tags.waterway]) return 'waterway';
       return null;
     }
 
@@ -90,15 +96,23 @@ export function validationImpossibleOneway(context) {
         if (parentWay.id === way.id) return false;
 
         if (wayType === 'highway') {
+          const routable = schema?.getScope('osm')?.rulesets?.get('routable_highway');
+
           // allow connections to highway areas
-          if (parentWay.geometry(graph) === 'area' && osmRoutableHighwayTagValues[parentWay.tags.highway]) return true;
+          const parentIsRoutable = routable
+            ? routable.matchKV('highway', parentWay.tags.highway)
+            : osmRoutableHighwayTagValues[parentWay.tags.highway];
+          if (parentWay.geometry(graph) === 'area' && parentIsRoutable) return true;
           // consider connections to ferry routes as connected
           if (parentWay.tags.route === 'ferry') return true;
 
           return graph.parentRelations(parentWay).some(parentRelation => {
             if (parentRelation.tags.type === 'route' && parentRelation.tags.route === 'ferry') return true;
             // allow connections to highway multipolygons
-            return parentRelation.isMultipolygon() && osmRoutableHighwayTagValues[parentRelation.tags.highway];
+            const relIsRoutable = routable
+              ? routable.matchKV('highway', parentRelation.tags.highway)
+              : osmRoutableHighwayTagValues[parentRelation.tags.highway];
+            return parentRelation.isMultipolygon() && relIsRoutable;
           });
         } else if (wayType === 'waterway') {
           // multiple waterways may start or end at a water body at the same node

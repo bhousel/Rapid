@@ -303,6 +303,10 @@ export class OsmWay extends OsmEntity {
    * @return `true` if the tags suggest that this is a oneway, `false` if not.
    */
   isOneWay(): boolean {
+    const context = this.context;
+    const schema = context.systems.schema;
+    const rulesets = schema?.getScope('osm')?.rulesets;
+
     // explicit oneway tag..
     const values: Record<string, boolean> = {
       'yes': true,
@@ -317,7 +321,15 @@ export class OsmWay extends OsmEntity {
       return values[this.tags.oneway];
     }
 
-    // implied oneway tag..
+    // implied oneway tag — check scope rulesets if available
+    if (rulesets) {
+      return rulesets.get('one_way_forward')?.matchAny(this.tags)
+        || rulesets.get('one_way_backward')?.matchAny(this.tags)
+        || rulesets.get('one_way_bidirectional')?.matchAny(this.tags)
+        || false;
+    }
+
+    // Fallback to globals if rulesets aren't loaded
     for (const key in this.tags) {
       if (key in osmOneWayTags && (this.tags[key] in osmOneWayTags[key])) {
         return true;
@@ -333,11 +345,20 @@ export class OsmWay extends OsmEntity {
    * @return The tag key indicating the sidedness, or `null` if not sided
    */
   sidednessIdentifier(): string | null {
+    const context = this.context;
+    const schema = context.systems.schema;
+    const rulesets = schema?.getScope('osm')?.rulesets;
+
+    const sided = rulesets?.get('right_side_is_inside');
+
     for (const realKey in this.tags) {
       const value = this.tags[realKey];
       const key = osmRemoveLifecyclePrefix(realKey);
-      if (key in osmRightSideIsInsideTags && (value in osmRightSideIsInsideTags[key])) {
-        return key;
+
+      if (sided) {
+        if (sided.matchKV(key, value)) return key;
+      } else {
+        if (key in osmRightSideIsInsideTags && (value in osmRightSideIsInsideTags[key])) return key;
       }
     }
 

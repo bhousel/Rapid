@@ -11,9 +11,16 @@ export function validationDisconnectedWay(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
+  const schema = context.systems.schema;
+
+  const routable = schema?.getScope('osm')?.rulesets?.get('routable_highway');
 
   function isTaggedAsHighway(entity) {
-    return osmRoutableHighwayTagValues[entity.tags.highway];
+    if (routable) {
+      return routable.matchKV('highway', entity.tags.highway);
+    } else {     // Fallback to globals if rulesets aren't loaded
+      return osmRoutableHighwayTagValues[entity.tags.highway];
+    }
   }
 
 

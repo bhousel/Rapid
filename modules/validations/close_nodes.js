@@ -10,6 +10,7 @@ export function validationCloseNodes(context) {
   const type = 'close_nodes';
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const schema = context.systems.schema;
 
   const pointThresholdMeters = 0.2;
 
@@ -42,7 +43,8 @@ export function validationCloseNodes(context) {
       if (hasTag(tags.boundary)) return 'boundary';
       if (hasTag(tags.indoor)) return 'indoor';
       if (hasTag(tags.building) || hasTag(tags['building:part'])) return 'building';
-      if (osmPathHighwayTagValues[tags.highway]) return 'path';
+      const pathHighway = schema?.getScope('osm')?.rulesets?.get('path_highway');
+      if (pathHighway ? pathHighway.matchKV('highway', tags.highway) : osmPathHighwayTagValues[tags.highway]) return 'path';
 
       const parentRelations = graph.parentRelations(way);
       for (const relation of parentRelations) {

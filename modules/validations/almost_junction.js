@@ -19,6 +19,7 @@ export function validationAlmostJunction(context) {
   const type = 'almost_junction';
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const schema = context.systems.schema;
 
   const EXTEND_TH_METERS = 5;
   const WELD_TH_METERS = 0.75;
@@ -27,9 +28,12 @@ export function validationAlmostJunction(context) {
   // Comes from considering bounding case of perpendicular ways
   const SIG_ANGLE_TH = Math.atan(WELD_TH_METERS / EXTEND_TH_METERS);
 
+  const routable = schema?.getScope('osm')?.rulesets?.get('routable_highway');
+
   function isHighway(entity) {
+    // Fallback to globals if rulesets aren't loaded
     return entity.type === 'way'
-      && osmRoutableHighwayTagValues[entity.tags.highway];
+      && (routable ? routable.matchKV('highway', entity.tags.highway) : osmRoutableHighwayTagValues[entity.tags.highway]);
   }
 
   function isTaggedAsNotContinuing(node) {
