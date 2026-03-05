@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import { setupMockRulesets } from '../mock_rulesets.js';
 
 
 describe('OsmWay', () => {
@@ -10,6 +11,7 @@ describe('OsmWay', () => {
   beforeAll(() => {
     _savedAreaKeys = Rapid.osmAreaKeys;
     Rapid.osmSetAreaKeys({ building: {} });
+    setupMockRulesets(Rapid, context);
   });
 
   afterAll(() => {
@@ -542,45 +544,6 @@ describe('OsmWay', () => {
   });
 
 
-  describe('sidednessIdentifier', () => {
-    it('returns tag when the tag has implied sidedness', () => {
-      let way = new Rapid.OsmWay(context, { tags: { natural: 'cliff' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'natural');
-      way = new Rapid.OsmWay(context, { tags: { natural: 'coastline' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'natural');
-      way = new Rapid.OsmWay(context, { tags: { barrier: 'retaining_wall' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'barrier');
-      way = new Rapid.OsmWay(context, { tags: { barrier: 'kerb' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'barrier');
-      way = new Rapid.OsmWay(context, { tags: { barrier: 'guard_rail' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'barrier');
-      way = new Rapid.OsmWay(context, { tags: { barrier: 'city_wall' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'barrier');
-      way = new Rapid.OsmWay(context, { tags: { man_made: 'embankment' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'man_made');
-      way = new Rapid.OsmWay(context, { tags: { man_made: 'quay' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'man_made');
-      way = new Rapid.OsmWay(context, { tags: { 'abandoned:barrier': 'guard_rail' } });
-      assert.strictEqual(way.sidednessIdentifier(), 'barrier');
-    });
-
-    it('returns null when tag does not have implied sidedness', () => {
-      let way = new Rapid.OsmWay(context, { tags: { natural: 'ridge' } });
-      assert.isNull(way.sidednessIdentifier());
-      way = new Rapid.OsmWay(context, { tags: { barrier: 'fence' } });
-      assert.isNull(way.sidednessIdentifier());
-      way = new Rapid.OsmWay(context, { tags: { man_made: 'dyke' } });
-      assert.isNull(way.sidednessIdentifier());
-      way = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
-      assert.isNull(way.sidednessIdentifier());
-      way = new Rapid.OsmWay(context, { tags: { 'demolished:highway': 'motorway' } });
-      assert.isNull(way.sidednessIdentifier());
-      way = new Rapid.OsmWay(context, { tags: { 'not:natural': 'cliff' } });
-      assert.isNull(way.sidednessIdentifier());
-    });
-  });
-
-
   describe('isSided', () => {
     it('returns false when the way has no tags', () => {
       const way = new Rapid.OsmWay(context);
@@ -607,6 +570,15 @@ describe('OsmWay', () => {
       assert.isTrue(way.isSided());
       way = new Rapid.OsmWay(context, { tags: { man_made: 'embankment' } });
       assert.isTrue(way.isSided());
+    });
+
+    it('strips lifecycle prefixes when checking sidedness', () => {
+      let way = new Rapid.OsmWay(context, { tags: { 'abandoned:barrier': 'guard_rail' } });
+      assert.isTrue(way.isSided());
+      way = new Rapid.OsmWay(context, { tags: { 'demolished:highway': 'motorway' } });
+      assert.isFalse(way.isSided());
+      way = new Rapid.OsmWay(context, { tags: { 'not:natural': 'cliff' } });
+      assert.isFalse(way.isSided());
     });
 
     it('returns false when two_sided=yes overrides tag with implied sidedness', () => {

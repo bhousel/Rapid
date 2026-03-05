@@ -1,6 +1,7 @@
 import { beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import { setupMockRulesets } from '../mock_rulesets.js';
 
 
 describe('validationDisconnectedWay', () => {
@@ -17,6 +18,7 @@ describe('validationDisconnectedWay', () => {
     l10n:     new Rapid.LocalizationSystem(context),
     spatial:  new Rapid.SpatialSystem(context)
   };
+  setupMockRulesets(Rapid, context);
 
   const validator = Rapid.validationDisconnectedWay(context);
 

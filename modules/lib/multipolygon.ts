@@ -1,12 +1,10 @@
 import { actionReverse } from '../actions/reverse.ts';
-import { osmIsInterestingTag } from './tags.js';
 
 import { OsmNode } from '../data/OsmNode.ts';
-import { OsmRelation } from '../data/OsmRelation.ts';
 import { OsmWay } from '../data/OsmWay.ts';
 
 import type { Graph } from './Graph.ts';
-import type { OsmEntity, OsmRelationMember } from '../data/types.ts';
+import type { OsmRelationMember } from '../data/types.ts';
 import type { Action } from '../actions/types.ts';
 
 
@@ -24,123 +22,6 @@ export interface JoinedWaySequence extends Array<OsmRelationMember | OsmWay> {
 export interface JoinedWaysResult extends Array<JoinedWaySequence> {
   /** Actions to apply to reverse ways if needed */
   actions: Action[];
-}
-
-
-/**
- * "Old" multipolygons, previously known as "simple" multipolygons, are as follows:
- *
- * 1. Relation tagged with `type=multipolygon` and no interesting tags.
- * 2. One and only one member with the `outer` role. Must be a way with interesting tags.
- * 3. No members without a role.
- *
- * Old multipolygons are no longer recommended but are still rendered as areas.
- *
- * @param entity - The entity to check (should be a relation)
- * @param graph - The graph containing the entity
- * @returns The outer member way if entity is a valid old multipolygon relation, false otherwise
- */
-export function osmOldMultipolygonOuterMemberOfRelation(entity: OsmEntity, graph: Graph): OsmWay | false {
-  if (entity.type !== 'relation' ||
-    !(entity as OsmRelation).isMultipolygon()
-    || Object.keys(entity.tags).filter(osmIsInterestingTag).length > 1) {
-    return false;
-  }
-
-  let outerMember: OsmWay | undefined;
-  for (const member of (entity as OsmRelation).members) {
-    if (!member.role || member.role === 'outer') {
-      if (outerMember) return false;
-      if (member.type !== 'way') return false;
-      if (!graph.hasEntity(member.id)) return false;
-
-      outerMember = graph.entity(member.id) as OsmWay;
-
-      if (Object.keys(outerMember.tags).filter(osmIsInterestingTag).length === 0) {
-        return false;
-      }
-    }
-  }
-
-  return outerMember || false;
-}
-
-
-/**
- * Checks if an entity is the outer member of an old-style multipolygon.
- * Used for fixing up rendering of multipolygons with tags on the outer member.
- * @see https://github.com/openstreetmap/iD/issues/613
- *
- * @param entity - The entity to check (should be a way)
- * @param graph - The graph containing the entity
- * @returns The parent relation if entity is an old multipolygon outer member, false otherwise
- */
-export function osmIsOldMultipolygonOuterMember(entity: OsmEntity, graph: Graph): OsmRelation | false {
-  if (entity.type !== 'way' ||
-    Object.keys(entity.tags).filter(osmIsInterestingTag).length === 0) {
-    return false;
-  }
-
-  const parents = graph.parentRelations(entity);
-  if (parents.length !== 1) return false;
-
-  const parent = parents[0];
-  if (!parent.isMultipolygon() ||
-    Object.keys(parent.tags).filter(osmIsInterestingTag).length > 1) {
-    return false;
-  }
-
-  for (const member of parent.members) {
-    if (member.id === entity.id && member.role && member.role !== 'outer') {
-      // Not outer member
-      return false;
-    }
-    if (member.id !== entity.id && (!member.role || member.role === 'outer')) {
-      // Not a simple multipolygon
-      return false;
-    }
-  }
-
-  return parent;
-}
-
-
-/**
- * Gets the outer member of an old-style multipolygon that contains the given entity.
- *
- * @param entity - The entity to check (should be a way)
- * @param graph - The graph containing the entity
- * @returns The outer member way entity, or false if not found or not applicable
- */
-export function osmOldMultipolygonOuterMember(entity: OsmEntity, graph: Graph): OsmWay | false {
-  if (entity.type !== 'way') return false;
-
-  const parents = graph.parentRelations(entity);
-  if (parents.length !== 1) return false;
-
-  const parent = parents[0];
-  if (!parent.isMultipolygon() ||
-    Object.keys(parent.tags).filter(osmIsInterestingTag).length > 1) {
-    return false;
-  }
-
-  let outerMember: OsmRelationMember | undefined;
-  for (const member of parent.members) {
-    if (!member.role || member.role === 'outer') {
-      if (outerMember) return false; // Not a simple multipolygon
-      outerMember = member;
-    }
-  }
-
-  if (!outerMember) return false;
-
-  const outerEntity = graph.hasEntity(outerMember.id) as OsmWay | undefined;
-  if (!outerEntity ||
-    !Object.keys(outerEntity.tags).filter(osmIsInterestingTag).length) {
-    return false;
-  }
-
-  return outerEntity;
 }
 
 

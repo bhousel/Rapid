@@ -1,6 +1,5 @@
 import { actionAddMember } from './add_member.ts';
 import { geoSphericalDistance, numWrap } from '@rapid-sdk/math';
-import { osmIsOldMultipolygonOuterMember } from '../lib/multipolygon.ts';
 import { OsmRelation } from '../data/OsmRelation.ts';
 import { OsmWay } from '../data/OsmWay.ts';
 import { utilArrayIntersection, utilArrayUniq } from '@rapid-sdk/util';
@@ -128,7 +127,6 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
     let nodesA: EntityID[];
     let nodesB: EntityID[];
     const isArea = wayA.isArea();
-    const isOuter = osmIsOldMultipolygonOuterMember(wayA, graph);
 
     if (wayA.isClosed()) {
       const nodes: EntityID[] = wayA.nodes.slice(0, -1);
@@ -236,28 +234,29 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
       // 1. Both `wayA` and `wayB` remain in the relation
       // 2. But must be inserted as a pair (see `actionAddMember` for details)
       } else {
-        if (rel === isOuter) {
-          graph.replace(rel.mergeTags(wayA.tags));
-          graph.replace(wayA.update({ tags: {} }));
-          graph.replace(wayB.update({ tags: {} }));
-        }
-
         member = { id: wayB.id, type: 'way', role: rel.memberById(wayA.id)!.role };
         const insertPair = { originalID: wayA.id, insertedID: wayB.id, nodes: origNodes };
         graph = actionAddMember(rel.id, member, undefined, insertPair)(graph);
       }
     }
 
-    if (!isOuter && isArea) {
-      const multipolygon = new OsmRelation(wayA.context, {
-        tags: Object.assign({}, wayA.tags, { type: 'multipolygon' }),
-        members: [
-          { id: wayA.id, role: 'outer', type: 'way' },
-          { id: wayB.id, role: 'outer', type: 'way' }
-        ]
-      });
+    if (isArea) {
+      // If the way is already in a multipolygon relation, move its tags
+      // to that relation instead of creating a new one.
+      const parentMP = graph.parentRelations(wayA).find(r => r.isMultipolygon());
+      if (parentMP) {
+        graph.replace(parentMP.mergeTags(wayA.tags));
+      } else {
+        const multipolygon = new OsmRelation(wayA.context, {
+          tags: Object.assign({}, wayA.tags, { type: 'multipolygon' }),
+          members: [
+            { id: wayA.id, role: 'outer', type: 'way' },
+            { id: wayB.id, role: 'outer', type: 'way' }
+          ]
+        });
+        graph.replace(multipolygon);
+      }
 
-      graph.replace(multipolygon);
       graph.replace(wayA.update({ tags: {} }));
       graph.replace(wayB.update({ tags: {} }));
     }

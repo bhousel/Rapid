@@ -1,6 +1,4 @@
 import { operationDelete } from '../operations/delete.js';
-import { osmIsInterestingTag } from '../lib/tags.ts';
-import { osmOldMultipolygonOuterMemberOfRelation } from '../lib/multipolygon.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -15,7 +13,7 @@ export function validationMissingTag(context) {
   function hasDescriptiveTags(entity, graph) {
     const onlyAttributeKeys = ['description', 'name', 'note', 'start_date'];
     const entityDescriptiveKeys = Object.keys(entity.tags).filter(k => {
-      if (k === 'area' || !osmIsInterestingTag(k)) return false;
+      if (k === 'area' || !entity.isInterestingTag(k)) return false;
       return !onlyAttributeKeys.some(attributeKey => {
         return k === attributeKey || k.indexOf(attributeKey + ':') === 0;
       });
@@ -25,7 +23,7 @@ export function validationMissingTag(context) {
       // this relation's only interesting tag just says its a multipolygon, which is not descriptive enough
       // It's okay for a simple multipolygon to have no descriptive tags
       // if its outer way has them (old model, see `outdated_tags.js`)
-      return osmOldMultipolygonOuterMemberOfRelation(entity, graph);
+      return false;
     }
 
     return entityDescriptiveKeys.length > 0;

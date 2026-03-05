@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, afterEach, describe, it, mock } from '
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './StyleSystem.sample.js';
+import { setupMockRulesets } from '../mock_rulesets.js';
 
 
 describe('StyleSystem', () => {
@@ -208,9 +209,11 @@ describe('StyleSystem', () => {
           assert.strictEqual(version, '2026-01-01');
         });
 
-        it('adds styles to the scope', () => {
+        it('adds styles to the correct scope', () => {
+          const common = _styles.getScope('*');
+          assert.isTrue(common.styles.has('DEFAULTS'));
+
           const scope = _styles.getScope('osm');
-          assert.isTrue(scope.styles.has('DEFAULTS'));
           assert.isTrue(scope.styles.has('LIFECYCLE'));
           assert.isTrue(scope.styles.has('motorway'));
           assert.isTrue(scope.styles.has('trunk'));
@@ -341,11 +344,13 @@ describe('StyleSystem', () => {
         });
 
         it('does not remove unrelated styles', () => {
+          const common = _styles.getScope('*');
+          assert.isTrue(common.styles.has('DEFAULTS'));
+
           const scope = _styles.getScope('osm');
           assert.isTrue(scope.styles.has('trunk'));
           assert.isTrue(scope.styles.has('primary'));
           assert.isTrue(scope.styles.has('green'));
-          assert.isTrue(scope.styles.has('DEFAULTS'));
         });
 
         it('emits stylechange after merging', () => {
@@ -377,11 +382,13 @@ describe('StyleSystem', () => {
         });
 
         it('does not remove unrelated styles', () => {
+          const common = _styles.getScope('*');
+          assert.isTrue(common.styles.has('DEFAULTS'));
+
           const scope = _styles.getScope('osm');
           assert.isTrue(scope.styles.has('motorway'));
           assert.isTrue(scope.styles.has('trunk'));
           assert.isTrue(scope.styles.has('green'));
-          assert.isTrue(scope.styles.has('DEFAULTS'));
           assert.isTrue(scope.styles.has('new-style'));
         });
 
@@ -552,6 +559,7 @@ describe('StyleSystem', () => {
     let _styles;
 
     beforeAll(() => {
+      setupMockRulesets(Rapid, context);
       _styles = new Rapid.StyleSystem(context);
       context.systems.styles = _styles;
       // Don't init - just create and merge data directly

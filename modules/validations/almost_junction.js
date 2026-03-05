@@ -7,7 +7,6 @@ import { actionAddMidpoint } from '../actions/add_midpoint.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionMergeNodes } from '../actions/merge_nodes.js';
 import { geoHasSelfIntersections } from '../geo/geom.js';
-import { osmRoutableHighwayTagValues } from '../lib/tags.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -28,12 +27,11 @@ export function validationAlmostJunction(context) {
   // Comes from considering bounding case of perpendicular ways
   const SIG_ANGLE_TH = Math.atan(WELD_TH_METERS / EXTEND_TH_METERS);
 
-  const routable = schema?.getScope('osm')?.rulesets?.get('routable_highway');
+  const routable = schema?.getScope('osm')?.rulesets?.get('connected_highway');
 
   function isHighway(entity) {
-    // Fallback to globals if rulesets aren't loaded
     return entity.type === 'way'
-      && (routable ? routable.matchKV('highway', entity.tags.highway) : osmRoutableHighwayTagValues[entity.tags.highway]);
+      && routable?.match({ highway: entity.tags.highway });
   }
 
   function isTaggedAsNotContinuing(node) {
@@ -44,6 +42,7 @@ export function validationAlmostJunction(context) {
 
 
   const validation = function checkAlmostJunction(entity, graph) {
+    if (!routable) return [];
     if (!isHighway(entity)) return [];
     if (entity.isDegenerate()) return [];
 

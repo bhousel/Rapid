@@ -64,7 +64,7 @@ export type PhotoLayerID = string;
 export type PhotoType = string;
 /** Preset ID - unique identifier for presets (e.g. 'highway/residential') */
 export type PresetID = string;
-/** Ruleset ID - identifier for tag rulesets (e.g. 'paved', 'routable_highway') */
+/** Ruleset ID - identifier for tag rulesets (e.g. 'surface_paved', 'connected_highway') */
 export type RulesetID = string;
 /** Scope ID - identifier for style/schema scopes (e.g. 'osm') */
 export type ScopeID = string;

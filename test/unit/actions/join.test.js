@@ -1,10 +1,15 @@
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import { setupMockRulesets } from '../mock_rulesets.js';
 
 
 describe('actionJoin', () => {
   const context = new Rapid.MockContext();
+
+  beforeAll(() => {
+    setupMockRulesets(Rapid, context);
+  });
 
   describe('disabled', () => {
     it('returns falsy for ways that share an end/start node', () => {

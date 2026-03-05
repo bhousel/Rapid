@@ -1,8 +1,13 @@
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import { setupMockRulesets } from '../mock_rulesets.js';
 
 const context = new Rapid.MockContext();
+
+beforeAll(() => {
+  setupMockRulesets(Rapid, context);
+});
 
 
 describe('createOsmEntity', () => {

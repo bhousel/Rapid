@@ -263,21 +263,21 @@ export const addRulesetData = {
   scopes: [{
     scope: 'osm',
     rulesets: {
-      'paved': {
-        rules: [
+      'surface_paved': {
+        include: [
           { key: 'surface', op: 'in', value: ['paved', 'asphalt', 'concrete'] },
           { key: 'tracktype', value: 'grade1' }
         ]
       },
-      'one_way_forward': {
-        rules: [
+      'oneway_forward': {
+        include: [
           { key: 'highway', value: 'motorway' },
           { key: 'oneway', value: 'yes' },
           { key: 'junction', op: 'in', value: ['circular', 'roundabout'] }
         ]
       },
-      'routable_highway': {
-        rules: [
+      'connected_highway': {
+        include: [
           { key: 'highway', op: 'in', value: ['motorway', 'trunk', 'primary', 'residential'] }
         ]
       }
@@ -292,8 +292,8 @@ export const updateRulesetData = {
   scopes: [{
     scope: 'osm',
     rulesets: {
-      'paved': {
-        rules: [
+      'surface_paved': {
+        include: [
           { key: 'surface', op: 'in', value: ['paved', 'asphalt', 'concrete', 'chipseal'] },
           { key: 'tracktype', value: 'grade1' }
         ]
@@ -309,8 +309,8 @@ export const deleteRulesetData = {
   scopes: [{
     scope: 'osm',
     rulesets: {
-      'one_way_*': null,
-      'routable_highway': null
+      'oneway_*': null,
+      'connected_highway': null
     }
   }]
 };

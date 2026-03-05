@@ -3,7 +3,7 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmLanes } from '../lib/lanes.ts';
-import { osmTagSuggestingArea, osmOneWayTags, osmRightSideIsInsideTags, osmRemoveLifecyclePrefix } from '../lib/tags.ts';
+import { osmTagSuggestingArea, osmRemoveLifecyclePrefix } from '../lib/tags.ts';
 
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -307,74 +307,36 @@ export class OsmWay extends OsmEntity {
     const schema = context.systems.schema;
     const rulesets = schema?.getScope('osm')?.rulesets;
 
-    // explicit oneway tag..
-    const values: Record<string, boolean> = {
-      'yes': true,
-      '1': true,
-      '-1': true,
-      'reversible': true,
-      'alternating': true,
-      'no': false,
-      '0': false
-    };
-    if (values[this.tags.oneway] !== undefined) {
-      return values[this.tags.oneway];
-    }
-
-    // implied oneway tag — check scope rulesets if available
-    if (rulesets) {
-      return rulesets.get('one_way_forward')?.matchAny(this.tags)
-        || rulesets.get('one_way_backward')?.matchAny(this.tags)
-        || rulesets.get('one_way_bidirectional')?.matchAny(this.tags)
-        || false;
-    }
-
-    // Fallback to globals if rulesets aren't loaded
-    for (const key in this.tags) {
-      if (key in osmOneWayTags && (this.tags[key] in osmOneWayTags[key])) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * sidednessIdentifier
-   * Returns the tag key that implies this way is "sided",
-   *  i.e. the right side is the 'inside' (e.g. the right side of a `natural=cliff` is lower).
-   * @return The tag key indicating the sidedness, or `null` if not sided
-   */
-  sidednessIdentifier(): string | null {
-    const context = this.context;
-    const schema = context.systems.schema;
-    const rulesets = schema?.getScope('osm')?.rulesets;
-
-    const sided = rulesets?.get('right_side_is_inside');
-
-    for (const realKey in this.tags) {
-      const value = this.tags[realKey];
-      const key = osmRemoveLifecyclePrefix(realKey);
-
-      if (sided) {
-        if (sided.matchKV(key, value)) return key;
-      } else {
-        if (key in osmRightSideIsInsideTags && (value in osmRightSideIsInsideTags[key])) return key;
-      }
-    }
-
-    return null;
+    return rulesets?.get('oneway_forward')?.match(this.tags)
+      || rulesets?.get('oneway_backward')?.match(this.tags)
+      || rulesets?.get('oneway_bidirectional')?.match(this.tags)
+      || false;
   }
 
   /**
    * isSided
-   * Returns whether a line sided, given the tags present.
+   * Returns whether a line is sided, given the tags present.
+   * For a sided way, the direction that the way is drawn is significant.
+   * Conventionally, the right side is the 'inside'/'lower'.
+   * (e.g. the right side of a `natural=cliff` is lower).
    * @return `true` if the tags suggest that the line is sided, `false` if not.
    */
   isSided(): boolean {
-    if (this.tags.two_sided === 'yes') {
-      return false;
+    const context = this.context;
+    const schema = context.systems.schema;
+    const rulesets = schema?.getScope('osm')?.rulesets;
+
+    const sided = rulesets?.get('sided_right');
+    if (!sided) return false;
+
+    // Build tags with lifecycle prefixes stripped so rulesets can match
+    const cleanedTags: Record<string, string> = {};
+    for (const realKey in this.tags) {
+      const key = osmRemoveLifecyclePrefix(realKey);
+      cleanedTags[key] = this.tags[realKey];
     }
-    return this.sidednessIdentifier() !== null;
+
+    return sided.match(cleanedTags);
   }
 
   /**

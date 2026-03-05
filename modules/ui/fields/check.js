@@ -3,7 +3,6 @@ import { select as d3_select } from 'd3-selection';
 
 import { utilRebind } from '../../util/rebind.ts';
 import { actionReverse } from '../../actions/reverse.js';
-import { osmOneWayTags } from '../../lib/tags.ts';
 import { uiIcon } from '../icon.js';
 
 export { uiFieldCheck as uiFieldDefaultCheck };
@@ -54,14 +53,18 @@ export function uiFieldCheck(context, uifield) {
     // hack: pretend `oneway` field is a `oneway_yes` field
     // where implied oneway tag exists (e.g. `junction=roundabout`) iD#2220, iD#1841
     if (uifield.id === 'oneway' && _entityIDs.length) {
+      const schema = context.systems.schema;
+      const rulesets = schema?.getScope('osm')?.rulesets;
       const graph = editor.staging.graph;
       const entity = graph.entity(_entityIDs[0]);
-      for (let key in entity.tags) {
-        if (key in osmOneWayTags && (entity.tags[key] in osmOneWayTags[key])) {
-          _impliedYes = true;
-          texts[0] = l10n.tHtml('_tagging.presets.fields.oneway_yes.options.undefined');
-          break;
-        }
+
+      const isImpliedOneway = rulesets?.get('oneway_forward')?.match(entity.tags)
+        || rulesets?.get('oneway_backward')?.match(entity.tags)
+        || rulesets?.get('oneway_bidirectional')?.match(entity.tags);
+
+      if (isImpliedOneway) {
+        _impliedYes = true;
+        texts[0] = l10n.tHtml('_tagging.presets.fields.oneway_yes.options.undefined');
       }
     }
   }

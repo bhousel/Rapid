@@ -547,53 +547,53 @@ describe('SchemaSystem', () => {
 
         it('adds a paved ruleset', () => {
           const scope = _schema.getScope('osm');
-          const paved = scope.rulesets.get('paved');
+          const paved = scope.rulesets.get('surface_paved');
           assert.instanceOf(paved, Rapid.Ruleset);
-          assert.strictEqual(paved.id, 'paved');
+          assert.strictEqual(paved.id, 'surface_paved');
         });
 
         it('paved ruleset has correct rules count', () => {
-          const paved = _schema.getScope('osm').rulesets.get('paved');
-          assert.lengthOf(paved.rules, 2);   // 'in' rule + exact match rule
+          const paved = _schema.getScope('osm').rulesets.get('surface_paved');
+          assert.lengthOf(paved.include, 2);   // 'in' rule + exact match rule
         });
 
         it('paved ruleset matches surface=asphalt', () => {
-          const paved = _schema.getScope('osm').rulesets.get('paved');
-          assert.isTrue(paved.matchAny({ surface: 'asphalt' }));
+          const paved = _schema.getScope('osm').rulesets.get('surface_paved');
+          assert.isTrue(paved.match({ surface: 'asphalt' }));
         });
 
         it('paved ruleset matches tracktype=grade1', () => {
-          const paved = _schema.getScope('osm').rulesets.get('paved');
-          assert.isTrue(paved.matchAny({ tracktype: 'grade1' }));
+          const paved = _schema.getScope('osm').rulesets.get('surface_paved');
+          assert.isTrue(paved.match({ tracktype: 'grade1' }));
         });
 
         it('paved ruleset does not match surface=gravel', () => {
-          const paved = _schema.getScope('osm').rulesets.get('paved');
-          assert.isFalse(paved.matchAny({ surface: 'gravel' }));
+          const paved = _schema.getScope('osm').rulesets.get('surface_paved');
+          assert.isFalse(paved.match({ surface: 'gravel' }));
         });
 
-        it('one_way_forward ruleset matches highway=motorway', () => {
-          const forward = _schema.getScope('osm').rulesets.get('one_way_forward');
-          assert.isTrue(forward.matchAny({ highway: 'motorway' }));
+        it('oneway_forward ruleset matches highway=motorway', () => {
+          const forward = _schema.getScope('osm').rulesets.get('oneway_forward');
+          assert.isTrue(forward.match({ highway: 'motorway' }));
         });
 
-        it('routable_highway ruleset matches highway=trunk', () => {
-          const routable = _schema.getScope('osm').rulesets.get('routable_highway');
-          assert.isTrue(routable.matchAny({ highway: 'trunk' }));
+        it('connected_highway ruleset matches highway=trunk', () => {
+          const routable = _schema.getScope('osm').rulesets.get('connected_highway');
+          assert.isTrue(routable.match({ highway: 'trunk' }));
         });
 
-        it('routable_highway ruleset does not match highway=raceway', () => {
-          const routable = _schema.getScope('osm').rulesets.get('routable_highway');
-          assert.isFalse(routable.matchAny({ highway: 'raceway' }));
+        it('connected_highway ruleset does not match highway=raceway', () => {
+          const routable = _schema.getScope('osm').rulesets.get('connected_highway');
+          assert.isFalse(routable.match({ highway: 'raceway' }));
         });
 
         it('sets assetID on ruleset props', () => {
-          const paved = _schema.getScope('osm').rulesets.get('paved');
+          const paved = _schema.getScope('osm').rulesets.get('surface_paved');
           assert.strictEqual(paved.props.assetID, 'add-ruleset-data');
         });
 
         it('sets scopeID on ruleset props', () => {
-          const paved = _schema.getScope('osm').rulesets.get('paved');
+          const paved = _schema.getScope('osm').rulesets.get('surface_paved');
           assert.strictEqual(paved.props.scopeID, 'osm');
         });
       });
@@ -606,18 +606,18 @@ describe('SchemaSystem', () => {
         });
 
         it('replaces the paved ruleset', () => {
-          const paved = _schema.getScope('osm').rulesets.get('paved');
+          const paved = _schema.getScope('osm').rulesets.get('surface_paved');
           assert.instanceOf(paved, Rapid.Ruleset);
           assert.strictEqual(paved.props.assetID, 'update-ruleset-data');
         });
 
         it('updated paved ruleset matches surface=chipseal', () => {
-          const paved = _schema.getScope('osm').rulesets.get('paved');
-          assert.isTrue(paved.matchAny({ surface: 'chipseal' }));
+          const paved = _schema.getScope('osm').rulesets.get('surface_paved');
+          assert.isTrue(paved.match({ surface: 'chipseal' }));
         });
 
         it('does not affect other rulesets', () => {
-          const forward = _schema.getScope('osm').rulesets.get('one_way_forward');
+          const forward = _schema.getScope('osm').rulesets.get('oneway_forward');
           assert.instanceOf(forward, Rapid.Ruleset);
           assert.strictEqual(forward.props.assetID, 'add-ruleset-data');  // still the original
         });
@@ -631,15 +631,15 @@ describe('SchemaSystem', () => {
         });
 
         it('deletes an exact rulesetID', () => {
-          assert.isUndefined(_schema.getScope('osm').rulesets.get('routable_highway'));
+          assert.isUndefined(_schema.getScope('osm').rulesets.get('connected_highway'));
         });
 
         it(`deletes wildcard rulesetIDs containing '*'`, () => {
-          assert.isUndefined(_schema.getScope('osm').rulesets.get('one_way_forward'));
+          assert.isUndefined(_schema.getScope('osm').rulesets.get('oneway_forward'));
         });
 
         it('does not delete non-matching rulesets', () => {
-          const paved = _schema.getScope('osm').rulesets.get('paved');
+          const paved = _schema.getScope('osm').rulesets.get('surface_paved');
           assert.instanceOf(paved, Rapid.Ruleset);
         });
       });

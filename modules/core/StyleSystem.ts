@@ -1,6 +1,5 @@
 import { merge as deepMerge } from 'lodash-es';
 import { AbstractSystem } from './AbstractSystem.ts';
-import { osmPavedTags } from '../lib/tags.ts';
 import { Style, styleDefaults } from '../lib/Style.ts';
 import { StyleSelector } from '../lib/StyleSelector.ts';
 import { utilIterable } from '../util/iterable.ts';
@@ -643,8 +642,8 @@ const unpause = gfx?.pause();  // block rendering
 
     // Bumpy casing for roads with unpaved surface
     if (surface && highway && roadVals.has(highway)) {
-      const paved = schema?.getScope('osm')?.rulesets?.get('paved');
-      const isPaved = paved ? paved.matchKV('surface', surface) : osmPavedTags.surface?.[surface];
+      const paved = schema?.getScope('osm')?.rulesets?.get('surface_paved');
+      const isPaved = paved?.match({ surface });
       if (!isPaved) {
         if (!bridge) result.casing.color = 0xcccccc;
         result.casing.cap = 'butt';

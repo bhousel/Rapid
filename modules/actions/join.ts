@@ -1,7 +1,6 @@
 import { actionDeleteRelation } from './delete_relation.js';
 import { actionDeleteWay } from './delete_way.js';
 import { geomPathIntersections } from '@rapid-sdk/math';
-import { osmIsInterestingTag } from '../lib/tags.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
 import { utilArrayGroupBy, utilArrayIdentical, utilArrayIntersection } from '@rapid-sdk/util';
 
@@ -232,7 +231,7 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
       for (const k in way.tags) {
         if (!(k in tags)) {
           tags[k] = way.tags[k];
-        } else if (tags[k] && osmIsInterestingTag(k) && tags[k] !== way.tags[k]) {
+        } else if (tags[k] && way.isInterestingTag(k) && tags[k] !== way.tags[k]) {
           conflicting = true;
 
           // Rapid tagnosticRoadCombine - allow combining highways with conflicting tags

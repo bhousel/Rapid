@@ -1,7 +1,6 @@
 import { utilArrayUnion, utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
-import { osmIsInterestingTag } from '../lib/tags.ts';
 
 import type { Context } from '../Context.ts';
 import type { GeometryType } from '../core/SchemaSystem.ts';
@@ -366,15 +365,32 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
+   * isInterestingTag
+   * By convention, some tags are more for storing metadata and can be safely ignored.
+   * (For example, `source`, `created_by`, etc).
+   * Checks the 'uninteresting' ruleset from the 'osm' schema scope.
+   * @param key - The tag key to check
+   * @returns `true` if the tag key is "interesting", `false` if it is metadata/uninteresting
+   */
+  isInterestingTag(key: string): boolean {
+    const context = this.context;
+    const schema = context.systems.schema;
+    const uninteresting = schema?.getScope('osm')?.rulesets?.get('uninteresting');
+    if (uninteresting) {
+      return !uninteresting.match({ [key]: true });
+    }
+    return true;  // if no ruleset available, assume all tags are interesting
+  }
+
+  /**
    * hasInterestingTags
    * By convention, some tags are more for storing metadata and can be safely ignored.
    * (For example, `source`, `created_by`, etc).
-   * The list of these tags can be found in `osmIsInterestingTag`.
    * @returns `true` if this Entity has "interesting" tags, `false` if not
    */
   hasInterestingTags(): boolean {
     for (const k of Object.keys(this.tags)) {
-      if (osmIsInterestingTag(k)) return true;
+      if (this.isInterestingTag(k)) return true;
     }
     return false;
   }

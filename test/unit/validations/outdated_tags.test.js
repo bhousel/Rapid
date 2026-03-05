@@ -73,27 +73,4 @@ describe('validationOutdatedTags', () => {
     assert.deepEqual(rIssues, []);
   });
 
-  it('flags multipolygon tagged on the outer way', () => {
-    const w = new Rapid.OsmWay(context, { tags: { building: 'yes' } });
-    const r = new Rapid.OsmRelation(context, {
-      tags: { type: 'multipolygon' },
-      members: [{ id: w.id, role: 'outer' }]
-    });
-    const g = new Rapid.Graph(context, [w, r]);
-    const wIssues = validator(w, g);
-    const rIssues = validator(r, g);
-
-    assert.deepEqual(rIssues, []);
-
-    assert.isArray(wIssues);
-    assert.lengthOf(wIssues, 1);
-    const expected = {
-      type:      'outdated_tags',
-      subtype:   'old_multipolygon',
-      severity:  'warning',
-      entityIds: [w.id, r.id]
-    };
-    assert.deepInclude(wIssues[0], expected);
-  });
-
 });

@@ -1,7 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
 
 import { operationDelete } from '../operations/delete.js';
-import { osmRoutableHighwayTagValues } from '../lib/tags.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -13,14 +12,9 @@ export function validationDisconnectedWay(context) {
   const map = context.systems.map;
   const schema = context.systems.schema;
 
-  const routable = schema?.getScope('osm')?.rulesets?.get('routable_highway');
-
   function isTaggedAsHighway(entity) {
-    if (routable) {
-      return routable.matchKV('highway', entity.tags.highway);
-    } else {     // Fallback to globals if rulesets aren't loaded
-      return osmRoutableHighwayTagValues[entity.tags.highway];
-    }
+    const routable = schema?.getScope('osm')?.rulesets?.get('connected_highway');
+    return routable?.match({ highway: entity.tags.highway });
   }
 
 

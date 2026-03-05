@@ -3,15 +3,7 @@ import { utilHashcode, utilTagDiff } from '@rapid-sdk/util';
 import { actionChangePreset } from '../actions/change_preset.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionUpgradeTags } from '../actions/upgrade_tags.js';
-
-import {
-  Graph,
-  getDeprecatedTags,
-  osmIsOldMultipolygonOuterMember,
-  osmOldMultipolygonOuterMemberOfRelation,
-  ValidationIssue,
-  ValidationFix
-} from '../lib/index.ts';
+import { Graph, getDeprecatedTags, ValidationIssue, ValidationFix } from '../lib/index.ts';
 
 
 const pathVals = new Set([
@@ -283,87 +275,8 @@ graph = new Graph(graph);
   }
 
 
-  /**
-   * oldMultipolygonIssues
-   */
-  function oldMultipolygonIssues(entity, graph) {
-    let multipolygon, outerWay;
-    if (entity.type === 'relation') {
-      outerWay = osmOldMultipolygonOuterMemberOfRelation(entity, graph);
-      multipolygon = entity;
-    } else if (entity.type === 'way') {
-      multipolygon = osmIsOldMultipolygonOuterMember(entity, graph);
-      outerWay = entity;
-    } else {
-      return [];
-    }
-
-    if (!multipolygon || !outerWay) return [];
-
-    return [new ValidationIssue(context, {
-      type: type,
-      subtype: 'old_multipolygon',
-      severity: 'warning',
-      message: showMultipolygonMessage,
-      reference: showMultipolygonReference,
-      entityIds: [outerWay.id, multipolygon.id],
-      autoArgs: [actionUpgradeMultipolygon, l10n.t('issues.fix.move_tags.annotation')],
-      dynamicFixes: () => {
-        return [
-          new ValidationFix({
-            title: l10n.t('issues.fix.move_tags.title'),
-            onClick: () => {
-              editor.perform(actionUpgradeMultipolygon);
-              editor.commit({
-                annotation: l10n.t('issues.fix.move_tags.annotation'),
-                selectedIDs: [entity.id]
-              });
-            }
-          })
-        ];
-      }
-    })];
-
-
-    function actionUpgradeMultipolygon(graph) {
-      let currMultipolygon = graph.hasEntity(multipolygon.id);
-      let currOuterWay = graph.hasEntity(outerWay.id);
-      if (!currMultipolygon || !currOuterWay) return graph;
-
-      currMultipolygon = currMultipolygon.mergeTags(currOuterWay.tags);
-      graph = graph.replace(currMultipolygon);
-      return actionChangeTags(currOuterWay.id, {})(graph);
-    }
-
-
-    function showMultipolygonMessage() {
-      const graph = editor.staging.graph;
-      let currMultipolygon = graph.hasEntity(multipolygon.id);
-      if (!currMultipolygon) return '';
-
-      return l10n.t('issues.old_multipolygon.message',
-          { multipolygon: l10n.displayLabel(currMultipolygon, graph, true) }   // true = verbose
-      );
-    }
-
-
-    function showMultipolygonReference(selection) {
-      selection.selectAll('.issue-reference')
-        .data([0])
-        .enter()
-        .append('div')
-        .attr('class', 'issue-reference')
-        .text(l10n.t('issues.old_multipolygon.reference'));
-    }
-  }
-
-
   let validation = function checkOutdatedTags(entity, graph) {
-    let issues = oldMultipolygonIssues(entity, graph);
-    if (!issues.length) {
-      issues = oldTagIssues(entity, graph);
-    }
-    return issues;
+    return oldTagIssues(entity, graph);
   };
 
 

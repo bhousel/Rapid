@@ -1,7 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
 
 import { actionReverse } from '../actions/reverse.js';
-import { osmFlowingWaterwayTagValues, osmRoutableHighwayTagValues } from '../lib/tags.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -38,11 +37,11 @@ export function validationImpossibleOneway(context) {
       if (way.geometry(graph) !== 'line') return null;
 
       const rulesets = schema?.getScope('osm')?.rulesets;
-      const routable = rulesets?.get('routable_highway');
-      const flowing = rulesets?.get('flowing_waterway');
+      const routable = rulesets?.get('connected_highway');
+      const flowing = rulesets?.get('connected_waterway');
 
-      if (routable ? routable.matchKV('highway', way.tags.highway) : osmRoutableHighwayTagValues[way.tags.highway]) return 'highway';
-      if (flowing ? flowing.matchKV('waterway', way.tags.waterway) : osmFlowingWaterwayTagValues[way.tags.waterway]) return 'waterway';
+      if (routable?.match({ highway: way.tags.highway })) return 'highway';
+      if (flowing?.match({ waterway: way.tags.waterway })) return 'waterway';
       return null;
     }
 
@@ -96,23 +95,17 @@ export function validationImpossibleOneway(context) {
         if (parentWay.id === way.id) return false;
 
         if (wayType === 'highway') {
-          const routable = schema?.getScope('osm')?.rulesets?.get('routable_highway');
+          const routable = schema?.getScope('osm')?.rulesets?.get('connected_highway');
 
           // allow connections to highway areas
-          const parentIsRoutable = routable
-            ? routable.matchKV('highway', parentWay.tags.highway)
-            : osmRoutableHighwayTagValues[parentWay.tags.highway];
-          if (parentWay.geometry(graph) === 'area' && parentIsRoutable) return true;
+          if (parentWay.geometry(graph) === 'area' && routable?.match({ highway: parentWay.tags.highway })) return true;
           // consider connections to ferry routes as connected
           if (parentWay.tags.route === 'ferry') return true;
 
           return graph.parentRelations(parentWay).some(parentRelation => {
             if (parentRelation.tags.type === 'route' && parentRelation.tags.route === 'ferry') return true;
             // allow connections to highway multipolygons
-            const relIsRoutable = routable
-              ? routable.matchKV('highway', parentRelation.tags.highway)
-              : osmRoutableHighwayTagValues[parentRelation.tags.highway];
-            return parentRelation.isMultipolygon() && relIsRoutable;
+            return parentRelation.isMultipolygon() && routable?.match({ highway: parentRelation.tags.highway });
           });
         } else if (wayType === 'waterway') {
           // multiple waterways may start or end at a water body at the same node

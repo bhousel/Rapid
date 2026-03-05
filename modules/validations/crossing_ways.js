@@ -6,10 +6,7 @@ import {
 
 import { actionAddMidpoint, actionChangeTags, actionMergeNodes, actionSplit, actionSyncCrossingTags } from '../actions/index.js';
 import { OsmNode } from '../data/OsmNode.ts';
-import {
-  osmFlowingWaterwayTagValues, osmPathHighwayTagValues, osmRailwayTrackTagValues,
-  osmRoutableAerowayTags, osmRoutableHighwayTagValues
-} from '../lib/tags.ts';
+
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -164,21 +161,21 @@ export function validationCrossingWays(context) {
     const tags = entity.tags;
     const rulesets = schema?.getScope('osm')?.rulesets;
 
-    const routeAero = rulesets?.get('routable_aeroway');
-    if (routeAero ? routeAero.matchKV('aeroway', tags.aeroway) : osmRoutableAerowayTags[tags.aeroway]) return 'aeroway';
+    const routeAero = rulesets?.get('connected_aeroway');
+    if (routeAero?.match({ aeroway: tags.aeroway })) return 'aeroway';
     if (hasTag(tags.building) && !ignoreBuilding.has(tags.building)) return 'building';
 
-    const routeHwy = rulesets?.get('routable_highway');
-    if (hasTag(tags.highway) && (routeHwy ? routeHwy.matchKV('highway', tags.highway) : osmRoutableHighwayTagValues[tags.highway])) return 'highway';
+    const routeHwy = rulesets?.get('connected_highway');
+    if (hasTag(tags.highway) && routeHwy?.match({ highway: tags.highway })) return 'highway';
 
     // don't check railway or waterway areas
     if (geometry !== 'line') return null;
 
-    const railTrack = rulesets?.get('railway_track');
-    if (hasTag(tags.railway) && (railTrack ? railTrack.matchKV('railway', tags.railway) : osmRailwayTrackTagValues[tags.railway])) return 'railway';
+    const railTrack = rulesets?.get('connected_railway');
+    if (hasTag(tags.railway) && railTrack?.match({ railway: tags.railway })) return 'railway';
 
-    const flowWater = rulesets?.get('flowing_waterway');
-    if (hasTag(tags.waterway) && (flowWater ? flowWater.matchKV('waterway', tags.waterway) : osmFlowingWaterwayTagValues[tags.waterway])) return 'waterway';
+    const flowWater = rulesets?.get('connected_waterway');
+    if (hasTag(tags.waterway) && flowWater?.match({ waterway: tags.waterway })) return 'waterway';
 
     return null;
   }
@@ -250,7 +247,7 @@ export function validationCrossingWays(context) {
     const bothLines = geometry1 === 'line' && geometry2 === 'line';
 
     const pathHighway = schema?.getScope('osm')?.rulesets?.get('path_highway');
-    const isPathHighway = (val) => pathHighway ? pathHighway.matchKV('highway', val) : osmPathHighwayTagValues[val];
+    const isPathHighway = (val) => pathHighway?.match({ highway: val });
 
     if (crossingType === 'aeroway-aeroway') {
       return {};  // allowed, no tag suggestion

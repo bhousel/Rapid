@@ -1,7 +1,6 @@
 import { Extent, geoMetersToLat, geoMetersToLon, geoSphericalDistance } from '@rapid-sdk/math';
 
 import { actionMergeNodes } from '../actions/merge_nodes.js';
-import { osmPathHighwayTagValues } from '../lib/tags.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -44,7 +43,7 @@ export function validationCloseNodes(context) {
       if (hasTag(tags.indoor)) return 'indoor';
       if (hasTag(tags.building) || hasTag(tags['building:part'])) return 'building';
       const pathHighway = schema?.getScope('osm')?.rulesets?.get('path_highway');
-      if (pathHighway ? pathHighway.matchKV('highway', tags.highway) : osmPathHighwayTagValues[tags.highway]) return 'path';
+      if (pathHighway?.match({ highway: tags.highway })) return 'path';
 
       const parentRelations = graph.parentRelations(way);
       for (const relation of parentRelations) {
