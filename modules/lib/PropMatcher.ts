@@ -65,11 +65,11 @@ export interface PropMatcherProps {
   key: string | string[] | RegExp;
   /**
    * Key matching mode (inferred from `key` type when omitted).
-   * - `'='` (default for `string`): exact key match — checks `obj[key]` directly
-   * - `'~'` (default for `RegExp`): regex key match — iterates all keys of `obj` and tests each against the key pattern
+   * - `'='`  (default for `string`): exact key match — checks `obj[key]` directly
    * - `'in'` (default for `string[]`): list key match — checks each key in the array against `obj`
+   * - `'~'`  (default for `RegExp`): regex key match — iterates all keys of `obj` and tests each against the key pattern
    */
-  keyOp?: '=' | '~' | 'in';
+  keyOp?: '=' | 'in' | '~';
   /**
    * Comparison operator.
    * Defaults to '=' if value is provided, 'exists' if no value.
@@ -106,8 +106,12 @@ export class PropMatcher {
   readonly op: PropMatcherOp;
   /** Cached RegExp for regex operations on key (when keyOp is '~') */
   private _keyRegex: RegExp | null = null;
+  /** Cached Set for key-list lookups (when keyOp is 'in') */
+  private _keySet: Set<string> | null = null;
   /** Cached RegExp for regex operations on value */
   private _valueRegex: RegExp | null = null;
+  /** Cached Set for value-list lookups (when op is 'in' or '!in') */
+  private _valueSet: Set<string> | null = null;
 
   /**
    * @constructor
@@ -160,6 +164,11 @@ export class PropMatcher {
       }
     }
 
+    // Pre-compile key list into Set for O(1) lookups
+    if (this.keyOp === 'in' && Array.isArray(this.key)) {
+      this._keySet = new Set(this.key);
+    }
+
     // Pre-compile value regex if needed
     if ((this.op === '~' || this.op === '!~') && props.value !== undefined) {
       if (props.value instanceof RegExp) {
@@ -171,6 +180,11 @@ export class PropMatcher {
           throw new Error(`PropMatcher: invalid regex pattern '${props.value}'`);
         }
       }
+    }
+
+    // Pre-compile value list into Set for O(1) lookups
+    if ((this.op === 'in' || this.op === '!in') && Array.isArray(props.value)) {
+      this._valueSet = new Set(props.value as string[]);
     }
   }
 
@@ -208,66 +222,66 @@ export class PropMatcher {
     // Exact key matching
     const key = this.key as string;
     const hasKey = Object.prototype.hasOwnProperty.call(obj, key);
-    const actualValue = obj[key];
+    const val = obj[key];
 
-    if (this.op === 'exists') return hasKey && actualValue !== undefined && actualValue !== null;
-    if (this.op === '!exists') return !hasKey || actualValue === undefined || actualValue === null;
-    return this._checkValueOp(actualValue);
+    if (this.op === 'exists') return hasKey && val !== undefined && val !== null;
+    if (this.op === '!exists') return !hasKey || val === undefined || val === null;
+
+    return this._checkValueOp(val);
   }
 
 
   /**
    * Test equality match.
    */
-  private _matchEquals(actualValue: unknown): boolean {
+  private _matchEquals(val: unknown): boolean {
     const expected = this.props.value;
 
     // Handle wildcard '*' - matches any truthy value
     if (expected === '*') {
-      return actualValue !== undefined && actualValue !== null && actualValue !== '';
+      return val !== undefined && val !== null && val !== '';
     }
 
     // Type coercion for comparison (OSM tags are strings)
-    if (typeof actualValue === 'string' && typeof expected === 'number') {
-      return actualValue === String(expected);
+    if (typeof val === 'string' && typeof expected === 'number') {
+      return val === String(expected);
     }
-    if (typeof actualValue === 'number' && typeof expected === 'string') {
-      return String(actualValue) === expected;
+    if (typeof val === 'number' && typeof expected === 'string') {
+      return String(val) === expected;
     }
 
-    return actualValue === expected;
+    return val === expected;
   }
 
 
   /**
    * Test regex match.
    */
-  private _matchRegex(actualValue: unknown): boolean {
+  private _matchValueRegex(val: unknown): boolean {
     if (!this._valueRegex) return false;
-    if (actualValue === undefined || actualValue === null) return false;
+    if (val === undefined || val === null) return false;
 
-    const str = String(actualValue);
+    const str = String(val);
     return this._valueRegex.test(str);
   }
 
 
   /**
-   * Test if value is in an array.
+   * Test if value is in the precompiled Set.
    */
-  private _matchIn(actualValue: unknown): boolean {
-    const expected = this.props.value;
-    if (!Array.isArray(expected)) return false;
-    if (actualValue === undefined || actualValue === null) return false;
+  private _matchValueIn(val: unknown): boolean {
+    if (!this._valueSet) return false;
+    if (val === undefined || val === null) return false;
 
-    const str = String(actualValue);
-    return expected.includes(str);
+    const str = String(val);
+    return this._valueSet.has(str);
   }
 
 
   /**
    * Perform numeric comparison.
    */
-  private _compareNumeric(actualValue: unknown, compareFn: (a: number, b: number) => boolean): boolean {
+  private _compareValueNumeric(actualValue: unknown, compareFn: (a: number, b: number) => boolean): boolean {
     const expected = this.props.value;
     if (typeof expected !== 'number') return false;
 
@@ -289,18 +303,18 @@ export class PropMatcher {
    * Apply a value-side check for a single actual value.
    * Handles all ops except 'exists' and '!exists' (which are handled by the caller).
    */
-  private _checkValueOp(actualValue: unknown): boolean {
+  private _checkValueOp(val: unknown): boolean {
     switch (this.op) {
-      case '=':   return this._matchEquals(actualValue);
-      case '!=':  return !this._matchEquals(actualValue);
-      case '~':   return this._matchRegex(actualValue);
-      case '!~':  return !this._matchRegex(actualValue);
-      case 'in':  return this._matchIn(actualValue);
-      case '!in': return !this._matchIn(actualValue);
-      case '>':   return this._compareNumeric(actualValue, (a, b) => a > b);
-      case '>=':  return this._compareNumeric(actualValue, (a, b) => a >= b);
-      case '<':   return this._compareNumeric(actualValue, (a, b) => a < b);
-      case '<=':  return this._compareNumeric(actualValue, (a, b) => a <= b);
+      case '=':   return this._matchEquals(val);
+      case '!=':  return !this._matchEquals(val);
+      case '~':   return this._matchValueRegex(val);
+      case '!~':  return !this._matchValueRegex(val);
+      case 'in':  return this._matchValueIn(val);
+      case '!in': return !this._matchValueIn(val);
+      case '>':   return this._compareValueNumeric(val, (a, b) => a > b);
+      case '>=':  return this._compareValueNumeric(val, (a, b) => a >= b);
+      case '<':   return this._compareValueNumeric(val, (a, b) => a < b);
+      case '<=':  return this._compareValueNumeric(val, (a, b) => a <= b);
       default:    return false;
     }
   }
@@ -341,24 +355,28 @@ export class PropMatcher {
 
 
   /**
-   * Match by key list: check each key in the array against the object.
+   * Match by key list: iterate obj keys, checking each against the
+   * precompiled key Set for O(1) membership tests.
    * For 'exists', returns true if any listed key exists. For '!exists',
    * returns true only if none of the listed keys exist.
    */
   private _matchKeyList(obj: Record<string, unknown>): boolean {
-    const keys = this.key as string[];
+    const keySet = this._keySet!;
 
-    // For '!exists', ALL listed keys must not exist
+    // For '!exists', ALL obj keys in our key set must have null/undefined values
     if (this.op === '!exists') {
-      return keys.every(k => {
-        const v = obj[k];
-        return !Object.prototype.hasOwnProperty.call(obj, k) || v === undefined || v === null;
-      });
+      for (const k of Object.keys(obj)) {
+        if (keySet.has(k)) {
+          const v = obj[k];
+          if (v !== undefined && v !== null) return false;
+        }
+      }
+      return true;
     }
 
-    // For all other ops, find the first listed key that exists and test its value
-    for (const k of keys) {
-      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+    // For all other ops, find the first obj key in our key set that passes
+    for (const k of Object.keys(obj)) {
+      if (!keySet.has(k)) continue;
       const actualValue = obj[k];
       if (this.op === 'exists') {
         if (actualValue !== undefined && actualValue !== null) return true;

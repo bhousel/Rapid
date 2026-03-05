@@ -11,31 +11,36 @@ import type { Context } from '../Context.ts';
  * surfaces are "paved", which highways are "routable") per schema scope,
  * replacing module-level globals with scope-owned configuration.
  *
+ * Rules are split into `include` (positive matches) and `exclude` (vetoes):
+ * - A feature matches the ruleset if ANY `include` rule matches
+ *   AND NO `exclude` rule matches.
+ * - This mirrors the include/exclude pattern from location-conflation's locationSets.
+ *
  * @example
- * // Define a ruleset for paved surfaces
- * const paved = new Ruleset({
- *   id: 'paved',
- *   rules: [
- *     { key: 'surface', value: 'paved' },
+ * // Define a ruleset for sided features with a veto condition
+ * const sided = new Ruleset(context, {
+ *   id: 'sided_right',
+ *   include: [
+ *     { key: 'natural', op: 'in', value: ['cliff', 'coastline'] },
+ *     { key: 'barrier', op: 'in', value: ['retaining_wall', 'kerb'] },
+ *   ],
+ *   exclude: [
+ *     { key: 'two_sided', value: 'yes' }
+ *   ]
+ * });
+ * sided.match({ natural: 'cliff' });                    // true
+ * sided.match({ natural: 'cliff', two_sided: 'yes' });  // false (vetoed)
+ *
+ * // Define a simple ruleset (include only)
+ * const paved = new Ruleset(context, {
+ *   id: 'surface_paved',
+ *   include: [
  *     { key: 'surface', value: 'asphalt' },
  *     { key: 'surface', value: 'concrete' },
  *   ]
  * });
- * paved.matchAny({ surface: 'asphalt' });  // true
- * paved.matchAny({ surface: 'gravel' });   // false
- *
- * // Define a ruleset for routable highways
- * const routable = new Ruleset({
- *   id: 'routable_highway',
- *   rules: [
- *     { key: 'highway', value: 'motorway' },
- *     { key: 'highway', value: 'trunk' },
- *     { key: 'highway', value: 'primary' },
- *     { key: 'highway', value: 'secondary' },
- *   ]
- * });
- * routable.matchKV('highway', 'trunk');       // true
- * routable.firstMatchKey({ highway: 'trunk', name: 'Main St' });  // 'highway'
+ * paved.match({ surface: 'asphalt' });  // true
+ * paved.match({ surface: 'gravel' });   // false
  *
  * @module
  */
@@ -51,18 +56,26 @@ export interface RulesetProps {
   assetID?: AssetID;
   /** The scope that this Ruleset applies to (e.g. 'osm') */
   scopeID?: ScopeID;
-  /** Array of matcher rules — any match means the property set belongs to this ruleset */
-  rules: PropMatcherProps[];
+  /** Positive match rules — any match means the property set belongs to this ruleset */
+  include: PropMatcherProps[];
+  /** Negative match rules — any match vetoes the classification (even if include matched) */
+  exclude?: PropMatcherProps[];
 }
 
 
 /**
- * Ruleset - A named collection of PropMatcher rules with OR semantics.
+ * Ruleset - A named collection of PropMatcher rules with include/exclude semantics.
+ *
+ * Matching logic: ANY include matches AND NO exclude matches.
  *
  * Properties you can access:
- *   `id`       Unique identifier for this ruleset
- *   `props`    The full props object
- *   `rules`    The compiled PropMatcher instances
+ *   `id`        Unique identifier for this ruleset
+ *   `props`     The full props object
+ *   `include`   The compiled include PropMatcher instances
+ *   `exclude`   The compiled exclude PropMatcher instances
+ *
+ * Methods:
+ *   `match(obj)` Test if the property set belongs to this ruleset
  */
 export class Ruleset {
   context: Context;
@@ -71,8 +84,11 @@ export class Ruleset {
   /** Unique identifier */
   readonly id: RulesetID;
 
-  /** Compiled matchers from the rules */
-  readonly rules: PropMatcher[];
+  /** Compiled include matchers */
+  readonly include: PropMatcher[];
+
+  /** Compiled exclude matchers */
+  readonly exclude: PropMatcher[];
 
 
   /**
@@ -90,127 +106,47 @@ export class Ruleset {
 
     // Deep clone to avoid mutations
     this.props = globalThis.structuredClone(props) as RulesetProps;
-    this.props.rules ??= [];
+    this.props.include ??= [];
+    this.props.exclude ??= [];
     this.id = props.id;
 
     // Compile PropMatcherProps into PropMatcher instances
-    this.rules = this.props.rules.map(r => new PropMatcher(r));
-  }
-
-
-  /** The asset ID this Ruleset came from. */
-  get assetID(): AssetID | undefined {
-    return this.props.assetID;
-  }
-
-  /** The scope ID this Ruleset applies to. */
-  get scopeID(): ScopeID | undefined {
-    return this.props.scopeID;
+    this.include = this.props.include.map(r => new PropMatcher(r));
+    this.exclude = this.props.exclude.map(r => new PropMatcher(r));
   }
 
 
   /**
-   * Test if ANY rule matches the given properties object.
-   * Implements OR logic across all rules.
+   * Test if ANY include rule matches AND NO exclude rule matches.
    *
    * @param obj - Object with properties to test
-   * @return `true` if any rule matches
+   * @return `true` if any include matches and no exclude matches
    */
-  matchAny(obj: Record<string, unknown>): boolean {
-    return this.rules.some(r => r.matches(obj));
-  }
-
-
-  /**
-   * Test if a specific key-value pair matches any rule.
-   * Constructs a single-property object and tests against all rules.
-   * Useful when you have a key and value but not a full tag object.
-   *
-   * @param key - The property key
-   * @param value - The property value
-   * @return `true` if any rule matches the key-value pair
-   */
-  matchKV(key: string, value: unknown): boolean {
-    return this.matchAny({ [key]: value });
-  }
-
-
-  /**
-   * Find the first key from the given object that matches any rule.
-   * Iterates the object's own properties and returns the first key
-   * where the full object matches a rule involving that key.
-   *
-   * This is useful for determining which tag "triggered" the match.
-   *
-   * @param obj - Object with properties to test
-   * @return The first matching key, or `undefined` if no match
-   */
-  firstMatchKey(obj: Record<string, unknown>): string | undefined {
-    if (!obj || typeof obj !== 'object') return undefined;
-
-    for (const key of Object.keys(obj)) {
-      // Check if any rule's key matches this property key AND the rule matches the object
-      for (const rule of this.rules) {
-        const ruleKey = rule.key;
-        const isKeyMatch = Array.isArray(ruleKey)
-          ? ruleKey.includes(key)
-          : ruleKey === key;
-
-        if (isKeyMatch && rule.matches(obj)) {
-          return key;
-        }
-      }
-    }
-
-    // Also check regex-keyed rules that may have matched
-    for (const rule of this.rules) {
-      if (rule.keyOp === '~' && rule.matches(obj)) {
-        // Find which key in obj actually matched the pattern
-        const keyRegex = new RegExp(rule.key as string);
-        for (const key of Object.keys(obj)) {
-          if (keyRegex.test(key)) return key;
-        }
-      }
-    }
-    return undefined;
-  }
-
-
-  /**
-   * Get all keys from the rules in this ruleset.
-   * Useful for building lookup indexes.
-   *
-   * @return Set of all unique keys referenced by rules
-   */
-  ruleKeys(): Set<string> {
-    const keys = new Set<string>();
-    for (const rule of this.rules) {
-      const ruleKey = rule.key;
-      if (Array.isArray(ruleKey)) {
-        for (const k of ruleKey) keys.add(k);
-      } else {
-        keys.add(ruleKey);  // string (exact or regex pattern)
-      }
-    }
-    return keys;
+  match(obj: Record<string, unknown>): boolean {
+    if (this.exclude.some(r => r.matches(obj))) return false;
+    if (!this.include.some(r => r.matches(obj))) return false;
+    return true;
   }
 
 
   /**
    * Returns a new Ruleset that is a merge of this and another.
-   * Rules from `other` are appended to this ruleset's rules.
-   * Properties from `other` (except rules) override this.
+   * Include rules from `other` are appended to this ruleset's include rules.
+   * Exclude rules from `other` are appended to this ruleset's exclude rules.
+   * Properties from `other` (except include/exclude) override this.
    *
    * @param other - Another Ruleset to merge with
    * @return A new merged Ruleset
    */
   merge(other: Ruleset): Ruleset {
-    const mergedRules = [...this.props.rules, ...other.props.rules];
+    const mergedInclude = [...this.props.include, ...other.props.include];
+    const mergedExclude = [...(this.props.exclude ?? []), ...(other.props.exclude ?? [])];
     return new Ruleset(this.context, {
       ...this.props,
       ...other.props,
       id: this.id,  // Keep original ID
-      rules: mergedRules,
+      include: mergedInclude,
+      exclude: mergedExclude,
     });
   }
 
@@ -234,10 +170,15 @@ export class Ruleset {
    * Convert to a JSON-serializable object.
    */
   toJSON(): RulesetProps {
-    return {
-      ...this.props,
-      rules: this.rules.map(r => r.toJSON()),
+    const { exclude: _exclude, ...rest } = this.props;
+    const result: RulesetProps = {
+      ...rest,
+      include: this.include.map(r => r.toJSON()),
     };
+    if (this.exclude.length) {
+      result.exclude = this.exclude.map(r => r.toJSON());
+    }
+    return result;
   }
 
 
@@ -245,6 +186,10 @@ export class Ruleset {
    * String representation for debugging.
    */
   toString(): string {
-    return `Ruleset(${this.id}, ${this.rules.length} rules)`;
+    const parts = [`${this.include.length} include`];
+    if (this.exclude.length) {
+      parts.push(`${this.exclude.length} exclude`);
+    }
+    return `Ruleset(${this.id}, ${parts.join(', ')})`;
   }
 }
