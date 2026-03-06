@@ -3,13 +3,11 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmLanes } from '../lib/lanes.ts';
-import { osmRemoveLifecyclePrefix } from '../lib/tags.ts';
 
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmNode, Tags, Vec2 } from './types.ts';
+import type { OsmNode, Tags, TagKeyValueLookup, Vec2 } from './types.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
-import type { TagKeyValueLookup } from '../lib/tags.ts';
 
 
 // Filter function to eliminate consecutive duplicates.
@@ -333,7 +331,7 @@ export class OsmWay extends OsmEntity {
     // Build tags with lifecycle prefixes stripped so rulesets can match
     const cleanedTags: Record<string, string> = {};
     for (const realKey in this.tags) {
-      const key = osmRemoveLifecyclePrefix(realKey);
+      const key = schema!.removeLifecyclePrefix(realKey);
       cleanedTags[key] = this.tags[realKey];
     }
 
@@ -411,7 +409,7 @@ export class OsmWay extends OsmEntity {
 
     const returnTags: Record<string, string> = {};
     for (const realKey in tags) {
-      const key = osmRemoveLifecyclePrefix(realKey);
+      const key = schema?.removeLifecyclePrefix(realKey) ?? realKey;
       const kv: Record<string, string> = { [key]: tags[realKey] };
 
       // Skip tags forced false (e.g. emergency=yes — key is in areaKeys but value is not an area)

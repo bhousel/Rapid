@@ -11,11 +11,10 @@ import type { Context } from '../Context.ts';
 import type { FieldProps } from '../lib/Field.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { HasLocationSet } from '../core/LocationSystem.ts';
-import type { OsmEntity, OsmNode, Tags, Vec2 } from '../data/types.ts';
+import type { OsmEntity, OsmNode, Tags, TagKeyValueLookup, Vec2 } from '../data/types.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { PresetProps } from '../lib/Preset.ts';
 import type { RulesetProps } from '../lib/Ruleset.ts';
-import type { TagKeyValueLookup } from '../lib/tags.ts';
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
@@ -96,6 +95,8 @@ export interface SchemaScope {
   // Derived tag lookup tables (computed by _schemaChanged)
   areaKeys: TagKeyValueLookup;
   deprecatedValues: Record<string, string[]>;
+  /** Lifecycle prefixes derived from the 'lifecycle' ruleset (e.g. 'abandoned', 'disused') */
+  lifecyclePrefixes: Set<string>;
 
   // improve:
   deprecated: DeprecationRule[];
@@ -733,6 +734,7 @@ gfx?.scene?.reset();  // throw it all away
         // Derived tag lookup tables
         areaKeys: {},
         deprecatedValues: {},
+        lifecyclePrefixes: new Set(),
 
         // improve
         deprecated: [],
@@ -1023,6 +1025,28 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
+   * removeLifecyclePrefix
+   * Removes a lifecycle prefix from a tag key if present (e.g. 'disused:railway' → 'railway').
+   * The set of recognized lifecycle prefixes is derived from the 'lifecycle' ruleset.
+   *
+   * @param key - The tag key, possibly with a lifecycle prefix
+   * @param scopeID - Scope to query (defaults to 'osm')
+   * @return The key with lifecycle prefix removed, or the original key
+   */
+  removeLifecyclePrefix(key: string, scopeID: ScopeID = 'osm'): string {
+    const colonIndex = key.indexOf(':');
+    if (colonIndex === -1) return key;
+
+    const scope = this.getScope(scopeID);
+    const prefix = key.slice(0, colonIndex);
+    if (scope.lifecyclePrefixes.has(prefix)) {
+      return key.slice(colonIndex + 1);
+    }
+    return key;
+  }
+
+
+  /**
    * getDeprecatedTags
    * Returns any tag deprecations that match the given tags.
    * Checks whether the entity's tags match any known deprecated tag patterns.
@@ -1081,20 +1105,6 @@ gfx?.scene?.reset();  // throw it all away
     }
 
     return results;
-  }
-
-
-  /**
-   * deprecatedTagValuesByKey
-   * Returns a precomputed lookup of deprecated tag values grouped by key.
-   * Only includes single-key deprecations with non-wildcard values.
-   * Used by the combo field UI to filter deprecated values from suggestions.
-   *
-   * @param   scopeID - Scope to query (defaults to 'osm')
-   * @return  Record mapping tag keys to arrays of deprecated values
-   */
-  deprecatedTagValuesByKey(scopeID: ScopeID = 'osm'): Record<string, string[]> {
-    return this.getScope(scopeID).deprecatedValues;
   }
 
 
@@ -1471,6 +1481,21 @@ gfx?.scene?.reset();  // throw it all away
     // Compute and store derived tag lookup tables per scope
     for (const [scopeID, scope] of this._scopes) {
       scope.areaKeys = this.areaKeys(scopeID);
+
+      // Derive lifecycle prefixes from the lifecycle ruleset
+      scope.lifecyclePrefixes = new Set();
+      const lifecycleRuleset = scope.rulesets.get('lifecycle');
+      if (lifecycleRuleset) {
+        for (const matcher of lifecycleRuleset.include) {
+          // Extract prefix string from regex pattern like "^abandoned:"
+          if (matcher.keyOp === '~' && typeof matcher.key === 'string') {
+            const prefix = matcher.key.replace(/^\^/, '').replace(/:$/, '');
+            if (prefix) {
+              scope.lifecyclePrefixes.add(prefix);
+            }
+          }
+        }
+      }
 
       // Precompute deprecated values by key for this scope
       const dvbk: Record<string, string[]> = {};

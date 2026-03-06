@@ -224,6 +224,30 @@
         ]
       },
 
+      // ### LIFECYCLE PREFIXES
+      // OSM lifecycle prefixes that can appear before a tag key (e.g. 'disused:railway').
+      // These indicate that the feature is no longer in active use but retains a trace
+      // of its former purpose.  Code can derive a Set<string> of prefix strings from
+      // this ruleset's key patterns, for use in stripping prefixes or identifying
+      // past/future features.
+      lifecycle: {
+        include: [
+          { keyOp: "~", key: "^abandoned:" },
+          { keyOp: "~", key: "^construction:" },
+          { keyOp: "~", key: "^demolished:" },
+          { keyOp: "~", key: "^destroyed:" },
+          { keyOp: "~", key: "^dismantled:" },
+          { keyOp: "~", key: "^disused:" },
+          { keyOp: "~", key: "^intermittent:" },
+          { keyOp: "~", key: "^obliterated:" },
+          { keyOp: "~", key: "^planned:" },
+          { keyOp: "~", key: "^proposed:" },
+          { keyOp: "~", key: "^razed:" },
+          { keyOp: "~", key: "^removed:" },
+          { keyOp: "~", key: "^was:" }
+        ]
+      },
+
       // ### TAG METADATA
       // Tag keys that are metadata or import-related (not "interesting" for feature display).
       // Used by `OsmEntity.isInterestingTag()` to filter out keys like 'source', 'tiger:*', etc.

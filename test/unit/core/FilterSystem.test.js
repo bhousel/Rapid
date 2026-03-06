@@ -1,6 +1,7 @@
 import { beforeAll, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import { setupMockRulesets } from '../mock_rulesets.js';
 
 
 describe('FilterSystem', () => {
@@ -16,6 +17,7 @@ describe('FilterSystem', () => {
   context.systems = {
     editor:  new MockEditSystem(context)
   };
+  setupMockRulesets(Rapid, context);
 
 
   // Test construction and startup of the system..

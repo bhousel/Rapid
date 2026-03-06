@@ -9,11 +9,26 @@ import type { Context } from '../Context.ts';
 // Re-export entity classes as types
 export type { AbstractData } from './AbstractData.ts';
 export type { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
+export type { OsmChangeset, OsmChangesetProps } from './OsmChangeset.ts';
 export type { OsmNode, OsmNodeProps } from './OsmNode.ts';
 export type { OsmRelation, OsmRelationProps, OsmRelationMember } from './OsmRelation.ts';
 export type { OsmWay, OsmWayProps } from './OsmWay.ts';
+
 /** OSM tags as key-value string pairs */
 export type Tags = Record<string, string>;
+
+/**
+ * A lookup table mapping tag values to boolean flags.
+ * Used for checking if a specific value is valid for a tag key.
+ * The special key '*' matches any value.
+ */
+export type TagValueLookup = Record<string, boolean>;
+
+/**
+ * A two-level lookup table: key → value → boolean.
+ * Used for osmAreaKeys
+ */
+export type TagKeyValueLookup = Record<string, TagValueLookup>;
 
 
 /** 2D vector as [x, y], typically [longitude, latitude] in WGS84 for geographic coordinates */

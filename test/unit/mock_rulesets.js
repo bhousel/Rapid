@@ -123,14 +123,54 @@ export function setupMockRulesets(Rapid, context) {
     ]
   }));
 
+  // Lifecycle prefixes: used by SchemaSystem.removeLifecyclePrefix and FilterSystem._isPastFuture
+  rulesets.set('lifecycle', new Rapid.Ruleset(context, {
+    id: 'lifecycle',
+    include: [
+      { keyOp: '~', key: '^abandoned:' },
+      { keyOp: '~', key: '^construction:' },
+      { keyOp: '~', key: '^demolished:' },
+      { keyOp: '~', key: '^disused:' },
+      { keyOp: '~', key: '^destroyed:' },
+      { keyOp: '~', key: '^proposed:' },
+      { keyOp: '~', key: '^was:' }
+    ]
+  }));
+
+  // Derive lifecyclePrefixes Set from the lifecycle ruleset's key patterns
+  const lifecyclePrefixes = new Set();
+  const lifecycleRuleset = rulesets.get('lifecycle');
+  if (lifecycleRuleset) {
+    for (const matcher of lifecycleRuleset.include) {
+      if (matcher.keyOp === '~' && typeof matcher.key === 'string') {
+        const prefix = matcher.key.replace(/^\^/, '').replace(/:$/, '');
+        if (prefix) {
+          lifecyclePrefixes.add(prefix);
+        }
+      }
+    }
+  }
+
   const mockScope = {
     rulesets,
-    areaKeys: {}
+    areaKeys: {},
+    lifecyclePrefixes
   };
 
   if (!context.systems.schema) {
     context.systems.schema = {
-      getScope: (scopeID) => scopeID === 'osm' ? mockScope : undefined
+      getScope: (scopeID) => scopeID === 'osm' ? mockScope : undefined,
+
+      // Mirror SchemaSystem.removeLifecyclePrefix for tests
+      removeLifecyclePrefix: (key, scopeID = 'osm') => {
+        const colonIndex = key.indexOf(':');
+        if (colonIndex === -1) return key;
+        const prefix = key.slice(0, colonIndex);
+        if (lifecyclePrefixes.has(prefix)) {
+          return key.slice(colonIndex + 1);
+        }
+        return key;
+      }
     };
   }
 

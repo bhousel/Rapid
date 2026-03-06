@@ -2,13 +2,11 @@ import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 import diacritics from 'diacritics';
 import { utilGatherTokens } from '../util/string.ts';
 
-import type { TagKeyValueLookup } from './tags.ts';
-
 import type { Context } from '../Context.ts';
 import type { Field } from './Field.ts';
 import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { LocationSet } from '@rapideditor/location-conflation';
-import type { Tags } from '../data/types.ts';
+import type { Tags, TagKeyValueLookup } from '../data/types.ts';
 
 
 /**

@@ -187,7 +187,7 @@ export function uiFieldCombo(context, uifield) {
             });
 
             // don't suggest deprecated tag values
-            var deprecatedValues = schema.deprecatedTagValuesByKey()[uifield.key];
+            var deprecatedValues = schema.getScope('osm').deprecatedValues[uifield.key];
             if (deprecatedValues) {
                 data = data.filter(function(d) {
                     return deprecatedValues.indexOf(d.value) === -1;

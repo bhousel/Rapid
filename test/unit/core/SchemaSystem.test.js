@@ -1547,6 +1547,129 @@ describe('SchemaSystem', () => {
   });
 
 
+  describe('allowsVertex', () => {
+    const testPresets = {
+      assetID: 'allowsVertex-test',
+      scopes: [{
+        scope: 'osm',
+        presets: {
+          'highway/traffic_signals': { tags: { highway: 'traffic_signals' }, geometry: ['vertex'] },
+          'amenity/cafe': { tags: { amenity: 'cafe' }, geometry: ['point', 'area'] },
+          'natural/tree': { tags: { natural: 'tree' }, geometry: ['point'] }
+        }
+      }]
+    };
+
+    it('returns false for non-node entities', () => {
+      const schema = new Rapid.SchemaSystem(context);
+      return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const way = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
+        const graph = new Rapid.Graph(context, [way]);
+        assert.isFalse(schema.allowsVertex(way, graph));
+      });
+    });
+
+    it('returns true for nodes with no tags', () => {
+      const schema = new Rapid.SchemaSystem(context);
+      return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const node = new Rapid.OsmNode(context);
+        const graph = new Rapid.Graph(context, [node]);
+        assert.isTrue(schema.allowsVertex(node, graph));
+      });
+    });
+
+    it('returns true for nodes on an addr:interpolation line', () => {
+      const schema = new Rapid.SchemaSystem(context);
+      return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const node = new Rapid.OsmNode(context, { tags: { natural: 'tree' } });
+        const line = new Rapid.OsmWay(context, { nodes: [node.id], tags: { 'addr:interpolation': 'even' } });
+        const graph = new Rapid.Graph(context, [node, line]);
+        assert.isTrue(schema.allowsVertex(node, graph));
+      });
+    });
+
+    it('returns true for nodes matching a vertex preset', () => {
+      const schema = new Rapid.SchemaSystem(context);
+      return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const node = new Rapid.OsmNode(context, { tags: { highway: 'traffic_signals' } });
+        const line = new Rapid.OsmWay(context, { nodes: [node.id], tags: { highway: 'residential' } });
+        const graph = new Rapid.Graph(context, [node, line]);
+        assert.isTrue(schema.allowsVertex(node, graph));
+      });
+    });
+
+    it('returns false for nodes matching only a point preset', () => {
+      const schema = new Rapid.SchemaSystem(context);
+      return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const node = new Rapid.OsmNode(context, { tags: { natural: 'tree' } });
+        const line = new Rapid.OsmWay(context, { nodes: [node.id], tags: { highway: 'residential' } });
+        const graph = new Rapid.Graph(context, [node, line]);
+        assert.isFalse(schema.allowsVertex(node, graph));
+      });
+    });
+
+    it('returns true for nodes with unrecognized tags (fallback)', () => {
+      const schema = new Rapid.SchemaSystem(context);
+      return schema.initAsync().then(() => {
+        schema.merge(testPresets);
+        const node = new Rapid.OsmNode(context, { tags: { foo: 'bar' } });
+        const line = new Rapid.OsmWay(context, { nodes: [node.id], tags: { highway: 'residential' } });
+        const graph = new Rapid.Graph(context, [node, line]);
+        assert.isTrue(schema.allowsVertex(node, graph));
+      });
+    });
+  });
+
+
+  describe('removeLifecyclePrefix', () => {
+    const _schema = new Rapid.SchemaSystem(context);
+
+    beforeAll(() => {
+      _schema.merge({
+        assetID: 'test_lifecycle',
+        scopes: [{
+          scope: 'osm',
+          rulesets: {
+            lifecycle: {
+              include: [
+                { keyOp: '~', key: '^abandoned:' },
+                { keyOp: '~', key: '^construction:' },
+                { keyOp: '~', key: '^disused:' },
+                { keyOp: '~', key: '^was:' }
+              ]
+            }
+          }
+        }]
+      });
+    });
+
+    it('removes a lifecycle prefix from a tag key', () => {
+      assert.strictEqual(_schema.removeLifecyclePrefix('was:natural'), 'natural');
+    });
+
+    it('removes a recognized prefix', () => {
+      assert.strictEqual(_schema.removeLifecyclePrefix('disused:railway'), 'railway');
+    });
+
+    it('handles keys with multiple colons', () => {
+      assert.strictEqual(_schema.removeLifecyclePrefix('construction:seamark:type'), 'seamark:type');
+    });
+
+    it('ignores unrecognized lifecycle prefixes', () => {
+      assert.strictEqual(_schema.removeLifecyclePrefix('ex:leisure'), 'ex:leisure');
+    });
+
+    it('returns keys without colons unchanged', () => {
+      assert.strictEqual(_schema.removeLifecyclePrefix('highway'), 'highway');
+    });
+  });
+
+
   describe('getDeprecatedTags', () => {
     const deprecated = [
       { old: { highway: 'no' } },

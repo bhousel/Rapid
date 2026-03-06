@@ -75,7 +75,7 @@ There is a `.github/scratchpad.md` file (git-ignored) that serves as persistent 
 - All runtime-computed data in Rapid should be **owned by a core system** so that we can manage its state and lifecycle
 - **Module-level mutable globals** (e.g. `export let osmAreaKeys = {}` with a setter function) break this rule — other code depends on them in ways where we can't guarantee they've been properly initialized or reset when changes occur
 - The test for whether something should be on a system: "If I call this function right now, can I guarantee the data it depends on is ready?" If the answer requires knowing another system's startup sequence, the data belongs on that system.
-- **Truly constant data** (like `osmLifecyclePrefixes`) is fine as a module-level `const` — it doesn't change at runtime, so there's no lifecycle to manage
+- **Truly constant data** that does not change at runtime is fine as a module-level `const` — there's no lifecycle to manage. But if the data is a list of domain-specific "magic strings" (like lifecycle prefixes), prefer expressing it as a ruleset in `osm_rulesets.json5` so it's configurable and scope-owned.
 - **Domain-specific logic** (like "is this tag interesting?" or "does this tag suggest an area?") belongs on the data class that represents the domain concept (e.g. `OsmEntity`), not as a free function reading a global. The instance method can access the system through `this.context` — making the dependency explicit and traceable.
 
 ## TypeScript Patterns

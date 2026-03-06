@@ -49,13 +49,6 @@ This module contains a mix of data structures, schema classes, and utility funct
 | `ValidationFix.ts` | A fix that can be applied to resolve a validation issue |
 | `ValidationIssue.ts` | A validation problem detected in the map data |
 
-### Tag Utilities
-
-| File | Description |
-|------|-------------|
-| `tags.ts` | Tag-related constants and utilities (area keys, lifecycle prefixes, etc.) |
-| `tag_classes.ts` | Generate CSS classes from tags (legacy - not used anymore) |
-
 ### Other Utilities
 
 | File | Description |

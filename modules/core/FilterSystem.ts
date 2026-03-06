@@ -1,7 +1,6 @@
 import { /* utilArrayGroupBy,*/ utilArrayUnion } from '@rapid-sdk/util';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { osmLifecyclePrefixes } from '../lib/tags.ts';
 import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
@@ -880,12 +879,20 @@ export class FilterSystem extends AbstractSystem {
       return false;
     }
 
-    for (const [k, v] of Object.entries(tags)) {
-      if (osmLifecyclePrefixes[k] || osmLifecyclePrefixes[v as string]) return true;
+    const schema = this.context.systems.schema;
+    const lifecyclePrefixes = schema?.getScope('osm')?.lifecyclePrefixes;
+    if (!lifecyclePrefixes?.size) return false;
 
-      const parts = k.split(':');
-      if (parts.length === 1) continue;
-      if (osmLifecyclePrefixes[parts[0]]) return true;
+    for (const [k, v] of Object.entries(tags)) {
+      // Check if bare key is a lifecycle prefix (e.g. construction=yes)
+      if (lifecyclePrefixes.has(k)) return true;
+      // Check if value is a lifecycle prefix (e.g. highway=construction)
+      if (typeof v === 'string' && lifecyclePrefixes.has(v)) return true;
+
+      const colonIndex = k.indexOf(':');
+      if (colonIndex === -1) continue;
+      // Check if key prefix is a lifecycle prefix (e.g. disused:railway=...)
+      if (lifecyclePrefixes.has(k.slice(0, colonIndex))) return true;
     }
 
     return false;
