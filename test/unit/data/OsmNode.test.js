@@ -1,10 +1,15 @@
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import { setupMockRulesets } from '../mock_rulesets.js';
 
 
 describe('OsmNode', () => {
   const context = new Rapid.MockContext();
+
+  beforeAll(() => {
+    setupMockRulesets(Rapid, context);
+  });
 
   describe('constructor', () => {
     it('constructs an OsmNode from a context', () => {

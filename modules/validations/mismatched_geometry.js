@@ -7,7 +7,6 @@ import { actionChangeTags } from '../actions/change_tags.js';
 import { actionMergeNodes } from '../actions/merge_nodes.js';
 import { actionExtract } from '../actions/extract.js';
 import { osmJoinWays } from '../lib/multipolygon.ts';
-import { osmTagSuggestingArea } from '../lib/tags.ts';
 import { geoHasSelfIntersections } from '../geo/geom.js';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
@@ -318,7 +317,7 @@ export function validationMismatchedGeometry(context) {
       const tags = Object.assign({}, entity.tags);  // shallow copy
       delete tags.area;
 
-      if (!osmTagSuggestingArea(tags, schema?.getScope('osm')?.areaKeys ?? {})) {
+      if (!entity.tagSuggestingArea(tags)) {
         // if removing the area tag would make this a line, offer that as a quick fix
         convertOnClick = function() {
           const entityID = this.issue.entityIds[0];

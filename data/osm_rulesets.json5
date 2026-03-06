@@ -191,6 +191,39 @@
         ]
       },
 
+      // ### AREA KEY EXCEPTIONS
+      // These rulesets are exceptions to the normal areaKeys lookups that SchemaSystem
+      // derives from the Presets. SchemaSystem.areaKeys() computes a keeplist/discardlist
+      // from presets, but some tags need special treatment:
+      // Used by OsmWay.tagSuggestingArea() to override the preset-derived areaKeys.
+
+      // areakeys_force_true:  Tags that should be treated as areas even though their
+      //  primary key is typically linear (e.g. highway=elevator, railway=station).
+      //  These tags are NOT in the preset-derived areaKeys but ARE areas.
+      areakeys_force_true: {
+        include: [
+          { key: "amenity", value: "bicycle_parking" },
+          { key: "highway", op: "in", value: ["elevator", "rest_area", "services"] },
+          { key: "public_transport", value: "platform" },
+          { key: "railway", op: "in", value: [
+            "platform", "roundhouse", "station", "traverser", "turntable",
+            "ventilation_shaft", "wash"
+          ]},
+          { key: "traffic_calming", value: "island" },
+          { key: "waterway", value: "dam" }
+        ]
+      },
+      // areakeys_force_false: Tags that should NOT be treated as areas even though
+      //  their primary key IS in the preset-derived areaKeys (e.g. emergency=yes
+      //  on a road — emergency is an area key but these values are not areas).
+      areakeys_force_false: {
+        include: [
+          { key: "emergency", op: "in", value: [
+            "yes", "no", "private", "designated", "destination", "official"
+          ]}
+        ]
+      },
+
       // ### TAG METADATA
       // Tag keys that are metadata or import-related (not "interesting" for feature display).
       // Used by `OsmEntity.isInterestingTag()` to filter out keys like 'source', 'tiger:*', etc.

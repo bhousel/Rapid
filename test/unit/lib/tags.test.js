@@ -19,19 +19,3 @@ describe('osmRemoveLifecyclePrefix', () => {
     assert.strictEqual(result, 'ex:leisure');
   });
 });
-
-
-describe('osmTagSuggestingArea', () => {
-  const areaKeys = { leisure: {} };
-
-  it('handles features with a lifecycle prefixes', () => {
-    let result = Rapid.osmTagSuggestingArea({ leisure: 'stadium' }, areaKeys);
-    assert.deepEqual(result, { leisure: 'stadium' });
-
-    result = Rapid.osmTagSuggestingArea({ 'disused:leisure': 'stadium' }, areaKeys);
-    assert.deepEqual(result, { 'disused:leisure': 'stadium' });
-
-    result = Rapid.osmTagSuggestingArea({ 'ex:leisure': 'stadium' }, areaKeys);
-    assert.isNull(result);
-  });
-});

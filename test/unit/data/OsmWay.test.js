@@ -624,6 +624,46 @@ describe('OsmWay', () => {
   });
 
 
+  describe('tagSuggestingArea', () => {
+    it('returns matching tag if key is in areaKeys', () => {
+      const way = new Rapid.OsmWay(context, { tags: { building: 'yes' } });
+      assert.deepEqual(way.tagSuggestingArea(), { building: 'yes' });
+    });
+
+    it('returns null if no tags suggest area', () => {
+      const way = new Rapid.OsmWay(context, { tags: { a: 'b' } });
+      assert.isNull(way.tagSuggestingArea());
+    });
+
+    it('handles lifecycle prefixes', () => {
+      let way = new Rapid.OsmWay(context, { tags: { building: 'yes' } });
+      assert.deepEqual(way.tagSuggestingArea(), { building: 'yes' });
+
+      way = new Rapid.OsmWay(context, { tags: { 'disused:building': 'yes' } });
+      assert.deepEqual(way.tagSuggestingArea(), { 'disused:building': 'yes' });
+
+      way = new Rapid.OsmWay(context, { tags: { 'nope:building': 'yes' } });
+      assert.isNull(way.tagSuggestingArea());
+    });
+
+    it('accepts optional tags parameter', () => {
+      const way = new Rapid.OsmWay(context, { tags: { area: 'yes', building: 'yes' } });
+      const tagsWithoutArea = { building: 'yes' };
+      assert.deepEqual(way.tagSuggestingArea(tagsWithoutArea), { building: 'yes' });
+    });
+
+    it('returns { area: "yes" } when area=yes', () => {
+      const way = new Rapid.OsmWay(context, { tags: { area: 'yes' } });
+      assert.deepEqual(way.tagSuggestingArea(), { area: 'yes' });
+    });
+
+    it('returns null when area=no', () => {
+      const way = new Rapid.OsmWay(context, { tags: { area: 'no', building: 'yes' } });
+      assert.isNull(way.tagSuggestingArea());
+    });
+  });
+
+
   describe('isArea', () => {
     it('returns false when the way has no tags', () => {
       const way = new Rapid.OsmWay(context);

@@ -1,4 +1,3 @@
-import { osmTagSuggestingArea } from '../lib/tags.ts';
 import { utilArrayGroupBy, utilArrayUniq } from '@rapid-sdk/util';
 
 import type { Action } from './types.ts';
@@ -7,7 +6,6 @@ import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
 import type { OsmWay } from '../data/OsmWay.ts';
-import type { TagKeyValueLookup } from '../lib/tags.ts';
 
 
 /** Geometry grouping result */
@@ -39,9 +37,6 @@ export function actionMerge(entityIDs: EntityID[]): Action {
 
 
   const action = ((graph: Graph): Graph => {
-    const context = graph.context;
-    const schema = context.systems.schema;
-
     const geometries = groupEntitiesByGeometry(graph);
     const points = geometries.point as OsmNode[];
     let target = (geometries.area[0] || geometries.line[0]) as OsmWay;
@@ -79,8 +74,7 @@ export function actionMerge(entityIDs: EntityID[]): Action {
     if (target.tags.area === 'yes') {
       const tags = Object.assign({}, target.tags);  // shallow copy
       delete tags.area;
-      const areaKeys: TagKeyValueLookup = schema?.getScope('osm')?.areaKeys ?? {};
-      if (osmTagSuggestingArea(tags, areaKeys)) {
+      if (target.tagSuggestingArea(tags)) {
         // remove the `area` tag if area geometry is now implied - iD#3851
         target = target.update({ tags: tags });
         graph.replace(target);

@@ -103,6 +103,26 @@ export function setupMockRulesets(Rapid, context) {
     ]
   }));
 
+  // OsmWay.tagSuggestingArea: force area even when key is typically linear
+  rulesets.set('areakeys_force_true', new Rapid.Ruleset(context, {
+    id: 'areakeys_force_true',
+    include: [
+      { key: 'highway', op: 'in', value: ['elevator', 'rest_area', 'services'] },
+      { key: 'railway', op: 'in', value: [
+        'platform', 'roundhouse', 'station', 'traverser', 'turntable',
+        'ventilation_shaft', 'wash'
+      ]}
+    ]
+  }));
+
+  // OsmWay.tagSuggestingArea: prevent area even when key is in areaKeys
+  rulesets.set('areakeys_force_false', new Rapid.Ruleset(context, {
+    id: 'areakeys_force_false',
+    include: [
+      { key: 'emergency', op: 'in', value: ['yes', 'no'] }
+    ]
+  }));
+
   const mockScope = {
     rulesets,
     areaKeys: {}

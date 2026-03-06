@@ -3,11 +3,11 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmLanes } from '../lib/lanes.ts';
-import { osmTagSuggestingArea, osmRemoveLifecyclePrefix } from '../lib/tags.ts';
+import { osmRemoveLifecyclePrefix } from '../lib/tags.ts';
 
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmNode, Vec2 } from './types.ts';
+import type { OsmNode, Tags, Vec2 } from './types.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 import type { TagKeyValueLookup } from '../lib/tags.ts';
 
@@ -392,12 +392,44 @@ export class OsmWay extends OsmEntity {
   /**
    * tagSuggestingArea
    * Returns an Object with the tag that implies that this way is an area (polygon).
-   * @return The tag that indicates the area
+   * Checks the preset-derived `areaKeys` lookup, plus `areakeys_force_true` and
+   * `areakeys_force_false` rulesets that override the normal areaKeys lookups.
+   *
+   * @param tags - Tags to check (defaults to `this.tags`)
+   * @return The tag that indicates the area, or `null`
    */
-  tagSuggestingArea(): Record<string, string> | null {
+  tagSuggestingArea(tags?: Tags): Record<string, string> | null {
+    if (!tags) tags = this.tags;
+    if (tags.area === 'yes') return { area: 'yes' };
+    if (tags.area === 'no') return null;
+
     const schema = this.context.systems.schema;
-    const areaKeys: TagKeyValueLookup = schema?.getScope('osm')?.areaKeys ?? {};
-    return osmTagSuggestingArea(this.tags, areaKeys) as Record<string, string> | null;
+    const scope = schema?.getScope('osm');
+    const areaKeys: TagKeyValueLookup = scope?.areaKeys ?? {};
+    const forceTrue = scope?.rulesets.get('areakeys_force_true');
+    const forceFalse = scope?.rulesets.get('areakeys_force_false');
+
+    const returnTags: Record<string, string> = {};
+    for (const realKey in tags) {
+      const key = osmRemoveLifecyclePrefix(realKey);
+      const kv: Record<string, string> = { [key]: tags[realKey] };
+
+      // Skip tags forced false (e.g. emergency=yes — key is in areaKeys but value is not an area)
+      if (forceFalse?.match(kv)) continue;
+
+      // Include tags forced true (e.g. highway=elevator — key is linear but value is an area)
+      if (forceTrue?.match(kv)) {
+        returnTags[realKey] = tags[realKey];
+        return returnTags;
+      }
+
+      // Standard areaKeys lookup: key is in areaKeys and value is NOT in the discardlist
+      if (key in areaKeys && !(tags[realKey] in areaKeys[key])) {
+        returnTags[realKey] = tags[realKey];
+        return returnTags;
+      }
+    }
+    return null;
   }
 
   /**
