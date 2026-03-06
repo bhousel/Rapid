@@ -4,7 +4,6 @@ import { drag as d3_drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-import { deprecatedTagValuesByKey } from '../../lib/tags.ts';
 import { uiCombobox } from '../combobox.js';
 import { utilKeybinding } from '../../util/keybinding.ts';
 import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
@@ -21,6 +20,7 @@ export {
 export function uiFieldCombo(context, uifield) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const schema = context.systems.schema;
   const dispatch = d3_dispatch('change');
   const presetField = uifield.presetField;
 
@@ -187,7 +187,7 @@ export function uiFieldCombo(context, uifield) {
             });
 
             // don't suggest deprecated tag values
-            var deprecatedValues = deprecatedTagValuesByKey()[uifield.key];
+            var deprecatedValues = schema.deprecatedTagValuesByKey()[uifield.key];
             if (deprecatedValues) {
                 data = data.filter(function(d) {
                     return deprecatedValues.indexOf(d.value) === -1;

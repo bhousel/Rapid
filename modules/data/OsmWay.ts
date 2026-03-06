@@ -395,7 +395,8 @@ export class OsmWay extends OsmEntity {
    * @return The tag that indicates the area
    */
   tagSuggestingArea(): Record<string, string> | null {
-    const areaKeys: TagKeyValueLookup = this.context?.systems?.schema?.getScope('osm')?.areaKeys ?? {};
+    const schema = this.context.systems.schema;
+    const areaKeys: TagKeyValueLookup = schema?.getScope('osm')?.areaKeys ?? {};
     return osmTagSuggestingArea(this.tags, areaKeys) as Record<string, string> | null;
   }
 

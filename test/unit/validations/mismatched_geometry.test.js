@@ -155,7 +155,8 @@ describe('validationMismatchedGeometry', () => {
   it('does not flag cases whether the entity matches the generic preset, regardless of geometry', () => {
     // In this test case, `waterway=yes` suggests area, but we won't match any presets.
     // There is no preset for `waterway=security_lock`, so it matches fallback presets for both line and area.
-    context.systems.schema.getScope('osm').areaKeys = { waterway: { dam: true } };
+    const schema = context.systems.schema;
+    schema.getScope('osm').areaKeys = { waterway: { dam: true } };
     createOpenWay({ 'disused:waterway': 'security_lock' });
     const issues = validate();
     assert.deepEqual(issues, []);

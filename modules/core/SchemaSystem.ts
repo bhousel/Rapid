@@ -95,6 +95,7 @@ export interface SchemaScope {
 
   // Derived tag lookup tables (computed by _schemaChanged)
   areaKeys: TagKeyValueLookup;
+  deprecatedValues: Record<string, string[]>;
 
   // improve:
   deprecated: DeprecationRule[];
@@ -731,6 +732,7 @@ gfx?.scene?.reset();  // throw it all away
 
         // Derived tag lookup tables
         areaKeys: {},
+        deprecatedValues: {},
 
         // improve
         deprecated: [],
@@ -1017,6 +1019,82 @@ gfx?.scene?.reset();  // throw it all away
     }
 
     return areaKeys;
+  }
+
+
+  /**
+   * getDeprecatedTags
+   * Returns any tag deprecations that match the given tags.
+   * Checks whether the entity's tags match any known deprecated tag patterns.
+   *
+   * @param   tags - The tags to check for deprecations
+   * @param   scopeID - Scope to query (defaults to 'osm')
+   * @return  Array of deprecation rules that match the given tags
+   */
+  getDeprecatedTags(tags: Tags, scopeID: ScopeID = 'osm'): DeprecationRule[] {
+    const scope = this.getScope(scopeID);
+    const results: DeprecationRule[] = [];
+
+    // if there are no tags, none can be deprecated
+    if (Object.keys(tags).length === 0) return results;
+
+    for (const d of scope.deprecated) {
+      const oldKeys = Object.keys(d.old);
+      if (d.replace) {
+        const replace = d.replace;  // capture for callback
+        const hasExistingValues = Object.keys(replace).some(replaceKey => {
+          if (!tags[replaceKey] || d.old[replaceKey]) return false;
+          const replaceValue = replace[replaceKey];
+          if (replaceValue === '*') return false;
+          if (replaceValue === tags[replaceKey]) return false;
+          return true;
+        });
+        // don't flag deprecated tags if the upgrade path would overwrite existing data - iD#7843
+        if (hasExistingValues) continue;
+      }
+      const matchesDeprecatedTags = oldKeys.every(oldKey => {
+        if (!tags[oldKey]) return false;
+        if (d.old[oldKey] === '*') return true;
+        if (d.old[oldKey] === tags[oldKey]) return true;
+
+        const vals = tags[oldKey].split(';').filter(Boolean);
+        if (vals.length === 0) {
+          return false;
+        } else if (vals.length > 1) {
+          return vals.includes(d.old[oldKey]);
+        } else {
+          if (tags[oldKey] === d.old[oldKey]) {
+            if (d.replace && d.old[oldKey] === d.replace[oldKey]) {
+              const replaceKeys = Object.keys(d.replace);
+              return !replaceKeys.every(replaceKey => tags[replaceKey] === d.replace![replaceKey]);
+            } else {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+
+      if (matchesDeprecatedTags) {
+        results.push(d);
+      }
+    }
+
+    return results;
+  }
+
+
+  /**
+   * deprecatedTagValuesByKey
+   * Returns a precomputed lookup of deprecated tag values grouped by key.
+   * Only includes single-key deprecations with non-wildcard values.
+   * Used by the combo field UI to filter deprecated values from suggestions.
+   *
+   * @param   scopeID - Scope to query (defaults to 'osm')
+   * @return  Record mapping tag keys to arrays of deprecated values
+   */
+  deprecatedTagValuesByKey(scopeID: ScopeID = 'osm'): Record<string, string[]> {
+    return this.getScope(scopeID).deprecatedValues;
   }
 
 
@@ -1393,6 +1471,24 @@ gfx?.scene?.reset();  // throw it all away
     // Compute and store derived tag lookup tables per scope
     for (const [scopeID, scope] of this._scopes) {
       scope.areaKeys = this.areaKeys(scopeID);
+
+      // Precompute deprecated values by key for this scope
+      const dvbk: Record<string, string[]> = {};
+      for (const d of scope.deprecated) {
+        const oldKeys = Object.keys(d.old);
+        if (oldKeys.length === 1) {
+          const oldKey = oldKeys[0];
+          const oldValue = d.old[oldKey];
+          if (oldValue !== '*') {
+            if (!dvbk[oldKey]) {
+              dvbk[oldKey] = [oldValue];
+            } else {
+              dvbk[oldKey].push(oldValue);
+            }
+          }
+        }
+      }
+      scope.deprecatedValues = dvbk;
     }
 
     gfx?.immediateRedraw();

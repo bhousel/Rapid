@@ -39,6 +39,9 @@ export function actionMerge(entityIDs: EntityID[]): Action {
 
 
   const action = ((graph: Graph): Graph => {
+    const context = graph.context;
+    const schema = context.systems.schema;
+
     const geometries = groupEntitiesByGeometry(graph);
     const points = geometries.point as OsmNode[];
     let target = (geometries.area[0] || geometries.line[0]) as OsmWay;
@@ -76,7 +79,7 @@ export function actionMerge(entityIDs: EntityID[]): Action {
     if (target.tags.area === 'yes') {
       const tags = Object.assign({}, target.tags);  // shallow copy
       delete tags.area;
-      const areaKeys: TagKeyValueLookup = target.context?.systems?.schema?.getScope('osm')?.areaKeys ?? {};
+      const areaKeys: TagKeyValueLookup = schema?.getScope('osm')?.areaKeys ?? {};
       if (osmTagSuggestingArea(tags, areaKeys)) {
         // remove the `area` tag if area geometry is now implied - iD#3851
         target = target.update({ tags: tags });

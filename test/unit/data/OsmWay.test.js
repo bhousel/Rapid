@@ -10,7 +10,8 @@ describe('OsmWay', () => {
   beforeAll(() => {
     setupMockRulesets(Rapid, context);
     // Set areaKeys on the mock scope for isArea() tests
-    context.systems.schema.getScope('osm').areaKeys = { building: {} };
+    const schema = context.systems.schema;
+    schema.getScope('osm').areaKeys = { building: {} };
   });
 
   describe('constructor', () => {

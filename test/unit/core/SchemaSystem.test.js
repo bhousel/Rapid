@@ -1546,4 +1546,68 @@ describe('SchemaSystem', () => {
     });
   });
 
+
+  describe('getDeprecatedTags', () => {
+    const deprecated = [
+      { old: { highway: 'no' } },
+      { old: { amenity: 'toilet' }, replace: { amenity: 'toilets' } },
+      { old: { speedlimit: '*' }, replace: { maxspeed: '$1' } },
+      { old: { man_made: 'water_tank' }, replace: { man_made: 'storage_tank', content: 'water' } },
+      { old: { amenity: 'gambling', gambling: 'casino' }, replace: { amenity: 'casino' } }
+    ];
+
+    const _schema = new Rapid.SchemaSystem(context);
+
+    beforeAll(() => {
+      _schema.merge({
+        assetID: 'test_deprecated',
+        scopes: [{ scope: 'osm', deprecated }]
+      });
+    });
+
+    it('returns none if entity has no tags', () => {
+      assert.deepEqual(_schema.getDeprecatedTags({}), []);
+    });
+
+    it('returns none when no tags are deprecated', () => {
+      assert.deepEqual(_schema.getDeprecatedTags({ amenity: 'toilets' }), []);
+    });
+
+    it('returns 1:0 replacement', () => {
+      const tags = { highway: 'no' };
+      const expected = [{ old: { highway: 'no' }}];
+      assert.deepEqual(_schema.getDeprecatedTags(tags), expected);
+    });
+
+    it('returns 1:1 replacement', () => {
+      const tags = { amenity: 'toilet' };
+      const expected = [{ old: { amenity: 'toilet' }, replace: { amenity: 'toilets' } }];
+      assert.deepEqual(_schema.getDeprecatedTags(tags), expected);
+    });
+
+    it('returns 1:1 wildcard', () => {
+      const tags = { speedlimit: '50' };
+      const expected = [{ old: { speedlimit: '*' }, replace: { maxspeed: '$1' } }];
+      assert.deepEqual(_schema.getDeprecatedTags(tags), expected);
+    });
+
+    it('returns 1:2 total replacement', () => {
+      const tags = { man_made: 'water_tank' };
+      const expected = [{ old: { man_made: 'water_tank' }, replace: { man_made: 'storage_tank', content: 'water' } }];
+      assert.deepEqual(_schema.getDeprecatedTags(tags), expected);
+    });
+
+    it('returns 1:2 partial replacement', () => {
+      const tags = { man_made: 'water_tank', content: 'water' };
+      const expected = [{ old: { man_made: 'water_tank' }, replace: { man_made: 'storage_tank', content: 'water' } }];
+      assert.deepEqual(_schema.getDeprecatedTags(tags), expected);
+    });
+
+    it('returns 2:1 replacement', () => {
+      const tags = { amenity: 'gambling', gambling: 'casino' };
+      const expected = [{ old: { amenity: 'gambling', gambling: 'casino' }, replace: { amenity: 'casino' } }];
+      assert.deepEqual(_schema.getDeprecatedTags(tags), expected);
+    });
+  });
+
 });

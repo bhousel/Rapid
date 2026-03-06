@@ -17,9 +17,13 @@ describe('validationOutdatedTags', () => {
 
 
   beforeAll(() => {
-    const deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
-    Rapid.osmSetDeprecatedTags(deprecated);
-    return context.systems.schema.initAsync();
+    return context.systems.schema.initAsync().then(() => {
+      const deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
+      context.systems.schema.merge({
+        assetID: 'test_deprecated',
+        scopes: [{ scope: 'osm', deprecated }]
+      });
+    });
   });
 
 

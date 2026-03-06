@@ -3,7 +3,7 @@ import { utilHashcode, utilTagDiff } from '@rapid-sdk/util';
 import { actionChangePreset } from '../actions/change_preset.js';
 import { actionChangeTags } from '../actions/change_tags.js';
 import { actionUpgradeTags } from '../actions/upgrade_tags.js';
-import { Graph, getDeprecatedTags, ValidationIssue, ValidationFix } from '../lib/index.ts';
+import { Graph, ValidationIssue, ValidationFix } from '../lib/index.ts';
 
 
 const pathVals = new Set([
@@ -82,7 +82,7 @@ graph = new Graph(graph);
     }
 
     // Upgrade deprecated tags..
-    const deprecatedTags = getDeprecatedTags(entity.tags);
+    const deprecatedTags = schema.getDeprecatedTags(entity.tags);
     for (const tag of deprecatedTags) {
       graph = actionUpgradeTags(entity.id, tag.old, tag.replace)(graph);
       entity = graph.entity(entity.id);

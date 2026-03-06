@@ -482,6 +482,8 @@ export class Preset {
    * @return The final tags for the Entity, after adding has happened.
    */
   setTags(tags: Tags, geometry: GeometryType, skipFieldDefaults?: boolean): Tags {
+    const schema = this.context.systems.schema;
+
     const addTags = this.addTags;
     tags = Object.assign({}, tags);   // shallow copy
 
@@ -504,7 +506,7 @@ export class Preset {
     if (!addTags.hasOwnProperty('area')) {
       delete tags.area;
       if (geometry === 'area' && this.geometries.has('line')) {  // can also be a line
-        const areaKeys: TagKeyValueLookup = this.context?.systems?.schema?.getScope('osm')?.areaKeys ?? {};
+        const areaKeys: TagKeyValueLookup = schema?.getScope('osm')?.areaKeys ?? {};
         let needsAreaTag = true;
         for (const k in addTags) {
           if (k in areaKeys) {
