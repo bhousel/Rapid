@@ -1,7 +1,8 @@
 import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 import diacritics from 'diacritics';
 import { utilGatherTokens } from '../util/string.ts';
-import { osmAreaKeys } from './tags.js';
+
+import type { TagKeyValueLookup } from './tags.ts';
 
 import type { Context } from '../Context.ts';
 import type { Field } from './Field.ts';
@@ -499,13 +500,14 @@ export class Preset {
     // This tag is only needed for features that can be either a 'line' or an 'area'.
     // Set this tag if the geometry is already an area (e.g. user drew an area) AND:
     // 1. chosen preset could be either an 'area' or a 'line' (`barrier=city_wall`)
-    // 2. chosen preset doesn't have a key in osmAreaKeys (`railway=station`)
+    // 2. chosen preset doesn't have a key in areaKeys (`railway=station`)
     if (!addTags.hasOwnProperty('area')) {
       delete tags.area;
       if (geometry === 'area' && this.geometries.has('line')) {  // can also be a line
+        const areaKeys: TagKeyValueLookup = this.context?.systems?.schema?.getScope('osm')?.areaKeys ?? {};
         let needsAreaTag = true;
         for (const k in addTags) {
-          if (k in osmAreaKeys) {
+          if (k in areaKeys) {
             needsAreaTag = false;
             break;
           }

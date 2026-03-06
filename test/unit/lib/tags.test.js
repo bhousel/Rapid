@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -22,18 +22,16 @@ describe('osmRemoveLifecyclePrefix', () => {
 
 
 describe('osmTagSuggestingArea', () => {
-  beforeEach(() => {
-    Rapid.osmSetAreaKeys({ leisure: {} });
-  });
+  const areaKeys = { leisure: {} };
 
   it('handles features with a lifecycle prefixes', () => {
-    let result = Rapid.osmTagSuggestingArea({ leisure: 'stadium' });
+    let result = Rapid.osmTagSuggestingArea({ leisure: 'stadium' }, areaKeys);
     assert.deepEqual(result, { leisure: 'stadium' });
 
-    result = Rapid.osmTagSuggestingArea({ 'disused:leisure': 'stadium' });
+    result = Rapid.osmTagSuggestingArea({ 'disused:leisure': 'stadium' }, areaKeys);
     assert.deepEqual(result, { 'disused:leisure': 'stadium' });
 
-    result = Rapid.osmTagSuggestingArea({ 'ex:leisure': 'stadium' });
+    result = Rapid.osmTagSuggestingArea({ 'ex:leisure': 'stadium' }, areaKeys);
     assert.isNull(result);
   });
 });

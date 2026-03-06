@@ -7,6 +7,7 @@ import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
 import type { OsmWay } from '../data/OsmWay.ts';
+import type { TagKeyValueLookup } from '../lib/tags.ts';
 
 
 /** Geometry grouping result */
@@ -75,7 +76,8 @@ export function actionMerge(entityIDs: EntityID[]): Action {
     if (target.tags.area === 'yes') {
       const tags = Object.assign({}, target.tags);  // shallow copy
       delete tags.area;
-      if (osmTagSuggestingArea(tags)) {
+      const areaKeys: TagKeyValueLookup = target.context?.systems?.schema?.getScope('osm')?.areaKeys ?? {};
+      if (osmTagSuggestingArea(tags, areaKeys)) {
         // remove the `area` tag if area geometry is now implied - iD#3851
         target = target.update({ tags: tags });
         graph.replace(target);

@@ -9,6 +9,7 @@ import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmNode, Vec2 } from './types.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
+import type { TagKeyValueLookup } from '../lib/tags.ts';
 
 
 // Filter function to eliminate consecutive duplicates.
@@ -394,7 +395,8 @@ export class OsmWay extends OsmEntity {
    * @return The tag that indicates the area
    */
   tagSuggestingArea(): Record<string, string> | null {
-    return osmTagSuggestingArea(this.tags) as Record<string, string> | null;
+    const areaKeys: TagKeyValueLookup = this.context?.systems?.schema?.getScope('osm')?.areaKeys ?? {};
+    return osmTagSuggestingArea(this.tags, areaKeys) as Record<string, string> | null;
   }
 
   /**

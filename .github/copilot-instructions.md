@@ -71,6 +71,13 @@ There is a `.github/scratchpad.md` file (git-ignored) that serves as persistent 
 - Example: `if (loc && locations?.isBlockedAt(loc)) continue;`
 - This keeps code working even when optional systems are absent
 
+### System Ownership of Runtime State
+- All runtime-computed data in Rapid should be **owned by a core system** so that we can manage its state and lifecycle
+- **Module-level mutable globals** (e.g. `export let osmAreaKeys = {}` with a setter function) break this rule — other code depends on them in ways where we can't guarantee they've been properly initialized or reset when changes occur
+- The test for whether something should be on a system: "If I call this function right now, can I guarantee the data it depends on is ready?" If the answer requires knowing another system's startup sequence, the data belongs on that system.
+- **Truly constant data** (like `osmAreaKeysExceptions` or `osmLifecyclePrefixes`) is fine as a module-level `const` — it doesn't change at runtime, so there's no lifecycle to manage
+- **Domain-specific logic** (like "is this tag interesting?" or "does this tag suggest an area?") belongs on the data class that represents the domain concept (e.g. `OsmEntity`), not as a free function reading a global. The instance method can access the system through `this.context` — making the dependency explicit and traceable.
+
 ## TypeScript Patterns
 
 ### File Conversion

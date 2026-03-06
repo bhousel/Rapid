@@ -7,7 +7,7 @@ import { actionChangeTags } from '../actions/change_tags.js';
 import { actionMergeNodes } from '../actions/merge_nodes.js';
 import { actionExtract } from '../actions/extract.js';
 import { osmJoinWays } from '../lib/multipolygon.ts';
-import { osmNodeGeometriesForTags, osmTagSuggestingArea } from '../lib/tags.ts';
+import { osmTagSuggestingArea } from '../lib/tags.ts';
 import { geoHasSelfIntersections } from '../geo/geom.js';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
@@ -171,9 +171,12 @@ export function validationMismatchedGeometry(context) {
         if (entity.isOnAddressLine(graph)) return null;
 
         var geometry = entity.geometry(graph);
-        var allowedGeometries = osmNodeGeometriesForTags(entity.tags);
+        var pointMatch = schema?.matchTags(entity.tags, 'point');
+        var vertexMatch = schema?.matchTags(entity.tags, 'vertex');
+        var allowsPoint = pointMatch && !pointMatch.isFallback();
+        var allowsVertex = vertexMatch && !vertexMatch.isFallback();
 
-        if (geometry === 'point' && !allowedGeometries.point && allowedGeometries.vertex) {
+        if (geometry === 'point' && !allowsPoint && allowsVertex) {
 
             return new ValidationIssue(context, {
                 type: type,
@@ -197,7 +200,7 @@ export function validationMismatchedGeometry(context) {
                 entityIds: [entity.id]
             });
 
-        } else if (geometry === 'vertex' && !allowedGeometries.vertex && allowedGeometries.point) {
+        } else if (geometry === 'vertex' && !allowsVertex && allowsPoint) {
 
             return new ValidationIssue(context, {
                 type: type,
@@ -315,7 +318,7 @@ export function validationMismatchedGeometry(context) {
       const tags = Object.assign({}, entity.tags);  // shallow copy
       delete tags.area;
 
-      if (!osmTagSuggestingArea(tags)) {
+      if (!osmTagSuggestingArea(tags, schema?.getScope('osm')?.areaKeys ?? {})) {
         // if removing the area tag would make this a line, offer that as a quick fix
         convertOnClick = function() {
           const entityID = this.issue.entityIds[0];

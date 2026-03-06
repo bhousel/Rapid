@@ -375,15 +375,9 @@ describe('Preset', () => {
 
 
   describe('setTags', () => {
-    let _savedAreaKeys;
-
     beforeAll(() => {
-      _savedAreaKeys = Rapid.osmAreaKeys;
-      Rapid.osmSetAreaKeys({ building: {}, natural: {} });
-    });
-
-    afterAll(() => {
-      Rapid.osmSetAreaKeys(_savedAreaKeys);
+      // Set areaKeys on the scope for area tag tests
+      schema.getScope('osm').areaKeys = { building: {}, natural: {} };
     });
 
     it('adds match tags', () => {

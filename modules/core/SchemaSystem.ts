@@ -2,7 +2,6 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 import MiniSearch from 'minisearch';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { osmNodeGeometriesForTags, osmSetAreaKeys, osmSetPointTags, osmSetVertexTags } from '../lib/tags.ts';
 import { Category, Field, Preset, Ruleset } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
@@ -16,6 +15,7 @@ import type { OsmEntity, OsmNode, Tags, Vec2 } from '../data/types.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { PresetProps } from '../lib/Preset.ts';
 import type { RulesetProps } from '../lib/Ruleset.ts';
+import type { TagKeyValueLookup } from '../lib/tags.ts';
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
@@ -92,6 +92,9 @@ export interface SchemaScope {
   matchIndex: Map<GeometryType, Record<string, Record<string, Preset[]>>>;
   searchIndexes: Map<LocaleCode, MiniSearch>;
   currSearchIndex: MiniSearch | null;
+
+  // Derived tag lookup tables (computed by _schemaChanged)
+  areaKeys: TagKeyValueLookup;
 
   // improve:
   deprecated: DeprecationRule[];
@@ -726,6 +729,9 @@ gfx?.scene?.reset();  // throw it all away
         searchIndexes: new Map(),
         currSearchIndex: null,
 
+        // Derived tag lookup tables
+        areaKeys: {},
+
         // improve
         deprecated: [],
         discarded: {}
@@ -949,9 +955,10 @@ gfx?.scene?.reset();  // throw it all away
       // address lines allow vertices to act as standalone points
       if ((entity as any).isOnAddressLine?.(graph)) return true;
 
-      const geometries = osmNodeGeometriesForTags(entity.tags);
-      if (geometries.vertex) return true;
-      if (geometries.point) return false;
+      const vertexMatch = this.matchTags(entity.tags, 'vertex');
+      if (vertexMatch && !vertexMatch.isFallback()) return true;
+      const pointMatch = this.matchTags(entity.tags, 'point');
+      if (pointMatch && !pointMatch.isFallback()) return false;
       // allow vertices for unspecified points
       return true;
     });
@@ -1014,60 +1021,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * pointTags
-   */
-  pointTags(scopeID: ScopeID = 'osm'): Record<string, Record<string, boolean>> {
-    const scope = this.getScope(scopeID);
-
-    const pointTags: Record<string, Record<string, boolean>> = {};
-
-    // ignore name-suggestion-index and deprecated presets
-    const presets = [...scope.presets.values()]
-      .filter(p => !p.props.suggestion && !p.props.replacement && p.props.searchable);
-
-    for (const p of presets) {
-      if (!p.geometries.has('point')) continue;
-
-      const k = Object.keys(p.tags)[0];    // pick the first tag
-      const v = Object.values(p.tags)[0];  // pick the first tag
-      if (!k || !v) continue;
-
-      pointTags[k] = pointTags[k] || {};
-      pointTags[k][v] = true;
-    }
-
-    return pointTags;
-  }
-
-
-  /**
-   * vertexTags
-   */
-  vertexTags(scopeID: ScopeID = 'osm'): Record<string, Record<string, boolean>> {
-    const scope = this.getScope(scopeID);
-
-    const vertexTags: Record<string, Record<string, boolean>> = {};
-
-    // ignore name-suggestion-index and deprecated presets
-    const presets = [...scope.presets.values()]
-      .filter(p => !p.props.suggestion && !p.props.replacement && p.props.searchable);
-
-    for (const p of presets) {
-      if (!p.geometries.has('vertex')) continue;
-
-      const k = Object.keys(p.tags)[0];    // pick the first tag
-      const v = Object.values(p.tags)[0];  // pick the first tag
-      if (!k || !v) continue;
-
-      vertexTags[k] = vertexTags[k] || {};
-      vertexTags[k][v] = true;
-    }
-
-    return vertexTags;
-  }
-
-
-  /**
    * getFallback
    * Gets the fallback preset for the given geometry.
    * For most geometries we just return the Preset with that `id`, but for `vertex' we return 'point'.
@@ -1101,6 +1054,7 @@ gfx?.scene?.reset();  // throw it all away
     loc: Vec2 | null = null,
     scopeID: ScopeID = 'osm'
   ): Array<Category | Preset> {
+
     if (!geometry) return [];
 
     const context = this.context;
@@ -1436,10 +1390,10 @@ gfx?.scene?.reset();  // throw it all away
     // Prepare search indexes
     this._prepareSearchIndex();
 
-    // Update OSM-specific global state from the 'osm' scope
-    osmSetAreaKeys(this.areaKeys());
-    osmSetPointTags(this.pointTags());
-    osmSetVertexTags(this.vertexTags());
+    // Compute and store derived tag lookup tables per scope
+    for (const [scopeID, scope] of this._scopes) {
+      scope.areaKeys = this.areaKeys(scopeID);
+    }
 
     gfx?.immediateRedraw();
     this.emit('schemachange');

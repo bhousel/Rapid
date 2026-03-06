@@ -1,10 +1,6 @@
 import type { Tags } from '../data/types.ts';
 
 
-// ============================================================================
-// Tag Lookup Types
-// ============================================================================
-
 /**
  * A lookup table mapping tag values to boolean flags.
  * Used for checking if a specific value is valid for a tag key.
@@ -32,54 +28,6 @@ export interface DeprecatedTagEntry {
 // ============================================================================
 // Mutable Tag Data (set at runtime by SchemaSystem)
 // ============================================================================
-
-/** Tags that imply that a closed way should be treated as an area */
-export let osmAreaKeys: TagKeyValueLookup = {};
-
-/**
- * Sets the area keys lookup table.
- * Called by SchemaSystem at startup.
- * @param value - The area keys lookup table
- */
-export function osmSetAreaKeys(value: TagKeyValueLookup): void {
-  osmAreaKeys = value;
-}
-
-/** Tags that indicate a feature is typically linear (used to avoid false "connect the ends" suggestions) */
-export let osmLineTags: TagKeyValueLookup = {};
-
-/**
- * Sets the line tags lookup table.
- * Called by SchemaSystem at startup.
- * @param value - The line tags lookup table
- */
-export function osmSetLineTags(value: TagKeyValueLookup): void {
-  osmLineTags = value;
-}
-
-/** Tags that indicate a node can be a standalone point, e.g. `{ amenity: { bar: true, parking: true, ... } ... }` */
-export let osmPointTags: TagKeyValueLookup = {};
-
-/**
- * Sets the point tags lookup table.
- * Called by SchemaSystem at startup.
- * @param value - The point tags lookup table
- */
-export function osmSetPointTags(value: TagKeyValueLookup): void {
-  osmPointTags = value;
-}
-
-/** Tags that indicate a node can be part of a way, e.g. `{ amenity: { parking: true, ... }, highway: { stop: true ... } ... }` */
-export let osmVertexTags: TagKeyValueLookup = {};
-
-/**
- * Sets the vertex tags lookup table.
- * Called by SchemaSystem at startup.
- * @param value - The vertex tags lookup table
- */
-export function osmSetVertexTags(value: TagKeyValueLookup): void {
-  osmVertexTags = value;
-}
 
 /** Tags that are deprecated, some offer replacement/upgrade */
 export let osmDeprecatedTags: DeprecatedTagEntry[] = [];
@@ -185,12 +133,13 @@ export const osmAreaKeysExceptions: Record<string, Record<string, boolean>> = {
 
 /**
  * Returns a tag from the given tags that implies an area geometry, if any.
- * Checks against `osmAreaKeys` and `osmAreaKeysExceptions`.
+ * Checks against the provided `areaKeys` and the hardcoded `osmAreaKeysExceptions`.
  *
  * @param tags - The tags to check
+ * @param areaKeys - Tag key→value lookup for area-implying tags (from SchemaScope)
  * @returns An object with the tag suggesting area, or null if none found
  */
-export function osmTagSuggestingArea(tags: Tags): Tags | null {
+export function osmTagSuggestingArea(tags: Tags, areaKeys: TagKeyValueLookup): Tags | null {
   if (tags.area === 'yes') return { area: 'yes' };
   if (tags.area === 'no') return null;
 
@@ -201,7 +150,7 @@ export function osmTagSuggestingArea(tags: Tags): Tags | null {
     if (key in osmAreaKeysExceptions && osmAreaKeysExceptions[key][tags[realKey]] === false) {
       continue;
     }
-    if (key in osmAreaKeys && !(tags[realKey] in osmAreaKeys[key])) {
+    if (key in areaKeys && !(tags[realKey] in areaKeys[key])) {
       returnTags[realKey] = tags[realKey];
       return returnTags;
     }
@@ -211,38 +160,6 @@ export function osmTagSuggestingArea(tags: Tags): Tags | null {
     }
   }
   return null;
-}
-
-/**
- * Node geometry capabilities.
- */
-export interface NodeGeometries {
-  point?: boolean;
-  vertex?: boolean;
-}
-
-/**
- * Returns the node geometries supported by the given tags.
- * A node can be a standalone `point` or a `vertex` (part of a way).
- *
- * @param tags - The tags to check
- * @returns Object with `point` and/or `vertex` set to true if supported
- */
-export function osmNodeGeometriesForTags(tags: Tags): NodeGeometries {
-  const geometries: NodeGeometries = {};
-  for (const key in tags) {
-    if (osmPointTags[key] &&
-      (osmPointTags[key]['*'] || osmPointTags[key][tags[key]])) {
-      geometries.point = true;
-    }
-    if (osmVertexTags[key] &&
-      (osmVertexTags[key]['*'] || osmVertexTags[key][tags[key]])) {
-      geometries.vertex = true;
-    }
-    // break early if both are already supported
-    if (geometries.point && geometries.vertex) break;
-  }
-  return geometries;
 }
 
 /**

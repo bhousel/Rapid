@@ -103,7 +103,10 @@ export function setupMockRulesets(Rapid, context) {
     ]
   }));
 
-  const mockScope = { rulesets };
+  const mockScope = {
+    rulesets,
+    areaKeys: {}
+  };
 
   if (!context.systems.schema) {
     context.systems.schema = {

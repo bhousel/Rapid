@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import { setupMockRulesets } from '../mock_rulesets.js';
@@ -6,16 +6,11 @@ import { setupMockRulesets } from '../mock_rulesets.js';
 
 describe('OsmWay', () => {
   const context = new Rapid.MockContext();
-  let _savedAreaKeys;
 
   beforeAll(() => {
-    _savedAreaKeys = Rapid.osmAreaKeys;
-    Rapid.osmSetAreaKeys({ building: {} });
     setupMockRulesets(Rapid, context);
-  });
-
-  afterAll(() => {
-    Rapid.osmSetAreaKeys(_savedAreaKeys);
+    // Set areaKeys on the mock scope for isArea() tests
+    context.systems.schema.getScope('osm').areaKeys = { building: {} };
   });
 
   describe('constructor', () => {
@@ -644,7 +639,7 @@ describe('OsmWay', () => {
       assert.isFalse(way.isArea());
     });
 
-    it('returns true if the way is closed and has a key in Rapid.osmAreaKeys', () => {
+    it('returns true if the way is closed and has a key in areaKeys', () => {
       const way = new Rapid.OsmWay(context, { nodes: ['n1', 'n1'], tags: { building: 'yes' } });
       assert.isTrue(way.isArea());
     });
@@ -666,7 +661,7 @@ describe('OsmWay', () => {
       assert.isTrue(way.isArea(), 'railway=wash');
     });
 
-    it('returns false if the way is closed and has no keys in Rapid.osmAreaKeys', () => {
+    it('returns false if the way is closed and has no keys in areaKeys', () => {
       const way = new Rapid.OsmWay(context, { nodes: ['n1', 'n1'], tags: { a: 'b' } });
       assert.isFalse(way.isArea());
     });

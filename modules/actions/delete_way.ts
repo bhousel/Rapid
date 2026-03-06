@@ -1,5 +1,4 @@
 import { actionDeleteRelation } from './delete_relation.ts';
-import { osmNodeGeometriesForTags } from '../lib/tags.ts';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -52,9 +51,13 @@ export function actionDeleteWay(wayID: EntityID, doDeleteDegenerate: boolean = t
     // Don't delete nodes still attached to ways or relations
     if (graph.parentWays(node).length || graph.parentRelations(node).length) return false;
 
-    const geometries = osmNodeGeometriesForTags(node.tags);
-    if (geometries.point) return false;    // don't delete if this node can be a standalone point
-    if (geometries.vertex) return true;    // do delete if this node can only be a vertex
+    const schema = node.context?.systems?.schema;
+    if (schema) {
+      const pointMatch = schema.matchTags(node.tags, 'point');
+      if (pointMatch && !pointMatch.isFallback()) return false;    // don't delete standalone points
+      const vertexMatch = schema.matchTags(node.tags, 'vertex');
+      if (vertexMatch && !vertexMatch.isFallback()) return true;   // do delete vertex-only nodes
+    }
 
     // If not sure, only delete if there are no interesting tags
     return !node.hasInterestingTags();

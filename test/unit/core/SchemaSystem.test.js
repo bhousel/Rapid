@@ -120,7 +120,7 @@ describe('SchemaSystem', () => {
   // merge multiple preset schemas into the SchemaSystem and then matching against them.
   describe.serial('methods', () => {
     const spySchemaChange = mock();
-    let _schema, _savedAreaKeys;
+    let _schema;
 
     beforeAll(() => {
       _schema = new Rapid.SchemaSystem(context);
@@ -128,14 +128,6 @@ describe('SchemaSystem', () => {
       return _schema.initAsync()
         .then(() => _schema.startAsync())
         .then(() => _schema.on('schemachange', spySchemaChange));
-    });
-
-    beforeEach(() => {
-      _savedAreaKeys = Rapid.osmAreaKeys;
-    });
-
-    afterEach(() => {
-      Rapid.osmSetAreaKeys(_savedAreaKeys);
     });
 
     describe('properties', () => {

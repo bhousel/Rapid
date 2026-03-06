@@ -137,7 +137,6 @@ describe('validationMismatchedGeometry', () => {
 
   it('flags open way with area tag', () => {
     // In this test case, `building=yes` suggests area, and we should match the 'building' preset.
-    Rapid.osmSetAreaKeys({ building: {} });
     createOpenWay({ building: 'yes' });
 
     const issues = validate();
@@ -156,7 +155,7 @@ describe('validationMismatchedGeometry', () => {
   it('does not flag cases whether the entity matches the generic preset, regardless of geometry', () => {
     // In this test case, `waterway=yes` suggests area, but we won't match any presets.
     // There is no preset for `waterway=security_lock`, so it matches fallback presets for both line and area.
-    Rapid.osmSetAreaKeys({ waterway: { dam: true } });
+    context.systems.schema.getScope('osm').areaKeys = { waterway: { dam: true } };
     createOpenWay({ 'disused:waterway': 'security_lock' });
     const issues = validate();
     assert.deepEqual(issues, []);
