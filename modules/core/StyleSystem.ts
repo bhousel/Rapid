@@ -240,8 +240,7 @@ export class StyleSystem extends AbstractSystem {
   loadStyleAssetsAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets;
-const gfx = context.systems.gfx;
-const unpause = gfx?.pause();  // block rendering
+    const gfx = context.systems.gfx;
 
     // Clear out whatever was loaded before.
     this.resetAll();
@@ -251,6 +250,8 @@ const unpause = gfx?.pause();  // block rendering
     if (!assets) {
       return Promise.resolve();
     }
+
+    const unpause = gfx?.pause();  // block rendering
 
     // Load the style files
     const which = this._requestedAssetIDs ?? this._defaultAssetIDs;
@@ -280,9 +281,12 @@ const unpause = gfx?.pause();  // block rendering
       }
 
       this._styleChanged();
-  unpause?.();  // resume rendering
-  gfx?.scene?.reset();  // throw it all away
+    })
+    .finally(() => {
+      unpause?.();  // resume rendering
+      gfx?.scene?.reset();  // throw it all away
     });
+
   }
 
 

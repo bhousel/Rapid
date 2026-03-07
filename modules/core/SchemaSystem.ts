@@ -65,11 +65,11 @@ export interface SchemaInputScope {
   categories?: Record<CategoryID, Partial<CategoryProps> | null>;
   /** Object mapping RulesetID to Ruleset props (or null to delete) */
   rulesets?: Record<RulesetID, Partial<RulesetProps> | null>;
-  /** Object mapping geometry type to array of default preset/category IDs */
+  /** Object mapping geometry type to array of default PresetIDs/CategoryIDs */
   defaults?: Record<GeometryType, string[]>;
-
-  // improve:
+  /** Array of deprecation rule objects, each represented as `{ old: { … }, replace: { … } }` */
   deprecated?: DeprecationRule[];
+  /** Object of keys considered discardable */
   discarded?: Record<string, true>;
 }
 
@@ -92,15 +92,15 @@ export interface SchemaScope {
   searchIndexes: Map<LocaleCode, MiniSearch>;
   currSearchIndex: MiniSearch | null;
 
+  // improve:
+  deprecated: DeprecationRule[];
+  discarded: Record<string, true>;
+
   // Derived tag lookup tables (computed by _schemaChanged)
   areaKeys: TagKeyValueLookup;
   deprecatedValues: Record<string, string[]>;
   /** Lifecycle prefixes derived from the 'lifecycle' ruleset (e.g. 'abandoned', 'disused') */
   lifecyclePrefixes: Set<string>;
-
-  // improve:
-  deprecated: DeprecationRule[];
-  discarded: Record<string, true>;
 }
 
 /**
@@ -299,8 +299,7 @@ export class SchemaSystem extends AbstractSystem {
   loadSchemaAssetsAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets;
-const gfx = context.systems.gfx;
-const unpause = gfx?.pause();  // block rendering
+    const gfx = context.systems.gfx;
 
     // Clear out whatever was loaded before.
     this.resetAll();
@@ -310,6 +309,8 @@ const unpause = gfx?.pause();  // block rendering
     if (!assets) {
       return Promise.resolve();
     }
+
+    const unpause = gfx?.pause();  // block rendering
 
     // Load the schema files
     const which = this._requestedAssetIDs ?? this._defaultAssetIDs;
@@ -369,8 +370,9 @@ const unpause = gfx?.pause();  // block rendering
       for (const reason of rejectedReasons as string[]) {
         console.error(reason);   // eslint-disable-line no-console
       }
-  unpause?.();  // resume rendering
-
+    })
+    .finally(() => {
+      unpause?.();  // resume rendering
     });
   }
 
@@ -668,16 +670,6 @@ gfx?.scene?.reset();  // throw it all away
         }
       }
 
-      // TODO:  These just do simple overwrites right now
-      // Merge deprecated
-      if (inputScope.deprecated) {
-        scope.deprecated = inputScope.deprecated;
-      }
-      // Merge discarded
-      if (inputScope.discarded) {
-        scope.discarded = inputScope.discarded;
-      }
-
       // Merge Rulesets
       if (inputScope.rulesets) {
         for (const [rulesetID, props] of Object.entries(inputScope.rulesets)) {
@@ -690,6 +682,16 @@ gfx?.scene?.reset();  // throw it all away
             utilWildcardDelete(scope.rulesets, rulesetID);
           }
         }
+      }
+
+      // TODO:  These just do simple overwrites right now
+      // Merge deprecated
+      if (inputScope.deprecated) {
+        scope.deprecated = inputScope.deprecated;
+      }
+      // Merge discarded
+      if (inputScope.discarded) {
+        scope.discarded = inputScope.discarded;
       }
     }
 
@@ -776,16 +778,20 @@ gfx?.scene?.reset();  // throw it all away
    */
   search(
     query: string = '',
-    geometries: GeometryType | GeometryType[] = [],
+    geometries: OneOrMore<GeometryType> = [],
     loc: Vec2 | null = null,
     scopeID: ScopeID = 'osm'
   ): SearchResult[] {
+
     const scope = this.getScope(scopeID);
     if (!scope.currSearchIndex) {   // shouldn't happen
       throw new Error('Search index not ready');
     }
 
-    if (!query || !geometries.length) return [];
+    if (!query) return [];   // no query
+
+    const filterGeometries = new Set(utilIterable(geometries));
+    if (!filterGeometries.size) return [];  // no geometry types
 
     // Get diacritic marks into a consistent format, perfer them combined into fewer characters.
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
@@ -793,8 +799,6 @@ gfx?.scene?.reset();  // throw it all away
 
     const context = this.context;
     const locations = context.systems.locations;
-
-    const filterGeometries = new Set(utilIterable(geometries));
     const filterLocationSets = Array.isArray(loc) ? locations?.locationSetsAt(loc) : null;
 
     const _filter = (result: SearchResult): boolean => {
@@ -891,7 +895,6 @@ gfx?.scene?.reset();  // throw it all away
     const locations = context.systems.locations;
 
     const scope = this.getScope(scopeID);
-
     const keyIndex = scope.matchIndex.get(geometry);
     if (!keyIndex) return null;  // invalid geometry option?
 
@@ -957,7 +960,7 @@ gfx?.scene?.reset();  // throw it all away
 
     return entity.transient('vertexMatch', () => {
       // address lines allow vertices to act as standalone points
-      if ((entity as any).isOnAddressLine?.(graph)) return true;
+      if ((entity as OsmNode).isOnAddressLine(graph)) return true;
 
       const vertexMatch = this.matchTags(entity.tags, 'vertex');
       if (vertexMatch && !vertexMatch.isFallback()) return true;
@@ -986,12 +989,12 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to query (defaults to 'osm')
    * @returns  areaKeys Object
    */
-  areaKeys(scopeID: ScopeID = 'osm'): Record<string, Record<string, boolean>> {
+  areaKeys(scopeID: ScopeID = 'osm'): TagKeyValueLookup {
     const scope = this.getScope(scopeID);
 
     // The ignore list is for keys that imply lines. (We always add `area=yes` for exceptions)
     const ignore = new Set(['barrier', 'highway', 'footway', 'railway', 'junction', 'type']);
-    const areaKeys: Record<string, Record<string, boolean>> = {};
+    const areaKeys: TagKeyValueLookup = {};
 
     // ignore name-suggestion-index and deprecated presets
     const presets = [...scope.presets.values()]
