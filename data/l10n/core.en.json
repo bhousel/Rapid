@@ -2492,10 +2492,6 @@
           "message": "{feature} is a relation without a type"
         }
       },
-      "old_multipolygon": {
-        "message": "{multipolygon} has misplaced tags",
-        "reference": "Multipolygons should be tagged on their relation, not their outer way."
-      },
       "outdated_tags": {
         "title": "Outdated Tags",
         "message": "{feature} has outdated tags",

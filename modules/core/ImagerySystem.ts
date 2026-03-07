@@ -223,28 +223,11 @@ export class ImagerySystem extends AbstractSystem {
     )
     .then(results => {
       const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
-      for (const value of fulfilledValues as Record<string, any>[]) {
-        let imageryData: ImageryInput;
-
-        if (value.assetID === 'editor_layer_index') {
-          // The bundle returns flat format with top-level `imagery` key.
-          // Wrap into scoped format for merge().
-          imageryData = {
-            assetID: value.assetID as AssetID,
-            assetVersion: value.assetVersion ?? 'unknown',
-            scopes: [{
-              scope: 'osm',
-              imagery: value.imagery,
-            }],
-          };
-        } else {
-          // Other assets (e.g. 'rapid_imagery') are already in scoped format
-          imageryData = value as ImageryInput;
-          if (imageryData.assetID === 'rapid_imagery') {
-            imageryData.assetVersion ||= context.version;
-          }
+      for (const value of fulfilledValues as ImageryInput[]) {
+        if (value.assetID === 'rapid_imagery') {
+          value.assetVersion ||= context.version;
         }
-        this.merge(imageryData);
+        this.merge(value);
       }
 
       const rejectedReasons = results.filter(isRejected).map(p => p.reason);
