@@ -2,14 +2,15 @@ import { afterAll, beforeAll, beforeEach, afterEach, describe, it, mock } from '
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './StyleSystem.sample.js';
-import { setupMockRulesets } from '../mock_rulesets.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('StyleSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:  new Rapid.AssetSystem(context)
+    assets:  new Rapid.AssetSystem(context),
+    schema:  new Rapid.SchemaSystem(context)
   };
 
   // Setup mock asset data that SchemaSystem attempts to load at init time.
@@ -558,8 +559,11 @@ describe('StyleSystem', () => {
   describe('styleMatch', () => {
     let _styles;
 
-    beforeAll(() => {
-      setupMockRulesets(Rapid, context);
+    beforeAll(async () => {
+      const schema = context.systems.schema;
+      schema.requestedAssetIDs = '';
+      await schema.initAsync();
+      schema.merge(osmRulesets);
       _styles = new Rapid.StyleSystem(context);
       context.systems.styles = _styles;
       // Don't init - just create and merge data directly

@@ -1,15 +1,24 @@
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('validationPrivateData', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    l10n:  new Rapid.LocalizationSystem(context)
+    l10n:    new Rapid.LocalizationSystem(context),
+    schema:  new Rapid.SchemaSystem(context)
   };
 
-  const validator = Rapid.validationPrivateData(context);
+  let validator;
+  beforeAll(async () => {
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    await schema.initAsync();
+    schema.merge(osmRulesets);
+    validator = Rapid.validationPrivateData(context);
+  });
 
 
   it('ignores way with no tags', () => {

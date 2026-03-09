@@ -1,6 +1,7 @@
 import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('validationOutdatedTags', () => {
@@ -13,17 +14,18 @@ describe('validationOutdatedTags', () => {
     schema:     new Rapid.SchemaSystem(context)
   };
 
-  const validator = Rapid.validationOutdatedTags(context);
-
-
-  beforeAll(() => {
-    return context.systems.schema.initAsync().then(() => {
-      const deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
-      context.systems.schema.merge({
-        assetID: 'test_deprecated',
-        scopes: [{ scope: 'osm', deprecated }]
-      });
+  let validator;
+  beforeAll(async () => {
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    await schema.initAsync();
+    schema.merge(osmRulesets);
+    const deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
+    schema.merge({
+      assetID: 'test_deprecated',
+      scopes: [{ scope: 'osm', deprecated }]
     });
+    validator = Rapid.validationOutdatedTags(context);
   });
 
 

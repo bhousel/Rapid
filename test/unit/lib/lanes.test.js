@@ -1,14 +1,18 @@
 import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
-import { setupMockRulesets } from '../mock_rulesets.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('lanes', () => {
   const context = new Rapid.MockContext();
+  context.systems.schema = new Rapid.SchemaSystem(context);
 
   beforeAll(() => {
-    setupMockRulesets(Rapid, context);
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    return schema.initAsync()
+      .then(() => schema.merge(osmRulesets));
   });
 
   describe('default lane tags', () => {

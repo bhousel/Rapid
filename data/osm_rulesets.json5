@@ -61,6 +61,27 @@
       // attribute/note tags than as defining tags.
       crossing_preserve_keys: [
         "crossing_ref", "crossing:continuous", "crossing:island"
+      ],
+
+      // Building types that are likely private residences.
+      // Used by the private_data validator to identify buildings that shouldn't
+      // have personal contact info (phone, email, fax).
+      private_building_values: [
+        "detached", "farm", "house", "houseboat", "residential",
+        "semidetached_house", "static_caravan"
+      ],
+
+      // Tag keys whose presence indicates a building is public (not private).
+      // If a building has any of these keys, it's treated as a public feature
+      // and personal data warnings are suppressed.
+      public_feature_keys: [
+        "amenity", "craft", "historic", "leisure", "office", "shop", "tourism"
+      ],
+
+      // Tag keys that may contain personally identifying information.
+      // The private_data validator flags these on private buildings.
+      personal_data_keys: [
+        "contact:email", "contact:fax", "contact:phone", "email", "fax", "phone"
       ]
     },
 

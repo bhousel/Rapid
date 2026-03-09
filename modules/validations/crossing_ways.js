@@ -21,6 +21,7 @@ export function validationCrossingWays(context) {
   const variables = schema?.getScope('osm')?.variables;
   const rulesets = schema?.getScope('osm')?.rulesets;
   const pathVals = variables?.get('path_highway_values')?.asSet();
+  const lifecyclePrefixes = variables?.get('lifecycle_prefixes')?.asSet();
 
   // helpers
   function hasTag(v) {
@@ -33,7 +34,6 @@ export function validationCrossingWays(context) {
   // lookups
   const allowBridge = new Set(['aeroway', 'highway', 'railway', 'waterway']);
   const allowTunnel = new Set(['highway', 'railway', 'waterway']);
-  const ignoreBuilding = new Set(['demolished', 'dismantled', 'proposed', 'razed']);
   const disallowFord = new Set([
     'motorway', 'motorway_link', 'trunk', 'trunk_link',
     'primary', 'primary_link', 'secondary', 'secondary_link'
@@ -166,7 +166,7 @@ export function validationCrossingWays(context) {
 
     const routeAero = rulesets?.get('connected_aeroway');
     if (routeAero?.match({ aeroway: tags.aeroway })) return 'aeroway';
-    if (hasTag(tags.building) && !ignoreBuilding.has(tags.building)) return 'building';
+    if (hasTag(tags.building) && !lifecyclePrefixes?.has(tags.building)) return 'building';
 
     const routeHwy = rulesets?.get('connected_highway');
     if (hasTag(tags.highway) && routeHwy?.match({ highway: tags.highway })) return 'highway';

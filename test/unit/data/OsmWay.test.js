@@ -1,16 +1,19 @@
 import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
-import { setupMockRulesets } from '../mock_rulesets.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('OsmWay', () => {
   const context = new Rapid.MockContext();
+  context.systems.schema = new Rapid.SchemaSystem(context);
 
-  beforeAll(() => {
-    setupMockRulesets(Rapid, context);
-    // Set areaKeys on the mock scope for isArea() tests
+  beforeAll(async () => {
     const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    await schema.initAsync();
+    schema.merge(osmRulesets);
+    // Set areaKeys on the mock scope for isArea() tests
     schema.getScope('osm').areaKeys = { building: {} };
   });
 

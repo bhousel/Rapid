@@ -1,12 +1,19 @@
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
-import { setupMockRulesets } from '../mock_rulesets.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('actionSyncCrossingTags', () => {
   const context = new Rapid.MockContext();
-  setupMockRulesets(Rapid, context);
+  context.systems.schema = new Rapid.SchemaSystem(context);
+
+  beforeAll(() => {
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    return schema.initAsync()
+      .then(() => schema.merge(osmRulesets));
+  });
 
   it('synchronizes parent way to child node', () => {
     //

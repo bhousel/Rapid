@@ -1,7 +1,7 @@
 import { beforeAll, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
-import { setupMockRulesets } from '../mock_rulesets.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('FilterSystem', () => {
@@ -15,9 +15,16 @@ describe('FilterSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    editor:  new MockEditSystem(context)
+    editor:  new MockEditSystem(context),
+    schema:  new Rapid.SchemaSystem(context)
   };
-  setupMockRulesets(Rapid, context);
+
+  beforeAll(() => {
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    return schema.initAsync()
+      .then(() => schema.merge(osmRulesets));
+  });
 
 
   // Test construction and startup of the system..

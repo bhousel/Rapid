@@ -1,6 +1,7 @@
 import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('ValidationSystem', () => {
@@ -14,6 +15,13 @@ describe('ValidationSystem', () => {
     spatial:    new Rapid.SpatialSystem(context),
     storage:    new Rapid.StorageSystem(context)
   };
+
+  beforeAll(() => {
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    return schema.initAsync()
+      .then(() => schema.merge(osmRulesets));
+  });
 
   // Test construction and startup of the system..
   describe('lifecycle', () => {
@@ -77,6 +85,7 @@ describe('ValidationSystem', () => {
 
     beforeAll(() => {
       _validator = new Rapid.ValidationSystem(context);
+
       return _validator.initAsync()
         .then(() => _validator.startAsync())
         .then(() => {

@@ -9,24 +9,17 @@ export function validationPrivateData(context) {
   const type = 'private_data';
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const schema = context.systems.schema;
 
-  // assume that some buildings are private
-  const privateBuildingValues = new Set([
-    'detached', 'farm', 'house', 'houseboat', 'residential', 'semidetached_house', 'static_caravan'
-  ]);
-
-  // but they might be public if they have one of these other tags
-  const publicKeys = new Set([
-    'amenity', 'craft', 'historic', 'leisure', 'office', 'shop', 'tourism'
-  ]);
-
-  // these tags may contain personally identifying info
-  const personalKeys = new Set([
-    'contact:email', 'contact:fax', 'contact:phone', 'email', 'fax', 'phone'
-  ]);
+  // Schema prerequisites
+  const variables = schema?.getScope('osm')?.variables;
+  const privateBuildingValues = variables?.get('private_building_values')?.asSet();
+  const publicKeys = variables?.get('public_feature_keys')?.asSet();
+  const personalKeys = variables?.get('personal_data_keys')?.asSet();
 
 
   let validation = function checkPrivateData(entity) {
+    if (!privateBuildingValues) return [];  // schema not ready
     const tags = entity.tags;
     if (!tags.building || !privateBuildingValues.has(tags.building)) return [];  // not a private building
 

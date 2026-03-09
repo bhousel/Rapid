@@ -1,7 +1,7 @@
-import { beforeEach, describe, it } from 'bun:test';
+import { beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
-import { setupMockRulesets } from '../mock_rulesets.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('validationDisconnectedWay', () => {
@@ -16,11 +16,18 @@ describe('validationDisconnectedWay', () => {
   context.systems = {
     // editor:   new MockEditSystem(context),
     l10n:     new Rapid.LocalizationSystem(context),
+    schema:   new Rapid.SchemaSystem(context),
     spatial:  new Rapid.SpatialSystem(context)
   };
-  setupMockRulesets(Rapid, context);
 
-  const validator = Rapid.validationDisconnectedWay(context);
+  let validator;
+  beforeAll(async () => {
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    await schema.initAsync();
+    schema.merge(osmRulesets);
+    validator = Rapid.validationDisconnectedWay(context);
+  });
 
   beforeEach(() => {
     graph = new Rapid.Graph(context);   // reset
