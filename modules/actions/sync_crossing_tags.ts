@@ -4,29 +4,6 @@ import type { OsmNode } from '../data/OsmNode.ts';
 import type { OsmWay } from '../data/OsmWay.ts';
 import type { Tags } from '../data/types.ts';
 
-
-// Some of these don't make sense for crossings, but we will check them
-const roadVals = new Set<string>([
-  'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential',
-  'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link',
-  'unclassified', 'road', 'service', 'track', 'living_street', 'bus_guideway', 'busway',
-]);
-
-const pathVals = new Set<string>([
-  'path', 'footway', 'cycleway', 'bridleway', 'pedestrian'
-]);
-
-// These crossing tags should be kept in sync between the parent way and any child nodes
-const crossingKeys = new Set<string>([
-  'crossing', 'crossing_ref', 'crossing:continuous', 'crossing:island', 'crossing:markings', 'crossing:signals'
-]);
-
-// These tags can be preserved (not deleted) if they are set in one place and not the other.
-// (they function more as attribute tags than defining tags)
-const crossingPreserveKeys = new Set<string>([
-  'crossing_ref', 'crossing:continuous', 'crossing:island'
-]);
-
 /**
  *  actionSyncCrossingTags
  *  This performs some basic crossing tag cleanups and upgrades, and keeps the
@@ -42,12 +19,31 @@ const crossingPreserveKeys = new Set<string>([
  *    (but not the raw tag editor)
  *  - by the `ambiguous_crossing_tags` validator to detect issues, or make fixes
  *
- *  @param  {string}   entityID  - The Entity with the tags that should be checked
- *  @return {Function} The Action function, accepts a Graph and returns a modified Graph
+ *  @param  entityID  - The Entity with the tags that should be checked
+ *  @return The Action function, accepts a Graph and returns a modified Graph
  */
 export function actionSyncCrossingTags(entityID: EntityID): Action {
 
+  // Highway/crossing tags populated from schema at runtime.
+  // Using outer-scope lets so all inner helper closures can share them.
+  let roadVals = new Set<string>();
+  let pathVals = new Set<string>();
+  let crossingKeys = new Set<string>();
+  let crossingPreserveKeys = new Set<string>();
+
   return function action(graph: Graph): Graph {
+    const schema = graph.context.systems.schema;
+    const variables = schema?.getScope('osm')?.variables;
+    if (!variables) return graph;
+
+    // Resolve highway/crossing tags from schema.
+    const majorVals = (variables.get('major_highway_values')?.asSet() ?? new Set()) as Set<string>;
+    const minorVals = (variables.get('minor_highway_values')?.asSet() ?? new Set()) as Set<string>;
+    roadVals = new Set([...majorVals, ...minorVals]);
+    pathVals = (variables.get('path_highway_values')?.asSet() ?? new Set()) as Set<string>;
+    crossingKeys = (variables.get('crossing_sync_keys')?.asSet() ?? new Set()) as Set<string>;
+    crossingPreserveKeys = (variables.get('crossing_preserve_keys')?.asSet() ?? new Set()) as Set<string>;
+
     const entity = graph.entity(entityID);
     const geometry = entity.geometry(graph);
 

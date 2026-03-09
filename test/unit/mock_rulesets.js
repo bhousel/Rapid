@@ -99,11 +99,17 @@ export function setupMockRulesets(Rapid, context) {
     ]
   }));
 
-  // validationDisconnectedWay tests: highway=residential, highway=unclassified
+  // All common routable highway values: used by disconnected_way, FilterSystem (_isBoundary, _isRail, _isPastFuture)
   rulesets.set('connected_highway', new Rapid.Ruleset(context, {
     id: 'connected_highway',
     include: [
-      { key: 'highway', op: 'in', value: ['residential', 'unclassified'] }
+      { key: 'highway', op: 'in', value: [
+        'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+        'unclassified', 'residential', 'living_street', 'road',
+        'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link',
+        'service', 'track', 'busway', 'bus_guideway',
+        'path', 'footway', 'cycleway', 'bridleway', 'pedestrian', 'steps', 'corridor'
+      ]}
     ]
   }));
 
@@ -158,6 +164,34 @@ export function setupMockRulesets(Rapid, context) {
   variables.set('lifecycle_prefixes', new Rapid.Variable(context, {
     id: 'lifecycle_prefixes',
     value: ['abandoned', 'construction', 'demolished', 'disused', 'destroyed', 'proposed', 'was']
+  }));
+
+  // Highway value lists (subset matching production osm_rulesets.json5)
+  variables.set('major_highway_values', new Rapid.Variable(context, {
+    id: 'major_highway_values',
+    value: [
+      'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+      'unclassified', 'residential', 'living_street', 'road',
+      'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link'
+    ]
+  }));
+  variables.set('minor_highway_values', new Rapid.Variable(context, {
+    id: 'minor_highway_values',
+    value: ['service', 'track', 'busway', 'bus_guideway']
+  }));
+  variables.set('path_highway_values', new Rapid.Variable(context, {
+    id: 'path_highway_values',
+    value: ['path', 'footway', 'cycleway', 'bridleway', 'pedestrian', 'corridor', 'steps']
+  }));
+
+  // Crossing tag keys
+  variables.set('crossing_sync_keys', new Rapid.Variable(context, {
+    id: 'crossing_sync_keys',
+    value: ['crossing', 'crossing_ref', 'crossing:continuous', 'crossing:island', 'crossing:markings', 'crossing:signals']
+  }));
+  variables.set('crossing_preserve_keys', new Rapid.Variable(context, {
+    id: 'crossing_preserve_keys',
+    value: ['crossing_ref', 'crossing:continuous', 'crossing:island']
   }));
 
   const mockScope = {

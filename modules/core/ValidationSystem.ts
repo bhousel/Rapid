@@ -143,6 +143,14 @@ export class ValidationSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     // Create the validation rules
+    // TODO: Validator functions are instantiated once here at init time.  Any schema-derived
+    // data they capture at construction (e.g. hoisted `pathVals`, `variables`, etc.) will be
+    // stale if the schema is loaded or updated after this point.  The fix is to convert each
+    // validator into a proper class (like the systems and behaviors) so it can subscribe to
+    // 'schemachange' events and refresh its cached prerequisites.  Until then, validators
+    // that depend on schema data must fetch it lazily (inside the validation function), or
+    // use the `if (!pathVals) return []` guard pattern to fail gracefully when schema is not
+    // yet loaded.
     const context = this.context;
     Object.values(Validations).forEach((validation: unknown) => {
       if (typeof validation !== 'function') return;

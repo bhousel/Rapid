@@ -47,6 +47,20 @@
       path_highway_values: [
         "path", "footway", "cycleway", "bridleway", "pedestrian", "corridor",
         "elevator", "ladder", "steps", "via_ferrata"
+      ],
+
+      // Tag keys that should be kept in sync between a crossing way and its child
+      // crossing nodes.
+      crossing_sync_keys: [
+        "crossing", "crossing_ref", "crossing:continuous", "crossing:island",
+        "crossing:markings", "crossing:signals"
+      ],
+
+      // A subset of crossing_sync_keys: tags that should be preserved (not deleted)
+      // if they are set in one place but not the other.  They function more as
+      // attribute/note tags than as defining tags.
+      crossing_preserve_keys: [
+        "crossing_ref", "crossing:continuous", "crossing:island"
       ]
     },
 

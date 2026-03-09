@@ -40,6 +40,12 @@ interface PresetLike {
 }
 
 
+// These objects define the highway values for each display filter category.
+// Note: these intentionally differ slightly from the schema variables
+// (major_highway_values, minor_highway_values, path_highway_values) which classify
+// highways for routing/connectivity purposes. For example, FilterSystem places
+// 'road' in service_roads while the schema variables place it in major_highway_values.
+// For cross-cutting "is this a known highway?" checks, use the connected_highway ruleset.
 const traffic_roads: Record<string, boolean> = {
   'motorway': true,
   'motorway_link': true,
@@ -821,12 +827,12 @@ export class FilterSystem extends AbstractSystem {
   }
 
   _isBoundary(tags: Tags): boolean {
+    const schema = this.context.systems.schema;
+    const connectedHighway = schema?.getScope('osm')?.rulesets.get('connected_highway');
     return (
       !!tags.boundary
     ) && !(
-      traffic_roads[tags.highway as string] ||
-      service_roads[tags.highway as string] ||
-      paths[tags.highway as string] ||
+      connectedHighway?.match(tags) ||
       tags.waterway ||
       tags.railway ||
       tags.landuse ||
@@ -850,13 +856,11 @@ export class FilterSystem extends AbstractSystem {
   }
 
   _isRail(tags: Tags): boolean {
+    const schema = this.context.systems.schema;
+    const connectedHighway = schema?.getScope('osm')?.rulesets.get('connected_highway');
     return (
       !!tags.railway || tags.landuse === 'railway'
-    ) && !(
-      traffic_roads[tags.highway as string] ||
-      service_roads[tags.highway as string] ||
-      paths[tags.highway as string]
-    ) && !this._isPastFuture(tags);
+    ) && !connectedHighway?.match(tags) && !this._isPastFuture(tags);
   }
 
   _isPiste(tags: Tags): boolean {
@@ -875,12 +879,11 @@ export class FilterSystem extends AbstractSystem {
 
   // contains a past/future tag, but not in active use as a road/path/cycleway/etc..
   _isPastFuture(tags: Tags): boolean {
-    if (traffic_roads[tags.highway as string] || service_roads[tags.highway as string] || paths[tags.highway as string]) {
-      return false;
-    }
-
     const schema = this.context.systems.schema;
-    const lifecyclePrefixes = schema?.getScope('osm')?.variables?.get('lifecycle_prefixes')?.asSet();
+    const osmScope = schema?.getScope('osm');
+    if (osmScope?.rulesets.get('connected_highway')?.match(tags)) return false;
+
+    const lifecyclePrefixes = osmScope?.variables?.get('lifecycle_prefixes')?.asSet();
     if (!lifecyclePrefixes?.size) return false;
 
     for (const [k, v] of Object.entries(tags)) {

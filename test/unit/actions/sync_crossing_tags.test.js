@@ -1,10 +1,12 @@
 import { describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import { setupMockRulesets } from '../mock_rulesets.js';
 
 
 describe('actionSyncCrossingTags', () => {
   const context = new Rapid.MockContext();
+  setupMockRulesets(Rapid, context);
 
   it('synchronizes parent way to child node', () => {
     //

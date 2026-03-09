@@ -6,16 +6,16 @@ import { actionUpgradeTags } from '../actions/upgrade_tags.js';
 import { Graph, ValidationIssue, ValidationFix } from '../lib/index.ts';
 
 
-const pathVals = new Set([
-  'path', 'footway', 'cycleway', 'bridleway', 'pedestrian'
-]);
-
-
 export function validationOutdatedTags(context) {
   const type = 'outdated_tags';
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
+
+  // Schema prerequisites
+  const variables = schema?.getScope('osm')?.variables;
+  const presets = schema?.getScope('osm')?.presets;
+  const pathVals = variables?.get('path_highway_values')?.asSet();
 
   /**
    * _isCrossingWay
@@ -25,7 +25,7 @@ export function validationOutdatedTags(context) {
    * @return  {boolean}  `true` if the way is tagged as a crossing
    */
   function _isCrossingWay(tags) {
-    for (const k of pathVals) {
+    for (const k of pathVals ?? []) {
       if (tags.highway === k && tags[k] === 'crossing') {
         return true;
       }
@@ -75,7 +75,7 @@ graph = new Graph(graph);
 
     // Upgrade preset, if a replacement is available..
     if (preset.props.replacement) {
-      const newPreset = schema.getScope('osm').presets.get(preset.props.replacement);
+      const newPreset = presets?.get(preset.props.replacement);
       graph = actionChangePreset(entity.id, preset, newPreset, true /* skip field defaults */)(graph);
       entity = graph.entity(entity.id);
       preset = newPreset;

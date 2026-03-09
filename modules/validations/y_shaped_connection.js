@@ -30,19 +30,20 @@ export function validationYShapedConnection(context) {
 
   const type = 'y_shaped_connection';
   const l10n = context.systems.l10n;
+  const schema = context.systems.schema;
+
+  // Schema prerequisites
+  const variables = schema?.getScope('osm')?.variables;
+  const majorVals = variables?.get('major_highway_values')?.asSet();
+  const minorVals = variables?.get('minor_highway_values')?.asSet();
 
   const SHORT_EDGE_THD_METERS = 12;       // (THD means "threshold")
   const NON_FLAT_ANGLE_THD_DEGREES = 5;
-  const relatedHighways = new Set([
-    'residential', 'service', 'track', 'unclassified',
-    'tertiary', 'secondary', 'primary', 'living_street',
-    'cycleway', 'trunk', 'motorway', 'road', 'raceway'
-  ]);
 
 
   function getRelatedHighwayParents(node, graph) {
     const parentWays = graph.parentWays(node);
-    return parentWays.filter(way => relatedHighways.has(way.tags.highway));
+    return parentWays.filter(way => majorVals?.has(way.tags.highway) || minorVals?.has(way.tags.highway));
   }
 
   function createIssueAndFixForNode(node, context) {
@@ -141,6 +142,7 @@ export function validationYShapedConnection(context) {
 
 
   let validation = function(entity, graph) {
+    if (!majorVals || !minorVals) return [];
     // Only flag issue on non-connection nodes on negative ways
     if (entity.type !== 'node') return [];
     const pways = getRelatedHighwayParents(entity, graph);

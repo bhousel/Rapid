@@ -17,6 +17,11 @@ export function validationCrossingWays(context) {
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
 
+  // Schema prerequisites
+  const variables = schema?.getScope('osm')?.variables;
+  const rulesets = schema?.getScope('osm')?.rulesets;
+  const pathVals = variables?.get('path_highway_values')?.asSet();
+
   // helpers
   function hasTag(v) {
     return v !== undefined && v !== 'no';
@@ -32,9 +37,6 @@ export function validationCrossingWays(context) {
   const disallowFord = new Set([
     'motorway', 'motorway_link', 'trunk', 'trunk_link',
     'primary', 'primary_link', 'secondary', 'secondary_link'
-  ]);
-  const pathVals = new Set([
-    'path', 'footway', 'cycleway', 'bridleway', 'pedestrian'
   ]);
 
 
@@ -75,6 +77,8 @@ export function validationCrossingWays(context) {
    * @return {Array}   Array of ValidationIssues detected
    */
   const validation = function checkCrossingWays(entity, graph) {
+    if (!pathVals || !rulesets) return [];
+
 // note: using tree like this may be problematic - it may not reflect the graph we are validating.
 // update: it's probably ok, as `tree.waySegments` will reset the tree to the graph are using..
 // (although this will surely hurt performance)
@@ -159,7 +163,6 @@ export function validationCrossingWays(context) {
     if (geometry !== 'line' && geometry !== 'area') return null;
 
     const tags = entity.tags;
-    const rulesets = schema?.getScope('osm')?.rulesets;
 
     const routeAero = rulesets?.get('connected_aeroway');
     if (routeAero?.match({ aeroway: tags.aeroway })) return 'aeroway';
@@ -246,7 +249,7 @@ export function validationCrossingWays(context) {
     const geometry2 = entity2.geometry(graph);
     const bothLines = geometry1 === 'line' && geometry2 === 'line';
 
-    const pathHighway = schema?.getScope('osm')?.rulesets?.get('path_highway');
+    const pathHighway = rulesets?.get('path_highway');
     const isPathHighway = (val) => pathHighway?.match({ highway: val });
 
     if (crossingType === 'aeroway-aeroway') {

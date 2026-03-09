@@ -17,16 +17,13 @@ import { uiSectionSelectionList } from './sections/selection_list.js';
 
 let _wasSelectedIDs = [];
 
-// Crossings.. :-(  If touching any of these, call the sync action.  Rapid#1260
-const crossingKeys = new Set([
-  'crossing', 'crossing_ref', 'crossing:continuous', 'crossing:island', 'crossing:markings', 'crossing:signals'
-]);
-
 
 export function uiEntityEditor(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
+  // Crossings.. :-(  If touching any of these, call the sync action.  Rapid#1260
+  const crossingKeys = schema?.getScope('osm')?.variables.get('crossing_sync_keys')?.asSet() ?? new Set();
   const dispatch = d3_dispatch('choose');
 
   const sections = [

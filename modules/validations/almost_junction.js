@@ -27,7 +27,9 @@ export function validationAlmostJunction(context) {
   // Comes from considering bounding case of perpendicular ways
   const SIG_ANGLE_TH = Math.atan(WELD_TH_METERS / EXTEND_TH_METERS);
 
-  const routable = schema?.getScope('osm')?.rulesets?.get('connected_highway');
+  // Schema prerequisites
+  const rulesets = schema?.getScope('osm')?.rulesets;
+  const routable = rulesets?.get('connected_highway');
 
   function isHighway(entity) {
     return entity.type === 'way'

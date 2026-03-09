@@ -12,13 +12,17 @@ export function validationDisconnectedWay(context) {
   const map = context.systems.map;
   const schema = context.systems.schema;
 
+  // Schema prerequisites
+  const rulesets = schema?.getScope('osm')?.rulesets;
+  const routable = rulesets?.get('connected_highway');
+
   function isTaggedAsHighway(entity) {
-    const routable = schema?.getScope('osm')?.rulesets?.get('connected_highway');
     return routable?.match({ highway: entity.tags.highway });
   }
 
 
   let validation = function checkDisconnectedWay(entity, graph) {
+    if (!routable) return [];
     const routingIslandEntities = routingIslandForEntity(entity);
     if (!routingIslandEntities) return [];
 

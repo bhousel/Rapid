@@ -23,6 +23,17 @@ describe('actionChangePreset', () => {
             'old': { tags: { old: 'true' } },
             'new': { tags: { new: 'true' } },
             'crossing': { tags: { highway: 'footway', footway: 'crossing', 'crossing:markings': 'zebra' } }
+          },
+          variables: {
+            major_highway_values: [
+              'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+              'unclassified', 'residential', 'living_street', 'road',
+              'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link'
+            ],
+            minor_highway_values: ['service', 'track', 'busway', 'bus_guideway'],
+            path_highway_values: ['path', 'footway', 'cycleway', 'bridleway', 'pedestrian', 'corridor', 'steps'],
+            crossing_sync_keys: ['crossing', 'crossing_ref', 'crossing:continuous', 'crossing:island', 'crossing:markings', 'crossing:signals'],
+            crossing_preserve_keys: ['crossing_ref', 'crossing:continuous', 'crossing:island']
           }
         }]
       };

@@ -22,6 +22,9 @@ export function validationAmbiguousCrossingTags(context) {
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
 
+  // Schema prerequisites
+  const presets = schema?.getScope('osm')?.presets;
+
   // These checks will be run on the parent way.
   const validation = function checkAmbiguousCrossingTags(entity, graph) {
     if (entity.type !== 'way' || entity.isDegenerate()) return [];
@@ -42,7 +45,7 @@ export function validationAmbiguousCrossingTags(context) {
       const entity = graph.entity(entityID);
       const currPreset = schema.match(entity, graph);
       const replacementID = currPreset?.props?.replacement;
-      const replacement = replacementID && schema.getScope('osm').presets.get(replacementID);
+      const replacement = replacementID && presets?.get(replacementID);
 
       if (replacement) {
         graph = actionChangePreset(entityID, currPreset, replacement, true /* skip field defaults */)(graph);

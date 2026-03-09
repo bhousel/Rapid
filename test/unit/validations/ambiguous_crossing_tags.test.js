@@ -26,7 +26,47 @@ describe('validationAmbiguousCrossingTags', () => {
       context.systems.locations.initAsync(),
       context.systems.spatial.initAsync(),
       context.systems.schema.initAsync()
-    ]);
+    ]).then(() => {
+      context.systems.schema.merge({
+        assetID: 'crossings_schema',
+        scopes: [{
+          scope: 'osm',
+          variables: {
+            // Highway values for major roads (motor vehicles, classified roads)
+            major_highway_values: [
+              'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+              'unclassified', 'residential', 'living_street', 'road',
+              'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link'
+            ],
+
+            // Highway values for minor roads (motor vehicles, service/access roads)
+            minor_highway_values: [
+              'service', 'track', 'busway', 'bus_guideway'
+            ],
+
+            // Highway values for paths (no motor vehicles)
+            path_highway_values: [
+              'path', 'footway', 'cycleway', 'bridleway', 'pedestrian', 'corridor',
+              'elevator', 'ladder', 'steps', 'via_ferrata'
+            ],
+
+            // Tag keys that should be kept in sync between a crossing way and its child
+            // crossing nodes.
+            crossing_sync_keys: [
+              'crossing', 'crossing_ref', 'crossing:continuous', 'crossing:island',
+              'crossing:markings', 'crossing:signals'
+            ],
+
+            // A subset of crossing_sync_keys: tags that should be preserved (not deleted)
+            // if they are set in one place but not the other.  They function more as
+            // attribute/note tags than as defining tags.
+            crossing_preserve_keys: [
+              'crossing_ref', 'crossing:continuous', 'crossing:island'
+            ]
+          }
+        }]
+      });
+    });
   });
 
   beforeEach(() => {
