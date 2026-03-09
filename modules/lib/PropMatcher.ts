@@ -1,8 +1,17 @@
+import { isVarRef, resolveVarRef } from './Variable.ts';
+
+import type { Variable } from './Variable.ts';
+
 /**
  * PropMatcher - A declarative property matcher for comparing object properties.
  *
  * Used for matching OSM tags and other key-value properties against conditions.
  * Supports various comparison operators: equals, not equals, exists, regex, numeric comparisons, etc.
+ *
+ * Values can be `var()` references that resolve against a Map of Variables:
+ * ```json5
+ * { key: "highway", op: "in", value: "var(major_highway_values)" }
+ * ```
  *
  * @example
  * // Match highway=motorway
@@ -112,6 +121,8 @@ export class PropMatcher {
   private _valueRegex: RegExp | null = null;
   /** Cached Set for value-list lookups (when op is 'in' or '!in') */
   private _valueSet: Set<string> | null = null;
+  /** Raw var() reference string, if the value is a variable reference */
+  private _varRef: string | null = null;
 
   /**
    * @constructor
@@ -183,8 +194,13 @@ export class PropMatcher {
     }
 
     // Pre-compile value list into Set for O(1) lookups
-    if ((this.op === 'in' || this.op === '!in') && Array.isArray(props.value)) {
-      this._valueSet = new Set(props.value as string[]);
+    // If the value is a var() reference string, defer compilation until resolveVariables() is called.
+    if ((this.op === 'in' || this.op === '!in') && props.value !== undefined) {
+      if (typeof props.value === 'string' && isVarRef(props.value)) {
+        this._varRef = props.value;
+      } else if (Array.isArray(props.value)) {
+        this._valueSet = new Set(props.value as string[]);
+      }
     }
   }
 
@@ -439,6 +455,53 @@ export class PropMatcher {
 
 
   /**
+   * Whether this matcher has an unresolved `var()` reference.
+   * @return `true` if the value contains a `var(...)` reference that hasn't been resolved
+   */
+  get hasVarRef(): boolean {
+    return this._varRef !== null;
+  }
+
+
+  /**
+   * Resolve any `var()` reference in this matcher's value against the given variables Map.
+   * If the value is not a var() reference, this is a no-op.
+   *
+   * After resolution, `_valueSet` is compiled from the resolved array values.
+   *
+   * @param variables - Map of VariableID to Variable instances
+   */
+  resolveVariables(variables: Map<VariableID, Variable>): void {
+    if (!this._varRef) return;
+
+    const resolved = resolveVarRef(this._varRef, variables);
+    if (resolved === undefined) return;  // unresolved — leave as-is
+
+    // Replace the props value with the resolved value, converting to string[] for PropMatcher compatibility
+    if (Array.isArray(resolved)) {
+      const strValues = resolved.map(String);
+      this.props.value = strValues;
+      this._valueSet = new Set(strValues);
+    } else {
+      this.props.value = String(resolved);
+      this._valueSet = new Set([String(resolved)]);
+    }
+  }
+
+
+  /**
+   * Reset compiled caches so this matcher can be re-resolved.
+   * Called when variables change (e.g. on schema reload).
+   * Only affects matchers that have var() references.
+   */
+  reset(): void {
+    if (!this._varRef) return;
+    this._valueSet = null;
+    // _varRef is preserved — it holds the raw reference for re-resolution
+  }
+
+
+  /**
    * Convert to a JSON-serializable object.
    */
   toJSON(): PropMatcherProps {
@@ -456,8 +519,10 @@ export class PropMatcher {
       result.op = this.op;
     }
 
-    // Include value if present (convert RegExp to string)
-    if (this.props.value !== undefined) {
+    // Include value if present (convert RegExp to string, preserve var() refs)
+    if (this._varRef) {
+      result.value = this._varRef;
+    } else if (this.props.value !== undefined) {
       if (this.props.value instanceof RegExp) {
         result.value = this.props.value.source;
       } else {

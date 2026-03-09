@@ -1,7 +1,8 @@
 import { PropMatcher } from './PropMatcher.ts';
 
-import type { PropMatcherProps } from './PropMatcher.ts';
 import type { Context } from '../Context.ts';
+import type { PropMatcherProps } from './PropMatcher.ts';
+import type { Variable } from './Variable.ts';
 
 /**
  * Ruleset - A collection of PropMatcher rules for classifying properties.
@@ -163,6 +164,36 @@ export class Ruleset {
       cloned.id = newID;
     }
     return new Ruleset(this.context, cloned);
+  }
+
+
+  /**
+   * Resolve any `var()` references in this ruleset's include/exclude matchers.
+   * Delegates to each PropMatcher's `resolveVariables()`.
+   *
+   * @param variables - Map of VariableID to Variable instances
+   */
+  resolveVariables(variables: Map<VariableID, Variable>): void {
+    for (const matcher of this.include) {
+      matcher.resolveVariables(variables);
+    }
+    for (const matcher of this.exclude) {
+      matcher.resolveVariables(variables);
+    }
+  }
+
+
+  /**
+   * Reset compiled caches on all matchers with var() references.
+   * Called when variables change (e.g. on schema reload) so they can be re-resolved.
+   */
+  reset(): void {
+    for (const matcher of this.include) {
+      matcher.reset();
+    }
+    for (const matcher of this.exclude) {
+      matcher.reset();
+    }
   }
 
 

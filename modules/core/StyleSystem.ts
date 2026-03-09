@@ -65,21 +65,6 @@ export interface MatchedStyle {
 }
 
 
-const roadVals = new Set([
-  'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential',
-  'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link',
-  'unclassified', 'road', 'service', 'track', 'living_street', 'bus_guideway', 'busway',
-]);
-
-const lifecycleVals = new Set([
-  'abandoned', 'construction', 'demolished', 'destroyed', 'dismantled', 'disused',
-  'intermittent', 'obliterated', 'planned', 'proposed', 'razed', 'removed', 'was'
-]);
-
-// matches these things as a tag prefix
-const lifecycleRegex = new RegExp('^(' + Array.from(lifecycleVals).join('|') + '):');
-
-
 /**
  * getTag
  * Returns the value of the tag, but ignores 'no' values.
@@ -584,21 +569,28 @@ export class StyleSystem extends AbstractSystem {
    * @see Rapid#1312, Rapid#1199, Rapid#791, Rapid#535
    */
   private _hasLifecycleTag(tags: Tags, styleKey: string | undefined): boolean {
+    const schema = this.context.systems.schema;
+    const lifecyclePrefixes = schema?.getScope('osm')?.variables?.get('lifecycle_prefixes')?.asSet();
+    if (!lifecyclePrefixes?.size) return false;
+
     for (const [k, v] of Object.entries(tags)) {
       // Lifecycle key, e.g. `demolished=yes`
       // (applies to all tags, styleKey doesn't matter)
-      if (lifecycleVals.has(k) && v !== 'no') {
+      if (lifecyclePrefixes.has(k) && v !== 'no') {
         return true;
 
       // Lifecycle value, e.g. `railway=demolished`
       // (applies only if `k` is styleKey or there is no styleKey controlling styling)
-      } else if ((!styleKey || k === styleKey) && lifecycleVals.has(v)) {
+      } else if ((!styleKey || k === styleKey) && lifecyclePrefixes.has(v)) {
         return true;
 
       // Lifecycle key prefix, e.g. `demolished:railway=rail`
       // (applies only if there is no styleKey controlling the styling)
-      } else if (!styleKey && lifecycleRegex.test(k) && v !== 'no') {
-        return true;
+      } else if (!styleKey && v !== 'no') {
+        const colonIdx = k.indexOf(':');
+        if (colonIdx !== -1 && lifecyclePrefixes.has(k.substring(0, colonIdx))) {
+          return true;
+        }
       }
     }
     return false;
@@ -645,13 +637,17 @@ export class StyleSystem extends AbstractSystem {
     }
 
     // Bumpy casing for roads with unpaved surface
-    if (surface && highway && roadVals.has(highway)) {
-      const paved = schema?.getScope('osm')?.rulesets?.get('surface_paved');
-      const isPaved = paved?.match({ surface });
-      if (!isPaved) {
-        if (!bridge) result.casing.color = 0xcccccc;
-        result.casing.cap = 'butt';
-        result.casing.dash = [4, 4];
+    if (surface && highway) {
+      const osmRulesets = schema?.getScope('osm')?.rulesets;
+      const isRoad = osmRulesets?.get('major_vehicular')?.match({ highway }) ||
+                     osmRulesets?.get('minor_vehicular')?.match({ highway });
+      if (isRoad) {
+        const isPaved = osmRulesets?.get('surface_paved')?.match({ surface });
+        if (!isPaved) {
+          if (!bridge) result.casing.color = 0xcccccc;
+          result.casing.cap = 'butt';
+          result.casing.dash = [4, 4];
+        }
       }
     }
   }

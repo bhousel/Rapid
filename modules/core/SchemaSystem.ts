@@ -2,7 +2,7 @@ import { utilArrayUniq } from '@rapid-sdk/util';
 import MiniSearch from 'minisearch';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { Category, Field, Preset, Ruleset } from '../lib/index.ts';
+import { Category, Field, Preset, Ruleset, Variable } from '../lib/index.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
@@ -11,10 +11,11 @@ import type { Context } from '../Context.ts';
 import type { FieldProps } from '../lib/Field.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { HasLocationSet } from '../core/LocationSystem.ts';
-import type { OsmEntity, OsmNode, Tags, TagKeyValueLookup, Vec2 } from '../data/types.ts';
 import type { OneOrMore } from '../util/iterable.ts';
+import type { OsmEntity, OsmNode, Tags, TagKeyValueLookup, Vec2 } from '../data/types.ts';
 import type { PresetProps } from '../lib/Preset.ts';
 import type { RulesetProps } from '../lib/Ruleset.ts';
+import type { VariableProps, VariableValue } from '../lib/Variable.ts';
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
@@ -57,6 +58,8 @@ export interface SchemaInput {
 export interface SchemaInputScope {
   /** Scope identifier that this input data applies to (required - defaults to 'osm') */
   scope: ScopeID;
+  /** Object mapping VariableID to Variable value (or null to delete) */
+  variables?: Record<VariableID, VariableValue | null>;
   /** Object mapping FieldID to Field props (or null to delete) */
   fields?: Record<FieldID, Partial<FieldProps> | null>;
   /** Object mapping PresetID to Preset props (or null to delete) */
@@ -77,6 +80,8 @@ export interface SchemaInputScope {
  * Internal per-scope cache for loaded schema data.
  */
 export interface SchemaScope {
+  /** Map of VariableIDs to instantiated Variables */
+  variables: Map<VariableID, Variable>;
   /** Map of FieldIDs to instantiated Fields */
   fields: Map<FieldID, Field>;
   /** Map of PresetIDs to instantiated Presets */
@@ -99,8 +104,6 @@ export interface SchemaScope {
   // Derived tag lookup tables (computed by _schemaChanged)
   areaKeys: TagKeyValueLookup;
   deprecatedValues: Record<string, string[]>;
-  /** Lifecycle prefixes derived from the 'lifecycle' ruleset (e.g. 'abandoned', 'disused') */
-  lifecyclePrefixes: Set<string>;
 }
 
 /**
@@ -670,6 +673,20 @@ gfx?.scene?.reset();  // throw it all away
         }
       }
 
+      // Merge Variables (before Rulesets, since rulesets may reference variables)
+      if (inputScope.variables) {
+        for (const [variableID, value] of Object.entries(inputScope.variables)) {
+          if (value !== null && value !== undefined) {   // add or replace
+            const varProps: Partial<VariableProps> = { id: variableID, assetID, scopeID, value };
+            const variable = new Variable(context, varProps);
+            scope.variables.set(variableID, variable);
+
+          } else {   // remove
+            utilWildcardDelete(scope.variables, variableID);
+          }
+        }
+      }
+
       // Merge Rulesets
       if (inputScope.rulesets) {
         for (const [rulesetID, props] of Object.entries(inputScope.rulesets)) {
@@ -723,6 +740,7 @@ gfx?.scene?.reset();  // throw it all away
     if (!scope) {
       // Doesn't exist yet - create.
       scope = {
+        variables: new Map(),
         fields: new Map(),
         presets: new Map(),
         categories: new Map(),
@@ -736,7 +754,6 @@ gfx?.scene?.reset();  // throw it all away
         // Derived tag lookup tables
         areaKeys: {},
         deprecatedValues: {},
-        lifecyclePrefixes: new Set(),
 
         // improve
         deprecated: [],
@@ -1030,7 +1047,7 @@ gfx?.scene?.reset();  // throw it all away
   /**
    * removeLifecyclePrefix
    * Removes a lifecycle prefix from a tag key if present (e.g. 'disused:railway' → 'railway').
-   * The set of recognized lifecycle prefixes is derived from the 'lifecycle' ruleset.
+   * The set of recognized lifecycle prefixes comes from the 'lifecycle_prefixes' variable.
    *
    * @param key - The tag key, possibly with a lifecycle prefix
    * @param scopeID - Scope to query (defaults to 'osm')
@@ -1041,8 +1058,9 @@ gfx?.scene?.reset();  // throw it all away
     if (colonIndex === -1) return key;
 
     const scope = this.getScope(scopeID);
+    const lifecyclePrefixes = scope.variables.get('lifecycle_prefixes')?.asSet();
     const prefix = key.slice(0, colonIndex);
-    if (scope.lifecyclePrefixes.has(prefix)) {
+    if (lifecyclePrefixes?.has(prefix)) {
       return key.slice(colonIndex + 1);
     }
     return key;
@@ -1485,19 +1503,10 @@ gfx?.scene?.reset();  // throw it all away
     for (const [scopeID, scope] of this._scopes) {
       scope.areaKeys = this.areaKeys(scopeID);
 
-      // Derive lifecycle prefixes from the lifecycle ruleset
-      scope.lifecyclePrefixes = new Set();
-      const lifecycleRuleset = scope.rulesets.get('lifecycle');
-      if (lifecycleRuleset) {
-        for (const matcher of lifecycleRuleset.include) {
-          // Extract prefix string from regex pattern like "^abandoned:"
-          if (matcher.keyOp === '~' && typeof matcher.key === 'string') {
-            const prefix = matcher.key.replace(/^\^/, '').replace(/:$/, '');
-            if (prefix) {
-              scope.lifecyclePrefixes.add(prefix);
-            }
-          }
-        }
+      // Resolve var() references in rulesets against scope variables
+      for (const ruleset of scope.rulesets.values()) {
+        ruleset.reset();
+        ruleset.resolveVariables(scope.variables);
       }
 
       // Precompute deprecated values by key for this scope

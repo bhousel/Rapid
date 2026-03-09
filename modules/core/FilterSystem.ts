@@ -880,7 +880,7 @@ export class FilterSystem extends AbstractSystem {
     }
 
     const schema = this.context.systems.schema;
-    const lifecyclePrefixes = schema?.getScope('osm')?.lifecyclePrefixes;
+    const lifecyclePrefixes = schema?.getScope('osm')?.variables?.get('lifecycle_prefixes')?.asSet();
     if (!lifecyclePrefixes?.size) return false;
 
     for (const [k, v] of Object.entries(tags)) {

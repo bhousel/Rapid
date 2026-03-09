@@ -88,13 +88,15 @@ export type TileID = string;
 export type TextureID = string;
 /** Validator ID - identifier for validation rule types */
 export type ValidatorID = string;
+/** Variable ID - identifier for named value lists in schema/style scopes (e.g. 'lifecycle_prefixes') */
+export type VariableID = string;
 
 
 // Make these types available globally (no import needed within Rapid)
 declare global {
+  type AssetID = string;
   type AtlasID = string;
   type BehaviorID = string;
-  type AssetID = string;
   type CategoryID = string;
   type CheckpointID = string;
   type ClassID = string;
@@ -121,10 +123,10 @@ declare global {
   type PhotoType = string;
   type PresetID = string;
   type RulesetID = string;
-  type ServiceID = string;
-  type SequenceID = string;
   type ScopeID = string;
   type ScriptCode = string;
+  type SequenceID = string;
+  type ServiceID = string;
   type StringID = string;
   type StyleID = string;
   type StyleSelectorID = string;
@@ -132,4 +134,5 @@ declare global {
   type TileID = string;
   type TextureID = string;
   type ValidatorID = string;
+  type VariableID = string;
 }

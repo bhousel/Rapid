@@ -16,6 +16,40 @@
   assetID: "osm_rulesets",
   scopes: [{
     scope: "osm",
+
+    variables: {
+      // Named value lists for reuse by rulesets and other consumers.
+      // These can be referenced from PropMatcher rules via var() syntax,
+      // and accessed directly via scope.variables.get(id).
+
+      // OSM lifecycle prefixes that can appear before a tag key (e.g. 'disused:railway').
+      // These indicate that the feature is no longer in active use but retains a trace
+      // of its former purpose.
+      lifecycle_prefixes: [
+        "abandoned", "construction", "demolished", "destroyed", "dismantled",
+        "disused", "intermittent", "obliterated", "planned", "proposed",
+        "razed", "removed", "was"
+      ],
+
+      // Highway values for major roads (motor vehicles, classified roads)
+      major_highway_values: [
+        "motorway", "trunk", "primary", "secondary", "tertiary",
+        "unclassified", "residential", "living_street", "road",
+        "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"
+      ],
+
+      // Highway values for minor roads (motor vehicles, service/access roads)
+      minor_highway_values: [
+        "service", "track", "busway", "bus_guideway"
+      ],
+
+      // Highway values for paths (no motor vehicles)
+      path_highway_values: [
+        "path", "footway", "cycleway", "bridleway", "pedestrian", "corridor",
+        "elevator", "ladder", "steps", "via_ferrata"
+      ]
+    },
+
     rulesets: {
 
       // ### SURFACES
@@ -104,33 +138,22 @@
       },
 
       // ### HIGHWAY CLASSIFICATION
-      // Tags that identify major roads for motor vehicles (including non-standard)
+      // Tags that identify major roads for motor vehicles
       major_vehicular: {
         include: [
-          { key: "highway", op: "in", value: [
-            "motorway", "trunk", "primary", "secondary", "tertiary",
-            "unclassified", "residential", "living_street", "road",
-            "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link",
-            "unclassified_link", "residential_link", "living_street_link", "road_link"
-          ]}
+          { key: "highway", op: "in", value: "var(major_highway_values)" }
         ]
       },
-      // Tags that identify minor roads for motor vehicles (including non-standard)
+      // Tags that identify minor roads for motor vehicles
       minor_vehicular: {
         include: [
-          { key: "highway", op: "in", value: [
-            "service", "track", "busway", "bus_guideway",
-            "service_link", "track_link", "busway_link", "bus_guideway_link"
-          ]}
+          { key: "highway", op: "in", value: "var(minor_highway_values)" }
         ]
       },
       // Tags that identify paths, no motor vehicles
       path_highway: {
         include: [
-          { key: "highway", op: "in", value: [
-            "path", "footway", "cycleway", "bridleway", "pedestrian", "corridor",
-            "elevator", "ladder", "steps", "via_ferrata"
-          ]}
+          { key: "highway", op: "in", value: "var(path_highway_values)" }
         ]
       },
 
@@ -140,14 +163,7 @@
       // This should only include the "standard" tags (does not include 'raceway', 'abandoned')
       connected_highway: {
         include: [
-          { key: "highway", op: "in", value: [
-            "motorway", "trunk", "primary", "secondary", "tertiary",
-            "unclassified", "residential", "living_street", "road",
-            "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link",
-            "service", "track", "busway", "bus_guideway",
-            "path", "footway", "cycleway", "bridleway", "pedestrian", "corridor",
-            "elevator", "ladder", "steps", "via_ferrata"
-          ]}
+          { key: "highway", op: "in", value: "var(major_highway_values, minor_highway_values, path_highway_values)" }
         ]
       },
       // Aeroway tags that we want to test for connectivity.

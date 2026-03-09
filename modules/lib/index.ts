@@ -24,3 +24,4 @@ export * from './Tree.ts';
 export * from './ValidationCache.ts';
 export * from './ValidationFix.ts';
 export * from './ValidationIssue.ts';
+export * from './Variable.ts';

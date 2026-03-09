@@ -1634,6 +1634,9 @@ describe('SchemaSystem', () => {
         assetID: 'test_lifecycle',
         scopes: [{
           scope: 'osm',
+          variables: {
+            lifecycle_prefixes: ['abandoned', 'construction', 'disused', 'was']
+          },
           rulesets: {
             lifecycle: {
               include: [

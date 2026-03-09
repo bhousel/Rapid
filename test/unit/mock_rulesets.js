@@ -83,6 +83,22 @@ export function setupMockRulesets(Rapid, context) {
     ]
   }));
 
+  // StyleSystem tests: highway=residential → major road
+  rulesets.set('major_vehicular', new Rapid.Ruleset(context, {
+    id: 'major_vehicular',
+    include: [
+      { key: 'highway', op: 'in', value: ['residential', 'unclassified'] }
+    ]
+  }));
+
+  // StyleSystem tests: highway=track → minor road
+  rulesets.set('minor_vehicular', new Rapid.Ruleset(context, {
+    id: 'minor_vehicular',
+    include: [
+      { key: 'highway', op: 'in', value: ['track', 'service'] }
+    ]
+  }));
+
   // validationDisconnectedWay tests: highway=residential, highway=unclassified
   rulesets.set('connected_highway', new Rapid.Ruleset(context, {
     id: 'connected_highway',
@@ -137,24 +153,17 @@ export function setupMockRulesets(Rapid, context) {
     ]
   }));
 
-  // Derive lifecyclePrefixes Set from the lifecycle ruleset's key patterns
-  const lifecyclePrefixes = new Set();
-  const lifecycleRuleset = rulesets.get('lifecycle');
-  if (lifecycleRuleset) {
-    for (const matcher of lifecycleRuleset.include) {
-      if (matcher.keyOp === '~' && typeof matcher.key === 'string') {
-        const prefix = matcher.key.replace(/^\^/, '').replace(/:$/, '');
-        if (prefix) {
-          lifecyclePrefixes.add(prefix);
-        }
-      }
-    }
-  }
+  // Variables: named value lists
+  const variables = new Map();
+  variables.set('lifecycle_prefixes', new Rapid.Variable(context, {
+    id: 'lifecycle_prefixes',
+    value: ['abandoned', 'construction', 'demolished', 'disused', 'destroyed', 'proposed', 'was']
+  }));
 
   const mockScope = {
+    variables,
     rulesets,
-    areaKeys: {},
-    lifecyclePrefixes
+    areaKeys: {}
   };
 
   if (!context.systems.schema) {
@@ -165,8 +174,10 @@ export function setupMockRulesets(Rapid, context) {
       removeLifecyclePrefix: (key, scopeID = 'osm') => {
         const colonIndex = key.indexOf(':');
         if (colonIndex === -1) return key;
+        const scope = scopeID === 'osm' ? mockScope : undefined;
+        const lifecyclePrefixes = scope?.variables?.get('lifecycle_prefixes')?.asSet();
         const prefix = key.slice(0, colonIndex);
-        if (lifecyclePrefixes.has(prefix)) {
+        if (lifecyclePrefixes?.has(prefix)) {
           return key.slice(colonIndex + 1);
         }
         return key;
