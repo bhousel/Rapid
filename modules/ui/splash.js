@@ -6,7 +6,7 @@ import { uiModal } from './modal.js';
 
 
 /**
- * uiRapidSplash
+ * uiSplash
  * This is the screen we show to the users if:
  *   - They have never used Rapid before, or
  *   - We have an updated privacy policy to tell them about
@@ -19,33 +19,28 @@ export function uiSplash(context) {
   const sawPrivacyVersion = parseInt(storage.getItem('sawPrivacyVersion'), 10) || 0;
 
 
-  return function render(selection) {
+  return function render($selection) {
     const rtl = l10n.isRTL ? '-rtl' : '';
     storage.setItem('sawPrivacyVersion', context.privacyVersion);
-
-    let version;
-    const match = context.version.match(/(\d+\.\d+)/);  // first match should be major,minor
-    if (match !== null) {
-      version = `v${match[1]}`;
-    } else {
-      version = context.version.toString();
-    }
 
     // prefetch intro graph data now, while user is looking at the splash screen
     assets.loadAssetAsync('intro_graph');
 
-    const modal = uiModal(selection);
-    modal.select('.modal')
+    // `uiModal` returns a selection that is appended to $selection (in this case $container)
+    // We can append to the the $modal selection here.
+    // (todo: instead of appending, rewrite as a data bind that supports rerendering)
+    const $modal = uiModal($selection);
+    $modal.select('.modal')
       .attr('class', 'modal rapid-modal modal-splash');
 
-    const content = modal.select('.content');
-    content
+    const $content = $modal.select('.content');
+    $content
       .append('div')
       .attr('class', 'modal-section')
       .append('h2')
       .html(l10n.t('splash.welcome', {
         rapidicon: icon(`#rapid-logo-rapid-wordmark${rtl}`, 'pre-text rapid'),
-        version: version
+        version: `v${context.version}`
       }));
 
 
@@ -59,50 +54,50 @@ export function uiSplash(context) {
     markdown += l10n.t('splash.privacy');
 
 
-    content
+    $content
       .append('div')
       .attr('class', 'modal-section')
       .html(marked.parse(markdown));
 
     // outbound links should open in new tab
-    content.selectAll('a')
+    $content.selectAll('a')
       .attr('target', '_blank');
 
 
-    const buttonWrap = content
+    const $buttonWrap = $content
       .append('div')
       .attr('class', 'modal-actions');
 
-    const walkthrough = buttonWrap
+    const $walkthrough = $buttonWrap
       .append('button')
       .attr('class', 'walkthrough')
       .on('click', () => {
         context.container().call(uiIntro(context));
-        modal.close();
+        $modal.close();
       });
 
-    walkthrough
+    $walkthrough
       .append('svg')
       .attr('class', 'logo logo-walkthrough')
       .append('use')
       .attr('xlink:href', '#rapid-logo-walkthrough');
 
-    walkthrough
+    $walkthrough
       .append('div')
       .text(l10n.t('splash.walkthrough'));
 
-    const startEditing = buttonWrap
+    const $startEditing = $buttonWrap
       .append('button')
       .attr('class', 'start-editing')
-      .on('click', modal.close);
+      .on('click', $modal.close);
 
-    startEditing
+    $startEditing
       .append('svg')
       .attr('class', 'logo logo-features')
       .append('use')
       .attr('xlink:href', '#rapid-logo-features');
 
-    startEditing
+    $startEditing
       .append('div')
       .text(l10n.t('splash.start'));
   };

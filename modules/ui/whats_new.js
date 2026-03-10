@@ -17,16 +17,11 @@ export function uiWhatsNew(context) {
 
 
   return function render(selection) {
+    // `uiModal` returns a selection that is appended to $selection (in this case $container)
+    // We can append to the the $modal selection here.
+    // (todo: instead of appending, rewrite as a data bind that supports rerendering)
     const $modal = uiModal(selection);
     const rtl = l10n.isRTL ? '-rtl' : '';
-
-    let version;
-    const match = context.version.match(/(\d+\.\d+)/);  // first match should be major,minor
-    if (match !== null) {
-      version = `v${match[1]}`;
-    } else {
-      version = context.version.toString();
-    }
 
     $modal.select('.modal')
       .attr('class', 'modal rapid-modal modal-whatsnew');
@@ -38,7 +33,7 @@ export function uiWhatsNew(context) {
       .append('h2')
       .html(l10n.t('splash.welcome', {
         rapidicon: icon(`#rapid-logo-rapid-wordmark${rtl}`, 'pre-text rapid'),
-        version: version
+        version: `v${context.version}`
       }));
 
 
