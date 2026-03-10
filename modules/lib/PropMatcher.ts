@@ -92,6 +92,13 @@ export interface PropMatcherProps {
    * - `RegExp` for '~'/'!~' operators (or string that will be converted)
    */
   value?: string | number | string[] | RegExp;
+  /**
+   * Whether to allow 'no' as a valid match for 'exists' and wildcard '*' operations.
+   * In OSM, `tag=no` is an anti-pattern meaning "this tag does not apply", so by
+   * default (false) these values are treated as if the tag doesn't exist.
+   * Set to `true` if 'no' should be treated as a legitimate value.
+   */
+  allowNo?: boolean;
 }
 
 
@@ -123,6 +130,8 @@ export class PropMatcher {
   private _valueSet: Set<string> | null = null;
   /** Raw var() reference string, if the value is a variable reference */
   private _varRef: string | null = null;
+  /** Whether to allow 'no' as a valid match for 'exists' and wildcard '*' ops */
+  private _allowNo: boolean;
 
   /**
    * @constructor
@@ -202,6 +211,10 @@ export class PropMatcher {
         this._valueSet = new Set(props.value as string[]);
       }
     }
+
+    // In OSM, `tag=no` is a common anti-pattern meaning "this doesn't apply".
+    // By default, 'exists' and wildcard '*' treat 'no' as if the key were absent.
+    this._allowNo = props.allowNo ?? false;
   }
 
 
@@ -240,7 +253,7 @@ export class PropMatcher {
     const hasKey = Object.prototype.hasOwnProperty.call(obj, key);
     const val = obj[key];
 
-    if (this.op === 'exists') return hasKey && val !== undefined && val !== null;
+    if (this.op === 'exists') return hasKey && val !== undefined && val !== null && (this._allowNo || val !== 'no');
     if (this.op === '!exists') return !hasKey || val === undefined || val === null;
 
     return this._checkValueOp(val);
@@ -255,7 +268,7 @@ export class PropMatcher {
 
     // Handle wildcard '*' - matches any truthy value
     if (expected === '*') {
-      return val !== undefined && val !== null && val !== '';
+      return val !== undefined && val !== null && val !== '' && (this._allowNo || val !== 'no');
     }
 
     // Type coercion for comparison (OSM tags are strings)
@@ -360,7 +373,7 @@ export class PropMatcher {
       if (keyRegex.test(k)) {
         const actualValue = obj[k];
         if (this.op === 'exists') {
-          if (actualValue !== undefined && actualValue !== null) return true;
+          if (actualValue !== undefined && actualValue !== null && (this._allowNo || actualValue !== 'no')) return true;
         } else {
           if (this._checkValueOp(actualValue)) return true;
         }
@@ -395,7 +408,7 @@ export class PropMatcher {
       if (!keySet.has(k)) continue;
       const actualValue = obj[k];
       if (this.op === 'exists') {
-        if (actualValue !== undefined && actualValue !== null) return true;
+        if (actualValue !== undefined && actualValue !== null && (this._allowNo || actualValue !== 'no')) return true;
       } else {
         if (this._checkValueOp(actualValue)) return true;
       }
@@ -517,6 +530,11 @@ export class PropMatcher {
     const defaultOp = this.props.value !== undefined ? '=' : 'exists';
     if (this.op !== defaultOp) {
       result.op = this.op;
+    }
+
+    // Include allowNo only when it's true (non-default)
+    if (this._allowNo) {
+      result.allowNo = true;
     }
 
     // Include value if present (convert RegExp to string, preserve var() refs)

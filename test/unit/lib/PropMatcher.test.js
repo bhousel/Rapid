@@ -57,6 +57,39 @@ describe('PropMatcher', () => {
       assert.isFalse(m.matches({ highway: null }));
       assert.isFalse(m.matches({ highway: undefined }));
     });
+
+    it('does not match value "no" by default', () => {
+      const m = new Rapid.PropMatcher({ key: 'indoor' });
+      assert.isFalse(m.matches({ indoor: 'no' }));
+    });
+
+    it('matches value "no" when allowNo is true', () => {
+      const m = new Rapid.PropMatcher({ key: 'indoor', allowNo: true });
+      assert.isTrue(m.matches({ indoor: 'no' }));
+    });
+
+    it('does not match "no" with key-pattern (keyOp ~)', () => {
+      const m = new Rapid.PropMatcher({ key: '^build', keyOp: '~' });
+      assert.isTrue(m.matches({ building: 'yes' }));
+      assert.isFalse(m.matches({ building: 'no' }));
+    });
+
+    it('matches "no" with key-pattern when allowNo is true', () => {
+      const m = new Rapid.PropMatcher({ key: '^build', keyOp: '~', allowNo: true });
+      assert.isTrue(m.matches({ building: 'no' }));
+    });
+
+    it('does not match "no" with key-list (keyOp in)', () => {
+      const m = new Rapid.PropMatcher({ key: ['indoor', 'building'] });
+      assert.isTrue(m.matches({ indoor: 'room' }));
+      assert.isFalse(m.matches({ indoor: 'no' }));
+      assert.isFalse(m.matches({ building: 'no' }));
+    });
+
+    it('matches "no" with key-list when allowNo is true', () => {
+      const m = new Rapid.PropMatcher({ key: ['indoor', 'building'], allowNo: true });
+      assert.isTrue(m.matches({ indoor: 'no' }));
+    });
   });
 
 
@@ -78,6 +111,11 @@ describe('PropMatcher', () => {
       assert.isFalse(m.matches({ tunnel: 'yes' }));
       assert.isFalse(m.matches({ tunnel: 'building_passage' }));
     });
+
+    it('does not treat "no" as absent (!exists is unaffected by allowNo)', () => {
+      const m = new Rapid.PropMatcher({ key: 'tunnel', op: '!exists' });
+      assert.isFalse(m.matches({ tunnel: 'no' }));
+    });
   });
 
 
@@ -96,6 +134,16 @@ describe('PropMatcher', () => {
       assert.isFalse(m.matches({ building: '' }));
       assert.isFalse(m.matches({ building: null }));
       assert.isFalse(m.matches({}));
+    });
+
+    it('wildcard * does not match "no" by default', () => {
+      const m = new Rapid.PropMatcher({ key: 'building', value: '*' });
+      assert.isFalse(m.matches({ building: 'no' }));
+    });
+
+    it('wildcard * matches "no" when allowNo is true', () => {
+      const m = new Rapid.PropMatcher({ key: 'building', value: '*', allowNo: true });
+      assert.isTrue(m.matches({ building: 'no' }));
     });
 
     it('handles numeric comparisons with type coercion', () => {
@@ -601,6 +649,35 @@ describe('PropMatcher', () => {
     it('toString shows value ops with array keys', () => {
       const m = new Rapid.PropMatcher({ key: ['source', 'source_ref'], value: 'bing' });
       assert.strictEqual(m.toString(), '[(source, source_ref)=bing]');
+    });
+  });
+
+
+  describe('allowNo', () => {
+    it('toJSON omits allowNo when false (default)', () => {
+      const m = new Rapid.PropMatcher({ key: 'building' });
+      const json = m.toJSON();
+      assert.notProperty(json, 'allowNo');
+    });
+
+    it('toJSON includes allowNo when true', () => {
+      const m = new Rapid.PropMatcher({ key: 'building', allowNo: true });
+      const json = m.toJSON();
+      assert.strictEqual(json.allowNo, true);
+    });
+
+    it('does not affect = operator (exact match)', () => {
+      // Exact match for value "no" should still work regardless of allowNo
+      const m = new Rapid.PropMatcher({ key: 'building', value: 'no' });
+      assert.isTrue(m.matches({ building: 'no' }));
+    });
+
+    it('does not affect in operator', () => {
+      // The "in" op checks against a specific set — "no" must be in the set to match
+      const m = new Rapid.PropMatcher({ key: 'building', op: 'in', value: ['yes', 'no'] });
+      assert.isTrue(m.matches({ building: 'no' }));
+      const m2 = new Rapid.PropMatcher({ key: 'building', op: 'in', value: ['yes', 'residential'] });
+      assert.isFalse(m2.matches({ building: 'no' }));
     });
   });
 
