@@ -130,6 +130,8 @@ export class PropMatcher {
   private _valueSet: Set<string> | null = null;
   /** Raw var() reference string, if the value is a variable reference */
   private _varRef: string | null = null;
+  /** Resolved value after var() resolution — `null` means use raw props.value */
+  private _resolvedValue: string | number | string[] | RegExp | null = null;
   /** Whether to allow 'no' as a valid match for 'exists' and wildcard '*' ops */
   private _allowNo: boolean;
 
@@ -220,9 +222,10 @@ export class PropMatcher {
 
   /**
    * The value to compare against.
+   * Returns the resolved value (after var() resolution) if available, otherwise the raw value.
    */
   get value(): string | number | string[] | RegExp | undefined {
-    return this.props.value;
+    return this._resolvedValue ?? this.props.value;
   }
 
 
@@ -264,7 +267,7 @@ export class PropMatcher {
    * Test equality match.
    */
   private _matchEquals(val: unknown): boolean {
-    const expected = this.props.value;
+    const expected = this.value;
 
     // Handle wildcard '*' - matches any truthy value
     if (expected === '*') {
@@ -311,7 +314,7 @@ export class PropMatcher {
    * Perform numeric comparison.
    */
   private _compareValueNumeric(actualValue: unknown, compareFn: (a: number, b: number) => boolean): boolean {
-    const expected = this.props.value;
+    const expected = this.value;
     if (typeof expected !== 'number') return false;
 
     let actual: number;
@@ -490,13 +493,13 @@ export class PropMatcher {
     const resolved = resolveVarRef(this._varRef, variables);
     if (resolved === undefined) return;  // unresolved — leave as-is
 
-    // Replace the props value with the resolved value, converting to string[] for PropMatcher compatibility
+    // Store resolved value separately — raw props.value is never mutated
     if (Array.isArray(resolved)) {
       const strValues = resolved.map(String);
-      this.props.value = strValues;
+      this._resolvedValue = strValues;
       this._valueSet = new Set(strValues);
     } else {
-      this.props.value = String(resolved);
+      this._resolvedValue = String(resolved);
       this._valueSet = new Set([String(resolved)]);
     }
   }
@@ -509,6 +512,7 @@ export class PropMatcher {
    */
   reset(): void {
     if (!this._varRef) return;
+    this._resolvedValue = null;
     this._valueSet = null;
     // _varRef is preserved — it holds the raw reference for re-resolution
   }
@@ -556,7 +560,7 @@ export class PropMatcher {
    * String representation for debugging.
    */
   toString(): string {
-    const value = this.props.value;
+    const value = this.value;
     let keyStr: string;
     if (this.keyOp === '~') {
       keyStr = `/${this.key}/`;
