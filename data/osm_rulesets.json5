@@ -226,10 +226,63 @@
         ]
       },
 
-      // ### LANDUSE
-      // Tag values that represent actual land use (areas).
-      // Currently unused - in iD, this powers the `_isLanduse` filter matcher.
-      landuse: {
+      // ### FILTERS
+      // Rulesets used by FilterSystem to classify entities for the map filter UI.
+      // Each filter corresponds to a toggle in the features panel.
+      // Some filters also apply a _isPastFuture() check in FilterSystem code.
+
+      // Aerialway filter: aerial ways excluding generic 'yes' and 'station' values
+      filter_aerialway: {
+        include: [
+          { key: "aerialway", op: "exists" }
+        ],
+        exclude: [
+          { key: "aerialway", op: "in", value: ["yes", "station"] }
+        ]
+      },
+
+      // Boundary filter: administrative boundaries, excluding features with
+      // more specific classifications (highways, waterways, railways, etc.)
+      filter_boundary: {
+        include: [
+          { key: "boundary", op: "exists" }
+        ],
+        exclude: [
+          { key: "highway", op: "in", value: "var(major_highway_values, minor_highway_values, path_highway_values)" },
+          { key: "waterway", op: "exists" },
+          { key: "railway", op: "exists" },
+          { key: "landuse", op: "exists" },
+          { key: "natural", op: "exists" },
+          { key: "building", op: "exists" },
+          { key: "power", op: "exists" }
+        ]
+      },
+
+      // Building filter: building with actual value (not 'no'), or parking structures
+      filter_building: {
+        include: [
+          { key: "building", value: "*" },
+          { key: "parking", op: "in", value: ["multi-storey", "sheds", "carports", "garage_boxes"] }
+        ]
+      },
+
+      // Building part filter
+      filter_building_part: {
+        include: [
+          { key: "building:part", op: "exists" }
+        ]
+      },
+
+      // Indoor filter
+      filter_indoor: {
+        include: [
+          { key: "indoor", op: "exists" }
+        ]
+      },
+
+      // Landuse features: areas with amenity, landuse, leisure, or natural tags.
+      // See also iD#11153, iD#11184
+      filter_landuse: {
         include: [
           { key: "amenity", op: "in", value: [
             "bicycle_parking", "college", "grave_yard", "hospital", "marketplace",
@@ -239,8 +292,52 @@
           { key: "landuse", op: "exists" },
           { key: "leisure", op: "exists" },
           { key: "natural", op: "exists" }
+        ],
+        exclude: [
+          { key: "building", op: "exists" },
+          { key: "building:part", op: "exists" },
+          { key: "indoor", op: "exists" },
+          { key: "waterway", op: "exists" },
+          { key: "natural", op: "in", value: ["water", "coastline", "bay"] },
+          { key: "landuse", op: "in", value: ["pond", "basin", "reservoir", "salt_pond"] },
+          { key: "aerialway", op: "exists" }
         ]
       },
+
+      // Piste/ski filter
+      filter_piste: {
+        include: [
+          { key: "piste:type", op: "exists" }
+        ]
+      },
+
+      // Rail filter: railways and railway land use, excluding connected highways
+      filter_rail: {
+        include: [
+          { key: "railway", op: "exists" },
+          { key: "landuse", value: "railway" }
+        ],
+        exclude: [
+          { key: "highway", op: "in", value: "var(major_highway_values, minor_highway_values, path_highway_values)" }
+        ]
+      },
+
+      // Power infrastructure filter
+      filter_power: {
+        include: [
+          { key: "power", op: "exists" }
+        ]
+      },
+
+      // Water features: waterways, natural water bodies, water-related land use
+      filter_water: {
+        include: [
+          { key: "waterway", op: "exists" },
+          { key: "natural", op: "in", value: ["water", "coastline", "bay"] },
+          { key: "landuse", op: "in", value: ["pond", "basin", "reservoir", "salt_pond"] }
+        ]
+      },
+
 
       // ### AREA KEY EXCEPTIONS
       // These rulesets are exceptions to the normal areaKeys lookups that SchemaSystem

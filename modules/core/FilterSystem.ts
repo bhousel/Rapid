@@ -4,17 +4,14 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
-import type { Tags } from '../data/types.ts';
+import type { GeometryType } from './SchemaSystem.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmRelation, OsmWay } from '../data/index.ts';
+import type { Tags } from '../data/types.ts';
 
-
-/** Geometry type for entities */
-type Geometry = 'point' | 'vertex' | 'line' | 'area' | 'relation';
 
 /** Filter match function signature */
-type FilterMatchFn = (tags: Tags, geometry?: Geometry) => boolean;
-
+type FilterMatchFn = (tags: Tags, geometry?: GeometryType) => boolean;
 
 /** Single filter stat */
 interface FilterStat {
@@ -25,60 +22,17 @@ interface FilterStat {
 /** Stats collected for all filters, keyed by filterID */
 type FilterStats = Record<string, FilterStat>;
 
-
 /** Cached data for an entity */
 interface EntityCache {
   parents: OsmEntity[] | null;
   matches: Set<string> | null;
 }
 
-
 /** A preset-like object for isHiddenPreset */
 interface PresetLike {
   tags?: Tags;
-  setTags: (tags: Tags, geometry: Geometry) => Tags;
+  setTags: (tags: Tags, geometry: GeometryType) => Tags;
 }
-
-
-// These objects define the highway values for each display filter category.
-// Note: these intentionally differ slightly from the schema variables
-// (major_highway_values, minor_highway_values, path_highway_values) which classify
-// highways for routing/connectivity purposes. For example, FilterSystem places
-// 'road' in service_roads while the schema variables place it in major_highway_values.
-// For cross-cutting "is this a known highway?" checks, use the connected_highway ruleset.
-const traffic_roads: Record<string, boolean> = {
-  'motorway': true,
-  'motorway_link': true,
-  'trunk': true,
-  'trunk_link': true,
-  'primary': true,
-  'primary_link': true,
-  'secondary': true,
-  'secondary_link': true,
-  'tertiary': true,
-  'tertiary_link': true,
-  'residential': true,
-  'unclassified': true,
-  'living_street': true
-};
-
-const service_roads: Record<string, boolean> = {
-  'busway': true,
-  'service': true,
-  'road': true,
-  'track': true
-};
-
-const paths: Record<string, boolean> = {
-  'path': true,
-  'footway': true,
-  'cycleway': true,
-  'bridleway': true,
-  'steps': true,
-  'pedestrian': true
-};
-
-
 
 /**
  * A filter with a match function, enabled state, and count.
@@ -437,7 +391,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return A Set containing the matched filterIDs
    */
-  getMatches(entity: OsmEntity, graph: Graph, geometry: Geometry): Set<string> {
+  getMatches(entity: OsmEntity, graph: Graph, geometry: GeometryType): Set<string> {
     // skip - vertexes are hidden based on whatever filters their parent ways have matched
     if (geometry === 'vertex') return new Set();
     // skip - most relations don't have a geometry worth checking
@@ -461,7 +415,7 @@ export class FilterSystem extends AbstractSystem {
         const pkey = parent.key;
         const pmatches = this._cache[pkey]?.matches;
         if (pmatches) continue;  // parent matching was done already
-        this.getMatches(parent, graph, parent.geometry(graph) as Geometry);  // recurse up
+        this.getMatches(parent, graph, parent.geometry(graph) as GeometryType);  // recurse up
       }
     }
 
@@ -506,7 +460,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return An array of parent entities
    */
-  getParents(entity: OsmEntity, graph: Graph, geometry: Geometry): OsmEntity[] {
+  getParents(entity: OsmEntity, graph: Graph, geometry: GeometryType): OsmEntity[] {
     if (geometry === 'point') return [];
 
     const ekey = entity.key;
@@ -536,7 +490,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Preset ('point', 'line', 'vertex', 'area', 'relation')
    * @return The first `filterID` which causes the Preset to be hidden, or `null`
    */
-  isHiddenPreset(preset: PresetLike, geometry: Geometry): FilterID | null {
+  isHiddenPreset(preset: PresetLike, geometry: GeometryType): FilterID | null {
     if (!this._hidden.size) return null;
     if (!preset.tags) return null;
 
@@ -563,7 +517,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHiddenFeature(entity: OsmEntity, graph: Graph, geometry: Geometry): FilterID | null {
+  isHiddenFeature(entity: OsmEntity, graph: Graph, geometry: GeometryType): FilterID | null {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
     if (this._forceVisible.has(entity.id)) return null;
@@ -595,7 +549,7 @@ export class FilterSystem extends AbstractSystem {
 
     let filterID: FilterID | null = null;
     for (const parent of parents) {
-      const parentFilterID = this.isHidden(parent, graph, parent.geometry(graph) as Geometry);
+      const parentFilterID = this.isHidden(parent, graph, parent.geometry(graph) as GeometryType);
       if (!parentFilterID) return null;  // parent is not hidden
       if (!filterID) filterID = parentFilterID;  // keep the first one
     }
@@ -620,7 +574,7 @@ export class FilterSystem extends AbstractSystem {
       connections = [];
     } else {
       childNodes = (entity as any).nodes ? graph.childNodes(entity as OsmWay) : [];
-      connections = this.getParents(entity, graph, entity.geometry(graph) as Geometry);
+      connections = this.getParents(entity, graph, entity.geometry(graph) as GeometryType);
     }
 
     // Gather other parentWays connected to this entity's childnodes..
@@ -629,7 +583,7 @@ export class FilterSystem extends AbstractSystem {
       connections = utilArrayUnion(connections, parents);
     }
 
-    return connections.some(other => this.isHidden(other, graph, other.geometry(graph) as Geometry));
+    return connections.some(other => this.isHidden(other, graph, other.geometry(graph) as GeometryType));
   }
 
 
@@ -641,7 +595,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHidden(entity: OsmEntity, graph: Graph, geometry: Geometry): FilterID | null {
+  isHidden(entity: OsmEntity, graph: Graph, geometry: GeometryType): FilterID | null {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
 
@@ -671,7 +625,7 @@ export class FilterSystem extends AbstractSystem {
 
     const results: OsmEntity[] = [];
     for (const entity of entities) {
-      const geometry = entity.geometry(graph) as Geometry;
+      const geometry = entity.geometry(graph) as GeometryType;
       const filterID = this.isHidden(entity, graph, geometry);
       if (filterID) {
         // don't count uninteresting vertices
@@ -782,99 +736,74 @@ export class FilterSystem extends AbstractSystem {
 
   // matchers
 
-  _isPoint(tags: Tags, geometry?: Geometry): boolean {
+  _isPoint(tags: Tags, geometry?: GeometryType): boolean {
     return geometry === 'point';
   }
 
   _isTrafficRoad(tags: Tags): boolean {
-    return !!traffic_roads[tags.highway as string];
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('major_vehicular')?.match(tags);
   }
 
   _isServiceRoad(tags: Tags): boolean {
-    return !!service_roads[tags.highway as string];
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('minor_vehicular')?.match(tags);
   }
 
   _isPath(tags: Tags): boolean {
-    return !!paths[tags.highway as string];
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('path_highway')?.match(tags);
   }
 
   _isBuilding(tags: Tags): boolean {
-    return (
-      (!!tags.building && tags.building !== 'no') ||
-      tags.parking === 'multi-storey' ||
-      tags.parking === 'sheds' ||
-      tags.parking === 'carports' ||
-      tags.parking === 'garage_boxes'
-    ) && !this._isPastFuture(tags);
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('filter_building')?.match(tags) && !this._isPastFuture(tags);
   }
 
   _isBuildingPart(tags: Tags): boolean {
-    return !!tags['building:part'];
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('filter_building_part')?.match(tags);
   }
 
   _isIndoor(tags: Tags): boolean {
-    return !!tags.indoor;
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('filter_indoor')?.match(tags);
   }
 
-  _isLanduse(tags: Tags, geometry?: Geometry): boolean {
-    return geometry === 'area' &&
-      !this._isBuilding(tags) &&
-      !this._isBuildingPart(tags) &&
-      !this._isIndoor(tags) &&
-      !this._isWater(tags) &&
-      !this._isAerialway(tags) &&
-      !this._isPastFuture(tags);
+  _isLanduse(tags: Tags, geometry?: GeometryType): boolean {
+    if (geometry !== 'area') return false;
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('filter_landuse')?.match(tags) && !this._isPastFuture(tags);
   }
 
   _isBoundary(tags: Tags): boolean {
     const schema = this.context.systems.schema;
-    const connectedHighway = schema?.getScope('osm')?.rulesets.get('connected_highway');
-    return (
-      !!tags.boundary
-    ) && !(
-      connectedHighway?.match(tags) ||
-      tags.waterway ||
-      tags.railway ||
-      tags.landuse ||
-      tags.natural ||
-      tags.building ||
-      tags.power
-    );
+    return !!schema?.getScope('osm')?.rulesets.get('filter_boundary')?.match(tags);
   }
 
   _isWater(tags: Tags): boolean {
-    return (
-      !!tags.waterway ||
-      tags.natural === 'water' ||
-      tags.natural === 'coastline' ||
-      tags.natural === 'bay' ||
-      tags.landuse === 'pond' ||
-      tags.landuse === 'basin' ||
-      tags.landuse === 'reservoir' ||
-      tags.landuse === 'salt_pond'
-    ) && !this._isPastFuture(tags);
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('filter_water')?.match(tags) && !this._isPastFuture(tags);
   }
 
   _isRail(tags: Tags): boolean {
     const schema = this.context.systems.schema;
-    const connectedHighway = schema?.getScope('osm')?.rulesets.get('connected_highway');
-    return (
-      !!tags.railway || tags.landuse === 'railway'
-    ) && !connectedHighway?.match(tags) && !this._isPastFuture(tags);
+    return !!schema?.getScope('osm')?.rulesets.get('filter_rail')?.match(tags) && !this._isPastFuture(tags);
   }
 
   _isPiste(tags: Tags): boolean {
-    return !!tags['piste:type'];
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('filter_piste')?.match(tags);
   }
 
   _isAerialway(tags: Tags): boolean {
-    return !!tags.aerialway &&
-      tags.aerialway !== 'yes' &&
-      tags.aerialway !== 'station';
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('filter_aerialway')?.match(tags);
   }
 
   _isPower(tags: Tags): boolean {
-    return !!tags.power && !this._isPastFuture(tags);
+    const schema = this.context.systems.schema;
+    return !!schema?.getScope('osm')?.rulesets.get('filter_power')?.match(tags) && !this._isPastFuture(tags);
   }
 
   // contains a past/future tag, but not in active use as a road/path/cycleway/etc..
@@ -904,7 +833,7 @@ export class FilterSystem extends AbstractSystem {
   // Lines or areas that don't match another feature filter.
   // IMPORTANT: The 'others' feature must be the last one defined,
   // so that code in getMatches can skip this test if someting else was matched.
-  _isOther(tags: Tags, geometry?: Geometry): boolean {
+  _isOther(tags: Tags, geometry?: GeometryType): boolean {
     return (geometry === 'line' || geometry === 'area');
   }
 }

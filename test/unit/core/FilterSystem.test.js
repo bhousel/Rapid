@@ -420,10 +420,10 @@ describe('FilterSystem', () => {
         new Rapid.OsmWay(context, { id: 'residential', tags: { highway: 'residential' }, version: 1 }),
         new Rapid.OsmWay(context, { id: 'unclassified', tags: { highway: 'unclassified' }, version: 1 }),
         new Rapid.OsmWay(context, { id: 'living_street', tags: { highway: 'living_street' }, version: 1 }),
+        new Rapid.OsmWay(context, { id: 'road', tags: { highway: 'road' }, version: 1 }),
 
         // Service Roads
         new Rapid.OsmWay(context, { id: 'service', tags: { highway: 'service' }, version: 1 }),
-        new Rapid.OsmWay(context, { id: 'road', tags: { highway: 'road' }, version: 1 }),
         new Rapid.OsmWay(context, { id: 'track', tags: { highway: 'track' }, version: 1 }),
 
         // Paths
@@ -465,6 +465,7 @@ describe('FilterSystem', () => {
         new Rapid.OsmWay(context, { id: 'scrub', tags: { area: 'yes', natural: 'scrub' }, version: 1 }),
         new Rapid.OsmWay(context, { id: 'industrial', tags: { area: 'yes', landuse: 'industrial' }, version: 1 }),
         new Rapid.OsmWay(context, { id: 'parkinglot', tags: { area: 'yes', amenity: 'parking', parking: 'surface' }, version: 1 }),
+        new Rapid.OsmWay(context, { id: 'shelter', tags: { area: 'yes', amenity: 'shelter' }, version: 1 }),
 
         // Landuse Multipolygon
         new Rapid.OsmWay(context, { id: 'outer', version: 1 }),
@@ -589,11 +590,11 @@ describe('FilterSystem', () => {
           'motorway', 'motorway_link', 'trunk', 'trunk_link',
           'primary', 'primary_link', 'secondary', 'secondary_link',
           'tertiary', 'tertiary_link', 'residential', 'living_street',
-          'unclassified', 'boundary_road', 'inner3'
+          'unclassified', 'road', 'boundary_road', 'inner3'
         ]);
 
         dontMatch('traffic_roads', [
-          'point_bar', 'service', 'road', 'track', 'path', 'building_yes',
+          'point_bar', 'service', 'track', 'path', 'building_yes',
           'forest', 'boundary', 'boundary_member', 'water', 'railway', 'power_line',
           'motorway_construction', 'fence'
         ]);
@@ -602,11 +603,11 @@ describe('FilterSystem', () => {
 
       it('matches service roads', () => {
         doMatch('service_roads', [
-          'service', 'road', 'track', 'piste_track_combo'
+          'service', 'track', 'piste_track_combo'
         ]);
 
         dontMatch('service_roads', [
-          'point_bar', 'motorway', 'unclassified', 'living_street',
+          'point_bar', 'motorway', 'unclassified', 'living_street', 'road',
           'path', 'building_yes', 'forest', 'boundary', 'boundary_member', 'water',
           'railway', 'power_line', 'motorway_construction', 'fence'
         ]);
@@ -616,13 +617,13 @@ describe('FilterSystem', () => {
       it('matches paths', () => {
         doMatch('paths', [
           'path', 'footway', 'cycleway', 'bridleway',
-          'steps', 'pedestrian'
+          'steps', 'pedestrian', 'corridor'
         ]);
 
         dontMatch('paths', [
           'point_bar', 'motorway', 'service', 'building_yes',
           'forest', 'boundary', 'boundary_member', 'water', 'railway', 'power_line',
-          'motorway_construction', 'fence', 'corridor'
+          'motorway_construction', 'fence'
         ]);
       });
 
@@ -724,6 +725,7 @@ describe('FilterSystem', () => {
           'point_bar', 'motorway', 'service', 'path', 'building_yes',
           'boundary', 'boundary_member', 'water', 'railway', 'power_line',
           'motorway_construction', 'fence',
+          'shelter',   // See also iD#11153, iD#11184
           'inner3'   // member of landuse multipolygon, but tagged as highway
         ]);
       });
@@ -732,14 +734,14 @@ describe('FilterSystem', () => {
       it('matches boundaries', () => {
         doMatch('boundaries', [
           'boundary',
-          // match ways that are part of boundary relations - #5601
+          // match ways that are part of boundary relations - iD#5601
           'boundary_member', 'boundary_member2',
           // relations
           'boundary_relation', 'boundary_relation2'
         ]);
 
         dontMatch('boundaries', [
-          'boundary_road',   // because boundary also used as highway - #4973
+          'boundary_road',   // because boundary also used as highway - iD#4973
           'point_bar', 'motorway', 'service', 'path', 'building_yes',
           'forest', 'water', 'railway', 'power_line',
           'motorway_construction', 'fence'
@@ -853,7 +855,7 @@ describe('FilterSystem', () => {
         assert.strictEqual(_filters.isHidden(outer, graph, outer.geometry(graph)), 'landuse');    // iD#2548
         assert.strictEqual(_filters.isHidden(inner1, graph, inner1.geometry(graph)), 'landuse');  // iD#2548
         assert.strictEqual(_filters.isHidden(inner2, graph, inner2.geometry(graph)), 'landuse');  // iD#2548
-        assert.isNull(_filters.isHidden(inner3, graph, inner3.geometry(graph)));                   // iD#2887
+        assert.isNull(_filters.isHidden(inner3, graph, inner3.geometry(graph)));                  // iD#2887
       });
 
       it('hides only versioned entities', () => {
