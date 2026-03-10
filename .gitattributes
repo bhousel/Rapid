@@ -13,3 +13,5 @@
 docs/** linguist-documentation
 
 dist/** linguist-generated
+
+data/l10n/** linguist-vendored
