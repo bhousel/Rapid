@@ -556,6 +556,203 @@ describe('StyleSystem', () => {
   });  // methods
 
 
+  describe.serial('variables', () => {
+    let _styles;
+
+    beforeAll(() => {
+      _styles = new Rapid.StyleSystem(context);
+      context.systems.styles = _styles;
+      return _styles.initAsync()
+        .then(() => _styles.startAsync())
+        .then(() => {
+          _styles.resetAll();
+          _styles.merge(sample.variableAddData);
+        });
+    });
+
+
+    describe('merge variables', () => {
+      it('stores variables in scope.variables Map', () => {
+        const scope = _styles.getScope('osm');
+        assert.instanceOf(scope.variables, Map);
+        assert.isTrue(scope.variables.has('major_road_values'));
+        assert.isTrue(scope.variables.has('water_color'));
+        assert.isTrue(scope.variables.has('delete_me'));
+        assert.isTrue(scope.variables.has('delete_wild_1'));
+        assert.isTrue(scope.variables.has('delete_wild_2'));
+      });
+
+      it('creates Variable instances', () => {
+        const scope = _styles.getScope('osm');
+        const majorRoads = scope.variables.get('major_road_values');
+        assert.instanceOf(majorRoads, Rapid.Variable);
+        assert.strictEqual(majorRoads.id, 'major_road_values');
+      });
+
+      it('preserves array variable values', () => {
+        const scope = _styles.getScope('osm');
+        const majorRoads = scope.variables.get('major_road_values');
+        assert.deepEqual(majorRoads.value, ['motorway', 'trunk', 'primary']);
+      });
+
+      it('preserves scalar variable values', () => {
+        const scope = _styles.getScope('osm');
+        const waterColor = scope.variables.get('water_color');
+        assert.strictEqual(waterColor.value, 0x77DDDD);
+      });
+
+      it('resolves var() references in selectors', () => {
+        const scope = _styles.getScope('osm');
+        const selector = scope.selectors.get('highway-major');
+        assert.instanceOf(selector, Rapid.StyleSelector);
+
+        // The selector's var() reference should have been resolved by _styleChanged
+        const tagMatchers = selector.tagMatchers;
+        assert.lengthOf(tagMatchers, 1);
+        // The matcher should now match highway=motorway
+        assert.isTrue(tagMatchers[0].matches({ highway: 'motorway' }));
+        assert.isTrue(tagMatchers[0].matches({ highway: 'trunk' }));
+        assert.isTrue(tagMatchers[0].matches({ highway: 'primary' }));
+        assert.isFalse(tagMatchers[0].matches({ highway: 'residential' }));
+      });
+
+      it('uses var()-based selectors in styleMatch', () => {
+        const result = _styles.styleMatch({ highway: 'motorway' });
+        assert.strictEqual(result.stroke.color, 0xcf2081);
+        assert.strictEqual(result.stroke.width, 8);
+        assert.strictEqual(result.casing.color, 0x70372f);
+        assert.strictEqual(result.casing.width, 10);
+      });
+
+      it('does not match values outside the variable list', () => {
+        const result = _styles.styleMatch({ highway: 'residential' });
+        // Should fall through to defaults, not match major_road style
+        assert.notStrictEqual(result.stroke.color, 0xcf2081);
+      });
+    });
+
+
+    describe('var() in style props', () => {
+      it('resolves var() color references in style props', () => {
+        const scope = _styles.getScope('osm');
+        const majorRoad = scope.styles.get('major_road');
+        assert.instanceOf(majorRoad, Rapid.Style);
+
+        // After _styleChanged, var() references should be resolved to numeric values
+        assert.strictEqual(majorRoad.stroke.color, 0xcf2081);
+        assert.strictEqual(majorRoad.casing.color, 0x70372f);
+      });
+
+      it('resolves var() width references in style props', () => {
+        const scope = _styles.getScope('osm');
+        const majorRoad = scope.styles.get('major_road');
+        assert.strictEqual(majorRoad.stroke.width, 8);
+        assert.strictEqual(majorRoad.casing.width, 10);
+      });
+
+      it('resolves var() opacity references in style props', () => {
+        const scope = _styles.getScope('osm');
+        const waterStyle = scope.styles.get('water_style');
+        assert.instanceOf(waterStyle, Rapid.Style);
+        assert.strictEqual(waterStyle.fill.color, 0x77DDDD);
+        assert.strictEqual(waterStyle.fill.opacity, 0.3);
+      });
+
+      it('resolved styles produce correct styleMatch results', () => {
+        // Water style uses var() for both color and opacity
+        const result = _styles.styleMatch({ natural: 'water' });
+        assert.strictEqual(result.fill.color, 0x77DDDD);
+        assert.strictEqual(result.fill.opacity, 0.3);
+      });
+
+      it('tracks hasVarRefs on styles with var() references', () => {
+        const scope = _styles.getScope('osm');
+        const majorRoad = scope.styles.get('major_road');
+        assert.isTrue(majorRoad.hasVarRefs);
+
+        // Style without var() references should not have varRefs
+        const minorRoad = scope.styles.get('minor_road');
+        assert.isFalse(minorRoad.hasVarRefs);
+      });
+
+      it('re-resolves style vars after reset and resolveVariables', () => {
+        const scope = _styles.getScope('osm');
+        const majorRoad = scope.styles.get('major_road');
+
+        // Reset restores var() strings
+        majorRoad.reset();
+        assert.strictEqual(majorRoad.stroke.color, 'var(major_stroke_color)');
+
+        // Re-resolve restores numeric values
+        majorRoad.resolveVariables(scope.variables);
+        assert.strictEqual(majorRoad.stroke.color, 0xcf2081);
+      });
+    });
+
+
+    describe('merge variable update/delete', () => {
+      beforeAll(() => {
+        _styles.merge(sample.variableUpdateData);
+      });
+
+      it('adds new variables', () => {
+        const scope = _styles.getScope('osm');
+        assert.isTrue(scope.variables.has('minor_road_values'));
+        const minorRoads = scope.variables.get('minor_road_values');
+        assert.deepEqual(minorRoads.value, ['residential', 'service', 'unclassified']);
+      });
+
+      it('deletes variables by exact match', () => {
+        const scope = _styles.getScope('osm');
+        assert.isFalse(scope.variables.has('delete_me'));
+      });
+
+      it('deletes variables by wildcard', () => {
+        const scope = _styles.getScope('osm');
+        assert.isFalse(scope.variables.has('delete_wild_1'));
+        assert.isFalse(scope.variables.has('delete_wild_2'));
+      });
+
+      it('preserves unrelated variables', () => {
+        const scope = _styles.getScope('osm');
+        assert.isTrue(scope.variables.has('major_road_values'));
+        assert.isTrue(scope.variables.has('water_color'));
+      });
+
+      it('resolves new var() selector after update', () => {
+        const result = _styles.styleMatch({ highway: 'residential' });
+        assert.strictEqual(result.stroke.color, 0xffffff);
+        assert.strictEqual(result.stroke.width, 5);
+      });
+    });
+
+
+    describe('getScope auto-creates variables Map', () => {
+      it('new scope has empty variables Map', () => {
+        const scope = _styles.getScope('test-scope-vars');
+        assert.instanceOf(scope.variables, Map);
+        assert.strictEqual(scope.variables.size, 0);
+      });
+    });
+
+
+    describe('resetAll clears variables', () => {
+      beforeAll(() => {
+        _styles.resetAll();
+      });
+
+      it('clears all scope data including variables', () => {
+        // After resetAll, getScope creates a fresh empty scope
+        const scope = _styles.getScope('osm');
+        assert.strictEqual(scope.variables.size, 0);
+        assert.strictEqual(scope.styles.size, 0);
+        assert.strictEqual(scope.selectors.size, 0);
+      });
+    });
+
+  });  // variables
+
+
   describe('styleMatch', () => {
     let _styles;
 

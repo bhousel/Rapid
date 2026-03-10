@@ -2,6 +2,7 @@ import { PropMatcher } from './PropMatcher.ts';
 
 import type { Context } from '../Context.ts';
 import type { PropMatcherProps } from './PropMatcher.ts';
+import type { Variable } from './Variable.ts';
 
 /**
  * StyleSelector - Matching conditions for applying styles to features.
@@ -122,20 +123,22 @@ export class StyleSelector {
 
 
   /**
+   * Reset compiled caches so this selector can be re-resolved.
+   * Called when variables change (e.g. on style reload).
+   */
+  reset(): void {
+    for (const matcher of this.tagMatchers) {
+      matcher.reset();
+    }
+  }
+
+
+  /**
    * Get the match conditions.
    */
   get match(): StyleMatchConditions {
     return this.props.match;
   }
-
-
-  /**
-   * The asset ID this selector came from.
-   */
-  get assetID(): AssetID | undefined {
-    return this.props.assetID;
-  }
-
 
   /**
    * Get the tag matchers, lazily creating PropMatcher instances.
@@ -197,6 +200,18 @@ export class StyleSelector {
     score += this.tagMatchers.length * 10;
 
     return score;
+  }
+
+
+  /**
+   * Resolve any `var()` references in this selector's tag matchers.
+   * Delegates to each PropMatcher's `resolveVariables()`.
+   * @param variables - Map of VariableID to Variable instances
+   */
+  resolveVariables(variables: Map<VariableID, Variable>): void {
+    for (const matcher of this.tagMatchers) {
+      matcher.resolveVariables(variables);
+    }
   }
 
 

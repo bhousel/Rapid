@@ -284,3 +284,85 @@ export const styleMatchData = {
     }
   }]
 };
+
+
+// Data for testing variable support
+export const variableAddData = {
+  assetID: 'variable-add-data',
+  assetVersion: '2026-03-01',
+
+  scopes: [{
+    scope: '*',
+    styles: {
+      'DEFAULTS': {
+        fill: { width: 2, color: 0xaaaaaa, opacity: 0.3 },
+        casing: { width: 5, color: 0x444444, opacity: 1, cap: 'round', join: 'round' },
+        stroke: { width: 3, color: 0xcccccc, opacity: 1, cap: 'round', join: 'round' }
+      }
+    }
+  }, {
+    scope: 'osm',
+    variables: {
+      'major_road_values': ['motorway', 'trunk', 'primary'],
+      'water_color': 0x77DDDD,
+      'water_opacity': 0.3,
+      'major_casing_color': 0x70372f,
+      'major_stroke_color': 0xcf2081,
+      'major_road_width': 8,
+      'major_casing_width': 10,
+      'delete_me': 'temporary',
+      'delete_wild_1': 'temp1',
+      'delete_wild_2': 'temp2'
+    },
+    styles: {
+      // Styles using var() references for colors, widths, and opacities
+      'major_road': {
+        casing: { width: 'var(major_casing_width)', color: 'var(major_casing_color)' },
+        stroke: { width: 'var(major_road_width)', color: 'var(major_stroke_color)' }
+      },
+      'minor_road': {
+        casing: { width: 7, color: 0x444444 },
+        stroke: { width: 5, color: 0xffffff }
+      },
+      'water_style': {
+        fill: { color: 'var(water_color)', opacity: 'var(water_opacity)' }
+      }
+    },
+    selectors: {
+      'highway-major': {
+        styleIDs: ['major_road'],
+        match: { tags: [{ key: 'highway', op: 'in', value: 'var(major_road_values)' }] }
+      },
+      'natural-water': {
+        styleIDs: ['water_style'],
+        match: { tags: [{ key: 'natural', value: 'water' }] }
+      }
+    }
+  }]
+};
+
+
+// Data for testing variable update/delete
+export const variableUpdateData = {
+  assetID: 'variable-update-data',
+  assetVersion: '2026-03-02',
+
+  scopes: [{
+    scope: 'osm',
+    variables: {
+      // Add a new variable
+      'minor_road_values': ['residential', 'service', 'unclassified'],
+      // Delete a specific variable
+      'delete_me': null,
+      // Delete via wildcard
+      'delete_wild_*': null
+    },
+    selectors: {
+      // Add a selector that uses the new variable
+      'highway-minor': {
+        styleIDs: ['minor_road'],
+        match: { tags: [{ key: 'highway', op: 'in', value: 'var(minor_road_values)' }] }
+      }
+    }
+  }]
+};

@@ -17,6 +17,20 @@
     "scope": "osm",
 
     //
+    // Variables
+    // Named values that can be referenced by selectors using var() syntax.
+    // Useful for defining reusable color palettes, value lists, etc.
+    //
+    // Opportunities for future variables:
+    // - Color palette values (e.g. road casings, fill colors) shared across multiple styles
+    // - Opacity presets (e.g. standard fill opacity, lifecycle opacity)
+    // - Width presets (e.g. major road width, minor road width, path width)
+    // - Tag value lists for selector matching (e.g. major highway values, water feature types)
+    //
+    "variables": {
+    },
+
+    //
     // Styles
     // A "Style" contains properties that describe how features should look.
     //

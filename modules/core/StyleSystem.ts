@@ -2,6 +2,7 @@ import { merge as deepMerge } from 'lodash-es';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Style, styleDefaults } from '../lib/Style.ts';
 import { StyleSelector } from '../lib/StyleSelector.ts';
+import { Variable } from '../lib/Variable.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
@@ -9,9 +10,15 @@ import type { Context } from '../Context.ts';
 import type { Tags } from '../data/types.ts';
 import type { StyleProps, FillStyleProps, LineStyleProps, PointStyleProps, LabelStyleProps, ViewfieldStyleProps } from '../lib/Style.ts';
 import type { StyleSelectorProps } from '../lib/StyleSelector.ts';
+import type { VariableValue, VariableProps } from '../lib/Variable.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { GeometryType } from './SchemaSystem.ts';
 
+
+/** Style Groups supported by the style system */
+export type StyleGroup =
+  | 'base' | 'fill' | 'casing' | 'stroke' | 'marker' | 'icon'
+  | 'viewfield' | 'lineMarker' | 'sidedMarker' | 'label';
 
 /**
  * Input format for data to merge into the StyleSystem.
@@ -31,6 +38,8 @@ export interface StyleInput {
 export interface StyleInputScope {
   /** Scope identifier that this input data applies to (required - defaults to 'osm') */
   scope: ScopeID;
+  /** Object mapping VariableID to Variable value (or null to delete) */
+  variables?: Record<VariableID, VariableValue | null>;
   /** Object mapping StyleID to Style props (or null to delete) */
   styles?: Record<StyleID, Partial<StyleProps> | null>;
   /** Object mapping StyleSelectorID to StyleSelector props (or null to delete) */
@@ -41,6 +50,8 @@ export interface StyleInputScope {
  * Internal per-scope storage for loaded style data.
  */
 export interface StyleScope {
+  /** Map of VariableIDs to instantiated Variables */
+  variables: Map<VariableID, Variable>;
   /** Map of StyleIDs to instantiated Styles */
   styles: Map<StyleID, Style>;
   /** Map of StyleSelectorIDs to instantiated StyleSelectors */
@@ -88,6 +99,9 @@ function getTag(tags: Tags, key: string): string | undefined {
  *   `stylechange`  Fires on any change in style
  */
 export class StyleSystem extends AbstractSystem {
+  /** The supported style groups */
+  readonly styleGroups: Set<StyleGroup>;
+
   /** Protanopia color blindness simulation matrix */
   protanopiaMatrix: number[];
   /** Deuteranopia color blindness simulation matrix */
@@ -122,6 +136,11 @@ export class StyleSystem extends AbstractSystem {
     this._defaultAssetIDs = new Set(['rapid_style']);
     this._loadedAssetIDs = new Map();
     this._requestedAssetIDs = null;
+
+    this.styleGroups = new Set([
+      'base', 'fill', 'casing', 'stroke', 'marker', 'icon',
+      'viewfield', 'lineMarker', 'sidedMarker', 'label'] as StyleGroup[]
+    );
 
     // Pattern IDs - hardcoded list that must match the patterns loaded by PixiTextures.
     // (Maybe we will make this dynamic someday, but for now it stays in code.)
@@ -392,6 +411,20 @@ export class StyleSystem extends AbstractSystem {
       // Get or create a data cache for this scopeID
       const scope = this.getScope(scopeID);
 
+      // Merge Variables (before Styles/Selectors, since selectors may reference variables)
+      if (inputScope.variables) {
+        for (const [variableID, value] of Object.entries(inputScope.variables)) {
+          if (value !== null && value !== undefined) {   // add or replace
+            const varProps: Partial<VariableProps> = { id: variableID, assetID, scopeID, value };
+            const variable = new Variable(context, varProps);
+            scope.variables.set(variableID, variable);
+
+          } else {   // remove
+            utilWildcardDelete(scope.variables, variableID);
+          }
+        }
+      }
+
       // Merge Styles
       if (inputScope.styles) {
         for (const [styleID, props] of Object.entries(inputScope.styles)) {
@@ -455,7 +488,7 @@ export class StyleSystem extends AbstractSystem {
   getScope(scopeID: ScopeID): StyleScope {
     let scope = this._scopes.get(scopeID);
     if (!scope) {
-      scope = { styles: new Map(), selectors: new Map() };
+      scope = { variables: new Map(), styles: new Map(), selectors: new Map() };
       this._scopes.set(scopeID, scope);
     }
     return scope;
@@ -500,7 +533,7 @@ export class StyleSystem extends AbstractSystem {
       for (const styleID of selector.styleIDs) {
         const style = scopeStyles.get(styleID);
         if (style) {
-          combinedProps = deepMerge(combinedProps, style.props) as StyleProps;
+          combinedProps = deepMerge(combinedProps, style.resolved) as StyleProps;
           combinedIDs.add(styleID);
         } else {
           console.error(`invalid styleID: ${styleID}`);  // eslint-disable-line
@@ -699,6 +732,18 @@ export class StyleSystem extends AbstractSystem {
    */
   _styleChanged(): void {
     const gfx = this.context.systems.gfx;
+
+    // Resolve var() references in styles and selectors against scope variables
+    for (const scope of this._scopes.values()) {
+      for (const style of scope.styles.values()) {
+        style.reset();
+        style.resolveVariables(scope.variables);
+      }
+      for (const selector of scope.selectors.values()) {
+        selector.reset();
+        selector.resolveVariables(scope.variables);
+      }
+    }
 
     // Mark all features dirty so they re-fetch their styles on the next render
     gfx?.scene?.dirtyScene();

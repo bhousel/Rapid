@@ -34,23 +34,14 @@ describe('StyleSelector', () => {
       assert.deepEqual(s.match.tags, [{ key: 'highway' }]);
     });
 
-    it('exposes assetID via getter', () => {
+    it('preserves assetID in props', () => {
       const s = new Rapid.StyleSelector(context, {
         id: 'test',
         styleIDs: ['motorway'],
         assetID: 'rapid_style',
         match: {}
       });
-      assert.strictEqual(s.assetID, 'rapid_style');
-    });
-
-    it('assetID is undefined when not provided', () => {
-      const s = new Rapid.StyleSelector(context, {
-        id: 'test',
-        styleIDs: ['motorway'],
-        match: {}
-      });
-      assert.isUndefined(s.assetID);
+      assert.strictEqual(s.props.assetID, 'rapid_style');
     });
 
     it('deep clones input props', () => {

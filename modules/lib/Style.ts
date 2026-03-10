@@ -1,7 +1,9 @@
 import { merge as deepMerge } from 'lodash-es';
+import { isVarRef, resolveVarRef } from './Variable.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
+import type { Variable } from './Variable.ts';
 
 /**
  * Style - Visual styling properties for map features.
@@ -202,12 +204,22 @@ export const styleDefaults: MinimalStyleProps = {
  *   `marker`      Marker style properties (point background)
  *   `icon`        Icon style properties (rendered in marker)
  */
+
 export class Style {
   context: Context;
   props: StyleProps;
 
   /** Unique identifier */
   readonly id: StyleID;
+
+  /**
+   * Resolved copy of props with var() references replaced by actual values.
+   * `null` when no var() references have been resolved (or after reset).
+   */
+  private _resolved: StyleProps | null;
+
+  /** Whether this style's raw props contain any var() references. */
+  private _hasVarRefs: boolean;
 
 
   /**
@@ -225,49 +237,54 @@ export class Style {
     // Deep clone to avoid mutations
     this.props = globalThis.structuredClone(props) as StyleProps;
     this.id = props.id;
+    this._resolved = null;
+    this._hasVarRefs = false;
   }
 
 
-  /** The asset ID this Style came from. */
-  get assetID(): AssetID | undefined {
-    return this.props.assetID;
+  /**
+   * Returns the resolved props (with var() references replaced), or the raw
+   * props if no variables have been resolved.
+   */
+  get resolved(): StyleProps {
+    return this._resolved ?? this.props;
   }
 
   /** Fill style properties. */
   get fill(): FillStyleProps | undefined {
-    return this.props.fill;
+    return this.resolved.fill;
   }
   /** Casing style properties. */
   get casing(): LineStyleProps | undefined {
-    return this.props.casing;
+    return this.resolved.casing;
   }
   /** Stroke style properties. */
   get stroke(): LineStyleProps | undefined {
-    return this.props.stroke;
+    return this.resolved.stroke;
   }
   /** Marker style properties (point background shape). */
   get marker(): PointStyleProps | undefined {
-    return this.props.marker;
+    return this.resolved.marker;
   }
   /** Icon style properties (rendered inside marker). */
   get icon(): PointStyleProps | undefined {
-    return this.props.icon;
+    return this.resolved.icon;
   }
   /** Viewfield style properties */
   get viewfield(): ViewfieldStyleProps | undefined {
-    return this.props.viewfield;
+    return this.resolved.viewfield;
   }
   /** Line marker style properties (e.g. oneway arrows). */
   get lineMarker(): PointStyleProps | undefined {
-    return this.props.lineMarker;
+    return this.resolved.lineMarker;
   }
   /** Sided marker style properties (e.g. cliffs, retaining walls). */
   get sidedMarker(): PointStyleProps | undefined {
-    return this.props.sidedMarker;
+    return this.resolved.sidedMarker;
   }
   /** Label styling properties. */
   get label(): LabelStyleProps | undefined {
-    return this.props.label;
+    return this.resolved.label;
   }
 
 
@@ -280,9 +297,10 @@ export class Style {
     // Look in several places for fallback color properties.
     // Only the matched style's own props are used here — userDefaults are applied as a
     // separate layer so they don't interfere with the cascade computation.
-    const base = this.props.base;
-    const stroke = this.props.stroke;
-    const fill = this.props.fill;
+    const resolved = this.resolved;
+    const base = resolved.base;
+    const stroke = resolved.stroke;
+    const fill = resolved.fill;
 
     const fallbacks: MinimalStyleProps = {
       fill: {
@@ -321,10 +339,10 @@ export class Style {
       }
     };
 
-    // result: styleDefaults ← userDefaults ← fallbacks ← this.props
+    // result: styleDefaults ← userDefaults ← fallbacks ← this.resolved
     // userDefaults (e.g. DEFAULTS style from the asset file) fills the gap between hardcoded
     // styleDefaults and the semantic fallbacks, so base.color and stroke/fill cascades still win.
-    return deepMerge({}, styleDefaults, userDefaults?.props ?? {}, fallbacks, this.props) as MinimalStyleProps;
+    return deepMerge({}, styleDefaults, userDefaults?.resolved ?? {}, fallbacks, resolved) as MinimalStyleProps;
   }
 
 
@@ -336,7 +354,7 @@ export class Style {
    * @return A new Style with merged properties
    */
   merge(other: Style): Style {
-    const merged = deepMerge({}, this.props, other.props) as StyleProps;
+    const merged = deepMerge({}, this.resolved, other.resolved) as StyleProps;
     merged.id = this.id;  // Keep original ID
     return new Style(this.context, merged);
   }
@@ -353,6 +371,56 @@ export class Style {
       cloned.id = newID;
     }
     return new Style(this.context, cloned);
+  }
+
+
+  /**
+   * Resolve any `var()` reference strings found in this style's props.
+   * Creates a resolved copy of `props` — the raw props are never mutated.
+   * Call `reset()` to discard the resolved copy before re-resolving.
+   *
+   * @param variables - Map of VariableID to Variable instances
+   */
+  resolveVariables(variables: Map<VariableID, Variable>): void {
+    for (const [group, subProps] of Object.entries(this.props) as [keyof StyleProps, unknown][]) {
+      if (!subProps || typeof subProps !== 'object') continue;
+
+      for (const [prop, val] of Object.entries(subProps)) {
+        if (typeof val !== 'string' || !isVarRef(val)) continue;
+
+        // Lazy-clone on first var() hit
+        if (!this._resolved) {
+          this._resolved = globalThis.structuredClone(this.props);
+          this._hasVarRefs = true;
+        }
+
+        // Resolve in the clone only
+        const result = resolveVarRef(val, variables);
+        if (result !== undefined) {
+          const resolvedGroup = this._resolved[group] as Record<string, unknown> | undefined;
+          if (resolvedGroup) {
+            resolvedGroup[prop] = result;
+          }
+        }
+      }
+    }
+  }
+
+
+  /**
+   * Discard the resolved copy so getters fall back to raw props.
+   * Called before re-resolving when variables change (e.g. on style reload).
+   */
+  reset(): void {
+    this._resolved = null;
+  }
+
+
+  /**
+   * Whether this style's raw props contain any `var()` references.
+   */
+  get hasVarRefs(): boolean {
+    return this._hasVarRefs;
   }
 
 

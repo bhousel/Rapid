@@ -98,12 +98,12 @@ describe('Style', () => {
       assert.deepEqual(d.stroke.dash, [10, 5]);
     });
 
-    it('assetID returns the asset ID', () => {
+    it('preserves assetID in props', () => {
       const d = new Rapid.Style(context, {
         id: 'test',
         assetID: 'rapid_style'
       });
-      assert.strictEqual(d.assetID, 'rapid_style');
+      assert.strictEqual(d.props.assetID, 'rapid_style');
     });
 
     it('marker returns marker properties', () => {
