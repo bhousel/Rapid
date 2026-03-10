@@ -6,12 +6,10 @@
 *.json linguist-detectable
 *.jsonc linguist-detectable
 *.json5 linguist-detectable
+*.md linguist-documentation
 *.svg linguist-detectable
 *.yaml linguist-detectable
 
-*.md linguist-documentation
 docs/** linguist-documentation
-
 dist/** linguist-generated
-
-data/l10n/** linguist-vendored
+data/** linguist-vendored
