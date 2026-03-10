@@ -161,104 +161,297 @@ context.initAsync()
 ```
 
 
+### Scoped Architecture
+
+The `ImagerySystem`, `SchemaSystem`, and `StyleSystem` all organize their data into
+**scopes**.  A scope is a named container (like `'osm'` or `'*'`) that holds a set
+of related objects.  Scopes allow different data to coexist cleanly — for example,
+default OpenStreetMap data lives in the `'osm'` scope, while built-in constants live
+in the `'*'` common scope.
+
+When you call `merge()`, you provide data grouped under scope identifiers.  The system
+creates scopes on demand, so you can introduce your own (e.g. `'my_custom_scope'`).
+Public-facing getters aggregate all scopes together into a single view.
+
+Each asset data file has this general shape:
+```javascript
+{
+  assetID: 'my_asset',           // Required: unique identifier for this asset
+  assetVersion: '1.0.0',        // Optional: version string
+  scopes: [
+    { scope: 'osm', /* scope-specific data */ },
+    { scope: '*',   /* scope-specific data */ }
+  ]
+}
+```
+
+
+### Merge Semantics
+
+All three systems follow the same merge rules:
+* **Replace** — New items replace existing items that have the same ID.
+* **Delete** — Setting a value to `null` deletes that item.
+* **Wildcard delete** — `*` and `?` wildcards are allowed in the ID when deleting.
+  For example, `"crossing*": null` deletes all IDs that start with `crossing`.
+* **Ordering** — Items are processed in the order they appear in the input.
+* **Assets** — Each `merge()` call must include a unique `assetID`.  An `assetID`
+  cannot be merged twice.
+
+
+### Variables and `var()` References
+
+The `SchemaSystem` and `StyleSystem` both support **variables** — named value lists
+that can be referenced elsewhere using `var()` syntax.
+
+Variables are defined per-scope and processed before other data in the same scope.
+This lets styles, selectors, and rulesets reference shared values:
+
+```javascript
+{
+  assetID: 'my_config',
+  scopes: [{
+    scope: 'osm',
+    variables: {
+      major_road_color: 0xcf2081,
+      paved_surfaces: ["asphalt", "concrete", "paved", "chipseal"]
+    }
+  }]
+}
+```
+
+Once defined, `var(paved_surfaces)` in a PropMatcher value resolves to the array
+`["asphalt", "concrete", "paved", "chipseal"]`.  Variable values can be any JSON
+type: string, number, boolean, array, or object.
+
+Setting a variable to `null` deletes it (with wildcard support):
+```javascript
+variables: { "paved*": null }   // deletes all variables starting with "paved"
+```
+
+
 ### Background Imagery
 
 Rapid's background imagery is managed by the `ImagerySystem`.
-Default imagery assets are loaded at init time, but customizations and overrides can be
-made to the imagery by calling `ImagerySystem.merge(…)` with new data to merge in.
 
-Note that the "None" and "Custom" options will always be shown in the list.
+At init time, Rapid loads default imagery assets (`editor_layer_index` and
+`rapid_imagery`).  You can override which assets are loaded using the `imagery=`
+URL parameter, or customize them programmatically by calling
+`ImagerySystem.merge(…)` with new data.
 
-TODO: document merging sceneraios.
+Note that the "None" and "Custom" options always appear in the imagery list
+(they live in the `'*'` common scope).
 
-Each imagery source should have the following properties:
-* `id` - Unique identifier for this source (also used as a url parameter)
-* `name` - Display name for the source
-* `type` - Source type, 'wms', 'tms', or 'bing'.
-* `template` - Url template, valid replacement tokens include:
-  * `{z}`, `{x}`, `{y}` - for Z/X/Y scheme
-  * `{-y}` or `{ty}` - for flipped Y
-  * `{u}` - for quadtile scheme
-  * `{switch:a,b,c}` - for parts of the url that can be cycled for connection parallelization
+#### Merge data format
 
-Optional properties:
-* `description` - A longer source description which, if included, will be
-  displayed in a popup when viewing the background imagery list.
-* `overlay` - If `true`, this is an overlay layer (a transparent layer rendered
-  above base imagery). Defaults to `false`.
-* `zoomExtent` - Allowable min and max zoom levels, defaults to `[0, 22]`.
-* `feature` - A GeoJSON `Polygon` or `MultiPolygon` within which imagery is valid.
-  If omitted, imagery is assumed to be valid worldwide.
-* `terms_url` - Url to link to when displaying the imagery terms.
-* `terms_html` - Html content to display in the imagery terms.
-* `terms_text` - Text content to display in the imagery terms.
-* `best` - If set to `true`, this imagery is considered "better than Bing" and
-  may be chosen by default when Rapid starts. It will display with a star in the
-  background imagery list. Defaults to `false`.
+```javascript
+{
+  assetID: 'my_imagery',        // required asset identifier
+  assetVersion: '2026-01-01',   // optional asset version
+
+  scopes: [{
+    scope: 'osm',
+
+    // Imagery definitions appear in an `imagery` block
+    imagery: {
+      "my_imagery_source": {    // add or update an imagery source
+        id: 'my_source',
+        name: 'My Satellite Imagery',
+        type: 'tms',
+        template: 'https://{switch:a,b,c}.tiles.example.com/{z}/{x}/{y}.png'
+      },
+      "old_source": null       // delete an existing imagery source
+    }
+  }]
+}
+```
+
+#### Imagery source properties
+
+Required:
+* `id` — Unique identifier for this source (also used as a URL parameter)
+* `name` — Display name for the source
+* `type` — Source type: `'wms'`, `'tms'`, or `'bing'`
+* `template` — URL template with replacement tokens:
+  * `{z}`, `{x}`, `{y}` — standard Z/X/Y tile scheme
+  * `{-y}` or `{ty}` — flipped (TMS-style) Y coordinate
+  * `{u}` — quadtile scheme
+  * `{switch:a,b,c}` — DNS multiplexing
+
+Optional:
+* `description` — Longer description, displayed in a popup in the imagery list
+* `overlay` — If `true`, rendered as a transparent overlay above base imagery (default `false`)
+* `zoomExtent` — Allowable min and max zoom levels (default `[0, 22]`)
+* `feature` — A GeoJSON `Polygon` or `MultiPolygon` within which imagery is valid.
+  If omitted, imagery is assumed valid worldwide.
+* `terms_url` — URL to link to when displaying the imagery terms
+* `terms_html` — HTML content for the imagery terms
+* `terms_text` — Text content for the imagery terms
+* `best` — If `true`, considered "better than Bing" and may be chosen by default.
+  Displays with a star in the imagery list. (default `false`)
 
 
 ### Tagging Schema (aka "Presets")
 
 Rapid's tagging schema is managed by the `SchemaSystem`.
-Default schema assets are loaded at init time, but customizations and overrides can be
-made to the schema by calling `SchemaSystem.merge(…)` with new data to merge in.
 
-TODO: document merging sceneraios.
+At init time, Rapid loads default schema assets (`id_tagging_schema`, `osm_rulesets`,
+and `rapid_schema`).  You can override which assets are loaded using the `schema=`
+URL parameter, or customize them by calling `SchemaSystem.merge(…)`.
+
+#### Merge data format
+
+```javascript
+{
+  assetID: 'my_schema',
+
+  scopes: [{
+    scope: 'osm',
+
+    // Variables: Named values or lists, reusable via 'var()' syntax
+    variables: {
+      lifecycle_prefixes: ["abandoned", "construction", "disused", "planned", "proposed"]
+    },
+
+    // Fields: Controls shown in the user interface when editing a feature.
+    fields: {
+      "my_field": {         // add or update a Field
+        key: "my_tag",
+        type: "combo",
+        label: "My Tag"
+      },
+      "old_field*": null    // delete all Fields matching 'old_field*'
+    },
+
+    // Presets: Feature types with associated tags and fields
+    presets: {
+      "amenity/custom_shop": {      // add or update a Preset
+        name: "Custom Shop",
+        tags: { amenity: "custom_shop" },
+        geometry: ["point", "area"],
+        fields: ["name", "opening_hours"],
+        icon: "maki-shop"
+      }
+    },
+
+    // Categories: Groups of Presets - appear in the user interface as an expandable folder.
+    categories: {
+      "category-custom": {       // add or update a Category
+        name: "Custom Features",
+        members: ["amenity/custom_shop"]
+      }
+    },
+
+    // Rulesets: Tag matching rules with include/exclude semantics.
+    // A feature matches a ruleset if ANY 'include' rule matches AND NO 'exclude' rule matches.
+    // These are used extensively for filtering and validation.
+    rulesets: {
+      "filter_paved": {   // add a ruleset for matching tags
+        include: [
+          { key: "surface", op: "in", value: "var(paved_surfaces)" }    // can reference a var()
+        ],
+        exclude: []
+      }
+    },
+
+    // Defaults: PresetIDs/CategoryIDs that are shown by default for each geometry type.
+    defaults: {
+      area: ["category-custom", "amenity/custom_shop"],
+      point: ["amenity/custom_shop"]
+    },
+
+    // Deprecations: If detected, users will be prompted to replace old tags with new tags.
+    deprecated: [
+      {
+        old: { "amenity": "gym" },
+        replace: { "leisure": "fitness_centre" }
+      }
+    ],
+
+    // Discards:  Keys silently removed (stripped on upload)
+    discarded: {
+      "odbl": true,
+      "odbl:note": true
+    }
+  }]
+}
+```
 
 
 ### Map Styling
 
 Rapid's map styling is managed by the `StyleSystem`.
-Default style assets are loaded at init time, but customizations and overrides can be
-made to the styles by calling `StyleSystem.merge(…)` with new data to merge in.
 
-Each style asset should have the following structure:
+At init time, Rapid loads the default style asset (`rapid_style`).  You can override
+which assets are loaded using the `style=` URL parameter, or customize them by calling
+`StyleSystem.merge(…)`.
+
+#### Merge data format
+
 ```javascript
 {
-  assetID: 'my_styles',        // Required: unique identifier for this asset
-  assetVersion: '1.0.0',       // Optional: version string
+  assetID: 'my_styles',
+  scopes: [{
+    scope: 'osm',
 
-  // Style declarations define how features look (fill, casing, stroke properties)
-  declarations: {
-    "my_style_id": {
-      fill:   { color: 0xff0000, opacity: 0.3 },           // fill properties
-      casing: { width: 10, color: 0x444444 },              // casing line properties
-      stroke: { width: 8, color: 0xffffff, dash: [8, 8] }  // stroke line properties
+    // Variables: Named values or lists, reusable via 'var()' syntax.
+    variables: {
+      road_casing_color: 0x444444
     },
-    "forest": {
-      fill: { pattern: "forest" }   // pattern-only style
-    }
-  },
 
-  // Style selectors map OSM tags to styles using styleIDs array
-  // ALL matching selectors are applied, merged in specificity order (most specific wins)
-  // Multiple styleIDs within a selector are merged in order (later overrides earlier)
-  selectors: {
-    "highway-motorway": {
-      "styleIDs": ["my_style_id"],  // array of styleIDs to apply
-      "match": { "tags": [{ "key": "highway", "value": "motorway" }] }
+    // Styles: Named visual property sets.  Styles control how things look.
+    styles: {
+      "my_red_highway": {
+        fill:   { color: 0xff0000, opacity: 0.3 },
+        casing: { width: 10, color: 'var(road_casing_color)' },  // can reference a var()
+        stroke: { width: 8, color: 0xff0000, dash: [8, 8] }
+      },
+      "forest": {
+        fill: { pattern: "forest" }
+      }
     },
-    "landuse-forest": {
-      "styleIDs": ["green", "forest"],  // color + pattern composed together
-      "match": { "tags": [{ "key": "landuse", "value": "forest" }] }
+
+    // Selectors:  Map of tag matching patterns to Styles.
+    // ALL matching selectors are applied, merged in specificity order (most specific wins).
+    // Multiple styleIDs within a selector are merged in order (later overrides earlier).
+    selectors: {
+      "highway-motorway": {
+        styleIDs: ["my_red_highway"],
+        match: { tags: [{ key: "highway", value: "motorway" }] }
+      },
+      "landuse-forest": {
+        styleIDs: ["green", "forest"],
+        match: { tags: [{ key: "landuse", value: "forest" }] }
+      }
     }
-  }
+  }]
 }
 ```
 
-Available properties for style declarations:
-* `width` - line width in pixels
-* `color` - color as hex number, e.g. `0xcf2081`
-* `opacity` - opacity: 0 = transparent, 1 = opaque
-* `cap` - line cap: 'butt', 'round', or 'square'
-* `join` - line join: 'bevel', 'miter', or 'round'
-* `dash` - dash pattern array, e.g. `[8, 4]` for dashed line
-* `pattern` - (fill only) pattern ID for fill patterns
+The `'*'` common scope holds the built-in `DEFAULTS` style (fallback when no selector
+matches) and the `LIFECYCLE` style (applied to features with lifecycle-prefixed tags
+like `disused:railway`).  These styles can be overridden but not deleted.
 
-When merging:
-* New items replace existing items with the same ID
-* Setting a value to `null` deletes that item
-* Wildcards `*` and `?` are allowed when deleting
-* The `DEFAULTS` and `LIFECYCLE` declarations cannot be deleted
+#### Style properties
+
+Each style can include `fill`, `casing`, and `stroke` property groups:
+* `width` — line width in pixels (for fills, the width of the outline)
+* `color` — color as hex number, e.g. `0xcf2081`
+* `opacity` — opacity: 0 = transparent, 1 = opaque
+* `cap` — line cap: `'butt'`, `'round'`, or `'square'`
+* `join` — line join: `'bevel'`, `'miter'`, or `'round'`
+* `dash` — dash pattern array, e.g. `[8, 4]`
+* `pattern` — (fill only) pattern ID for fill patterns
+
+#### Selector matching
+
+Each selector has a `match` property containing an array of `tags` rules.  All rules
+in a selector must match (AND semantics).  A rule can specify:
+* `key` — tag key to match (exact match by default)
+* `value` — tag value to match
+* `op` — comparison operator: `'='`, `'!='`, `'exists'`, `'!exists'`, `'~'`, `'!~'`,
+  `'in'`, `'!in'`, `'>'`, `'>='`, `'<'`, `'<='`
+* `keyOp` — key matching mode: `'='` (exact, default) or `'~'` (regex)
+
+Values can reference variables using `var()` syntax, e.g. `value: "var(paved_surfaces)"`.
 
 

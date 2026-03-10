@@ -89,7 +89,31 @@ function getTag(tags: Tags, key: string): string | undefined {
 
 
 /**
- * `StyleSystem` maintains the the rules about how map data should look.
+ * `StyleSystem` maintains the rules about how map data should look.
+ *
+ * The style system uses a `Style` + `StyleSelector` architecture:
+ * - A `Style` defines visual properties (fill color, stroke width, dash patterns, etc.)
+ * - A `StyleSelector` defines *when* a style applies, using tag-matching conditions
+ *   with AND semantics (all conditions must match). Each selector references one or more
+ *   `styleIDs` to apply.
+ * - A `Variable` is a named value list that can be referenced from Styles and Selectors
+ *   via `var()` syntax, allowing shared values to be defined once.
+ *
+ * **Scoped Architecture:**
+ * Data is organized into scopes (e.g. 'osm', '*'). Each scope has its own Styles,
+ * Selectors, and Variables. When matching, the system falls back from the requested scope
+ * to the '*' common scope. Data is loaded via `merge()`, which accepts scoped input and
+ * processes Variables before Styles/Selectors (since they may contain `var()` references).
+ *
+ * **Style Matching (`styleMatch`):**
+ * All matching selectors are collected and sorted by specificity (more conditions = higher
+ * specificity). Styles from matching selectors are deep-merged in order of increasing
+ * specificity, so more specific selectors override less specific ones.
+ *
+ * **Default assets loaded at init time:**
+ * - `rapid_style` — Style declarations, selectors, and variables (from `data/rapid_style.json5`)
+ *
+ * Custom style data can be merged in to supplement or override the defaults.
  *
  * Properties available:
  *   `defaultAssetIDs`  Default assetIDs that are loaded if no custom assets are requested
@@ -728,9 +752,10 @@ export class StyleSystem extends AbstractSystem {
   /**
    * _styleChanged
    * Called whenever the style changes.
-   * This will dirty all features so they get re-styled, then trigger a redraw.
+   * Resolves `var()` references in styles and selectors, then dirties all features
+   * so they get re-styled, triggers a redraw, and emits a 'stylechange' event.
    */
-  _styleChanged(): void {
+  private _styleChanged(): void {
     const gfx = this.context.systems.gfx;
 
     // Resolve var() references in styles and selectors against scope variables

@@ -11,10 +11,14 @@ presets, imagery definitions, translations, and validation rules.
 - **`intro_rapid_graph.json`** - Rapid-specific tutorial data
 - **`languages.json`** - Language metadata (generated from CLDR)
 - **`locales.json`** - Locale settings and RTL configurations (generated from Transifex)
+- **`osm_rulesets.json5`** - Tag classification rulesets and variables for OSM data
+  (e.g. surface types, highway classifications, lifecycle prefixes)
 - **`phone_formats.json`** - International phone number formats
 - **`qa_data.json5`** - Quality assurance validation rules for KeepRight and Osmose
-- **`rapid_imagery.json5`** - Rapid-specific imagery
-- **`rapid_schema.json5`** - Rapid-specific schema
+- **`rapid_imagery.json5`** - Rapid-specific imagery source definitions
+- **`rapid_schema.json5`** - Rapid-specific schema customizations (presets, fields, categories)
+- **`rapid_style.json5`** - Map styling rules: style declarations, selectors, variables, and
+  the `DEFAULTS`/`LIFECYCLE` base styles
 - **`shortcuts.json5`** - Keyboard shortcuts and gesture definitions
 - **`territory_languages.json`** - Territory to language mappings (generated from CLDR)
 - **`wayback.json`** - Esri Wayback imagery metadata (generated)

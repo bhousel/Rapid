@@ -91,18 +91,25 @@ export interface SchemaScope {
   /** Map of RulesetIDs to instantiated Rulesets */
   rulesets: Map<RulesetID, Ruleset>;
 
+  /** Default Presets/Categories offered per geometry type when adding a new feature */
   defaults: Map<GeometryType, Set<PresetID | CategoryID>>;
+  /** Fields with `universal: true` — shown for all features regardless of preset */
   universal: Map<FieldID, Field>;
+  /** Per-geometry match index for fast preset lookup by tag key/value */
   matchIndex: Map<GeometryType, Record<string, Record<string, Preset[]>>>;
+  /** Full-text search indexes cached per locale */
   searchIndexes: Map<LocaleCode, MiniSearch>;
+  /** Currently active full-text search index for the active locale */
   currSearchIndex: MiniSearch | null;
 
-  // improve:
+  /** Tag deprecation rules: `{ old: { key: value }, replace: { key: value } }` */
   deprecated: DeprecationRule[];
+  /** Keys considered discardable (stripped on upload) */
   discarded: Record<string, true>;
 
-  // Derived tag lookup tables (computed by _schemaChanged)
+  /** Derived keeplist/discardlist for area detection (computed by `_schemaChanged`) */
   areaKeys: TagKeyValueLookup;
+  /** Deprecated values grouped by key, for quick lookup (computed by `_schemaChanged`) */
   deprecatedValues: Record<string, string[]>;
 }
 
@@ -131,19 +138,35 @@ export interface DeprecationRule {
 
 
 /**
- * `SchemaSystem` maintains data and indexes of all the Categories, Presets, and Fields.
+ * `SchemaSystem` maintains data and indexes of all the Categories, Presets, Fields,
+ * Rulesets, and Variables that define how map features are identified and classified.
  * (This used to be called 'presets' or 'PresetSystem')
  *
  * This system is used to identify features in OpenStreetMap based on their tagging,
  * and to support user interface functions like searching for feature types and editing attributes.
  *
+ * Key concepts:
  * - A `Field` represents a user interface component for displaying/editing a tag or tags.
  * - A `Preset` represents a set of tags that identify a feature type. A Preset can reference multiple Fields.
  * - A `Category` is a collection of Presets (e.g. "Major Roads", "Buildings", etc).
+ * - A `Ruleset` is a named collection of `PropMatcher` rules with include/exclude semantics,
+ *   used for tag classification (e.g. "is this surface paved?", "is this a major road?").
+ * - A `Variable` is a named value list that can be referenced from Rulesets via `var()` syntax,
+ *   allowing shared data (e.g. lifecycle prefixes, highway values) to be defined once.
  *
- * In this case, "schemas" are the files containing these rules about tagging.
- * At init time, Rapid will load the default schema data from the `id-tagging-schema` project
- * but additional preset data can be merged in to supplement or override the defaults,
+ * **Scoped Architecture:**
+ * Data is organized into scopes (e.g. 'osm', '*'). Each scope has its own Fields, Presets,
+ * Categories, Rulesets, and Variables. The '*' common scope holds fallback presets that are
+ * always available. Data is loaded via `merge()`, which accepts scoped input and processes
+ * Variables before Rulesets (since rulesets may contain `var()` references).
+ *
+ * **Default assets loaded at init time:**
+ * 1. `id_tagging_schema` — Presets, Fields, Categories, Defaults, Deprecated, and Discarded
+ *    from the [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema) project
+ * 2. `osm_rulesets` — Tag classification rulesets and variables (from `data/osm_rulesets.json5`)
+ * 3. `rapid_schema` — Rapid's customizations merged after (from `data/rapid_schema.json5`)
+ *
+ * Custom schema data can be merged in to supplement or override the defaults.
  *
  * For the schema definition, see: https://github.com/ideditor/schema-builder
  * For the default schema data, see: https://github.com/openstreetmap/id-tagging-schema
@@ -881,6 +904,8 @@ gfx?.scene?.reset();  // throw it all away
 
   /**
    * match
+   * Find the best matching Preset for the given entity.
+   * Results are cached as a transient on the entity.
    * @param   entity  - the Entity to test
    * @param   graph   - the Graph containing this Entity
    * @return  Preset that best matches
@@ -900,9 +925,10 @@ gfx?.scene?.reset();  // throw it all away
 
   /**
    * matchTags
-   * @param   tags
-   * @param   geometry
-   * @param   loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
+   * Find the best matching Preset for the given tags and geometry.
+   * Uses the per-scope match index for fast lookup, and filters by location if provided.
+   * @param   tags - OSM tags to match
+   * @param   geometry - The geometry type of the feature
    * @param   loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
    * @param   scopeID - Scope to match in (defaults to 'osm')
    * @return  Preset that best matches

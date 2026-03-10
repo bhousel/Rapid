@@ -50,7 +50,20 @@ export interface ImageryScope {
 /**
  * `ImagerySystem` maintains the state of the tiled background and overlay imagery.
  *
- * At init time, Rapid will attempt to load the imagery.
+ * At init time, Rapid will load the imagery index and any custom imagery assets.
+ *
+ * **Scoped Architecture:**
+ * Data is organized into scopes (e.g. 'osm', '*'). Each scope has its own
+ * `Map<ImagerySourceID, ImagerySource>`. The '*' common scope holds builtin
+ * sources ('none' and 'custom') that are always available. The `sources` getter
+ * aggregates all scopes into a single Map. Data is loaded via `merge()`, which
+ * accepts scoped input.
+ *
+ * **Default assets loaded at init time:**
+ * - `editor_layer_index` — Community-maintained imagery definitions
+ * - `rapid_imagery` — Rapid-specific imagery additions (from `data/rapid_imagery.json5`)
+ *
+ * Custom imagery data can be merged in to supplement or override the defaults.
  *
  * Properties available:
  *   `sources`     `Map<ImagerySourceID, ImagerySource>` - Computed aggregate of all scopes
