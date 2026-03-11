@@ -1,0 +1,24 @@
+{
+  "$id": "deprecated.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Deprecated",
+  "description": "An array of deprecation rules. Each rule maps an old tag pattern to optional replacement tags.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "old": {
+        "description": "The old tag pattern to match. Value of '*' matches any value.",
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      },
+      "replace": {
+        "description": "Optional replacement tags to suggest.",
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
+    },
+    "required": ["old"],
+    "additionalProperties": false
+  }
+}

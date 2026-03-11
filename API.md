@@ -138,10 +138,10 @@ means to apply the default assets in that position.
   (useful for testing, normally RTL is controlled by the `locale` parameter).
 
 
-## Customized Deployments
+## Customization
 
-Rapid may be used to edit maps in a non-OpenStreetMap environment.  This requires
-certain parts of the Rapid code to be replaced at runtime by custom code or data.
+Rapid is designed to be highly customizable.
+This requires certain parts of the Rapid code to be replaced at runtime by custom code or data.
 
 Rapid uses a highly modular architecture.  Core components called `Systems` each have
 different areas of responsibility.  When Rapid starts up, the available systems are constructed
@@ -165,9 +165,9 @@ context.initAsync()
 
 The `ImagerySystem`, `SchemaSystem`, and `StyleSystem` all organize their data into
 **scopes**.  A scope is a named container (like `'osm'` or `'*'`) that holds a set
-of related objects.  Scopes allow different data to coexist cleanly — for example,
-default OpenStreetMap data lives in the `'osm'` scope, while built-in constants live
-in the `'*'` common scope.
+of related configuration properties.  Scopes allow different data to coexist cleanly.
+For example, default OpenStreetMap rules and configuration lives in the `'osm'` scope,
+but these rules can be overridden or replaced when working with other data providers.
 
 When you call `merge()`, you provide data grouped under scope identifiers.  The system
 creates scopes on demand, so you can introduce your own (e.g. `'my_custom_scope'`).
@@ -176,11 +176,11 @@ Public-facing getters aggregate all scopes together into a single view.
 Each asset data file has this general shape:
 ```javascript
 {
-  assetID: 'my_asset',           // Required: unique identifier for this asset
-  assetVersion: '1.0.0',        // Optional: version string
+  assetID: 'my_asset',       // Required: unique identifier for this asset
+  assetVersion: '1.0.0',     // Optional: version string
   scopes: [
-    { scope: 'osm', /* scope-specific data */ },
-    { scope: '*',   /* scope-specific data */ }
+    { scope: '*',   /* common configuration */ },
+    { scope: 'osm', /* scope-specific configuration */ }
   ]
 }
 ```
@@ -241,7 +241,7 @@ URL parameter, or customize them programmatically by calling
 Note that the "None" and "Custom" options always appear in the imagery list
 (they live in the `'*'` common scope).
 
-#### Merge data format
+#### Imagery data format
 
 ```javascript
 {
@@ -298,7 +298,7 @@ At init time, Rapid loads default schema assets (`id_tagging_schema`, `osm_rules
 and `rapid_schema`).  You can override which assets are loaded using the `schema=`
 URL parameter, or customize them by calling `SchemaSystem.merge(…)`.
 
-#### Merge data format
+#### Schema data format
 
 ```javascript
 {
@@ -385,7 +385,7 @@ At init time, Rapid loads the default style asset (`rapid_style`).  You can over
 which assets are loaded using the `style=` URL parameter, or customize them by calling
 `StyleSystem.merge(…)`.
 
-#### Merge data format
+#### Style data format
 
 ```javascript
 {
@@ -454,4 +454,52 @@ in a selector must match (AND semantics).  A rule can specify:
 
 Values can reference variables using `var()` syntax, e.g. `value: "var(paved_surfaces)"`.
 
+
+### JSON Schemas
+
+Rapid's imagery, schema, and styling data files may be validated against
+[JSON Schema](http://json-schema.org/draft-07/schema#) definitions located
+in the `data/schema/` directory.  The schemas are organized into a "main"
+datafile schema and component schemas for each domain type:
+
+| Schema file | Description |
+|-------------|-------------|
+| `main.schema.json` | Main data file: `assetID`, `assetVersion`, `scopes[]` |
+| `imagery.schema.json` | Imagery source definitions |
+| `style.schema.json` | Style declarations (`fill`, `casing`, `stroke`, `marker`, `icon`, `label`, etc.) |
+| `selector.schema.json` | Selector rules mapping tag patterns to styles |
+| `matcher.schema.json` | Tag matching rules used by selectors and rulesets |
+| `variable.schema.json` | Variable values (string, number, or arrays thereof) |
+| `ruleset.schema.json` | Include/exclude tag rulesets |
+| `field.schema.json` | Editor field definitions (compatible with id-tagging-schema) |
+| `preset.schema.json` | Preset (feature type) definitions |
+| `category.schema.json` | Preset category groupings |
+| `defaults.schema.json` | Default preset/category lists per geometry type |
+| `deprecated.schema.json` | Tag deprecation rules (`old` → `replace`) |
+| `discarded.schema.json` | Tags to silently discard on upload |
+
+The schemas use `$ref` to reference each other — for example, `main.schema.json` references
+`imagery.schema.json` for each imagery entry, and `selector.schema.json` references
+`matcher.schema.json` for tag match rules.
+
+To validate all data files against the schemas:
+```bash
+bun run validate:json
+```
+
+#### Compatibility
+
+Several schemas are designed to be compatible with data produced by external projects.
+Our definitions may deviate slightly (e.g. additional optional properties), but they
+accept the same data formats:
+
+* **`imagery.schema.json`** — tracks the
+  [editor-layer-index](https://github.com/osmlab/editor-layer-index) project,
+  which is the source for default imagery definitions.
+* **`field.schema.json`**, **`preset.schema.json`**, **`category.schema.json`**,
+  **`defaults.schema.json`**, **`deprecated.schema.json`**, **`discarded.schema.json`** —
+  compatible with data produced by
+  [schema-builder](https://github.com/ideditor/schema-builder),
+  the build tool behind the
+  [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema) project.
 

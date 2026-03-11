@@ -1,0 +1,11 @@
+{
+  "$id": "discarded.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Discarded",
+  "description": "A map of tag keys that should be silently discarded (not uploaded). Each value must be true.",
+  "type": "object",
+  "additionalProperties": {
+    "type": "boolean",
+    "const": true
+  }
+}

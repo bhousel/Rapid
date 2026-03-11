@@ -1,0 +1,40 @@
+{
+  "$id": "category.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Category",
+  "description": "A category groups related presets together in the UI. Compatible with id-tagging-schema category format.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "Display name for this category.",
+      "type": "string"
+    },
+    "members": {
+      "description": "Array of preset IDs that belong to this category.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "searchable": {
+      "description": "Whether this category appears in search results.",
+      "type": "boolean"
+    },
+    "matchScore": {
+      "description": "Priority for matching.",
+      "type": "number"
+    },
+    "icon": {
+      "description": "Icon identifier.",
+      "type": "string"
+    },
+    "imageURL": {
+      "description": "URL to an image for this category.",
+      "type": "string",
+      "format": "uri"
+    },
+    "locationSet": {
+      "description": "LocationSet defining where this category is relevant.",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

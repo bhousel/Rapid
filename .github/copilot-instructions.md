@@ -479,6 +479,15 @@ After making changes:
 2. Run `bun run lint` to perform linting
 3. Run `bun run build:js` to verify build
 4. Run `bun test` for full test suite
+5. Run `bun run validate:json` to validate data files against JSON schemas
+
+### JSON Schemas
+- Data files in `data/` are validated by JSON Schema definitions in `data/schema/`
+- The main data file schema is `main.schema.json` (includes `assetID`, `asserVersion`, `scopes[]`)
+- Component schemas use `$ref` to reference each other (e.g. `matcher.schema.json` is used by both `selector.schema.json` and `ruleset.schema.json`)
+- Imagery schema tracks the upstream [editor-layer-index schema](https://github.com/osmlab/editor-layer-index) closely
+- Field, preset, category, defaults, deprecated, and discarded schemas are compatible with [schema-builder](https://github.com/ideditor/schema-builder) / [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema)
+- When changing data file structure, update the corresponding schema and run `bun run validate:json`
 
 ### Writing Meaningful Assertions
 - **Avoid `assert.isTrue(true)` in feature tests** — If a `.then()` callback only does `assert.isTrue(true)`, ask: "what is this test actually verifying?"

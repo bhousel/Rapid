@@ -1,0 +1,95 @@
+{
+  "$id": "preset.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Preset",
+  "description": "A preset definition for OSM feature types. Compatible with id-tagging-schema preset format.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "Display name for this preset.",
+      "type": "string"
+    },
+    "aliases": {
+      "description": "Alternative names for search matching.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "terms": {
+      "description": "Additional search terms.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "tags": {
+      "description": "OSM tags that define this preset. Value of '*' matches any value.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "addTags": {
+      "description": "Additional tags to add when applying this preset (superset of 'tags').",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "removeTags": {
+      "description": "Tags to remove when switching away from this preset.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "fields": {
+      "description": "Field IDs shown in the primary editor section.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "moreFields": {
+      "description": "Field IDs available in the 'more fields' section.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "geometry": {
+      "description": "Geometry types this preset applies to.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["point", "vertex", "line", "area", "relation"]
+      }
+    },
+    "matchScore": {
+      "description": "Priority for matching (higher wins). Default is 1.0.",
+      "type": "number"
+    },
+    "searchable": {
+      "description": "Whether this preset appears in search results.",
+      "type": "boolean"
+    },
+    "suggestion": {
+      "description": "Whether this is a name-suggestion-index preset.",
+      "type": "boolean"
+    },
+    "reference": {
+      "description": "OSM wiki reference for documentation.",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "icon": {
+      "description": "Icon identifier (e.g. 'maki-park', 'temaki-pedestrian').",
+      "type": "string"
+    },
+    "imageURL": {
+      "description": "URL to an image for this preset.",
+      "type": "string",
+      "format": "uri"
+    },
+    "replacement": {
+      "description": "Preset ID to suggest as a replacement (for deprecated presets).",
+      "type": "string"
+    },
+    "locationSet": {
+      "description": "LocationSet defining where this preset is relevant.",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

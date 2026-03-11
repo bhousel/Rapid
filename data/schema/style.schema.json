@@ -1,0 +1,238 @@
+{
+  "$id": "style.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Style",
+  "description": "A style definition for rendering map features. Can contain any combination of fill, line, point, viewfield, and label properties.",
+  "type": "object",
+  "properties": {
+    "base":        { "$ref": "#/definitions/baseStyle" },
+    "fill":        { "$ref": "#/definitions/fillStyle" },
+    "casing":      { "$ref": "#/definitions/lineStyle" },
+    "stroke":      { "$ref": "#/definitions/lineStyle" },
+    "marker":      { "$ref": "#/definitions/pointStyle" },
+    "icon":        { "$ref": "#/definitions/pointStyle" },
+    "viewfield":   { "$ref": "#/definitions/viewfieldStyle" },
+    "lineMarker":  { "$ref": "#/definitions/pointStyle" },
+    "sidedMarker": { "$ref": "#/definitions/pointStyle" },
+    "label":       { "$ref": "#/definitions/labelStyle" }
+  },
+  "additionalProperties": false,
+
+  "definitions": {
+    "baseStyle": {
+      "description": "Base properties (fallback color/opacity for other groups).",
+      "type": "object",
+      "properties": {
+        "color": {
+          "description": "Base color as an integer (e.g. 0xcf2081 in JSON5, 13565057 in JSON).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        "opacity": {
+          "description": "Base opacity (0 = transparent, 1 = opaque).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "fillStyle": {
+      "description": "Properties for drawing area fills.",
+      "type": "object",
+      "properties": {
+        "color": {
+          "description": "Fill color as an integer.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        "opacity": {
+          "description": "Fill opacity (0 = transparent, 1 = opaque).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "width": {
+          "description": "Width of the fill outline in pixels.",
+          "type": "number",
+          "minimum": 0
+        },
+        "pattern": {
+          "description": "Fill pattern name (see dist/img/pattern/* for available patterns).",
+          "type": "string"
+        },
+        "type": {
+          "description": "Fill type.",
+          "type": "string",
+          "enum": ["full", "partial"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "lineStyle": {
+      "description": "Properties for drawing lines (casing or stroke).",
+      "type": "object",
+      "properties": {
+        "color": {
+          "description": "Line color as an integer.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        "opacity": {
+          "description": "Line opacity (0 = transparent, 1 = opaque).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "width": {
+          "description": "Line width in pixels.",
+          "type": "number",
+          "minimum": 0
+        },
+        "cap": {
+          "description": "Line cap style.",
+          "type": "string",
+          "enum": ["butt", "round", "square"]
+        },
+        "join": {
+          "description": "Line join style.",
+          "type": "string",
+          "enum": ["bevel", "miter", "round"]
+        },
+        "dash": {
+          "description": "Dash pattern as array of pixel lengths (on/off alternating).",
+          "type": "array",
+          "items": { "type": "number", "minimum": 0 },
+          "minItems": 2
+        }
+      },
+      "additionalProperties": false
+    },
+    "pointStyle": {
+      "description": "Properties for point styling (markers, icons, line markers, sided markers).",
+      "type": "object",
+      "properties": {
+        "color": {
+          "description": "Display color as an integer.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        "opacity": {
+          "description": "Opacity (0 = transparent, 1 = opaque).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "image": {
+          "description": "Image identifier - a symbol name from the spritesheet.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Size in pixels.",
+          "type": "number",
+          "minimum": 0
+        },
+        "anchor": {
+          "description": "Anchor position [x, y] where [0.5, 0.5] = centered.",
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "scale": {
+          "description": "Scale multiplier: uniform number or per-axis [x, y].",
+          "oneOf": [
+            { "type": "number" },
+            {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "viewfieldStyle": {
+      "description": "Properties for viewfield styling (extends point style with angles).",
+      "type": "object",
+      "properties": {
+        "color": {
+          "description": "Display color as an integer.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        "opacity": {
+          "description": "Opacity (0 = transparent, 1 = opaque).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "image": {
+          "description": "Image identifier - a symbol name from the spritesheet.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Size in pixels.",
+          "type": "number",
+          "minimum": 0
+        },
+        "anchor": {
+          "description": "Anchor position [x, y] where [0.5, 0.5] = centered.",
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "scale": {
+          "description": "Scale multiplier: uniform number or per-axis [x, y].",
+          "oneOf": [
+            { "type": "number" },
+            {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          ]
+        },
+        "angles": {
+          "description": "Angles (in degrees) that the viewfields should extend out from the point.",
+          "type": "array",
+          "items": { "type": "number" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "labelStyle": {
+      "description": "Properties for label styling.",
+      "type": "object",
+      "properties": {
+        "color": {
+          "description": "Label color as an integer.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        "opacity": {
+          "description": "Label opacity (0 = transparent, 1 = opaque).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "size": {
+          "description": "Label size in pixels.",
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

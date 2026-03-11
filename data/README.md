@@ -44,3 +44,52 @@ Rapid treats them all equally, but note that classic JSON will load slightly qui
 - **JSONC** (`.jsonc`) - JSON with comments - Used by VS Code for config files like `tsconfig.json`
 - **JSON5** (`.json5`) - Extended JSON format, allows comments, unquoted keys,
   single quotes, hexidecimal, and more - [json5.org](https://json5.org/)
+
+### JSON Schemas
+
+Rapid's imagery, schema, and styling data files may be validated against
+[JSON Schema](http://json-schema.org/draft-07/schema#) definitions located
+in the `data/schema/` directory.  The schemas are organized into a "main"
+datafile schema and component schemas for each domain type:
+
+| Schema file | Description |
+|-------------|-------------|
+| `main.schema.json` | Main data file: `assetID`, `assetVersion`, `scopes[]` |
+| `imagery.schema.json` | Imagery source definitions |
+| `style.schema.json` | Style declarations (`fill`, `casing`, `stroke`, `marker`, `icon`, `label`, etc.) |
+| `selector.schema.json` | Selector rules mapping tag patterns to styles |
+| `matcher.schema.json` | Tag matching rules used by selectors and rulesets |
+| `variable.schema.json` | Variable values (string, number, or arrays thereof) |
+| `ruleset.schema.json` | Include/exclude tag rulesets |
+| `field.schema.json` | Editor field definitions (compatible with id-tagging-schema) |
+| `preset.schema.json` | Preset (feature type) definitions |
+| `category.schema.json` | Preset category groupings |
+| `defaults.schema.json` | Default preset/category lists per geometry type |
+| `deprecated.schema.json` | Tag deprecation rules (`old` → `replace`) |
+| `discarded.schema.json` | Tags to silently discard on upload |
+
+The schemas use `$ref` to reference each other — for example, `main.schema.json` references
+`imagery.schema.json` for each imagery entry, and `selector.schema.json` references
+`matcher.schema.json` for tag match rules.
+
+To validate all data files:
+```bash
+bun run validate:json
+```
+
+#### Compatibility
+
+Several schemas are designed to be compatible with data produced by external projects.
+Our definitions may deviate slightly (e.g. additional optional properties), but they
+accept the same data formats:
+
+* **`imagery.schema.json`** — tracks the
+  [editor-layer-index](https://github.com/osmlab/editor-layer-index) project,
+  which is the source for default imagery definitions.
+* **`field.schema.json`**, **`preset.schema.json`**, **`category.schema.json`**,
+  **`defaults.schema.json`**, **`deprecated.schema.json`**, **`discarded.schema.json`** —
+  compatible with data produced by
+  [schema-builder](https://github.com/ideditor/schema-builder),
+  the build tool behind the
+  [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema) project.
+

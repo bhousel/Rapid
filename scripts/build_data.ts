@@ -117,6 +117,7 @@ async function buildData() {
   // Create target folders if necessary
   await $`mkdir -p ./data/l10n`;
   await $`mkdir -p ./dist/data/l10n`;
+  await $`mkdir -p ./dist/data/schema`;
 
 
   // Gather icons from various places that we need assembled into a spritesheet.
@@ -152,7 +153,7 @@ async function buildData() {
 
   await writeEnJson();
 
-  // copy `./data/*` files to `./dist/data/*`
+  // copy `./data/**` files to `./dist/data/**`
   const glob = new Glob('./data/**/*.json{,c,5}');
   for (const src of glob.scanSync()) {
     const dest = src.replace(/\\/g, '/').replace('data/', 'dist/data/');

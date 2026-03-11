@@ -1,0 +1,20 @@
+{
+  "$id": "variable.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Variable",
+  "description": "A named reusable value (string, number, or array) that can be referenced via var() syntax in PropMatcher rules.",
+  "oneOf": [
+    { "type": "string" },
+    { "type": "number" },
+    {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 1
+    }
+  ]
+}

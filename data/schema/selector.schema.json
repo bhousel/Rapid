@@ -1,0 +1,47 @@
+{
+  "$id": "selector.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StyleSelector",
+  "description": "Maps tag/geometry conditions to style IDs. All matching selectors are applied, sorted by specificity.",
+  "type": "object",
+  "properties": {
+    "styleIDs": {
+      "description": "Array of style IDs to apply when matched (merged in order, later overrides earlier).",
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "match": {
+      "description": "Conditions for matching features.",
+      "type": "object",
+      "properties": {
+        "geometry": {
+          "description": "Geometry type(s) to match, or '*' for all.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["point", "vertex", "line", "area", "relation", "*"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["point", "vertex", "line", "area", "relation"]
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "tags": {
+          "description": "Array of PropMatcher rules. All must match (AND logic).",
+          "type": "array",
+          "items": { "$ref": "matcher.schema.json" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["styleIDs", "match"],
+  "additionalProperties": false
+}

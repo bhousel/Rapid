@@ -1,0 +1,30 @@
+{
+  "$id": "defaults.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Defaults",
+  "description": "Default preset lists per geometry type. Maps geometry types to arrays of preset IDs.",
+  "type": "object",
+  "properties": {
+    "area": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "line": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "point": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "vertex": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "relation": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

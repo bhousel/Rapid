@@ -1,0 +1,143 @@
+{
+  "$id": "main.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Rapid Data Asset",
+  "description": "Master schema for Rapid data asset files. Each file contains an assetID, optional assetVersion, and an array of scopes. Each scope can carry any combination of domain data (imagery, styles, presets, rulesets, etc).",
+  "type": "object",
+  "properties": {
+    "assetID": {
+      "description": "Unique identifier for this data asset.",
+      "type": "string"
+    },
+    "assetVersion": {
+      "description": "Version string for this asset (e.g. '2026-03-02').",
+      "type": "string"
+    },
+    "scopes": {
+      "description": "Array of scoped data sections. Each scope targets a specific dataset (e.g. 'osm') or all datasets ('*').",
+      "type": "array",
+      "items": { "$ref": "#/definitions/scope" },
+      "minItems": 1
+    }
+  },
+  "required": ["assetID", "scopes"],
+  "additionalProperties": false,
+
+  "definitions": {
+    "scope": {
+      "description": "A scoped data section containing domain-specific definitions.",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "description": "The scope this section applies to (e.g. 'osm', '*').",
+          "type": "string"
+        },
+
+        "variables": {
+          "description": "Named reusable values, keyed by variable ID. Set to null to delete.",
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "variable.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+
+        "imagery": {
+          "description": "Imagery source definitions, keyed by imagery source ID. Set to null to delete.",
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "imagery.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+
+        "styles": {
+          "description": "Style definitions, keyed by style ID. Set to null to delete.",
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "style.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+
+        "selectors": {
+          "description": "Style selector definitions, keyed by selector ID. Set to null to delete.",
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "selector.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+
+        "fields": {
+          "description": "Field definitions, keyed by field ID. Set to null to delete (supports wildcard keys).",
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "field.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+
+        "presets": {
+          "description": "Preset definitions, keyed by preset ID. Set to null to delete (supports wildcard keys).",
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "preset.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+
+        "categories": {
+          "description": "Category definitions, keyed by category ID. Set to null to delete.",
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "category.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+
+        "rulesets": {
+          "description": "Ruleset definitions, keyed by ruleset ID. Set to null to delete.",
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "ruleset.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+
+        "defaults": {
+          "description": "Default preset lists per geometry type.",
+          "$ref": "defaults.schema.json"
+        },
+
+        "deprecated": {
+          "description": "Array of deprecation rules.",
+          "$ref": "deprecated.schema.json"
+        },
+
+        "discarded": {
+          "description": "Map of tag keys to silently discard.",
+          "$ref": "discarded.schema.json"
+        }
+      },
+      "required": ["scope"],
+      "additionalProperties": false
+    }
+  }
+}

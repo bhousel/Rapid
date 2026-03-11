@@ -1,0 +1,160 @@
+{
+  "$id": "field.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Field",
+  "description": "A field definition for the tag editor UI. Compatible with id-tagging-schema field format.",
+  "type": "object",
+  "properties": {
+    "key": {
+      "description": "Primary OSM tag key this field edits.",
+      "type": "string"
+    },
+    "keys": {
+      "description": "Additional OSM tag keys this field edits.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "type": {
+      "description": "Field editor type.",
+      "type": "string",
+      "enum": [
+        "access", "address", "check", "colour", "combo", "cycleway",
+        "defaultCheck", "directionalCombo", "identifier", "lanes",
+        "localized", "manyCombo", "multiCombo", "networkCombo", "number",
+        "onewayCheck", "radio", "restrictions", "roadheight", "roadspeed",
+        "semiCombo", "structureRadio", "tel", "text", "textarea",
+        "typeCombo", "url", "wikidata", "wikipedia"
+      ]
+    },
+    "label": {
+      "description": "Display label for this field.",
+      "type": "string"
+    },
+    "geometry": {
+      "description": "Geometry types this field applies to.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["point", "vertex", "line", "area", "relation"]
+      }
+    },
+    "default": {
+      "description": "Default value.",
+      "type": "string"
+    },
+    "placeholder": {
+      "description": "Placeholder text shown when empty.",
+      "type": "string"
+    },
+    "options": {
+      "description": "Available option values (for combo/radio fields).",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "terms": {
+      "description": "Search terms for this field.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "autoSuggestions": {
+      "description": "Whether to show auto-suggestions from taginfo.",
+      "type": "boolean"
+    },
+    "customValues": {
+      "description": "Whether custom (non-listed) values are allowed.",
+      "type": "boolean"
+    },
+    "universal": {
+      "description": "Whether this field applies to all feature types.",
+      "type": "boolean"
+    },
+    "snake_case": {
+      "description": "Whether to convert values to snake_case.",
+      "type": "boolean"
+    },
+    "caseSensitive": {
+      "description": "Whether values are case-sensitive.",
+      "type": "boolean"
+    },
+    "allowDuplicates": {
+      "description": "Whether duplicate values are allowed (semi-combo).",
+      "type": "boolean"
+    },
+    "minValue": {
+      "description": "Minimum numeric value.",
+      "type": "number"
+    },
+    "maxValue": {
+      "description": "Maximum numeric value.",
+      "type": "number"
+    },
+    "increment": {
+      "description": "Step increment for numeric fields.",
+      "type": "number"
+    },
+    "prerequisiteTag": {
+      "description": "Tag condition that must be met for this field to appear.",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "keyNot": { "type": "string" },
+        "value": { "type": "string" },
+        "valueNot": { "type": "string" },
+        "values": { "type": "array", "items": { "type": "string" } },
+        "valuesNot": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "reference": {
+      "description": "OSM wiki reference for documentation.",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "string" },
+        "rtype": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "strings": {
+      "description": "Localized string overrides.",
+      "type": "object",
+      "properties": {
+        "options": { "type": "object" },
+        "types": { "type": "object" },
+        "placeholders": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "stringsCrossReference": {
+      "description": "Cross-reference to another field's strings (e.g. '{leaf_type}').",
+      "type": "string"
+    },
+    "urlFormat": {
+      "description": "URL format template for identifier fields.",
+      "type": "string"
+    },
+    "pattern": {
+      "description": "Regex pattern for validation.",
+      "type": "string"
+    },
+    "usage": {
+      "description": "How this field is used.",
+      "type": "string",
+      "enum": ["preset", "changeset", "manual", "group"]
+    },
+    "icons": {
+      "description": "Map of option values to icon names.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "iconsCrossReference": {
+      "description": "Cross-reference to another field's icons (e.g. '{leaf_type}').",
+      "type": "string"
+    },
+    "locationSet": {
+      "description": "LocationSet defining where this field is relevant.",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,48 @@
+{
+  "$id": "matcher.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PropMatcher",
+  "description": "A rule for matching OSM tag key-value pairs. Used by rulesets and style selectors.",
+  "type": "object",
+  "properties": {
+    "key": {
+      "description": "The tag key to match. An exact string by default, or a regex pattern if keyOp is '~'.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      ]
+    },
+    "keyOp": {
+      "description": "Key matching mode: '=' (exact match, default), 'in' (key is one of an array), or '~' (regex on key name).",
+      "type": "string",
+      "enum": ["=", "in", "~"]
+    },
+    "op": {
+      "description": "Comparison operator. Defaults to '=' if value is present, 'exists' if no value.",
+      "type": "string",
+      "enum": ["=", "!=", "exists", "!exists", "~", "!~", "in", "!in", ">", ">=", "<", "<="]
+    },
+    "value": {
+      "description": "The tag value to match. Can be a string, number, or array of strings (for 'in'/'!in'). Supports var() references.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      ]
+    },
+    "allowNo": {
+      "description": "If true, also match when value is 'no'.",
+      "type": "boolean"
+    }
+  },
+  "required": ["key"],
+  "additionalProperties": false
+}

@@ -1,0 +1,22 @@
+{
+  "$id": "ruleset.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ruleset",
+  "description": "A tag classification ruleset using include/exclude semantics. A feature matches if ANY include rule matches AND NO exclude rule matches.",
+  "type": "object",
+  "properties": {
+    "include": {
+      "description": "Rules that cause a match (OR logic: any match is sufficient).",
+      "type": "array",
+      "items": { "$ref": "matcher.schema.json" },
+      "minItems": 1
+    },
+    "exclude": {
+      "description": "Rules that prevent a match (any match disqualifies).",
+      "type": "array",
+      "items": { "$ref": "matcher.schema.json" }
+    }
+  },
+  "required": ["include"],
+  "additionalProperties": false
+}
