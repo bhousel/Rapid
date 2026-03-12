@@ -46,7 +46,7 @@ Big changes are coming soon to Rapid. including:
 * · Style, Schema, and Imagery can all be replaced with your own custom rules changed on the fly.
 * · All customizations can be scoped - they can apply to 'osm' or to other data layers.
 
-<br/>Happy Mapping! 👍"
+<br/>Happy Mapping! 👍
 `;
 //    const markdown = l10n.t('whats_new.text_v25') + '\n\n' + l10n.t('whats_new.project_links') + '\n\n';
 
