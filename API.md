@@ -144,20 +144,59 @@ Rapid is designed to be highly customizable.
 This requires certain parts of the Rapid code to be replaced at runtime by custom code or data.
 
 Rapid uses a highly modular architecture.  Core components called `Systems` each have
-different areas of responsibility.  When Rapid starts up, the available systems are constructed
-automatically. At that time, you can make customizations.
+different areas of responsibility.  When Rapid starts up, the available systems are constructed,
+initialized, and started in a multi-phase process that you can hook into.
 
-Then, your code must call `rapidContext.initAsync()`, which will initialize all of the components
-and complete the startup process.
+### Startup Lifecycle
+
+The startup process is split into three phases:
+
+1. **`prepareAsync()`** — Constructs all systems, modes, behaviors, and services.
+   After this resolves, all components exist on `context.systems`, `context.modes`, etc.
+   and can be configured (e.g. register assets, set properties on systems).
+
+2. **`initAsync()`** — Initializes all systems and services (loads default assets, sets up
+   event listeners, establishes dependency graphs).  Implicitly calls `prepareAsync()` first.
+   After this resolves, you can call `merge()` on systems to customize schema, styles, or imagery.
+
+3. **`startAsync()`** — Starts all auto-start systems and services (begins network fetches,
+   rendering, event dispatching).  Implicitly calls `initAsync()` first.
+   After this resolves, Rapid is fully running.
+
+Each method is idempotent — calling it multiple times returns the same promise.
+Each method implicitly calls the previous phase, so you only need to call the methods
+for phases where you want to insert customization hooks.
+
+**Simple usage** — If you don't need to customize anything between phases,
+you can just call `runAsync()`:
+
+```javascript
+const context = new Rapid.Context();
+window.rapidContext = context;
+context.runAsync()
+  .then(() => console.log('Rapid is running'));
+```
+
+**Customizing between phases** — Hook into the pipeline with `.then()`:
 
 ```javascript
 const context = new Rapid.Context();
 window.rapidContext = context;
 
-// customizations may happen here…
-
-context.initAsync()
-  .then(() => console.log('Rapid is running'));
+context.prepareAsync()
+  .then(() => {
+    // All systems are constructed — configure them before init
+    const assets = context.systems.assets;
+    assets.registerAsset('my_schema', { preferred: 'https://example.com/schema.json' });
+  })
+  .then(() => context.initAsync())
+  .then(() => {
+    // All systems are initialized — merge custom data before start
+    const schema = context.systems.schema;
+    schema.merge(myCustomSchemaData);
+  })
+  .then(() => context.startAsync())
+  .then(() => console.log('Rapid is running with customizations'));
 ```
 
 

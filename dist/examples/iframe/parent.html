@@ -88,9 +88,9 @@ function iframeLoaded() {
   _context = window.rapidContext = _innerWindow.rapidContext;
   updateSidebar();
 
-  // Rapid should already be initting.
+  // Rapid should already be starting up.
   // We can chain off that Promise to know when it's done.
-  _context.initAsync()
+  _context.runAsync()
     .then(() => {
       _rapidStarted = true;
       _editor = _context.systems.editor;

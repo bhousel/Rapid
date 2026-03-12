@@ -9,7 +9,6 @@ import { services } from './services/index.ts';
 import { systems } from './core/index.ts';
 
 import type { AbstractMode } from './modes/AbstractMode.ts';
-import type { AbstractSystem } from './core/AbstractSystem.ts';
 import type { Behaviors } from './behaviors/types.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from './lib/Graph.ts';
@@ -118,20 +117,28 @@ export class Context extends EventEmitter {
 
   /** The map viewport (projection, pan, zoom) */
   viewport: Viewport;
+  /** Whether we're in the intro walkthrough */
+  inIntro: boolean;
+  /** Container element (D3 selection) */
+  $container: D3Selection;
 
   /** All initialized systems */
   systems: Systems;
   /** All initialized modes */
   modes: Modes;
-  /** Currently active mode */
-  private _currMode: AbstractMode | null;
   /** All initialized behaviors */
   behaviors: Behaviors;
   /** All initialized services */
   services: Services;
 
-  /** Promise for initialization */
+  /** Currently active mode */
+  private _currMode: AbstractMode | null;
+  /** Promise for prepare phase (construct + configure) */
+  private _preparePromise: Promise<void> | null;
+  /** Promise for init phase */
   private _initPromise: Promise<void> | null;
+  /** Promise for start phase */
+  private _startPromise: Promise<void> | null;
   /** Promise for reset */
   private _resetPromise: Promise<void> | null;
 
@@ -157,13 +164,9 @@ export class Context extends EventEmitter {
   /** Debug visualization flags */
   private _debugFlags: DebugFlags;
 
-  /** Container element (D3 selection) */
-  $container: D3Selection;
   /** Whether embedded mode is enabled */
   private _embed: boolean | null;
 
-  /** Whether we're in the intro walkthrough */
-  inIntro: boolean;
 
   /** Check if entity has hidden connections (set during init) */
   hasHiddenConnections!: (entityID: EntityID) => boolean;
@@ -220,9 +223,10 @@ export class Context extends EventEmitter {
     this.services = {};
 
 
+    this._preparePromise = null;
     this._initPromise = null;
+    this._startPromise = null;
     this._resetPromise = null;
-
 
     // User interface and keybinding
     // AFAICT `lastPointerType` is just used to localize the intro? for now - instead get this from pixi?
@@ -260,17 +264,17 @@ export class Context extends EventEmitter {
 
 
   /**
-   * initAsync
-   * Call one time to start up Rapid.
-   * Constructs and initializes all systems, modes, behaviors, and services.
-   * @return  Promise resolved when Rapid is ready
+   * prepareAsync
+   * Constructs all available components: systems, modes, behaviors, and services,
+   * then applies any pre-init configuration (asset paths, locale, etc.).
+   * After this resolves, all available components exist
+   * and can be configured before calling `initAsync()`.
+   * @return  Promise resolved when all components are constructed and configured
    */
-  initAsync(): Promise<void> {
-    if (this._initPromise) return this._initPromise;
+  prepareAsync(): Promise<void> {
+    if (this._preparePromise) return this._preparePromise;
 
-    // -------------------------------
     // Construct all the core classes
-    // -------------------------------
     for (const [id, System] of systems.available) {
       this.systems[id] = new System(this);
     }
@@ -283,7 +287,7 @@ export class Context extends EventEmitter {
 
     // LocalizationSystem
     const l10n = this.systems.l10n;
-    if (this._prelocale && l10n) {   // set preferred locale codes, if we have them
+    if (l10n && this._prelocale) {   // set preferred locale codes, if we have them
       l10n.preferredLocaleCodes = this._prelocale;
     }
 
@@ -321,24 +325,67 @@ export class Context extends EventEmitter {
       }
     }
 
+    return this._preparePromise = Promise.resolve();
+  }
 
-    // ---------------------------------
-    // Initialize all the core classes
-    // ---------------------------------
-    const allSystems = Object.values(this.systems);
-    const allServices = Object.values(this.services).filter((s): s is AbstractSystem => !!s);
 
-    return this._initPromise = Promise.resolve()
-      .then(() => Promise.all( allSystems.map(s => s!.initAsync()) ))
-      .then(() => Promise.all( allServices.map(s => s.initAsync()) ))
+  /**
+   * initAsync
+   * Initializes all systems and services.
+   * Implicitly calls `prepareAsync()` first if it hasn't been called yet.
+   * After this resolves, components are initialized and can accept configuration
+   * (e.g. `merge()` calls for schema, styles, imagery), but are not yet running.
+   * @return  Promise resolved when all components are initialized
+   */
+  initAsync(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = this.prepareAsync()
       .then(() => {
-        // Setup the osm connection if we have preauth credentials to use
-        const osm = this.services.osm as any;
-        return (osm && this._preauth) ? osm.switchAsync(this._preauth) : Promise.resolve();
+        const allSystems = Object.values(this.systems).filter(s => !!s);
+        const allServices = Object.values(this.services).filter(s => !!s);
+        return Promise.all( allSystems.map(s => s.initAsync()) )
+          .then(() => Promise.all( allServices.map(s => s.initAsync()) ))
+          .then(() => {
+            // Setup the osm connection if we have preauth credentials to use
+            const osm = this.services.osm as any;
+            return (osm && this._preauth) ? osm.switchAsync(this._preauth) : Promise.resolve();
+          });
       })
-      .then(() => Promise.all( allSystems.map(s => s!.autoStart ? s!.startAsync() : Promise.resolve()) ))
-      .then(() => Promise.all( allServices.map(s => s.autoStart ? s.startAsync() : Promise.resolve()) ))
       .then(() => {});  // void return
+  }
+
+
+  /**
+   * startAsync
+   * Starts all systems and services that have `autoStart` enabled.
+   * Implicitly calls `initAsync()` first if it hasn't been called yet.
+   * After this resolves, Rapid is fully running.
+   * @return  Promise resolved when Rapid is running
+   */
+  startAsync(): Promise<void> {
+    if (this._startPromise) return this._startPromise;
+
+    return this._startPromise = this.initAsync()
+      .then(() => {
+        const allSystems = Object.values(this.systems).filter(s => !!s);
+        const allServices = Object.values(this.services).filter(s => !!s);
+        return Promise.all( allSystems.map(s => s.autoStart ? s.startAsync() : Promise.resolve()) )
+          .then(() => Promise.all( allServices.map(s => s.autoStart ? s.startAsync() : Promise.resolve()) ));
+      })
+      .then(() => {});  // void return
+  }
+
+
+  /**
+   * runAsync
+   * Convenience method that calls `prepareAsync()`, `initAsync()`, and `startAsync()`.
+   * Equivalent to calling `startAsync()` directly (which chains all steps),
+   * but makes the intent clearer for simple use cases.
+   * @return  Promise resolved when Rapid is fully running
+   */
+  runAsync(): Promise<void> {
+    return this.startAsync();
   }
 
 
@@ -350,11 +397,11 @@ export class Context extends EventEmitter {
   resetAsync(): Promise<void> {
     if (this._resetPromise) return this._resetPromise;
 
-    const allSystems = Object.values(this.systems);
-    const allServices = Object.values(this.services).filter((s): s is AbstractSystem => !!s);
+    const allSystems = Object.values(this.systems).filter(s => !!s);
+    const allServices = Object.values(this.services).filter(s => !!s);
 
     return this._resetPromise = Promise.resolve()
-      .then(() => Promise.all( allSystems.map(s => s!.resetAsync()) ))
+      .then(() => Promise.all( allSystems.map(s => s.resetAsync()) ))
       .then(() => Promise.all( allServices.map(s => s.resetAsync()) ))
       .then(() => {})  // void return
       .finally(() => { this._resetPromise = null; });

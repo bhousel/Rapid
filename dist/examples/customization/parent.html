@@ -117,16 +117,21 @@ function iframeLoaded() {
   _context = window.rapidContext = _innerWindow.rapidContext;
     updateStatus('Rapid is initializing...');
 
-  // Rapid should already be initting.
+  // Rapid should already be starting up.
   // We can chain off that Promise to know when it's done.
-  _context.initAsync()
+  _context.prepareAsync()
     .then(() => {
-      _rapidStarted = true;
+      // capture variables so we can use the systems
       _assets = _context.systems.assets;
       _map = _context.systems.map;
       _rapid = _context.systems.rapid;
       _styles = _context.systems.styles;
       _schema = _context.systems.schema;
+    })
+    .then(() => context.initAsync())
+    .then(() => context.startAsync())
+    .then(() => {
+      _rapidStarted = true;
 
       // Disable Rapid layer for this demo
       const scene = _context.systems.gfx.scene;
