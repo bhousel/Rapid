@@ -10,7 +10,6 @@ export * from './services/index.ts';
 export * from './util/index.ts';
 export * from './validations/index.js';
 export * from './mocks.ts';
-export * from './Context.ts';
 
 // These Systems and Services can work without browser and UI.
 export { AbstractSystem } from './core/AbstractSystem.ts';
