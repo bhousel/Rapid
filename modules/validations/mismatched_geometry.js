@@ -170,8 +170,8 @@ export function validationMismatchedGeometry(context) {
         if (entity.isOnAddressLine(graph)) return null;
 
         var geometry = entity.geometry(graph);
-        var pointMatch = schema?.matchTags(entity.tags, 'point');
-        var vertexMatch = schema?.matchTags(entity.tags, 'vertex');
+        var pointMatch = schema.matchTags(entity.tags, 'point');
+        var vertexMatch = schema.matchTags(entity.tags, 'vertex');
         var allowsPoint = pointMatch && !pointMatch.isFallback();
         var allowsVertex = vertexMatch && !vertexMatch.isFallback();
 
@@ -431,6 +431,8 @@ export function validationMismatchedGeometry(context) {
     }
 
     var validation = function checkMismatchedGeometry(entity, graph) {
+        if (!schema) return [];
+
         var vertexPoint = vertexPointIssue(entity, graph);
         if (vertexPoint) return [vertexPoint];
 

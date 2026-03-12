@@ -11,13 +11,9 @@ export function validationImpossibleOneway(context) {
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
 
-  // Schema prerequisites
-  const rulesets = schema?.getScope('osm')?.rulesets;
-  const routable = rulesets?.get('connected_highway');
-  const flowing = rulesets?.get('connected_waterway');
 
   let validation = function checkImpossibleOneway(entity, graph) {
-    if (!rulesets) return [];
+    if (!schema) return [];
     if (entity.type !== 'way' || entity.geometry(graph) !== 'line') return [];
     if (entity.isClosed()) return [];
     if (!typeForWay(entity)) return [];
@@ -42,8 +38,18 @@ export function validationImpossibleOneway(context) {
     function typeForWay(way) {
       if (way.geometry(graph) !== 'line') return null;
 
-      if (routable?.match({ highway: way.tags.highway })) return 'highway';
-      if (flowing?.match({ waterway: way.tags.waterway })) return 'waterway';
+      const rulesets = schema.getScope('osm').rulesets;
+
+      const routable = rulesets.get('connected_highway');
+      if (routable?.match({ highway: way.tags.highway })) {
+        return 'highway';
+      }
+
+      const flowing = rulesets.get('connected_waterway');
+      if (flowing?.match({ waterway: way.tags.waterway })) {
+        return 'waterway';
+      }
+
       return null;
     }
 
@@ -97,6 +103,8 @@ export function validationImpossibleOneway(context) {
         if (parentWay.id === way.id) return false;
 
         if (wayType === 'highway') {
+          const routable = schema.getScope('osm').rulesets.get('connected_highway');
+
           // allow connections to highway areas
           if (parentWay.geometry(graph) === 'area' && routable?.match({ highway: parentWay.tags.highway })) return true;
           // consider connections to ferry routes as connected

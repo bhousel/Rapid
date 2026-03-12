@@ -12,10 +12,6 @@ export function validationOutdatedTags(context) {
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
 
-  // Schema prerequisites
-  const variables = schema?.getScope('osm')?.variables;
-  const presets = schema?.getScope('osm')?.presets;
-  const pathVals = variables?.get('path_highway_values')?.asSet();
 
   /**
    * _isCrossingWay
@@ -25,6 +21,7 @@ export function validationOutdatedTags(context) {
    * @return  {boolean}  `true` if the way is tagged as a crossing
    */
   function _isCrossingWay(tags) {
+    const pathVals = schema.getScope('osm').variables.get('path_highway_values')?.asSet();
     for (const k of pathVals ?? []) {
       if (tags.highway === k && tags[k] === 'crossing') {
         return true;
@@ -38,6 +35,7 @@ export function validationOutdatedTags(context) {
    * oldTagIssues
    */
   function oldTagIssues(entity, graph) {
+    if (!schema) return [];
     if (!entity.hasInterestingTags()) return [];
 
     let preset = schema.match(entity, graph);
@@ -75,7 +73,11 @@ graph = new Graph(graph);
 
     // Upgrade preset, if a replacement is available..
     if (preset.props.replacement) {
-      const newPreset = presets?.get(preset.props.replacement);
+      const newPreset = schema.getScope('osm').presets.get(preset.props.replacement);
+      if (!newPreset) {
+        console.warn(`validationOutdatedTags: warning "${preset.id}" wants replacement "${preset.props.replacement}" not found`);  // eslint-disable-line no-console
+        return [];
+      }
       graph = actionChangePreset(entity.id, preset, newPreset, true /* skip field defaults */)(graph);
       entity = graph.entity(entity.id);
       preset = newPreset;

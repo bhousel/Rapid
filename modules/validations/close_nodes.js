@@ -11,10 +11,6 @@ export function validationCloseNodes(context) {
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
 
-  // Schema prerequisites
-  const rulesets = schema?.getScope('osm')?.rulesets;
-  const pathHighway = rulesets?.get('path_highway');
-
   const pointThresholdMeters = 0.2;
 
   // helpers
@@ -24,6 +20,8 @@ export function validationCloseNodes(context) {
 
 
   let validation = function(entity, graph) {
+    if (!schema) return [];
+
     if (entity.type === 'node') {
       return getIssuesForNode(entity);
     } else if (entity.type === 'way') {
@@ -46,6 +44,8 @@ export function validationCloseNodes(context) {
       if (hasTag(tags.boundary)) return 'boundary';
       if (hasTag(tags.indoor)) return 'indoor';
       if (hasTag(tags.building) || hasTag(tags['building:part'])) return 'building';
+
+      const pathHighway = schema.getScope('osm').rulesets.get('path_highway');
       if (pathHighway?.match({ highway: tags.highway })) return 'path';
 
       const parentRelations = graph.parentRelations(way);

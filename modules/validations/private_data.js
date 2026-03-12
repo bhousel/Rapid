@@ -11,19 +11,21 @@ export function validationPrivateData(context) {
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
 
-  // Schema prerequisites
-  const variables = schema?.getScope('osm')?.variables;
-  const privateBuildingValues = variables?.get('private_building_values')?.asSet();
-  const publicKeys = variables?.get('public_feature_keys')?.asSet();
-  const personalKeys = variables?.get('personal_data_keys')?.asSet();
-
 
   let validation = function checkPrivateData(entity) {
-    if (!privateBuildingValues) return [];  // schema not ready
+    if (!schema) return [];
+
+    const variables = schema.getScope('osm').variables;
+    const privateBuildingValues = variables.get('private_building_values')?.asSet();
+    if (!privateBuildingValues) return [];
+
     const tags = entity.tags;
     if (!tags.building || !privateBuildingValues.has(tags.building)) return [];  // not a private building
 
     let keepTags = {};
+    const publicKeys = variables.get('public_feature_keys')?.asSet();
+    const personalKeys = variables.get('personal_data_keys')?.asSet();
+
     for (const [k, v] of Object.entries(tags)) {
       if (publicKeys.has(k)) return [];  // ignore, probably a public feature
       if (!personalKeys.has(k)) {
