@@ -31,6 +31,7 @@
         "razed", "removed", "was"
       ],
 
+      // ### HIGHWAY CLASSIFICATION
       // Highway values for major roads (motor vehicles, classified roads)
       major_highway_values: [
         "motorway", "trunk", "primary", "secondary", "tertiary",
@@ -49,6 +50,7 @@
         "elevator", "ladder", "steps", "via_ferrata"
       ],
 
+      // ### CROSSINGS
       // Tag keys that should be kept in sync between a crossing way and its child
       // crossing nodes.
       crossing_sync_keys: [
@@ -63,6 +65,7 @@
         "crossing_ref", "crossing:continuous", "crossing:island"
       ],
 
+      // ### PRIVATE DATA
       // Building types that are likely private residences.
       // Used by the private_data validator to identify buildings that shouldn't
       // have personal contact info (phone, email, fax).
