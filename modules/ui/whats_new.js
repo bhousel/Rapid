@@ -37,7 +37,18 @@ export function uiWhatsNew(context) {
       }));
 
 
-    const markdown = l10n.t('whats_new.text_v25') + '\n\n' + l10n.t('whats_new.project_links') + '\n\n';
+    const markdown = `
+Big changes are coming soon to Rapid. including:
+
+* · Rewritten core data model, allows for runtime data conflation across data layers.
+* · New schema system - bring your own Presets, Fields, tag matching rules.
+* · New styling system - control all aspects of map styling: colors, line widths, etc.
+* · Style, Schema, and Imagery can all be replaced with your own custom rules changed on the fly.
+* · All customizations can be scoped - they can apply to 'osm' or to other data layers.
+
+<br/>Happy Mapping! 👍"
+`;
+//    const markdown = l10n.t('whats_new.text_v25') + '\n\n' + l10n.t('whats_new.project_links') + '\n\n';
 
     const $mainSection = $content
       .append('div')
@@ -48,25 +59,25 @@ export function uiWhatsNew(context) {
       .attr('class', 'whatsnew-text')
       .html(marked.parse(markdown));
 
-    $mainSection
-      .append('div')
-      .attr('class', 'whatsnew-images')
-// if an image:
-      .append('img')
-      .attr('class', 'whatsnew-image')
-      .attr('src', assets.getFileURL('img/rapid-v25-curbs.gif'));
-// if a video:
-//      .append('video')
-//      .attr('class', 'whatsnew-image')
-//      .attr('width', '660')
-//      .attr('muted', '')
-//      .attr('controls', '')
-//      .attr('loop', '')
-//      .attr('playsinline', '')
-//      .attr('disablepictureinpicture', '')
-//      .attr('poster', assets.getFileURL('img/rapid-v23-rotation.jpg'))
-//      .attr('src', assets.getFileURL('img/rapid-v23-rotation.mp4'))
-//      .attr('autoplay', '');
+//     $mainSection
+//       .append('div')
+//       .attr('class', 'whatsnew-images')
+// // if an image:
+//       .append('img')
+//       .attr('class', 'whatsnew-image')
+//       .attr('src', assets.getFileURL('img/rapid-v25-curbs.gif'));
+// // if a video:
+// //      .append('video')
+// //      .attr('class', 'whatsnew-image')
+// //      .attr('width', '660')
+// //      .attr('muted', '')
+// //      .attr('controls', '')
+// //      .attr('loop', '')
+// //      .attr('playsinline', '')
+// //      .attr('disablepictureinpicture', '')
+// //      .attr('poster', assets.getFileURL('img/rapid-v23-rotation.jpg'))
+// //      .attr('src', assets.getFileURL('img/rapid-v23-rotation.mp4'))
+// //      .attr('autoplay', '');
 
     const $checkbox = $mainSection
       .append('div')
