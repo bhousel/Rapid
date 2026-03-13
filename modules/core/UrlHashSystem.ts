@@ -172,15 +172,6 @@ export class UrlHashSystem extends AbstractSystem {
         editor?.on('stablechange', this.deferredUpdateTitle);
         context.on('modechange', this.deferredUpdateTitle);
         (_window as Window).addEventListener('hashchange', this._hashChanged);
-
-        // A lot of things will start happening when urlhash emits its
-        // first hashchange event.  Chain off Context's initAsync Promise
-        // to know when everything has started up and it is ok to do this.
-        context.initAsync()
-          .then(() => {
-            this._unpauseFn?.();
-            this._unpauseFn = null;
-          });
       });
   }
 
@@ -191,7 +182,17 @@ export class UrlHashSystem extends AbstractSystem {
    * @return  Promise resolved when this component has completed startup
    */
   startAsync(): Promise<void> {
-    return super.startAsync();
+    return super.startAsync()
+      .then(() => {
+        // A lot of things will start happening when urlhash emits its
+        // first hashchange event.  Chain off Context's startAsync Promise
+        // to know when everything has started up and it is ok to do this.
+        this.context.startAsync()
+          .then(() => {
+            this._unpauseFn?.();
+            this._unpauseFn = null;
+          });
+      });
   }
 
 
