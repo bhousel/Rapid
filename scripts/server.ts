@@ -6,6 +6,13 @@ const hostname = '127.0.0.1';
 const port = 8080;
 const matchCDN = new RegExp(`(['"\`])(https?://cdn.jsdelivr.*${project}.*/)(dist.*["'\`])`, 'gi');
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': '*'
+};
+
+
 //
 // Note: we don't use this for Rapid currently, but leave it in anyway
 //
@@ -35,10 +42,17 @@ const server = Bun.serve({
     const url = new URL(req.url);
 
     // Handle special cases first
+    // CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      console.log(styleText('yellowBright', `${req.method}:  ${url.pathname}`));
+      console.log(styleText('greenBright', `200:  Preflight OK`));
+      return new Response('Preflight OK', { status: 200, ...CORS });
+    }
+
     // By default, redirect root `/` to `dist/`
     if (url.pathname === '/') {
       console.log(styleText('yellowBright', `307:  Temporary Redirect → 'dist/'`));
-      return new Response('Temporary Redirect', { status: 307, headers: { location: 'dist/' }});
+      return new Response('Temporary Redirect', { status: 307, headers: { location: 'dist/', ...CORS }});
     }
     // Chrome Devtools - generate a workspace JSON file
     // see: http://goo.gle/devtools-automatic-workspace-folders
@@ -57,7 +71,7 @@ const server = Bun.serve({
         styleText('greenBright', `200:  Generating workspace JSON`) +
         styleText('green', `  ${contentType}`)
       );
-      return new Response(JSON.stringify(json), { status: 200, headers: { 'content-type': contentType }});
+      return new Response(JSON.stringify(json), { status: 200, headers: { 'content-type': contentType, ...CORS }});
     }
 
     const path = url.pathname.split('/');
@@ -78,9 +92,9 @@ const server = Bun.serve({
         );
         if (/(html|javascript)/.test(file.type)) {
           const content: string = await file.text();
-          return new Response(replaceCDNPath(content), { headers: { 'content-type': file.type }});
+          return new Response(replaceCDNPath(content), { headers: { 'content-type': file.type, ...CORS }});
         } else {
-          return new Response(file);
+          return new Response(file, { headers: { 'content-type': file.type, ...CORS } });
         }
       } else {
         console.log(styleText('redBright', `404:  Not Found → '${filepath}'`));
