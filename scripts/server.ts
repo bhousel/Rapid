@@ -17,7 +17,7 @@ const CORS = {
 // Note: we don't use this for Rapid currently, but leave it in anyway
 //
 // Replace urls for CDN `dist/*` files with local `dist/*` files.
-// e.g. 'https://cdn.jsdelivr.net/npm/path/to/dist/file.min.js' -> '/dist/file.js'
+// e.g. 'https://cdn.jsdelivr.net/npm/path/to/dist/file.js' -> '/dist/file.js'
 function replaceCDNPath(s: string): string {
   return s.replaceAll(matchCDN, replacer);
 }
@@ -82,7 +82,7 @@ const server = Bun.serve({
       path[last] = 'index.html';
     }
 
-    const filepath = '.' + path.join('/').replace('.min', '');
+    const filepath = '.' + path.join('/');  // .replace('.min', '');
     try {
       const file = Bun.file(filepath);
       if (await file.exists()) {

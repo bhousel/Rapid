@@ -154,10 +154,16 @@ async function buildData() {
   await writeEnJson();
 
   // copy `./data/**` files to `./dist/data/**`
-  const glob = new Glob('./data/**/*.json{,c,5}');
+  let glob = new Glob('./data/**/*.json{,c,5}');
   for (const src of glob.scanSync()) {
     const dest = src.replace(/\\/g, '/').replace('data/', 'dist/data/');
     await $`cp -f ${src} ${dest}`;
+  }
+
+  // minify files
+  glob = new Glob('./dist/data/**/*.{json,jsonc,json5}');
+  for (const filepath of glob.scanSync()) {
+    await minifyJSON(filepath);
   }
 
   console.timeEnd(END);
@@ -349,3 +355,23 @@ function sortObject(obj: Record<string, unknown>): Record<string, unknown> | nul
   }
   return sorted;
 }
+
+
+/**
+ * minifyJSON
+ * This function creates a minified `.min.json` file in the same place as an original `.json` file.
+ *
+ * JSDelivr CDN does not yet have automatic support for serving `.min.json`.
+ * We can watch this issue to see if they add it:  https://github.com/jsdelivr/jsdelivr/issues/18604
+ * Then maybe remove this code.
+ *
+ * @param  {string}  filepath - the path to the file we want to minify
+ */
+async function minifyJSON(filepath: string): Promise<void> {
+  const outpath = filepath.replace('.json', '.min.json');
+  const contents = Bun.JSON5.parse(await Bun.file(filepath).text());
+
+  // console.log(styleText('greenBright', outpath));
+  await Bun.write(outpath, JSON.stringify(contents));
+}
+

@@ -31,11 +31,11 @@
   },
   "include": [
     "global.d.ts",
-    "modules/**/*"
+    "modules/**/*",
+    "scripts/**/*"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "scripts"
+    "dist"
   ]
 }
