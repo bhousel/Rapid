@@ -1,5 +1,8 @@
 ## **Rapid** Release Checklist
 
+> [!WARNING]
+> This file is outdated and will require a rewrite when we publish v3
+
 ### To update translations
 
 Create a file `transifex.auth` in the root folder of the Rapid project.
@@ -131,6 +134,9 @@ aws s3 cp dist <destination>
 
 
 ### Purge cache
+
+> [!WARNING]
+> This section is outdated.  Paths have changed and will be different when we publish v3
 
 ```bash
 curl 'https://purge.jsdelivr.net/npm/@rapideditor/rapid/dist/rapid.css'
