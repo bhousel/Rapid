@@ -16,9 +16,9 @@ const PARTIALFILLWIDTH = 32;
 interface SSRData {
   screenSSR: any;
   worldSSR: any;
-  worldAxis1: Vec2[];
-  worldAxis2: Vec2[];
-  worldCenter: Vec2;
+  worldSSRHeight: Vec2[];
+  worldSSRWidth: Vec2[];
+  worldSSRCenter: Vec2;
   shapeType: 'square' | 'circle';
 }
 
@@ -188,26 +188,28 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         // Calculate axes of symmetry to determine width, height
         // The shape's surrounding rectangle has 2 axes of symmetry.
         //
-        //       1
+        //       0
         //   p1 /\              p1 = midpoint of poly[0]-poly[1]
         //     /\ \ q2          q1 = midpoint of poly[2]-poly[3]
-        //   0 \ \/\
-        //      \/\ \ 2         p2 = midpoint of poly[3]-poly[0]
-        //    p2 \ \/           q2 = midpoint of poly[1]-poly[2]
+        //   1 \ \/\
+        //      \/\ \ 3         p2 = midpoint of poly[1]-poly[2]
+        //    p2 \ \/           q2 = midpoint of poly[3]-poly[0]
         //        \/ q1
-        //        3
+        //        2
 
-        const poly = screen.ssr.poly;
+        const poly = screen.ssr.poly;  // note: wound counterclockwise
         const p1: Vec2 = [(poly[0][0] + poly[1][0]) / 2, (poly[0][1] + poly[1][1]) / 2 ];
         const q1: Vec2 = [(poly[2][0] + poly[3][0]) / 2, (poly[2][1] + poly[3][1]) / 2 ];
         const p2: Vec2 = [(poly[3][0] + poly[0][0]) / 2, (poly[3][1] + poly[0][1]) / 2 ];
         const q2: Vec2 = [(poly[1][0] + poly[2][0]) / 2, (poly[1][1] + poly[2][1]) / 2 ];
-        const axis1 = [p1, q1];
-        const axis2 = [p2, q2];
+        // axis1 (p1→q1) is perpendicular to `angle` — this is the SSR's height
+        // axis2 (p2→q2) is along `angle` — this is the SSR's width
+        const height = [p1, q1];
+        const width = [p2, q2];
         const center: Vec2 = [ (p1[0] + q1[0]) / 2, (p1[1] + q1[1]) / 2 ];
 
         // Pick an appropriate lowRes sprite for this shape
-        // Are the SSR corners part of the shape?
+        // Are any SSR corners part of the shape?
         const EPSILON = 0.1;
         let c0in: boolean | undefined;
         let c1in: boolean | undefined;
@@ -225,9 +227,9 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         this._ssrdata = {
           screenSSR: geom.screen!.ssr,
           worldSSR: geom.world!.ssr,
-          worldAxis1: axis1.map(coord => viewport.screenToWorld(coord as Vec2)),
-          worldAxis2: axis2.map(coord => viewport.screenToWorld(coord as Vec2)),
-          worldCenter: viewport.screenToWorld(center),
+          worldSSRHeight: height.map(coord => viewport.screenToWorld(coord)),
+          worldSSRWidth: width.map(coord => viewport.screenToWorld(coord)),
+          worldSSRCenter: viewport.screenToWorld(center),
           shapeType: (cornersInSSR ? 'square' : 'circle')
         };
       }
@@ -302,12 +304,14 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const ssrdata = this._ssrdata;
       const filling = isWireframeMode ? '-unfilled' : '';
       const textureName = `lowres${filling}-${ssrdata.shapeType}`;
-      const [x, y] = viewport.worldToScreen(ssrdata.worldCenter);
+      const [x, y] = viewport.worldToScreen(ssrdata.worldSSRCenter);
       const rotation = ssrdata.worldSSR.angle;
-      const axis1 = ssrdata.worldAxis1.map(coord => viewport.worldToScreen(coord));
-      const axis2 = ssrdata.worldAxis2.map(coord => viewport.worldToScreen(coord));
-      const w = vecLength(axis1[0], axis1[1]);
-      const h = vecLength(axis2[0], axis2[1]);
+      const axis1 = ssrdata.worldSSRHeight.map(coord => viewport.worldToScreen(coord));
+      const axis2 = ssrdata.worldSSRWidth.map(coord => viewport.worldToScreen(coord));
+      // axis1 (p1→q1) is perpendicular to `angle` — this is the SSR's height
+      // axis2 (p2→q2) is along `angle` — this is the SSR's width
+      const w = vecLength(axis2[0], axis2[1]);
+      const h = vecLength(axis1[0], axis1[1]);
 
       lowRes.texture = textureManager.getTexture('symbol', textureName) || PIXI.Texture.WHITE;
       lowRes.position.set(x, y);
@@ -492,19 +496,21 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     // Debug SSR
-    // const p = this._ssrdata.screenSSR.poly;
-    // const ssrflat = [
-    //  p[0][0], p[0][1],
-    //  p[1][0], p[1][1],
-    //  p[2][0], p[2][1],
-    //  p[3][0], p[3][1],
-    //  p[0][0], p[0][1]
-    // ];
+    // this.debugSSR.clear();
+    // if (this._ssrdata) {
+    //   const p = this._ssrdata.screenSSR.poly;
+    //   const ssrflat = [
+    //     p[0][0], p[0][1],
+    //     p[1][0], p[1][1],
+    //     p[2][0], p[2][1],
+    //     p[3][0], p[3][1],
+    //     p[0][0], p[0][1]
+    //   ];
     //
-    // this.debugSSR
-    //   .clear()
-    //   .poly(new PIXI.Polygon(ssrflat))
-    //   .stroke({ width: 2, color: 0x00ff00 });
+    //   this.debugSSR
+    //     .poly(ssrflat, true)
+    //     .stroke({ width: 2, color: 0x00ff00 });
+    // }
 
     this._styleDirty = false;
 
