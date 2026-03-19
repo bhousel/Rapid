@@ -411,20 +411,29 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
           if (poiFeature.dirty) {
             // copy the polygon style, then apply customizations
-            const markerStyle = Object.assign({}, feature.style) as MatchedStyle;  // shallow copy
-            markerStyle.marker.image = 'pin';
+            const markerStyle = globalThis.structuredClone(feature.style) as MatchedStyle;  // clone the style
+
+            if (hasWikidata(entity)) {
+              markerStyle.marker.image = 'boldPin';
+              markerStyle.marker.color = 0xdddddd;  // grey pins
+              markerStyle.label.color = 0xdddddd;
+            } else {
+              markerStyle.marker.image = 'pin';
+              markerStyle.marker.color = 0xffffff;  // white pins
+              markerStyle.label.color = 0xffffff;
+            }
+            // -or- make the virtual pins more closely match the polygon fill color?
+            // (interesting idea, but these tend to be hard to see)
+            // see Rapid#958 and Rapid#1474
+            // markerStyle.marker.color = markerStyle.fill.color;
+            // markerStyle.label.color = markerStyle.fill.color;
+            markerStyle.icon.color = 0x444444;
 
             const poiIcon = (feature as any).poiPreset?.props?.icon;
             if (poiIcon) {
               markerStyle.icon.image = poiIcon;
             }
 
-            if (hasWikidata(entity)) {
-              markerStyle.icon.color = 0x444444;
-              markerStyle.marker.image = 'boldPin';
-              markerStyle.marker.color = 0xdddddd;
-              markerStyle.label.color = 0xdddddd;
-            }
             poiFeature.style = markerStyle;
             poiFeature.label = feature.label;
           }
@@ -458,10 +467,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         levelContainer = new PIXI.Container();
         levelContainer.label = level.toString();
         levelContainer.sortableChildren = true;
-        (levelContainer as PIXI.Container).zIndex = parseInt(level, 10);
+        levelContainer.zIndex = parseInt(level, 10);
         lineContainer.addChild(levelContainer);
       }
-      return levelContainer as PIXI.Container;
+      return levelContainer;
     };
 
     const entities = data.lines;
@@ -651,13 +660,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         if (hasWikidata(node)) {
           markerStyle.icon.color = 0x444444;
-          markerStyle.label.color = 0xdddddd;
           markerStyle.marker.color = 0xdddddd;
+          markerStyle.label.color = 0xdddddd;
         }
         if (node.isShared(graph)) {     // shared nodes / junctions are more grey
           markerStyle.icon.color = 0x111111;
-          markerStyle.label.color = 0xbbbbbb;
           markerStyle.marker.color = 0xbbbbbb;
+          markerStyle.label.color = 0xbbbbbb;
         }
 
         feature.style = markerStyle;
@@ -714,18 +723,22 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       if (feature.dirty) {
         const markerStyle = styles.styleMatch(node.tags, 'point') as MatchedStyle;
-        markerStyle.marker.image = 'pin';
+
+        if (hasWikidata(node)) {
+          markerStyle.marker.image = 'boldPin';
+          markerStyle.marker.color = 0xdddddd;  // grey pins
+          markerStyle.label.color = 0xdddddd;
+        } else {
+          markerStyle.marker.image = 'pin';
+          markerStyle.marker.color = 0xffffff;  // white pins
+          markerStyle.label.color = 0xffffff;
+        }
+        markerStyle.icon.color = 0x444444;
 
         // Show viewfields, if any..
         markerStyle.viewfield.angles = node.directions(graph);
         markerStyle.viewfield.image = 'viewfieldDark';
 
-        if (hasWikidata(node)) {
-          markerStyle.icon.color = 0x444444;
-          markerStyle.marker.image = 'boldPin';
-          markerStyle.marker.color = 0xdddddd;
-          markerStyle.label.color = 0xdddddd;
-        }
 
         // Override to style standalone addresses as circles, not pins.
         const preset = schema.matchTags(node.tags, 'point');
