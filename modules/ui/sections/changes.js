@@ -89,10 +89,10 @@ export function uiSectionChanges(context) {
         if (name !== '') {
           string += ':';
         }
-        return string += ' ' + name;
+        return string + ' ' + name;
       });
 
-    items = itemsEnter
+    items = itemsEnter  // eslint-disable-line no-useless-assignment
       .merge(items);
 
 

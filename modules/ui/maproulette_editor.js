@@ -110,7 +110,7 @@ export function uiMapRouletteEditor(context) {
       .attr('class', 'mr-save save-section cf');
 
     // update
-    $saveSection = $saveSection
+    $saveSection = $saveSection  // eslint-disable-line no-useless-assignment
       .merge($$saveSection)
       .call(userDetails)
       .call(mRSaveButtons);

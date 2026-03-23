@@ -96,7 +96,7 @@ export class UiVersionInfo {
     }
 
     // update
-    $wrap = $wrap.merge($$wrap);
+    $wrap = $wrap.merge($$wrap);  // eslint-disable-line no-useless-assignment
 
     this.Tooltip
       .title(l10n.t('version.whats_new', { version: currVersion }))

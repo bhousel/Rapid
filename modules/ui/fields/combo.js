@@ -446,7 +446,7 @@ export function uiFieldCombo(context, uifield) {
 
                 if (key) {
                     // Set keys for form-field modified (needed for undo and reset buttons)..
-                    keys = _multiData.map(function(d) { return d.key; });
+                    keys = _multiData.map(function (d) { return d.key; });  // eslint-disable-line no-useless-assignment
 
                     // limit the input length so it fits after prepending the key prefix
                     maxLength = context.maxCharsForTagKey - utilUnicodeCharsCount(key);

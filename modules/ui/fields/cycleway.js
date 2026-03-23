@@ -92,7 +92,7 @@ export function uiFieldCycleway(context, uifield) {
         }
         if (otherValue === 'none' || otherValue === '') { otherValue = undefined; }
 
-        var tag = {};
+        var tag;
 
         // If the left and right tags match, use the cycleway tag to tag both
         // sides the same way

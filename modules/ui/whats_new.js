@@ -11,7 +11,7 @@ import { uiModal } from './modal.js';
  *   - They do not have backup changes to restore
  */
 export function uiWhatsNew(context) {
-  const assets = context.systems.assets;
+  // const assets = context.systems.assets;
   const l10n = context.systems.l10n;
   const storage = context.systems.storage;
 

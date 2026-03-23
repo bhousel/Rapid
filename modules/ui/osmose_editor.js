@@ -85,7 +85,7 @@ export function uiOsmoseEditor(context) {
       .attr('class', 'qa-save save-section cf');
 
     // update
-    $saveSection = $$saveSection
+    $saveSection = $$saveSection   // eslint-disable-line no-useless-assignment
       .merge($saveSection)
       .call(qaSaveButtons);
   }

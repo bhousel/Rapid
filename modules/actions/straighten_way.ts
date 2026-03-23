@@ -25,7 +25,6 @@ export function actionStraightenWay(selectedIDs: EntityID[], viewport: Viewport)
 
   // Return all selected ways as a continuous, ordered array of nodes
   function allNodes(graph: Graph): OsmNode[] {
-    let nodes: EntityID[] = [];
     let startNodes: EntityID[] = [];
     let endNodes: EntityID[] = [];
     let remainingWays: EntityID[][] = [];
@@ -34,10 +33,10 @@ export function actionStraightenWay(selectedIDs: EntityID[], viewport: Viewport)
 
     for (const wayID of selectedWays) {
       const way = graph.entity(wayID) as OsmWay;
-      nodes = way.nodes.slice(0);
-      remainingWays.push(nodes);
-      startNodes.push(nodes[0]);
-      endNodes.push(nodes[nodes.length-1]);
+      const wayNodes = way.nodes.slice(0);
+      remainingWays.push(wayNodes);
+      startNodes.push(wayNodes[0]);
+      endNodes.push(wayNodes[wayNodes.length-1]);
     }
 
     // Remove duplicate end/startNodes (duplicate nodes cannot be at the line end,
@@ -49,8 +48,8 @@ export function actionStraightenWay(selectedIDs: EntityID[], viewport: Viewport)
     // Choose the initial endpoint to start from
     let currNode: EntityID | undefined = utilArrayDifference(startNodes, endNodes)
         .concat(utilArrayDifference(endNodes, startNodes))[0];
-    let nextWay: EntityID[] = [];
-    nodes = [];
+    let nextWay: EntityID[];
+    let nodes: EntityID[] = [];
 
     // Create nested function outside of loop to avoid "function in loop" lint error
     const getNextWay = function(currNode: EntityID | undefined, remainingWays: EntityID[][]): EntityID[] | undefined {

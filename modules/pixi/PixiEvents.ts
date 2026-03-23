@@ -441,8 +441,8 @@ export class PixiEvents extends EventEmitter {
     // (NB: We observe modifier keys elsewhere and can know whether the user really did press ctrlKey)
     const isPinchZoom = !isRoundNumber && e.ctrlKey && !this.modifierKeys.has('Control');
 
-    let gesture: 'zoom' | 'pan' = 'zoom';  // Detect this wheel event as 'zoom' or 'pan'
-    let speed = 3;         // Multiplier to adjust the zoom speed
+    let gesture: 'zoom' | 'pan';  // Detect this wheel event as 'zoom' or 'pan'
+    let speed: number;         // Multiplier to adjust the zoom speed
 
     if (isPinchZoom) {   // A pinch-zoom gesture on a trackpad...
       gesture = 'zoom';

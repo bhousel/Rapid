@@ -57,7 +57,7 @@ export class UiSpector {
       .append('div')
       .attr('class', 'spector');
 
-    this.$wrap = $wrap = $wrap.merge($$wrap)
+    this.$wrap = $wrap.merge($$wrap)
       .style('display', this._isHidden ? 'none' : 'block');
   }
 

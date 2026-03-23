@@ -160,7 +160,7 @@ export class UiSidebar {
       .append('div')
       .attr('class', 'resizer-handle');
 
-    this.$resizer = $resizer = $resizer.merge($$resizer)
+    this.$resizer = $resizer = $resizer.merge($$resizer)  // eslint-disable-line no-useless-assignment
       .call(this.Tooltip
         .placement(dir === 'rtl' ? 'right' : 'left')  // place on the sidebar side (i.e. don't cover the map)
         .title(l10n.t('inspector.tooltip'))

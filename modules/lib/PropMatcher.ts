@@ -182,7 +182,7 @@ export class PropMatcher {
       try {
         this._keyRegex = new RegExp(this.key as string);
       } catch (e) {
-        throw new Error(`PropMatcher: invalid key regex pattern '${this.key}'`);
+        throw new Error(`PropMatcher: invalid key regex pattern '${this.key}'`, { cause: e });
       }
     }
 
@@ -199,7 +199,7 @@ export class PropMatcher {
         try {
           this._valueRegex = new RegExp(props.value, 'i');  // Case-insensitive by default
         } catch (e) {
-          throw new Error(`PropMatcher: invalid regex pattern '${props.value}'`);
+          throw new Error(`PropMatcher: invalid regex pattern '${props.value}'`, { cause: e });
         }
       }
     }

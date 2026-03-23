@@ -782,7 +782,7 @@ export class Context extends EventEmitter {
    * @return  The next number in the sequence
    */
   next(sequenceID: SequenceID): number {
-    let num = this.sequences[sequenceID] || 0;
-    return this.sequences[sequenceID] = ++num;
+    const num = (this.sequences[sequenceID] || 0) + 1;
+    return this.sequences[sequenceID] = num;
   }
 }

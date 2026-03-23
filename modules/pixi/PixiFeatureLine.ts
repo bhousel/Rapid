@@ -115,7 +115,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       if (!screen) return;  // can't render anything without screen coords
 
       // Apply effectiveZoom style adjustments
-      let showMarkers = true;
+      let showMarkers: boolean;
 
       // Cull really tiny shapes
       if (screen.width! < 4 && screen.height! < 4) {  // so tiny
@@ -297,7 +297,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       drawLineFromPoints(points, g);
     } else {
       drawLineFromPoints(points, g as PIXI.Graphics);
-      g = (g as PIXI.Graphics).stroke(strokeStyle);
+      (g as PIXI.Graphics).stroke(strokeStyle);
     }
 
     function drawLineFromPoints(points: Vec2[], graphics: PIXI.Graphics | DashLine): void {

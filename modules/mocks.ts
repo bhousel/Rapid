@@ -49,8 +49,8 @@ export class MockContext {
   cleanTagKey(val: string): string    { return val; };
   cleanTagValue(val: string): string  { return val; };
   next(which: SequenceID): number {
-    let num = this.sequences[which] || 0;
-    return this.sequences[which] = ++num;
+    const num = (this.sequences[which] || 0) + 1;
+    return this.sequences[which] = num;
   }
 }
 

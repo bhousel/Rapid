@@ -40,7 +40,7 @@ export function utilDetect(refresh?: boolean): DetectResult {
   const result: Partial<DetectResult> = {};
 
   const ua = globalThis.navigator?.userAgent ?? '';
-  let m: RegExpMatchArray | null = null;
+  let m: RegExpMatchArray | null;
 
   /* Browser */
   m = ua.match(/(edg)\/?\s*(\.?\d+(\.\d+)*)/i);   // Edge

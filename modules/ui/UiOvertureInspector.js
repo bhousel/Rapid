@@ -236,7 +236,7 @@ export class UiOvertureInspector {
     }
 
     // update
-    $propInfo = $propInfo.merge($$propInfo);
+    $propInfo = $propInfo.merge($$propInfo);  // eslint-disable-line no-useless-assignment
   }
 
 

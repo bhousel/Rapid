@@ -120,9 +120,9 @@ export function validationYShapedConnection(context) {
     const other = context.viewport.project(otherNode.loc);
     const conn = context.viewport.project(connNode.loc);
     const edge = context.viewport.project(edgeNode.loc);
-    let prevEdgeAngle = 0;
-    let nextEdgeAngle = 0;
-    let angleBetweenEdges = 0;
+    let prevEdgeAngle;
+    let nextEdgeAngle;
+    let angleBetweenEdges;
 
     if (otherNodeIdx < edgeNodeIdx) {
       // node order along way: otherNode -> connNode -> edgeNode

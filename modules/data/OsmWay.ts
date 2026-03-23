@@ -367,7 +367,7 @@ export class OsmWay extends OsmEntity {
 
     const nodes = utilArrayUniq(graph.childNodes(this));
     const coords = nodes.map((node: any) => node.loc);
-    let curr = 0;
+    let curr: number;
     let prev = 0;
 
     for (let i = 0; i < coords.length; i++) {

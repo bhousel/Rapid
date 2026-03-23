@@ -401,7 +401,7 @@ export class DrawAreaMode extends AbstractMode {
     eventManager.setCursor('crosshair');
 
     let graph = editor.staging.graph;
-    let drawNode = this.drawNodeID && graph.hasEntity(this.drawNodeID) as OsmNode | undefined;
+    const drawNode = this.drawNodeID && graph.hasEntity(this.drawNodeID) as OsmNode | undefined;
 
     // Start transaction now - if we are making a draw node, we want it included.
     editor.beginTransaction();
@@ -410,7 +410,7 @@ export class DrawAreaMode extends AbstractMode {
     // Note that we don't need the distance checking code here that we have in `_move()`.
     // If we receive a 'click', we really do need a draw node now!
     if (this.drawWayID && !drawNode) {
-      drawNode = this._addDrawNode();
+      this._addDrawNode();
       graph = editor.staging.graph;
     }
 

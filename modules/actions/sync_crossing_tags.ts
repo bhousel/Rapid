@@ -302,7 +302,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
    * @return  updated tags to set
    */
   function cleanCrossingTags(t: Tags): Tags {
-    let crossing: string | null = t.crossing ?? '';
+    const crossing: string | null = t.crossing ?? '';
     const crossingref: string = t.crossing_ref ?? '';
     let markings: string = t['crossing:markings'] ?? '';
     let signals: string  = t['crossing:signals'] ?? '';
@@ -387,7 +387,6 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
         (legacySignaled && !modernSignaled) || (!legacySignaled && modernSignaled) ||
         (crossing === 'yes' && markings)  // replace 'yes' with something better - Rapid#1284
       ) {
-        crossing = null;
         delete tags.crossing;
       }
     }

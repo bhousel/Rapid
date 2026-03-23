@@ -403,7 +403,7 @@ export class PixiTextures {
     const size = this.gfx.highQuality ? 64 : 32;
 
     // Make a new <svg> container
-    let svg: SVGSVGElement | null = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
     svg.setAttribute('width', String(size));
     svg.setAttribute('height', String(size));
@@ -418,7 +418,6 @@ export class PixiTextures {
     }
 
     const svgStr = (new XMLSerializer()).serializeToString(svg);
-    svg = null;
 
     let image = new Image();
     image.src = `data:image/svg+xml,${encodeURIComponent(svgStr)}`;

@@ -123,7 +123,7 @@ export function osmIntersection(
   const checkVertices: OsmNode[] = [startNode];
   let vertices: OsmNode[] = [];
   let ways: OsmWay[] = [];
-  let parents: OsmWay[] = [];
+  let parents: OsmWay[];
 
   // `actions` will store whatever actions must be performed to satisfy
   // preconditions for adding a turn restriction to this intersection.

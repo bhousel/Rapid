@@ -107,7 +107,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     if (!this.enabled || !(this.hasData())) return;
 
     const vtService = this.context.services.vectortile as any;
-    let geoData: GeoJSON[] = [];
+    let geoData: GeoJSON[];
     if (this._template && vtService) {   // fetch data from vector tile service
       if (zoom >= 13) {  // avoid firing off too many API requests
         vtService.loadTiles(this._template);
@@ -534,7 +534,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const osm = this.context.services.osm as any;
     if (osm) {
       const blocklists = osm.imageryBlocklists ?? [];
-      let fail = false;
+      let fail: boolean;
       let tested = 0;
       let regex;
 
