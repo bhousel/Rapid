@@ -1,8 +1,12 @@
 .DS_Store
+SCRATCHPAD.md
+transifex.auth
+
 .esm-cache
 npm-debug.log
-transifex.auth
-scratchpad.md
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
 
 .coverage/
 .idea/

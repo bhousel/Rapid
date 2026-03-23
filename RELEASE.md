@@ -1,20 +1,29 @@
-## **Rapid** Release Checklist
+# Release Checklist
 
 > [!WARNING]
 > This file is outdated and will require a rewrite when we publish v3
 
-### To update translations
+## Update translations
 
 Create a file `transifex.auth` in the root folder of the Rapid project.
 This file should contain your API bearer token, for example:
-```js
- { "token": "1/f306870b35f5182b5c2ef80aa4fd797196819cb132409" }
+```json
+ { "token": "1/f306870b35***********************************" }
 ```
 See: https://developers.transifex.com/reference/api-authentication for information on generating an API bearer token.
 (This file is `.gitignore`d)
 
 
-### Update `main` branch
+## Prepare the release
+
+Use the `/release` prompt in Copilot Chat — it will:
+- Validate the version number
+- Identify commits since the last release and look up PR numbers
+- Update `CHANGELOG.md` with a new entry
+- Bump the version in `package.json`
+
+
+## Update `main` branch
 
 The `main` branch includes all the code, but we don't check in the built assets to git.
 (Many of the files in `/dist` are in `.gitignore`)
@@ -62,7 +71,7 @@ git push origin main
 ```
 
 
-### Update `release` branch
+## Update `release` branch
 
 The `release` branch checks in the contents of `/dist` too, this makes it suitable for deployment.
 It's basically a copy of `main` but with one additional commit appended to it.
@@ -78,7 +87,7 @@ git commit -m 'Check in build'
 git push origin -f release
 ```
 
-#### Sanity checks
+### Sanity checks
 
 - At this point, our GitHub deploy action should notice that a commit was pushed to the release branch.
 - You can check the status of the action to see where the release got deployed:
@@ -88,7 +97,7 @@ git push origin -f release
 - If something looks wrong, you can still go back to `main` and push more commits, then remake the `release` branch as above.
 
 
-#### Dry run
+### Dry run
 
 Confirm that publish will work, and that it won't be >150 MB.
 If it is too large, the JSDelivr CDN will not serve it.  See Rapid#1561
@@ -105,12 +114,13 @@ npm notice unpacked size: 94.8 MB
 (someday: can we automate this check?)
 
 
-#### Tag and Publish
+### Tag and Publish
 
 The point of no return, tag and publish:
 ```bash
 git tag "$VERSION"
 git push origin "$VERSION"
+npm login    # if needed, session tokens last 2 hours
 bun publish
 ```
 
@@ -120,7 +130,7 @@ Set as latest release on GitHub:
 - There should be a link like "create a release from the tag", click that, and paste in the link to the changelog.
 
 
-### Deploys
+## Deploys
 
 Rapid is set up to do deploys automatically from a GitHub Action (see above).
 (We use AWS web console to promote a release to `rapideditor.org/rapid` or other URLs.)
@@ -133,7 +143,7 @@ aws s3 cp dist <destination>
 ```
 
 
-### Purge cache
+## Purge cache
 
 > [!WARNING]
 > This section is outdated.  Paths have changed and will be different when we publish v3
@@ -150,26 +160,26 @@ curl 'https://purge.jsdelivr.net/npm/@rapideditor/rapid@2/dist/rapid.js'
 curl 'https://purge.jsdelivr.net/npm/@rapideditor/rapid@2/dist/rapid.min.js'
 ```
 
-### Update rapid-standalone
+## Update rapid-standalone
 
 See https://github.com/rapideditor/rapid-standalone
 After publishing a new version of Rapid, you should also refresh and publish a new version of that project too.
 
 
-### Notify Partners
+## Notify Partners
 
 Notify anyone who uses Rapid that there is a new release.
 This section is to keep track of those.
 
-#### OpenStreetMap Communities
+### OpenStreetMap Communities
 - Discourse: https://community.openstreetmap.org/
 - Diaries:  https://openstreetmap.org/diary
 - OSM-US Slack:  https://osmus.slack.com/
 - Discord: https://discord.gg/openstreetmap
 
-#### MapRoulette
+### MapRoulette
 https://github.com/maproulette/maproulette3
 
-#### HOT Tasking Manager
+### HOT Tasking Manager
 https://github.com/hotosm/tasking-manager
 

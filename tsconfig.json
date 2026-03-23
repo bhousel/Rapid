@@ -23,7 +23,16 @@
 
     // Type Checking
     "strict": true,
+    // "noImplicitAny": false,
     "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": false,
+    // "noImplicitOverride": true,
+
+    // Some stricter flags (disabled by default)
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false,
 
     // JavaScript Support (for incremental migration)
     "allowJs": true,
