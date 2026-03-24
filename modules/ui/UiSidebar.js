@@ -3,7 +3,7 @@ import { interpolateNumber } from 'd3-interpolate';
 import { Extent, vecLength } from '@rapid-sdk/math';
 import _throttle from 'lodash-es/throttle.js';
 
-import { GeoJSON, Marker, OsmEntity } from '../data/index.ts';
+import { GeoJSONData, MarkerData, OsmEntity } from '../data/index.ts';
 import { uiDataEditor } from './data_editor.js';
 import { UiFeatureList } from './UiFeatureList.js';
 import { UiInspector } from './UiInspector.js';
@@ -235,7 +235,7 @@ export class UiSidebar {
     this.reset();
 
     // Hovering on Geo Data (vector tile, geojson, etc..)
-    if (datum instanceof GeoJSON) {
+    if (datum instanceof GeoJSONData) {
       this.show(this.DataEditor.datum(datum));
 
     // Hovering on Rapid data..
@@ -249,10 +249,10 @@ export class UiSidebar {
       this.show(this.OvertureInspector.render);
 
     // Hovering on Mapillary detection..
-    } else if (datum instanceof Marker && datum?.type === 'detection') {
+    } else if (datum instanceof MarkerData && datum?.type === 'detection') {
       this.show(this.DetectionInspector.datum(datum));
 
-    } else if (datum instanceof Marker && datum.serviceID === 'osm') {
+    } else if (datum instanceof MarkerData && datum.serviceID === 'osm') {
       if (context.mode?.id === 'drag-note') return;
       const service = context.services.osm;
       if (service) {
@@ -260,21 +260,21 @@ export class UiSidebar {
       }
       this.show(this.NoteEditor.note(datum));
 
-    } else if (datum instanceof Marker && datum.serviceID === 'keepright') {
+    } else if (datum instanceof MarkerData && datum.serviceID === 'keepright') {
       const service = context.services.keepright;
       if (service) {
         datum = service.getError(datum.id);  // marker may contain stale data - get latest
       }
       this.show(this.KeepRightEditor.error(datum));
 
-    } else if (datum instanceof Marker && datum.serviceID === 'osmose') {
+    } else if (datum instanceof MarkerData && datum.serviceID === 'osmose') {
       const service = context.services.osmose;
       if (service) {
         datum = service.getError(datum.id);  // marker may contain stale data - get latest
       }
       this.show(this.OsmoseEditor.error(datum));
 
-    } else if (datum instanceof Marker && datum.serviceID === 'maproulette') {
+    } else if (datum instanceof MarkerData && datum.serviceID === 'maproulette') {
       const service = context.services.maproulette;
       if (service) {
         datum = service.getError(datum.id);  // marker may contain stale data - get latest

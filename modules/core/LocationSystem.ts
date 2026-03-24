@@ -3,7 +3,7 @@ import whichPolygon from 'which-polygon';
 import calcArea from '@mapbox/geojson-area';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { GeoJSON } from '../data/GeoJSON.ts';
+import { GeoJSONData } from '../data/GeoJSONData.ts';
 
 import type { Context } from '../Context.ts';
 import type { Extent } from '@rapid-sdk/math';
@@ -57,8 +57,8 @@ export class LocationSystem extends AbstractSystem {
   /** A which-polygon index for blocked regions */
   private _wpblocks!: ReturnType<typeof whichPolygon>;
 
-  /** Map of locationSetID or locationID to resolved GeoJSON data */
-  private _resolved: Map<LocationSetID, GeoJSON>;
+  /** Map of locationSetID or locationID to resolved GeoJSONData data */
+  private _resolved: Map<LocationSetID, GeoJSONData>;
   /** Map of locationSetID to area in km² */
   private _knownLocationSets: Map<LocationSetID, number>;
   /** Map of locationID to Set of locationSetIDs that include it */
@@ -185,7 +185,7 @@ export class LocationSystem extends AbstractSystem {
 
         if (!data) {    // first time seeing a location like this
           const feature = loco.resolveLocation(location)!.feature;
-          data = new GeoJSON(context, { geojson: feature as any });
+          data = new GeoJSONData(context, { geojson: feature as any });
           this._resolved.set(locationID, data);
         }
         area += data.properties.area as number;
@@ -205,7 +205,7 @@ export class LocationSystem extends AbstractSystem {
 
         if (!data) {    // first time seeing a location like this
           const feature = loco.resolveLocation(location)!.feature;
-          data = new GeoJSON(context, { geojson: feature as any });
+          data = new GeoJSONData(context, { geojson: feature as any });
           this._resolved.set(locationID, data);
         }
         area -= data.properties.area as number;
@@ -236,9 +236,9 @@ export class LocationSystem extends AbstractSystem {
    * Note: You need to call `_rebuildIndex()` after you're all finished validating the locationSets.
    *
    * @param obj - Object to resolve, it should have `locationSet` property
-   * @return GeoJSON data feature (fallback to the world feature)
+   * @return GeoJSONData data feature (fallback to the world feature)
    */
-  _resolveLocationSet(obj: HasLocationSet): GeoJSON {
+  _resolveLocationSet(obj: HasLocationSet): GeoJSONData {
     this._validateLocationSet(obj);
 
     let data = this._resolved.get(obj.locationSetID!);
@@ -254,11 +254,11 @@ export class LocationSystem extends AbstractSystem {
       }
 
       // Important: here we use the locationSet `id` (`+[Q30]`), not the feature `id` (`Q30`)
-      const feature = JSON.parse(JSON.stringify(result.feature));   // deep clone the GeoJSON feature
+      const feature = JSON.parse(JSON.stringify(result.feature));   // deep clone the GeoJSONData feature
       feature.id = locationSetID;
       feature.properties.id = locationSetID;
 
-      data = new GeoJSON(this.context, { geojson: feature });
+      data = new GeoJSONData(this.context, { geojson: feature });
       this._resolved.set(locationSetID, data);
       return data;
 
@@ -448,15 +448,15 @@ export class LocationSystem extends AbstractSystem {
    * getBlocks
    * Returns any blocked regions that exist within the given extent.
    * @param extent - the extent to query
-   * @return Array of GeoJSON data objects
+   * @return Array of GeoJSONData data objects
    */
-  getBlocks(extent: Extent): GeoJSON[] {
+  getBlocks(extent: Extent): GeoJSONData[] {
     if (!this._blocks.length) return [];
 
     const hits = this._wpblocks.bbox(extent.rectangle() as Vec4);
-    const results = new Set<GeoJSON>();
+    const results = new Set<GeoJSONData>();
 
-    // whichPolygon returns properties objects, we need to lookup the original GeoJSON data features.
+    // whichPolygon returns properties objects, we need to lookup the original GeoJSONData data features.
     for (const hit of hits) {
       const data = this._resolved.get(hit.id);
       if (data) {
@@ -470,11 +470,11 @@ export class LocationSystem extends AbstractSystem {
 
   /**
    * getFeature
-   * Returns the resolved GeoJSON feature for a given locationSetID or locationID (fallback to 'world')
+   * Returns the resolved GeoJSONData feature for a given locationSetID or locationID (fallback to 'world')
    * @param val - locationSetID or locationID to retrieve
-   * @return GeoJSON data object (fallback to world)
+   * @return GeoJSONData data object (fallback to world)
    */
-  getFeature(val: string = '+[Q2]'): GeoJSON | undefined {
+  getFeature(val: string = '+[Q2]'): GeoJSONData | undefined {
     // should we actually resolve it if it hasn't been?
     // (note that this isn't used currently, so it doesn't matter)
     return this._resolved.get(val) ?? this._resolved.get('+[Q2]');

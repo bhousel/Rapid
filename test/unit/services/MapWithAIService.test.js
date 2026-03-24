@@ -210,12 +210,12 @@ describe('MapWithAIService', () => {
           assert.lengthOf(result, 5);  // 4 nodes and 1 way
 
 //          const item1 = result[0];
-//          assert.instanceOf(item1, Rapid.GeoJSON);
+//          assert.instanceOf(item1, Rapid.GeoJSONData);
 //          assert.deepInclude(item1.props, { serviceID: 'mapwithai' });
 //          assert.deepInclude(item1.props?.geojson?.properties, { id: 1, type: 'scribble', color: '#ffffff' });
 //
 //          const item2 = result[1];
-//          assert.instanceOf(item2, Rapid.GeoJSON);
+//          assert.instanceOf(item2, Rapid.GeoJSONData);
 //          assert.deepInclude(item2.props, { serviceID: 'mapwithai' });
 //          assert.deepInclude(item2.props?.geojson?.properties, { id: 2, type: 'label', color: null });
         });

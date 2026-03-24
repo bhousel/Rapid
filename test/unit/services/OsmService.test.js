@@ -628,7 +628,7 @@ describe('OsmService', () => {
           assert.lengthOf(result, 2);
 
           const m1 = result[0];
-          assert.instanceOf(m1, Rapid.Marker);
+          assert.instanceOf(m1, Rapid.MarkerData);
           assert.deepInclude(m1.props, { id: '1', type: 'note', serviceID: 'osm' });
 
           const m1comments = m1.props.comments;
@@ -637,7 +637,7 @@ describe('OsmService', () => {
           assert.deepEqual(m1comments[0].action, 'opened');
 
           const m2 = result[1];
-          assert.instanceOf(m2, Rapid.Marker);
+          assert.instanceOf(m2, Rapid.MarkerData);
           assert.deepInclude(m2.props, { id: '2', type: 'note', serviceID: 'osm' });
           assert.isArray(m2.props.comments);
           assert.lengthOf(m2.props.comments, 2);
@@ -653,7 +653,7 @@ describe('OsmService', () => {
       describe('getNote', () => {
         it('returns a note with the given id', () => {
           const result = _osm.getNote('1');
-          assert.instanceOf(result, Rapid.Marker);
+          assert.instanceOf(result, Rapid.MarkerData);
           assert.deepInclude(result.props, { id: '1', type: 'note', serviceID: 'osm' });
         });
       });
@@ -682,8 +682,8 @@ describe('OsmService', () => {
 ////      });
 //
 //      it('sets/gets a note', () => {
-//        const note1 = new Rapid.Marker(context, { id: '1', loc: [0, 0], serviceID: 'osm' });
-//        const note2 = new Rapid.Marker(context, { id: '2', loc: [0, 0], serviceID: 'osm' });
+//        const note1 = new Rapid.MarkerData(context, { id: '1', loc: [0, 0], serviceID: 'osm' });
+//        const note2 = new Rapid.MarkerData(context, { id: '2', loc: [0, 0], serviceID: 'osm' });
 //        const obj = {
 //          note: { note: { '1': note1, '2': note2 } }
 //        };
@@ -735,7 +735,7 @@ describe('OsmService', () => {
 //  describe('replaceNote', () => {
 //    it('adds a note', () => {
 //      const noteID = '-1';
-//      const note = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm', isNew: true });
+//      const note = new Rapid.MarkerData(context, { id: noteID, loc: [0, 0], serviceID: 'osm', isNew: true });
 //      const result = _osm.replaceNote(note);
 //      expect(result).to.equal(note);  // strict ===
 //      expect(_osm._noteCache.note[noteID]).to.equal(note);  // note is added to cache
@@ -748,7 +748,7 @@ describe('OsmService', () => {
 //
 //    it('replaces a note', () => {
 //      const noteID = '1';
-//      const note1 = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm' });
+//      const note1 = new Rapid.MarkerData(context, { id: noteID, loc: [0, 0], serviceID: 'osm' });
 //      _osm.replaceNote(note1);  // note1 added to caches
 //
 //      const note2 = note1.update({ status: 'closed' });  // note2 is an updated note1
@@ -768,7 +768,7 @@ describe('OsmService', () => {
 //  describe('getNote', () => {
 //    it('returns a note from the cache', () => {
 //      const noteID = '3';
-//      const note = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm' });
+//      const note = new Rapid.MarkerData(context, { id: noteID, loc: [0, 0], serviceID: 'osm' });
 //      _osm.replaceNote(note);  // note added to caches
 //      const result = _osm.getNote(noteID);
 //      expect(result).to.equal(note);  // strict ===
@@ -778,7 +778,7 @@ describe('OsmService', () => {
 //  describe('removeNote', () => {
 //    it('removes a note', () => {
 //      const noteID = '4';
-//      const note = new Rapid.Marker(context, { id: noteID, loc: [0, 0], serviceID: 'osm', isNew: true });
+//      const note = new Rapid.MarkerData(context, { id: noteID, loc: [0, 0], serviceID: 'osm', isNew: true });
 //      _osm.replaceNote(note);  // note added to caches
 //      expect(_osm._noteCache.note[noteID]).to.equal(note);  // note is added to cache
 //

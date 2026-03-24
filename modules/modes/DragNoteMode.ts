@@ -4,7 +4,7 @@ import { AbstractMode } from './AbstractMode.ts';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
-import type { Marker } from '../data/Marker.ts';
+import type { MarkerData } from '../data/MarkerData.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 /** Options for entering DragNoteMode */
@@ -19,8 +19,8 @@ interface DragNoteModeOptions {
  *  In this mode, the user has started dragging an OSM Note
  */
 export class DragNoteMode extends AbstractMode {
-  /** The note (Marker) being dragged, or null if not dragging */
-  dragNote: Marker | null;
+  /** The note (MarkerData) being dragged, or null if not dragging */
+  dragNote: MarkerData | null;
 
   /** Starting location of the note before dragging */
   private _startLoc: Vec2 | null;
@@ -60,7 +60,7 @@ export class DragNoteMode extends AbstractMode {
     if (!osm) return false;
 
     const noteID = options.noteID;
-    const note = osm.getNote(noteID) as Marker | undefined;
+    const note = osm.getNote(noteID) as MarkerData | undefined;
     if (!note?.loc) return false;
 
     this._active = true;

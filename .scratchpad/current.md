@@ -13,11 +13,12 @@ The longer-term fix is converting validators to proper classes with lifecycle ma
 - Per-dataset schema querying (different presets for Rapid vs OSM data)
 
 ## Recently Completed (one-liners)
+- **Data class renames** (Mar 2026) — `Tags` → `OsmTags`, `GeoJSON` → `GeoJSONData`, `Marker` → `MarkerData`. Reduces ambiguity with `@types/geojson` namespace.
 - **Context lifecycle split** (Mar 2026) — `prepareAsync()` → `initAsync()` → `startAsync()` → `run()`. Breaking change: simple consumers use `context.run()`.
 - **JSON Schema validation** (Mar 2026) — 13 schemas in `data/schema/`, validated via `bun run validate:json`.
 - **Scope-owned tag rulesets** (Mar 2026) — All tag globals eliminated. Rulesets on `SchemaScope`, accessed via `schema.getScope('osm')?.rulesets.get(id)`. `tags.ts` deleted.
 - **Variables system** (Mar 2026) — `Variable` class with `var()` refs in both SchemaSystem and StyleSystem. Dual-props pattern for resolution.
 - **Scoped customization** (Feb 2026) — `_scopes: Map<ScopeID, ScopeData>` is sole source of truth in both StyleSystem and SchemaSystem. `'*'` common scope for fallbacks.
 - **Dynamic styling fixes** (Feb 2026) — `dirtyScene()` before redraw, removed hardcoded marker styles, selective fallback cascading, single `styleDefaults`.
-- **Services TS conversion** (Feb 2026) — All 19 service files converted. Generic `Marker<P>` / `GeoJSON<P>` for typed props.
+- **Services TS conversion** (Feb 2026) — All 19 service files converted. Generic `MarkerData<P>` / `GeoJSONData<P>` for typed props.
 - **`isForwardOneWay()` / `isBackwardOneWay()`** — Still TODO on OsmWay.

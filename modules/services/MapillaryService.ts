@@ -4,13 +4,13 @@ import { VectorTile } from '@mapbox/vector-tile';
 import Protobuf from 'pbf';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { Marker, GeoJSON } from '../data/index.ts';
+import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { GeoJSONProps } from '../data/GeoJSON.ts';
-import type { MarkerProps } from '../data/Marker.ts';
+import type { GeoJSONProps } from '../data/GeoJSONData.ts';
+import type { MarkerProps } from '../data/MarkerData.ts';
 import type {
   ComponentSize as MlyComponentSize, FilterExpression, Image as MlyImage, NavigationDirection,
   OutlineTag, OutlineTagOptions, PolygonGeometry, SequenceComponent, TagComponent, Viewer,
@@ -186,11 +186,11 @@ export interface MapillaryDetectionProps extends MarkerProps {
   segmentationIDs?: Set<string>;
 }
 
-/** A Mapillary image Marker with typed props */
-export type MapillaryImage = Marker<MapillaryImageProps>;
+/** A Mapillary image MarkerData with typed props */
+export type MapillaryImage = MarkerData<MapillaryImageProps>;
 
-/** A Mapillary detection Marker with typed props */
-export type MapillaryDetection = Marker<MapillaryDetectionProps>;
+/** A Mapillary detection MarkerData with typed props */
+export type MapillaryDetection = MarkerData<MapillaryDetectionProps>;
 
 
 /**
@@ -383,9 +383,9 @@ export class MapillaryService extends AbstractSystem {
    * @param  sequenceID - sequenceID to get
    * @return  The sequence, or `undefined` if not found
    */
-  getSequence(sequenceID: SequenceID): GeoJSON | undefined {
+  getSequence(sequenceID: SequenceID): GeoJSONData | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getData<GeoJSON>('mapillary-sequences', sequenceID);
+    return spatial.getData<GeoJSONData>('mapillary-sequences', sequenceID);
   }
 
 
@@ -407,18 +407,18 @@ export class MapillaryService extends AbstractSystem {
    * @param  datasetID - one of 'images', 'signs', or 'detections'
    * @return  Array of Markers
    */
-  getData(datasetID: MapillaryDatasetID): Marker[] {
+  getData(datasetID: MapillaryDatasetID): MarkerData[] {
 
     const spatial = this.context.systems.spatial!;
 
     if (datasetID === 'images') {
       return spatial.getVisibleData('mapillary-images')
-        .map(hit => hit.contents) as Marker[];
+        .map(hit => hit.contents) as MarkerData[];
 
     } else {  // both signs and detections are currently stored in the `detections` cache
       const type = (datasetID === 'signs') ? 'traffic_sign' : 'point';
       return spatial.getVisibleData('mapillary-detections')
-        .map(hit => (hit.contents as Marker))
+        .map(hit => (hit.contents as MarkerData))
         .filter(d => d.props.object_type === type);
     }
   }
@@ -427,12 +427,12 @@ export class MapillaryService extends AbstractSystem {
   /**
    * getSequences
    * Get already loaded sequence data that appears in the current map view
-   * @return  Array of GeoJSON sequences
+   * @return  Array of GeoJSONData sequences
    */
-  getSequences(): GeoJSON[] {
+  getSequences(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
     return spatial.getVisibleData('mapillary-sequences')
-      .map(hit => hit.contents) as GeoJSON[];
+      .map(hit => hit.contents) as GeoJSONData[];
   }
 
 
@@ -633,7 +633,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  imageID - the id of the image to select
    * @return Promise that resolves to the image after it has been selected
    */
-  selectImageAsync(imageID: PhotoID | null): Promise<Marker | void> {
+  selectImageAsync(imageID: PhotoID | null): Promise<MarkerData | void> {
     this._clearSegmentations();
 
     if (!imageID) {
@@ -698,7 +698,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  detectionID - the id of the detection to select
    * @return Promise that resolves to the detection after it has been selected
    */
-  selectDetectionAsync(detectionID: DetectionID | null): Promise<Marker | void> {
+  selectDetectionAsync(detectionID: DetectionID | null): Promise<MarkerData | void> {
     this._clearSegmentations();
     if (!detectionID) {
       return Promise.resolve();  // do nothing
@@ -1015,7 +1015,7 @@ export class MapillaryService extends AbstractSystem {
         if (!feature) continue;
 
         const sequenceID = feature.properties!.id.toString();
-        let sequence = spatial.getData<GeoJSON>('mapillary-sequences', sequenceID);
+        let sequence = spatial.getData<GeoJSONData>('mapillary-sequences', sequenceID);
         if (!sequence) {
           const props = {
             id:         sequenceID,
@@ -1026,7 +1026,7 @@ export class MapillaryService extends AbstractSystem {
               features:  []
             }
           };
-          sequence = new GeoJSON(context, props as Partial<GeoJSONProps>);
+          sequence = new GeoJSONData(context, props as Partial<GeoJSONProps>);
         }
         (sequence.props.geojson as GeoJSON.FeatureCollection).features.push(feature);  // updating it in-place, hope this is ok.
         sequence.updateGeometry().touch();
@@ -1377,7 +1377,7 @@ export class MapillaryService extends AbstractSystem {
     let image = spatial.getData<MapillaryImage>('mapillary-images', imageID);
     if (!image) {
       const loc = spatial.preventCoincidentLoc('mapillary-images', source.loc);
-      image = new Marker(this.context, {
+      image = new MarkerData(this.context, {
         type:       'photo',
         serviceID:  this.id as ServiceID,
         id:         imageID,
@@ -1416,7 +1416,7 @@ export class MapillaryService extends AbstractSystem {
 
     let detection = spatial.getData<MapillaryDetection>('mapillary-detections', detectionID);
     if (!detection) {
-      detection = new Marker<MapillaryDetectionProps>(this.context, {
+      detection = new MarkerData<MapillaryDetectionProps>(this.context, {
         type:         'detection',
         serviceID:    this.id as ServiceID,
         id:           detectionID,
@@ -1427,7 +1427,7 @@ export class MapillaryService extends AbstractSystem {
     // If we haven't locked in the location yet, try here..
     // (see Rapid#1557 - sometimes we don't have this!)
     if (!detection.loc && source.loc) {
-      // Marker `loc` should really have been set at construction time, but unfortunately we need to redo it
+      // MarkerData `loc` should really have been set at construction time, but unfortunately we need to redo it
       const loc = spatial.preventCoincidentLoc('mapillary-detections', source.loc);
       detection.props.loc = loc;
       detection.updateGeometry();

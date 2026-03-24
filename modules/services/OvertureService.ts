@@ -3,7 +3,7 @@ import { RapidDataset } from '../lib/RapidDataset.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
-import type { GeoJSON } from '../data/GeoJSON.ts';
+import type { GeoJSONData } from '../data/GeoJSONData.ts';
 import type { VectorTileService } from './VectorTileService.ts';
 
 /** Base URL for Overture PMTiles hosted on S3 */
@@ -151,7 +151,7 @@ export class OvertureService extends AbstractSystem {
    * @param  datasetID - datasetID to get data for
    * @return Array of data
    */
-  getData(datasetID: DatasetID): GeoJSON[] {
+  getData(datasetID: DatasetID): GeoJSONData[] {
     const vtService = this.context.services.vectortile as VectorTileService;
 
     if (datasetID.includes('places')) {

@@ -100,18 +100,18 @@ D3 selection variables follow a naming + typing convention:
 
 ## Type-Only Imports
 
-When importing data classes (`GeoJSON`, `Marker`) only for type annotations, use `import type`:
+When importing data classes (`GeoJSONData`, `MarkerData`) only for type annotations, use `import type`:
 ```typescript
-import type { GeoJSON } from '../data/GeoJSON.ts';
-import type { Marker } from '../data/Marker.ts';
+import type { GeoJSONData } from '../data/GeoJSONData.ts';
+import type { MarkerData } from '../data/MarkerData.ts';
 ```
 
-## Filtering Data (Marker, GeoJSON, etc.)
+## Filtering Data (MarkerData, GeoJSONData, etc.)
 
-When filtering `Marker` or `GeoJSON` data, always access `.props` for filterable data (not `.properties`):
+When filtering `MarkerData` or `GeoJSONData` data, always access `.props` for filterable data (not `.properties`):
 
 ```typescript
-filterMarkers(markers: Marker[]): Marker[] {
+filterMarkers(markers: MarkerData[]): MarkerData[] {
   return markers.filter(marker => {
     const props = marker.props;
     // Check types before using values
@@ -134,8 +134,8 @@ Key points:
 
 D3's `.data()` and other selection methods have complex generic signatures. TypeScript often can't infer the datum type in callbacks. Explicitly annotate callback parameters:
 ```typescript
-.data(blocks, (d: GeoJSON) => d.id)
-.text((d: GeoJSON) => d.props.text as string)
+.data(blocks, (d: GeoJSONData) => d.id)
+.text((d: GeoJSONData) => d.props.text as string)
 ```
 
 ## ScaleLinear Import

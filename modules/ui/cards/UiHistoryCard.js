@@ -2,7 +2,7 @@ import { selection } from 'd3-selection';
 import debounce from 'lodash-es/debounce.js';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
-import { Marker } from '../../data/Marker.ts';
+import { MarkerData } from '../../data/MarkerData.ts';
 import { uiIcon } from '../icon.js';
 import { utilCmd } from '../../util/cmd.ts';
 
@@ -116,7 +116,7 @@ export class UiHistoryCard extends AbstractUiCard {
 
     // We can only currently show info about OSM Entities and OSM notes.
     for (const [datumID, datum] of selected) {
-      if (datum instanceof Marker && datum.serviceID === 'osm') continue;  // OSM Note
+      if (datum instanceof MarkerData && datum.serviceID === 'osm') continue;  // OSM Note
       if (graph.hasEntity(datumID)) continue;  // OSM Entity
       selected.delete(datumID);  // something else, discard
     }
@@ -131,7 +131,7 @@ export class UiHistoryCard extends AbstractUiCard {
       const [pair] = selected;  // get the first (only) thing in the Map()
       const [datumID, datum] = pair;
 
-      if (datum instanceof Marker) {  // a note
+      if (datum instanceof MarkerData) {  // a note
         $content
           .append('h4')
           .attr('class', 'history-heading')

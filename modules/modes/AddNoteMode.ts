@@ -1,5 +1,5 @@
 import { AbstractMode } from './AbstractMode.ts';
-import { Marker } from '../data/Marker.ts';
+import { MarkerData } from '../data/MarkerData.ts';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
@@ -86,7 +86,7 @@ export class AddNoteMode extends AbstractMode {
 
     // pass `null` to generate a new noteID
     const props: Partial<OsmNoteProps> = { serviceID: 'osm' as ServiceID, loc: loc, isNew: true, status: 'open', comments: [] };
-    const note: OsmNote = new Marker(context, props);
+    const note: OsmNote = new MarkerData(context, props);
     osm.replaceNote(note);
 
     const selection = new Map().set(note.id, note);

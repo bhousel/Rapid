@@ -2,11 +2,11 @@ import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { Marker } from '../data/Marker.ts';
+import { MarkerData } from '../data/MarkerData.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
-import type { MarkerProps } from '../data/Marker.ts';
+import type { MarkerProps } from '../data/MarkerData.ts';
 import type { Tile } from '@rapid-sdk/math';
 
 
@@ -42,8 +42,8 @@ export interface KeepRightIssueProps extends MarkerProps {
   newState?: string;
 }
 
-/** A KeepRight issue Marker with typed props */
-export type KeepRightIssue = Marker<KeepRightIssueProps>;
+/** A KeepRight issue MarkerData with typed props */
+export type KeepRightIssue = MarkerData<KeepRightIssueProps>;
 
 
 /** Base URL for the KeepRight API */
@@ -209,9 +209,9 @@ export class KeepRightService extends AbstractSystem {
    * Get already loaded data that appears in the current map view
    * @return Array of data
    */
-  getData(): Marker[] {
+  getData(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('keepright').map(hit => hit.contents) as Marker[];
+    return spatial.getVisibleData('keepright').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -372,7 +372,7 @@ export class KeepRightService extends AbstractSystem {
 
       props.replacements = this._tokenReplacements(props);
 
-      spatial.addData('keepright', new Marker(context, props));
+      spatial.addData('keepright', new MarkerData(context, props));
     }
 
     gfx?.deferredRedraw();
@@ -383,10 +383,10 @@ export class KeepRightService extends AbstractSystem {
    * postUpdate
    * Called to change some properies (status, comments) about the KeepRight data item.
    * Will send the update to the KeepRight API and refresh the local data cache.
-   * @param item - the Marker item to update
+   * @param item - the MarkerData item to update
    * @param callback - errback-style callback function to call with results
    */
-  postUpdate(item: Marker, callback: (err: any, item: Marker) => void): void {
+  postUpdate(item: MarkerData, callback: (err: any, item: MarkerData) => void): void {
     const cache = this._cache;
     const dataID = item.id;
     if (cache.inflightPost.has(dataID)) {
@@ -459,11 +459,11 @@ export class KeepRightService extends AbstractSystem {
   /**
    * replaceItem
    * Replace a single item in the cache
-   * @param item - Marker to replace
+   * @param item - MarkerData to replace
    * @return the item, or `null` if it couldn't be replaced
    */
-  replaceItem(item: Marker): Marker | null {
-    if (!(item instanceof Marker) || !item.id) return null;
+  replaceItem(item: MarkerData): MarkerData | null {
+    if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
     spatial.replaceData('keepright', item);
@@ -474,10 +474,10 @@ export class KeepRightService extends AbstractSystem {
   /**
    * removeItem
    * Remove a single item from the cache
-   * @param item - Marker to remove
+   * @param item - MarkerData to remove
    */
-  removeItem(item: Marker): void {
-    if (!(item instanceof Marker) || !item.id) return;
+  removeItem(item: MarkerData): void {
+    if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
     spatial.removeData('keepright', item);
@@ -487,10 +487,10 @@ export class KeepRightService extends AbstractSystem {
   /**
    * issueURL
    * Returns the URL to link to details about an item
-   * @param item - the Marker item
+   * @param item - the MarkerData item
    * @return the url
    */
-  issueURL(item: Marker): string {
+  issueURL(item: MarkerData): string {
     return `${KEEPRIGHT_API}/report_map.php?schema=${item.props.schema}&error=${item.id}`;
   }
 

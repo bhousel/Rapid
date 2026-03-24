@@ -4,7 +4,7 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
 import type { MatchedStyle } from '../core/StyleSystem.ts';
-import type { Marker } from '../data/Marker.ts';
+import type { MarkerData } from '../data/MarkerData.ts';
 import type { PixiScene } from './PixiScene.ts';
 
 const MINZOOM = 12;
@@ -77,7 +77,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
    * @param  markers - all markers
    * @return markers with filtering applied
    */
-  filterMarkers(markers: Marker[]): Marker[] {
+  filterMarkers(markers: MarkerData[]): MarkerData[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();

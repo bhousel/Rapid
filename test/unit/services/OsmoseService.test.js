@@ -169,19 +169,19 @@ describe('OsmoseService', () => {
           assert.lengthOf(result, 3);
 
           const m1 = result[0];
-          assert.instanceOf(m1, Rapid.Marker);
+          assert.instanceOf(m1, Rapid.MarkerData);
           assert.deepInclude(m1.props, {
             id: '1', class: 1, item: 1070, type: '1070-1', iconID: 'maki-home', serviceID: 'osmose'
           });
 
           const m2 = result[1];
-          assert.instanceOf(m2, Rapid.Marker);
+          assert.instanceOf(m2, Rapid.MarkerData);
           assert.deepInclude(m2.props, {
             id: '2', class: 6, item: 7040, type: '7040-6', iconID: 'temaki-power', serviceID: 'osmose'
           });
 
           const m3 = result[2];
-          assert.instanceOf(m3, Rapid.Marker);
+          assert.instanceOf(m3, Rapid.MarkerData);
           assert.deepInclude(m3.props, {
             id: '3', class: 52, item: 8300, type: '8300-52', iconID: 'temaki-stop', serviceID: 'osmose'
           });

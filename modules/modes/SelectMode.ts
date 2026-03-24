@@ -1,7 +1,7 @@
 import { Extent } from '@rapid-sdk/math';
 
 import { AbstractMode } from './AbstractMode.ts';
-import { AbstractData, GeoJSON, Marker } from '../data/index.ts';
+import { AbstractData, GeoJSONData, MarkerData } from '../data/index.ts';
 import { uiOsmoseEditor } from '../ui/osmose_editor.js';
 import { uiDataEditor } from '../ui/data_editor.js';
 import { uiDetectionInspector } from '../ui/detection_inspector.js';
@@ -89,13 +89,13 @@ export class SelectMode extends AbstractMode {
       let layerID = null;
 
       // hacky - improve?
-      if (datum instanceof Marker && datum.type === 'detection') {  // A detection (object or sign)
+      if (datum instanceof MarkerData && datum.type === 'detection') {  // A detection (object or sign)
         if (datum.serviceID === 'mapillary' && datum.props.object_type === 'point') {
           layerID = 'mapillary-detections';
         } else if (datum.serviceID === 'mapillary' && datum.props.object_type === 'traffic_sign') {
           layerID = 'mapillary-signs';
         }
-      } else if (datum instanceof Marker) {  // in most cases the `service` is the layerID
+      } else if (datum instanceof MarkerData) {  // in most cases the `service` is the layerID
         const serviceID = datum.serviceID;   // 'keepright', 'osmose', etc.
         layerID = serviceID === 'osm' ? 'notes' : serviceID;
         if (layerID === 'osm') {
@@ -105,7 +105,7 @@ export class SelectMode extends AbstractMode {
         layerID = 'rapid';
       } else if (datum.props.overture) {      // Overture data
         layerID = 'rapid';
-      } else if (datum instanceof GeoJSON) {  // custom data
+      } else if (datum instanceof GeoJSONData) {  // custom data
         layerID = 'custom-data';
       }
 
@@ -120,43 +120,43 @@ export class SelectMode extends AbstractMode {
  // The update handlers feel like they should live with the sidebar content components, not here
     let sidebarContent: any = null;
     // Selected a note...
-    if (datum instanceof Marker && datum.serviceID === 'osm') {
+    if (datum instanceof MarkerData && datum.serviceID === 'osm') {
       sidebarContent = (uiNoteEditor as any)(context).note(datum);
       sidebarContent
         .on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const osm = context.services.osm as any;
           const note = osm?.getNote(datumID);
-          if (!(note instanceof Marker)) return;  // or - go to browse mode
+          if (!(note instanceof MarkerData)) return;  // or - go to browse mode
           Sidebar?.show(sidebarContent.note(note));
           this._selectedData.set(datumID, note);  // update selectedData after a change happens?
         });
 
-    } else if (datum instanceof Marker && datum.serviceID === 'keepright') {
+    } else if (datum instanceof MarkerData && datum.serviceID === 'keepright') {
       sidebarContent = (uiKeepRightEditor as any)(context).error(datum);
       sidebarContent
         .on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const keepright = context.services.keepright as any;
           const error = keepright?.getError(datumID);
-          if (!(error instanceof Marker)) return;  // or - go to browse mode?
+          if (!(error instanceof MarkerData)) return;  // or - go to browse mode?
           Sidebar?.show(sidebarContent.error(error));
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
 
-    } else if (datum instanceof Marker && datum.serviceID === 'osmose') {
+    } else if (datum instanceof MarkerData && datum.serviceID === 'osmose') {
       sidebarContent = (uiOsmoseEditor as any)(context).error(datum);
       sidebarContent
         .on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const osmose = context.services.osmose as any;
           const error = osmose?.getError(datumID);
-          if (!(error instanceof Marker)) return;  // or - go to browse mode?
+          if (!(error instanceof MarkerData)) return;  // or - go to browse mode?
           Sidebar?.show(sidebarContent.error(error));
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
 
-    } else if (datum instanceof Marker && datum.serviceID === 'maproulette') {
+    } else if (datum instanceof MarkerData && datum.serviceID === 'maproulette') {
       sidebarContent = (uiMapRouletteEditor as any)(context).error(datum);
       (ui as any)?.MapRouletteMenu?.error(datum);
       sidebarContent
@@ -164,12 +164,12 @@ export class SelectMode extends AbstractMode {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const maproulette = context.services.maproulette as any;
           const error = maproulette?.getError(datumID);
-          if (!(error instanceof Marker)) return;  // or - go to browse mode?
+          if (!(error instanceof MarkerData)) return;  // or - go to browse mode?
           Sidebar?.show(sidebarContent.error(error));
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
 
-    } else if (datum instanceof Marker && datum.type === 'detection') {
+    } else if (datum instanceof MarkerData && datum.type === 'detection') {
       sidebarContent = (uiDetectionInspector as any)(context).datum(datum);
       const serviceID = datum.serviceID;
       const type = (datum.props.object_type === 'traffic_sign') ? 'signs' : 'detections';
@@ -177,7 +177,7 @@ export class SelectMode extends AbstractMode {
       photos.selectDetection(layerID, datum.id);
 
     // Selected custom data (e.g. gpx track)...
-    } else if (datum instanceof GeoJSON) {
+    } else if (datum instanceof GeoJSONData) {
       sidebarContent = (uiDataEditor as any)(context).datum(datum);
 
     // Selected Overture feature...

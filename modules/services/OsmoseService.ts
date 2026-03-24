@@ -4,11 +4,11 @@ import { utilQsString } from '@rapid-sdk/util';
 import { marked } from 'marked';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { Marker } from '../data/Marker.ts';
+import { MarkerData } from '../data/MarkerData.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
-import type { MarkerProps } from '../data/Marker.ts';
+import type { MarkerProps } from '../data/MarkerData.ts';
 import type { Tile } from '@rapid-sdk/math';
 
 
@@ -28,8 +28,8 @@ export interface OsmoseIssueProps extends MarkerProps {
   newStatus?: string;
 }
 
-/** An Osmose issue Marker with typed props */
-export type OsmoseIssue = Marker<OsmoseIssueProps>;
+/** An Osmose issue MarkerData with typed props */
+export type OsmoseIssue = MarkerData<OsmoseIssueProps>;
 
 
 /** Zoom level used for tiling Osmose data requests */
@@ -171,9 +171,9 @@ export class OsmoseService extends AbstractSystem {
    * Get already loaded data that appears in the current map view
    * @return Array of data
    */
-  getData(): Marker[] {
+  getData(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('osmose').map(hit => hit.contents) as Marker[];
+    return spatial.getVisibleData('osmose').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -280,7 +280,7 @@ export class OsmoseService extends AbstractSystem {
         props.elems = [];
       }
 
-      spatial.addData('osmose', new Marker(context, props));
+      spatial.addData('osmose', new MarkerData(context, props));
     }
 
     gfx?.deferredRedraw();
@@ -293,7 +293,7 @@ export class OsmoseService extends AbstractSystem {
    * @param issue
    * @return Promise resolved once the data has been fetched
    */
-  loadIssueDetailAsync(issue: Marker): Promise<Marker> {
+  loadIssueDetailAsync(issue: MarkerData): Promise<MarkerData> {
     // Issue details only need to be fetched once
     if (issue.props.elems !== undefined) return Promise.resolve(issue);
 
@@ -364,7 +364,7 @@ export class OsmoseService extends AbstractSystem {
    * @param issue
    * @param callback - errback-style callback function to call with results
    */
-  postUpdate(issue: Marker, callback: (err: any, issue: Marker) => void): void {
+  postUpdate(issue: MarkerData, callback: (err: any, issue: MarkerData) => void): void {
     const cache = this._cache;
     const issueID = issue.id;
     const status = issue.props.newStatus as string;
@@ -422,8 +422,8 @@ export class OsmoseService extends AbstractSystem {
    * @param item - item to replace
    * @return the item, or `null` if it couldn't be replaced
    */
-  replaceItem(item: Marker): Marker | null {
-    if (!(item instanceof Marker) || !item.id) return null;
+  replaceItem(item: MarkerData): MarkerData | null {
+    if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
     spatial.replaceData('osmose', item);
@@ -436,8 +436,8 @@ export class OsmoseService extends AbstractSystem {
    * Remove a single item from the cache
    * @param item - item to remove
    */
-  removeItem(item: Marker): void {
-    if (!(item instanceof Marker) || !item.id) return;
+  removeItem(item: MarkerData): void {
+    if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
     spatial.removeData('osmose', item);
@@ -461,7 +461,7 @@ export class OsmoseService extends AbstractSystem {
    * @param item
    * @return the url
    */
-  itemURL(item: Marker): string {
+  itemURL(item: MarkerData): string {
     return `https://osmose.openstreetmap.fr/en/error/${item.id}`;
   }
 

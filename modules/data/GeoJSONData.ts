@@ -24,7 +24,7 @@ export interface GeoJSONProps extends AbstractDataProps {
  *   `geoms`   Geometry object (inherited from `AbstractData`)
  *   `props`   Properties object (inherited from `AbstractData`)
  */
-export class GeoJSON<P extends GeoJSONProps = GeoJSONProps> extends AbstractData<P> {
+export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends AbstractData<P> {
 
   // Narrow `props` from `Partial<P>` to `P`.
   // The constructor accepts `Partial<P>` for flexibility (e.g. tests),
@@ -39,7 +39,7 @@ export class GeoJSON<P extends GeoJSONProps = GeoJSONProps> extends AbstractData
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: GeoJSON<P> | Context, props: Partial<P> = {}) {
+  constructor(otherOrContext: GeoJSONData<P> | Context, props: Partial<P> = {}) {
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one

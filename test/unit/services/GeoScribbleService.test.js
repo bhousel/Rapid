@@ -153,12 +153,12 @@ describe('GeoScribbleService', () => {
           assert.lengthOf(result, 2);
 
           const item1 = result[0];
-          assert.instanceOf(item1, Rapid.GeoJSON);
+          assert.instanceOf(item1, Rapid.GeoJSONData);
           assert.deepInclude(item1.props, { serviceID: 'geoscribble' });
           assert.deepInclude(item1.props?.geojson?.properties, { id: 1, type: 'scribble', color: '#ffffff' });
 
           const item2 = result[1];
-          assert.instanceOf(item2, Rapid.GeoJSON);
+          assert.instanceOf(item2, Rapid.GeoJSONData);
           assert.deepInclude(item2.props, { serviceID: 'geoscribble' });
           assert.deepInclude(item2.props?.geojson?.properties, { id: 2, type: 'label', color: null });
         });

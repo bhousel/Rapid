@@ -18,7 +18,7 @@ export interface MarkerProps extends AbstractDataProps {
 
 
 /**
- * Marker
+ * MarkerData
  * This is a wrapper for any kind of arbitrary point data that appears on the map.
  * Markers are associated with a service where we fetched them from.
  * This used to be called "QAItem".
@@ -27,7 +27,7 @@ export interface MarkerProps extends AbstractDataProps {
  *   `geoms`   Geometry object (inherited from `AbstractData`)
  *   `props`   Properties object (inherited from `AbstractData`)
  */
-export class Marker<P extends MarkerProps = MarkerProps> extends AbstractData<P> {
+export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractData<P> {
 
   // Narrow `props` from `Partial<P>` to `P`.
   // The constructor accepts `Partial<P>` for flexibility (e.g. tests),
@@ -42,7 +42,7 @@ export class Marker<P extends MarkerProps = MarkerProps> extends AbstractData<P>
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: Marker<P> | Context, props: Partial<P> = {}) {
+  constructor(otherOrContext: MarkerData<P> | Context, props: Partial<P> = {}) {
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one

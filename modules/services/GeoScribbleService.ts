@@ -2,7 +2,7 @@ import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { GeoJSON } from '../data/GeoJSON.ts';
+import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
@@ -11,7 +11,7 @@ import type { Tile } from '@rapid-sdk/math';
 
 /** Zoom level used for tiling GeoScribble data requests */
 const TILEZOOM = 14;
-/** Base URL for the GeoScribble GeoJSON API endpoint */
+/** Base URL for the GeoScribble GeoJSONData API endpoint */
 const GEOSCRIBBLE_API = 'https://geoscribble.osmz.ru/geojson';
 
 
@@ -179,9 +179,9 @@ export class GeoScribbleService extends AbstractSystem {
       throw new Error('Invalid response');
     }
 
-    const toLoad: GeoJSON[] = [];
+    const toLoad: GeoJSONData[] = [];
     for (const feature of response.features) {
-      toLoad.push(new GeoJSON(context, { serviceID: this.id, geojson: feature }));
+      toLoad.push(new GeoJSONData(context, { serviceID: this.id, geojson: feature }));
     }
 
     spatial.addData('geoscribble', toLoad);

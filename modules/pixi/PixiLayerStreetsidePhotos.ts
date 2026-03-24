@@ -4,8 +4,8 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
-import type { GeoJSON } from '../data/GeoJSON.ts';
-import type { Marker } from '../data/Marker.ts';
+import type { GeoJSONData } from '../data/GeoJSONData.ts';
+import type { MarkerData } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
@@ -127,7 +127,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
    * @param markers - all markers
    * @return markers with filtering applied
    */
-  filterMarkers(markers: Marker[]): Marker[] {
+  filterMarkers(markers: MarkerData[]): MarkerData[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -163,7 +163,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
    * @param sequences - all sequences
    * @return sequences with filtering applied
    */
-  filterSequences(sequences: GeoJSON[]): GeoJSON[] {
+  filterSequences(sequences: GeoJSONData[]): GeoJSONData[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();

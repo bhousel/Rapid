@@ -174,19 +174,19 @@ describe('MapillaryService', () => {
           assert.lengthOf(result, 3);
 
           const m1 = result[0];
-          assert.instanceOf(m1, Rapid.Marker);
+          assert.instanceOf(m1, Rapid.MarkerData);
           assert.deepInclude(m1.props, {
             id: '1', type: 'photo', serviceID: 'mapillary', isPano: false
           });
 
           const m2 = result[1];
-          assert.instanceOf(m2, Rapid.Marker);
+          assert.instanceOf(m2, Rapid.MarkerData);
           assert.deepInclude(m2.props, {
             id: '2', type: 'photo', serviceID: 'mapillary', isPano: false
           });
 
           const m3 = result[2];
-          assert.instanceOf(m3, Rapid.Marker);
+          assert.instanceOf(m3, Rapid.MarkerData);
           assert.deepInclude(m3.props, {
             id: '3', type: 'photo', serviceID: 'mapillary', isPano: false
           });
@@ -200,7 +200,7 @@ describe('MapillaryService', () => {
           assert.lengthOf(result, 1);
 
           const seq = result[0];
-          assert.instanceOf(seq, Rapid.GeoJSON);
+          assert.instanceOf(seq, Rapid.GeoJSONData);
           assert.deepInclude(seq.props, {
             id: '100', type: 'sequence', serviceID: 'mapillary'
           });
@@ -210,7 +210,7 @@ describe('MapillaryService', () => {
       describe('getImage', () => {
         it('returns the image with the given id', () => {
           const result = _mapillary.getImage('1');
-          assert.instanceOf(result, Rapid.Marker);
+          assert.instanceOf(result, Rapid.MarkerData);
           assert.deepInclude(result.props, {
             id: '1', type: 'photo', serviceID: 'mapillary', isPano: false
           });
@@ -220,7 +220,7 @@ describe('MapillaryService', () => {
       describe('getSequence', () => {
         it('returns the sequence with the given id', () => {
           const result = _mapillary.getSequence('100');
-          assert.instanceOf(result, Rapid.GeoJSON);
+          assert.instanceOf(result, Rapid.GeoJSONData);
           assert.deepInclude(result.props, {
             id: '100', type: 'sequence', serviceID: 'mapillary'
           });

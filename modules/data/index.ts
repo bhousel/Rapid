@@ -1,8 +1,8 @@
 export * from './parsers/index.ts';
 
 import { AbstractData } from './AbstractData.ts';
-import { GeoJSON } from './GeoJSON.ts';
-import { Marker } from './Marker.ts';  // was "QAItem"
+import { GeoJSONData } from './GeoJSONData.ts';
+import { MarkerData } from './MarkerData.ts';  // was "QAItem"
 import { OsmChangeset } from './OsmChangeset.ts';
 import { OsmEntity } from './OsmEntity.ts';
 import { OsmNode } from './OsmNode.ts';
@@ -12,8 +12,8 @@ import type { Context } from '../Context.ts';
 
 export {
   AbstractData,
-  GeoJSON,
-  Marker,
+  GeoJSONData,
+  MarkerData,
   OsmChangeset,
   OsmEntity,
   OsmNode,
@@ -23,8 +23,8 @@ export {
 
 // Re-export types
 export type { AbstractDataProps } from './AbstractData.ts';
-export type { GeoJSONProps } from './GeoJSON.ts';
-export type { MarkerProps } from './Marker.ts';
+export type { GeoJSONProps } from './GeoJSONData.ts';
+export type { MarkerProps } from './MarkerData.ts';
 export type { OsmChangesetProps, OsmChanges } from './OsmChangeset.ts';
 export type { OsmEntityProps } from './OsmEntity.ts';
 export type { OsmNodeProps } from './OsmNode.ts';

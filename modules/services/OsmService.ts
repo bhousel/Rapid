@@ -5,13 +5,13 @@ import { osmAuth } from 'osm-auth';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { JXON } from '../util/jxon.ts';
-import { OsmEntity, Marker } from '../data/index.ts';
+import { OsmEntity, MarkerData } from '../data/index.ts';
 import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
-import type { MarkerProps } from '../data/Marker.ts';
+import type { MarkerProps } from '../data/MarkerData.ts';
 import type { OsmChangeset, OsmChanges } from '../data/OsmChangeset.ts';
 import type { ParserOptions, ParserResult, ParsedApi, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
 
@@ -34,8 +34,8 @@ export interface OsmNoteProps extends MarkerProps {
   newComment?: string;
 }
 
-/** An OSM note Marker with typed props */
-export type OsmNote = Marker<OsmNoteProps>;
+/** An OSM note MarkerData with typed props */
+export type OsmNote = MarkerData<OsmNoteProps>;
 
 /** Rate limit information */
 interface RateLimitInfo {
@@ -517,13 +517,13 @@ export class OsmService extends AbstractSystem {
 
 
   /** Returns the OSM website URL for a given note */
-  noteURL(note: Marker): string {
+  noteURL(note: MarkerData): string {
     return `${this._wwwroot}/note/${note.id}`;
   }
 
 
   /** Returns the OSM website URL for reporting a given note */
-  noteReportURL(note: Marker): string {
+  noteReportURL(note: MarkerData): string {
     return `${this._wwwroot}/reports/new?reportable_type=Note&reportable_id=${note.id}`;
   }
 
@@ -1728,7 +1728,7 @@ export class OsmService extends AbstractSystem {
         if (k === 'note') {
           target.note = {} as Record<string, any>;
           for (const id of Object.keys(v as Record<string, any>)) {
-            target.note[id] = new Marker((source as any).note[id]);  // clone notes
+            target.note[id] = new MarkerData((source as any).note[id]);  // clone notes
           }
         } else {
           target[k] = globalThis.structuredClone(v);  // clone anything else
@@ -1860,7 +1860,7 @@ export class OsmService extends AbstractSystem {
    * @return  the item, or `null` if it couldn't be replaced
    */
   replaceNote(item: OsmNote): OsmNote | null {
-    if (!(item instanceof Marker) || !item.id) return null;
+    if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
     spatial.replaceData('osm-notes', item);
@@ -1874,7 +1874,7 @@ export class OsmService extends AbstractSystem {
    * @param  item to remove
    */
   removeNote(item: OsmNote): void {
-    if (!(item instanceof Marker) || !item.id) return;
+    if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
     spatial.removeData('osm-notes', item);
@@ -1943,7 +1943,7 @@ export class OsmService extends AbstractSystem {
     let note = spatial.getData<OsmNote>('osm-notes', noteID);
     if (!note) {
       const loc = spatial.preventCoincidentLoc('osm-notes', source.loc);
-      note = new Marker<OsmNoteProps>(this.context, {
+      note = new MarkerData<OsmNoteProps>(this.context, {
         type:       'note',
         serviceID:  this.id,
         id:         noteID,

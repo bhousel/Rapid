@@ -178,19 +178,19 @@ describe('StreetsideService', () => {
           assert.lengthOf(result, 3);
 
           const m1 = result[0];
-          assert.instanceOf(m1, Rapid.Marker);
+          assert.instanceOf(m1, Rapid.MarkerData);
           assert.deepInclude(m1.props, {
             id: '1', type: 'photo', serviceID: 'streetside', isPano: true
           });
 
           const m2 = result[1];
-          assert.instanceOf(m2, Rapid.Marker);
+          assert.instanceOf(m2, Rapid.MarkerData);
           assert.deepInclude(m2.props, {
             id: '2', type: 'photo', serviceID: 'streetside', isPano: true
           });
 
           const m3 = result[2];
-          assert.instanceOf(m3, Rapid.Marker);
+          assert.instanceOf(m3, Rapid.MarkerData);
           assert.deepInclude(m3.props, {
             id: '3', type: 'photo', serviceID: 'streetside', isPano: true
           });
@@ -204,7 +204,7 @@ describe('StreetsideService', () => {
           assert.lengthOf(result, 1);
 
           const seq = result[0];
-          assert.instanceOf(seq, Rapid.GeoJSON);
+          assert.instanceOf(seq, Rapid.GeoJSONData);
           assert.deepInclude(seq.props, {
             type: 'sequence', serviceID: 'streetside', isPano: true, bubbleIDs: ['1', '2', '3']
           });

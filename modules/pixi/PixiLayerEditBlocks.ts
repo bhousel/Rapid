@@ -2,7 +2,7 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { D3Selection, D3EnterSelection } from 'd3-selection';
-import type { GeoJSON } from '../data/GeoJSON.ts';
+import type { GeoJSONData } from '../data/GeoJSONData.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { StyleProps } from '../lib/Style.ts';
 import type { Viewport } from '@rapid-sdk/math';
@@ -64,7 +64,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
     if (!locations) return;   // Need a LocationSystem for this to work.
 
-    let blocks: GeoJSON[] = [];
+    let blocks: GeoJSONData[] = [];
     if (zoom >= MINZOOM) {
       blocks = locations.getBlocks(mapViewport.visibleExtent());
       this.renderEditBlocks(frame, viewport, zoom, blocks);
@@ -74,7 +74,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
     // add a special 'api-status' line to the map footer explain the block
     const $explanationRow: D3Selection = context.container().select('.main-content > .map-footer')
       .selectAll('.api-status.blocks')
-      .data(blocks, (d: GeoJSON) => d.id);
+      .data(blocks, (d: GeoJSONData) => d.id);
 
     $explanationRow.exit()
       .remove();
@@ -87,12 +87,12 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
     $$explanationRow
       .append('span')
       .attr('class', 'explanation-item')
-      .text((d: GeoJSON) => d.props.text as string);
+      .text((d: GeoJSONData) => d.props.text as string);
 
     $$explanationRow
       .append('a')
       .attr('target', '_blank')
-      .attr('href', (d: GeoJSON) => d.props.url as string)
+      .attr('href', (d: GeoJSONData) => d.props.url as string)
       .text(l10n?.t('rapid_menu.more_info') || 'More Info');
   }
 
@@ -104,7 +104,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * @param zoom - Effective zoom to use for rendering
    * @param blocks - Array of block data visible in the view
    */
-  renderEditBlocks(frame: number, viewport: Viewport, zoom: number, blocks: GeoJSON[]): void {
+  renderEditBlocks(frame: number, viewport: Viewport, zoom: number, blocks: GeoJSONData[]): void {
     const parentContainer = this.scene.groups.get('blocks')!;
     if (!parentContainer) return;
 

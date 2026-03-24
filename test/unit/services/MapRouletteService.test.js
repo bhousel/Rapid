@@ -161,21 +161,21 @@ describe('MapRouletteService', () => {
           assert.lengthOf(result, 3);
 
           const m1 = result[0];
-          assert.instanceOf(m1, Rapid.Marker);
+          assert.instanceOf(m1, Rapid.MarkerData);
           assert.isTrue(Rapid.sdk.vecEqual(m1.loc, [10.0001, 0], 1e-6));
           assert.deepInclude(m1.props, {
             id: '1', serviceID: 'maproulette', parentId: '100', parentName: 'Unconnected Crosswalks'
           });
 
           const m2 = result[1];
-          assert.instanceOf(m2, Rapid.Marker);
+          assert.instanceOf(m2, Rapid.MarkerData);
           assert.isTrue(Rapid.sdk.vecEqual(m2.loc, [10.0002, 0], 1e-6));
           assert.deepInclude(m2.props, {
             id: '2', serviceID: 'maproulette', parentId: '100', parentName: 'Unconnected Crosswalks'
           });
 
           const m3 = result[2];
-          assert.instanceOf(m3, Rapid.Marker);
+          assert.instanceOf(m3, Rapid.MarkerData);
           assert.isTrue(Rapid.sdk.vecEqual(m3.loc, [10.0003, 0], 1e-6));
           assert.deepInclude(m3.props, {
             id: '3', serviceID: 'maproulette', parentId: '100', parentName: 'Unconnected Crosswalks'
@@ -186,7 +186,7 @@ describe('MapRouletteService', () => {
       describe('getTask', () => {
         it('returns a task given its ID', () => {
           const task = _maproulette.getTask('1');
-          assert.instanceOf(task, Rapid.Marker);
+          assert.instanceOf(task, Rapid.MarkerData);
           assert.isTrue(Rapid.sdk.vecEqual(task.loc, [10.0001, 0], 1e-6));
           assert.deepInclude(task.props, {
             id: '1', serviceID: 'maproulette', parentId: '100', parentName: 'Unconnected Crosswalks'

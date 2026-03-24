@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
-import { Marker, OsmNode } from '../data/index.ts';
+import { MarkerData, OsmNode } from '../data/index.ts';
 import { utilDetect } from '../util/detect.ts';
 
 import type { FederatedPointerEvent } from 'pixi.js';
@@ -130,7 +130,7 @@ export class DragBehavior extends AbstractBehavior {
     const data = target?.data;
     if (!data) return;
 
-    const isNote = data instanceof Marker && data.isNew && target.layerID === 'notes';
+    const isNote = data instanceof MarkerData && data.isNew && target.layerID === 'notes';
     const isNode = data instanceof OsmNode && target.layerID === 'osm';       // not 'rapid'
     const isMidpoint = (data as any).type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
 
@@ -190,7 +190,7 @@ export class DragBehavior extends AbstractBehavior {
 
         // What are we dragging?
         const data: any = target.data;
-        const isNote = data instanceof Marker;
+        const isNote = data instanceof MarkerData;
         const isNode = data instanceof OsmNode;
         const isMidpoint = (data.type === 'midpoint');
 

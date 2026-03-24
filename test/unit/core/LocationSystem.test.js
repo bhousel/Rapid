@@ -157,13 +157,13 @@ describe('LocationSystem', () => {
     describe('getFeature', () => {
       it('has the world locationSet pre-resolved', () => {
         const result = _locations.getFeature('+[Q2]');
-        assert.instanceOf(result, Rapid.GeoJSON);
+        assert.instanceOf(result, Rapid.GeoJSONData);
         assert.deepInclude(result.props.geojson, { type: 'Feature', id: '+[Q2]' });
       });
 
       it('falls back to the world locationSetID in case of errors', () => {
         const result = _locations.getFeature('fake');
-        assert.instanceOf(result, Rapid.GeoJSON);
+        assert.instanceOf(result, Rapid.GeoJSONData);
         assert.deepInclude(result.props.geojson, { type: 'Feature', id: '+[Q2]' });
       });
     });
@@ -221,7 +221,7 @@ describe('LocationSystem', () => {
         assert.isArray(blocks);
         assert.isAtLeast(blocks.length, 1);
         for (const block of blocks) {
-          assert.instanceOf(block, Rapid.GeoJSON);
+          assert.instanceOf(block, Rapid.GeoJSONData);
         }
       });
 

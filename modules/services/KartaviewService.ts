@@ -3,14 +3,14 @@ import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { Marker, GeoJSON } from '../data/index.ts';
+import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { uiIcon } from '../ui/icon.js';
 import { utilFetchResponse, utilSetTransform } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { GeoJSONProps } from '../data/GeoJSON.ts';
-import type { MarkerProps } from '../data/Marker.ts';
+import type { GeoJSONProps } from '../data/GeoJSONData.ts';
+import type { MarkerProps } from '../data/MarkerData.ts';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 import type { ZoomBehavior } from 'd3-zoom';
 
@@ -98,7 +98,7 @@ export interface KartaviewImageProps extends MarkerProps {
   imageHighUrl?: string;
 }
 
-/** Properties for Kartaview sequence GeoJSON data */
+/** Properties for Kartaview sequence GeoJSONData data */
 export interface KartaviewSequenceProps extends GeoJSONProps {
   /** Ordered (possibly sparse) array of image IDs in this sequence */
   imageIDs: PhotoID[];
@@ -114,11 +114,11 @@ export interface KartaviewSequenceProps extends GeoJSONProps {
   captured_by?: string;
 }
 
-/** A Kartaview image Marker with typed props */
-export type KartaviewImage = Marker<KartaviewImageProps>;
+/** A Kartaview image MarkerData with typed props */
+export type KartaviewImage = MarkerData<KartaviewImageProps>;
 
-/** A Kartaview sequence GeoJSON with typed props */
-export type KartaviewSequence = GeoJSON<KartaviewSequenceProps>;
+/** A Kartaview sequence GeoJSONData with typed props */
+export type KartaviewSequence = GeoJSONData<KartaviewSequenceProps>;
 
 
 /**
@@ -305,9 +305,9 @@ export class KartaviewService extends AbstractSystem {
    * Get already loaded image data that appears in the current map view
    * @return  Array of image data
    */
-  getImages(): Marker[] {
+  getImages(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('kartaview-images').map(hit => hit.contents) as Marker[];
+    return spatial.getVisibleData('kartaview-images').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -316,9 +316,9 @@ export class KartaviewService extends AbstractSystem {
    * Get already loaded sequence data that appears in the current map view
    * @return  Array of sequence data
    */
-  getSequences(): GeoJSON[] {
+  getSequences(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('kartaview-sequences').map(hit => hit.contents) as GeoJSON[];
+    return spatial.getVisibleData('kartaview-sequences').map(hit => hit.contents) as GeoJSONData[];
   }
 
 
@@ -597,7 +597,7 @@ export class KartaviewService extends AbstractSystem {
         const data = response?.currentPageItems || [];
         if (!data.length) return;
 
-        const seenSequences = new Set<GeoJSON>();
+        const seenSequences = new Set<GeoJSONData>();
 
         // Process and cache the images
         for (const d of data) {
@@ -854,7 +854,7 @@ export class KartaviewService extends AbstractSystem {
     let image = spatial.getData<KartaviewImage>('kartaview-images', imageID);
     if (!image) {
       const loc = spatial.preventCoincidentLoc('kartaview-images', source.loc);
-      image = new Marker<KartaviewImageProps>(context, {
+      image = new MarkerData<KartaviewImageProps>(context, {
         type:       'photo',
         serviceID:  this.id as ServiceID,
         id:         imageID,
@@ -900,7 +900,7 @@ export class KartaviewService extends AbstractSystem {
 
     let sequence = spatial.getData<KartaviewSequence>('kartaview-sequences', sequenceID);
     if (!sequence) {
-      sequence = new GeoJSON<KartaviewSequenceProps>(context, {
+      sequence = new GeoJSONData<KartaviewSequenceProps>(context, {
         id:         sequenceID,
         type:       'sequence',
         serviceID:  this.id as ServiceID,

@@ -5,7 +5,7 @@ import {
 } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.ts';
-import { Marker } from '../data/Marker.ts';
+import { MarkerData } from '../data/MarkerData.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
@@ -434,7 +434,7 @@ export class MapSystem extends AbstractSystem {
     let noteID;
     const [pair] = context.selectedData();  // get the first thing in the Map()
     const [datumID, datum] = pair || [];
-    if (datum instanceof Marker && datum.serviceID === 'osm') {
+    if (datum instanceof MarkerData && datum.serviceID === 'osm') {
       noteID = datumID;
     }
 
@@ -756,7 +756,7 @@ export class MapSystem extends AbstractSystem {
     }
 
     osm.loadNoteAsync(noteID)
-      .then((note: Marker) => {
+      .then((note: MarkerData) => {
         if (!note.loc) return;
         scene.enableLayers('notes');
         const selection = new Map().set(note.id, note);

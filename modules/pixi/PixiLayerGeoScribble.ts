@@ -4,7 +4,7 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
-import type { GeoJSON } from '../data/GeoJSON.ts';
+import type { GeoJSONData } from '../data/GeoJSONData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
@@ -110,7 +110,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     if (!service) return;
     service.loadTiles();
 
-    const geoData: GeoJSON[] = service.getData();
+    const geoData: GeoJSONData[] = service.getData();
 
     // Determine which renderer(s) to use for each feature
     // No polygons will be returned by the service, so we don't need to consider those types.
@@ -124,7 +124,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
   /**
    * getLineStyle
-   * @param props - The GeoJSON properties object, may contain:
+   * @param props - The GeoJSONData properties object, may contain:
    * `thin`   (boolean)
    * `dashed` (boolean)
    * `color`  (hex code string like `#FFEECC`)
@@ -158,7 +158,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @param zoom - Effective zoom to use for rendering
    * @param lines - Array of line data
    */
-  renderLines(frame: number, viewport: Viewport, zoom: number, lines: GeoJSON[]): void {
+  renderLines(frame: number, viewport: Viewport, zoom: number, lines: GeoJSONData[]): void {
     const parentContainer = this.scribblesContainer;
 
     for (const d of lines) {
@@ -210,7 +210,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @param zoom - Effective zoom to use for rendering
    * @param points - Array of point data
    */
-  renderPoints(frame: number, viewport: Viewport, zoom: number, points: GeoJSON[]): void {
+  renderPoints(frame: number, viewport: Viewport, zoom: number, points: GeoJSONData[]): void {
     const parentContainer = this.scribblesContainer;
 
     const pointStyle: Partial<MatchedStyle> = {

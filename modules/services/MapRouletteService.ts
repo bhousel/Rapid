@@ -1,12 +1,12 @@
 import { Tiler } from '@rapid-sdk/math';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { Marker } from '../data/Marker.ts';
+import { MarkerData } from '../data/MarkerData.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
-import type { MarkerProps } from '../data/Marker.ts';
+import type { MarkerProps } from '../data/MarkerData.ts';
 import type { Tile } from '@rapid-sdk/math';
 
 
@@ -38,8 +38,8 @@ export interface MapRouletteTaskProps extends MarkerProps {
   point?: { lng: number; lat: number };
 }
 
-/** A MapRoulette task Marker with typed props */
-export type MapRouletteTask = Marker<MapRouletteTaskProps>;
+/** A MapRoulette task MarkerData with typed props */
+export type MapRouletteTask = MarkerData<MapRouletteTaskProps>;
 
 /** Zoom level used to tile data requests */
 const TILEZOOM = 14;
@@ -90,7 +90,7 @@ interface MapRouletteCache {
   /** Last viewport version used for tile loading, to avoid redundant work */
   lastv: number | null;
   /** Cached task Markers keyed by task ID */
-  tasks: Map<string, Marker>;
+  tasks: Map<string, MarkerData>;
   /** Cached challenge data keyed by challenge ID */
   challenges: Map<string, ChallengeData>;
   /** Tile request statuses keyed by tile ID */
@@ -195,7 +195,7 @@ export class MapRouletteService extends AbstractSystem {
 
     this._cache = {
       lastv: null,
-      tasks: new Map(),             // Map<taskID, Marker>
+      tasks: new Map(),             // Map<taskID, MarkerData>
       challenges: new Map(),        // Map<challengeID, Object>
       tileRequest: new Map(),       // Map<tileID, { status, controller, url }>
       challengeRequest: new Map(),  // Map<challengeID, { status, controller, url }>
@@ -570,7 +570,7 @@ export class MapRouletteService extends AbstractSystem {
    * @return the item, or `null` if it couldn't be replaced
    */
   replaceItem(item: MapRouletteTask): MapRouletteTask | null {
-    if (!(item instanceof Marker) || !item.id) return null;
+    if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
     spatial.replaceData('maproulette', item);
@@ -584,7 +584,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param item - item to remove
    */
   removeItem(item: MapRouletteTask): void {
-    if (!(item instanceof Marker) || !item.id) return;
+    if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
     spatial.removeData('maproulette', item);
@@ -684,10 +684,10 @@ export class MapRouletteService extends AbstractSystem {
    * @param task - The task to be selected
    */
   selectAndDisplayTask(task: MapRouletteTask): void {
-    if (!(task instanceof Marker)) return;
+    if (!(task instanceof MarkerData)) return;
 
     this.currentTask = task;
-    const selection = new Map<string, Marker>().set(task.id, task);
+    const selection = new Map<string, MarkerData>().set(task.id, task);
     this.context.enter('select', { selection });
   }
 
@@ -735,8 +735,8 @@ export class MapRouletteService extends AbstractSystem {
     props.loc = spatial.preventCoincidentLoc('maproulette', [props.point.lng, props.point.lat]);
     props.serviceID = this.id;
 
-    // Create a Marker for the task
-    task = new Marker<MapRouletteTaskProps>(context, props as Partial<MapRouletteTaskProps>);
+    // Create a MarkerData for the task
+    task = new MarkerData<MapRouletteTaskProps>(context, props as Partial<MapRouletteTaskProps>);
     spatial.addData('maproulette', task);
 
     return task;

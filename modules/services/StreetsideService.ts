@@ -8,14 +8,14 @@ import {
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { Marker, GeoJSON } from '../data/index.ts';
+import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { uiIcon } from '../ui/icon.js';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { GeoJSONProps } from '../data/GeoJSON.ts';
-import type { MarkerProps } from '../data/Marker.ts';
+import type { GeoJSONProps } from '../data/GeoJSONData.ts';
+import type { MarkerProps } from '../data/MarkerData.ts';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 
 
@@ -35,7 +35,7 @@ export interface StreetsideBubbleProps extends MarkerProps {
   isPano: boolean;
 }
 
-/** Properties for Streetside sequence GeoJSON data */
+/** Properties for Streetside sequence GeoJSONData data */
 export interface StreetsideSequenceProps extends GeoJSONProps {
   /** Ordered array of bubble IDs in this sequence */
   bubbleIDs: PhotoID[];
@@ -47,11 +47,11 @@ export interface StreetsideSequenceProps extends GeoJSONProps {
   captured_by?: string;
 }
 
-/** A Streetside bubble Marker with typed props */
-export type StreetsideBubble = Marker<StreetsideBubbleProps>;
+/** A Streetside bubble MarkerData with typed props */
+export type StreetsideBubble = MarkerData<StreetsideBubbleProps>;
 
-/** A Streetside sequence GeoJSON with typed props */
-export type StreetsideSequence = GeoJSON<StreetsideSequenceProps>;
+/** A Streetside sequence GeoJSONData with typed props */
+export type StreetsideSequence = GeoJSONData<StreetsideSequenceProps>;
 
 /** Zoom level used by the tiler for loading Streetside bubble data */
 const TILEZOOM = 16.5;
@@ -336,9 +336,9 @@ export class StreetsideService extends AbstractSystem {
    * Get already loaded image data that appears in the current map view
    * @return Array of image data
    */
-  getImages(): Marker[] {
+  getImages(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('streetside-images').map(hit => hit.contents) as Marker[];
+    return spatial.getVisibleData('streetside-images').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -347,9 +347,9 @@ export class StreetsideService extends AbstractSystem {
    * Get already loaded sequence data that appears in the current map view
    * @return Array of sequence data
    */
-  getSequences(): GeoJSON[] {
+  getSequences(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('streetside-sequences').map(hit => hit.contents) as GeoJSON[];
+    return spatial.getVisibleData('streetside-sequences').map(hit => hit.contents) as GeoJSONData[];
   }
 
 
@@ -435,7 +435,7 @@ export class StreetsideService extends AbstractSystem {
    * @param imageID - the id of the image to select
    * @return Promise that resolves to the image after it has been selected
    */
-  selectImageAsync(bubbleID: Nullable<PhotoID>): Promise<Marker | void> {
+  selectImageAsync(bubbleID: Nullable<PhotoID>): Promise<MarkerData | void> {
     if (!bubbleID) {
       this._updatePhotoFooter(null);  // reset
       return Promise.resolve();  // do nothing
@@ -451,7 +451,7 @@ export class StreetsideService extends AbstractSystem {
 
     // It's possible we could be trying to show a photo that hasn't been fetched yet
     // (e.g. if we are starting up with a photoID specified in the url hash)
-    const bubble = spatial.getData<Marker<StreetsideBubbleProps>>('streetside-images', bubbleID);
+    const bubble = spatial.getData<MarkerData<StreetsideBubbleProps>>('streetside-images', bubbleID);
     if (!bubble) {
       this._waitingForPhotoID = bubbleID;
       return Promise.resolve();
@@ -846,7 +846,7 @@ export class StreetsideService extends AbstractSystem {
     if (!bubbles.length) return;
 
     let selectBubbleID: PhotoID | null = null;
-    const toLoad: Marker[] = [];
+    const toLoad: MarkerData[] = [];
     for (const bubble of bubbles) {
       const bubbleID = bubble.id.toString();
       if (this._waitingForPhotoID === bubbleID) {
@@ -871,7 +871,7 @@ export class StreetsideService extends AbstractSystem {
         isPano:       true
       };
 
-      toLoad.push(new Marker(context, props));
+      toLoad.push(new MarkerData(context, props));
       cache.unattachedBubbles.add(bubbleID);
     }
 
@@ -1003,7 +1003,7 @@ export class StreetsideService extends AbstractSystem {
           }
         };
 
-        const sequence: StreetsideSequence = new GeoJSON(this.context, props as Partial<StreetsideSequenceProps>);
+        const sequence: StreetsideSequence = new GeoJSONData(this.context, props as Partial<StreetsideSequenceProps>);
         spatial.addData('streetside-sequences', sequence);
 
         const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place

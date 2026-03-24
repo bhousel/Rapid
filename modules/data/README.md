@@ -11,8 +11,8 @@ All data classes extend `AbstractData` and are designed to be **immutable**. Whe
 | File | Description |
 |------|-------------|
 | `AbstractData.ts` | Base class for all data elements |
-| `GeoJSON.ts` | Wrapper for GeoJSON features |
-| `Marker.ts` | Map markers (pins, notes, etc.) |
+| `GeoJSONData.ts` | Wrapper for GeoJSON features |
+| `MarkerData.ts` | Map markers (pins, notes, etc.) |
 | `OsmChangeset.ts` | Represents an OSM changeset |
 | `OsmEntity.ts` | Base class for OSM entities |
 | `OsmNode.ts` | OSM node (point feature) |

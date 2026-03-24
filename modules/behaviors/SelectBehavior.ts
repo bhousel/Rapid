@@ -2,7 +2,7 @@ import { vecLength } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { MapInteractionBehavior } from './MapInteractionBehavior.ts';
-import { GeoJSON, Marker, OsmEntity, OsmNode, OsmWay } from '../data/index.ts';
+import { GeoJSONData, MarkerData, OsmEntity, OsmNode, OsmWay } from '../data/index.ts';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { geoChooseEdge } from '../geo/geom.js';
 import { utilDetect } from '../util/detect.ts';
@@ -393,8 +393,8 @@ export class SelectBehavior extends AbstractBehavior {
     } else if (
       data.props.__fbid__ ||      // Clicked a Rapid feature..
       data.props.overture ||      // Clicked an Overture feature..
-      data instanceof GeoJSON ||  // Clicked Custom Data (e.g. gpx track)..
-      data instanceof Marker      // Clicked a Marker (OSM Note, KeepRight, Osmose, Maproulette)..
+      data instanceof GeoJSONData ||  // Clicked Custom Data (e.g. gpx track)..
+      data instanceof MarkerData      // Clicked a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
     ) {
       const selection = new Map().set(dataID, data);
       context.enter('select', { selection: selection });
@@ -530,7 +530,7 @@ export class SelectBehavior extends AbstractBehavior {
     const target = eventData.target;
     const data = target?.data;
     // Check if the clicked item is a MapRoulette task
-    if (data instanceof Marker && data.serviceID === 'maproulette') {
+    if (data instanceof MarkerData && data.serviceID === 'maproulette') {
       const anchorPoint = eventData.coord.screen;
       if (this._showsMapRouletteMenu) {
         ui.closeMapRouletteMenu();

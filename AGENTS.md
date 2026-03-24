@@ -222,18 +222,18 @@ export class Category {
 
 ### Narrowing `Partial<P>` in Subclasses with `declare`
 - `AbstractData.props` is typed as `Partial<P>` so the base class constructor can accept incomplete props (useful for tests and incremental construction)
-- Subclasses like `Marker` and `GeoJSON` represent real data that always has required properties set at construction time
+- Subclasses like `MarkerData` and `GeoJSONData` represent real data that always has required properties set at construction time
 - Use `declare props: P;` to narrow the stored type from `Partial<P>` to `P`:
   ```typescript
-  class Marker<P extends MarkerProps = MarkerProps> extends AbstractData<P> {
+  class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractData<P> {
     // `declare` emits no JavaScript — it only narrows the type for access sites.
     // The constructor still accepts `Partial<P>` for flexibility.
     declare props: P;
   }
   ```
 - **Why**: Eliminates `!` assertions at every access site (e.g. `props.loc!` → `props.loc`) by localizing the trust decision to the class definition
-- **Tradeoff**: If someone constructs `new Marker(context, {})` (no `loc`), TypeScript won't warn at access sites — but the constructor still accepts `Partial` so tests compile. In practice, real data paths always provide required props, and tests that skip them don't access them.
-- When constructing a Marker/GeoJSON with service-specific props, **specify the generic type param** on the constructor: `new Marker<KartaviewImageProps>(context, { ... })`
+- **Tradeoff**: If someone constructs `new MarkerData(context, {})` (no `loc`), TypeScript won't warn at access sites — but the constructor still accepts `Partial` so tests compile. In practice, real data paths always provide required props, and tests that skip them don't access them.
+- When constructing a MarkerData/GeoJSONData with service-specific props, **specify the generic type param** on the constructor: `new MarkerData<KartaviewImageProps>(context, { ... })`
 
 ### Avoid Unnecessary Casts
 - Don't add type casts that TypeScript can already infer
@@ -462,7 +462,6 @@ import type { OsmNode, OsmWay } from '../core/index.ts';
   - `SingularGeometry` = `GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon` (excludes Multi* and GeometryCollection)
   - `SingularGeometryType` = `'Point' | 'LineString' | 'Polygon'`
   - `GeoJSONFeature`, `GeoJSONObject` - slightly looser versions that allow optional `geometry` for easier construction
-- **Note**: The `data/GeoJSON.ts` class wraps arbitrary GeoJSON - be aware of the naming collision with the global namespace.
 
 ### Working with Untyped JavaScript Components
 - It's OK to assert `as any` for parts of the codebase that haven't been converted to TypeScript yet

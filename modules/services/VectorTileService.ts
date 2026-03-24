@@ -9,7 +9,7 @@ import Protobuf from 'pbf';
 import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { GeoJSON } from '../data/GeoJSON.ts';
+import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Tile } from '@rapid-sdk/math';
@@ -26,14 +26,14 @@ interface RBushBox {
   maxX: number;
   /** Maximum Y coordinate (latitude) of the bounding box */
   maxY: number;
-  /** The GeoJSON feature contained within this bounding box */
-  data: GeoJSON;
+  /** The GeoJSONData feature contained within this bounding box */
+  data: GeoJSONData;
 }
 
 /** Per-zoom cache for vector tile features */
 interface VTZoomCache {
-  /** Map of GeoJSON features keyed by feature ID */
-  features: Map<string, GeoJSON>;
+  /** Map of GeoJSONData features keyed by feature ID */
+  features: Map<string, GeoJSONData>;
   /** Map of RBush bounding boxes keyed by feature ID */
   boxes: Map<string, RBushBox>;
   /** Queue of pending merge operations: edge ID → property hash → set of feature IDs */
@@ -160,7 +160,7 @@ export class VectorTileService extends AbstractSystem {
    * @param  template - template to get data for
    * @return Array of data
    */
-  getData(template: string): GeoJSON[] {
+  getData(template: string): GeoJSONData[] {
     const source = this._sources.get(template);
     if (!source) return [];
 
@@ -413,10 +413,10 @@ export class VectorTileService extends AbstractSystem {
         // (This means we should probably not rely on the ids being unique enough for our needs)
         const origID = vtFeature.id;
 
-        // Convert to GeoJSON
+        // Convert to GeoJSONData
         const orig = vtFeature.toGeoJSON(x, y, z);
 
-        // It's common for a vector tile to return 'Multi' GeoJSON features..
+        // It's common for a vector tile to return 'Multi' GeoJSONData features..
         // e.g. All the roads together in one `MultiLineString`.
         // For our purposes, we really want to work with them as single part features..
         for (const part of this._toSingleFeatures(orig)) {
@@ -430,7 +430,7 @@ export class VectorTileService extends AbstractSystem {
           part._layerID = layerID;
           part._origID = origID;
 
-          const feat = new GeoJSON(this.context, { geojson: part });
+          const feat = new GeoJSONData(this.context, { geojson: part });
           const featureID = feat.id;  // the generated ID
           // rewind?  really something that `GeometryPart` should handle now
 
@@ -513,7 +513,7 @@ export class VectorTileService extends AbstractSystem {
    * @param  cache
    * @param  features
    */
-  _cacheFeatures(cache: VTZoomCache, features: GeoJSON[]): void {
+  _cacheFeatures(cache: VTZoomCache, features: GeoJSONData[]): void {
     const boxes = [];
     for (const feature of features) {
       cache.features.set(feature.id, feature);  // cache feature
@@ -557,7 +557,7 @@ export class VectorTileService extends AbstractSystem {
    * @param  highTile
    */
   _mergePolygons(cache: VTZoomCache, prophash: string, featureIDs: Set<string>, lowTile: Tile, highTile: Tile): void {
-    const features = Array.from(featureIDs).map(featureID => cache.features.get(featureID)).filter((f): f is GeoJSON => !!f);
+    const features = Array.from(featureIDs).map(featureID => cache.features.get(featureID)).filter((f): f is GeoJSONData => !!f);
     if (!features.length) return;
 
     // We have more edges to keep track of now..
@@ -628,7 +628,7 @@ export class VectorTileService extends AbstractSystem {
       part._layerID = source.props._layerID;
       part._origID = source.props._origID;
 
-      const feat = new GeoJSON(this.context, { geojson: part });
+      const feat = new GeoJSONData(this.context, { geojson: part });
       const featureID = feat.id;  // the generated ID
       // rewind?  really something that `GeometryPart` should handle now
 
@@ -655,7 +655,7 @@ export class VectorTileService extends AbstractSystem {
 
   /**
    * _calcExtent
-   * @param  geojson - a GeoJSON Feature
+   * @param  geojson - a GeoJSONData Feature
    * @return the extent
    */
   _calcExtent(geojson: any): Extent {
@@ -696,7 +696,7 @@ export class VectorTileService extends AbstractSystem {
    * _dedupePoints
    * The union operation often leaves points which are essentially coincident
    * This will remove them in-place
-   * @param  geojson - a GeoJSON Feature
+   * @param  geojson - a GeoJSONData Feature
    */
   _dedupePoints(geojson: any): void {
     const geometry = geojson?.geometry;
@@ -729,8 +729,8 @@ export class VectorTileService extends AbstractSystem {
    * Call this to convert a multi feature to an array of single features
    * (e.g. convert MultiPolygon to array of Polygons)
    * (If passed a single feature, this will just return the single feature in an array)
-   * @param  geojson - any GeoJSON Feature
-   * @return array of single GeoJSON features
+   * @param  geojson - any GeoJSONData Feature
+   * @return array of single GeoJSONData features
    */
   _toSingleFeatures(geojson: any): any[] {
     const result: any[] = [];
