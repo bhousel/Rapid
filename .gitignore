@@ -1,5 +1,5 @@
 .DS_Store
-SCRATCHPAD.md
+.env
 transifex.auth
 
 .esm-cache

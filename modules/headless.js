@@ -2,7 +2,7 @@
 import './polyfills.ts';
 
 // Core components to support a headless (no browser) Rapid for testing.
-export * from './actions/index.js';
+export * from './actions/index.ts';
 export * from './data/index.ts';
 export * from './geo/index.ts';
 export * from './lib/index.ts';

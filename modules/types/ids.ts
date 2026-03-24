@@ -95,7 +95,7 @@ export type VariableID = string;
 // Make these types available globally (no import needed within Rapid)
 declare global {
   type AssetID = string;
-  type AtlasID = string;
+  type AtlasID = 'symbol' | 'text' | 'tile';
   type BehaviorID = string;
   type CategoryID = string;
   type CheckpointID = string;

@@ -13,9 +13,6 @@
 
     // Emit
     "noEmit": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
 
     // Interop
     "esModuleInterop": true,

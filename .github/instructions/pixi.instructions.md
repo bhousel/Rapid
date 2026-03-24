@@ -17,7 +17,7 @@ All core systems ARE now TypeScript - use non-null assertion:
 - `const photos = context.systems.photos!;`
 - `const editor = context.systems.editor!;`
 
-Use `!` for systems that definitely exist when the code runs. Only use `?.` for truly optional dependencies (see `copilot-instructions.md` for the list of optional systems).
+Use `!` for systems that definitely exist when the code runs. Only use `?.` for truly optional dependencies.
 
 ## Viewport Type
 

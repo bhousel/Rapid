@@ -29,7 +29,7 @@ You can also test in a local server:
 
 It's also good to check on the dependencies sometimes with commands like:
 - `bun outdated` — what packages have updates available?
-- `bun update --interactive` — choose which updates to apply
+- `bun update` — update dependencies to the latest versions within their ranges
 
 Try to keep things simple!
 
