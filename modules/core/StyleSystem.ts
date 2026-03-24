@@ -7,7 +7,7 @@ import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmTags } from '../data/types.ts';
 import type { StyleProps, FillStyleProps, LineStyleProps, PointStyleProps, LabelStyleProps, ViewfieldStyleProps } from '../lib/Style.ts';
 import type { StyleSelectorProps } from '../lib/StyleSelector.ts';
 import type { VariableValue, VariableProps } from '../lib/Variable.ts';
@@ -83,7 +83,7 @@ export interface MatchedStyle {
  * @param key - Tag key to look up
  * @return Tag value, or undefined if not present or 'no'
  */
-function getTag(tags: Tags, key: string): string | undefined {
+function getTag(tags: OsmTags, key: string): string | undefined {
   return tags[key] === 'no' ? undefined : tags[key];
 }
 
@@ -526,7 +526,7 @@ export class StyleSystem extends AbstractSystem {
    * @param scopeID - Optional scope ID for scoped matching (defaults to 'osm')
    * @return Styling info for the given tags
    */
-  styleMatch(tags: Tags, geometry?: GeometryType, scopeID: ScopeID = 'osm'): MatchedStyle {
+  styleMatch(tags: OsmTags, geometry?: GeometryType, scopeID: ScopeID = 'osm'): MatchedStyle {
     const context = this.context;
     const schema = context.systems.schema;
 
@@ -625,7 +625,7 @@ export class StyleSystem extends AbstractSystem {
    * @return True if a lifecycle tag is found
    * @see Rapid#1312, Rapid#1199, Rapid#791, Rapid#535
    */
-  private _hasLifecycleTag(tags: Tags, styleKey: string | undefined): boolean {
+  private _hasLifecycleTag(tags: OsmTags, styleKey: string | undefined): boolean {
     const schema = this.context.systems.schema;
     const lifecyclePrefixes = schema?.getScope('osm')?.variables?.get('lifecycle_prefixes')?.asSet();
     if (!lifecyclePrefixes?.size) return false;
@@ -660,7 +660,7 @@ export class StyleSystem extends AbstractSystem {
    * @param result - The result object to mutate
    * @param tags - OSM tags
    */
-  private _applyStructureOverrides(result: MatchedStyle, tags: Tags): void {
+  private _applyStructureOverrides(result: MatchedStyle, tags: OsmTags): void {
     const context = this.context;
     const schema = context.systems.schema;
 
@@ -738,7 +738,7 @@ export class StyleSystem extends AbstractSystem {
    * @param result - The result object to validate
    * @param tags - OSM tags (to check for building exception)
    */
-  private _validateFillPattern(result: MatchedStyle, tags: Tags): void {
+  private _validateFillPattern(result: MatchedStyle, tags: OsmTags): void {
     const building = getTag(tags, 'building');
     if (building) return;  // exception: don't apply patterns to buildings
 

@@ -4,14 +4,14 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 
 import type { LocationSet } from '@rapideditor/location-conflation';
 import type { Context } from '../Context.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmTags } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
 /** Result from `upgradeTags` when a match is found */
 interface UpgradeResult {
   /** The suggested tags the feature should have */
-  newTags: Tags;
+  newTags: OsmTags;
   /** The NSI item that was matched, or `null` if no item matched */
   matched: NsiItem | null;
 }
@@ -25,7 +25,7 @@ interface NsiItem {
   /** The primary wikidata tag key, e.g. `"brand:wikidata"` */
   mainTag: string;
   /** OSM tags associated with this item */
-  tags: Tags;
+  tags: OsmTags;
   /** Regex patterns for tags that should not be overwritten during upgrades */
   preserveTags?: string[];
   /** LocationSet defining where this item is valid */
@@ -238,7 +238,7 @@ export class NsiService extends AbstractSystem {
    * @param tags - Object containing the feature's OSM tags
    * @return `true` if it is generic, `false` if not
    */
-  isGenericName(tags: Tags): boolean {
+  isGenericName(tags: OsmTags): boolean {
     const n = tags.name;
     if (!n) return false;
 
@@ -277,8 +277,8 @@ export class NsiService extends AbstractSystem {
    * @param loc - Location where this feature exists, as a [lon, lat]
    * @return The result, or `null` if no changes suggested
    */
-  upgradeTags(tags: Tags, loc: Vec2): UpgradeResult | null {
-    const newTags: Tags = Object.assign({}, tags);  // shallow copy
+  upgradeTags(tags: OsmTags, loc: Vec2): UpgradeResult | null {
+    const newTags: OsmTags = Object.assign({}, tags);  // shallow copy
     let changed = false;
 
     // Before anything, perform trivial Wikipedia/Wikidata replacements
@@ -386,7 +386,7 @@ export class NsiService extends AbstractSystem {
 
       const regexes = preserveTags.map(s => new RegExp(s, 'i'));
 
-      const keepTags: Tags = {};
+      const keepTags: OsmTags = {};
       for (const osmkey of Object.keys(newTags)) {
         if (regexes.some(regex => regex.test(osmkey))) {
           keepTags[osmkey] = newTags[osmkey];
@@ -637,7 +637,7 @@ matcher.locationIndex = (bbox: Vec2): any[] => {
    * @param tags - Object containing the feature's OSM tags
    * @return Object containing the primary and alternate key/value pairs to test
    */
-  _gatherKVs(tags: Tags): KVGroups {
+  _gatherKVs(tags: OsmTags): KVGroups {
     const primary = new Set<string>();
     const alternate = new Set<string>();
 
@@ -683,7 +683,7 @@ matcher.locationIndex = (bbox: Vec2): any[] => {
    * @param tags - Object containing the feature's OSM tags
    * @return The name of the tree if known, or 'unknown' for multiple, or `null` if no match
    */
-  _identifyTree(tags: Tags): string | null {
+  _identifyTree(tags: OsmTags): string | null {
     let unknown: string | undefined;
     let t: string | undefined;
 
@@ -724,7 +724,7 @@ matcher.locationIndex = (bbox: Vec2): any[] => {
    * @param tags - Object containing the feature's OSM tags
    * @return Object containing the primary and alternate names to test
    */
-  _gatherNames(tags: Tags): NameGroups {
+  _gatherNames(tags: OsmTags): NameGroups {
     const empty: NameGroups = { primary: new Set(), alternate: new Set() };
     const primary = new Set<string>();
     const alternate = new Set<string>();

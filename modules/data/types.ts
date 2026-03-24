@@ -15,7 +15,7 @@ export type { OsmRelation, OsmRelationProps, OsmRelationMember } from './OsmRela
 export type { OsmWay, OsmWayProps } from './OsmWay.ts';
 
 /** OSM tags as key-value string pairs */
-export type Tags = Record<string, string>;
+export type OsmTags = Record<string, string>;
 
 /**
  * A lookup table mapping tag values to boolean flags.

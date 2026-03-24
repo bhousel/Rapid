@@ -3,9 +3,7 @@ import { Vec2, vecInterp } from '@rapid-sdk/math';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { OsmRelationMember } from '../data/OsmRelation.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmEntity, OsmRelationMember, OsmTags } from '../data/types.ts';
 
 
 /** Result of finding a connection point on target way */
@@ -186,7 +184,7 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
   // Removes the metadata directly, this is kind of hacky
   function removeMetadata(entity: OsmEntity): void {
     const props = entity.props as Record<string, unknown>;
-    const tags = props.tags as Tags;
+    const tags = props.tags as OsmTags;
 
     delete props.__fbid__;
     delete props.__origid__;

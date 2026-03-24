@@ -1,6 +1,6 @@
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmTags } from '../data/types.ts';
 
 
 /**
@@ -34,11 +34,11 @@ import type { Tags } from '../data/types.ts';
  * @param   replaceTags  - Optional tags to replace with
  * @return  An Action function that upgrades tags in the graph
  */
-export function actionUpgradeTags(entityID: EntityID, oldTags: Tags, replaceTags?: Tags): Action {
+export function actionUpgradeTags(entityID: EntityID, oldTags: OsmTags, replaceTags?: OsmTags): Action {
 
   return (graph: Graph): Graph => {
     const entity = graph.entity(entityID);
-    const tags: Tags = Object.assign({}, entity.tags);      // shallow copy
+    const tags: OsmTags = Object.assign({}, entity.tags);      // shallow copy
     let transferValue: string | undefined;
     let semiIndex: number | undefined;
 

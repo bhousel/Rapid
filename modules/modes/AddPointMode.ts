@@ -7,9 +7,8 @@ import { OsmNode } from '../data/OsmNode.ts';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
-import type { OsmWay } from '../data/OsmWay.ts';
+import type { OsmTags, OsmWay } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
-import type { Tags } from '../data/index.ts';
 
 const DEBUG = false;
 
@@ -19,7 +18,7 @@ const DEBUG = false;
  * In this mode, we are waiting for the user to place a point somewhere
  */
 export class AddPointMode extends AbstractMode {
-  defaultTags: Tags;
+  defaultTags: OsmTags;
 
   /**
    * @constructor
@@ -176,7 +175,7 @@ export class AddPointMode extends AbstractMode {
       return;
     }
 
-    const tags: Tags = Object.assign({}, node.tags);  // shallow copy
+    const tags: OsmTags = Object.assign({}, node.tags);  // shallow copy
     for (const k in this.defaultTags) {
       tags[k] = this.defaultTags[k];
     }

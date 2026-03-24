@@ -6,12 +6,11 @@ import { utilExtractValues } from '../util/string.ts';
 import type { Context } from '../Context.ts';
 import type { GeometryType } from './SchemaSystem.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity, OsmRelation, OsmWay } from '../data/index.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from '../data/index.ts';
 
 
 /** Filter match function signature */
-type FilterMatchFn = (tags: Tags, geometry?: GeometryType) => boolean;
+type FilterMatchFn = (tags: OsmTags, geometry?: GeometryType) => boolean;
 
 /** Single filter stat */
 interface FilterStat {
@@ -30,8 +29,8 @@ interface EntityCache {
 
 /** A preset-like object for isHiddenPreset */
 interface PresetLike {
-  tags?: Tags;
-  setTags: (tags: Tags, geometry: GeometryType) => Tags;
+  tags?: OsmTags;
+  setTags: (tags: OsmTags, geometry: GeometryType) => OsmTags;
 }
 
 /**
@@ -736,78 +735,78 @@ export class FilterSystem extends AbstractSystem {
 
   // matchers
 
-  _isPoint(tags: Tags, geometry?: GeometryType): boolean {
+  _isPoint(tags: OsmTags, geometry?: GeometryType): boolean {
     return geometry === 'point';
   }
 
-  _isTrafficRoad(tags: Tags): boolean {
+  _isTrafficRoad(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('major_vehicular')?.match(tags);
   }
 
-  _isServiceRoad(tags: Tags): boolean {
+  _isServiceRoad(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('minor_vehicular')?.match(tags);
   }
 
-  _isPath(tags: Tags): boolean {
+  _isPath(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('path_highway')?.match(tags);
   }
 
-  _isBuilding(tags: Tags): boolean {
+  _isBuilding(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_building')?.match(tags) && !this._isPastFuture(tags);
   }
 
-  _isBuildingPart(tags: Tags): boolean {
+  _isBuildingPart(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_building_part')?.match(tags);
   }
 
-  _isIndoor(tags: Tags): boolean {
+  _isIndoor(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_indoor')?.match(tags);
   }
 
-  _isLanduse(tags: Tags, geometry?: GeometryType): boolean {
+  _isLanduse(tags: OsmTags, geometry?: GeometryType): boolean {
     if (geometry !== 'area') return false;
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_landuse')?.match(tags) && !this._isPastFuture(tags);
   }
 
-  _isBoundary(tags: Tags): boolean {
+  _isBoundary(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_boundary')?.match(tags);
   }
 
-  _isWater(tags: Tags): boolean {
+  _isWater(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_water')?.match(tags) && !this._isPastFuture(tags);
   }
 
-  _isRail(tags: Tags): boolean {
+  _isRail(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_rail')?.match(tags) && !this._isPastFuture(tags);
   }
 
-  _isPiste(tags: Tags): boolean {
+  _isPiste(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_piste')?.match(tags);
   }
 
-  _isAerialway(tags: Tags): boolean {
+  _isAerialway(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_aerialway')?.match(tags);
   }
 
-  _isPower(tags: Tags): boolean {
+  _isPower(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_power')?.match(tags) && !this._isPastFuture(tags);
   }
 
   // contains a past/future tag, but not in active use as a road/path/cycleway/etc..
-  _isPastFuture(tags: Tags): boolean {
+  _isPastFuture(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     const osmScope = schema?.getScope('osm');
     if (osmScope?.rulesets.get('connected_highway')?.match(tags)) return false;
@@ -833,7 +832,7 @@ export class FilterSystem extends AbstractSystem {
   // Lines or areas that don't match another feature filter.
   // IMPORTANT: The 'others' feature must be the last one defined,
   // so that code in getMatches can skip this test if someting else was matched.
-  _isOther(tags: Tags, geometry?: GeometryType): boolean {
+  _isOther(tags: OsmTags, geometry?: GeometryType): boolean {
     return (geometry === 'line' || geometry === 'area');
   }
 }

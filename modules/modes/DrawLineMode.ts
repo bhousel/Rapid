@@ -13,7 +13,7 @@ import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 import type { Action } from '../actions/types.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmTags } from '../data/types.ts';
 
 const DEBUG = false;
 
@@ -44,7 +44,7 @@ interface DrawLineSnapshot {
  */
 export class DrawLineMode extends AbstractMode {
   /** Default tags for new ways */
-  defaultTags: Tags;
+  defaultTags: OsmTags;
   /** The draw way just contains the way that we are drawing */
   drawWayID: EntityID | null;
   /** The draw node is temporary and just follows the pointer */

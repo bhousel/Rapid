@@ -1,8 +1,7 @@
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmNode } from '../data/OsmNode.ts';
-import type { OsmWay } from '../data/OsmWay.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmNode, OsmTags, OsmWay } from '../data/types.ts';
+
 
 /**
  *  actionSyncCrossingTags
@@ -64,7 +63,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
    * @param   tags - tags to check
    * @return  `true` if the way is tagged as a crossing
    */
-  function _isHighwayCrossingWay(tags: Tags): boolean {
+  function _isHighwayCrossingWay(tags: OsmTags): boolean {
     for (const k of pathVals) {
       if (tags.highway === k && tags[k] === 'crossing') {
         return true;
@@ -80,7 +79,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
    * @param   tags - tags to check
    * @return  `true` if the way is tagged as a crossing
    */
-  function _isCrossableWay(tags: Tags): boolean {
+  function _isCrossableWay(tags: OsmTags): boolean {
     return roadVals.has(tags.highway) || pathVals.has(tags.highway) || !!tags.railway || !!tags.crossing;
   }
 
@@ -104,7 +103,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
    * @param   tags - tags to check
    * @return  boolean
    */
-  function _isCrossingNode(tags: Tags): boolean {
+  function _isCrossingNode(tags: OsmTags): boolean {
     // Watch out for multivalues ';', sometimes the `crossing` might also be a stopline / traffic_signals / etc.
     const highwayVals = new Set<string>( (tags.highway || '').split(';').filter(Boolean) );
     return !!tags['crossing:markings'] || highwayVals.has('crossing');
@@ -121,7 +120,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
    * @param   skipChildID - Optional, if the change originated from `syncChildToParents`, skip the original child nodeID
    */
   function syncParentToChildren(parent: OsmWay, graph: Graph, skipChildID?: EntityID): void {
-    let parentTags: Tags = Object.assign({}, parent.tags);  // copy
+    let parentTags: OsmTags = Object.assign({}, parent.tags);  // copy
     parentTags = cleanCrossingTags(parentTags);
 
     // These are the two conditions where we want to attempt syncing the parent crossing tags to child nodes:
@@ -143,7 +142,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
     // Gather relevant crossing tags from the parent way, these are the tags that will be synced.
     // (If the parent is not a crossing, we'll be gathering `undefined`, this is expected)
-    const syncTags: Tags = {};
+    const syncTags: OsmTags = {};
     for (const k of crossingKeys) {
       syncTags[k] = parentTags[k];
     }
@@ -191,7 +190,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
     // Sync the tags to the child nodes..
     const isInformalCrossing = ['informal', 'no'].includes(syncTags.crossing);
     for (const child of childNodes) {
-      const childTags: Tags = Object.assign({}, child.tags);  // copy
+      const childTags: OsmTags = Object.assign({}, child.tags);  // copy
 
       for (const [k, v] of Object.entries(syncTags)) {
         if (v) {
@@ -235,7 +234,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
   function syncChildToParents(child: OsmNode, graph: Graph): void {
     const parentWays = graph.parentWays(child);
 
-    let childTags: Tags = Object.assign({}, child.tags);  // copy
+    let childTags: OsmTags = Object.assign({}, child.tags);  // copy
     childTags = cleanCrossingTags(childTags);
 
     // Is the child vertex
@@ -257,7 +256,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
     if (!isCrossingNode) return;
 
     // Gather relevant crossing tags from the child way, these are the tags that will be synced.
-    const syncTags: Tags = {};
+    const syncTags: OsmTags = {};
     for (const k of crossingKeys) {
       syncTags[k] = childTags[k];
     }
@@ -272,7 +271,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
     // Sync the tags to the parent ways..
     for (let parent of crossingWays) {
-      const parentTags: Tags = Object.assign({}, parent.tags);  // copy
+      const parentTags: OsmTags = Object.assign({}, parent.tags);  // copy
 
       for (const [k, v] of Object.entries(syncTags)) {
         if (v) {
@@ -301,7 +300,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
    * @param   t - the input tags to check
    * @return  updated tags to set
    */
-  function cleanCrossingTags(t: Tags): Tags {
+  function cleanCrossingTags(t: OsmTags): OsmTags {
     const crossing: string | null = t.crossing ?? '';
     const crossingref: string = t.crossing_ref ?? '';
     let markings: string = t['crossing:markings'] ?? '';
@@ -313,7 +312,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
     // Bail out if any of these tags include semicolons..
     if (crossing.includes(';') || crossingref.includes(';') || markings.includes(';') || signals.includes(';')) return t;
 
-    const tags: Tags = Object.assign({}, t);  // copy
+    const tags: OsmTags = Object.assign({}, t);  // copy
 
     // First, consider `crossing_ref` tag
     if (crossingref) {  // Assign default `crossing:markings`, if it doesn't exist yet..

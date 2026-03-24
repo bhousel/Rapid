@@ -7,7 +7,7 @@ import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { Vec2, Viewport } from '@rapid-sdk/math';
-import type { OsmEntity, OsmNode, OsmRelationMember, Tags } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmRelationMember, OsmTags } from '../data/types.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
@@ -67,7 +67,7 @@ interface MidpointData {
  * @param tags - Entity tags
  * @returns z-index value
  */
-function getzIndex(tags: Tags): number {
+function getzIndex(tags: OsmTags): number {
   return HIGHWAYSTACK[tags.highway] || 0;
 }
 
@@ -79,7 +79,7 @@ function getzIndex(tags: Tags): number {
  * @returns true if entity has wikidata tags
  */
 function hasWikidata(entity: OsmEntity): boolean {
-  const tags = entity.tags as Tags;
+  const tags = entity.tags as OsmTags;
   return !!(
     tags.wikidata ||
     tags['flag:wikidata'] ||

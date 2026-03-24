@@ -11,7 +11,7 @@ import { uiLoading } from '../ui/loading.js';
 
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
-import type { OsmEntity, OsmEntityProps, Tags } from '../data/types.ts';
+import type { OsmEntity, OsmEntityProps, OsmTags } from '../data/types.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 
@@ -71,7 +71,7 @@ interface EntityCopy {
   /** String describing what kind of data element this is (e.g. 'node', 'way', 'relation') */
   type?: string;
   /** OSM tags as key-value string pairs */
-  tags?: Tags;
+  tags?: OsmTags;
   /** Internal version number, used to detect changes */
   v?: number;
   /** OSM visibility attribute - objects with visible=false are considered deleted */

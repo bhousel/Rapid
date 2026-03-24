@@ -1,10 +1,8 @@
 import { OsmNode } from '../data/OsmNode.ts';
 
 import type { Action } from './types.ts';
-import type { EntityType, Tags } from '../data/types.ts';
+import type { EntityType, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmRelation } from '../data/OsmRelation.ts';
-import type { OsmWay } from '../data/OsmWay.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 
@@ -77,8 +75,8 @@ export function actionExtract(entityID: EntityID, viewport: Viewport): ExtractAc
     const isBuilding = (entity.tags.building && entity.tags.building !== 'no') ||
       (entity.tags['building:part'] && entity.tags['building:part'] !== 'no');
 
-    const entityTags: Tags = Object.assign({}, entity.tags);  // shallow copy
-    const extractTags: Tags = {};
+    const entityTags: OsmTags = Object.assign({}, entity.tags);  // shallow copy
+    const extractTags: OsmTags = {};
 
     for (const key in entityTags) {
       if (entity.type === 'relation' && key === 'type') continue;

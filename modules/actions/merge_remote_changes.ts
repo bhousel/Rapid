@@ -7,11 +7,7 @@ import { vecEqual } from '@rapid-sdk/math';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { OsmNode } from '../data/OsmNode.ts';
-import type { OsmRelation } from '../data/OsmRelation.ts';
-import type { OsmWay } from '../data/OsmWay.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
 
 
 /** Options for merge remote changes action */
@@ -204,12 +200,12 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
     }
 
     const origLength = _conflicts.length;
-    const o: Tags = base.tags ?? {};
-    const a: Tags = target.tags ?? {};
-    const b: Tags = remote.tags ?? {};
+    const o: OsmTags = base.tags ?? {};
+    const a: OsmTags = target.tags ?? {};
+    const b: OsmTags = remote.tags ?? {};
     const keys = utilArrayUnion(utilArrayUnion(Object.keys(o), Object.keys(a)), Object.keys(b))
         .filter((k: string) => { return !discardTags[k]; });
-    const tags: Tags = Object.assign({}, a);   // shallow copy
+    const tags: OsmTags = Object.assign({}, a);   // shallow copy
     let changed = false;
 
     for (const k of keys) {

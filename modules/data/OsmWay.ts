@@ -6,7 +6,7 @@ import { osmLanes } from '../lib/lanes.ts';
 
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmNode, Tags, TagKeyValueLookup, Vec2 } from './types.ts';
+import type { OsmNode, OsmTags, TagKeyValueLookup, Vec2 } from './types.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 
 
@@ -396,7 +396,7 @@ export class OsmWay extends OsmEntity {
    * @param tags - Tags to check (defaults to `this.tags`)
    * @return The tag that indicates the area, or `null`
    */
-  tagSuggestingArea(tags?: Tags): Record<string, string> | null {
+  tagSuggestingArea(tags?: OsmTags): Record<string, string> | null {
     if (!tags) tags = this.tags;
     if (tags.area === 'yes') return { area: 'yes' };
     if (tags.area === 'no') return null;

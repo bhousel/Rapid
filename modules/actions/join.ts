@@ -5,12 +5,9 @@ import { osmJoinWays } from '../lib/multipolygon.ts';
 import { utilArrayGroupBy, utilArrayIdentical, utilArrayIntersection } from '@rapid-sdk/util';
 
 import type { Action } from './types.ts';
-import type { EntityType, Tags } from '../data/types.ts';
+import type { EntityType, OsmNode, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { JoinedWaysResult } from '../lib/multipolygon.ts';
-import type { OsmNode } from '../data/OsmNode.ts';
-import type { OsmRelation } from '../data/OsmRelation.ts';
-import type { OsmWay } from '../data/OsmWay.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -110,7 +107,7 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
 
     // Rapid tagnosticRoadCombine - allow combining highways with conflicting tags
     if (options.tagnosticRoadCombine && ways.length && ways[0].tags.highway) {
-      const newTags: Tags = Object.assign({}, survivor.tags);
+      const newTags: OsmTags = Object.assign({}, survivor.tags);
       newTags.highway = ways[0].tags.highway;
       survivor = survivor.update({ tags: newTags });
       graph.replace(survivor);
@@ -143,7 +140,7 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
       graph.replace(survivor);
       graph = actionDeleteRelation(multipolygon.id, true, true /* allow untagged members */)(graph);
 
-      const tags: Tags = Object.assign({}, survivor.tags);
+      const tags: OsmTags = Object.assign({}, survivor.tags);
       if (survivor.geometry(graph) !== 'area') {
         // ensure the feature persists as an area
         tags.area = 'yes';
@@ -216,7 +213,7 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
 
     const nodeIDs: EntityID[] = joined[0].nodes.map((n: OsmNode) => n.id).slice(1, -1);
     let relation: OsmRelation | undefined;
-    const tags: Tags = {};
+    const tags: OsmTags = {};
     let conflicting = false;
 
     joined[0].forEach((item) => {

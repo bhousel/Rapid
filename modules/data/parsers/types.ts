@@ -1,4 +1,4 @@
-import type { Tags, Vec2 } from '../types.ts';
+import type { OsmTags, Vec2 } from '../types.ts';
 
 
 /** Supported types that can be parsed from OSM data */
@@ -33,7 +33,7 @@ export interface ParsedNode {
   type: 'node';
   id: string;
   visible: boolean;
-  tags: Tags;
+  tags: OsmTags;
   loc: Vec2;
   [key: string]: unknown;
 }
@@ -43,7 +43,7 @@ export interface ParsedWay {
   type: 'way';
   id: string;
   visible: boolean;
-  tags: Tags;
+  tags: OsmTags;
   nodes: string[];
   [key: string]: unknown;
 }
@@ -60,7 +60,7 @@ export interface ParsedRelation {
   type: 'relation';
   id: string;
   visible: boolean;
-  tags: Tags;
+  tags: OsmTags;
   members: ParsedRelationMember[];
   [key: string]: unknown;
 }
@@ -69,7 +69,7 @@ export interface ParsedRelation {
 export interface ParsedChangeset {
   type: 'changeset';
   id: string;
-  tags: Tags;
+  tags: OsmTags;
   comments?: ParsedComment[];
   [key: string]: unknown;
 }

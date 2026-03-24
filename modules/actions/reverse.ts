@@ -1,8 +1,6 @@
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmNode } from '../data/OsmNode.ts';
-import type { OsmWay } from '../data/OsmWay.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmNode, OsmTags, OsmWay } from '../data/types.ts';
 
 
 /** Options for the reverse action */
@@ -161,7 +159,7 @@ export function actionReverse(entityID: EntityID, options?: ReverseOptions): Rev
       const node = graph.hasEntity(nodeID) as OsmNode | undefined;
       if (!node || !Object.keys(node.tags).length) continue;
 
-      const tags: Tags = {};
+      const tags: OsmTags = {};
       for (const [key, value] of Object.entries(node.tags)) {
         tags[reverseKey(key)] = reverseValue(key, value, node.id === entityID);
       }
@@ -172,7 +170,7 @@ export function actionReverse(entityID: EntityID, options?: ReverseOptions): Rev
 
   function reverseWay(graph: Graph, way: OsmWay): void {
     const nodes: EntityID[] = way.nodes.slice().reverse();
-    const tags: Tags = {};
+    const tags: OsmTags = {};
 
     for (const [key, value] of Object.entries(way.tags)) {
       tags[reverseKey(key)] = reverseValue(key, value);

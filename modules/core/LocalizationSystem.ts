@@ -8,7 +8,7 @@ import { utilExtractValues } from '../util/string.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity, Tags, Vec2 } from '../data/index.ts';
+import type { OsmEntity, OsmTags, Vec2 } from '../data/index.ts';
 
 
 /** Information about a language */
@@ -765,7 +765,7 @@ export class LocalizationSystem extends AbstractSystem {
    *   it being shown twice (see PR iD#8707#discussion_r712658175)
    * @return A name string suitable for display
    */
-  displayName(tags: Tags, hideNetwork?: boolean): string {
+  displayName(tags: OsmTags, hideNetwork?: boolean): string {
     const code = this._currLanguageCode.toLowerCase();
 
     const route = tags.route;
@@ -841,7 +841,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param tags - OSM tags object
    * @return A name string suitable for display
    */
-  displayPOIName(tags: Tags): string {
+  displayPOIName(tags: OsmTags): string {
     const code = this._currLanguageCode.toLowerCase();
     return tags[`name:${code}`] ?? tags.name ??
       tags[`brand:${code}`] ?? tags.brand ??
@@ -876,7 +876,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param verbose         - Whether to include both preset and feature name
    * @return A name string suitable for display
    */
-  displayLabel(entity: { id: EntityID; tags: Tags }, graphOrGeometry: Graph | string, verbose?: boolean): string {
+  displayLabel(entity: { id: EntityID; tags: OsmTags }, graphOrGeometry: Graph | string, verbose?: boolean): string {
     const context = this.context;
     const schema = context.systems.schema;
 

@@ -1,8 +1,7 @@
 import type { Action } from './types.ts';
 import type { Difference } from '../lib/Difference.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmEntity, OsmTags } from '../data/types.ts';
 
 
 /**
@@ -22,7 +21,7 @@ export function actionDiscardTags(difference: Difference, discardTags: Record<st
     function checkTags(entity: OsmEntity): void {
       const keys = Object.keys(entity.tags);
       let didDiscard = false;
-      const tags: Tags = {};
+      const tags: OsmTags = {};
 
       for (const k of keys) {
         if (discardTags[k] || !entity.tags[k]) {

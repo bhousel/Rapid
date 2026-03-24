@@ -13,7 +13,7 @@ import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 import type { Action } from '../actions/types.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmTags } from '../data/types.ts';
 
 const DEBUG = false;
 
@@ -32,7 +32,7 @@ interface DrawAreaSnapshot {
  * In this mode, we are drawing a new area.
  */
 export class DrawAreaMode extends AbstractMode {
-  defaultTags: Tags;
+  defaultTags: OsmTags;
   drawWayID: EntityID | null;
   drawNodeID: EntityID | null;
   firstNodeID: EntityID | null;

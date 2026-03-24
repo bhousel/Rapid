@@ -1,6 +1,6 @@
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { Tags } from '../data/types.ts';
+import type { OsmTags } from '../data/types.ts';
 
 
 /**
@@ -10,7 +10,7 @@ import type { Tags } from '../data/types.ts';
  * @param tags - The new tags to set
  * @return Action that replaces the entity's tags
  */
-export function actionChangeTags(entityID: EntityID, tags: Tags): Action {
+export function actionChangeTags(entityID: EntityID, tags: OsmTags): Action {
   return (graph: Graph): Graph => {
     return graph.replace(graph.entity(entityID).update({ tags: tags })).commit();
   };

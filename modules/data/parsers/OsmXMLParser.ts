@@ -17,7 +17,7 @@ import type {
   ParsedUserBlock,
   ParsedWay,
 } from './types.ts';
-import type { Tags } from '../types.ts';
+import type { OsmTags } from '../types.ts';
 
 
 /**
@@ -646,9 +646,9 @@ export class OsmXMLParser {
    * @param   xml - the containing DOM element
    * @return  Object of tag k-v pairs
    */
-  _getTags(xml: Element): Tags {
+  _getTags(xml: Element): OsmTags {
     const elems = Array.from(xml.getElementsByTagName('tag'));
-    const tags: Tags = {};
+    const tags: OsmTags = {};
     for (const elem of elems) {
       const k = (elem.getAttribute('k') ?? '').trim();
       const v = (elem.getAttribute('v') ?? '').trim();

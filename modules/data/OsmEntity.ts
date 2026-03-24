@@ -6,7 +6,7 @@ import type { Context } from '../Context.ts';
 import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { Tags } from './types.ts';
+import type { OsmTags } from './types.ts';
 
 
 /**
@@ -14,7 +14,7 @@ import type { Tags } from './types.ts';
  */
 export interface OsmEntityProps extends AbstractDataProps {
   /** OSM tags as key-value string pairs */
-  tags?: Tags;
+  tags?: OsmTags;
   /** OSM visibility attribute - objects with visible=false are considered deleted */
   visible?: boolean;
   /** OSM version attribute, used for conflict detection */
@@ -210,7 +210,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @see https://wiki.openstreetmap.org/wiki/Elements#Tag
    * @readonly
    */
-  get tags(): Tags {
+  get tags(): OsmTags {
     return this.props.tags ?? {};
   }
 
@@ -315,8 +315,8 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param tags - Tags to merge into this entity
    * @returns A new Entity copied from this Entity, but with the updated tags
    */
-  mergeTags(tags: Tags): this {
-    const merged: Tags = Object.assign({}, this.props.tags);  // copy
+  mergeTags(tags: OsmTags): this {
+    const merged: OsmTags = Object.assign({}, this.props.tags);  // copy
     let changed = false;
     for (const k in tags) {
       const t1 = merged[k];

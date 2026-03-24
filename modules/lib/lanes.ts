@@ -1,4 +1,4 @@
-import type { Tags, OsmWay } from '../data/types.ts';
+import type { OsmTags, OsmWay } from '../data/types.ts';
 
 /**
  * Valid turn lane values per OSM tagging.
@@ -188,7 +188,7 @@ export function osmLanes(entity: OsmWay): LanesInfo | null {
 }
 
 
-function getLaneCount(tags: Tags, isOneWay: boolean): number {
+function getLaneCount(tags: OsmTags, isOneWay: boolean): number {
   let count: number;
   if (tags.lanes) {
     count = parseInt(tags.lanes, 10);
@@ -211,7 +211,7 @@ function getLaneCount(tags: Tags, isOneWay: boolean): number {
 }
 
 
-function parseMaxspeed(tags: Tags): number | undefined {
+function parseMaxspeed(tags: OsmTags): number | undefined {
   const maxspeed = tags.maxspeed;
   if (!maxspeed) return;
 
@@ -222,7 +222,7 @@ function parseMaxspeed(tags: Tags): number | undefined {
 }
 
 
-function parseLaneDirections(tags: Tags, isOneWay: boolean, laneCount: number): LaneDirections {
+function parseLaneDirections(tags: OsmTags, isOneWay: boolean, laneCount: number): LaneDirections {
   let forward = parseInt(tags['lanes:forward'] ?? '', 10);
   let backward = parseInt(tags['lanes:backward'] ?? '', 10);
   const bothways = parseInt(tags['lanes:both_ways'] ?? '', 10) > 0 ? 1 : 0;

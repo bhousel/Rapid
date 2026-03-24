@@ -8,7 +8,7 @@ import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { OsmNodeProps, OsmRelationProps, OsmWayProps, Tags } from '../data/types.ts';
+import type { OsmNodeProps, OsmRelationProps, OsmWayProps, OsmTags } from '../data/types.ts';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 
 
@@ -657,7 +657,7 @@ export class EsriService extends AbstractSystem {
             type: 'way'
           };
         });
-        const tags = Object.assign(parseTags(properties), { type: 'multipolygon' }) as Tags;
+        const tags = Object.assign(parseTags(properties), { type: 'multipolygon' }) as OsmTags;
         const props = Object.assign({ members: members, tags: tags }, metadata) as OsmRelationProps;
         const r = new OsmRelation(context, props);
         entities.push(r);
@@ -684,7 +684,7 @@ export class EsriService extends AbstractSystem {
       return nodelist;
     }
 
-    function parseTags(properties: Record<string, any>): Tags {
+    function parseTags(properties: Record<string, any>): OsmTags {
       const tags: Record<string, string> = {};
       for (const prop of Object.keys(properties)) {
         const k = clean(ds.layer!.tagmap[prop]);

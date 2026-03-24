@@ -6,7 +6,7 @@ import type { Context } from '../Context.ts';
 import type { Field } from './Field.ts';
 import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { LocationSet } from '@rapideditor/location-conflation';
-import type { Tags, TagKeyValueLookup } from '../data/types.ts';
+import type { OsmTags, TagKeyValueLookup } from '../data/types.ts';
 
 
 /**
@@ -29,11 +29,11 @@ export interface PresetProps {
   /** Related words used for searching */
   terms: string[];
   /** Tags that identify this Preset */
-  tags: Tags;
+  tags: OsmTags;
   /** Tags to add when applying this Preset */
-  addTags: Tags;
+  addTags: OsmTags;
   /** Tags to remove when removing this Preset */
-  removeTags: Tags;
+  removeTags: OsmTags;
   /** Field IDs for this Preset */
   fields: FieldID[];
   /** Additional Field IDs shown in "more fields" */
@@ -104,9 +104,9 @@ export class Preset {
   presetID: PresetID;
   props: PresetProps;
   geometries: Set<GeometryType>;
-  tags: Tags;
-  addTags: Tags;
-  removeTags: Tags;
+  tags: OsmTags;
+  addTags: OsmTags;
+  removeTags: OsmTags;
   searchable: boolean;
   suggestion: boolean;
 
@@ -336,7 +336,7 @@ export class Preset {
    * @param matchTags - Tags to match
    * @return The match score
    */
-  matchScore(matchTags: Tags): number {
+  matchScore(matchTags: OsmTags): number {
     const tags = this.tags;
     const seen: Record<string, boolean> = {};
     let score = 0;
@@ -453,7 +453,7 @@ export class Preset {
    * @param skipFieldDefaults - `true` to ignore tags controlled by the Fields
    * @return The final tags for the Entity, after removal has happened.
    */
-  unsetTags(tags: Tags, geometry: GeometryType, ignoreKeys?: string[], skipFieldDefaults?: boolean): Tags {
+  unsetTags(tags: OsmTags, geometry: GeometryType, ignoreKeys?: string[], skipFieldDefaults?: boolean): OsmTags {
     // allow manually keeping some tags
     const removeTags = ignoreKeys ? utilObjectOmit(this.removeTags, ignoreKeys) : this.removeTags;
     tags = utilObjectOmit(tags, Object.keys(removeTags));
@@ -479,7 +479,7 @@ export class Preset {
    * @param skipFieldDefaults - `true` to ignore tags controlled by the Fields
    * @return The final tags for the Entity, after adding has happened.
    */
-  setTags(tags: Tags, geometry: GeometryType, skipFieldDefaults?: boolean): Tags {
+  setTags(tags: OsmTags, geometry: GeometryType, skipFieldDefaults?: boolean): OsmTags {
     const schema = this.context.systems.schema;
 
     const addTags = this.addTags;

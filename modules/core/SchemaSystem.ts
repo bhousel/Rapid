@@ -12,7 +12,7 @@ import type { FieldProps } from '../lib/Field.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { HasLocationSet } from '../core/LocationSystem.ts';
 import type { OneOrMore } from '../util/iterable.ts';
-import type { OsmEntity, OsmNode, Tags, TagKeyValueLookup, Vec2 } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmTags, TagKeyValueLookup, Vec2 } from '../data/types.ts';
 import type { PresetProps } from '../lib/Preset.ts';
 import type { RulesetProps } from '../lib/Ruleset.ts';
 import type { VariableProps, VariableValue } from '../lib/Variable.ts';
@@ -933,7 +933,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to match in (defaults to 'osm')
    * @return  Preset that best matches
    */
-  matchTags(tags: Tags, geometry: GeometryType, loc?: Vec2, scopeID: ScopeID = 'osm'): Preset | null {
+  matchTags(tags: OsmTags, geometry: GeometryType, loc?: Vec2, scopeID: ScopeID = 'osm'): Preset | null {
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -1102,7 +1102,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to query (defaults to 'osm')
    * @return  Array of deprecation rules that match the given tags
    */
-  getDeprecatedTags(tags: Tags, scopeID: ScopeID = 'osm'): DeprecationRule[] {
+  getDeprecatedTags(tags: OsmTags, scopeID: ScopeID = 'osm'): DeprecationRule[] {
     const scope = this.getScope(scopeID);
     const results: DeprecationRule[] = [];
 
