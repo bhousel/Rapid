@@ -80,7 +80,7 @@ export class UiGeolocateControl {
       .call(uiIcon('#rapid-icon-geolocate', 'light'));
 
     // update
-    this.$button = $button = $button.merge($$button);  // eslint-disable-line no-useless-assignment
+    this.$button = $button = $button.merge($$button);
 
     this.$button
       .classed('active', this._isActive);

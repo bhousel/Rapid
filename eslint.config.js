@@ -122,16 +122,20 @@ export default [
       'no-console': 'warn',
       'no-process-env': 'error'
     }
-  },
-  {
+  }, {
+    // allow "useless assignment" when working with UI/D3 code - see 42eeb758
+    files: ['modules/ui/**'],
+    rules: {
+      'no-useless-assignment': 'off'
+    }
+  }, {
     files: [ 'scripts/**', 'test/unit/**' ],
     languageOptions: {
       globals: {
         ...globals.bunBuiltin
       }
     }
-  },
-  {
+  }, {
     files: [ 'test/test_setup.js', 'test/browser/**' ],
     languageOptions: {
       globals: {
@@ -143,8 +147,7 @@ export default [
         fetchMock: false
       }
     }
-  },
-  {
+  }, {
     ignores: [ 'test/benchmark/**' ]
   }
 ];

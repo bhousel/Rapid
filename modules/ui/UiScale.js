@@ -72,7 +72,7 @@ export class UiScale {
       .attr('class', 'scale-text');
 
     // update
-    this.$wrap = $wrap = $wrap.merge($$wrap);  // eslint-disable-line no-useless-assignment
+    this.$wrap = $wrap = $wrap.merge($$wrap);
 
     this.updateScale();
   }

@@ -73,7 +73,7 @@ export class UiProjectLinks {
       .call(this.TranslateTooltip);
 
     // update
-    $wrap = $wrap.merge($$wrap);  // eslint-disable-line no-useless-assignment
+    $wrap = $wrap.merge($$wrap);
 
     // localize tooltips
     this.BugTooltip.title(l10n.t('report_a_bug'));

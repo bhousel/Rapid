@@ -244,7 +244,7 @@ export function uiPresetList(context) {
       .style('opacity', 1);
 
     // update
-    $items = $items.merge($$items)  // eslint-disable-line no-useless-assignment
+    $items = $items.merge($$items)
       .order()   // make them match the order of `arr`
       .each((d, i, nodes) => d3_select(nodes[i]).call(d.render))
       .classed('current', d => _selectedPresetIDs.has(d.item.id));

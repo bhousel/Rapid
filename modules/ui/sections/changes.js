@@ -92,7 +92,7 @@ export function uiSectionChanges(context) {
         return string + ' ' + name;
       });
 
-    items = itemsEnter  // eslint-disable-line no-useless-assignment
+    items = itemsEnter
       .merge(items);
 
 
