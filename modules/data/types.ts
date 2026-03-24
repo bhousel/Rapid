@@ -26,7 +26,7 @@ export type TagValueLookup = Record<string, boolean>;
 
 /**
  * A two-level lookup table: key → value → boolean.
- * Used for osmAreaKeys
+ * Used for areaKeys, pointTags, vertexTags on SchemaScope
  */
 export type TagKeyValueLookup = Record<string, TagValueLookup>;
 

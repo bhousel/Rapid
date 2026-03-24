@@ -19,11 +19,12 @@ Then work through each documentation layer below.
 
 ## Documentation layers to check
 
-### SCRATCHPAD.md (if present)
-A working-memory file for agents (gitignored). Update it with:
-- Any new quirks, gotchas, or lessons learned from recent work
-- Any known issues or follow-up tasks worth remembering
-- Remove anything that is now resolved or stale
+### `.scratchpad/` folder
+Persistent working memory for agents (committed to git). Check each file:
+- `current.md` — update with any new active work; remove completed items
+- `decisions.md` — add any non-obvious "why" from recent work
+- `lessons.md` — add any new gotchas or patterns learned
+- `quirks.md` — add new runtime issues; remove any that are resolved
 
 ### AGENTS.md (if present)
 Agent context file. Check that:

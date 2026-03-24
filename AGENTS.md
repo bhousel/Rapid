@@ -508,7 +508,7 @@ After making changes:
 
 ### JSON Schemas
 - Data files in `data/` are validated by JSON Schema definitions in `data/schema/`
-- The main data file schema is `main.schema.json` (includes `assetID`, `asserVersion`, `scopes[]`)
+- The main data file schema is `main.schema.json` (includes `assetID`, `assetVersion`, `scopes[]`)
 - Component schemas use `$ref` to reference each other (e.g. `matcher.schema.json` is used by both `selector.schema.json` and `ruleset.schema.json`)
 - Imagery schema tracks the upstream [editor-layer-index schema](https://github.com/osmlab/editor-layer-index) closely
 - Field, preset, category, defaults, deprecated, and discarded schemas are compatible with [schema-builder](https://github.com/ideditor/schema-builder) / [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema)
