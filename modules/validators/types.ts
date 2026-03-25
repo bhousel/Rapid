@@ -13,7 +13,7 @@ import type { ValidationIssue } from '../lib/ValidationIssue.ts';
 export type ValidatorResult = ValidationIssue[] & { provisional?: boolean };
 
 /**
- * A validation rule function that checks an entity for issues.
+ * A validator function that checks an entity for issues.
  * Returns an array of ValidationIssue, possibly with a `provisional` flag
  * to indicate that the result is incomplete (e.g. waiting for async data).
  */

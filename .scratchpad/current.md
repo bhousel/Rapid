@@ -13,7 +13,8 @@ The longer-term fix is converting validators to proper classes with lifecycle ma
 - Per-dataset schema querying (different presets for Rapid vs OSM data)
 
 ## Recently Completed (one-liners)
-- **Validations TS conversion** (Jun 2025) — All 19 validator files converted to TypeScript using factory function pattern. `types.ts` added with `ValidatorFunction`, `ValidatorFactory`, and `ValidatorResult` types. `index.js` → `index.ts` with module JSDoc and type re-exports. `D3Selection` typing on all `showReference` parameters. Entity narrowing pattern applied (single cast after guard). `CrossingInfo`/`WayInfo` types added to `crossing_ways.ts`. `mismatched_geometry.ts` re-indented from 4-space to 2-space. Sort comparator bug fixed in `crossing_ways.ts`.
+- **Validators folder rename** (Mar 2026) — `modules/validations/` → `modules/validators/`, `duplicate_way_segments` → `duplicate_segments`. Tests moved to `test/unit/validators/`. All imports updated.
+- **Validators TS conversion + JSDoc** (Mar 2026) — All 19 validator files converted to TypeScript. `types.ts` added with `ValidatorFunction`, `ValidatorFactory`, and `ValidatorResult` types. Comprehensive JSDoc on all functions. `D3Selection` typing on all `showReference` parameters. Entity narrowing pattern applied. `CrossingInfo`/`WayInfo` types in `crossing_ways.ts`.
 - **Data class renames** (Mar 2026) — `Tags` → `OsmTags`, `GeoJSON` → `GeoJSONData`, `Marker` → `MarkerData`. Reduces ambiguity with `@types/geojson` namespace.
 - **Context lifecycle split** (Mar 2026) — `prepareAsync()` → `initAsync()` → `startAsync()` → `run()`. Breaking change: simple consumers use `context.run()`.
 - **JSON Schema validation** (Mar 2026) — 13 schemas in `data/schema/`, validated via `bun run validate:json`.

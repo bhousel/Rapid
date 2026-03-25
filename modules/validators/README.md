@@ -1,10 +1,11 @@
-# Validations
+# Validators
 
 Validation rules that check map data for errors, warnings, and suggestions. These help mappers catch mistakes before uploading to OpenStreetMap.
 
 ## Overview
 
-Each validation is a function that examines entities and returns an array of `ValidationIssue` objects. Validations are run by the `ValidationSystem` and results are displayed in the issues panel.
+Each validator is a function that examines entities and returns an array of `ValidationIssue` objects.
+Validators are run by the `ValidationSystem` and results are displayed in the issues panel.
 
 ## Key Files
 
@@ -16,7 +17,7 @@ Each validation is a function that examines entities and returns an array of `Va
 | `crossing_ways.ts` | Ways that cross without a shared node (currently disabled) |
 | `curb_nodes.ts` | Missing or incorrect curb nodes at crossings |
 | `disconnected_way.ts` | Ways that should connect to the road network |
-| `duplicate_way_segments.ts` | Ways with duplicate segments |
+| `duplicate_segments.ts` | Ways with duplicate segments |
 | `help_request.ts` | Features tagged with fixme or help requests |
 | `impossible_oneway.ts` | Oneway roads with impossible connections |
 | `incompatible_source.ts` | Problematic source tags |
@@ -33,15 +34,15 @@ Each validation is a function that examines entities and returns an array of `Va
 
 ## Validation Interface
 
-Each validation is a factory function that accepts a `Context` and returns a `ValidatorFunction`:
+Each validator is a factory function that accepts a `Context` and returns a `ValidatorFunction`:
 
 ```typescript
-export function validationExample(context: Context): ValidatorFunction {
+export function validatorExample(context: Context): ValidatorFunction {
   const type = 'example' as ValidatorID;
   const editor = context.systems.editor!;
   const l10n = context.systems.l10n!;
 
-  const validation = function(entity: OsmEntity, graph: Graph): ValidationIssue[] {
+  const validator = function(entity: OsmEntity, graph: Graph): ValidationIssue[] {
     const issues = [];
 
     // Check for problems...
@@ -63,8 +64,8 @@ export function validationExample(context: Context): ValidatorFunction {
     return issues;
   } as ValidatorFunction;
 
-  validation.type = type;
-  return validation;
+  validator.type = type;
+  return validator;
 }
 ```
 
