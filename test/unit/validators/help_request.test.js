@@ -1,0 +1,15 @@
+/* eslint-disable */
+import { describe, it } from 'bun:test';
+import { assert } from 'chai';
+import * as Rapid from '../../../modules/headless.js';
+
+
+describe('validateHelpRequest', () => {
+  const context = new Rapid.MockContext();
+  context.systems = {
+    l10n:  new Rapid.LocalizationSystem(context)
+  };
+
+  const validator = Rapid.validateHelpRequest(context);
+
+});

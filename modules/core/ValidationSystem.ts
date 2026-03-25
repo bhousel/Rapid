@@ -5,13 +5,13 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference } from '../lib/Difference.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { ValidationCache } from '../lib/ValidationCache.ts';
-import * as Validations from '../validations/index.ts';
+import * as Validations from '../validators/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { ValidationIssue, ValidationSeverity } from '../lib/ValidationIssue.ts';
-import type { ValidatorFunction } from '../validations/types.ts';
+import type { ValidatorFunction } from '../validators/types.ts';
 
 /** Wait 5 sec before revalidating provisional entities */
 const RETRY = 5000;

@@ -12,7 +12,7 @@ export * from './services/index.ts';
 export * from './types/ids.ts';
 export * from './ui/index.js';
 export * from './util/index.ts';
-export * from './validations/index.js';
+export * from './validators/index.js';
 
 export * from './Context.ts';
 export * from './mocks.ts';

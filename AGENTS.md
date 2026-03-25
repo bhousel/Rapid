@@ -507,7 +507,7 @@ Track TypeScript conversion progress here:
 | `modules/operations/` | ❌ Not started | |
 | `modules/services/` | ✅ Complete | All files converted |
 | `modules/ui/` | ❌ Not started | |
-| `modules/validations/` | ✅ Complete | All files converted |
+| `modules/validators/` | ✅ Complete | All files converted |
 
 ## Testing
 
