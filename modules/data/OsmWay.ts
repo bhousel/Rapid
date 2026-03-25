@@ -366,7 +366,7 @@ export class OsmWay extends OsmEntity {
     if (!this.isClosed() || this.isDegenerate()) return null;
 
     const nodes = utilArrayUniq(graph.childNodes(this));
-    const coords = nodes.map((node: any) => node.loc);
+    const coords = nodes.map(node => node.loc!);
     let curr: number;
     let prev = 0;
 
@@ -396,7 +396,7 @@ export class OsmWay extends OsmEntity {
    * @param tags - Tags to check (defaults to `this.tags`)
    * @return The tag that indicates the area, or `null`
    */
-  tagSuggestingArea(tags?: OsmTags): Record<string, string> | null {
+  tagSuggestingArea(tags?: OsmTags): OsmTags | null {
     if (!tags) tags = this.tags;
     if (tags.area === 'yes') return { area: 'yes' };
     if (tags.area === 'no') return null;
@@ -407,10 +407,10 @@ export class OsmWay extends OsmEntity {
     const forceTrue = scope?.rulesets.get('areakeys_force_true');
     const forceFalse = scope?.rulesets.get('areakeys_force_false');
 
-    const returnTags: Record<string, string> = {};
+    const returnTags: OsmTags = {};
     for (const realKey in tags) {
       const key = schema?.removeLifecyclePrefix(realKey) ?? realKey;
-      const kv: Record<string, string> = { [key]: tags[realKey] };
+      const kv: OsmTags = { [key]: tags[realKey] };
 
       // Skip tags forced false (e.g. emergency=yes — key is in areaKeys but value is not an area)
       if (forceFalse?.match(kv)) continue;

@@ -5,27 +5,18 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference } from '../lib/Difference.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { ValidationCache } from '../lib/ValidationCache.ts';
-import * as Validations from '../validations/index.js';
+import * as Validations from '../validations/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { ValidationIssue, ValidationSeverity } from '../lib/ValidationIssue.ts';
+import type { ValidatorFunction } from '../validations/types.ts';
 
 /** Wait 5 sec before revalidating provisional entities */
 const RETRY = 5000;
 
-
-/**
- * A validation rule function that checks for issues.
- * Returns an array of ValidationIssue, possibly with a `provisional` flag.
- */
-interface ValidatorFunction {
-  (entity: OsmEntity, graph: Graph): ValidationIssue[] & { provisional?: boolean };
-  type: string;
-}
-
-/** Override rule for adjusting issue severity */
+/** Override for adjusting issue severity */
 interface SeverityOverride {
   type: RegExp;
   subtype: RegExp;
@@ -58,7 +49,7 @@ interface ValidateEntityResult {
 
 
 /**
- * `ValidationSystem` manages all the validation rules and maintains two caches
+ * `ValidationSystem` manages all the validator functions and maintains two caches
  * containing the validation results:
  *   `base` is the results of validating the base graph (before user edits)
  *   `head` is the results of validating the head graph (with user edits applied)
@@ -76,14 +67,14 @@ interface ValidateEntityResult {
  *   `focusedIssue`    Fires after an issue has received focus, receives the issue
  */
 export class ValidationSystem extends AbstractSystem {
-  /** Map of rule ID to validator function */
-  private _rules: Map<ValidatorID, ValidatorFunction>;
+  /** Map of ValidatorID to validator function */
+  private _validators: Map<ValidatorID, ValidatorFunction>;
   /** Validation cache for base graph (before user edits) */
   private _base: ValidationCache;
   /** Validation cache for head graph (with user edits) */
   private _head: ValidationCache;
-  /** Disabled rule IDs */
-  private _disabledRuleIDs: Set<ValidatorID>;
+  /** Disabled validator IDs */
+  private _disabledValidatorIDs: Set<ValidatorID>;
   /** Ignored issue IDs */
   private _ignoredIssueIDs: Set<IssueID>;
   /** Resolved issue IDs */
@@ -113,11 +104,11 @@ export class ValidationSystem extends AbstractSystem {
     this.requiredDependencies = new Set(['editor', 'schema', 'spatial']);
     this.optionalDependencies = new Set(['map', 'storage', 'urlhash']);
 
-    this._rules = new Map();
+    this._validators = new Map();
     this._base = new ValidationCache('base');
     this._head = new ValidationCache('head');
 
-    this._disabledRuleIDs = new Set();
+    this._disabledValidatorIDs = new Set();
     this._ignoredIssueIDs = new Set();
     this._resolvedIssueIDs = new Set();
     this._completeDiff = new Map();
@@ -142,7 +133,7 @@ export class ValidationSystem extends AbstractSystem {
   initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
-    // Create the validation rules
+    // Create the validator functions
     // TODO: Validator functions are instantiated once here at init time.  Any schema-derived
     // data they capture at construction (e.g. hoisted `pathVals`, `variables`, etc.) will be
     // stale if the schema is loaded or updated after this point.  The fix is to convert each
@@ -155,7 +146,7 @@ export class ValidationSystem extends AbstractSystem {
     Object.values(Validations).forEach((validation: unknown) => {
       if (typeof validation !== 'function') return;
       const fn = (validation as (ctx: Context) => ValidatorFunction)(context);
-      this._rules.set(fn.type, fn);
+      this._validators.set(fn.type, fn);
     });
 
     const editor = context.systems.editor;
@@ -190,8 +181,8 @@ export class ValidationSystem extends AbstractSystem {
         this._disableOverrides = this._parseHashParam(hash.get('validationDisable'));
 
         const disabledRules = storage?.getItem('validate-disabledRules') ?? '';
-        const ruleIDs = utilExtractValues(disabledRules).filter(Boolean);
-        this._disabledRuleIDs = new Set(ruleIDs);
+        const validatorIDs = utilExtractValues(disabledRules).filter(Boolean);
+        this._disabledValidatorIDs = new Set(validatorIDs);
 
         // Setup event handlers..
         // When to run validation:
@@ -253,9 +244,9 @@ export class ValidationSystem extends AbstractSystem {
   private _parseHashParam(val: string = ''): SeverityOverride[] {
     const result: SeverityOverride[] = [];
 
-    const rules = utilExtractValues(val, /[,;|]/).filter(Boolean);  // keep slashes
-    for (const rule of rules) {
-      const parts = rule.split('/', 2);  // "type/subtype"
+    const vals = utilExtractValues(val, /[,;|]/).filter(Boolean);  // keep slashes
+    for (const val of vals) {
+      const parts = val.split('/', 2);  // "type/subtype"
       const type = parts[0];
       const subtype = parts[1] ?? '*';
       if (!type || !subtype) continue;
@@ -288,7 +279,7 @@ export class ValidationSystem extends AbstractSystem {
    * It reruns just the "unsquare_way" validation on all buildings.
    */
   revalidateUnsquare(): void {
-    const checkUnsquareWay = this._rules.get('unsquare_way');
+    const checkUnsquareWay = this._validators.get('unsquare_way');
     if (typeof checkUnsquareWay !== 'function') return;
 
     const revalidate = (cache: ValidationCache): void => {
@@ -343,8 +334,8 @@ export class ValidationSystem extends AbstractSystem {
       if (!issue) return false;
       if (seen.has(issue.id)) return false;
       if (this._resolvedIssueIDs.has(issue.id)) return false;
-      if (opts.includeDisabledRules === 'only' && !this._disabledRuleIDs.has(issue.type)) return false;
-      if (!opts.includeDisabledRules && this._disabledRuleIDs.has(issue.type)) return false;
+      if (opts.includeDisabledRules === 'only' && !this._disabledValidatorIDs.has(issue.type)) return false;
+      if (!opts.includeDisabledRules && this._disabledValidatorIDs.has(issue.type)) return false;
 
       if (opts.includeIgnored === 'only' && !this._ignoredIssueIDs.has(issue.id)) return false;
       if (!opts.includeIgnored && this._ignoredIssueIDs.has(issue.id)) return false;
@@ -526,54 +517,54 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * getRuleKeys
-   * @return An Array containing the rule keys
+   * getValidatorIDs
+   * @return An Array containing all available validator IDs
    */
-  getRuleKeys(): ValidatorID[] {
-    return [...this._rules.keys()];
+  getValidatorIDs(): ValidatorID[] {
+    return [...this._validators.keys()];
   }
 
 
   /**
-   * isRuleEnabled
-   * @param ruleID - The ruleID (e.g. 'crossing_ways')
+   * isValidatorEnabled
+   * @param validatorID - The validatorID (e.g. 'crossing_ways')
    * @return true/false
    */
-  isRuleEnabled(ruleID: ValidatorID): boolean {
-    return !this._disabledRuleIDs.has(ruleID);
+  isValidatorEnabled(validatorID: ValidatorID): boolean {
+    return !this._disabledValidatorIDs.has(validatorID);
   }
 
 
   /**
-   * toggleRule
-   * Toggles a single validation rule,
-   * then reruns the validation so that the user sees something happen in the UI
-   * @param ruleID - The rule to toggle (e.g. 'crossing_ways')
+   * toggleValidator
+   * Toggles a single validatorID, then reruns the validation
+   * so that the user sees something happen in the UI.
+   * @param validatorID - The validator ID to toggle (e.g. 'crossing_ways')
    */
-  toggleRule(ruleID: ValidatorID): void {
-    if (this._disabledRuleIDs.has(ruleID)) {
-      this._disabledRuleIDs.delete(ruleID);
+  toggleValidator(validatorID: ValidatorID): void {
+    if (this._disabledValidatorIDs.has(validatorID)) {
+      this._disabledValidatorIDs.delete(validatorID);
     } else {
-      this._disabledRuleIDs.add(ruleID);
+      this._disabledValidatorIDs.add(validatorID);
     }
 
     const storage = this.context.systems.storage;
-    storage?.setItem('validate-disabledRules', [...this._disabledRuleIDs].join(','));
+    storage?.setItem('validate-disabledRules', [...this._disabledValidatorIDs].join(','));
     this.validateAsync();
   }
 
 
   /**
-   * disableRules
-   * Disables given validation rules,
-   * then reruns the validation so that the user sees something happen in the UI
-   * @param ruleIDs - Complete set of rules that should be disabled
+   * disableValidators
+   * Disables given validatorIDs, then reruns validation
+   * so that the user sees something happen in the UI.
+   * @param validatorID - Complete set of validatorIDs that should be disabled
    */
-  disableRules(ruleIDs: ValidatorID[] = []): void {
-    this._disabledRuleIDs = new Set(ruleIDs);
+  disableValidators(validatorID: ValidatorID[] = []): void {
+    this._disabledValidatorIDs = new Set(validatorID);
 
     const storage = this.context.systems.storage;
-    storage?.setItem('validate-disabledRules', [...this._disabledRuleIDs].join(','));
+    storage?.setItem('validate-disabledRules', [...this._disabledValidatorIDs].join(','));
     this.validateAsync();
   }
 
@@ -684,7 +675,7 @@ export class ValidationSystem extends AbstractSystem {
 
   /**
    * _validateEntity
-   * Runs all validation rules on a single entity.
+   * Runs all active validators against a single entity.
    * Some things to note:
    *  - Graph is passed in from whenever the validation was started.  Validators shouldn't use
    *    the staging/stable graphs because this all happens async, and the graph might have changed
@@ -730,12 +721,12 @@ export class ValidationSystem extends AbstractSystem {
 
 
     const result: ValidateEntityResult = { issues: [], provisional: false };
-    for (const [key, rule] of this._rules) {   // run all validators
-      if (typeof rule !== 'function') {
-        console.error(`no such validation rule = ${key}`);  // eslint-disable-line no-console
+    for (const [validatorID, validator] of this._validators) {   // run all validators
+      if (typeof validator !== 'function') {
+        console.error(`ValidationSystem: no such validatorID = ${validatorID}`);  // eslint-disable-line no-console
         continue;
       }
-      const detected = rule(entity, graph);
+      const detected = validator(entity, graph);
       if (detected.provisional) {   // this validation should be run again later
         result.provisional = true;
       }

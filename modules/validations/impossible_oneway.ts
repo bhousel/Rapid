@@ -1,44 +1,64 @@
 import { Extent } from '@rapid-sdk/math';
 
-import { actionReverse } from '../actions/reverse.js';
+import { actionReverse } from '../actions/reverse.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Graph } from '../lib/Graph.ts';
+import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
+import type { ValidatorFunction } from './types.ts';
 
-export function validationImpossibleOneway(context) {
-  const type = 'impossible_oneway';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+
+/**
+ * Factory that creates a validator for detecting oneway roads and waterways
+ * whose start or end nodes connect only to other oneways in a way that
+ * makes the feature unreachable or inescapable.
+ * @param context
+ * @returns Validator function
+ */
+export function validationImpossibleOneway(context: Context): ValidatorFunction {
+  const type = 'impossible_oneway' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
 
 
-  let validation = function checkImpossibleOneway(entity, graph) {
+  /**
+   * Checks whether a oneway road or waterway has unreachable or inescapable endpoints.
+   * @param entity - The entity to validate
+   * @param graph - The current graph
+   * @returns Array of issues for impossible oneway connections
+   */
+  const validation = function checkImpossibleOneway(entity: OsmEntity, graph: Graph): ValidationIssue[] {
     if (!schema) return [];
     if (entity.type !== 'way' || entity.geometry(graph) !== 'line') return [];
-    if (entity.isClosed()) return [];
-    if (!typeForWay(entity)) return [];
-    if (!entity.isOneWay()) return [];
+
+    const way = entity as OsmWay;
+    if (way.isClosed()) return [];
+    if (!typeForWay(way)) return [];
+    if (!way.isOneWay()) return [];
     if (
       entity.tags.oneway === 'alternating' ||
       entity.tags.oneway === 'reversible' ||
       entity.tags.intermittent === 'yes'      // Ignore intermittent waterways - Rapid#1018
     ) return [];
 
-    const firstIssues = issuesForNode(entity, entity.first());
-    const lastIssues = issuesForNode(entity, entity.last());
+    const firstIssues = issuesForNode(way, way.first()!);
+    const lastIssues = issuesForNode(way, way.last()!);
     return firstIssues.concat(lastIssues);
 
 
     /**
-     * typeForWay
-     * Return whether the way is a 'highway' or 'waterway'.
-     * @param   {OsmWay}   way
-     * @return  {string?}  'highway' or 'waterway'
+     * Returns whether the way is a 'highway' or 'waterway'.
+     * @param way - The way to classify
+     * @returns 'highway', 'waterway', or `null`
      */
-    function typeForWay(way) {
+    function typeForWay(way: OsmWay): 'highway' | 'waterway' | null {
       if (way.geometry(graph) !== 'line') return null;
 
-      const rulesets = schema.getScope('osm').rulesets;
+      const rulesets = schema!.getScope('osm').rulesets;
 
       const routable = rulesets.get('connected_highway');
       if (routable?.match({ highway: way.tags.highway })) {
@@ -55,33 +75,33 @@ export function validationImpossibleOneway(context) {
 
 
     /**
-     * nodeOccursMoreThanOnce
-     * We skip checks on nodes that occur more than once.
-     * This can happen if a way starts/ends in its middle, for example:
+     * Checks if a node occurs more than once in a way.
+     * We skip checks on such nodes because they indicate self-connecting ways.
+     *
+     * For example, a way that starts/ends in its middle:
      *
      * A --> B --> +
      *       |     |
      *       + <-- +
      *
-     * @param   {OsmWay}   way
-     * @param   {string}   nodeID
-     * @return  {boolean}  `true` if the node occurs more than once
+     * @param way - The way to check
+     * @param nodeID - The node to look for
+     * @returns `true` if the node occurs more than once
      */
-    function nodeOccursMoreThanOnce(way, nodeID) {
+    function nodeOccursMoreThanOnce(way: OsmWay, nodeID: EntityID): boolean {
       return (way.nodes.indexOf(nodeID) !== way.nodes.lastIndexOf(nodeID));
     }
 
 
     /**
-     * isNodeTaggedAsConnected
-     * Returns `true` if the node is connected (aka reachable/escapable)
-     * based on its tagging or what type of features it is attached to.
-     * @param   {OsmWay}   way
-     * @param   {OsmNode}  node
-     * @param   {boolean}  `true` if this node occurs at the head of the way.
-     * @return  {boolean}  `true` if this node is considered connected.
+     * Returns `true` if the node is connected (reachable/escapable) based on its
+     * tagging or what type of features it is attached to.
+     * @param way - The oneway being checked
+     * @param node - The node to evaluate
+     * @param isHead - `true` if this node is at the head of the oneway
+     * @returns `true` if this node is considered connected
      */
-    function isNodeTaggedAsConnected(way, node, isHead) {
+    function isNodeTaggedAsConnected(way: OsmWay, node: OsmNode, isHead: boolean): boolean {
       const wayType = typeForWay(way);
 
       if (wayType === 'highway') {
@@ -103,7 +123,7 @@ export function validationImpossibleOneway(context) {
         if (parentWay.id === way.id) return false;
 
         if (wayType === 'highway') {
-          const routable = schema.getScope('osm').rulesets.get('connected_highway');
+          const routable = schema!.getScope('osm').rulesets.get('connected_highway');
 
           // allow connections to highway areas
           if (parentWay.geometry(graph) === 'area' && routable?.match({ highway: parentWay.tags.highway })) return true;
@@ -125,16 +145,15 @@ export function validationImpossibleOneway(context) {
 
 
     /**
-     * issuesForNode
-     * Detects issues that occur at the given nodeID.
-     * This function gets called twice, once for the start node, once for the end node.
-     * (The start/end nodes can function either as the head or tail, depending on whether
-     *  the way is tagged as a normal oneway or a reverse oneway, see Rapid#1302)
-     * @param   {OsmWay}   way     - way to check (it should be a oneway)
-     * @param   {OsmNode}  nodeID  - node to check (either the start or end node of the way)
-     * @param   {Array}    Array of any `ValidationIssue`s detected
+     * Detects issues at the given node of a oneway.
+     * Called twice per way: once for the start node, once for the end node.
+     * The start/end nodes function as head or tail depending on whether
+     * the way is tagged as a normal oneway or reverse oneway (see Rapid#1302).
+     * @param way - The oneway to check
+     * @param nodeID - The node to check (either start or end)
+     * @returns Array of validation issues detected at this node
      */
-    function issuesForNode(way, nodeID) {
+    function issuesForNode(way: OsmWay, nodeID: EntityID): ValidationIssue[] {
       const isHead = (nodeID === way.first() && way.tags.oneway !== '-1');
       const isTail = !isHead;
       const wayType = typeForWay(way);
@@ -145,11 +164,11 @@ export function validationImpossibleOneway(context) {
       const osm = context.services.osm;
       if (!osm) return [];
 
-      const node = graph.hasEntity(nodeID);
+      const node = graph.hasEntity(nodeID) as OsmNode;
 
       // Bail out if map not fully loaded here - we won't know all the node's parentWays.
       // Don't worry, as more map tiles are loaded, we'll have additional chances to validate it.
-      if (!node || !osm.isDataLoaded(node.loc)) return [];
+      if (!node || !osm.isDataLoaded(node.loc!)) return [];
 
       // Some tags imply that the node is connected and we can stop here.
       if (isNodeTaggedAsConnected(way, node, isHead)) return [];
@@ -200,9 +219,9 @@ export function validationImpossibleOneway(context) {
 
       return [new ValidationIssue(context, {
         type: type,
-        subtype: wayType,
+        subtype: wayType ?? undefined,
         severity: 'warning',
-        message: function() {
+        message: function(this: any) {
           const graph = editor.staging.graph;
           const entity = graph.hasEntity(this.entityIds[0]);
           return entity ? l10n.t(`issues.impossible_oneway.${messageID}.message`, {
@@ -211,15 +230,15 @@ export function validationImpossibleOneway(context) {
         },
         reference: getReference(referenceID),
         entityIds: [way.id, node.id],
-        dynamicFixes: function() {
+        dynamicFixes: function(this: any) {
           const graph = editor.staging.graph;
-          let fixes = [];
+          const fixes = [];
           if (attachedOneways.length) {
             fixes.push(new ValidationFix({
               icon: 'rapid-operation-reverse',
               title: l10n.t('issues.fix.reverse_feature.title'),
               entityIds: [way.id],
-              onClick: function() {
+              onClick: function(this: any) {
                 const entityID = this.issue.entityIds[0];
                 editor.perform(actionReverse(entityID));
                 editor.commit({
@@ -235,11 +254,11 @@ export function validationImpossibleOneway(context) {
             fixes.push(new ValidationFix({
               icon: 'rapid-operation-continue' + (useLeftContinue ? '-left' : ''),
               title: l10n.t('issues.fix.continue_from_' + (isHead ? 'start' : 'end') + '.title'),
-              onClick: function() {
+              onClick: function(this: any) {
                 const entityID = this.issue.entityIds[0];
                 const vertexID = this.issue.entityIds[1];
-                const way = graph.entity(entityID);
-                const vertex = graph.entity(vertexID);
+                const way = graph.entity(entityID) as OsmWay;
+                const vertex = graph.entity(vertexID) as OsmNode;
                 continueDrawing(way, vertex, context);
               }
             }));
@@ -247,12 +266,17 @@ export function validationImpossibleOneway(context) {
 
           return fixes;
         },
-        loc: node.loc
+        loc: node.loc!
       })];
 
-      function getReference(referenceID) {
-        return function showReference(selection) {
-          selection.selectAll('.issue-reference')
+      /**
+       * Returns a function to render the reference information for the given issue reference ID.
+       * @param referenceID - The localization key suffix
+       * @returns A function that renders reference text into a D3 selection
+       */
+      function getReference(referenceID: string) {
+        return function showReference($selection: D3Selection): void {
+          $selection.selectAll('.issue-reference')
             .data([0])
             .enter()
             .append('div')
@@ -264,11 +288,15 @@ export function validationImpossibleOneway(context) {
   };
 
 
-  function continueDrawing(way, vertex, context) {
+  /**
+   * Activates draw-line mode to continue drawing from the given vertex.
+   * Also attempts to pan the map if the vertex is not visible.
+   */
+  function continueDrawing(way: OsmWay, vertex: OsmNode, context: Context): void {
     // make sure the vertex is actually visible and editable
-    let map = context.systems.map;
-    if (!context.editable() || !map.trimmedExtent().contains(new Extent(vertex.loc))) {
-      map.fitEntitiesEase(vertex);
+    const map = context.systems.map;
+    if (!context.editable() || !(map?.trimmedExtent() as Extent).contains(new Extent(vertex.loc!))) {
+      map?.fitEntitiesEase(vertex);
     }
 
     context.enter('draw-line', { continueWayID: way.id, continueNodeID: vertex.id });

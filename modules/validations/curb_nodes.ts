@@ -1,57 +1,68 @@
 import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '@rapid-sdk/math';
 
-import { actionAddMidpoint, actionChangeTags, actionSplit} from '../actions/index.js';
+import { actionAddMidpoint, actionChangeTags, actionSplit} from '../actions/index.ts';
 import { OsmNode } from '../data/OsmNode.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 import { uiIcon } from '../ui/icon.js';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Graph } from '../lib/Graph.ts';
+import type { OsmEntity, OsmTags, OsmWay } from '../data/types.ts';
+import type { ValidatorFunction } from './types.ts';
 
-export function validationCurbNodes(context) {
-  const type = 'curb_nodes';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+
+/**
+ * Factory that creates a validator for detecting crossing ways that are
+ * missing curb (kerb) nodes at their endpoints. Suggests adding curb nodes
+ * with various curb types (flush, lowered, raised).
+ * @param context
+ * @returns Validator function
+ */
+export function validationCurbNodes(context: Context): ValidatorFunction {
+  const type = 'curb_nodes' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
 
 
   /**
-   * checkCurbNodeCandidacy
-   * This validation checks the given entity to see if it is a candidate to have curb nodes added to it
-   * @param  {Entity}  entity - the Entity to validate
-   * @param  {Graph}   graph - the Graph we are validating
-   * @return {Array<ValidationIssue>}  validation results
+   * Checks the given entity for missing curb nodes on crossing ways.
+   * @param entity - The entity to validate
+   * @param graph - The graph we are validating
+   * @returns Array of validation issues
    */
-  const validation = function checkCurbNodeCandidacy(entity, graph) {
+  const validation = function checkCurbNodeCandidacy(entity: OsmEntity, graph: Graph): ValidationIssue[] {
     if (entity.type !== 'way' || entity.isDegenerate()) return [];
-    return detectCurbCandidates(entity, graph);
+    return detectCurbCandidates(entity as OsmWay, graph);
   };
 
 
   /**
-   * isCrossingWay
-   * Checks if the given tags describe a crossing way
-   * @param  {Object}   tags - The tags to check
-   * @return {Boolean}  True if the way has crossing tags, false otherwise
+   * Tests whether the given tags describe a crossing way.
+   * @param tags - The tags to check
+   * @returns `true` if the way has crossing tags
    */
-  const isCrossingWay = (tags) => {
+  const isCrossingWay = (tags: OsmTags): boolean => {
     return (tags.highway === 'footway' && tags.footway === 'crossing') ||
       (tags.highway === 'cycleway' && tags.cycleway === 'crossing');
   };
 
 
   /**
-   * detectCurbCandidates
-   * @param  {Way}    way - the Way to validate
-   * @param  {Graph}  graph - the Graph we are validating
-   * @return {Array<ValidationIssue>}  validation results
+   * Detects crossing ways that are missing curb nodes.
+   * @param way - The way to validate
+   * @param graph - The graph we are validating
+   * @returns Array of validation issues
    */
-  const detectCurbCandidates = (way, graph) => {
-    let issues = [];
+  const detectCurbCandidates = (way: OsmWay, graph: Graph): ValidationIssue[] => {
+    const issues: ValidationIssue[] = [];
     const wayID = way.id;
     if (!hasRoutableTags(way) || !isCrossingWay(way.tags)) return issues;
 
     // Check all nodes in the way for curb tags
     for (const nodeId of way.nodes) {
-      const node = graph.entity(nodeId);
+      const node = graph.entity(nodeId) as OsmNode;
       if (hasCurbTag(node)) {
         // If any node has a curb tag, skip this way as a candidate
         return issues;
@@ -87,23 +98,21 @@ export function validationCurbNodes(context) {
 
 
   /**
-   * hasRoutableTags
-   * Checks if the given way has tags that make it routable
-   * @param  {Way}      way - The way entity to check
-   * @return {Boolean}  True if the way has routable tags, false otherwise
+   * Tests whether the way has tags that make it routable.
+   * @param way - The way to check
+   * @returns `true` if the way has highway or cycleway tags
    */
-  function hasRoutableTags(way) {
+  function hasRoutableTags(way: OsmWay): boolean {
     const routableTags = ['highway', 'cycleway'];
     return way.isArea() ? false : routableTags.some(tag => way.tags[tag]);
   }
 
 
   /**
-   * showReference
-   * Displays a reference for the issue in the UI
-   * @param  {d3-selection} $selection - The UI selection to append the reference to
+   * Renders the issue reference text and wiki link into the given selection.
+   * @param $selection - The D3 selection to append the reference to
    */
-  function showReference($selection) {
+  function showReference($selection: D3Selection): void {
     const $$reference = $selection.selectAll('.issue-reference')
       .data([0])
       .enter()
@@ -131,33 +140,32 @@ export function validationCurbNodes(context) {
 
 
   /**
-   * hasCurbTag
-   * Checks if the given node has a curb
-   * @param  {Node}     node  - The node entity to check
-   * @return {Boolean}  true if the node has some tags that would indicate a curb, false otherwise
+   * Tests whether the node has curb-related tags.
+   * @param node - The node to check
+   * @returns `true` if the node has kerb or barrier=kerb tags
    */
-  function hasCurbTag(node) {
+  function hasCurbTag(node: OsmNode): boolean {
     const tags = node.tags;
     return !!tags.kerb || tags.barrier === 'kerb';
   }
 
 
   /**
-   * performCurbNodeFixes
-   * Either make the endpoints curb nodes, or insert curb nodes around there.
-   * @param  {string}  wayID - The ID of the way to modify.
-   * @param  {Object}  tags - The tags to assign to the new curb nodes.
+   * Adds curb nodes at the endpoints of a crossing way, either by
+   * converting existing endpoints or inserting new nodes.
+   * @param wayID - The ID of the crossing way to modify
+   * @param tags - The curb tags to assign to new/modified nodes
    */
-  function performCurbNodeFixes(wayID, tags) {
+  function performCurbNodeFixes(wayID: EntityID, tags: OsmTags): void {
     const graph = editor.staging.graph;
-    const way = graph.hasEntity(wayID);
+    const way = graph.hasEntity(wayID) as OsmWay;
     if (!way) {
       console.error('Way not found:', wayID);  // eslint-disable-line no-console
       return;
     }
 
-    const firstNode = graph.entity(way.nodes.at(0));
-    const lastNode = graph.entity(way.nodes.at(-1));
+    const firstNode = graph.entity(way.first()!) as OsmNode;
+    const lastNode = graph.entity(way.last()!) as OsmNode;
     const firstConnections = graph.parentWays(firstNode).filter(parent => parent.id !== wayID);
     const lastConnections = graph.parentWays(lastNode).filter(parent => parent.id !== wayID);
     const firstConnectsToRefugeIsland = firstConnections.some(parent => isRefugeIsland(parent));
@@ -180,20 +188,19 @@ export function validationCurbNodes(context) {
 
 
   /**
-   * insertCurbNode
-   * Adds a single curb node to a specified way at the position of an existing node, splits the way, and updates tags.
-   * This function is used when a node is not connected to a traffic island and needs a curb node addition.
-   * @param  {Node}    node - The existing node where the curb node will be added.
-   * @param  {Way}     way - The way entity that the node belongs to.
-   * @param  {Graph}   graph - The graph containing the way and node data.
-   * @param  {Object}  tags - The tags to assign to the new curb node.
+   * Inserts a curb node into a way by splitting at a position near an existing node.
+   * Used when the endpoint is connected to other ways and shouldn't be converted directly.
+   * @param node - The existing node near where the curb should be added
+   * @param way - The way to modify
+   * @param graph - The current graph
+   * @param curbTags - The curb tags to assign to the new node
    */
-  function insertCurbNode(node, way, graph, curbTags) {
+  function insertCurbNode(node: OsmNode, way: OsmWay, graph: Graph, curbTags: OsmTags): void {
     if (hasCurbTag(node)) return;  // Exit if curb already exists
 
     // Calculate the position for the new curb node
     const nodeIndex = way.nodes.indexOf(node.id);
-    const adjacentNode = graph.entity(way.nodes[nodeIndex + 1] || way.nodes[nodeIndex - 1]);
+    const adjacentNode = graph.entity(way.nodes[nodeIndex + 1] || way.nodes[nodeIndex - 1]) as OsmNode;
     const newNodePosition = calculateNewNodePosition(node, adjacentNode, 1);
 
     // Find connected ways and select the appropriate tags
@@ -209,14 +216,14 @@ export function validationCurbNodes(context) {
     if (connectedWayTags === null) {
       connectedWayTags = { highway: 'footway' };
     }
-    // Create a new curb node with the specified curb tags
+    if (!newNodePosition) return;
     const newCurbNode = new OsmNode(context, {
       loc: [newNodePosition.lon, newNodePosition.lat],
       tags: curbTags,
       visible: true
     });
     // Add the new node to the graph
-    editor.perform(actionAddMidpoint({ loc: newCurbNode.loc, edge: [node.id, adjacentNode.id] }, newCurbNode));
+    editor.perform(actionAddMidpoint({ loc: newCurbNode.loc!, edge: [node.id, adjacentNode.id] }, newCurbNode));
 
     // Perform the split
     const splitAction = actionSplit([newCurbNode.id]);
@@ -234,40 +241,37 @@ export function validationCurbNodes(context) {
 
 
   /**
-   * updateNodeToCurb
-   * Updates the given node to a curb with specified tags.
-   * @param  {Node}    node - The node to update.
-   * @param  {Object}  tags - The tags to assign to the node.
-   * @param  {Graph}   graph - The graph containing the node data.
+   * Converts an existing node into a curb node by adding kerb tags.
+   * @param node - The node to update
+   * @param tags - The curb tags to apply
+   * @param graph - The current graph
    */
-  function updateNodeToCurb(node, tags, graph) {
+  function updateNodeToCurb(node: OsmNode, tags: OsmTags, graph: Graph): void {
     const newTags = { ...node.tags, barrier: 'kerb', kerb: tags.kerb };
     editor.perform(actionChangeTags(node.id, newTags));
   }
 
 
   /**
-   * isRefugeIsland
-   * Checks if the given way is a refuge island based on its tags.
-   * @param  {Way}      way - The way entity to check.
-   * @return {Boolean}  True if the way is a refuge island, false otherwise.
+   * Tests whether the given way is a refuge island (traffic island).
+   * @param way - The way to check
+   * @returns `true` if the way is tagged as a traffic island
    */
-  function isRefugeIsland(way) {
+  function isRefugeIsland(way: OsmWay): boolean {
     const isTrafficIsland = way.tags.footway === 'traffic_island';
     return isTrafficIsland;
   }
 
 
   /**
-   * calculateNewNodePosition
-   * Calculates the position for a new node based on the start and end nodes
-   * @param  {Node}     startNode - The starting node
-   * @param  {Node}     endNode - The ending node
-   * @param  {number}   distance - The distance from the start node to place the new node
-   * @param  {boolean}  isLast - Flag to indicate if this is the last node (affects calculation direction)
-   * @return {Object|null} The calculated position or null if an error occurred
+   * Calculates a new node position offset from a start node toward an end node.
+   * @param startNode - The starting node
+   * @param endNode - The ending node
+   * @param distance - Distance in meters from the start node
+   * @param isLast - If `true`, offsets in the opposite direction
+   * @returns The calculated position, or `null` if it cannot be computed
    */
-  function calculateNewNodePosition(startNode, endNode, distance, isLast = false) {
+  function calculateNewNodePosition(startNode: OsmNode, endNode: OsmNode, distance: number, isLast: boolean = false): { lon: number; lat: number } | null {
     if (!startNode || !endNode) return null;
     if (!startNode.loc || !endNode.loc) return null;
 
@@ -299,12 +303,11 @@ export function validationCurbNodes(context) {
 
 
   /**
-   * getIconForCurbNode
-   * Determines the appropriate icon for a curb node based on its tags
-   * @param  {Object}  tags - The tags of the curb node
-   * @return {string}  The ID of the icon to use
+   * Returns the appropriate icon ID for a curb node based on its curb type.
+   * @param tags - The curb node tags
+   * @returns The icon identifier string
    */
-  function getIconForCurbNode(tags) {
+  function getIconForCurbNode(tags: OsmTags): string {
     const val = tags.kerb || '';
     if (['flush', 'lowered', 'raised', 'rolled'].includes(val)) {
       return `temaki-kerb-${val}`;

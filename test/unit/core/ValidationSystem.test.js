@@ -89,11 +89,11 @@ describe('ValidationSystem', () => {
       return _validator.initAsync()
         .then(() => _validator.startAsync())
         .then(() => {
-          // For now just run the one rule we are testing.
+          // For now just run the one validator we are testing.
           // Otherwise we need to mock out anything used by any validator.
-          for (const ruleID of _validator._rules.keys()) {
-            if (ruleID !== 'private_data') {
-              _validator._rules.delete(ruleID);
+          for (const validatorID of _validator._validators.keys()) {
+            if (validatorID !== 'private_data') {
+              _validator._validators.delete(validatorID);
             }
           }
         });

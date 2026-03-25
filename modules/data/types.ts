@@ -11,7 +11,7 @@ export type { AbstractData } from './AbstractData.ts';
 export type { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 export type { OsmChangeset, OsmChangesetProps } from './OsmChangeset.ts';
 export type { OsmNode, OsmNodeProps } from './OsmNode.ts';
-export type { OsmRelation, OsmRelationProps, OsmRelationMember } from './OsmRelation.ts';
+export type { OsmRelation, OsmRelationProps, OsmRelationMember, IndexedMember } from './OsmRelation.ts';
 export type { OsmWay, OsmWayProps } from './OsmWay.ts';
 
 /** OSM tags as key-value string pairs */

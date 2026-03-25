@@ -19,7 +19,7 @@ export function uiSectionValidationRules(context) {
     .label(l10n.t('issues.rules'));
 
 
-  let _ruleKeys = validator.getRuleKeys()
+  let _validatorIDs = validator.getValidatorIDs()
     .sort((key1, key2) => {
       // alphabetize by localized title
       return l10n.t(`issues.${key1}.title`) < l10n.t(`issues.${key2}.title`) ? -1 : 1;
@@ -49,7 +49,7 @@ export function uiSectionValidationRules(context) {
       .text(l10n.t('issues.disable_all'))
       .on('click', d3_event => {
         d3_event.preventDefault();
-        validator.disableRules(_ruleKeys);
+        validator.disableValidators(_validatorIDs);
       });
 
     ruleLinks
@@ -59,7 +59,7 @@ export function uiSectionValidationRules(context) {
       .text(l10n.t('issues.enable_all'))
       .on('click', d3_event => {
         d3_event.preventDefault();
-        validator.disableRules([]);
+        validator.disableValidators([]);
       });
 
     // Update
@@ -73,7 +73,7 @@ export function uiSectionValidationRules(context) {
 
   function drawListItems(selection) {
     let items = selection.selectAll('li')
-      .data(_ruleKeys);
+      .data(_validatorIDs);
 
     // Exit
     items.exit()
@@ -94,7 +94,7 @@ export function uiSectionValidationRules(context) {
       .append('input')
       .attr('type', 'checkbox')
       .attr('name', 'rule')
-      .on('change', toggleRule);
+      .on('change', toggleValidator);
 
     label
       .append('span')
@@ -111,9 +111,9 @@ export function uiSectionValidationRules(context) {
       .merge(enter);
 
     items
-      .classed('active', isRuleEnabled)
+      .classed('active', isValidatorEnabled)
       .selectAll('input')
-      .property('checked', isRuleEnabled)
+      .property('checked', isValidatorEnabled)
       .property('indeterminate', false);
 
 
@@ -176,12 +176,12 @@ export function uiSectionValidationRules(context) {
     validator.revalidateUnsquare();
   }
 
-  function isRuleEnabled(d) {
-    return validator.isRuleEnabled(d);
+  function isValidatorEnabled(d) {
+    return validator.isValidatorEnabled(d);
   }
 
-  function toggleRule(d3_event, d) {
-    validator.toggleRule(d);
+  function toggleValidator(d3_event, d) {
+    validator.toggleValidator(d);
   }
 
 

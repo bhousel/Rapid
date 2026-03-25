@@ -266,6 +266,19 @@ If a cast seems necessary, consider whether the root cause is:
 - Example: `if (!nodeIDs.length) return graph;` eliminates `| undefined` from variables computed from the array
 - This avoids needing non-null assertions or union types later in the function
 
+### Narrowing Entity Subclasses
+- TypeScript can't narrow `OsmEntity` to `OsmWay`/`OsmNode`/`OsmRelation` from a `.type` string check — it's not a discriminated union
+- After a guard like `if (entity.type !== 'way') return [];`, assign once: `const way = entity as OsmWay;`
+- This keeps the single `as` cast near the guard and eliminates repeated casts downstream
+- Example:
+  ```typescript
+  if (entity.type !== 'way' || entity.geometry(graph) !== 'line') return [];
+
+  const way = entity as OsmWay;
+  if (way.isClosed()) return [];
+  if (!way.isOneWay()) return [];
+  ```
+
 ### Coordinate Types
 - Use `Vec2` from `@rapid-sdk/math` instead of `[number, number]` for coordinate pairs
 - This provides better semantic meaning and matches the math library's conventions
@@ -494,7 +507,7 @@ Track TypeScript conversion progress here:
 | `modules/operations/` | ❌ Not started | |
 | `modules/services/` | ✅ Complete | All files converted |
 | `modules/ui/` | ❌ Not started | |
-| `modules/validations/` | ❌ Not started | |
+| `modules/validations/` | ✅ Complete | All files converted |
 
 ## Testing
 

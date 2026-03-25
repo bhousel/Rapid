@@ -1,6 +1,7 @@
 import { Extent } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
 import type { Vec2 } from '../data/types.ts';
 import type { Graph } from './Graph.js';
 import { ValidationFix } from './ValidationFix.ts';
@@ -34,7 +35,7 @@ export interface ValidationIssueProps {
   /** Function returning localized string for the issue message */
   message: () => string;
   /** Function to render reference information */
-  reference: (selection: unknown) => void;
+  reference: ($selection: D3Selection) => void;
   /** Function returning fixes for this issue */
   dynamicFixes: () => ValidationFix[];
 }
@@ -70,7 +71,7 @@ export class ValidationIssue {
   /** Function returning localized string for the issue message */
   message: () => string;
   /** Function to render reference information */
-  reference: (selection: unknown) => void;
+  reference: ($selection: D3Selection) => void;
   /** Function returning fixes for this issue */
   dynamicFixes: (() => ValidationFix[]) | undefined;
 

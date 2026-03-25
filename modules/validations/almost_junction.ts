@@ -3,21 +3,28 @@ import {
   geomLineIntersection, vecAngle, vecInterp
 } from '@rapid-sdk/math';
 
-import { actionAddMidpoint } from '../actions/add_midpoint.js';
-import { actionChangeTags } from '../actions/change_tags.js';
-import { actionMergeNodes } from '../actions/merge_nodes.js';
-import { geoHasSelfIntersections } from '../geo/geom.js';
+import { actionAddMidpoint } from '../actions/add_midpoint.ts';
+import { actionChangeTags } from '../actions/change_tags.ts';
+import { actionMergeNodes } from '../actions/merge_nodes.ts';
+import { geoHasSelfIntersections } from '../geo/geom.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Graph } from '../lib/Graph.ts';
+import type { OsmEntity, OsmNode, OsmTags, OsmWay } from '../data/types.ts';
+import type { ValidatorFunction } from './types.ts';
+
 
 /**
- * Look for roads that can be connected to other roads with a short extension
+ * Factory that creates a validator to detect roads that can
+ * be connected to other roads with a short extension
  */
-export function validationAlmostJunction(context) {
-  const type = 'almost_junction';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+export function validationAlmostJunction(context: Context): ValidatorFunction {
+  const type = 'almost_junction' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
 
   const EXTEND_TH_METERS = 5;
@@ -27,35 +34,45 @@ export function validationAlmostJunction(context) {
   // Comes from considering bounding case of perpendicular ways
   const SIG_ANGLE_TH = Math.atan(WELD_TH_METERS / EXTEND_TH_METERS);
 
-  function isHighway(entity) {
+  /** Tests whether the entity is a routable highway. */
+  function isHighway(entity: OsmEntity): boolean {
     if (entity.type !== 'way') return false;
-    return !!schema.getScope('osm').rulesets.get('connected_highway')?.match({ highway: entity.tags.highway });
+    return !!schema!.getScope('osm').rulesets.get('connected_highway')?.match({ highway: entity.tags.highway });
   }
 
-  function isTaggedAsNotContinuing(node) {
+  /** Tests whether the node is tagged as not continuing (noexit, entrance, or parking entrance). */
+  function isTaggedAsNotContinuing(node: OsmNode): boolean {
     return node.tags.noexit === 'yes'
       || node.tags.amenity === 'parking_entrance'
-      || (node.tags.entrance && node.tags.entrance !== 'no');
+      || !!(node.tags.entrance && node.tags.entrance !== 'no');
   }
 
 
-  const validation = function checkAlmostJunction(entity, graph) {
+  /**
+   * Checks whether a highway could be connected to a nearby highway by
+   * extending one of its endpoints a short distance.
+   * @param entity - The entity to validate
+   * @param graph - The current graph
+   * @returns Array of issues for potential junction connections
+   */
+  const validation = function checkAlmostJunction(entity: OsmEntity, graph: Graph): ValidationIssue[] {
     if (!schema) return [];
     if (!isHighway(entity)) return [];
     if (entity.isDegenerate()) return [];
 
 //todo: using tree like this may be problematic - it may not reflect the graph we are validating
     const tree = editor.tree;
-    const extendableNodeInfos = findConnectableEndNodesByExtension(entity, graph);
+    const way = entity as OsmWay;
+    const extendableNodeInfos = findConnectableEndNodesByExtension(way, graph);
 
-    let issues = [];
+    const issues: ValidationIssue[] = [];
 
     extendableNodeInfos.forEach(extendableNodeInfo => {
       issues.push(new ValidationIssue(context, {
         type,
         subtype: 'highway-highway',
         severity: 'warning',
-        message: function() {
+        message: function(this: any) {
           const graph = editor.staging.graph;
           const entity1 = graph.hasEntity(this.entityIds[0]);
           if (this.entityIds[0] === this.entityIds[2]) {
@@ -70,7 +87,7 @@ export function validationAlmostJunction(context) {
             }) : '';
           }
         },
-        reference: showReference,
+        reference: showReference as any,
         entityIds: [
           entity.id,
           extendableNodeInfo.node.id,
@@ -90,25 +107,29 @@ export function validationAlmostJunction(context) {
     return issues;
 
 
-    function makeFixes() {
+    /**
+     * Generates fixes for an almost-junction: connect the features or tag as disconnected.
+     * @returns Array of validation fixes
+     */
+    function makeFixes(this: any) {
       const graph = editor.staging.graph;
 
-      let fixes = [new ValidationFix({
+      const fixes = [new ValidationFix({
         icon: 'rapid-icon-abutment',
         title: l10n.t('issues.fix.connect_features.title'),
-        onClick: function() {
+        onClick: function(this: any) {
           const annotation = l10n.t('issues.fix.connect_almost_junction.annotation');
           const [, endNodeId, crossWayId] = this.issue.entityIds;
-          const midNode = graph.entity(this.issue.data.midId);
-          const endNode = graph.entity(endNodeId);
-          const crossWay = graph.entity(crossWayId);
+          const midNode = graph.entity(this.issue.data.midId) as OsmNode;
+          const endNode = graph.entity(endNodeId) as OsmNode;
+          const crossWay = graph.entity(crossWayId) as OsmWay;
 
           // When endpoints are close, just join if resulting small change in angle (iD#7201)
           const nearEndNodes = findNearbyEndNodes(endNode, crossWay, graph);
           if (nearEndNodes.length > 0) {
             const collinear = findSmallJoinAngle(midNode, endNode, nearEndNodes);
             if (collinear) {
-              editor.perform(actionMergeNodes([collinear.id, endNode.id], collinear.loc));
+              editor.perform(actionMergeNodes([collinear.id, endNode.id], collinear.loc!));
               editor.commit({
                 annotation: annotation,
                 selectedIDs: [collinear.id, endNode.id]
@@ -119,12 +140,12 @@ export function validationAlmostJunction(context) {
 
           const targetEdge = this.issue.data.edge;
           const crossLoc = this.issue.data.cross_loc;
-          const edgeNodes = [ graph.entity(targetEdge[0]), graph.entity(targetEdge[1]) ];
-          const points = edgeNodes.map(node => node.loc);
-          const closestPointInfo = geoSphericalClosestPoint(points, crossLoc);
+          const edgeNodes = [ graph.entity(targetEdge[0]) as OsmNode, graph.entity(targetEdge[1]) as OsmNode ];
+          const points = edgeNodes.map((node: OsmNode) => node.loc!);
+          const closestPointInfo = geoSphericalClosestPoint(points, crossLoc) as any;
 
           // already a point nearby, just connect to that
-          if (closestPointInfo.distance < WELD_TH_METERS) {
+          if (closestPointInfo?.distance < WELD_TH_METERS) {
             editor.perform(actionMergeNodes([ closestPointInfo.id, endNode.id ], closestPointInfo.loc));
             editor.commit({
               annotation: annotation,
@@ -147,7 +168,7 @@ export function validationAlmostJunction(context) {
         fixes.push(new ValidationFix({
           icon: 'maki-barrier',
           title: l10n.t('issues.fix.tag_as_disconnected.title'),
-          onClick: function() {
+          onClick: function(this: any) {
             const nodeID = this.issue.entityIds[1];
             const tags = Object.assign({}, graph.entity(nodeID).tags);
             tags.noexit = 'yes';
@@ -163,8 +184,9 @@ export function validationAlmostJunction(context) {
       return fixes;
     }
 
-    function showReference(selection) {
-      selection.selectAll('.issue-reference')
+    /** Renders the issue reference text into the given selection. */
+    function showReference($selection: D3Selection): void {
+      $selection.selectAll('.issue-reference')
         .data([0])
         .enter()
         .append('div')
@@ -172,11 +194,18 @@ export function validationAlmostJunction(context) {
         .text(l10n.t('issues.almost_junction.highway-highway.reference'));
     }
 
-    function isExtendableCandidate(node, way) {
+    /**
+     * Tests whether a node is a valid candidate for extension.
+     * Must be loaded, not tagged as not-continuing, and have exactly one parent way.
+     * @param node - The endpoint node to check
+     * @param way - The way containing the node
+     * @returns `true` if the node can be extended
+     */
+    function isExtendableCandidate(node: OsmNode, way: OsmWay): boolean {
       // Bail out if map not fully loaded here - we won't know all the node's parentWays. - iD#5938
       // Don't worry, as more map tiles are loaded, we'll have additional chances to validate it.
       const osm = context.services.osm;
-      if (osm && !osm.isDataLoaded(node.loc)) {
+      if (osm && !osm.isDataLoaded(node.loc!)) {
         return false;
       }
       if (isTaggedAsNotContinuing(node) || graph.parentWays(node).length !== 1) {
@@ -195,15 +224,22 @@ export function validationAlmostJunction(context) {
       return true;
     }
 
-    function findConnectableEndNodesByExtension(way, graph) {
-      let results = [];
+    /**
+     * Finds endpoints of a way that could be connected to nearby roads
+     * by extending the last edge segment.
+     * @param way - The way to check
+     * @param graph - The current graph
+     * @returns Array of connection info objects for extendable endpoints
+     */
+    function findConnectableEndNodesByExtension(way: OsmWay, graph: Graph): any[] {
+      const results: any[] = [];
       if (way.isClosed()) return results;
 
-      let testNodes;
+      let testNodes: OsmNode[];
       const indices = [0, way.nodes.length - 1];
       indices.forEach(nodeIndex => {
         const nodeID = way.nodes[nodeIndex];
-        const node = graph.entity(nodeID);
+        const node = graph.entity(nodeID) as OsmNode;
 
         if (!isExtendableCandidate(node, way)) return;
 
@@ -223,29 +259,42 @@ export function validationAlmostJunction(context) {
     }
 
 
-    function findNearbyEndNodes(node, way, graph) {
-      return [
-        way.nodes[0],
-        way.nodes[way.nodes.length - 1]
-      ].map(d => graph.entity(d))
-      .filter(d => {
-        // Node cannot be near to itself, but other endnode of same way could be
-        return d.id !== node.id
-          && geoSphericalDistance(node.loc, d.loc) <= CLOSE_NODE_TH;
-      });
+    /**
+     * Finds endpoints of the target way that are near the given node.
+     * @param node - The node to search around
+     * @param way - The way whose endpoints to check
+     * @param graph - The current graph
+     * @returns Array of nearby endpoint nodes
+     */
+    function findNearbyEndNodes(node: OsmNode, way: OsmWay, graph: Graph): OsmNode[] {
+      return [way.first()!, way.last()!]
+        .map(d => graph.entity(d) as OsmNode)
+        .filter((d: OsmNode) => {
+          // Node cannot be near to itself, but other endnode of same way could be
+          return d.id !== node.id && geoSphericalDistance(node.loc!, d.loc!) <= CLOSE_NODE_TH;
+        });
     }
 
 
-    function findSmallJoinAngle(midNode, tipNode, endNodes) {
+    /**
+     * Finds the endpoint most collinear with the mid→tip direction.
+     * Used to determine if merging with a nearby endpoint is preferable to
+     * adding a midpoint to the target edge.
+     * @param midNode - The interior node of the extending edge
+     * @param tipNode - The endpoint being extended
+     * @param endNodes - Candidate nearby endpoints
+     * @returns The most collinear endpoint, or `null` if none within threshold
+     */
+    function findSmallJoinAngle(midNode: OsmNode, tipNode: OsmNode, endNodes: OsmNode[]): OsmNode | null {
       // Both nodes could be close, so want to join whichever is closest to collinear
-      let joinTo;
+      let joinTo: OsmNode | undefined;
       let minAngle = Infinity;
 
       // Checks midNode -> tipNode -> endNode for collinearity
       endNodes.forEach(endNode => {
-        const mid = context.viewport.project(midNode.loc);
-        const tip = context.viewport.project(tipNode.loc);
-        const end = context.viewport.project(endNode.loc);
+        const mid = context.viewport.project(midNode.loc!);
+        const tip = context.viewport.project(tipNode.loc!);
+        const end = context.viewport.project(endNode.loc!);
 
         const a1 = vecAngle(mid, tip) + Math.PI;
         const a2 = vecAngle(mid, end) + Math.PI;
@@ -259,16 +308,23 @@ export function validationAlmostJunction(context) {
 
       /* Threshold set by considering right angle triangle
       based on node joining threshold and extension distance */
-      if (minAngle <= SIG_ANGLE_TH) return joinTo;
+      if (minAngle <= SIG_ANGLE_TH) return joinTo ?? null;
 
       return null;
     }
 
-    function hasTag(tags, key) {
+    /** Tests whether a tag value is defined and not `'no'`. */
+    function hasTag(tags: OsmTags, key: string): boolean {
       return tags[key] !== undefined && tags[key] !== 'no';
     }
 
-    function canConnectWays(way, way2) {
+    /**
+     * Tests whether two ways can be connected based on bridge/tunnel status and layer/level compatibility.
+     * @param way - The first way
+     * @param way2 - The second way
+     * @returns `true` if the ways are compatible for connection
+     */
+    function canConnectWays(way: OsmWay, way2: OsmWay): boolean {
 
       // allow self-connections
       if (way.id === way2.id) return true;
@@ -291,13 +347,19 @@ export function validationAlmostJunction(context) {
       return true;
     }
 
-    function canConnectByExtend(way, endNodeIdx) {
+    /**
+     * Tests whether extending a way's endpoint would intersect a nearby way segment.
+     * @param way - The way to extend
+     * @param endNodeIdx - Index of the endpoint node (0 or last)
+     * @returns Connection info with edge and crossing location, or `null`
+     */
+    function canConnectByExtend(way: OsmWay, endNodeIdx: number): any | null {
       const tipNid = way.nodes[endNodeIdx];  // the 'tip' node for extension point
       const midNid = endNodeIdx === 0 ? way.nodes[1] : way.nodes[way.nodes.length - 2];  // the other node of the edge
-      const tipNode = graph.entity(tipNid);
-      const midNode = graph.entity(midNid);
-      const lon = tipNode.loc[0];
-      const lat = tipNode.loc[1];
+      const tipNode = graph.entity(tipNid) as OsmNode;
+      const midNode = graph.entity(midNid) as OsmNode;
+      const lon = tipNode.loc![0];
+      const lat = tipNode.loc![1];
       const lon_range = geoMetersToLon(EXTEND_TH_METERS, lat) / 2;
       const lat_range = geoMetersToLat(EXTEND_TH_METERS) / 2;
       const queryExtent = new Extent(
@@ -306,26 +368,26 @@ export function validationAlmostJunction(context) {
       );
 
       // first, extend the edge of [midNode -> tipNode] by EXTEND_TH_METERS and find the "extended tip" location
-      const edgeLen = geoSphericalDistance(midNode.loc, tipNode.loc);
+      const edgeLen = geoSphericalDistance(midNode.loc!, tipNode.loc!);
       const t = EXTEND_TH_METERS / edgeLen + 1.0;
-      const extTipLoc = vecInterp(midNode.loc, tipNode.loc, t);
+      const extTipLoc = vecInterp(midNode.loc!, tipNode.loc!, t);
 
       // then, check if the extension part [tipNode.loc -> extTipLoc] intersects any other ways
       const segmentInfos = tree.waySegments(queryExtent, graph);
       for (const segmentInfo of segmentInfos) {
-        let way2 = graph.entity(segmentInfo.wayId);
+        const way2 = graph.entity(segmentInfo.wayId) as OsmWay;
 
         if (!isHighway(way2)) continue;
         if (!canConnectWays(way, way2)) continue;
 
-        let nAid = segmentInfo.nodes[0],
-          nBid = segmentInfo.nodes[1];
+        const nAid = segmentInfo.nodes[0] as EntityID,
+          nBid = segmentInfo.nodes[1] as EntityID;
 
         if (nAid === tipNid || nBid === tipNid) continue;
 
-        let nA = graph.entity(nAid);
-        let nB = graph.entity(nBid);
-        let crossLoc = geomLineIntersection([tipNode.loc, extTipLoc], [nA.loc, nB.loc]);
+        const nA = graph.entity(nAid) as OsmNode;
+        const nB = graph.entity(nBid) as OsmNode;
+        const crossLoc = geomLineIntersection([tipNode.loc!, extTipLoc], [nA.loc!, nB.loc!]);
         if (crossLoc) {
           return {
             mid: midNode,

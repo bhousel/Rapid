@@ -1,18 +1,37 @@
 import { utilTagDiff } from '@rapid-sdk/util';
 
-import { actionChangeTags } from '../actions/change_tags.js';
+import { actionChangeTags } from '../actions/change_tags.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Graph } from '../lib/Graph.ts';
+import type { OsmEntity, OsmTags } from '../data/types.ts';
+import type { TagDiff } from '@rapid-sdk/util';
+import type { ValidatorFunction } from './types.ts';
 
-export function validationPrivateData(context) {
-  const type = 'private_data';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+
+/**
+ * Factory that creates a validator for detecting personal/private data
+ * on private buildings (e.g. phone numbers, email addresses on residential buildings).
+ * @param context
+ * @returns Validator function
+ */
+export function validationPrivateData(context: Context): ValidatorFunction {
+  const type = 'private_data' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
 
 
-  let validation = function checkPrivateData(entity) {
+  /**
+   * Checks whether a private building has tags containing personal data
+   * that should not be publicly shared.
+   * @param entity - The entity to validate
+   * @returns Array of issues for personal data found on private buildings
+   */
+  const validation = function checkPrivateData(entity: OsmEntity): ValidationIssue[] {
     if (!schema) return [];
 
     const variables = schema.getScope('osm').variables;
@@ -22,9 +41,10 @@ export function validationPrivateData(context) {
     const tags = entity.tags;
     if (!tags.building || !privateBuildingValues.has(tags.building)) return [];  // not a private building
 
-    let keepTags = {};
+    const keepTags: OsmTags = {};
     const publicKeys = variables.get('public_feature_keys')?.asSet();
     const personalKeys = variables.get('personal_data_keys')?.asSet();
+    if (!publicKeys || !personalKeys) return [];
 
     for (const [k, v] of Object.entries(tags)) {
       if (publicKeys.has(k)) return [];  // ignore, probably a public feature
@@ -62,16 +82,21 @@ export function validationPrivateData(context) {
     })];
 
 
-    function doUpgrade(graph) {
+    /**
+     * Applies the tag removal to the graph.
+     * @param graph - The current graph state
+     * @returns Updated graph with personal data tags removed
+     */
+    function doUpgrade(graph: Graph): Graph {
       const currEntity = graph.hasEntity(entity.id);
       if (!currEntity) return graph;
 
-      let newTags = Object.assign({}, currEntity.tags);  // shallow copy
+      const newTags = Object.assign({}, currEntity.tags);  // shallow copy
       for (const diff of tagDiff) {
         if (diff.type === '-') {
           delete newTags[diff.key];
         } else if (diff.type === '+') {
-          newTags[diff.key] = diff.newVal;
+          newTags[diff.key] = diff.newVal!;
         }
       }
 
@@ -79,7 +104,8 @@ export function validationPrivateData(context) {
     }
 
 
-    function showMessage() {
+    /** Returns the localized issue message for display. */
+    function showMessage(this: any): string {
       const graph = editor.staging.graph;
       const currEntity = graph.hasEntity(this.entityIds[0]);
       if (!currEntity) return '';
@@ -90,21 +116,22 @@ export function validationPrivateData(context) {
     }
 
 
-    function showReference(selection) {
-      let enter = selection.selectAll('.issue-reference')
+    /** Renders the issue reference text and suggested tag changes. */
+    function showReference($selection: D3Selection): void {
+      const $$enter = $selection.selectAll('.issue-reference')
         .data([0])
         .enter();
 
-      enter
+      $$enter
         .append('div')
         .attr('class', 'issue-reference')
         .text(l10n.t('issues.private_data.reference'));
 
-      enter
+      $$enter
         .append('strong')
         .text(l10n.t('issues.suggested'));
 
-      enter
+      $$enter
         .append('table')
         .attr('class', 'tagDiff-table')
         .selectAll('.tagDiff-row')
@@ -113,11 +140,11 @@ export function validationPrivateData(context) {
         .append('tr')
         .attr('class', 'tagDiff-row')
         .append('td')
-        .attr('class', d => {
+        .attr('class', (d: TagDiff) => {
           const klass = d.type === '+' ? 'add' : 'remove';
           return `tagDiff-cell tagDiff-cell-${klass}`;
         })
-        .text(d => d.display);
+        .text((d: TagDiff) => d.display);
     }
   };
 

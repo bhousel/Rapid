@@ -10,50 +10,60 @@ Each validation is a function that examines entities and returns an array of `Va
 
 | File | Description |
 |------|-------------|
-| `almost_junction.js` | Roads that almost connect but don't (currently disabled) |
-| `ambiguous_crossing_tags.js` | Crossings with unclear tagging |
-| `close_nodes.js` | Nodes that are very close together |
-| `crossing_ways.js` | Ways that cross without a shared node (currently disabled) |
-| `curb_nodes.js` | Missing or incorrect curb nodes at crossings |
-| `disconnected_way.js` | Ways that should connect to the road network |
-| `duplicate_way_segments.js` | Ways with duplicate segments |
-| `help_request.js` | Features tagged with fixme or help requests |
-| `impossible_oneway.js` | Oneway roads with impossible connections |
-| `incompatible_source.js` | Problematic source tags |
-| `invalid_format.js` | Tags with invalid formatting |
-| `mismatched_geometry.js` | Tags that don't match the geometry type |
-| `missing_role.js` | Relation members without required roles |
-| `missing_tag.js` | Features missing required tags |
-| `outdated_tags.js` | Deprecated tags that should be updated |
-| `private_data.js` | Potentially private information in tags |
-| `short_road.js` | Very short road segments (currently disabled) |
-| `suspicious_name.js` | Names that look like tags or descriptions |
-| `unsquare_way.js` | Buildings with unsquare corners |
-| `y_shaped_connection.js` | Roads connecting at sharp Y-angles |
+| `almost_junction.ts` | Roads that almost connect but don't (currently disabled) |
+| `ambiguous_crossing_tags.ts` | Crossings with unclear tagging |
+| `close_nodes.ts` | Nodes that are very close together |
+| `crossing_ways.ts` | Ways that cross without a shared node (currently disabled) |
+| `curb_nodes.ts` | Missing or incorrect curb nodes at crossings |
+| `disconnected_way.ts` | Ways that should connect to the road network |
+| `duplicate_way_segments.ts` | Ways with duplicate segments |
+| `help_request.ts` | Features tagged with fixme or help requests |
+| `impossible_oneway.ts` | Oneway roads with impossible connections |
+| `incompatible_source.ts` | Problematic source tags |
+| `invalid_format.ts` | Tags with invalid formatting |
+| `mismatched_geometry.ts` | Tags that don't match the geometry type |
+| `missing_role.ts` | Relation members without required roles |
+| `missing_tag.ts` | Features missing required tags |
+| `outdated_tags.ts` | Deprecated tags that should be updated |
+| `private_data.ts` | Potentially private information in tags |
+| `short_road.ts` | Very short road segments (currently disabled) |
+| `suspicious_name.ts` | Names that look like tags or descriptions |
+| `unsquare_way.ts` | Buildings with unsquare corners |
+| `y_shaped_connection.ts` | Roads connecting at sharp Y-angles |
 
 ## Validation Interface
 
-Each validation function returns a validation object:
+Each validation is a factory function that accepts a `Context` and returns a `ValidatorFunction`:
 
-```javascript
-export function validationExample(context) {
-  const validation = function(entity, graph) {
+```typescript
+export function validationExample(context: Context): ValidatorFunction {
+  const type = 'example' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
+
+  const validation = function(entity: OsmEntity, graph: Graph): ValidationIssue[] {
     const issues = [];
 
     // Check for problems...
     if (problem) {
-      issues.push(new ValidationIssue({
-        type: 'example',
+      issues.push(new ValidationIssue(context, {
+        type: type,
         severity: 'warning',
-        message: () => 'Description of the problem',
+        message: function(this: any) {
+          const graph = editor.staging.graph;
+          const entity = graph.hasEntity(this.entityIds[0]);
+          return entity ? l10n.t('issues.example.message', {
+            feature: l10n.displayLabel(entity, graph)
+          }) : '';
+        },
         // ... other properties
       }));
     }
 
     return issues;
-  };
+  } as ValidatorFunction;
 
-  validation.type = 'example';
+  validation.type = type;
   return validation;
 }
 ```
@@ -68,11 +78,15 @@ export function validationExample(context) {
 
 Issues can include suggested fixes that users can apply with one click:
 
-```javascript
-fixes: [
-  new ValidationFix({
-    title: 'Fix the problem',
-    onClick: () => { /* apply fix */ }
-  })
-]
+```typescript
+dynamicFixes: function(this: any) {
+  return [
+    new ValidationFix({
+      title: l10n.t('issues.fix.fix_the_problem.title'),
+      onClick: function(this: any) {
+        // apply fix
+      }
+    })
+  ];
+}
 ```

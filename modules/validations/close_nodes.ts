@@ -1,35 +1,59 @@
 import { Extent, geoMetersToLat, geoMetersToLon, geoSphericalDistance } from '@rapid-sdk/math';
 
-import { actionMergeNodes } from '../actions/merge_nodes.js';
+import { actionMergeNodes } from '../actions/merge_nodes.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Graph } from '../lib/Graph.ts';
+import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
+import type { ValidatorFunction } from './types.ts';
 
-export function validationCloseNodes(context) {
-  const type = 'close_nodes';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+
+type WayType = 'boundary' | 'indoor' | 'building' | 'path' | 'other';
+
+
+/**
+ * Factory that creates a validator for detecting nodes that are very close
+ * together — either adjacent vertices within a way, or nearby detached points.
+ * @param context
+ * @returns Validator function
+ */
+export function validationCloseNodes(context: Context): ValidatorFunction {
+  const type = 'close_nodes' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
 
   const pointThresholdMeters = 0.2;
 
   // helpers
-  function hasTag(v) {
+  /** Tests whether a tag value is defined and not `'no'`. */
+  function hasTag(v: string | undefined): boolean {
     return v !== undefined && v !== 'no';
   }
 
 
-  let validation = function(entity, graph) {
+  /**
+   * Checks for close nodes on the entity — dispatching to vertex or
+   * detached point checks as appropriate.
+   * @param entity - The entity to validate
+   * @param graph - The current graph
+   * @returns Array of issues for nodes that are too close together
+   */
+  const validation = function(entity: OsmEntity, graph: Graph): ValidationIssue[] {
     if (!schema) return [];
 
     if (entity.type === 'node') {
-      return getIssuesForNode(entity);
+      return getIssuesForNode(entity as OsmNode);
     } else if (entity.type === 'way') {
-      return getIssuesForWay(entity);
+      return getIssuesForWay(entity as OsmWay);
     }
     return [];
 
-    function getIssuesForNode(node) {
+    /** Routes node validation to vertex or detached point checks. */
+    function getIssuesForNode(node: OsmNode): ValidationIssue[] {
       const parentWays = graph.parentWays(node);
       if (parentWays.length) {
         return getIssuesForVertex(node, parentWays);
@@ -38,14 +62,20 @@ export function validationCloseNodes(context) {
       }
     }
 
-    function wayTypeFor(way) {
+    /**
+     * Classifies a way by its primary type.
+     * The result is used to choose a distance threshold for how close the nodes may be.
+     * @param way - The way to classify
+     * @returns The way type category
+     */
+    function wayTypeFor(way: OsmWay): WayType {
       const tags = way.tags;
 
       if (hasTag(tags.boundary)) return 'boundary';
       if (hasTag(tags.indoor)) return 'indoor';
       if (hasTag(tags.building) || hasTag(tags['building:part'])) return 'building';
 
-      const pathHighway = schema.getScope('osm').rulesets.get('path_highway');
+      const pathHighway = schema!.getScope('osm').rulesets.get('path_highway');
       if (pathHighway?.match({ highway: tags.highway })) return 'path';
 
       const parentRelations = graph.parentRelations(way);
@@ -61,12 +91,18 @@ export function validationCloseNodes(context) {
     }
 
 
-    function shouldCheckWay(way) {
+    /**
+     * Tests whether a way should be checked for close nodes.
+     * Skips ways that are too small or have too few nodes.
+     * @param way - The way to check
+     * @returns `true` if the way should be checked
+     */
+    function shouldCheckWay(way: OsmWay): boolean {
       // don't flag issues where merging would create degenerate ways
       if (way.nodes.length <= 2 || (way.isClosed() && way.nodes.length <= 4)) return false;
 
       // don't flag close nodes in very small ways
-      const bbox = way.extent(graph).bbox();
+      const bbox = way.extent()!.bbox();
       const hypotenuseMeters = geoSphericalDistance([bbox.minX, bbox.minY], [bbox.maxX, bbox.maxY]);
       if (hypotenuseMeters < 1.5) return false;
 
@@ -74,10 +110,15 @@ export function validationCloseNodes(context) {
     }
 
 
-    function getIssuesForWay(way) {
+    /**
+     * Checks all adjacent node pairs in a way for closeness.
+     * @param way - The way to check
+     * @returns Array of close-node issues
+     */
+    function getIssuesForWay(way: OsmWay): ValidationIssue[] {
       if (!shouldCheckWay(way)) return [];
 
-      const issues = [];
+      const issues: ValidationIssue[] = [];
       const nodes = graph.childNodes(way);
 
       for (let i = 0; i < nodes.length - 1; i++) {
@@ -92,10 +133,16 @@ export function validationCloseNodes(context) {
     }
 
 
-    function getIssuesForVertex(node, parentWays) {
-      const issues = [];
+    /**
+     * Checks a vertex's adjacent nodes in all parent ways for closeness.
+     * @param node - The vertex node
+     * @param parentWays - The parent ways of the node
+     * @returns Array of close-node issues for this vertex
+     */
+    function getIssuesForVertex(node: OsmNode, parentWays: OsmWay[]): ValidationIssue[] {
+      const issues: ValidationIssue[] = [];
 
-      function checkForCloseness(node1, node2, way) {
+      function checkForCloseness(node1: OsmNode, node2: OsmNode, way: OsmWay): void {
         const issue = getWayIssueIfAny(node1, node2, way);
         if (issue) {
           issues.push(issue);
@@ -109,12 +156,12 @@ export function validationCloseNodes(context) {
         for (let j = 0; j < parentWay.nodes.length; j++) {
           if (j !== 0) {
             if (parentWay.nodes[j-1] === node.id) {
-              checkForCloseness(node, graph.entity(parentWay.nodes[j]), parentWay);
+              checkForCloseness(node, graph.entity(parentWay.nodes[j]) as OsmNode, parentWay);
             }
           }
           if (j !== lastIndex) {
             if (parentWay.nodes[j+1] === node.id) {
-              checkForCloseness(graph.entity(parentWay.nodes[j]), node, parentWay);
+              checkForCloseness(graph.entity(parentWay.nodes[j]) as OsmNode, node, parentWay);
             }
           }
         }
@@ -123,7 +170,12 @@ export function validationCloseNodes(context) {
     }
 
 
-    function thresholdMetersForWay(way) {
+    /**
+     * Returns the minimum distance threshold in meters for a way.
+     * @param way - The way to get the threshold for
+     * @returns Distance threshold in meters, or `0` to skip
+     */
+    function thresholdMetersForWay(way: OsmWay): number {
       if (!shouldCheckWay(way)) return 0;
 
       const wayType = wayTypeFor(way);
@@ -140,10 +192,15 @@ export function validationCloseNodes(context) {
     }
 
 
-    function getIssuesForDetachedPoint(node) {
-      const issues = [];
-      const lon = node.loc[0];
-      const lat = node.loc[1];
+    /**
+     * Checks a detached point for nearby points within the threshold.
+     * @param node - The detached point node
+     * @returns Array of close-node issues with nearby points
+     */
+    function getIssuesForDetachedPoint(node: OsmNode): ValidationIssue[] {
+      const issues: ValidationIssue[] = [];
+      const lon = node.loc![0];
+      const lat = node.loc![1];
       const lon_range = geoMetersToLon(pointThresholdMeters, lat) / 2;
       const lat_range = geoMetersToLat(pointThresholdMeters) / 2;
       const queryExtent = new Extent(
@@ -160,7 +217,7 @@ export function validationCloseNodes(context) {
         if (nearby.id === node.id) continue;  // ignore self
         if (nearby.type !== 'node' || nearby.geometry(graph) !== 'point') continue;
 
-        if (nearby.loc === node.loc || geoSphericalDistance(node.loc, nearby.loc) < pointThresholdMeters) {
+        if ((nearby as OsmNode).loc === node.loc || geoSphericalDistance(node.loc!, (nearby as OsmNode).loc!) < pointThresholdMeters) {
           // ignore stolperstein (https://wiki.openstreetmap.org/wiki/DE:Stolpersteine)
           if ('memorial:type' in node.tags && 'memorial:type' in nearby.tags && node.tags['memorial:type']==='stolperstein' && nearby.tags['memorial:type']==='stolperstein') continue;
           if ('memorial' in node.tags && 'memorial' in nearby.tags && node.tags.memorial==='stolperstein' && nearby.tags.memorial === 'stolperstein') continue;
@@ -168,7 +225,7 @@ export function validationCloseNodes(context) {
           // allow very close points if tags indicate the z-axis might vary
           const zAxisKeys = { layer: true, level: true, 'addr:housenumber': true, 'addr:unit': true };
           let zAxisDifferentiates = false;
-          for (var key in zAxisKeys) {
+          for (const key in zAxisKeys) {
             const nodeValue = node.tags[key] || '0';
             const nearbyValue = nearby.tags[key] || '0';
             if (nodeValue !== nearbyValue) {
@@ -182,7 +239,7 @@ export function validationCloseNodes(context) {
             type: type,
             subtype: 'detached',
             severity: 'warning',
-            message: function() {
+            message: function(this: any) {
               const graph = editor.staging.graph;
               const entity = graph.hasEntity(this.entityIds[0]);
               const entity2 = graph.hasEntity(this.entityIds[1]);
@@ -211,8 +268,8 @@ export function validationCloseNodes(context) {
 
       return issues;
 
-      function showReference(selection) {
-        selection.selectAll('.issue-reference')
+      function showReference($selection: D3Selection): void {
+        $selection.selectAll('.issue-reference')
           .data([0])
           .enter()
           .append('div')
@@ -222,7 +279,15 @@ export function validationCloseNodes(context) {
     }
 
 
-    function getWayIssueIfAny(node1, node2, way) {
+    /**
+     * Returns a close-nodes issue between two adjacent vertices if they
+     * are within the threshold distance, or `null` otherwise.
+     * @param node1 - The first node
+     * @param node2 - The second node
+     * @param way - The parent way
+     * @returns A validation issue, or `null` if nodes are not too close
+     */
+    function getWayIssueIfAny(node1: OsmNode, node2: OsmNode, way: OsmWay): ValidationIssue | null {
       if (node1.id === node2.id || (node1.hasInterestingTags() && node2.hasInterestingTags())) {
         return null;
       }
@@ -233,14 +298,14 @@ export function validationCloseNodes(context) {
         const sharedWays = parentWays1.filter(parentWay => parentWays2.has(parentWay));
         const thresholds = sharedWays.map(parentWay => thresholdMetersForWay(parentWay));
         const threshold = Math.min(...thresholds);
-        const distance = geoSphericalDistance(node1.loc, node2.loc);
+        const distance = geoSphericalDistance(node1.loc!, node2.loc!);
         if (distance > threshold) return null;
       }
 
       // This just wraps `actionMergeNodes`, but it checks that the nodes exist first.
       // During autofixing, the nodes involved may have been merged previously and not exist anymore.
-      const actionTryMergeNodes = (nodeIDs) => {
-        return graph => {
+      const actionTryMergeNodes = (nodeIDs: EntityID[]) => {
+        return (graph: Graph) => {
           const nA = nodeIDs[0];
           const nB = nodeIDs[1];
           if (nA && nB && graph.hasEntity(nA) && graph.hasEntity(nB)) {
@@ -255,7 +320,7 @@ export function validationCloseNodes(context) {
         type: type,
         subtype: 'vertices',
         severity: 'warning',
-        message: function() {
+        message: function(this: any) {
           const graph = editor.staging.graph;
           const entity = graph.hasEntity(this.entityIds[0]);
           return entity ? l10n.t('issues.close_nodes.message', { way: l10n.displayLabel(entity, graph) }) : '';
@@ -267,12 +332,12 @@ export function validationCloseNodes(context) {
           actionTryMergeNodes([node1.id, node2.id]),
           l10n.t('issues.fix.merge_close_vertices.annotation')
         ],
-        dynamicFixes: function() {
+        dynamicFixes: function(this: any) {
           return [
             new ValidationFix({
               icon: 'rapid-icon-plus',
               title: l10n.t('issues.fix.merge_points.title'),
-              onClick: function() {
+              onClick: function(this: any) {
                 const entityIds = this.issue.entityIds;
                 editor.perform(actionMergeNodes([entityIds[1], entityIds[2]]));
                 editor.commit({
@@ -289,8 +354,8 @@ export function validationCloseNodes(context) {
         }
       });
 
-      function showReference(selection) {
-        selection.selectAll('.issue-reference')
+      function showReference($selection: D3Selection): void {
+        $selection.selectAll('.issue-reference')
           .data([0])
           .enter()
           .append('div')

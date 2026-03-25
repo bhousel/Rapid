@@ -1,16 +1,39 @@
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { ValidatorFunction } from './types.ts';
 
-export function validationFormatting(context) {
-  const type = 'invalid_format';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+
+/**
+ * Factory that creates a validator for detecting invalid tag value formats,
+ * such as malformed email addresses.
+ * @param context
+ * @returns Validator function
+ */
+export function validationFormatting(context: Context): ValidatorFunction {
+  const type = 'invalid_format' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
 
 
-  let validation = function(entity) {
-    let issues = [];
+  /**
+   * Checks whether the entity has tags with improperly formatted values.
+   * Currently validates email addresses.
+   * @param entity - The entity to validate
+   * @returns Array of issues for invalid format values
+   */
+  const validation = function(entity: OsmEntity): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
 
-    function isValidEmail(email) {
+    /**
+     * Tests whether the given string is a valid email address.
+     * An empty string is considered valid.
+     * @param email - The email string to validate
+     * @returns `true` if the email is valid or empty
+     */
+    function isValidEmail(email: string): boolean {
       // Emails in OSM are going to be official so they should be pretty simple
       // Using negated lists to better support all possible unicode characters - iD#6494
       const validEmail = /^[^\(\)\\,":;<>@\[\]]+@[^\(\)\\,":;<>@\[\]\.]+(?:\.[a-z0-9-]+)*$/i;
@@ -25,8 +48,9 @@ export function validationFormatting(context) {
     }
     */
 
-    function showReferenceEmail(selection) {
-      selection.selectAll('.issue-reference')
+    /** Renders the email format issue reference text into the given selection. */
+    function showReferenceEmail($selection: D3Selection): void {
+      $selection.selectAll('.issue-reference')
         .data([0])
         .enter()
         .append('div')
@@ -35,8 +59,8 @@ export function validationFormatting(context) {
     }
 
     /*
-    function showReferenceWebsite(selection) {
-      selection.selectAll('.issue-reference')
+    function showReferenceWebsite($selection: D3Selection): void {
+      $selection.selectAll('.issue-reference')
         .data([0])
         .enter()
         .append('div')
@@ -85,7 +109,7 @@ export function validationFormatting(context) {
           type: type,
           subtype: 'email',
           severity: 'warning',
-          message: function() {
+          message: function(this: any) {
             const graph = editor.staging.graph;
             const entity = graph.hasEntity(this.entityIds[0]);
             return entity ? l10n.t('issues.invalid_format.email.message', {

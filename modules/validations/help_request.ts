@@ -1,14 +1,31 @@
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { ValidatorFunction } from './types.ts';
 
-export function validationHelpRequest(context) {
-  const type = 'help_request';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+
+/**
+ * Factory that creates a validator for detecting features with `fixme` tags.
+ * These tags indicate unresolved issues that need attention.
+ * @param context
+ * @returns Validator function
+ */
+export function validationHelpRequest(context: Context): ValidatorFunction {
+  const type = 'help_request' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
 
 
-  let validation = function checkFixmeTag(entity) {
+  /**
+   * Checks whether the entity has a `fixme` tag that was not added by the current user.
+   * @param entity - The entity to validate
+   * @returns Array of issues for unresolved fixme tags
+   */
+  const validation = function checkFixmeTag(entity: OsmEntity): ValidationIssue[] {
+    if (!entity.tags.fixme) return [];
     if (!entity.tags.fixme) return [];
 
     // don't flag fixmes on features added by the user
@@ -24,7 +41,7 @@ export function validationHelpRequest(context) {
       type: type,
       subtype: 'fixme_tag',
       severity: 'warning',
-      message: function() {
+      message: function(this: any) {
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(this.entityIds[0]);
         return entity ? l10n.t('issues.fixme_tag.message', {
@@ -40,8 +57,9 @@ export function validationHelpRequest(context) {
       entityIds: [entity.id]
     })];
 
-    function showReference(selection) {
-      selection.selectAll('.issue-reference')
+    /** Renders the issue reference text into the given selection. */
+    function showReference($selection: D3Selection): void {
+      $selection.selectAll('.issue-reference')
         .data([0])
         .enter()
         .append('div')

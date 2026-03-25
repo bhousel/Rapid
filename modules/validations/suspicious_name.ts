@@ -1,12 +1,24 @@
-import { actionChangeTags } from '../actions/change_tags.js';
+import { actionChangeTags } from '../actions/change_tags.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { OsmEntity, OsmTags } from '../data/types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
-export function validationSuspiciousName(context) {
-  const type = 'suspicious_name';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+
+/**
+ * Factory that creates a validator for detecting features with generic or
+ * incorrect names. Generic names match raw tag keys/values (e.g. naming a
+ * park "Park") or are flagged by the name-suggestion-index.
+ * @param context
+ * @returns Validator function
+ */
+export function validationSuspiciousName(context: Context): ValidatorFunction {
+  const type = 'suspicious_name' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
 
   const keysToTestForGenericValues = [
@@ -16,8 +28,12 @@ export function validationSuspiciousName(context) {
   let _waitingForNsi = false;
 
 
-  // Attempt to match a generic record in the name-suggestion-index.
-  function isGenericMatchInNsi(tags) {
+  /**
+   * Attempts to match a generic record in the name-suggestion-index.
+   * @param tags - The tags to check
+   * @returns `true` if the tags match a generic name in NSI
+   */
+  function isGenericMatchInNsi(tags: OsmTags): boolean {
     const nsi = context.services.nsi;
     if (nsi) {
       _waitingForNsi = (nsi.status === 'loading');
@@ -29,8 +45,13 @@ export function validationSuspiciousName(context) {
   }
 
 
-  // Test if the name is just the key or tag value (e.g. "park")
-  function nameMatchesRawTag(lowercaseName, tags) {
+  /**
+   * Tests if the name is just the key or tag value (e.g. "park" for `leisure=park`).
+   * @param lowercaseName - The lowercased name to check
+   * @param tags - The entity tags
+   * @returns `true` if the name matches a raw tag key or value
+   */
+  function nameMatchesRawTag(lowercaseName: string, tags: OsmTags): boolean {
     for (const key of keysToTestForGenericValues) {
       let val = tags[key];
       if (val) {
@@ -46,35 +67,49 @@ export function validationSuspiciousName(context) {
     return false;
   }
 
-  function isGenericName(name, tags) {
+  /**
+   * Tests whether a name is generic by checking raw tag matches and NSI.
+   * @param name - The name value to check
+   * @param tags - The entity tags
+   * @returns `true` if the name is considered generic
+   */
+  function isGenericName(name: string, tags: OsmTags): boolean {
     name = name.toLowerCase();
     return nameMatchesRawTag(name, tags) || isGenericMatchInNsi(tags);
   }
 
-  function makeGenericNameIssue(entityID, nameKey, genericName, langCode) {
+  /**
+   * Creates a validation issue for a feature with a generic name.
+   * @param entityID - The entity ID
+   * @param nameKey - The tag key containing the generic name (e.g. 'name', 'name:en')
+   * @param genericName - The generic name value
+   * @param langCode - The language code suffix, or `null` for the primary name
+   * @returns A validation issue with a fix to remove the name
+   */
+  function makeGenericNameIssue(entityID: EntityID, nameKey: string, genericName: string, langCode: string | null): ValidationIssue {
     return new ValidationIssue(context, {
       type: type,
       subtype: 'generic_name',
       severity: 'warning',
-      message: function() {
+      message: function(this: any) {
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(this.entityIds[0]);
         if (!entity) return '';
-        const preset = schema.match(entity, graph);
+        const preset = schema?.match(entity, graph);
         const langName = langCode && l10n.languageName(langCode);
         return l10n.t('issues.generic_name.message' + (langName ? '_language' : ''),
-          { feature: preset.name, name: genericName, language: langName }
+          { feature: preset?.name, name: genericName, language: langName || undefined }
         );
       },
       reference: showReference,
       entityIds: [entityID],
       hash: `${nameKey}=${genericName}`,
-      dynamicFixes: function() {
+      dynamicFixes: function(this: any) {
         return [
           new ValidationFix({
             icon: 'rapid-operation-delete',
             title: l10n.t('issues.fix.remove_the_name.title'),
-            onClick: function() {
+            onClick: function(this: any) {
               const graph = editor.staging.graph;
               const entityID = this.issue.entityIds[0];
               const entity = graph.entity(entityID);
@@ -91,8 +126,8 @@ export function validationSuspiciousName(context) {
       }
     });
 
-    function showReference(selection) {
-      selection.selectAll('.issue-reference')
+    function showReference($selection: D3Selection): void {
+      $selection.selectAll('.issue-reference')
         .data([0])
         .enter()
         .append('div')
@@ -101,30 +136,38 @@ export function validationSuspiciousName(context) {
     }
   }
 
-  function makeIncorrectNameIssue(entityID, nameKey, incorrectName, langCode) {
+  /**
+   * Creates a validation issue for a feature whose name appears in `not:name`.
+   * @param entityID - The entity ID
+   * @param nameKey - The tag key containing the incorrect name
+   * @param incorrectName - The incorrect name value
+   * @param langCode - The language code suffix, or `null` for the primary name
+   * @returns A validation issue with a fix to remove the name
+   */
+  function makeIncorrectNameIssue(entityID: EntityID, nameKey: string, incorrectName: string, langCode: string | null): ValidationIssue {
     return new ValidationIssue(context, {
       type: type,
       subtype: 'not_name',
       severity: 'warning',
-      message: function() {
+      message: function(this: any) {
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(this.entityIds[0]);
         if (!entity) return '';
-        const preset = schema.match(entity, graph);
+        const preset = schema?.match(entity, graph);
         const langName = langCode && l10n.languageName(langCode);
         return l10n.t('issues.incorrect_name.message' + (langName ? '_language' : ''),
-          { feature: preset.name, name: incorrectName, language: langName }
+          { feature: preset?.name, name: incorrectName, language: langName || undefined }
         );
       },
       reference: showReference,
       entityIds: [entityID],
       hash: `${nameKey}=${incorrectName}`,
-      dynamicFixes: function() {
+      dynamicFixes: function(this: any) {
         return [
           new ValidationFix({
             icon: 'rapid-operation-delete',
             title: l10n.t('issues.fix.remove_the_name.title'),
-            onClick: function() {
+            onClick: function(this: any) {
               const graph = editor.staging.graph;
               const entityID = this.issue.entityIds[0];
               const entity = graph.entity(entityID);
@@ -141,8 +184,8 @@ export function validationSuspiciousName(context) {
       }
     });
 
-    function showReference(selection) {
-      selection.selectAll('.issue-reference')
+    function showReference($selection: D3Selection): void {
+      $selection.selectAll('.issue-reference')
         .data([0])
         .enter()
         .append('div')
@@ -152,14 +195,19 @@ export function validationSuspiciousName(context) {
   }
 
 
-  let validation = function checkGenericName(entity) {
+  /**
+   * Checks whether the entity has generic or incorrect name tags.
+   * @param entity - The entity to validate
+   * @returns Array of issues, with `provisional` set if NSI is still loading
+   */
+  const validation = function checkGenericName(entity: OsmEntity): ValidatorResult {
     const tags = entity.tags;
 
     // a generic name is allowed if it's a known brand or entity
     const hasWikidata = (!!tags.wikidata || !!tags['brand:wikidata'] || !!tags['operator:wikidata']);
     if (hasWikidata) return [];
 
-    let issues = [];
+    const issues: ValidatorResult = [];
     const notNames = new Set((tags['not:name'] ?? '').split(';').map(s => s.trim()).filter(Boolean));
 
     for (const [k, v] of Object.entries(tags)) {

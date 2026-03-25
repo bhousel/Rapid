@@ -1,49 +1,63 @@
 import { select as d3_select } from 'd3-selection';
 import { utilTagDiff } from '@rapid-sdk/util';
 
-import { actionChangePreset, actionChangeTags, actionSyncCrossingTags } from '../actions/index.js';
+import { actionChangePreset, actionChangeTags, actionSyncCrossingTags } from '../actions/index.ts';
 import { Difference } from '../lib/Difference.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Action } from '../actions/types.ts';
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Graph } from '../lib/Graph.ts';
+import type { OsmEntity, OsmTags, OsmWay } from '../data/types.ts';
+import type { TagDiff } from '@rapid-sdk/util';
+import type { ValidatorFunction } from './types.ts';
+
 
 /**
- * validationAmbiguousCrossingTags
- * This file is all about resolving ambiguities between crossing ways and their constituent crossing nodes.
+ * Factory that creates a validator for resolving ambiguities between
+ * crossing ways and their constituent crossing nodes.
  *
  * There are three classes of ambiguity:
- * - candidate crossings: nodes without any crossing info that are candidates to be made into crossings
- * - marked/unmarked - i.e. one is marked and the other is not marked
- * - conflicting - both are marked but the markings differ (zebra vs. marked, ladder vs. lines, etc)
+ * - candidate crossings: nodes without crossing info that could be crossings
+ * - marked/unmarked: one is marked and the other is not
+ * - conflicting: both are marked but the markings differ
+ * @param context
+ * @returns Validator function
  */
-export function validationAmbiguousCrossingTags(context) {
-  const type = 'ambiguous_crossing';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+export function validationAmbiguousCrossingTags(context: Context): ValidatorFunction {
+  const type = 'ambiguous_crossing' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
 
-  // These checks will be run on the parent way.
-  const validation = function checkAmbiguousCrossingTags(entity, graph) {
+  /**
+   * Checks the parent way for ambiguous crossing tags.
+   * @param entity - The entity to validate
+   * @param graph - The current graph
+   * @returns Array of crossing ambiguity issues
+   */
+  const validation = function checkAmbiguousCrossingTags(entity: OsmEntity, graph: Graph): ValidationIssue[] {
     if (!schema) return [];
     if (entity.type !== 'way' || entity.isDegenerate()) return [];
 
-    return detectCrossingWayIssues(entity, graph);
+    return detectCrossingWayIssues(entity as OsmWay, graph);
   };
 
 
   /**
-   * actionUpdateCrossingTags
-   * Upgrades the preset, then syncs the crossing tags.
-   * This is like the upgrade steps in `outdated_tags.js`, but we take things further here.
-   * @param   {string}    entityID - The entity with the tags that should be checked.
-   * @return  {Function}  Action function, accepts a Graph and returns a modified Graph.
+   * Upgrades the preset and syncs crossing tags.
+   * Like the upgrade steps in `outdated_tags.ts`, but applies further crossing-specific sync.
+   * @param entityID - The entity whose crossing tags should be updated
+   * @returns An action function that accepts and returns a Graph
    */
-  function actionUpdateCrossing(entityID) {
-    return graph => {
+  function actionUpdateCrossing(entityID: EntityID): Action {
+    return (graph: Graph): Graph => {
       const entity = graph.entity(entityID);
-      const currPreset = schema.match(entity, graph);
+      const currPreset = schema!.match(entity, graph);
       const replacementID = currPreset?.props?.replacement;
-      const replacement = schema.getScope('osm').presets.get(replacementID);
+      const replacement = replacementID ? schema!.getScope('osm').presets.get(replacementID) : undefined;
 
       if (replacementID && !replacement) {
         console.warn(`validationAmbiguousCrossingTags: warning "${currPreset.id}" wants replacement "${replacementID}" not found`);  // eslint-disable-line no-console
@@ -62,15 +76,14 @@ export function validationAmbiguousCrossingTags(context) {
 
 
   /**
-   * detectCrossingWayIssues
-   * This check just runs `actionUpdateCrossing` and compares graphs to see what has changed.
-   * @param   {Way}    startWay - Way being validated
-   * @param   {Graph}  startGraph - Graph being validated
-   * @return  {Array}  Array of ValidationIssues detected
+   * Runs `actionUpdateCrossing` and compares graphs to detect what changed.
+   * @param startWay - The way being validated
+   * @param startGraph - The graph being validated
+   * @returns Array of validation issues detected
    */
-  function detectCrossingWayIssues(startWay, startGraph) {
+  function detectCrossingWayIssues(startWay: OsmWay, startGraph: Graph): ValidationIssue[] {
     const wayID = startWay.id;
-    const startPreset = schema.match(startWay, startGraph);
+    const startPreset = schema!.match(startWay, startGraph);
     const snapshot = startGraph.snapshot();
     const copyGraph = startGraph.snapshot();
     const action = actionUpdateCrossing(wayID);
@@ -83,10 +96,10 @@ export function validationAmbiguousCrossingTags(context) {
     if (!endWay) return [];   // shouldn't happen
 
     // Choices being offered..
-    const choices = new Map();  // Map(string -> { setTags })
+    const choices = new Map<string, any>();  // Map<string, { setTags }>
 
     // Details about the entities involved in this issue.
-    const updates = new Map();  // Map(entityID -> { preset name, tagDiff })
+    const updates = new Map<EntityID, any>();  // Map<EntityID, { preset name, tagDiff }>
 
     // The default choice is, basically:
     // - If the parent is a crossing, upgrade parent way tagging and make the child nodes match.
@@ -97,7 +110,7 @@ export function validationAmbiguousCrossingTags(context) {
 
     // First, collect the parent way (include it whether it changed or not, tagDiff may be `[]`).
     const tagDiff = utilTagDiff(startWay.tags, endWay.tags);
-    updates.set(wayID, { name: startPreset.name, tagDiff: tagDiff });
+    updates.set(wayID, { name: startPreset!.name, tagDiff: tagDiff });
     const isParentChanged = (tagDiff.length > 0);
 
     // Next, collect any child nodes that got changed.
@@ -116,9 +129,9 @@ export function validationAmbiguousCrossingTags(context) {
       }
 
       // Include this child node's details in the updates Map.
-      const startPreset = schema.match(base, startGraph);
+      const startPreset = schema!.match(base, startGraph);
       const tagDiff = utilTagDiff(base.tags, head.tags);
-      updates.set(base.id, { name: startPreset.name, tagDiff: tagDiff });
+      updates.set(base.id, { name: startPreset!.name, tagDiff: tagDiff });
     }
 
     // If we haven't already, create the 'not a crossing' choice to remove the crossing tags completely.
@@ -130,7 +143,7 @@ export function validationAmbiguousCrossingTags(context) {
     if (updates.size > 1) {
       for (const update of updates.values()) {
         if (!update.tagDiff?.length) continue;
-        if (update.tagDiff.some(d => d.type === '-')) {
+        if (update.tagDiff.some((d: TagDiff) => d.type === '-')) {
           isTagUpgrade = false;
           break;
         }
@@ -158,17 +171,20 @@ export function validationAmbiguousCrossingTags(context) {
     ];
 
 
-    // Based on the given tags, what type of crossing is this?
-    // Returns a type that will be used for both identification and display (e.g. 'lines', 'zebra', 'marked'),
-    // along with whatever tags should be set on the parent way if the user picks this type as a fix.
-    function inferCrossingType(t) {
+    /**
+     * Infers the crossing type from tags, returning the type string and
+     * the tags that should be set if the user picks this type.
+     * @param t - The tags to analyze
+     * @returns The crossing type and associated tags
+     */
+    function inferCrossingType(t: OsmTags): { type: string; tags: Record<string, string | null> | null } {
       const markings = t['crossing:markings'] ?? '';
       const crossing = t.crossing ?? '';
 
       const isUnspecified = t.highway === 'crossing' || t.path === 'crossing' || t.footway === 'crossing' ||
         t.cycleway === 'crossing' || t.bridleway === 'crossing'  || t.pedestrian === 'crossing';
 
-      let type, tags;
+      let type: string, tags: Record<string, string | null> | null;
       if (markings !== '' && markings !== 'yes' && markings !== 'no') {  // interesting values like 'lines', 'surface', etc
         type = markings;
         tags = { 'crossing:markings': markings };
@@ -197,12 +213,11 @@ export function validationAmbiguousCrossingTags(context) {
 
 
     /**
-     * Add a 'choice' to the `choices` Map, if it isn't there already
-     * @param {string}  data.type a string like 'lines', or 'unmarked'.
-     * @param {Object}  data.tags - the tags to apply to the parent way.
-     * @return {Object} Choice data containing `setTags`
+     * Adds a choice to the `choices` Map if it isn't there already.
+     * @param data - The crossing type and tags
+     * @returns The choice data
      */
-    function addChoice(data) {
+    function addChoice(data: { type: string; tags: Record<string, string | null> | null }): any {
       const type = data.type;
       const tags = data.tags;
 
@@ -224,11 +239,15 @@ export function validationAmbiguousCrossingTags(context) {
     }
 
 
-    function makeFixes() {
+    /**
+     * Builds the array of fixes for this crossing conflict issue.
+     * @returns Array of validation fixes, one per crossing type choice
+     */
+    function makeFixes(this: any): ValidationFix[] {
       const wayID = this.entityIds[0];
       const choices = this.data.choices;
       const stringID = this.data.isTagUpgrade ? 'update_type' : 'choose_type';
-      const fixes = [];
+      const fixes: ValidationFix[] = [];
 
       for (const [type, choice] of choices) {
         if (type === 'not a crossing') continue;  // will go at the end
@@ -248,7 +267,14 @@ export function validationAmbiguousCrossingTags(context) {
     }
 
 
-    function makeConflictFix(title, wayID, setTags) {
+    /**
+     * Creates a fix that applies the given crossing tags and syncs child nodes.
+     * @param title - Display title for the fix
+     * @param wayID - The parent way ID
+     * @param setTags - Tags to set (or remove if value is `null`)
+     * @returns A validation fix
+     */
+    function makeConflictFix(title: string, wayID: EntityID, setTags: Record<string, string | null> | null): ValidationFix {
       return new ValidationFix({
         title: title,
         onClick: () => {
@@ -278,7 +304,8 @@ export function validationAmbiguousCrossingTags(context) {
     }
 
 
-    function getIssueTitle() {
+    /** Returns the localized issue title based on the crossing ambiguity type. */
+    function getIssueTitle(this: any): string {
       const data = this.data;
 
       if (data.isParentCrossing && !data.isParentChanged && data.isTagUpgrade) {
@@ -291,60 +318,61 @@ export function validationAmbiguousCrossingTags(context) {
     }
 
 
-    function renderIssueReference(selection) {
+    /** Renders the issue reference with tag diff tables for each affected entity. */
+    function renderIssueReference(this: any, $selection: D3Selection): void {
       const data = this.data;
 
-      // convert `updates` Map to `data` Array for d3.data join
-      const updateData = [];
+      // convert `updates` Map to `suggestions` Array for d3.data join and display to user
+      const suggestions = [];
       for (const [entityID, update] of data.updates) {
-        updateData.push({
+        suggestions.push({
           entityID: entityID,
           name: update.name,
           tagDiff: update.tagDiff || []
         });
       }
 
-      const referenceEnter = selection.selectAll('.issue-reference')
+      const $$reference = $selection.selectAll('.issue-reference')
         .data([0])
         .enter();
 
-      referenceEnter
+      $$reference
         .append('div')
         .attr('class', 'issue-reference')
         .text(l10n.t('issues.ambiguous_crossing.reference.line1'));
 
-      referenceEnter
+      $$reference
         .append('div')
         .attr('class', 'issue-reference')
         .text(l10n.t('issues.ambiguous_crossing.reference.line2'));
 
-      referenceEnter
+      $$reference
         .append('strong')
         .text(l10n.t('issues.suggested'));  // "Suggested updates"
 
-      const updatesEnter = referenceEnter.selectAll('.suggested-update')
-        .data(updateData, d => d.entityID)
+      const $$suggestions = $$reference.selectAll('.suggested-update')
+        .data(suggestions, (d: any) => d.entityID)
         .enter()
         .append('div')
         .attr('class', 'suggested-update');
 
-      updatesEnter
+      $$suggestions
         .append('strong')
-        .text(d => {
+        .text((d: any) => {
           const lineOrPoint = d.entityID[0] === 'w' ? l10n.t('modes.add_line.title') : l10n.t('modes.add_point.title');
           return `${lineOrPoint} ${d.entityID} - ${d.name}:`;
         });
 
       // Render either the tagDiff or a message in its place.
-      updatesEnter
-        .each((d, i, nodes) => {
-          const selection = d3_select(nodes[i]);
+      $$suggestions
+        .each((d: any, i: number, nodes: any) => {
+          const $$suggestion = d3_select(nodes[i]);
 
           if (!d.tagDiff.length) {
-            selection
+            $$suggestion
               .append('div')
               .attr('class', 'tagDiff-message')
-              .text(d => {
+              .text((d: any) => {
                 if (d.entityID === wayID && !data.isParentCrossing) {
                   return l10n.t('issues.ambiguous_crossing.not_a_crossing');
                 } else {
@@ -352,20 +380,20 @@ export function validationAmbiguousCrossingTags(context) {
                 }
               });
           } else {
-            selection
+            $$suggestion
               .append('table')
               .attr('class', 'tagDiff-table')
               .selectAll('.tagDiff-row')
-              .data(d => d.tagDiff)
+              .data((d: any) => d.tagDiff)
               .enter()
               .append('tr')
               .attr('class', 'tagDiff-row')
               .append('td')
-              .attr('class', d => {
+              .attr('class', (d: TagDiff) => {
                 const klass = (d.type === '+') ? 'add' : 'remove';
                 return `tagDiff-cell tagDiff-cell-${klass}`;
               })
-              .text(d => d.display);
+              .text((d: TagDiff) => d.display);
           }
         });
     }

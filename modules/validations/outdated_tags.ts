@@ -1,27 +1,39 @@
 import { utilHashcode, utilTagDiff } from '@rapid-sdk/util';
 
-import { actionChangePreset } from '../actions/change_preset.js';
-import { actionChangeTags } from '../actions/change_tags.js';
-import { actionUpgradeTags } from '../actions/upgrade_tags.js';
+import { actionChangePreset } from '../actions/change_preset.ts';
+import { actionChangeTags } from '../actions/change_tags.ts';
+import { actionUpgradeTags } from '../actions/upgrade_tags.ts';
 import { Graph, ValidationIssue, ValidationFix } from '../lib/index.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { OsmEntity, OsmNode, OsmTags } from '../data/types.ts';
+import type { TagDiff } from '@rapid-sdk/util';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
-export function validationOutdatedTags(context) {
-  const type = 'outdated_tags';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
+
+/**
+ * Factory that creates a validator for detecting outdated, deprecated,
+ * or incomplete tags. Also handles name-suggestion-index upgrades for
+ * non-canonical brand tagging.
+ * @param context
+ * @returns Validator function
+ */
+export function validationOutdatedTags(context: Context): ValidatorFunction {
+  const type = 'outdated_tags' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
 
 
   /**
-   * _isCrossingWay
-   * Is the way tagged with something that would indicate that it is a crossing,
-   *   for example `highway=footway`+`footway=crossing` ?
-   * @param   {Object}   tags - tags to check
-   * @return  {boolean}  `true` if the way is tagged as a crossing
+   * Tests whether the way is tagged as a crossing
+   * (e.g. `highway=footway` + `footway=crossing`).
+   * @param tags - The tags to check
+   * @returns `true` if the way has crossing tags
    */
-  function _isCrossingWay(tags) {
-    const pathVals = schema.getScope('osm').variables.get('path_highway_values')?.asSet();
+  function _isCrossingWay(tags: OsmTags): boolean {
+    const pathVals = schema!.getScope('osm').variables.get('path_highway_values')?.asSet();
     for (const k of pathVals ?? []) {
       if (tags.highway === k && tags[k] === 'crossing') {
         return true;
@@ -32,9 +44,13 @@ export function validationOutdatedTags(context) {
 
 
   /**
-   * oldTagIssues
+   * Detects outdated, deprecated, or incomplete tags on an entity.
+   * Performs preset upgrades, deprecated tag replacement, and NSI matching.
+   * @param entity - The entity to check
+   * @param graph - The current graph
+   * @returns Array of issues, with `provisional` set if waiting on NSI
    */
-  function oldTagIssues(entity, graph) {
+  function oldTagIssues(entity: OsmEntity, graph: Graph): ValidatorResult {
     if (!schema) return [];
     if (!entity.hasInterestingTags()) return [];
 
@@ -57,7 +73,7 @@ graph = new Graph(graph);
         // Bail out if map not fully loaded here - we won't know all the node's parentWays.
         // Don't worry, as more map tiles are loaded, we'll have additional chances to validate it.
         const osm = context.services.osm;
-        if (osm && !osm.isDataLoaded(entity.loc)) return [];
+        if (osm && !osm.isDataLoaded((entity as OsmNode).loc!)) return [];
 
         const parents = graph.parentWays(entity);
         const hasParentCrossing = parents.some(parent => _isCrossingWay(parent.tags));
@@ -65,7 +81,7 @@ graph = new Graph(graph);
       }
     }
 
-    const oldTags = Object.assign({}, entity.tags);  // shallow copy
+    const oldTags: OsmTags = Object.assign({}, entity.tags);  // shallow copy
     let subtype = 'deprecated_tags';
 
     // Note: We are going to modify `graph` and `entity` locally in here, but these things will not change.
@@ -91,7 +107,7 @@ graph = new Graph(graph);
     }
 
     // Add missing addTags from the detected preset
-    let newTags = Object.assign({}, entity.tags);  // shallow copy
+    let newTags: OsmTags = Object.assign({}, entity.tags);  // shallow copy
     if (preset.tags !== preset.addTags) {
       for (const [k, v] of Object.entries(preset.addTags)) {
         if (!newTags[k]) {
@@ -107,11 +123,11 @@ graph = new Graph(graph);
     // Attempt to match a canonical record in the name-suggestion-index.
     const nsi = context.services.nsi;
     let isWaitingForNsi = false;
-    let nsiResult;
+    let nsiResult: any;
     if (nsi) {
       isWaitingForNsi = (nsi.status === 'loading');
       if (!isWaitingForNsi) {
-        const loc = entity.extent(graph).center();
+        const loc = entity.extent()!.center();
         nsiResult = nsi.upgradeTags(newTags, loc);
         if (nsiResult) {
           newTags = nsiResult.newTags;
@@ -120,7 +136,7 @@ graph = new Graph(graph);
       }
     }
 
-    let issues = [];
+    const issues: ValidatorResult = [];
     issues.provisional = isWaitingForNsi;
 
     // determine diff
@@ -139,7 +155,7 @@ graph = new Graph(graph);
 
     // Allow autofix for simple upgrades..
     // `noncanonical_brand` upgrades may have false positives, so they should be reviewed manually.
-    let autoArgs = null;
+    let autoArgs: unknown[] | undefined;
     if (subtype !== 'noncanonical_brand') {
       autoArgs = [actionDoTagUpgrade, l10n.t('issues.fix.upgrade_tags.annotation')];
     }
@@ -151,10 +167,10 @@ graph = new Graph(graph);
       message: showUpgradeMessage,
       reference: showUpgradeReference,
       entityIds: [entity.id],
-      hash: utilHashcode(JSON.stringify(tagDiff)),
+      hash: String(utilHashcode(JSON.stringify(tagDiff))),
       autoArgs: autoArgs,
       dynamicFixes: () => {
-        let fixes = [
+        const fixes = [
           new ValidationFix({
             title: l10n.t('issues.fix.upgrade_tags.title'),
             onClick: () => {
@@ -190,16 +206,21 @@ graph = new Graph(graph);
     return issues;
 
 
-    function actionDoTagUpgrade(graph) {
+    /**
+     * Applies the computed tag upgrade to the graph.
+     * @param graph - The current graph state
+     * @returns Updated graph with upgraded tags
+     */
+    function actionDoTagUpgrade(graph: Graph): Graph {
       const currEntity = graph.hasEntity(entity.id);
       if (!currEntity) return graph;
 
-      const newTags = Object.assign({}, currEntity.tags);  // shallow copy
+      const newTags: OsmTags = Object.assign({}, currEntity.tags);  // shallow copy
       for (const diff of tagDiff) {
         if (diff.type === '-') {
           delete newTags[diff.key];
         } else if (diff.type === '+') {
-          newTags[diff.key] = diff.newVal;
+          newTags[diff.key] = diff.newVal!;
         }
       }
 
@@ -207,14 +228,20 @@ graph = new Graph(graph);
     }
 
 
-    function actionAddNotTag(graph) {
+    /**
+     * Adds a `not:brand:wikidata` tag to indicate this entity was reviewed
+     * and is not the suggested brand.
+     * @param graph - The current graph state
+     * @returns Updated graph with the not-tag added
+     */
+    function actionAddNotTag(graph: Graph): Graph {
       const currEntity = graph.hasEntity(entity.id);
       if (!currEntity) return graph;
 
       const item = nsiResult?.matched;
       if (!item) return graph;
 
-      const newTags = Object.assign({}, currEntity.tags);  // shallow copy
+      const newTags: OsmTags = Object.assign({}, currEntity.tags);  // shallow copy
       const wd = item.mainTag;     // e.g. `brand:wikidata`
       const notwd = `not:${wd}`;   // e.g. `not:brand:wikidata`
       const qid = item.tags[wd];
@@ -230,7 +257,8 @@ graph = new Graph(graph);
     }
 
 
-    function showUpgradeMessage() {
+    /** Returns the localized upgrade message for display. */
+    function showUpgradeMessage(this: any): string {
       const graph = editor.staging.graph;
       const currEntity = graph.hasEntity(entity.id);
       if (!currEntity) return '';
@@ -245,8 +273,9 @@ graph = new Graph(graph);
     }
 
 
-    function showUpgradeReference(selection) {
-      const enter = selection.selectAll('.issue-reference')
+    /** Renders the issue reference text and suggested tag changes. */
+    function showUpgradeReference($selection: D3Selection): void {
+      const enter = $selection.selectAll('.issue-reference')
         .data([0])
         .enter();
 
@@ -268,16 +297,22 @@ graph = new Graph(graph);
         .append('tr')
         .attr('class', 'tagDiff-row')
         .append('td')
-        .attr('class', d => {
+        .attr('class', (d: TagDiff) => {
           const klass = (d.type === '+') ? 'add' : 'remove';
           return `tagDiff-cell tagDiff-cell-${klass}`;
         })
-        .text(d => d.display);
+        .text((d: TagDiff) => d.display);
     }
   }
 
 
-  let validation = function checkOutdatedTags(entity, graph) {
+  /**
+   * Delegates to `oldTagIssues` for the actual validation logic.
+   * @param entity - The entity to validate
+   * @param graph - The current graph
+   * @returns Array of issues for outdated tags
+   */
+  const validation = function checkOutdatedTags(entity: OsmEntity, graph: Graph): ValidatorResult {
     return oldTagIssues(entity, graph);
   };
 

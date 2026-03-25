@@ -1,13 +1,31 @@
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Context } from '../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { ValidatorFunction } from './types.ts';
 
-export function validationIncompatibleSource(context) {
-  const type = 'incompatible_source';
-  const editor = context.systems.editor;
-  const l10n = context.systems.l10n;
 
-  const incompatibleRules = [
+interface IncompatibleRule {
+  id: string;
+  regex: RegExp;
+  exceptRegex?: RegExp;
+}
+
+
+/**
+ * Factory that creates a validator for detecting features sourced from
+ * proprietary or incompatible data providers (e.g. Google, Baidu, Amap).
+ * @param context
+ * @returns Validator function
+ */
+export function validationIncompatibleSource(context: Context): ValidatorFunction {
+  const type = 'incompatible_source' as ValidatorID;
+  const editor = context.systems.editor!;
+  const l10n = context.systems.l10n!;
+
+  const incompatibleRules: IncompatibleRule[] = [
     {
       id: 'amap',
       regex: /(amap|autonavi|mapabc|高德)/i
@@ -22,7 +40,12 @@ export function validationIncompatibleSource(context) {
   ];
 
 
-  const validation = function checkIncompatibleSource(entity) {
+  /**
+   * Checks whether the entity's `source` tag references a known incompatible data provider.
+   * @param entity - The entity to validate
+   * @returns Array of issues, one per incompatible source value found
+   */
+  const validation = function checkIncompatibleSource(entity: OsmEntity): ValidationIssue[] {
     const entitySources = entity.tags?.source && entity.tags.source.split(';');
     if (!entitySources) return [];
 
@@ -59,12 +82,17 @@ export function validationIncompatibleSource(context) {
           }
         });
 
-      }).filter(Boolean);
+      }).filter((issue): issue is ValidationIssue => issue !== null);
 
 
-      function getReference(id) {
-        return function showReference(selection) {
-          selection.selectAll('.issue-reference')
+      /**
+       * Returns a reference renderer for the given incompatible source rule.
+       * @param id - The rule identifier (e.g. 'google', 'baidu')
+       * @returns A function that renders reference text into a D3 selection
+       */
+      function getReference(id: string): ($selection: D3Selection) => void {
+        return function showReference($selection: D3Selection): void {
+          $selection.selectAll('.issue-reference')
             .data([0])
             .enter()
             .append('div')
