@@ -4,8 +4,8 @@ Validation rules that check map data for errors, warnings, and suggestions. Thes
 
 ## Overview
 
-Each validator is a function that examines entities and returns an array of `ValidationIssue` objects.
-Validators are run by the `ValidationSystem` and results are displayed in the issues panel.
+Each validator is a function that examines entities and returns a `ValidatorResult` containing
+detected issues. Validators are run by the `ValidationSystem` and results are displayed in the issues panel.
 
 ## Key Files
 
@@ -37,17 +37,17 @@ Validators are run by the `ValidationSystem` and results are displayed in the is
 Each validator is a factory function that accepts a `Context` and returns a `ValidatorFunction`:
 
 ```typescript
-export function validatorExample(context: Context): ValidatorFunction {
+export function validateExample(context: Context): ValidatorFunction {
   const type = 'example' as ValidatorID;
   const editor = context.systems.editor!;
   const l10n = context.systems.l10n!;
 
-  const validator = function(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    const issues = [];
+  const validator = function checkExample(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
 
     // Check for problems...
     if (problem) {
-      issues.push(new ValidationIssue(context, {
+      result.issues.push(new ValidationIssue(context, {
         type: type,
         severity: 'warning',
         message: function(this: any) {
@@ -61,7 +61,7 @@ export function validatorExample(context: Context): ValidatorFunction {
       }));
     }
 
-    return issues;
+    return result;
   } as ValidatorFunction;
 
   validator.type = type;
