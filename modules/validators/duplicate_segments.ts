@@ -5,7 +5,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -25,13 +25,14 @@ export function validateDuplicateSegments(context: Context): ValidatorFunction {
    * Checks whether any adjacent node pairs in the way are shared by other routable ways.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for duplicated segments
+   * @returns Result object containing issues detected
    */
-  const validator = function checkDuplicateSegments(entity: OsmEntity, graph: Graph): ValidationIssue[] {
+  const validator = function checkDuplicateSegments(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
     if (entity.type === 'way') {
-      return getIssuesForWay(entity as OsmWay);
+      result.issues = getIssuesForWay(entity as OsmWay);
     }
-    return [];
+    return result;
 
 
     /**
@@ -146,11 +147,9 @@ export function validateDuplicateSegments(context: Context): ValidatorFunction {
           .text(l10n.t('issues.duplicate_segments.reference'));
       }
     }
-
   };
 
 
   validator.type = type;
-
   return validator;
 }

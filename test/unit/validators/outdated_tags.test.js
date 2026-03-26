@@ -32,14 +32,14 @@ describe('validateOutdatedTags', () => {
   it('has no errors on good tags', () => {
     const w = new Rapid.OsmWay(context, { tags: { highway: 'unclassified' }});
     const g = new Rapid.Graph(context, [w]);
-    const issues = validator(w, g);
+    const issues = validator(w, g).issues;
     assert.deepEqual(issues, []);
   });
 
   it('flags deprecated tag with replacement', () => {
     const w = new Rapid.OsmWay(context, { tags: { highway: 'ford' }});
     const g = new Rapid.Graph(context, [w]);
-    const issues = validator(w, g);
+    const issues = validator(w, g).issues;
     assert.isArray(issues);
     assert.lengthOf(issues, 1);
     const expected = {
@@ -54,7 +54,7 @@ describe('validateOutdatedTags', () => {
   it('flags deprecated tag with no replacement', () => {
     const w = new Rapid.OsmWay(context, { tags: { highway: 'no' }});
     const g = new Rapid.Graph(context, [w]);
-    const issues = validator(w, g);
+    const issues = validator(w, g).issues;
     assert.isArray(issues);
     assert.lengthOf(issues, 1);
     const expected = {
@@ -73,8 +73,8 @@ describe('validateOutdatedTags', () => {
       members: [{ id: w.id, role: 'outer' }]
     });
     const g = new Rapid.Graph(context, [w, r]);
-    const wIssues = validator(w, g);
-    const rIssues = validator(r, g);
+    const wIssues = validator(w, g).issues;
+    const rIssues = validator(r, g).issues;
     assert.deepEqual(wIssues, []);
     assert.deepEqual(rIssues, []);
   });

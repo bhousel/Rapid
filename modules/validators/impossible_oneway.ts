@@ -8,7 +8,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -29,25 +29,28 @@ export function validateImpossibleOneway(context: Context): ValidatorFunction {
    * Checks whether a oneway road or waterway has unreachable or inescapable endpoints.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for impossible oneway connections
+   * @returns Result object containing issues detected
    */
-  const validator = function checkImpossibleOneway(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (!schema) return [];
-    if (entity.type !== 'way' || entity.geometry(graph) !== 'line') return [];
+  const validator = function checkImpossibleOneway(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+
+    if (!schema) return result;
+    if (entity.type !== 'way' || entity.geometry(graph) !== 'line') return result;
 
     const way = entity as OsmWay;
-    if (way.isClosed()) return [];
-    if (!typeForWay(way)) return [];
-    if (!way.isOneWay()) return [];
+    if (way.isClosed()) return result;
+    if (!typeForWay(way)) return result;
+    if (!way.isOneWay()) return result;
     if (
       entity.tags.oneway === 'alternating' ||
       entity.tags.oneway === 'reversible' ||
       entity.tags.intermittent === 'yes'      // Ignore intermittent waterways - Rapid#1018
-    ) return [];
+    ) return result;
 
     const firstIssues = issuesForNode(way, way.first()!);
     const lastIssues = issuesForNode(way, way.last()!);
-    return firstIssues.concat(lastIssues);
+    result.issues = [...firstIssues, ...lastIssues];
+    return result;
 
 
     /**
@@ -302,7 +305,7 @@ export function validateImpossibleOneway(context: Context): ValidatorFunction {
     context.enter('draw-line', { continueWayID: way.id, continueNodeID: vertex.id });
   }
 
-  validator.type = type;
 
+  validator.type = type;
   return validator;
 }

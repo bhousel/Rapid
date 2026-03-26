@@ -198,16 +198,16 @@ export function validateSuspiciousName(context: Context): ValidatorFunction {
   /**
    * Checks whether the entity has generic or incorrect name tags.
    * @param entity - The entity to validate
-   * @returns Array of issues, with `provisional` set if NSI is still loading
+   * @returns  Result object containing issues detected - `provisional` flag set if NSI is still loading
    */
   const validator = function checkGenericName(entity: OsmEntity): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
     const tags = entity.tags;
 
     // a generic name is allowed if it's a known brand or entity
     const hasWikidata = (!!tags.wikidata || !!tags['brand:wikidata'] || !!tags['operator:wikidata']);
-    if (hasWikidata) return [];
+    if (hasWikidata) return result;
 
-    const issues: ValidatorResult = [];
     const notNames = new Set((tags['not:name'] ?? '').split(';').map(s => s.trim()).filter(Boolean));
 
     for (const [k, v] of Object.entries(tags)) {
@@ -217,19 +217,18 @@ export function validateSuspiciousName(context: Context): ValidatorFunction {
       const langCode = m.length >= 2 ? m[1] : null;
 
       if (notNames.has(v)) {
-        issues.push(makeIncorrectNameIssue(entity.id, k, v, langCode));
+        result.issues.push(makeIncorrectNameIssue(entity.id, k, v, langCode));
       }
       if (isGenericName(v, tags)) {
-        issues.provisional = _waitingForNsi;  // retry later if we are waiting on NSI to finish loading
-        issues.push(makeGenericNameIssue(entity.id, k, v, langCode));
+        result.provisional = _waitingForNsi;  // retry later if we are waiting on NSI to finish loading
+        result.issues.push(makeGenericNameIssue(entity.id, k, v, langCode));
       }
     }
 
-    return issues;
+    return result;
   };
 
 
   validator.type = type;
-
   return validator;
 }

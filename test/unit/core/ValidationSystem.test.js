@@ -10,7 +10,6 @@ describe('ValidationSystem', () => {
   context.systems = {
     editor:     new Rapid.EditSystem(context),
     l10n:       new Rapid.LocalizationSystem(context),
-    locations:  new Rapid.LocationSystem(context),
     schema:     new Rapid.SchemaSystem(context),
     spatial:    new Rapid.SpatialSystem(context),
     storage:    new Rapid.StorageSystem(context)

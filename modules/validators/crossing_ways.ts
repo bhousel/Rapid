@@ -14,7 +14,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 interface WayInfo {
@@ -92,23 +92,23 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
    * Checks the given entity for problematic way crossings.
    * @param entity - The entity to validate
    * @param graph - The graph we are validating
-   * @returns Array of validation issues detected
+   * @returns Result object containing issues detected
    */
-  const validator = function checkCrossingWays(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (!schema) return [];
+  const validator = function checkCrossingWays(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (!schema) return result;
 
 // note: using tree like this may be problematic - it may not reflect the graph we are validating.
 // update: it's probably ok, as `tree.waySegments` will reset the tree to the graph are using..
 // (although this will surely hurt performance)
     const tree = context.systems.editor!.tree;
-    const issues = [];
 
     for (const way of waysToCheck(entity, graph)) {
       for (const crossing of detectProblemCrossings(way, graph, tree)) {
-        issues.push(createIssue(crossing, graph));
+        result.issues.push(createIssue(crossing, graph));
       }
     }
-    return issues;
+    return result;
   };
 
 
@@ -958,7 +958,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
     });
   }
 
-  validator.type = type;
 
+  validator.type = type;
   return validator;
 }

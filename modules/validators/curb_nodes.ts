@@ -10,7 +10,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmTags, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -30,11 +30,14 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
    * Checks the given entity for missing curb nodes on crossing ways.
    * @param entity - The entity to validate
    * @param graph - The graph we are validating
-   * @returns Array of validation issues
+   * @returns Result object containing issues detected
    */
-  const validator = function checkCurbNodes(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (entity.type !== 'way' || entity.isDegenerate()) return [];
-    return detectCurbCandidates(entity as OsmWay, graph);
+  const validator = function checkCurbNodes(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (entity.type !== 'way' || entity.isDegenerate()) return result;
+
+    result.issues = detectCurbCandidates(entity as OsmWay, graph);
+    return result;
   };
 
 
@@ -318,6 +321,5 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
 
 
   validator.type = type;
-
   return validator;
 }

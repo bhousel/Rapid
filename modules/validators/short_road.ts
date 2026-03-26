@@ -8,7 +8,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -66,12 +66,14 @@ export function validateShortRoad(context: Context): ValidatorFunction {
    * Checks whether a way is a short road with open endpoints.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for short incomplete roads
+   * @returns  Result object containing issues detected
    */
-  const validator = function checkShortRoad(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (entity.type !== 'way') return [];
+  const validator = function checkShortRoad(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (entity.type !== 'way') return result;
+
     const way = entity as OsmWay;
-    if (!way.tags.highway || way.isClosed() || way.nodes.length >= SHORT_WAY_NODES_THD) return [];
+    if (!way.tags.highway || way.isClosed() || way.nodes.length >= SHORT_WAY_NODES_THD) return result;
 
     const firstNode = graph.entity(way.first()!) as OsmNode;
     const lastNode = graph.entity(way.last()!) as OsmNode;
@@ -81,7 +83,7 @@ export function validateShortRoad(context: Context): ValidatorFunction {
     const lastNodeOK = pwaysEnd.length > 1 || lastNode.tags.noexit === 'yes';
 
     // only do check on roads with open ends
-    if ((firstNodeOK && lastNodeOK) || wayLength(way, graph) >= SHORT_WAY_LENGTH_THD_METERS) return [];
+    if ((firstNodeOK && lastNodeOK) || wayLength(way, graph) >= SHORT_WAY_LENGTH_THD_METERS) return result;
 
     const fixes: ValidationFix[] = [];
     if (!firstNodeOK) {
@@ -125,7 +127,7 @@ export function validateShortRoad(context: Context): ValidatorFunction {
       }));
     }
 
-    return [new ValidationIssue(context, {
+    result.issues = [new ValidationIssue(context, {
       type: type,
       severity: 'warning',
       message: function(this: any) {
@@ -148,10 +150,11 @@ export function validateShortRoad(context: Context): ValidatorFunction {
         return fixes;
       }
     })];
+
+    return result;
   };
 
 
   validator.type = type;
-
   return validator;
 }

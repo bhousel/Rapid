@@ -38,7 +38,7 @@ describe.todo('validateAlmostJunction', () => {
 
     let issues = [];
     for (const entity of entities) {
-      issues = issues.concat(validator(entity, graph));
+      issues.push(...validator(entity, graph).issues);
     }
     return issues;
   }

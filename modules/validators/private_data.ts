@@ -9,7 +9,7 @@ import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmTags } from '../data/types.ts';
 import type { TagDiff } from '@rapid-sdk/util';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -29,36 +29,37 @@ export function validatePrivateData(context: Context): ValidatorFunction {
    * Checks whether a private building has tags containing personal data
    * that should not be publicly shared.
    * @param entity - The entity to validate
-   * @returns Array of issues for personal data found on private buildings
+   * @returns  Result object containing issues detected
    */
-  const validator = function checkPrivateData(entity: OsmEntity): ValidationIssue[] {
-    if (!schema) return [];
+  const validator = function checkPrivateData(entity: OsmEntity): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (!schema) return result;
 
     const variables = schema.getScope('osm').variables;
     const privateBuildingValues = variables.get('private_building_values')?.asSet();
-    if (!privateBuildingValues) return [];
+    if (!privateBuildingValues) return result;
 
     const tags = entity.tags;
-    if (!tags.building || !privateBuildingValues.has(tags.building)) return [];  // not a private building
+    if (!tags.building || !privateBuildingValues.has(tags.building)) return result;  // not a private building
 
     const keepTags: OsmTags = {};
     const publicKeys = variables.get('public_feature_keys')?.asSet();
     const personalKeys = variables.get('personal_data_keys')?.asSet();
-    if (!publicKeys || !personalKeys) return [];
+    if (!publicKeys || !personalKeys) return result;
 
     for (const [k, v] of Object.entries(tags)) {
-      if (publicKeys.has(k)) return [];  // ignore, probably a public feature
+      if (publicKeys.has(k)) return result;  // ignore, probably a public feature
       if (!personalKeys.has(k)) {
         keepTags[k] = v;
       }
     }
 
     const tagDiff = utilTagDiff(tags, keepTags);
-    if (!tagDiff.length) return [];
+    if (!tagDiff.length) return result;
 
     const fixID = tagDiff.length === 1 ? 'remove_tag' : 'remove_tags';
 
-    return [new ValidationIssue(context, {
+    result.issues = [new ValidationIssue(context, {
       type: type,
       severity: 'warning',
       message: showMessage,
@@ -80,6 +81,8 @@ export function validatePrivateData(context: Context): ValidatorFunction {
         ];
       }
     })];
+
+    return result;
 
 
     /**
@@ -150,6 +153,5 @@ export function validatePrivateData(context: Context): ValidatorFunction {
 
 
   validator.type = type;
-
   return validator;
 }

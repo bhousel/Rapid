@@ -48,17 +48,18 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
    * Performs preset upgrades, deprecated tag replacement, and NSI matching.
    * @param entity - The entity to check
    * @param graph - The current graph
-   * @returns Array of issues, with `provisional` set if waiting on NSI
+   * @returns  Result object containing issues detected, `provisional` flag set if waiting on NSI
    */
   function oldTagIssues(entity: OsmEntity, graph: Graph): ValidatorResult {
-    if (!schema) return [];
-    if (!entity.hasInterestingTags()) return [];
+    const result: ValidatorResult = { issues: [] };
+    if (!schema) return result;
+    if (!entity.hasInterestingTags()) return result;
 
     let preset = schema.match(entity, graph);
-    if (!preset) return [];
+    if (!preset) return result;
 
-// make a copy
-graph = new Graph(graph);
+    // make a copy
+    graph = new Graph(graph);
 
     // Crossings are special, see Rapid#1260
     // This validator can perform preset upgrades on standalone crossing nodes
@@ -68,16 +69,16 @@ graph = new Graph(graph);
     // (i.e. that parent way is the thing that will get validated thoroughly)
     if (/crossing/.test(preset.id)) {
       if (entity.type === 'way') {
-        return [];
+        return result;
       } else if (entity.type === 'node') {
         // Bail out if map not fully loaded here - we won't know all the node's parentWays.
         // Don't worry, as more map tiles are loaded, we'll have additional chances to validate it.
         const osm = context.services.osm;
-        if (osm && !osm.isDataLoaded((entity as OsmNode).loc!)) return [];
+        if (osm && !osm.isDataLoaded((entity as OsmNode).loc!)) return result;
 
         const parents = graph.parentWays(entity);
         const hasParentCrossing = parents.some(parent => _isCrossingWay(parent.tags));
-        if (hasParentCrossing) return [];
+        if (hasParentCrossing) return result;
       }
     }
 
@@ -92,7 +93,7 @@ graph = new Graph(graph);
       const newPreset = schema.getScope('osm').presets.get(preset.props.replacement);
       if (!newPreset) {
         console.warn(`validationOutdatedTags: warning "${preset.id}" wants replacement "${preset.props.replacement}" not found`);  // eslint-disable-line no-console
-        return [];
+        return result;
       }
       graph = actionChangePreset(entity.id, preset, newPreset, true /* skip field defaults */)(graph);
       entity = graph.entity(entity.id);
@@ -136,12 +137,11 @@ graph = new Graph(graph);
       }
     }
 
-    const issues: ValidatorResult = [];
-    issues.provisional = isWaitingForNsi;
+    result.provisional = isWaitingForNsi;
 
     // determine diff
     const tagDiff = utilTagDiff(oldTags, newTags);
-    if (!tagDiff.length) return issues;
+    if (!tagDiff.length) return result;
 
     const isOnlyAddingTags = tagDiff.every(d => d.type === '+');
 
@@ -160,7 +160,7 @@ graph = new Graph(graph);
       autoArgs = [actionDoTagUpgrade, l10n.t('issues.fix.upgrade_tags.annotation')];
     }
 
-    issues.push(new ValidationIssue(context, {
+    result.issues.push(new ValidationIssue(context, {
       type: type,
       subtype: subtype,
       severity: 'warning',
@@ -203,7 +203,7 @@ graph = new Graph(graph);
       }
     }));
 
-    return issues;
+    return result;
 
 
     /**
@@ -310,7 +310,7 @@ graph = new Graph(graph);
    * Delegates to `oldTagIssues` for the actual validation logic.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for outdated tags
+   * @returns  Result object containing issues detected, `provisional` flag set if waiting on NSI
    */
   const validator = function checkOutdatedTags(entity: OsmEntity, graph: Graph): ValidatorResult {
     return oldTagIssues(entity, graph);
@@ -318,6 +318,5 @@ graph = new Graph(graph);
 
 
   validator.type = type;
-
   return validator;
 }

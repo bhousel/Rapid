@@ -8,7 +8,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -178,29 +178,29 @@ export function validateYShapedConnection(context: Context): ValidatorFunction {
    * Only flags nodes on negative (ML-generated) ways with a single highway parent.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for Y-shaped connection nodes
+   * @returns Result object containing issues detected
    */
-  const validator = function checkYShapedConnection(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (!schema) return [];
+  const validator = function checkYShapedConnection(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (!schema) return result;
+
     // Only flag issue on non-connection nodes on negative ways
-    if (entity.type !== 'node') return [];
+    if (entity.type !== 'node') return result;
     const pways = getRelatedHighwayParents(entity as OsmNode, graph);
-    if (pways.length !== 1 || !pways[0].id.startsWith('w-')) return [];
+    if (pways.length !== 1 || !pways[0].id.startsWith('w-')) return result;
 
     // check if either neighbor node on its parent way is a connection node
-    const issues: ValidationIssue[] = [];
     const way = pways[0];
     const idx = way.nodes.indexOf(entity.id);
-    if (idx <= 0) return issues;
+    if (idx <= 0) return result;  // not found?
     if (isShortEdgeAndYShapedConnection(graph, way, idx - 1, idx) ||
       isShortEdgeAndYShapedConnection(graph, way, idx + 1, idx)) {
-      issues.push(createIssueAndFixForNode(entity as OsmNode, context));
+      result.issues.push(createIssueAndFixForNode(entity as OsmNode, context));
     }
-    return issues;
+    return result;
   };
 
 
   validator.type = type;
-
   return validator;
 }

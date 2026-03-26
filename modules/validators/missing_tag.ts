@@ -6,7 +6,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -65,9 +65,9 @@ export function validateMissingTag(context: Context): ValidatorFunction {
    * classification, or is a relation without a type.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for missing tags
+   * @returns Result object containing issues detected
    */
-  const validator = function checkMissingTag(entity: OsmEntity, graph: Graph): ValidationIssue[] {
+  const validator = function checkMissingTag(entity: OsmEntity, graph: Graph): ValidatorResult {
     const osm = context.services.osm;
     const isUnloadedNode = (entity.type === 'node') && osm && !osm.isDataLoaded((entity as OsmNode).loc!);
     let subtype;
@@ -93,7 +93,8 @@ export function validateMissingTag(context: Context): ValidatorFunction {
       subtype = 'highway_classification';
     }
 
-    if (!subtype) return [];
+    const result: ValidatorResult = { issues: [] };
+    if (!subtype) return result;
 
     const messageID = subtype === 'highway_classification' ? 'unknown_road' : `missing_tag.${subtype}`;
     const referenceID = subtype === 'highway_classification' ? 'unknown_road' : 'missing_tag';
@@ -102,7 +103,7 @@ export function validateMissingTag(context: Context): ValidatorFunction {
     const canDelete = (entity.version === undefined || entity.v !== undefined);
     const severity = (canDelete && subtype !== 'highway_classification') ? 'error' : 'warning';
 
-    return [new ValidationIssue(context, {
+    result.issues = [new ValidationIssue(context, {
         type: type,
         subtype: subtype,
         severity: severity,
@@ -153,6 +154,8 @@ export function validateMissingTag(context: Context): ValidatorFunction {
         }
     })];
 
+    return result;
+
     /** Renders the issue reference text into the given selection. */
     function showReference($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
@@ -164,7 +167,7 @@ export function validateMissingTag(context: Context): ValidatorFunction {
     }
   };
 
-  validator.type = type;
 
+  validator.type = type;
   return validator;
 }

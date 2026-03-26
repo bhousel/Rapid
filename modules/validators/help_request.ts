@@ -4,7 +4,7 @@ import { ValidationFix } from '../lib/ValidationFix.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -22,22 +22,22 @@ export function validateHelpRequest(context: Context): ValidatorFunction {
   /**
    * Checks whether the entity has a `fixme` tag that was not added by the current user.
    * @param entity - The entity to validate
-   * @returns Array of issues for unresolved fixme tags
+   * @returns Result object containing issues detected
    */
-  const validator = function checkHelpRequest(entity: OsmEntity): ValidationIssue[] {
-    if (!entity.tags.fixme) return [];
-    if (!entity.tags.fixme) return [];
+  const validator = function checkHelpRequest(entity: OsmEntity): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (!entity.tags.fixme) return result;
 
     // don't flag fixmes on features added by the user
-    if (entity.version === undefined) return [];
+    if (entity.version === undefined) return result;
 
     if (entity.v !== undefined) {
       const baseEntity = editor.base.graph.hasEntity(entity.id);
       // don't flag fixmes added by the user on existing features
-      if (!baseEntity || !baseEntity.tags.fixme) return [];
+      if (!baseEntity || !baseEntity.tags.fixme) return result;
     }
 
-    return [new ValidationIssue(context, {
+    result.issues = [new ValidationIssue(context, {
       type: type,
       subtype: 'fixme_tag',
       severity: 'warning',
@@ -57,6 +57,9 @@ export function validateHelpRequest(context: Context): ValidatorFunction {
       entityIds: [entity.id]
     })];
 
+    return result;
+
+
     /** Renders the issue reference text into the given selection. */
     function showReference($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
@@ -68,7 +71,7 @@ export function validateHelpRequest(context: Context): ValidatorFunction {
     }
   };
 
-  validator.type = type;
 
+  validator.type = type;
   return validator;
 }

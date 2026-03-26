@@ -5,13 +5,13 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference } from '../lib/Difference.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { ValidationCache } from '../lib/ValidationCache.ts';
-import * as Validations from '../validators/index.ts';
+import * as Validators from '../validators/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { ValidationIssue, ValidationSeverity } from '../lib/ValidationIssue.ts';
-import type { ValidatorFunction } from '../validators/types.ts';
+import type { ValidatorFactory, ValidatorFunction, ValidatorResult } from '../validators/types.ts';
 
 /** Wait 5 sec before revalidating provisional entities */
 const RETRY = 5000;
@@ -41,12 +41,6 @@ export interface IssuesBySeverity {
   suggestion: ValidationIssue[];
 }
 
-/** Result from _validateEntity */
-interface ValidateEntityResult {
-  issues: ValidationIssue[];
-  provisional: boolean;
-}
-
 
 /**
  * `ValidationSystem` manages all the validator functions and maintains two caches
@@ -55,7 +49,7 @@ interface ValidateEntityResult {
  *   `head` is the results of validating the head graph (with user edits applied)
  *
  * We do both because that's the only way to know whether to credit a user with
- * fixing something (or breaking it).  This means that every feaature downloaded
+ * fixing something (or breaking it).  This means that every feature downloaded
  * from OSM gets validated.  This system maintains a work queue so that validation
  * is performed in the background during browser idle times.
  *
@@ -101,8 +95,8 @@ export class ValidationSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'validator';
-    this.requiredDependencies = new Set(['editor', 'schema', 'spatial']);
-    this.optionalDependencies = new Set(['map', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set(['editor', 'l10n', 'schema', 'spatial']);
+    this.optionalDependencies = new Set(['map', 'storage', 'ui', 'urlhash']);
 
     this._validators = new Map();
     this._base = new ValidationCache('base');
@@ -143,11 +137,11 @@ export class ValidationSystem extends AbstractSystem {
     // use the `if (!pathVals) return []` guard pattern to fail gracefully when schema is not
     // yet loaded.
     const context = this.context;
-    Object.values(Validations).forEach((validation: unknown) => {
-      if (typeof validation !== 'function') return;
-      const fn = (validation as (ctx: Context) => ValidatorFunction)(context);
-      this._validators.set(fn.type, fn);
-    });
+    for (const factory of Object.values(Validators) as ValidatorFactory[]) {
+      if (typeof factory !== 'function') continue;
+      const validator = factory(context);
+      this._validators.set(validator.type, validator);
+    };
 
     const editor = context.systems.editor;
     const schema = context.systems.schema;
@@ -294,8 +288,8 @@ export class ValidationSystem extends AbstractSystem {
 
       for (const entity of buildings) {
         const detected = checkUnsquareWay(entity, cache.graph);
-        if (!detected.length) continue;
-        cache.cacheIssues(detected);
+        if (!detected.issues.length) continue;
+        cache.cacheIssues(detected.issues);
       }
     };
 
@@ -691,7 +685,7 @@ export class ValidationSystem extends AbstractSystem {
    *     provisional:  `true` if provisional result, `false` if final result
    *   }
    */
-  private _validateEntity(entity: OsmEntity, graph: Graph): ValidateEntityResult {
+  private _validateEntity(entity: OsmEntity, graph: Graph): ValidatorResult {
 
     // If there are any override rules that match the issue type/subtype,
     // adjust severity (or disable it) and keep/discard as quickly as possible.
@@ -720,7 +714,7 @@ export class ValidationSystem extends AbstractSystem {
     };
 
 
-    const result: ValidateEntityResult = { issues: [], provisional: false };
+    const result: ValidatorResult = { issues: [], provisional: false };
     for (const [validatorID, validator] of this._validators) {   // run all validators
       if (typeof validator !== 'function') {
         console.error(`ValidationSystem: no such validatorID = ${validatorID}`);  // eslint-disable-line no-console
@@ -731,7 +725,7 @@ export class ValidationSystem extends AbstractSystem {
         result.provisional = true;
       }
 
-      const filtered = detected.filter(applySeverityOverrides);
+      const filtered = detected.issues.filter(applySeverityOverrides);
       result.issues = result.issues.concat(filtered);
     }
 

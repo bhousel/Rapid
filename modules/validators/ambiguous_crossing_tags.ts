@@ -12,7 +12,7 @@ import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmTags, OsmWay } from '../data/types.ts';
 import type { TagDiff } from '@rapid-sdk/util';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -36,13 +36,15 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
    * Checks the parent way for ambiguous crossing tags.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of crossing ambiguity issues
+   * @returns Result object containing issues detected
    */
-  const validator = function checkAmbiguousCrossingTags(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (!schema) return [];
-    if (entity.type !== 'way' || entity.isDegenerate()) return [];
+  const validator = function checkAmbiguousCrossingTags(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (!schema) return result;
+    if (entity.type !== 'way' || entity.isDegenerate()) return result;
 
-    return detectCrossingWayIssues(entity as OsmWay, graph);
+    result.issues = detectCrossingWayIssues(entity as OsmWay, graph);
+    return result;
   };
 
 
@@ -401,6 +403,5 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
 
 
   validator.type = type;
-
   return validator;
 }

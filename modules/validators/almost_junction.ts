@@ -14,7 +14,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, OsmTags, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -53,22 +53,21 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
    * extending one of its endpoints a short distance.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for potential junction connections
+   * @returns Result object containing issues detected
    */
-  const validator = function checkAlmostJunction(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (!schema) return [];
-    if (!isHighway(entity)) return [];
-    if (entity.isDegenerate()) return [];
+  const validator = function checkAlmostJunction(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (!schema) return result;
+    if (!isHighway(entity)) return result;
+    if (entity.isDegenerate()) return result;
 
 //todo: using tree like this may be problematic - it may not reflect the graph we are validating
     const tree = editor.tree;
     const way = entity as OsmWay;
     const extendableNodeInfos = findConnectableEndNodesByExtension(way, graph);
 
-    const issues: ValidationIssue[] = [];
-
-    extendableNodeInfos.forEach(extendableNodeInfo => {
-      issues.push(new ValidationIssue(context, {
+    for (const extendableNodeInfo of extendableNodeInfos) {
+      result.issues.push(new ValidationIssue(context, {
         type,
         subtype: 'highway-highway',
         severity: 'warning',
@@ -102,9 +101,9 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         },
         dynamicFixes: makeFixes
       }));
-    });
+    }
 
-    return issues;
+    return result;
 
 
     /**
@@ -402,7 +401,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
     }
   };
 
-  validator.type = type;
 
+  validator.type = type;
   return validator;
 }

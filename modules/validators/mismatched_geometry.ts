@@ -15,7 +15,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay} from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -496,24 +496,24 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
    * other mismatch, then unclosed multipolygon parts.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of validation issues found
+   * @returns Result object containing issues detected
    */
-  const validator = function checkMismatchedGeometry(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (!schema) return [];
+  const validator = function checkMismatchedGeometry(entity: OsmEntity, graph: Graph): ValidatorResult {
+    if (!schema) return { issues: [] };
 
     const vertexPoint = vertexPointIssue(entity, graph);
-    if (vertexPoint) return [vertexPoint];
+    if (vertexPoint) return { issues: [vertexPoint] };
 
     const lineAsArea = lineTaggedAsAreaIssue(entity);
-    if (lineAsArea) return [lineAsArea];
+    if (lineAsArea) return { issues: [lineAsArea] };
 
     const mismatch = otherMismatchIssue(entity, graph);
-    if (mismatch) return [mismatch];
+    if (mismatch) return { issues: [mismatch] };
 
-    return unclosedMultipolygonPartIssues(entity, graph);
-  } as ValidatorFunction;
+    return { issues: unclosedMultipolygonPartIssues(entity, graph) };
+  };
+
 
   validator.type = type;
-
   return validator;
 }

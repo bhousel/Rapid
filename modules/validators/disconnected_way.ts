@@ -1,5 +1,4 @@
 import { Extent } from '@rapid-sdk/math';
-
 import { operationDelete } from '../operations/delete.js';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
@@ -8,7 +7,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -40,15 +39,16 @@ export function validateDisconnectedWay(context: Context): ValidatorFunction {
    * of interconnected routable features with no connection to the wider network.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for disconnected routing islands
+   * @returns Result object containing issues detected
    */
-  const validator = function checkDisconnectedWay(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (!schema) return [];
+  const validator = function checkDisconnectedWay(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (!schema) return result;
 
     const routingIslandEntities = routingIslandForEntity(entity);
-    if (!routingIslandEntities) return [];
+    if (!routingIslandEntities) return result;
 
-    return [new ValidationIssue(context, {
+    result.issues = [new ValidationIssue(context, {
       type: type,
       subtype: 'highway',
       severity: 'warning',
@@ -62,6 +62,8 @@ export function validateDisconnectedWay(context: Context): ValidatorFunction {
       entityIds: Array.from(routingIslandEntities).map(entity => entity.id),
       dynamicFixes: makeFixes
     })];
+
+    return result;
 
 
     /**
@@ -267,6 +269,5 @@ export function validateDisconnectedWay(context: Context): ValidatorFunction {
 
 
   validator.type = type;
-
   return validator;
 }

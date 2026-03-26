@@ -3,7 +3,7 @@ import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -22,10 +22,10 @@ export function validateInvalidFormat(context: Context): ValidatorFunction {
    * Checks whether the entity has tags with improperly formatted values.
    * Currently validates email addresses.
    * @param entity - The entity to validate
-   * @returns Array of issues for invalid format values
+   * @returns Result object containing issues detected
    */
-  const validator = function checkInvalidFormat(entity: OsmEntity): ValidationIssue[] {
-    const issues: ValidationIssue[] = [];
+  const validator = function checkInvalidFormat(entity: OsmEntity): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
 
     /**
      * Tests whether the given string is a valid email address.
@@ -76,7 +76,7 @@ export function validateInvalidFormat(context: Context): ValidatorFunction {
         .filter(s => !isSchemePresent(s));
 
       if (websites.length) {
-        issues.push(new ValidationIssue(context, {
+        result.issues.push(new ValidationIssue(context, {
           type: type,
           subtype: 'website',
           severity: 'warning',
@@ -105,7 +105,7 @@ export function validateInvalidFormat(context: Context): ValidatorFunction {
         .filter(s => !isValidEmail(s));
 
       if (emails.length) {
-        issues.push(new ValidationIssue(context, {
+        result.issues.push(new ValidationIssue(context, {
           type: type,
           subtype: 'email',
           severity: 'warning',
@@ -125,10 +125,10 @@ export function validateInvalidFormat(context: Context): ValidatorFunction {
       }
     }
 
-    return issues;
+    return result;
   };
 
-  validator.type = type;
 
+  validator.type = type;
   return validator;
 }

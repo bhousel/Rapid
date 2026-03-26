@@ -8,7 +8,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -44,26 +44,27 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
    * Checks whether a building outline has corners out of square.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for unsquare buildings
+   * @returns  Result object containing issues detected
    */
-  const validator = function checkUnsquareWay(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (!isBuilding(entity, graph)) return [];
+  const validator = function checkUnsquareWay(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (!isBuilding(entity, graph)) return result;
 
     // don't flag ways marked as physically unsquare
-    if (entity.tags.nonsquare === 'yes') return [];
+    if (entity.tags.nonsquare === 'yes') return result;
 
     const way = entity as OsmWay;
     const isClosed = way.isClosed();
-    if (!isClosed) return [];        // this building has bigger problems
+    if (!isClosed) return result;        // this building has bigger problems
 
     // don't flag ways with lots of nodes since they are likely detail-mapped
     const nodes = graph.childNodes(way).slice();    // shallow copy
-    if (nodes.length > nodeThreshold + 1) return [];   // +1 because closing node appears twice
+    if (nodes.length > nodeThreshold + 1) return result;   // +1 because closing node appears twice
 
     // Bail out if map not fully loaded here - we won't know all the node's parentWays.
     // Don't worry, as more map tiles are loaded, we'll have additional chances to validate it.
     const osm = context.services.osm;
-    if (!osm || nodes.some(node => !osm.isDataLoaded(node.loc!))) return [];
+    if (!osm || nodes.some(node => !osm.isDataLoaded(node.loc!))) return result;
 
     // don't flag connected ways to avoid unresolvable unsquare loops
     const hasConnectedSquarableWays = nodes.some(node => {
@@ -78,7 +79,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
         });
       });
     });
-    if (hasConnectedSquarableWays) return [];
+    if (hasConnectedSquarableWays) return result;
 
 
     // user-configurable square threshold
@@ -88,7 +89,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
     const degreeThreshold = isNaN(parsed) ? DEFAULT_DEG_THRESHOLD : parsed;
 
     const points = nodes.map(node => context.viewport.project(node.loc!));
-    if (!geoOrthoCanOrthogonalize(points, isClosed, epsilon, degreeThreshold, true)) return [];
+    if (!geoOrthoCanOrthogonalize(points, isClosed, epsilon, degreeThreshold, true)) return result;
 
     let autoArgs;
     // don't allow autosquaring features linked to wikidata
@@ -99,7 +100,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
       autoArgs = [ action, annotation ];
     }
 
-    return [new ValidationIssue(context, {
+    result.issues = [new ValidationIssue(context, {
       type: type,
       subtype: 'building',
       severity: 'warning',
@@ -151,6 +152,8 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
       }
     })];
 
+    return result;
+
     /** Renders the issue reference text into the given selection. */
     function showReference($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
@@ -162,7 +165,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
     }
   };
 
-  validator.type = type;
 
+  validator.type = type;
   return validator;
 }

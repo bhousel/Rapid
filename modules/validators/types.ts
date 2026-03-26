@@ -10,7 +10,10 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { ValidationIssue } from '../lib/ValidationIssue.ts';
 
 /** A validator result includes an array of detected issues and an optional `provisional` flag */
-export type ValidatorResult = ValidationIssue[] & { provisional?: boolean };
+export interface ValidatorResult {
+  issues: ValidationIssue[];
+  provisional?: boolean;
+};
 
 /**
  * A validator function that checks an entity for issues.

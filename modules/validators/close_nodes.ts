@@ -8,7 +8,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 type WayType = 'boundary' | 'indoor' | 'building' | 'path' | 'other';
@@ -40,27 +40,24 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
    * detached point checks as appropriate.
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for nodes that are too close together
+   * @returns Result object containing issues detected
    */
-  const validator = function checkCloseNodes(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    if (!schema) return [];
+  const validator = function checkCloseNodes(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
+    if (!schema) return result;
 
     if (entity.type === 'node') {
-      return getIssuesForNode(entity as OsmNode);
-    } else if (entity.type === 'way') {
-      return getIssuesForWay(entity as OsmWay);
-    }
-    return [];
-
-    /** Routes node validation to vertex or detached point checks. */
-    function getIssuesForNode(node: OsmNode): ValidationIssue[] {
-      const parentWays = graph.parentWays(node);
+      const parentWays = graph.parentWays(entity);
       if (parentWays.length) {
-        return getIssuesForVertex(node, parentWays);
+        result.issues = getIssuesForVertex(entity as OsmNode, parentWays);
       } else {
-        return getIssuesForDetachedPoint(node);
+        result.issues = getIssuesForPoint(entity as OsmNode);
       }
+    } else if (entity.type === 'way') {
+      result.issues = getIssuesForWay(entity as OsmWay);
     }
+    return result;
+
 
     /**
      * Classifies a way by its primary type.
@@ -197,7 +194,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
      * @param node - The detached point node
      * @returns Array of close-node issues with nearby points
      */
-    function getIssuesForDetachedPoint(node: OsmNode): ValidationIssue[] {
+    function getIssuesForPoint(node: OsmNode): ValidationIssue[] {
       const issues: ValidationIssue[] = [];
       const lon = node.loc![0];
       const lat = node.loc![1];
@@ -368,6 +365,5 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
 
 
   validator.type = type;
-
   return validator;
 }

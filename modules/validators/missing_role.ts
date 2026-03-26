@@ -7,7 +7,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { IndexedMember, OsmEntity, OsmRelation, OsmWay } from '../data/types.ts';
-import type { ValidatorFunction } from './types.ts';
+import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
 
 /**
@@ -28,10 +28,10 @@ export function validateMissingRole(context: Context): ValidatorFunction {
    * a multipolygon relation (checking its own members).
    * @param entity - The entity to validate
    * @param graph - The current graph
-   * @returns Array of issues for members missing roles
+   * @returns Result object containing issues detected
    */
-  const validator = function checkMissingRole(entity: OsmEntity, graph: Graph): ValidationIssue[] {
-    const issues: ValidationIssue[] = [];
+  const validator = function checkMissingRole(entity: OsmEntity, graph: Graph): ValidatorResult {
+    const result: ValidatorResult = { issues: [] };
 
     if (entity.type === 'way') {
       for (const relation of graph.parentRelations(entity)) {
@@ -39,7 +39,7 @@ export function validateMissingRole(context: Context): ValidatorFunction {
 
         const member = relation.memberById(entity.id);
         if (member && isMissingRole(member)) {
-          issues.push(makeIssue(entity as OsmWay, relation, member));
+          result.issues.push(makeIssue(entity as OsmWay, relation, member));
         }
       }
 
@@ -47,12 +47,12 @@ export function validateMissingRole(context: Context): ValidatorFunction {
       for (const member of (entity as OsmRelation).indexedMembers()) {
         const way = graph.hasEntity(member.id);
         if (way && isMissingRole(member)) {
-          issues.push(makeIssue(way as OsmWay, entity as OsmRelation, member));
+          result.issues.push(makeIssue(way as OsmWay, entity as OsmRelation, member));
         }
       }
     }
 
-    return issues;
+    return result;
   };
 
 
@@ -143,7 +143,7 @@ export function validateMissingRole(context: Context): ValidatorFunction {
     });
   }
 
-  validator.type = type;
 
+  validator.type = type;
   return validator;
 }
