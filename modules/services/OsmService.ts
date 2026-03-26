@@ -221,8 +221,6 @@ export class OsmService extends AbstractSystem {
   _changeset: ChangesetState;
   /** Tiler used to compute which tiles to load for the current viewport */
   _tiler: Tiler;
-  /** Set of pending `requestIdleCallback` handles */
-  _deferred: Set<number>;
   /** Incrementing ID that changes on connection reset (invalidates in-flight requests) */
   _connectionID: number;
   /** Zoom level at which map data tiles are loaded */
@@ -273,7 +271,6 @@ export class OsmService extends AbstractSystem {
     this._changeset = {};
 
     this._tiler = new Tiler();
-    this._deferred = new Set();
     this._connectionID = 0;
     this._tileZoom = 16;
     this._noteZoom = 12;
@@ -378,11 +375,6 @@ export class OsmService extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    for (const handle of this._deferred) {
-      globalThis.cancelIdleCallback(handle);
-      this._deferred.delete(handle);
-    }
-
     this._connectionID++;
     this._apiStatus = null;
     this._rateLimit = null;

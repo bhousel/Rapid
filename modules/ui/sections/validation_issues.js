@@ -21,6 +21,7 @@ export function uiSectionValidationIssues(context, severity) {
   const storage = context.systems.storage;
   const urlhash = context.systems.urlhash;
   const validator = context.systems.validator;
+  const scheduler = context.systems.scheduler;
   const viewport = context.viewport;
 
   const sectionID = `issues-${severity}`;
@@ -228,11 +229,16 @@ export function uiSectionValidationIssues(context, severity) {
 
   // Rerender the issue pane contents, but wait for an idle moment
   function deferredRender() {
-    window.requestIdleCallback(() => {
+    const fn = () => {
       if (!isVisible()) return;
       reloadIssues();
       section.reRender();
-    });
+    };
+    if (scheduler) {
+      scheduler.scheduleIdleTask(fn);
+    } else {
+      fn();
+    }
   }
 
 

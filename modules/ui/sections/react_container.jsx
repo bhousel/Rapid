@@ -9,6 +9,7 @@ import { uiSection } from '../section.js';
 export function uiSectionReactContainer(context) {
   const imagery = context.systems.imagery;
   const map = context.systems.map;
+  const scheduler = context.systems.scheduler;
   let reRenderCount = 0;
 
   const section = uiSection(context, 'react-container')
@@ -35,12 +36,14 @@ export function uiSectionReactContainer(context) {
   };
 
 
-  map
-    .on('draw', debounce(() => {
-        reRenderCount++;
-        window.requestIdleCallback(section.reRender);
-      }, 1000)
-    );
+  map.on('draw', debounce(() => {
+    reRenderCount++;
+    if (scheduler) {
+      scheduler.scheduleIdleTask(section.reRender);
+    } else {
+      section.reRender();
+    }
+  }, 1000));
 
   return section;
 }

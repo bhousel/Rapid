@@ -55,8 +55,6 @@ export class MapWithAIService extends AbstractSystem {
   _tiler: Tiler;
   /** Map of dataset IDs to their DatasetCache objects */
   _datasets: Map<DatasetID, DatasetCache>;
-  /** Set of idle callback handles for deferred processing */
-  _deferred: Set<number>;
 
   /**
    * @constructor
@@ -71,7 +69,6 @@ export class MapWithAIService extends AbstractSystem {
     this._XMLParser = new OsmXMLParser();
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
     this._datasets = new Map();
-    this._deferred = new Set();
   }
 
 
@@ -189,11 +186,6 @@ export class MapWithAIService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    for (const handle of this._deferred) {
-      window.cancelIdleCallback(handle);
-      this._deferred.delete(handle);
-    }
-
     for (const [datasetID, ds] of this._datasets) {
       if (ds.inflight) {
         Object.values(ds.inflight).forEach(controller => controller.abort());

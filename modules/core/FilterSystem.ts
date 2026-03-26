@@ -69,7 +69,6 @@ export class FilterSystem extends AbstractSystem {
   private _forceVisible: Set<EntityID>;
   /** Cache of entity.key to matched filterIDs */
   private _cache: Record<string, EntityCache>;
-//  private _deferred: Set<number>;
 
   /**
    * @constructor
@@ -85,7 +84,6 @@ export class FilterSystem extends AbstractSystem {
     this._hidden = new Set();         // Set<FilterID> to hide
     this._forceVisible = new Set();   // Set<EntityIDs> to show
     this._cache = {};                 // Cache of entity.key to matched FilterIDs
-//    this._deferred = new Set();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -131,23 +129,6 @@ export class FilterSystem extends AbstractSystem {
         // Setup event handlers..
         urlhash?.on('hashchange', this._hashChanged);
       });
-
-//    // warm up the feature matching cache upon merging fetched data
-//    const editor = this.context.systems.editor;
-//    editor.on('merge.features', function(newEntities) {
-//      if (!newEntities) return;
-//      var handle = window.requestIdleCallback(function() {
-//        var graph = editor.staging.graph;
-//        var types = utilArrayGroupBy(newEntities, 'type');
-//        // ensure that getMatches is called on relations before ways
-//        var entities = [].concat(types.relation || [], types.way || [], types.node || []);
-//        for (var i = 0; i < entities.length; i++) {
-//          var geometry = entities[i].geometry(graph);
-//          this.getMatches(entities[i], graph, geometry);
-//        }
-//      });
-//      this._deferred.add(handle);
-//    });
   }
 
 
@@ -187,10 +168,6 @@ export class FilterSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-//    for (const handle of this._deferred) {
-//      window.cancelIdleCallback(handle);
-//    }
-//    this._deferred.clear();
     this._cache = {};
     this._forceVisible.clear();
     return Promise.resolve();

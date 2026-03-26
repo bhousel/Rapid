@@ -15,6 +15,7 @@ import { Map3dSystem } from './Map3dSystem.ts';
 import { MapSystem } from './MapSystem.ts';
 import { PhotoSystem } from './PhotoSystem.ts';
 import { RapidSystem } from './RapidSystem.ts';
+import { SchedulerSystem } from './SchedulerSystem.ts';
 import { SchemaSystem } from './SchemaSystem.ts';
 import { SpatialSystem } from './SpatialSystem.ts';
 import { StorageSystem } from './StorageSystem.ts';
@@ -37,6 +38,7 @@ export {
   MapSystem,
   PhotoSystem,
   RapidSystem,
+  SchedulerSystem,
   SchemaSystem,
   SpatialSystem,
   StorageSystem,
@@ -80,6 +82,7 @@ systems.available.set('map', MapSystem);
 systems.available.set('map3d', Map3dSystem);
 systems.available.set('photos', PhotoSystem);
 systems.available.set('rapid', RapidSystem);
+systems.available.set('scheduler', SchedulerSystem);
 systems.available.set('schema', SchemaSystem);
 systems.available.set('spatial', SpatialSystem);
 systems.available.set('storage', StorageSystem);

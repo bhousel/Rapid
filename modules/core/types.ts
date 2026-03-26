@@ -18,6 +18,7 @@ import type { MapSystem } from './MapSystem.ts';
 import type { Map3dSystem } from './Map3dSystem.ts';
 import type { PhotoSystem } from './PhotoSystem.ts';
 import type { RapidSystem } from './RapidSystem.ts';
+import type { SchedulerSystem } from './SchedulerSystem.ts';
 import type { SchemaSystem } from './SchemaSystem.ts';
 import type { SpatialSystem } from './SpatialSystem.ts';
 import type { StorageSystem } from './StorageSystem.ts';
@@ -51,6 +52,7 @@ export interface Systems {
   map3d?: Map3dSystem;
   photos?: PhotoSystem;
   rapid?: RapidSystem;
+  scheduler?: SchedulerSystem;
   schema?: SchemaSystem;
   spatial?: SpatialSystem;
   storage?: StorageSystem;

@@ -20,6 +20,7 @@ export function uiSectionOverlayList(context) {
   const imagery = context.systems.imagery;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
+  const scheduler = context.systems.scheduler;
 
   const section = uiSection(context, 'overlay-list')
     .label(l10n.t('background.overlays'))
@@ -146,9 +147,11 @@ export function uiSectionOverlayList(context) {
    * Redraw the list sometimes if the map has moved
    */
   function onMapDraw() {
-    window.requestIdleCallback(() => {
+    if (scheduler) {
+      scheduler.scheduleIdleTask(() => renderIfVisible());
+    } else {
       renderIfVisible();
-    });
+    }
   }
 
 

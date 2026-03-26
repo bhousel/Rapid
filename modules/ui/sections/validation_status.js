@@ -6,6 +6,7 @@ import { uiSection } from '../section.js';
 
 export function uiSectionValidationStatus(context) {
   const l10n = context.systems.l10n;
+  const scheduler = context.systems.scheduler;
   const validator = context.systems.validator;
 
   const section = uiSection(context, 'issues-status')
@@ -160,11 +161,19 @@ export function uiSectionValidationStatus(context) {
 
 
   validator.on('validated', () => {
-    window.requestIdleCallback(section.reRender);
+    if (scheduler) {
+      scheduler.scheduleIdleTask(section.reRender);
+    } else {
+      section.reRender();
+    }
   });
 
   context.systems.map.on('draw', debounce(() => {
-    window.requestIdleCallback(section.reRender);
+    if (scheduler) {
+      scheduler.scheduleIdleTask(section.reRender);
+    } else {
+      section.reRender();
+    }
   }, 1000));
 
   return section;

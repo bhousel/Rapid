@@ -75,8 +75,6 @@ export class ValidationSystem extends AbstractSystem {
   private _resolvedIssueIDs: Set<IssueID>;
   /** Complete diff base -> head of what the user changed */
   private _completeDiff: Map<EntityID, OsmEntity | undefined>;
-  /** Deferred `requestIdleCallback` - Map<handle, Promise.reject> */
-  private _deferredRIC: Map<number, () => void>;
   /** Deferred `setTimeout` - Set<handles> */
   private _deferredST: Set<ReturnType<typeof setTimeout>>;
   /** Override rules that force issues to be errors */
@@ -95,7 +93,7 @@ export class ValidationSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'validator';
-    this.requiredDependencies = new Set(['editor', 'l10n', 'schema', 'spatial']);
+    this.requiredDependencies = new Set(['editor', 'l10n', 'scheduler', 'schema', 'spatial']);
     this.optionalDependencies = new Set(['map', 'storage', 'ui', 'urlhash']);
 
     this._validators = new Map();
@@ -106,7 +104,6 @@ export class ValidationSystem extends AbstractSystem {
     this._ignoredIssueIDs = new Set();
     this._resolvedIssueIDs = new Set();
     this._completeDiff = new Map();
-    this._deferredRIC = new Map();
     this._deferredST = new Set();
     this._errorOverrides = [];
     this._warningOverrides = [];
@@ -207,12 +204,9 @@ export class ValidationSystem extends AbstractSystem {
     this._base.queue = [];
     this._head.queue = [];
 
-    // cancel deferred work and reject any pending promise
-    for (const [handle, reject] of this._deferredRIC) {
-      globalThis.cancelIdleCallback(handle);
-      reject();
-    }
-    this._deferredRIC.clear();
+    // cancel deferred work
+    const scheduler = this.context.systems.scheduler!;
+    scheduler.cancelAllIdleTasks();
 
     for (const handle of this._deferredST) {
       globalThis.clearTimeout(handle);
@@ -850,17 +844,13 @@ export class ValidationSystem extends AbstractSystem {
 
     if (!cache.queue.length) return Promise.resolve();  // we're done
     const chunk = cache.queue.pop()!;
+    const scheduler = this.context.systems.scheduler!;
 
-    return new Promise<void>((resolve, reject) => {
-        const handle = globalThis.requestIdleCallback(() => {
-          this._deferredRIC.delete(handle);
-          // const t0 = performance.now();
-          chunk.forEach(job => job());
-          // const t1 = performance.now();
-          // console.log('chunk processed in ' + (t1 - t0) + ' ms');
-          resolve();
-        });
-        this._deferredRIC.set(handle, reject);
+    return scheduler.scheduleIdleTask(() => {
+        // const t0 = performance.now();
+        chunk.forEach(job => job());
+        // const t1 = performance.now();
+        // console.log('chunk processed in ' + (t1 - t0) + ' ms');
       })
       .then(() => { // dispatch an event sometimes to redraw various UI things
         if (cache.queue.length % 100 === 0) {

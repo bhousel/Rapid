@@ -7,6 +7,7 @@ import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 export function uiSectionValidationRules(context) {
   const l10n = context.systems.l10n;
+  const scheduler = context.systems.scheduler;
   const storage = context.systems.storage;
   const validator = context.systems.validator;
 
@@ -186,7 +187,11 @@ export function uiSectionValidationRules(context) {
 
 
   validator.on('validated', () => {
-    window.requestIdleCallback(section.reRender);
+    if (scheduler) {
+      scheduler.scheduleIdleTask(section.reRender);
+    } else {
+      section.reRender();
+    }
   });
 
   return section;

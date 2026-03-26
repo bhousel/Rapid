@@ -33,6 +33,7 @@ export function uiSectionBackgroundList(context) {
   const imagery = context.systems.imagery;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
+  const scheduler = context.systems.scheduler;
   const storage = context.systems.storage;
   const wayback = context.services.wayback;
   const ui = context.systems.ui;
@@ -616,12 +617,17 @@ export function uiSectionBackgroundList(context) {
    * Redraw the content sometimes after the map has moved.
    */
   function onMapDraw() {
-    window.requestIdleCallback(() => {
+    const fn = () => {
       if (isVisible()) {
         refreshWaybackDates();
         renderIfVisible();
       }
-    });
+    };
+    if (scheduler) {
+      scheduler.scheduleIdleTask(fn);
+    } else {
+      fn();
+    }
   }
 
 
