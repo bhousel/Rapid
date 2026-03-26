@@ -37,7 +37,7 @@ detected issues. Validators are run by the `ValidationSystem` and results are di
 Each validator is a factory function that accepts a `Context` and returns a `ValidatorFunction`:
 
 ```typescript
-export function validateExample(context: Context): ValidatorFunction {
+export function validatorExample(context: Context): ValidatorFunction {
   const type = 'example' as ValidatorID;
   const editor = context.systems.editor!;
   const l10n = context.systems.l10n!;
