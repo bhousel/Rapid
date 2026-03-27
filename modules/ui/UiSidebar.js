@@ -1,7 +1,6 @@
 import { selection } from 'd3-selection';
 import { interpolateNumber } from 'd3-interpolate';
 import { Extent, vecLength } from '@rapid-sdk/math';
-import _throttle from 'lodash-es/throttle.js';
 
 import { GeoJSONData, MarkerData, OsmEntity } from '../data/index.ts';
 import { uiDataEditor } from './data_editor.js';
@@ -96,7 +95,9 @@ export class UiSidebar {
      * This just wraps the internal `_hover` in a throttle to keep it from being called too frequently.
      * @param  {Object}  target - data element to target
      */
-    this.hover = _throttle(this._hover, 200);
+    this.hover = (target) => {
+      this.context.systems.scheduler?.throttle('UiSidebar-hover', () => this._hover(target), { ms: 200 });
+    };
 
     // Setup event handlers
     context.behaviors.hover.on('hoverchange', this._hoverchange);

@@ -1,5 +1,4 @@
 import { selection } from 'd3-selection';
-import debounce from 'lodash-es/debounce.js';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
 import { MarkerData } from '../../data/MarkerData.ts';
@@ -29,7 +28,9 @@ export class UiHistoryCard extends AbstractUiCard {
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
     this.rerender = (() => this.render());  // call render without argument
-    this.deferredRender = debounce(this.rerender, 250);
+    this.deferredRender = () => {
+      this.context.systems.scheduler?.debounce('UiHistoryCard-render', () => this.rerender(), { ms: 250 });
+    };
     this.renderEntity = this.renderEntity.bind(this);
     this.renderNote = this.renderNote.bind(this);
     this.renderUser = this.renderUser.bind(this);

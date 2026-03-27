@@ -1,5 +1,4 @@
 import { selection, select } from 'd3-selection';
-import debounce from 'lodash-es/debounce.js';
 
 import { uiIcon } from '../icon.js';
 import { uiTooltip } from '../tooltip.js';
@@ -71,7 +70,9 @@ export class UiDrawModesTool {
     this.choose = this.choose.bind(this);
     this.render = this.render.bind(this);
     this.rerender = (() => this.render());  // call render without argument
-    this.debouncedRender = debounce(this.rerender, 500, { leading: true, trailing: true });
+    this.debouncedRender = () => {
+      this.context.systems.scheduler?.throttle('UiDrawModesTool-render', () => this.rerender(), { ms: 500 });
+    };
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // Event listeners

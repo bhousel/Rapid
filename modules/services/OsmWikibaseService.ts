@@ -1,10 +1,8 @@
 import { utilQsString } from '@rapid-sdk/util';
-import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
-import type { DebouncedFunc } from 'lodash-es';
 import type { Context } from '../Context.ts';
 
 
@@ -60,8 +58,7 @@ export class OsmWikibaseService extends AbstractSystem {
   _inflight: Map<string, AbortController>;
   /** Cache of locale language codes to their Wikibase entity QIDs (or `false` if not found) */
   _localeIDs: Record<string, string | false>;
-  /** Debounced version of `_request`, used when callers opt into request batching */
-  _debouncedRequest: DebouncedFunc<typeof OsmWikibaseService.prototype._request>;
+
 
   /**
    * @constructor
@@ -70,7 +67,7 @@ export class OsmWikibaseService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'osmwikibase';
-    this.optionalDependencies = new Set(['l10n']);
+    this.optionalDependencies = new Set(['l10n', 'scheduler']);
     this.apibase = 'https://wiki.openstreetmap.org/w/api.php';
 
     this._cache = {};
@@ -84,7 +81,6 @@ export class OsmWikibaseService extends AbstractSystem {
     this.getEntity = this.getEntity.bind(this);
     this.getDocs = this.getDocs.bind(this);
     this._request = this._request.bind(this);
-    this._debouncedRequest = debounce(this._request, 500, { leading: false });
   }
 
 
@@ -114,7 +110,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    this._debouncedRequest.cancel();
+    this.context.systems.scheduler?.cancel('osmwikibase-request');  // cancel any request in progress
 
     for (const controller of this._inflight.values()) {
       controller.abort();
@@ -203,7 +199,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   getEntity(params: GetEntityParams, callback: WikibaseCallback): void {
-    const doRequest = params.debounce ? this._debouncedRequest : this._request;
+    const shouldDebounce = params.debounce;
     const rtypeSitelink: string | false = (params.key === 'type' && params.value) ? (`Relation:${params.value}`).replace(/_/g, ' ').trim() : false;
     const keySitelink: string | false = params.key ? this.toSitelink(params.key) : false;
     const tagSitelink: string | false = (params.key && params.value) ? this.toSitelink(params.key, params.value) : false;
@@ -271,7 +267,7 @@ export class OsmWikibaseService extends AbstractSystem {
     };
 
     const url = this.apibase + '?' + utilQsString(obj, false);
-    doRequest(url, (err, d) => {
+    const request = () => this._request(url, (err, d) => {
       if (err) {
         callback(err);
       } else if (!d.success || d.error) {
@@ -306,6 +302,13 @@ export class OsmWikibaseService extends AbstractSystem {
         callback(null, result);
       }
     });
+
+    const scheduler = this.context.systems.scheduler;
+    if (shouldDebounce && scheduler) {
+      scheduler.debounce('osmwikibase-request', request, { ms: 500 });
+    } else {
+      request();
+    }
   }
 
 

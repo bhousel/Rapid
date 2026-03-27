@@ -1,5 +1,4 @@
 import { selection, select } from 'd3-selection';
-import throttle from 'lodash-es/throttle.js';
 
 import { uiIcon } from './icon.js';
 
@@ -28,7 +27,9 @@ export class UiContributors {
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
     this.rerender = (() => this.render());  // call render without argument
-    this.deferredRender = throttle(this.rerender, 1000, { leading: true, trailing: true });
+    this.deferredRender = () => {
+      this.context.systems.scheduler?.throttle('UiContributors-render', () => this.rerender(), { ms: 1000 });
+    };
 
     // Event listeners
     const gfx = context.systems.gfx;

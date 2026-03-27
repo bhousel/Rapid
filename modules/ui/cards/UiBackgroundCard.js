@@ -1,6 +1,5 @@
 import { selection } from 'd3-selection';
 import { Extent } from '@rapid-sdk/math';
-import debounce from 'lodash-es/debounce.js';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
 import { uiIcon } from '../icon.js';
@@ -34,8 +33,12 @@ export class UiBackgroundCard extends AbstractUiCard {
     this.render = this.render.bind(this);
     this.rerender = (() => this.render());  // call render without argument
     this.updateMetadata = this.updateMetadata.bind(this);
-    this.deferredRender = debounce(this.rerender, 250);
-    this.deferredUpdateMetadata = debounce(this.updateMetadata, 250);
+    this.deferredRender = () => {
+      this.context.systems.scheduler?.debounce('UiBackgroundCard-render', () => this.rerender(), { ms: 250 });
+    };
+    this.deferredUpdateMetadata = () => {
+      this.context.systems.scheduler?.debounce('UiBackgroundCard-updateMetadata', () => this.updateMetadata(), { ms: 250 });
+    };
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // Setup event handlers..

@@ -1,10 +1,8 @@
 import { utilObjectOmit, utilQsString, utilStringQs } from '@rapid-sdk/util';
-import throttle from 'lodash-es/throttle.js';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 
 import type { Context } from '../Context.ts';
-import type { DebouncedFunc } from 'lodash-es';
 
 
 /** Mock window type for non-browser environments */
@@ -56,10 +54,6 @@ export class UrlHashSystem extends AbstractSystem {
   doUpdateTitle: boolean;
   /** The base document title to use */
   titleBase: string;
-  /** Deferred hash update function (throttled) */
-  deferredUpdateHash: DebouncedFunc<() => void>;
-  /** Deferred title update function (throttled) */
-  deferredUpdateTitle: DebouncedFunc<() => void>;
 
   /** Initial URL hash parameters at startup */
   private _initParams: Map<string, string>;
@@ -80,7 +74,7 @@ export class UrlHashSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'urlhash';
-    this.optionalDependencies = new Set(['editor', 'l10n', 'map']);
+    this.optionalDependencies = new Set(['editor', 'l10n', 'map', 'scheduler']);
 
     this.doUpdateTitle = true;
     this.titleBase = 'Rapid';
@@ -128,26 +122,8 @@ export class UrlHashSystem extends AbstractSystem {
     this._hashChanged = this._hashChanged.bind(this);
     this._updateHash = this._updateHash.bind(this);
     this._updateTitle = this._updateTitle.bind(this);
-
-    // `leading: false` means that we wait a bit for more updates to sneak in.
-    this.deferredUpdateHash = throttle(this._updateHash, 500, { leading: false }) as DebouncedFunc<() => void>;
-    this.deferredUpdateTitle = throttle(this._updateTitle, 500, { leading: false }) as DebouncedFunc<() => void>;
-
-    // When paused, cancel any pending throttled updates.
-    this.on('paused', () => {
-      this._currHash = null;
-      this.deferredUpdateHash.cancel();
-      this.deferredUpdateTitle.cancel();
-    });
-
-    // When resumed, sync the hash and title, and emit 'hashchange'
-    // so other code knows what the hash contains.
-    this.on('resumed', () => {
-      this._currHash = null;
-      this._hashChanged();
-      this._updateHash();
-      this._updateTitle();
-    });
+    this._deferredUpdateHash = this._deferredUpdateHash.bind(this);
+    this._deferredUpdateTitle = this._deferredUpdateTitle.bind(this);
 
     // Start paused, we will resume after all other components
     // are started and ready to receive the hashchange event.
@@ -165,12 +141,29 @@ export class UrlHashSystem extends AbstractSystem {
 
     const context = this.context;
     const editor = context.systems.editor;
+    const scheduler = context.systems.scheduler;
 
     return this._initPromise = super.initAsync()
       .then(() => {
+        // When paused, cancel any pending throttled updates.
+        this.on('paused', () => {
+          this._currHash = null;
+          scheduler?.cancel('urlhash-update-hash');
+          scheduler?.cancel('urlhash-update-title');
+        });
+
+        // When resumed, sync the hash and title, and emit 'hashchange'
+        // so other code knows what the hash contains.
+        this.on('resumed', () => {
+          this._currHash = null;
+          this._hashChanged();
+          this._updateHash();
+          this._updateTitle();
+        });
+
         // Register event handlers here
-        editor?.on('stablechange', this.deferredUpdateTitle);
-        context.on('modechange', this.deferredUpdateTitle);
+        editor?.on('stablechange', this._deferredUpdateTitle);
+        context.on('modechange', this._deferredUpdateTitle);
         (_window as Window).addEventListener('hashchange', this._hashChanged);
       });
   }
@@ -246,7 +239,7 @@ export class UrlHashSystem extends AbstractSystem {
     }
 
     if (this._started && !this._paused) {
-      this.deferredUpdateHash();
+      this._deferredUpdateHash();
     }
   }
 
@@ -267,6 +260,19 @@ export class UrlHashSystem extends AbstractSystem {
     if (newHash !== this._currHash) {
       (_window as Window).history.replaceState(null, this.titleBase, newHash);
       this._currHash = newHash;
+    }
+  }
+
+  /**
+   * _deferredUpdateHash
+   * Uses `throttle` to avoid performing updates too frequently.
+   */
+  _deferredUpdateHash(): void {
+    const scheduler = this.context.systems.scheduler;
+    if (scheduler) {
+      scheduler?.throttle('urlhash-update-hash', () => this._updateHash(), { ms: 500, leading: false });
+    } else {
+      this._updateHash();
     }
   }
 
@@ -317,6 +323,20 @@ export class UrlHashSystem extends AbstractSystem {
 
     if (_document.title !== title) {
       _document.title = title;
+    }
+  }
+
+
+  /**
+   * _deferredUpdateTitle
+   * Uses `throttle` to avoid performing updates too frequently.
+   */
+  _deferredUpdateTitle(): void {
+    const scheduler = this.context.systems.scheduler;
+    if (scheduler) {
+      scheduler?.throttle('urlhash-update-title', () => this._updateTitle(), { ms: 500, leading: false });
+    } else {
+      this._updateTitle();
     }
   }
 

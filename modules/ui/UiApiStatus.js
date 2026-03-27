@@ -142,7 +142,7 @@ export class UiApiStatus {
           .text(l10n.t('status.retry'))
           .on('click.retry', e => {
             e.preventDefault();
-            osm.throttledReloadApiStatus();
+            osm.deferredReloadApiStatus();
           });
       }
 

@@ -288,12 +288,45 @@ SchedulerSystem exists with managed `scheduleIdleTask`, `scheduleTimeout`, and `
 - 98 tests passing (26 new: setTimeout, setInterval, debounce, throttle, cancel,
   cancelAllTimers, priority, replacement, leading/trailing, cleanup)
 
-### Phase 4a — Migrate Callers (not started)
+### Phase 4a — Migrate Callers ✅
 
-- Migrate ~14 lodash `debounce` call sites to `scheduler.debounce(workID, fn, opts)`
-- Migrate ~13 lodash `throttle` call sites to `scheduler.throttle(workID, fn, opts)`
-- Remove lodash debounce/throttle imports
-- Deprecate/remove legacy `scheduleTimeout` / `scheduleInterval` once all callers migrated
+All 16 files with lodash `debounce`/`throttle` migrated to use SchedulerSystem's workID-keyed API:
+
+**TypeScript core/services (6 files):**
+- `EditSystem.ts` — `debounce('edit-backup', ..., { ms: 1000 })`
+- `Map3dSystem.ts` — `throttle('map3d-redraw', ..., { ms: 50 })`
+- `UrlHashSystem.ts` — `throttle('urlhash-update-hash/title', ..., { ms: 500, leading: false })`
+- `OsmService.ts` — `throttle('osm-reload-api-status', ..., { ms: 500 })`
+- `TaginfoService.ts` — `debounce('taginfo-request', ..., { ms: 300 })`
+- `OsmWikibaseService.ts` — `debounce('osmwikibase-request', ..., { ms: 500 })`
+
+**JavaScript UI class-based (10 files):**
+- `UiScale.js` — `throttle('UiScale-updateScale', ..., { ms: 100 })`
+- `UiContributors.js` — `throttle('UiContributors-render', ..., { ms: 1000 })`
+- `UiSidebar.js` — `throttle('UiSidebar-hover', ..., { ms: 200 })`
+- `UiAttribution.js` — `throttle('UiAttribution-render', ..., { ms: 400, leading: false })`
+- `UiFilterStatus.js` — `throttle('UiFilterStatus-render', ..., { ms: 1000 })`
+- `UiHistoryCard.js` — `debounce('UiHistoryCard-render', ..., { ms: 250 })`
+- `UiBackgroundCard.js` — `debounce('UiBackgroundCard-render/updateMetadata', ..., { ms: 250 })`
+- `UiLocationCard.js` — `debounce('UiLocationCard-updateLocation', ..., { ms: 1000 })`
+- `UiUndoRedoTool.js` — `throttle('UiUndoRedoTool-render', ..., { ms: 500 })`
+- `UiDrawModesTool.js` — `throttle('UiDrawModesTool-render', ..., { ms: 500 })`
+
+**JavaScript UI function-scoped (6 files):**
+- `react_container.jsx` — `debounce('ReactContainer-render', ..., { ms: 1000 })`
+- `validation_issues.js` — `debounce('ValidationIssues-render', ..., { ms: 500 })`
+- `validation_status.js` — `debounce('ValidationStatus-render', ..., { ms: 1000 })`
+- `background_list.js` — `throttle('BackgroundList-mapDraw', ..., { ms: 1000 })`
+- `overlay_list.js` — `throttle('OverlayList-mapDraw', ..., { ms: 1000 })`
+- `preset_list.js` — `debounce('PresetList-searchInput', ...)`
+
+Migration notes:
+- Added `leading` option to `scheduler.throttle()` (default `true`)
+- lodash `debounce(..., { leading: true, trailing: true })` → `scheduler.throttle()` (semantically equivalent for continuous event handling)
+- Functions that accepted arguments (e.g. `UiSidebar.hover(target)`, `UiLocationCard._deferredUpdateLocation(loc)`) use closure capture
+- Zero lodash debounce/throttle imports remain
+- **Scheduler fallback pattern**: Service request paths (TaginfoService, OsmWikibaseService, OsmService) use `if (shouldDebounce && scheduler) { scheduler.debounce(...) } else { request() }` so requests still fire when scheduler is absent. UI render deferrals use `scheduler?.throttle()` — a no-op is harmless there.
+- `scheduler` added to `optionalDependencies` in OsmService, TaginfoService, OsmWikibaseService
 
 ### Phase 5 — Backpressure
 

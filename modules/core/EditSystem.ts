@@ -2,7 +2,6 @@ import { easeLinear as d3_easeLinear } from 'd3-ease';
 import { select as d3_select } from 'd3-selection';
 import { Extent, geoScaleToZoom } from '@rapid-sdk/math';
 import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/util';
-import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference, Edit, Graph, Tree } from '../lib/index.ts';
@@ -180,8 +179,6 @@ export class EditSystem extends AbstractSystem {
   private _stagingSnapshot: Graph | null;
   private _fullDifference: Difference;
 
-  /** Debounced backup function */
-  deferredBackup: ReturnType<typeof debounce>;
 
   /**
    * @constructor
@@ -192,7 +189,7 @@ export class EditSystem extends AbstractSystem {
 
     this.id = 'editor';     // was 'history'
     this.requiredDependencies = new Set(['spatial', 'storage']);
-    this.optionalDependencies = new Set(['gfx', 'imagery', 'photos']);
+    this.optionalDependencies = new Set(['gfx', 'imagery', 'photos', 'scheduler']);
 
     this._mutex = utilSessionMutex('lock');
     this._canRestoreBackup = false;
@@ -215,8 +212,8 @@ export class EditSystem extends AbstractSystem {
     this._fullDifference = null!;
 
     // Make sure the event handlers have `this` bound correctly
-    this.saveBackup = this.saveBackup.bind(this);
-    this.deferredBackup = debounce(this.saveBackup, 1000, { leading: false, trailing: true });
+    this.immediateBackup = this.immediateBackup.bind(this);
+    this.deferredBackup = this.deferredBackup.bind(this);
   }
 
 
@@ -246,7 +243,7 @@ export class EditSystem extends AbstractSystem {
         window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
           if (this._history.length > 1) {  // user did something
             e.preventDefault();
-            this.saveBackup();
+            this.immediateBackup();
             return (e.returnValue = '');  // show browser prompt
           }
         });
@@ -294,7 +291,7 @@ export class EditSystem extends AbstractSystem {
    */
   private _reset(): void {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
-    this.deferredBackup.cancel();
+    this.context.systems.scheduler?.cancel('edit-backup');
 
     // Create a new Base Graph / Base Edit.
     const baseGraph = new Graph(this.context);
@@ -1333,11 +1330,11 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * saveBackup
+   * immediateBackup
    * Backup the user's edits to a JSON string in localStorage.
    * This code runs occasionally as the user edits.
    */
-  saveBackup(): void {
+  immediateBackup(): void {
     const context = this.context;
     if (context.inIntro) return;               // Don't backup edits made in the walkthrough
     if (context.mode?.id === 'save') return;   // Edits made in save mode may be conflict resolutions
@@ -1355,6 +1352,21 @@ export class EditSystem extends AbstractSystem {
         this._backupStatus = status;
         this.emit('backupstatuschange', this._backupStatus);
       }
+    }
+  }
+
+
+  /**
+   * deferredBackup
+   * Backup the user's edits after a delay.
+   * Uses `debounce` to avoid performing backups too frequently.
+   */
+  deferredBackup(): void {
+    const scheduler = this.context.systems.scheduler;
+    if (scheduler) {
+      scheduler.debounce('edit-backup', () => this.immediateBackup(), { ms: 1000 });
+    } else {
+      this.immediateBackup();
     }
   }
 
@@ -1402,7 +1414,7 @@ export class EditSystem extends AbstractSystem {
    */
   clearBackup(): void {
     this._canRestoreBackup = false;
-    this.deferredBackup.cancel();
+    this.context.systems.scheduler?.cancel('edit-backup');
 
     if (!this._mutex.locked()) return;  // another browser tab owns the history
 

@@ -1,5 +1,3 @@
-import debounce from 'lodash-es/debounce.js';
-
 import React from 'react';
 import ReactDom from 'react-dom';
 import ReactComponent from './ReactComponent';
@@ -36,14 +34,16 @@ export function uiSectionReactContainer(context) {
   };
 
 
-  map.on('draw', debounce(() => {
-    reRenderCount++;
-    if (scheduler) {
-      scheduler.scheduleIdleTask(section.reRender);
-    } else {
-      section.reRender();
-    }
-  }, 1000));
+  map.on('draw', () => {
+    scheduler?.debounce('ReactContainer-render', () => {
+      reRenderCount++;
+      if (scheduler) {
+        scheduler.scheduleIdleTask(section.reRender);
+      } else {
+        section.reRender();
+      }
+    }, { ms: 1000 });
+  });
 
   return section;
 }

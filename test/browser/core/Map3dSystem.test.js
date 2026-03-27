@@ -101,7 +101,6 @@ describe('Map3dSystem', () => {
     describe('deferredRedraw', () => {
       it('has a throttled redraw function', () => {
         assert.isFunction(_map3d.deferredRedraw);
-        assert.isFunction(_map3d.deferredRedraw.cancel);
       });
     });
   });

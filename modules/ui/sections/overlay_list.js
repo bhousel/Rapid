@@ -1,6 +1,5 @@
 import { descending as d3_descending, ascending as d3_ascending } from 'd3-array';
 import { select as d3_select } from 'd3-selection';
-import debounce from 'lodash-es/debounce.js';
 
 import { uiTooltip } from '../tooltip.js';
 import { uiSection } from '../section.js';
@@ -155,7 +154,9 @@ export function uiSectionOverlayList(context) {
   }
 
 
-  const deferredOnMapDraw = debounce(onMapDraw, 1000, { leading: true, trailing: true });
+  const deferredOnMapDraw = () => {
+    scheduler?.throttle('OverlayList-mapDraw', onMapDraw, { ms: 1000 });
+  };
 
   imagery.on('imagerychange', renderIfVisible);
   map.on('draw', deferredOnMapDraw);

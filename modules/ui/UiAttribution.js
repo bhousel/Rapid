@@ -1,5 +1,4 @@
 import { selection, select } from 'd3-selection';
-import throttle from 'lodash-es/throttle.js';
 
 
 /**
@@ -22,7 +21,9 @@ export class UiAttribution {
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
     this.rerender = (() => this.render());  // call render without argument
-    this.throttledRender = throttle(this.rerender, 400, { leading: false });
+    this.throttledRender = () => {
+      this.context.systems.scheduler?.throttle('UiAttribution-render', () => this.rerender(), { ms: 400, leading: false });
+    };
 
     context.systems.imagery.on('imagerychange', this.rerender);
     context.systems.map.on('draw', this.throttledRender);

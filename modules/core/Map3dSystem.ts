@@ -1,7 +1,6 @@
 import { select as d3_select } from 'd3-selection';
 import { RAD2DEG, numWrap, geomPolygonContainsPolygon, vecEqual, Vec2 } from '@rapid-sdk/math';
 import { Color } from 'pixi.js';
-import throttle from 'lodash-es/throttle.js';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilCmd } from '../util/cmd.ts';
@@ -29,9 +28,6 @@ export class Map3dSystem extends AbstractSystem {
   /** The DOM container ID for the 3D map */
   readonly containerID: string = 'map3d_container';
 
-  /** A throttled version of redraw() */
-  deferredRedraw: ReturnType<typeof throttle>;
-
   private _loadPromise: Promise<void> | null = null;
   private _keys: string[] | null = null;
 
@@ -50,14 +46,15 @@ export class Map3dSystem extends AbstractSystem {
     this.id = 'map3d';
     this.autoStart = false;
     this.requiredDependencies = new Set(['editor', 'gfx', 'map', 'ui']);
-    this.optionalDependencies = new Set(['l10n', 'styles', 'urlhash']);
+    this.optionalDependencies = new Set(['l10n', 'styles', 'urlhash', 'scheduler']);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
     this._map3dmoved = this._map3dmoved.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
+
     this.redraw = this.redraw.bind(this);
-    this.deferredRedraw = throttle(this.redraw, 50, { leading: true, trailing: true });
+    this.deferredRedraw = this.deferredRedraw.bind(this);
     this.toggle = this.toggle.bind(this);
 
     this._getAreaLayer = this._getAreaLayer.bind(this);
@@ -187,7 +184,7 @@ export class Map3dSystem extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    this.deferredRedraw.cancel();
+    this.context.systems.scheduler?.cancel('map3d-redraw');
     return Promise.resolve();
   }
 
@@ -325,6 +322,21 @@ export class Map3dSystem extends AbstractSystem {
     if (!this.visible) return;
     this.updateViewport();
     this.updateData();
+  }
+
+
+  /**
+   * deferredRedraw
+   * Redraw after a delay.
+   * Uses `throttle` to avoid performing redraws too frequently.
+   */
+  deferredRedraw(): void {
+    const scheduler = this.context.systems.scheduler;
+    if (scheduler) {
+      scheduler.throttle('map3d-redraw', () => this.redraw(), { ms: 50 });
+    } else {
+      this.redraw();
+    }
   }
 
 

@@ -23,3 +23,5 @@ Things that went wrong once and shouldn't go wrong again.
 
 - **Mark features dirty when styles change** — `immediateRedraw()` alone doesn't work. Call `gfx.scene.dirtyScene()` before redraw so features re-fetch their style.
 - **PIXI color formats** — CSS hex `"#FF6600"` and numeric `0xFF6600` work. String `"0xFF6600"` may also work (unverified).
+- **TaginfoService `_clean()` strips `debounce` from params** — When migrating `doRequest = params.debounce ? debouncedVersion : directVersion`, capture `shouldDebounce` BEFORE calling `_clean()`. The same pattern applies to OsmWikibaseService.
+- **`scheduler?.debounce()` silently drops calls** — Optional chaining on the scheduler means the debounced function never fires if scheduler is absent. Fix: `if (shouldDebounce && scheduler) { scheduler.debounce(...) } else { request() }`. Only matters for service request paths; UI render deferrals are safe to no-op.

@@ -201,6 +201,7 @@ export class GraphicsSystem extends AbstractSystem {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
+    const scheduler = context.systems.scheduler!;
     const urlhash = context.systems.urlhash;
 
     return this._startPromise = Promise.resolve()
@@ -211,7 +212,6 @@ export class GraphicsSystem extends AbstractSystem {
       .then(() => {
         this._started = true;
         // Register our tick function with the scheduler's game loop.
-        const scheduler = this.context.systems.scheduler!;
         scheduler.addFrameCallback('gfx', this._tick);
       });
   }

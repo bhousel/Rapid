@@ -1,7 +1,6 @@
 import { select } from 'd3-selection';
 import { easeCubicInOut } from 'd3-ease';
 import { geoSphericalDistance, numWrap } from '@rapid-sdk/math';
-import debounce from 'lodash-es/debounce.js';
 
 import { ImagerySource } from '../../lib/ImagerySource.ts';
 import { uiIcon } from '../icon.js';
@@ -657,7 +656,9 @@ export function uiSectionBackgroundList(context) {
 
 
   // Event listeners
-  const deferredOnMapDraw = debounce(onMapDraw, 1000, { leading: true, trailing: true });
+  const deferredOnMapDraw = () => {
+    scheduler?.throttle('BackgroundList-mapDraw', onMapDraw, { ms: 1000 });
+  };
   imagery.on('imagerychange', renderIfVisible);
   map.on('draw', deferredOnMapDraw);
   l10n.on('localechange', _setupKeybinding);

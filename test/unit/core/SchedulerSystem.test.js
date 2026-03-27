@@ -731,6 +731,31 @@ describe('SchedulerSystem', () => {
 
         await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
       });
+
+      it('leading: false defers first call to trailing edge', async () => {
+        const order = [];
+        _scheduler.throttle('test-no-lead', () => order.push('first'), { ms: 40, leading: false });
+
+        // Leading should NOT have fired
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 10); });
+        assert.deepEqual(order, [], 'should not fire on leading edge');
+
+        // After window expires, trailing should fire
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        assert.deepEqual(order, ['first'], 'should fire on trailing edge');
+        assert.strictEqual(_scheduler.numTimers, 0, 'cleaned up');
+      });
+
+      it('leading: false with multiple calls fires only trailing', async () => {
+        let count = 0;
+        _scheduler.throttle('test-no-lead-multi', () => { count++; }, { ms: 60, leading: false });
+        _scheduler.throttle('test-no-lead-multi', () => { count++; }, { ms: 60, leading: false });
+        _scheduler.throttle('test-no-lead-multi', () => { count++; }, { ms: 60, leading: false });
+
+        // After window expires, only the latest trailing should fire
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 120); });
+        assert.strictEqual(count, 1, 'only trailing fires once');
+      });
     });
 
     describe('cancel', () => {

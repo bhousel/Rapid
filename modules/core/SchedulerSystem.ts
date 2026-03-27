@@ -420,16 +420,20 @@ export class SchedulerSystem extends AbstractSystem {
    * milliseconds.  The last call during the window fires on the trailing
    * edge when the window expires.
    *
+   * With `leading: false`, the first call is deferred to the trailing
+   * edge instead of firing immediately.
+   *
    * Calling again with the same `workID` during the window stores the
    * latest `fn` as the trailing call.
    *
    * @param workID - Unique string key for tracking / cancellation
    * @param fn - The function to execute
-   * @param opts - Timer options (`ms`, `priority`)
+   * @param opts - Timer options (`ms`, `priority`, `leading`)
    */
   throttle(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
     const ms = opts?.ms ?? 250;
     const priority = opts?.priority ?? 'normal';
+    const leading = opts?.leading ?? true;
 
     const existing = this._timers.get(workID);
 
@@ -442,13 +446,15 @@ export class SchedulerSystem extends AbstractSystem {
     // Not in a window (first call or window expired)
     this.cancel(workID);
 
-    // Fire on leading edge
-    this._enqueue(fn, priority, workID);
+    // Fire on leading edge (if enabled), otherwise save as trailing
+    if (leading) {
+      this._enqueue(fn, priority, workID);
+    }
 
     // Start the throttle window
     const entry: TimerEntry = {
       workID, type: 'throttle', fn, ms, priority, handle: null,
-      leading: false, trailingFn: null,
+      leading, trailingFn: leading ? null : fn,
     };
     entry.handle = globalThis.setTimeout(() => this._throttleWindowExpired(entry), ms);
     this._timers.set(workID, entry);

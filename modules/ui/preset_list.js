@@ -1,6 +1,5 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { select as d3_select } from 'd3-selection';
-import debounce from 'lodash-es/debounce.js';
 
 import { actionChangePreset } from '../actions/change_preset.js';
 import { Category, Preset } from '../lib/index.ts';
@@ -18,6 +17,7 @@ export function uiPresetList(context) {
   const editor = context.systems.editor;
   const filters = context.systems.filters;
   const l10n = context.systems.l10n;
+  const scheduler = context.systems.scheduler;
   const schema = context.systems.schema;
   const dispatch = d3_dispatch('cancel', 'choose');
 
@@ -87,7 +87,13 @@ export function uiPresetList(context) {
       .call(utilNoAuto)
       .on('keydown', initialKeydown)
       .on('keypress', keypress)
-      .on('input', debounce(inputevent));
+      .on('input', () => {
+        if (scheduler) {
+          scheduler.debounce('PresetList-searchInput', inputevent);
+        } else {
+          inputevent();
+        }
+      });
 
     // update
     $search = $search.merge($$search);

@@ -1,5 +1,3 @@
-import debounce from 'lodash-es/debounce.js';
-
 import { uiIcon } from '../icon.js';
 import { uiSection } from '../section.js';
 
@@ -168,13 +166,15 @@ export function uiSectionValidationStatus(context) {
     }
   });
 
-  context.systems.map.on('draw', debounce(() => {
-    if (scheduler) {
-      scheduler.scheduleIdleTask(section.reRender);
-    } else {
-      section.reRender();
-    }
-  }, 1000));
+  context.systems.map.on('draw', () => {
+    scheduler?.debounce('ValidationStatus-render', () => {
+      if (scheduler) {
+        scheduler.scheduleIdleTask(section.reRender);
+      } else {
+        section.reRender();
+      }
+    }, { ms: 1000 });
+  });
 
   return section;
 }

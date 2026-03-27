@@ -1,6 +1,5 @@
 import { Tiler, Viewport } from '@rapid-sdk/math';
 import { utilArrayChunk, utilArrayUniq, utilObjectOmit, utilQsString } from '@rapid-sdk/util';
-import _throttle from 'lodash-es/throttle.js';
 import { osmAuth } from 'osm-auth';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
@@ -193,11 +192,8 @@ interface OsmAuthInstance {
  *   'authchange'
  */
 export class OsmService extends AbstractSystem {
-
   /** Whether to prefer JSON over XML when communicating with the OSM API */
   preferJSON: boolean;
-  /** Throttled wrapper around `reloadApiStatus` (max once per 500ms) */
-  throttledReloadApiStatus: ReturnType<typeof _throttle>;
 
   /** Maximum number of nodes allowed in a single way (from API capabilities) */
   _maxWayNodes: number;
@@ -248,7 +244,7 @@ export class OsmService extends AbstractSystem {
     super(context);
     this.id = 'osm';
     this.requiredDependencies = new Set(['spatial']);
-    this.optionalDependencies = new Set(['editor', 'gfx', 'l10n', 'locations']);
+    this.optionalDependencies = new Set(['editor', 'gfx', 'l10n', 'locations', 'scheduler']);
 
     // Some defaults that we will replace with whatever we fetch from the OSM API capabilities result.
     this._maxWayNodes = 2000;
@@ -285,7 +281,7 @@ export class OsmService extends AbstractSystem {
     this._authDone = this._authDone.bind(this);
 
     this.reloadApiStatus = this.reloadApiStatus.bind(this);
-    this.throttledReloadApiStatus = _throttle(this.reloadApiStatus, 500);
+    this.deferredReloadApiStatus = this.deferredReloadApiStatus.bind(this);
 
     // Calculate the deafult OAuth2 `redirect_uri`.
     // - `redirect_uri` should be a page that the authorizing server (e.g. `openstreetmap.org`)
@@ -565,23 +561,23 @@ export class OsmService extends AbstractSystem {
                 }
                 this.setRateLimit(duration);
               })
-              .then(() => this.throttledReloadApiStatus());  // reload status / raise warning
+              .then(() => this.deferredReloadApiStatus());  // reload status / raise warning
 
           // Some other error.. Note that these are not automatically API issues.
           // May be 404 Not Found, etc, but it is worth checking the API status now.
           } else {
             if (this._apiStatus !== 'error') {  // if no error before
-              this.throttledReloadApiStatus();  // reload status / raise warning
+              this.deferredReloadApiStatus();   // reload status / raise warning
             }
           }
 
         } else {  // no error
           if (this._rateLimit) {               // if had rate limit before
             this._rateLimit = null;            // clear rate limit
-            this.throttledReloadApiStatus();   // reload status / clear warning
+            this.deferredReloadApiStatus();    // reload status / clear warning
           }
           if (this._apiStatus === 'error') {   // if had error before
-            this.throttledReloadApiStatus();   // reload status / clear warning
+            this.deferredReloadApiStatus();    // reload status / clear warning
           }
         }
 
@@ -1045,6 +1041,19 @@ export class OsmService extends AbstractSystem {
           this.emit('apistatuschange', currStatus);
         }
       });
+  }
+
+  /**
+   * deferredReloadApiStatus
+   * Uses `throttle` to checking the API status too frequently
+   */
+  deferredReloadApiStatus(): void {
+    const scheduler = this.context.systems.scheduler;
+    if (scheduler) {
+      scheduler.throttle('osm-reload-api-status', () => this.reloadApiStatus(), { ms: 500 });
+    } else {
+      this.reloadApiStatus();
+    }
   }
 
 

@@ -1,5 +1,4 @@
 import { selection } from 'd3-selection';
-import debounce from 'lodash-es/debounce.js';
 
 import { AbstractUiCard } from './AbstractUiCard.js';
 import { uiIcon } from '../icon.js';
@@ -30,7 +29,9 @@ export class UiLocationCard extends AbstractUiCard {
     this.render = this.render.bind(this);
     this.rerender = (() => this.render());  // call render without argument
     this.updateLocation = this.updateLocation.bind(this);
-    this._deferredUpdateLocation = debounce(this.updateLocation, 1000);  // no more than 1/sec
+    this._deferredUpdateLocation = (loc) => {
+      this.context.systems.scheduler?.debounce('UiLocationCard-updateLocation', () => this.updateLocation(loc), { ms: 1000 });
+    };  // no more than 1/sec
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // Event listeners

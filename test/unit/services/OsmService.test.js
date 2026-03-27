@@ -181,7 +181,7 @@ describe('OsmService', () => {
     });
 
     afterEach(() => {
-      _osm.throttledReloadApiStatus.cancel();
+      context.systems.scheduler?.cancel('osm-reload-api-status');
     });
 
 

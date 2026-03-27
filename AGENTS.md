@@ -93,6 +93,7 @@ When asked to do one of these tasks, prefer using the prompt file rather than im
 - Use optional chaining (`?.`) for systems that might not be present:
   - `locations` - LocationManager may not be configured
   - `ui` - UiSystem won't exist in a future CLI build
+  - `scheduler` - SchedulerSystem may not be initialized in tests or CLI
 - Example: `if (loc && locations?.isBlockedAt(loc)) continue;`
 - This keeps code working even when optional systems are absent
 

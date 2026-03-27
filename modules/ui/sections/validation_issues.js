@@ -1,4 +1,3 @@
-import debounce from 'lodash-es/debounce.js';
 import { select as d3_select } from 'd3-selection';
 import { geoSphericalDistance } from '@rapid-sdk/math';
 
@@ -252,9 +251,9 @@ export function uiSectionValidationIssues(context, severity) {
   });
 
   map.on('draw',
-    debounce(() => {
-      deferredRender();
-    }, 500, { leading: false, trailing: true })  // after map has stopped moving for 500ms
+    () => {
+      scheduler?.debounce('ValidationIssues-render', deferredRender, { ms: 500 });
+    }
   );
 
   return section;

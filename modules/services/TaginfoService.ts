@@ -1,10 +1,8 @@
 import { utilObjectOmit, utilQsString } from '@rapid-sdk/util';
-import debounce from 'lodash-es/debounce.js';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
-import type { DebouncedFunc } from 'lodash-es';
 import type { Context } from '../Context.ts';
 
 
@@ -101,8 +99,6 @@ export class TaginfoService extends AbstractSystem {
   _cache: Record<string, any[]>;
   /** Set of popular tag keys to exclude from value lookups (see iD#3955) */
   _popularKeys: Record<string, boolean>;
-  /** Debounced version of `_request`, delayed by 300ms */
-  _debouncedRequest: DebouncedFunc<typeof TaginfoService.prototype._request>;
 
   /**
    * @constructor
@@ -111,7 +107,7 @@ export class TaginfoService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'taginfo';
-    this.optionalDependencies = new Set(['l10n']);
+    this.optionalDependencies = new Set(['l10n', 'scheduler']);
 
     this._inflight = {};
     this._cache = {};
@@ -136,7 +132,6 @@ export class TaginfoService extends AbstractSystem {
     this.roles = this.roles.bind(this);
     this.docs = this.docs.bind(this);
     this._request = this._request.bind(this);
-    this._debouncedRequest = debounce(this._request, 300, { leading: false });
   }
 
 
@@ -200,7 +195,7 @@ export class TaginfoService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    this._debouncedRequest.cancel();
+    this.context.systems.scheduler?.cancel('taginfo-request');  // cancel any request in progress
     Object.values(this._inflight).forEach(controller => controller.abort());
     this._inflight = {};
 
@@ -214,10 +209,13 @@ export class TaginfoService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   keys(params: TaginfoParams, callback: TaginfoCallback): void {
-    const l10n = this.context.systems.l10n;
-    const langCode = l10n?.languageCode || 'en';
+    const context = this.context;
+    const l10n = context.systems.l10n;
+    const scheduler = context.systems.scheduler;
 
-    const doRequest = params.debounce ? this._debouncedRequest : this._request;
+    const langCode = l10n?.languageCode || 'en';
+    const shouldDebounce = params.debounce;
+
     params = this._clean(this._setSort(params));
     params = Object.assign({
       rp: 10,
@@ -228,7 +226,7 @@ export class TaginfoService extends AbstractSystem {
     }, params);
 
     const url = TAGINFO_API + 'keys/all?' + utilQsString(params, false);
-    doRequest(url, params, false, callback, (err, result) => {
+    const request = () => this._request(url, params, false, callback, (err, result) => {
       if (err) {
         callback(err);
       } else {
@@ -238,6 +236,12 @@ export class TaginfoService extends AbstractSystem {
         callback(null, vals);
       }
     });
+
+    if (shouldDebounce && scheduler) {
+      scheduler.debounce('taginfo-request', request, { ms: 300 });
+    } else {
+      request();
+    }
   }
 
 
@@ -247,10 +251,13 @@ export class TaginfoService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   multikeys(params: TaginfoParams, callback: TaginfoCallback): void {
-    const l10n = this.context.systems.l10n;
-    const langCode = l10n?.languageCode || 'en';
+    const context = this.context;
+    const l10n = context.systems.l10n;
+    const scheduler = context.systems.scheduler;
 
-    const doRequest = params.debounce ? this._debouncedRequest : this._request;
+    const langCode = l10n?.languageCode || 'en';
+    const shouldDebounce = params.debounce;
+
     params = this._clean(this._setSort(params));
     params = Object.assign({
       rp: 25,
@@ -262,7 +269,7 @@ export class TaginfoService extends AbstractSystem {
 
     const prefix = params.query ?? '';
     const url = TAGINFO_API + 'keys/all?' + utilQsString(params, false);
-    doRequest(url, params, true, callback, (err, result) => {
+    const request = () => this._request(url, params, true, callback, (err, result) => {
       if (err) {
         callback(err);
       } else {
@@ -272,6 +279,12 @@ export class TaginfoService extends AbstractSystem {
         callback(null, vals);
       }
     });
+
+    if (shouldDebounce && scheduler) {
+      scheduler.debounce('taginfo-request', request, { ms: 300 });
+    } else {
+      request();
+    }
   }
 
 
@@ -287,11 +300,13 @@ export class TaginfoService extends AbstractSystem {
       callback(null, []);
       return;
     }
+    const context = this.context;
+    const l10n = context.systems.l10n;
+    const scheduler = context.systems.scheduler;
 
-    const l10n = this.context.systems.l10n;
     const langCode = l10n?.languageCode || 'en';
+    const shouldDebounce = params.debounce;
 
-    const doRequest = params.debounce ? this._debouncedRequest : this._request;
     params = this._clean(this._setSort(this._setFilter(params)));
     params = Object.assign({
       rp: 25,
@@ -302,7 +317,7 @@ export class TaginfoService extends AbstractSystem {
     }, params);
 
     const url = TAGINFO_API + 'key/values?' + utilQsString(params, false);
-    doRequest(url, params, false, callback, (err, result) => {
+    const request = () => this._request(url, params, false, callback, (err, result) => {
       if (err) {
         callback(err);
       } else {
@@ -319,6 +334,12 @@ export class TaginfoService extends AbstractSystem {
         callback(null, vals);
       }
     });
+
+    if (shouldDebounce && scheduler) {
+      scheduler.debounce('taginfo-request', request, { ms: 300 });
+    } else {
+      request();
+    }
   }
 
 
@@ -328,10 +349,13 @@ export class TaginfoService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   roles(params: TaginfoParams, callback: TaginfoCallback): void {
-    const l10n = this.context.systems.l10n;
-    const langCode = l10n?.languageCode || 'en';
+    const context = this.context;
+    const l10n = context.systems.l10n;
+    const scheduler = context.systems.scheduler;
 
-    const doRequest = params.debounce ? this._debouncedRequest : this._request;
+    const langCode = l10n?.languageCode || 'en';
+    const shouldDebounce = params.debounce;
+
     const geometry = params.geometry ?? '';
     params = this._clean(this._setSortMembers(params));
     params = Object.assign({
@@ -343,7 +367,7 @@ export class TaginfoService extends AbstractSystem {
     }, params);
 
     const url = TAGINFO_API + 'relation/roles?' + utilQsString(params, false);
-    doRequest(url, params, true, callback, (err, result) => {
+    const request = () => this._request(url, params, true, callback, (err, result) => {
       if (err) {
         callback(err);
       } else {
@@ -353,6 +377,12 @@ export class TaginfoService extends AbstractSystem {
         callback(null, vals);
       }
     });
+
+    if (shouldDebounce && scheduler) {
+      scheduler.debounce('taginfo-request', request, { ms: 300 });
+    } else {
+      request();
+    }
   }
 
 
@@ -362,7 +392,10 @@ export class TaginfoService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   docs(params: TaginfoParams, callback: TaginfoCallback): void {
-    const doRequest = params.debounce ? this._debouncedRequest : this._request;
+    const context = this.context;
+    const scheduler = context.systems.scheduler;
+
+    const shouldDebounce = params.debounce;
     params = this._clean(this._setSort(params));
 
     let path = 'key/wiki_pages?';
@@ -373,7 +406,7 @@ export class TaginfoService extends AbstractSystem {
     }
 
     const url = TAGINFO_API + path + utilQsString(params, false);
-    doRequest(url, params, true, callback, (err, result) => {
+    const request = () => this._request(url, params, true, callback, (err, result) => {
       if (err) {
         callback(err);
       } else {
@@ -381,6 +414,12 @@ export class TaginfoService extends AbstractSystem {
         callback(null, result.data);
       }
     });
+
+    if (shouldDebounce && scheduler) {
+      scheduler.debounce('taginfo-request', request, { ms: 300 });
+    } else {
+      request();
+    }
   }
 
 

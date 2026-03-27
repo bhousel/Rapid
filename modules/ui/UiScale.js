@@ -1,6 +1,5 @@
 import { selection } from 'd3-selection';
 import { geoLonToMeters, geoMetersToLon } from '@rapid-sdk/math';
-import throttle from 'lodash-es/throttle.js';
 
 const MAXLENGTH = 180;
 const TICKHEIGHT = 8;
@@ -34,7 +33,9 @@ export class UiScale {
     this.rerender = (() => this.render());  // call render without argument
     this.toggleUnits = this.toggleUnits.bind(this);
     this.updateScale = this.updateScale.bind(this);
-    this._deferredUpdateScale = throttle(this.updateScale, 100);
+    this._deferredUpdateScale = () => {
+      this.context.systems.scheduler?.throttle('UiScale-updateScale', () => this.updateScale(), { ms: 100 });
+    };
 
     gfx.on('draw', this._deferredUpdateScale);
   }
