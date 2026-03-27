@@ -1,4 +1,4 @@
-import { beforeAll, afterEach, describe, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -71,6 +71,23 @@ describe('SchedulerSystem', () => {
           })
           .then(() => {
             assert.strictEqual(scheduler.numPending, 0, 'should have no pending tasks after reset');
+          });
+      });
+
+      it('cancels all timeouts and intervals on reset', () => {
+        const scheduler = new Rapid.SchedulerSystem(context);
+        return scheduler.initAsync()
+          .then(() => scheduler.startAsync())
+          .then(() => {
+            scheduler.scheduleTimeout(() => {}, 5000);
+            scheduler.scheduleInterval(() => {}, 5000);
+            assert.strictEqual(scheduler.numTimeouts, 1, 'should have 1 timeout');
+            assert.strictEqual(scheduler.numIntervals, 1, 'should have 1 interval');
+            return scheduler.resetAsync();
+          })
+          .then(() => {
+            assert.strictEqual(scheduler.numTimeouts, 0, 'no timeouts after reset');
+            assert.strictEqual(scheduler.numIntervals, 0, 'no intervals after reset');
           });
       });
     });
@@ -240,6 +257,206 @@ describe('SchedulerSystem', () => {
       });
     });
 
+    describe('scheduleTimeout', () => {
+      it('executes a task after the specified delay', async () => {
+        let executed = false;
+        _scheduler.scheduleTimeout(() => { executed = true; }, 10);
+        assert.isFalse(executed, 'task should not run synchronously');
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        assert.isTrue(executed, 'task should have run after delay');
+      });
+
+      it('defaults to 0ms delay', async () => {
+        let executed = false;
+        _scheduler.scheduleTimeout(() => { executed = true; });
+        await new Promise(resolve => { setTimeout(resolve, 20); });
+        assert.isTrue(executed, 'task should have run');
+      });
+
+      it('returns a cancel function', () => {
+        const cancel = _scheduler.scheduleTimeout(() => {}, 5000);
+        assert.isFunction(cancel);
+      });
+
+      it('tracks the timeout in numTimeouts', () => {
+        assert.strictEqual(_scheduler.numTimeouts, 0);
+        const cancel = _scheduler.scheduleTimeout(() => {}, 5000);
+        assert.strictEqual(_scheduler.numTimeouts, 1);
+        cancel();
+      });
+
+      it('cancel function prevents execution', async () => {
+        let executed = false;
+        const cancel = _scheduler.scheduleTimeout(() => { executed = true; }, 10);
+        cancel();
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        assert.isFalse(executed, 'cancelled task should not run');
+      });
+
+      it('cancel function removes from tracking', () => {
+        const cancel = _scheduler.scheduleTimeout(() => {}, 5000);
+        assert.strictEqual(_scheduler.numTimeouts, 1);
+        cancel();
+        assert.strictEqual(_scheduler.numTimeouts, 0);
+      });
+
+      it('cancel function is idempotent', () => {
+        const cancel = _scheduler.scheduleTimeout(() => {}, 5000);
+        cancel();
+        cancel();  // should not throw or double-decrement
+        assert.strictEqual(_scheduler.numTimeouts, 0);
+      });
+
+      it('removes from tracking after natural completion', async () => {
+        _scheduler.scheduleTimeout(() => {}, 5);
+        assert.strictEqual(_scheduler.numTimeouts, 1);
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        assert.strictEqual(_scheduler.numTimeouts, 0, 'should auto-clean after firing');
+      });
+
+      it('handles multiple concurrent timeouts', async () => {
+        const results = [];
+        _scheduler.scheduleTimeout(() => results.push('a'), 10);
+        _scheduler.scheduleTimeout(() => results.push('b'), 20);
+        _scheduler.scheduleTimeout(() => results.push('c'), 30);
+        assert.strictEqual(_scheduler.numTimeouts, 3);
+
+        await new Promise(resolve => { setTimeout(resolve, 80); });
+        assert.sameMembers(results, ['a', 'b', 'c'], 'all timeouts should have fired');
+        assert.strictEqual(_scheduler.numTimeouts, 0);
+      });
+
+      it('cancel only affects the targeted timeout', async () => {
+        let aRan = false;
+        let bRan = false;
+        const cancelA = _scheduler.scheduleTimeout(() => { aRan = true; }, 10);
+        _scheduler.scheduleTimeout(() => { bRan = true; }, 10);
+        cancelA();
+
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        assert.isFalse(aRan, 'cancelled timeout should not run');
+        assert.isTrue(bRan, 'other timeout should still run');
+      });
+    });
+
+    describe('cancelAllTimeouts', () => {
+      it('cancels all active timeouts', async () => {
+        let count = 0;
+        _scheduler.scheduleTimeout(() => { count++; }, 10);
+        _scheduler.scheduleTimeout(() => { count++; }, 20);
+        assert.strictEqual(_scheduler.numTimeouts, 2);
+
+        _scheduler.cancelAllTimeouts();
+        assert.strictEqual(_scheduler.numTimeouts, 0);
+
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        assert.strictEqual(count, 0, 'no timeouts should have fired');
+      });
+
+      it('does nothing when there are no timeouts', () => {
+        assert.strictEqual(_scheduler.numTimeouts, 0);
+        _scheduler.cancelAllTimeouts();  // should not throw
+        assert.strictEqual(_scheduler.numTimeouts, 0);
+      });
+
+      it('allows new timeouts after cancellation', async () => {
+        _scheduler.scheduleTimeout(() => {}, 5000);
+        _scheduler.cancelAllTimeouts();
+
+        let executed = false;
+        _scheduler.scheduleTimeout(() => { executed = true; }, 5);
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        assert.isTrue(executed);
+      });
+    });
+
+    describe('scheduleInterval', () => {
+      it('executes a task repeatedly', async () => {
+        let count = 0;
+        const cancel = _scheduler.scheduleInterval(() => { count++; }, 15);
+        await new Promise(resolve => { setTimeout(resolve, 100); });
+        cancel();
+        assert.isAbove(count, 1, 'interval should have fired multiple times');
+      });
+
+      it('returns a cancel function', () => {
+        const cancel = _scheduler.scheduleInterval(() => {}, 5000);
+        assert.isFunction(cancel);
+        cancel();
+      });
+
+      it('tracks the interval in numIntervals', () => {
+        assert.strictEqual(_scheduler.numIntervals, 0);
+        const cancel = _scheduler.scheduleInterval(() => {}, 5000);
+        assert.strictEqual(_scheduler.numIntervals, 1);
+        cancel();
+      });
+
+      it('cancel function stops further execution', async () => {
+        let count = 0;
+        const cancel = _scheduler.scheduleInterval(() => { count++; }, 10);
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        cancel();
+        const countAtCancel = count;
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        assert.strictEqual(count, countAtCancel, 'no more ticks after cancel');
+      });
+
+      it('cancel function removes from tracking', () => {
+        const cancel = _scheduler.scheduleInterval(() => {}, 5000);
+        assert.strictEqual(_scheduler.numIntervals, 1);
+        cancel();
+        assert.strictEqual(_scheduler.numIntervals, 0);
+      });
+
+      it('handles multiple concurrent intervals', async () => {
+        let aCount = 0;
+        let bCount = 0;
+        const cancelA = _scheduler.scheduleInterval(() => { aCount++; }, 15);
+        const cancelB = _scheduler.scheduleInterval(() => { bCount++; }, 15);
+        assert.strictEqual(_scheduler.numIntervals, 2);
+
+        await new Promise(resolve => { setTimeout(resolve, 80); });
+        cancelA();
+        cancelB();
+        assert.isAbove(aCount, 0);
+        assert.isAbove(bCount, 0);
+        assert.strictEqual(_scheduler.numIntervals, 0);
+      });
+    });
+
+    describe('cancelAllIntervals', () => {
+      it('cancels all active intervals', async () => {
+        let count = 0;
+        _scheduler.scheduleInterval(() => { count++; }, 10);
+        _scheduler.scheduleInterval(() => { count++; }, 10);
+        assert.strictEqual(_scheduler.numIntervals, 2);
+
+        _scheduler.cancelAllIntervals();
+        assert.strictEqual(_scheduler.numIntervals, 0);
+
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        assert.strictEqual(count, 0, 'no intervals should have fired');
+      });
+
+      it('does nothing when there are no intervals', () => {
+        assert.strictEqual(_scheduler.numIntervals, 0);
+        _scheduler.cancelAllIntervals();  // should not throw
+        assert.strictEqual(_scheduler.numIntervals, 0);
+      });
+
+      it('allows new intervals after cancellation', async () => {
+        _scheduler.scheduleInterval(() => {}, 5000);
+        _scheduler.cancelAllIntervals();
+
+        let count = 0;
+        const cancel = _scheduler.scheduleInterval(() => { count++; }, 10);
+        await new Promise(resolve => { setTimeout(resolve, 50); });
+        cancel();
+        assert.isAbove(count, 0);
+      });
+    });
+
     describe('pause/resume interaction', () => {
       it('reference-counted pauses work with scheduling', async () => {
         const r1 = _scheduler.pause();
@@ -284,6 +501,177 @@ describe('SchedulerSystem', () => {
         // Give idle callbacks a chance to fire
         await new Promise(resolve => { setTimeout(resolve, 60); });
         assert.isFalse(executed, 'cancelled task should never run');
+      });
+    });
+
+    describe('game loop', () => {
+      // Helper: returns a Promise that resolves after N requestAnimationFrame frames
+      function waitFrames(n) {
+        return new Promise(resolve => {
+          let count = 0;
+          function next() {
+            count++;
+            if (count >= n) {
+              resolve();
+            } else {
+              globalThis.requestAnimationFrame(next);
+            }
+          }
+          globalThis.requestAnimationFrame(next);
+        });
+      }
+
+      describe('addFrameCallback / removeFrameCallback', () => {
+        it('registers a frame callback', () => {
+          assert.strictEqual(_scheduler.numFrameCallbacks, 0);
+          _scheduler.addFrameCallback('test', () => {});
+          assert.strictEqual(_scheduler.numFrameCallbacks, 1);
+          _scheduler.removeFrameCallback('test');
+        });
+
+        it('removes a frame callback by id', () => {
+          _scheduler.addFrameCallback('test', () => {});
+          assert.strictEqual(_scheduler.numFrameCallbacks, 1);
+          _scheduler.removeFrameCallback('test');
+          assert.strictEqual(_scheduler.numFrameCallbacks, 0);
+        });
+
+        it('replacing a callback with the same id keeps count at 1', () => {
+          _scheduler.addFrameCallback('test', () => {});
+          _scheduler.addFrameCallback('test', () => {});  // replace
+          assert.strictEqual(_scheduler.numFrameCallbacks, 1);
+          _scheduler.removeFrameCallback('test');
+        });
+
+        it('removing a nonexistent id does nothing', () => {
+          _scheduler.removeFrameCallback('nope');  // should not throw
+          assert.strictEqual(_scheduler.numFrameCallbacks, 0);
+        });
+      });
+
+      describe('frame callback execution', () => {
+        const origError = console.error;
+        const spyError = mock();
+
+        beforeAll(() => {
+          console.error = spyError;
+        });
+
+        beforeEach(() => {
+          spyError.mockClear();  // reset call count
+        });
+
+        afterAll(() => {
+          console.error = origError;
+        });
+
+        afterEach(() => {
+          _scheduler._frameCallbacks.clear();  // in case a thrown error skips removal steps
+        });
+
+
+        it('calls registered frame callbacks each frame', async () => {
+          let callCount = 0;
+          _scheduler.addFrameCallback('test', () => { callCount++; });
+
+          await waitFrames(3);
+          _scheduler.removeFrameCallback('test');
+          assert.isAbove(callCount, 0, 'callback should have been called');
+        });
+
+        it('passes deltaMS to frame callbacks', async () => {
+          let receivedDelta = null;
+          _scheduler.addFrameCallback('test', (deltaMS) => { receivedDelta = deltaMS; });
+
+          await waitFrames(3);
+          _scheduler.removeFrameCallback('test');
+          assert.isNotNull(receivedDelta, 'callback should have received deltaMS');
+          assert.isNumber(receivedDelta, 'deltaMS should be a number');
+          assert.isAtLeast(receivedDelta, 0, 'deltaMS should be non-negative');
+        });
+
+        it('exposes deltaMS via getter', async () => {
+          _scheduler.addFrameCallback('test', () => {});
+          await waitFrames(3);
+          _scheduler.removeFrameCallback('test');
+          assert.isNumber(_scheduler.deltaMS, 'deltaMS getter should return a number');
+          assert.isAtLeast(_scheduler.deltaMS, 0, 'deltaMS should be non-negative');
+        });
+
+        it('calls multiple frame callbacks in registration order', async () => {
+          const order = [];
+          _scheduler.addFrameCallback('first', () => { order.push('a'); });
+          _scheduler.addFrameCallback('second', () => { order.push('b'); });
+
+          await waitFrames(2);
+          _scheduler.removeFrameCallback('first');
+          _scheduler.removeFrameCallback('second');
+          // Check that both were called and 'a' always came before 'b'
+          assert.include(order, 'a');
+          assert.include(order, 'b');
+          // First occurrence of 'a' should be before first occurrence of 'b'
+          assert.isBelow(order.indexOf('a'), order.indexOf('b'));
+        });
+
+        it('does not call removed callbacks', async () => {
+          let called = false;
+          _scheduler.addFrameCallback('test', () => { called = true; });
+          _scheduler.removeFrameCallback('test');
+
+          await waitFrames(2);
+          assert.isFalse(called, 'removed callback should not be called');
+        });
+
+        it('survives a throwing callback without crashing', async () => {
+          let secondCalled = false;
+          _scheduler.addFrameCallback('bad', () => { throw new Error('boom'); });
+          _scheduler.addFrameCallback('good', () => { secondCalled = true; });
+
+          await waitFrames(2);
+
+          assert.lengthOf(spyError.mock.calls, 2, 'console.error called twice');
+          assert.match(spyError.mock.lastCall[0], /frame callback 'bad' threw/i);
+
+          _scheduler.removeFrameCallback('bad');
+          _scheduler.removeFrameCallback('good');
+          assert.isTrue(secondCalled, 'other callbacks should still run');
+        });
+      });
+
+      describe('pause/resume stops and restarts the loop', () => {
+        it('stops calling frame callbacks while paused', async () => {
+          let count = 0;
+          _scheduler.addFrameCallback('test', () => { count++; });
+
+          await waitFrames(2);
+          const countBeforePause = count;
+
+          const release = _scheduler.pause();
+          // Wait a bit — no frames should fire
+          await new Promise(resolve => { setTimeout(resolve, 60); });
+          assert.strictEqual(count, countBeforePause, 'no callbacks while paused');
+
+          release();
+          await waitFrames(2);
+          _scheduler.removeFrameCallback('test');
+          assert.isAbove(count, countBeforePause, 'callbacks resume after unpause');
+        });
+      });
+
+      describe('resetAsync preserves frame callbacks', () => {
+        it('keeps frame callbacks across resetAsync', async () => {
+          let count = 0;
+          _scheduler.addFrameCallback('test', () => { count++; });
+
+          await waitFrames(2);
+          const countBeforeReset = count;
+
+          await _scheduler.resetAsync();
+
+          await waitFrames(2);
+          _scheduler.removeFrameCallback('test');
+          assert.isAbove(count, countBeforeReset, 'callback should still fire after reset');
+        });
       });
     });
   });

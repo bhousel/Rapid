@@ -1,0 +1,316 @@
+# Scheduler System Design
+
+This document describes the design for Rapid's centralized work scheduling system, including the frame-aware execution model, task types, backpressure management, and migration path from the current ad-hoc scheduling.
+
+## Problem
+
+Rapid is a map editor built on a **game loop** — a Pixi.js Ticker calling `requestAnimationFrame` to render the map at a consistent frame rate. The target frame budget is 16.7ms (60fps) or 33.3ms (30fps).
+
+Today, deferred work is scheduled against the **browser's event loop** using raw `setTimeout`, `setInterval`, `requestIdleCallback`, and lodash `debounce`/`throttle`. These mechanisms fire whenever the browser decides — potentially right in the middle of a frame that GraphicsSystem is trying to render. Every interruption eats into the frame budget.
+
+Current pain points:
+- **~26 `setTimeout` call sites** with manual handle tracking and cleanup
+- **~30 lodash `debounce`/`throttle` wrappers** each needing manual `.cancel()` in lifecycle methods
+- **No coordination** between rendering and background work (validation, spatial indexing, network responses)
+- **No backpressure** — when the render loop falls behind, background work keeps piling on
+- Some UI code clumsily combines `debounce` + `requestIdleCallback` to approximate "run this later, but not during rendering"
+
+## Goals
+
+1. **Single coordination point** — All deferred work routes through SchedulerSystem, which decides *when* work actually runs relative to the render loop
+2. **Frame-budget-aware** — Background tasks run in leftover frame time, never stealing from rendering
+3. **Backpressure** — When frames are dropping, the scheduler defers non-essential work automatically
+4. **Familiar API** — Callers schedule work using wall-clock semantics (`setTimeout`, `debounce`, etc.), while the scheduler handles the timing internally
+5. **Lifecycle management** — All managed work auto-cancels on `resetAsync()`, eliminating manual handle tracking
+6. **Worker-ready** — The same API can route work to web workers when the task doesn't need main-thread access
+
+## Non-Goals (for now)
+
+- Preemptive task interruption — tasks run to completion once started
+- Sub-frame phase budgeting (splitting APP into geometry/labels/styles) — a future concern for GraphicsSystem, not the scheduler
+
+## Design
+
+### Ownership of the Game Loop
+
+Today, GraphicsSystem owns a `PIXI.Ticker.shared` instance that drives a `requestAnimationFrame` loop. The ticker is used minimally: `ticker.start()`, `ticker.stop()`, `ticker.deltaMS`, and a single registered listener (`_tick`). No other system accesses it.
+
+**Under this design, SchedulerSystem owns the game loop.** It calls `requestAnimationFrame` directly and orchestrates each frame. GraphicsSystem becomes a *client* of the scheduler — it registers a render callback, and the scheduler calls it with a budget.
+
+This replaces `PIXI.Ticker` entirely. The features we used from it (`deltaMS`, start/stop, FPS) are trivial to compute ourselves, and owning the loop gives the scheduler full control over frame timing, budget allocation, and backpressure — which is the whole point.
+
+```
+scheduler._onFrame(timestamp)          ← owns the rAF
+  ├─ compute deltaMS, record frame start
+  ├─ gfx._tick(frameBudgetMs)          ← scheduler calls graphics
+  │   ├─ _tform()                      — transform easing, viewport sync
+  │   ├─ _app()                        — scene graph updates
+  │   └─ _draw()                       — pixi.render()
+  ├─ mature expired timers into idle queue
+  ├─ drain idle queue with remaining budget
+  │   ├─ urgent tasks first
+  │   ├─ normal tasks
+  │   └─ idle tasks (only if budget permits)
+  └─ record frame metrics, update backpressure
+```
+
+**Boundary**: The scheduler owns *when* work happens. GraphicsSystem owns *what* rendering work to do. The scheduler doesn't import Pixi or know about the scene graph. GraphicsSystem doesn't call `requestAnimationFrame` or track frame timing.
+
+**Frame rate target**: The scheduler owns the target frame rate and computes the per-frame budget. It can dynamically adjust (e.g., drop from 60fps to 30fps under heavy pressure). GraphicsSystem's existing `THROTTLE = 250ms` logic (skip rendering for 250ms after each draw) stays in GraphicsSystem — that's a rendering concern about how often to re-prepare the scene graph, not a frame-timing concern.
+
+**Context loss**: When WebGL context is lost, GraphicsSystem calls `scheduler.pause()` (which it already supports via the reference-counted pause/resume mechanism). On context restore, it releases the pause. The scheduler stops the rAF loop while paused and resumes it on unpause.
+
+**Lifecycle**: The rAF loop starts in `startAsync()` and stops on `pause()`. Since SchedulerSystem has no required dependencies, it can start very early — before GraphicsSystem is even initialized. The loop simply has nothing to do until render callbacks are registered.
+
+### Task Types
+
+#### 1. Timeout — "run once, after a wall-clock delay"
+
+Replaces `setTimeout`. The task fires at the first idle opportunity *at or after* the specified delay — not exactly at the delay. This is "do this ASAP after 250ms" rather than "do this at 250ms".
+
+```typescript
+scheduler.setTimeout(workID, fn, { ms: 250 });
+```
+
+- `workID` — string key for tracking/cancellation
+- After `ms` elapses, the task moves into the idle queue and runs when budget permits
+- Returns a cancel function
+- Auto-cancelled on `resetAsync()`
+
+#### 2. Interval — "run repeatedly, about every N ms"
+
+Replaces `setInterval`. Each tick moves into the idle queue after the interval elapses, so execution may float slightly.
+
+```typescript
+scheduler.setInterval(workID, fn, { ms: 1000 });
+```
+
+- Same float behavior as timeout — runs at next idle opportunity after each interval
+- Returns a cancel function
+- Auto-cancelled on `resetAsync()`
+
+#### 3. Debounce — "run after N ms of stability"
+
+Replaces lodash `debounce`. Each call resets the timer. After `ms` of no calls, the task enters the idle queue.
+
+```typescript
+scheduler.debounce(workID, fn, { ms: 250 });
+```
+
+- Subsequent calls with the same `workID` reset the timer and replace `fn`
+- The `workID` key provides natural deduplication — no need for callers to track a debounced wrapper function
+- Supports `leading` option (fire immediately on first call, then debounce)
+- Auto-cancelled on `resetAsync()`
+
+#### 4. Throttle — "run no more than once per N ms"
+
+Replaces lodash `throttle`. Coalesces rapid calls, ensuring the function runs at most once per interval.
+
+```typescript
+scheduler.throttle(workID, fn, { ms: 500 });
+```
+
+- First call executes (or schedules for next idle); subsequent calls within the window are dropped
+- The last trailing call fires after the window expires
+- `workID` provides deduplication
+- Auto-cancelled on `resetAsync()`
+
+#### 5. Schedule — "generic task with priority"
+
+The general-purpose API. Callers specify priority to indicate urgency.
+
+```typescript
+scheduler.schedule(workID, fn, { priority: 'idle' });
+```
+
+**Priorities:**
+
+| Priority | Meaning | When it runs |
+|----------|---------|-------------|
+| `'urgent'` | Must run this frame if possible | Before idle work, within remaining budget |
+| `'normal'` | Run when convenient | During idle phase, respects budget |
+| `'idle'` | Run whenever there's spare time | Only when frames are consistently under budget |
+
+This covers the `requestIdleCallback` use case (`'idle'` priority) and could eventually cover `requestAnimationFrame`-like scheduling (`'urgent'` priority) for work that needs to happen every frame but isn't part of the core render.
+
+### The `workID` Pattern
+
+Every scheduled task has a string `workID`. This serves several purposes:
+
+1. **Cancellation** — `scheduler.cancel(workID)` cancels by name instead of tracking opaque handles
+2. **Deduplication** — scheduling the same `workID` again replaces the pending task (for debounce/throttle this is intrinsic; for schedule/timeout it could optionally replace)
+3. **Debugging** — `scheduler.debugPending()` returns a list of pending work with human-readable names
+4. **Profiling** — the scheduler can track per-`workID` timing statistics (average duration, frequency)
+
+Callers choose descriptive IDs: `'validation-ui-render'`, `'hash-update'`, `'taginfo-request'`, `'osm-api-status'`.
+
+### Idle Work Execution
+
+After rendering completes each frame, the scheduler drains its idle queue with whatever budget remains:
+
+```typescript
+private _drainIdleQueue(deadline: number): void {
+  // Drain by priority: urgent, then normal, then idle
+  for (const queue of [this._urgentQueue, this._normalQueue, this._idleQueue]) {
+    while (queue.length > 0) {
+      const next = queue[0];
+
+      // Check if we have enough budget for this task
+      const estimatedDuration = this._taskStats.get(next.workID)?.avgDuration ?? 1;
+      if (performance.now() + estimatedDuration > deadline) return;
+
+      // Run it
+      queue.shift();
+      const start = performance.now();
+      next.fn();
+      const elapsed = performance.now() - start;
+
+      // Update running average for this workID
+      this._updateTaskStats(next.workID, elapsed);
+    }
+  }
+}
+```
+
+The scheduler maintains an exponential moving average of each `workID`'s execution time. Before starting a task, it checks whether the estimated duration fits in the remaining budget. If not, the task waits for the next frame. Urgent tasks always drain before normal, and normal before idle.
+
+### Backpressure
+
+The scheduler tracks frame timing to detect when the system is under pressure:
+
+```typescript
+interface FrameMetrics {
+  avgFrameTime: number;      // Exponential moving average of total frame time
+  avgRenderTime: number;     // EMA of APP + DRAW time
+  avgIdleTime: number;       // EMA of idle work time
+  droppedFrames: number;     // Count of frames exceeding budget in recent window
+  targetFrameTime: number;   // Current target (16.7ms or 33.3ms)
+}
+```
+
+**Responses to backpressure:**
+
+1. **Light pressure** (occasional dropped frames) — Reduce idle work per frame, allow tasks to float longer
+2. **Moderate pressure** (consistent drops) — Stop running idle tasks entirely, let rendering catch up
+3. **Heavy pressure** (sustained frame drops) — Signal GraphicsSystem to reduce quality (`highQuality = false`), throttle expensive tasks
+4. **Recovery** — When frames are consistently under budget again, gradually allow idle work back in
+
+The scheduler emits events so other systems can react:
+
+```typescript
+scheduler.on('pressure', (level: 'light' | 'moderate' | 'heavy' | 'none') => { ... });
+```
+
+### Timer Float
+
+A key design decision: managed timeouts and intervals don't fire at their exact wall-clock time. Instead, when the timer expires, the task enters the idle queue and runs at the next opportunity within the frame budget.
+
+For a `scheduler.setTimeout(id, fn, { ms: 250 })`:
+1. At t=0, the scheduler records the deadline (now + 250ms)
+2. Each frame, the scheduler checks expired timers before running the idle queue
+3. At t=250ms (or the first frame after), the task moves to the idle queue
+4. The task runs when budget permits — likely within the same frame, worst case next frame
+
+This "float" means actual execution is 250ms + 0–16ms, which is fine for all current use cases (UI debouncing, deferred renders, API polling). The benefit is that the work doesn't interrupt a frame in progress.
+
+For code that truly needs exact wall-clock timing (e.g., long-press detection at 750ms in SelectBehavior), callers can use `{ exact: true }` to bypass the idle queue and fire the callback directly from the timer. These should be rare.
+
+### Worker Scheduling (Future)
+
+The same API naturally extends to worker-based execution:
+
+```typescript
+scheduler.schedule('validate-entities', fn, {
+  priority: 'idle',
+  thread: 'worker'    // run off the main thread
+});
+```
+
+For worker tasks, `fn` can't close over main-thread state. The scheduler would:
+1. Serialize the task's input data
+2. Post it to a managed worker
+3. Receive the result and invoke a callback on the main thread (during idle time)
+
+This is a future concern but the API and queue structure should accommodate it from the start.
+
+## Migration Path
+
+### Phase 1 — Foundation (done)
+
+SchedulerSystem exists with managed `scheduleIdleTask`, `scheduleTimeout`, and `scheduleInterval`. Auto-cleanup on `resetAsync()`. All `requestIdleCallback` usage migrated from callers.
+
+### Phase 2 — Own the Game Loop (done)
+
+- SchedulerSystem owns the `requestAnimationFrame` loop via `_onFrame(timestamp)`
+- Computes `deltaMS` (capped at 100ms) and exposes it via a getter
+- Frame callback registration API: `addFrameCallback(id, fn)` / `removeFrameCallback(id)`
+- GraphicsSystem registers `_tick(deltaMS)` as a frame callback instead of using `PIXI.Ticker`
+- `PIXI.Ticker.shared` is stopped but no longer used — the scheduler is the sole rAF owner
+- Loop stops on `pause()`, restarts on `resume()` (via event handlers)
+- WebGL context loss/restore handled through GraphicsSystem's own pause/resume
+- Added `requestAnimationFrame`/`cancelAnimationFrame` polyfill for test environments
+- 60 tests passing (12 new game loop tests)
+
+### Phase 3 — Frame-Aware Idle Execution
+
+- Replace `requestIdleCallback` backing with the internal idle queue
+- After render callbacks complete each frame, drain idle queue with remaining budget
+- Add task duration tracking (EMA per `workID`)
+- Add priority queues (urgent > normal > idle)
+
+### Phase 4 — Unified Timer API with `workID`
+
+- Add `setTimeout`, `setInterval`, `debounce`, `throttle` methods with `workID` keys
+- Timers mature into the idle queue instead of firing directly (the "float" behavior)
+- Add `cancel(workID)` for named cancellation
+- Migrate existing `window.setTimeout` / lodash `debounce` / `throttle` call sites
+
+### Phase 5 — Backpressure
+
+- Track frame timing metrics (render time, idle time, dropped frames)
+- Implement pressure levels and automatic idle queue throttling
+- Emit `'pressure'` events for other systems to react
+- Wire up GraphicsSystem quality adjustments
+- Dynamic frame rate adjustment (e.g., drop to 30fps under sustained pressure)
+
+### Phase 6 — Worker Integration
+
+- SchedulerSystem spawns and pools web workers
+- Add `thread: 'worker'` option to `schedule()`
+- Prototype with validation as the first worker-offloaded task
+
+## Decisions
+
+Resolved design questions (kept for context):
+
+1. **`debounce`/`throttle` use the `workID` pattern**, not callable wrappers. Departing from the lodash convention keeps things consistent within Rapid — callers pass `(workID, fn, opts)` rather than holding onto a wrapped function.
+
+2. **Pause/resume affects all task types.** When the scheduler is paused, the game loop stops entirely — no timers fire, no idle work drains. Callers that truly need wall-clock timing can still use `window.setTimeout` directly; the SchedulerSystem is opt-in.
+
+3. **Urgent tasks always preempt** normal and idle. Starvation of idle tasks is acceptable by definition.
+
+4. **SchedulerSystem owns the game loop and the target frame rate.** It replaces `PIXI.Ticker` entirely (Option A — roll our own `requestAnimationFrame` loop). The Pixi Ticker was used for very little (`deltaMS`, start/stop, one listener), and owning the loop gives the scheduler full control over frame timing, budget, and backpressure. See "Ownership of the Game Loop" section above.
+
+5. **"Game loop"** is the term of art for the `requestAnimationFrame` loop throughout code and docs.
+
+## Open Questions
+
+1. **Frame callback registration API** — Should GraphicsSystem call `scheduler.addFrameCallback(fn)` to register, or should the scheduler call `gfx._tick()` directly? The callback approach is more decoupled (any system could register frame work), but direct calling is simpler and GraphicsSystem is the only consumer for now. Leaning toward callback registration for extensibility.
+
+2. **Render throttle interaction** — GraphicsSystem currently throttles rendering to every 250ms via `_timeToNextRender`. With the scheduler owning frame timing, should this logic move to the scheduler (as a render-specific policy), or stay in GraphicsSystem (since it's a rendering concern)? Leaning toward keeping it in GraphicsSystem — the scheduler provides the budget, GraphicsSystem decides whether it's time to actually re-render.
+
+3. **`performance.now()` vs `timestamp` from rAF** — `requestAnimationFrame` provides a `DOMHighResTimeStamp`. Should we use that as the frame's reference time, or call `performance.now()` ourselves? The rAF timestamp is more accurate (it's the time the frame started, not when our callback runs). Leaning toward using the rAF timestamp.
+
+## Known Issues — `d3-transition` and `d3-timer`
+
+`d3-transition` is used extensively in the Rapid codebase (~49 `.transition()` call sites across ~25 UI files). Internally, `d3-transition` depends on `d3-timer`, which spins up its **own `requestAnimationFrame` loop** — completely uncoordinated with the Pixi/scheduler game loop.
+
+Every active d3 transition is a separate rAF competitor that can manipulate the DOM, trigger layout/reflow, and consume frame budget outside the scheduler's control. We've hit this before: d3 transitions were once used for map transform easing and caused jittery rendering. That's been fixed, but the underlying conflict remains for UI animations.
+
+**Current state:**
+- **`d3-timer`**: 1 direct import — `flash.js` uses `d3_timeout` for a one-shot notification timer. Trivial to replace with `scheduler.scheduleTimeout`.
+- **`d3-transition`**: 49 call sites, all doing DOM animations (opacity fades, height collapses, panel slides). All in UI code — none touch the Pixi render path. They come in via `d3-selection`'s `.transition()` method, so there's no explicit import to grep for.
+
+**Stretch goal (future phase):** Replace `d3-transition` usage with scheduler-managed tween/transition helpers. The scheduler could provide a `scheduler.tween(workID, fn, { duration, easing })` API that runs the animation callback within the frame loop's idle budget — or in a dedicated "UI animation" phase — keeping DOM animation work coordinated with rendering. CSS transitions/animations could also replace many of these cases, since the browser's compositor can run those off the main thread entirely.
+
+**For now:** No action needed. The d3 transitions are all in UI code, they're short-lived, and removing them is a large surface area change best done during the UI TypeScript conversion. We're no worse off than today.

@@ -64,7 +64,6 @@ export class GraphicsSystem extends AbstractSystem {
   scene: PixiScene | null;
   eventManager: PixiEvents | null;
   textureManager: PixiTextures | null;
-  ticker: PIXI.Ticker;
 
   // Private properties
   private _pixiViewport: Viewport | null;
@@ -86,7 +85,7 @@ export class GraphicsSystem extends AbstractSystem {
     super(context);
 
     this.id = 'gfx';
-    this.requiredDependencies = new Set(['map']);
+    this.requiredDependencies = new Set(['map', 'scheduler']);
     this.optionalDependencies = new Set(['assets', 'ui', 'urlhash']);
     this.highQuality = true;  // this can go false if we detect poor performance
 
@@ -130,13 +129,10 @@ export class GraphicsSystem extends AbstractSystem {
     // Schedule an immediate redraw whenever this system is resumed.
     this.on('resumed', () => { this.immediateRedraw(); });
 
-    // Anything involving PIXI globals can be set up here, to ensure it only happens one time.
-    // We'll use the Pixi shared ticker, but we don't want it started yet.
-    const ticker = PIXI.Ticker.shared;
-    ticker.autoStart = false;
-    ticker.stop();
-    ticker.add(this._tick, this);
-    this.ticker = ticker;
+    // Ensure Pixi's shared ticker doesn't run its own rAF loop.
+    // (The SchedulerSystem owns the game loop instead.)
+    PIXI.Ticker.shared.autoStart = false;
+    PIXI.Ticker.shared.stop();
 
     Object.assign(PIXI.BitmapFontManager.defaultOptions, {
       chars: PIXI.BitmapFontManager.ASCII,
@@ -214,7 +210,9 @@ export class GraphicsSystem extends AbstractSystem {
       })
       .then(() => {
         this._started = true;
-        this.ticker.start();
+        // Register our tick function with the scheduler's game loop.
+        const scheduler = this.context.systems.scheduler!;
+        scheduler.addFrameCallback('gfx', this._tick);
       });
   }
 
@@ -233,15 +231,16 @@ export class GraphicsSystem extends AbstractSystem {
 
   /**
    * _tick
-   * This is a Pixi.Ticker listener that runs in a `requestAnimationFrame` game loop.
+   * Called once per frame by the SchedulerSystem's game loop.
    * We can use this to determine the true frame rate that we're running at,
-   * and schedule work to happen at opportune times (within animation frame boundaries)
+   * and schedule work to happen at opportune times (within animation frame boundaries).
+   *
+   * @param deltaMS - Milliseconds elapsed since the previous frame
    */
-  _tick(): void {
+  _tick(deltaMS: number): void {
     if (!this._started || this._paused) return;
 
-    const ticker = this.ticker;
-    // console.log('FPS=' + ticker.FPS.toFixed(1));
+    // console.log('FPS=' + (1000 / deltaMS).toFixed(1));
 
     // For now, we will perform either APP (Rapid prepares scene graph) or DRAW (Pixi render) during a tick.
     // GPU work will happen in its own thread, and we don't have direct insight into its timing.
@@ -275,7 +274,7 @@ export class GraphicsSystem extends AbstractSystem {
 
     // Do APP to prepare the next frame..
     if (this._appPending) {
-      this._timeToNextRender -= ticker.deltaMS;
+      this._timeToNextRender -= deltaMS;
 
       if (this._timeToNextRender >= 0) {   // render later
         return;
@@ -836,8 +835,7 @@ export class GraphicsSystem extends AbstractSystem {
     this._isContextLost = true;
     this._drawPending = false;
 
-    this.ticker.stop();               // stop ticking
-    this._unpauseFn = this.pause();   // stop rendering, and preserve the unpause function.
+    this._unpauseFn = this.pause();   // stop rendering — _tick will return early while paused
     this.eventManager?.disable();     // stop listening for events
     this.highQuality = false;         // back off when we get the context restored..
 
@@ -891,9 +889,8 @@ export class GraphicsSystem extends AbstractSystem {
 
         this._isContextLost = false;
         this.eventManager?.enable();   // resume listening
-        this._unpauseFn!();            // resume rendering
+        this._unpauseFn!();            // resume rendering — _tick will run again on next frame
         this._unpauseFn = null;
-        this.ticker.start();           // resume ticking
         this.emit('statuschange', 'contextrestored');
       });
   }
