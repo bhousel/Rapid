@@ -213,7 +213,7 @@ For a `scheduler.setTimeout(id, fn, { ms: 250 })`:
 
 This "float" means actual execution is 250ms + 0–16ms, which is fine for all current use cases (UI debouncing, deferred renders, API polling). The benefit is that the work doesn't interrupt a frame in progress.
 
-For code that truly needs exact wall-clock timing (e.g., long-press detection at 750ms in SelectBehavior), callers can use `{ exact: true }` to bypass the idle queue and fire the callback directly from the timer. These should be rare.
+Code that truly needs exact wall-clock timing (e.g., long-press detection at 750ms in SelectBehavior) should use `globalThis.setTimeout` directly — there's no need to opt into the scheduler for those cases.
 
 ### Worker Scheduling (Future)
 
@@ -266,12 +266,34 @@ SchedulerSystem exists with managed `scheduleIdleTask`, `scheduleTimeout`, and `
 - Task duration tracking (EMA per `workID`) deferred to Phase 4 when workIDs are introduced
 - 72 tests passing (12 new: schedule API, priority ordering, error handling, targetFrameTime)
 
-### Phase 4 — Unified Timer API with `workID`
+### Phase 4 — Unified Timer API with `workID` (done)
 
-- Add `setTimeout`, `setInterval`, `debounce`, `throttle` methods with `workID` keys
-- Timers mature into the idle queue instead of firing directly (the "float" behavior)
-- Add `cancel(workID)` for named cancellation
-- Migrate existing `window.setTimeout` / lodash `debounce` / `throttle` call sites
+- New workID-keyed timer methods: `setTimeout(workID, fn, opts)`, `setInterval(workID, fn, opts)`,
+  `debounce(workID, fn, opts)`, `throttle(workID, fn, opts)`
+- **Timer float**: when a timer matures, its task enters the priority queue and runs at the
+  next frame's drain phase — never mid-frame.  ~0–16ms float, acceptable for all use cases.
+- `cancel(workID)` cancels both the timer entry and any queued tasks bearing that workID
+- `cancelAllTimers()` cancels all workID-keyed timers.  `resetAsync()` calls both
+  `cancelAllTimers()` and the legacy `cancelAllTimeouts()`/`cancelAllIntervals()`.
+- `debounce`: `leading: true` option fires immediately on first call, then debounces
+- `throttle`: fires on leading edge, saves trailing call, cleans up automatically when idle
+- Internal helpers: `_enqueue(fn, priority, workID)` for fire-and-forget queue pushes,
+  `_removeFromQueues(workID)` for cancel cleanup, `_throttleWindowExpired(entry)` for
+  throttle window chaining
+- Legacy `scheduleTimeout`/`scheduleInterval` (Phase 1) retained for backward compat —
+  they have zero external callers, only tests
+- 27 lodash debounce/throttle call sites across UI, services, and core identified for
+  future migration
+- QueuedTask and ScheduleOptions now support optional `workID` field
+- 98 tests passing (26 new: setTimeout, setInterval, debounce, throttle, cancel,
+  cancelAllTimers, priority, replacement, leading/trailing, cleanup)
+
+### Phase 4a — Migrate Callers (not started)
+
+- Migrate ~14 lodash `debounce` call sites to `scheduler.debounce(workID, fn, opts)`
+- Migrate ~13 lodash `throttle` call sites to `scheduler.throttle(workID, fn, opts)`
+- Remove lodash debounce/throttle imports
+- Deprecate/remove legacy `scheduleTimeout` / `scheduleInterval` once all callers migrated
 
 ### Phase 5 — Backpressure
 

@@ -90,6 +90,8 @@ export type TextureID = string;
 export type ValidatorID = string;
 /** Variable ID - identifier for named value lists in schema/style scopes (e.g. 'lifecycle_prefixes') */
 export type VariableID = string;
+/** Work ID - identifier for scheduled work items (e.g. 'validation-run', 'sidebar-debounce') */
+export type WorkID = string;
 
 
 // Make these types available globally (no import needed within Rapid)
@@ -135,4 +137,5 @@ declare global {
   type TextureID = string;
   type ValidatorID = string;
   type VariableID = string;
+  type WorkID = string;
 }

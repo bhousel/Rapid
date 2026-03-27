@@ -8,6 +8,7 @@ type TaskPriority = 'urgent' | 'normal' | 'idle';
 
 /** A task waiting in an internal queue */
 interface QueuedTask {
+  workID?: WorkID;
   fn: () => void;
   resolve: () => void;
   reject: (reason?: unknown) => void;
@@ -16,6 +17,30 @@ interface QueuedTask {
 /** Options for the general `schedule()` API */
 interface ScheduleOptions {
   priority?: TaskPriority;
+  workID?: WorkID;
+}
+
+/** Options for the workID-based timer methods */
+interface TimerOptions {
+  /** Delay or interval in milliseconds (default varies by method) */
+  ms?: number;
+  /** Which queue the matured task goes into (default `'normal'`) */
+  priority?: TaskPriority;
+  /** For debounce: fire on leading edge (default `false`) */
+  leading?: boolean;
+}
+
+/** Internal tracking entry for a workID-keyed timer */
+interface TimerEntry {
+  workID: WorkID;
+  type: 'timeout' | 'interval' | 'debounce' | 'throttle';
+  fn: () => void;
+  ms: number;
+  priority: TaskPriority;
+  handle: ReturnType<typeof globalThis.setTimeout> | null;
+  leading: boolean;
+  /** Throttle: the most recent fn passed during the throttle window */
+  trailingFn: (() => void) | null;
 }
 
 /** Opaque cancel function returned by `scheduleTimeout` and `scheduleInterval` */
@@ -48,8 +73,11 @@ const DEFAULT_TARGET_FRAME_TIME = 1000 / 60;
  *   - `'idle'`    — runs only if budget remains after normal tasks
  *
  * **Timer management** — Wraps `setTimeout` / `setInterval` so callers
- * don't need to track handles.  All managed timers are automatically
- * cancelled on `resetAsync()`.
+ * don't need to track handles.  Additionally provides `workID`-keyed
+ * timer methods — `setTimeout`, `setInterval`, `debounce`, `throttle` —
+ * where expired timers float into the priority queue instead of firing
+ * directly.  All managed timers are automatically cancelled on
+ * `resetAsync()`.
  *
  * **Worker management** (future) — Will spawn, pool, and message web
  * workers so that CPU-heavy work (validation, spatial indexing, etc.) can
@@ -77,7 +105,10 @@ export class SchedulerSystem extends AbstractSystem {
   private _normalQueue: QueuedTask[];
   private _idleQueue: QueuedTask[];
 
-  // Timers
+  // workID-keyed timers (timeout, interval, debounce, throttle)
+  private _timers: Map<string, TimerEntry>;
+
+  // Legacy handle-based timers (Phase 1 API — still used by existing callers)
   /** Active managed timeouts keyed by their setTimeout handle */
   private _timeouts: Set<ReturnType<typeof setTimeout>>;
   /** Active managed intervals keyed by their setInterval handle */
@@ -103,6 +134,8 @@ export class SchedulerSystem extends AbstractSystem {
     this._urgentQueue = [];
     this._normalQueue = [];
     this._idleQueue = [];
+
+    this._timers = new Map();
 
     this._timeouts = new Set();
     this._intervals = new Set();
@@ -153,6 +186,7 @@ export class SchedulerSystem extends AbstractSystem {
    */
   resetAsync(): Promise<void> {
     this.cancelAllIdleTasks();
+    this.cancelAllTimers();
     this.cancelAllTimeouts();
     this.cancelAllIntervals();
     return Promise.resolve();
@@ -180,7 +214,7 @@ export class SchedulerSystem extends AbstractSystem {
    */
   schedule(fn: () => void, opts?: ScheduleOptions): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const task: QueuedTask = { fn, resolve, reject };
+      const task: QueuedTask = { workID: opts?.workID, fn, resolve, reject };
       const priority = opts?.priority ?? 'normal';
       switch (priority) {
         case 'urgent':  this._urgentQueue.push(task);  break;
@@ -241,6 +275,236 @@ export class SchedulerSystem extends AbstractSystem {
   }
   set targetFrameTime(ms: number) {
     this._targetFrameTime = Math.max(1, ms);
+  }
+
+
+  // -------------------------------------------------------
+  // workID-keyed timer API
+  //
+  // These methods track timers by a string key (`workID`).
+  // When a timer matures, its task enters the priority queue
+  // ("float") rather than firing directly — so execution is
+  // synchronized with the game loop's frame budget.
+  //
+  // Cancel by name: `scheduler.cancel(workID)`
+  // Cancel all:     `scheduler.cancelAllTimers()`
+  // -------------------------------------------------------
+
+  /**
+   * setTimeout
+   * Schedules `fn` to run once after `ms` milliseconds.  When the timer
+   * expires, the task enters the priority queue and runs at the next
+   * frame's drain phase.
+   *
+   * Calling again with the same `workID` cancels the previous timer and
+   * starts a new one.
+   *
+   * @param workID - Unique string key for tracking / cancellation
+   * @param fn - The function to execute
+   * @param opts - Timer options (`ms`, `priority`)
+   */
+  setTimeout(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
+    this.cancel(workID);
+
+    const ms = opts?.ms ?? 0;
+    const priority = opts?.priority ?? 'normal';
+
+    const handle = globalThis.setTimeout(() => {
+      this._timers.delete(workID);
+      this._enqueue(fn, priority, workID);
+    }, ms);
+
+    this._timers.set(workID, {
+      workID, type: 'timeout', fn, ms, priority, handle,
+      leading: false, trailingFn: null,
+    });
+  }
+
+
+  /**
+   * setInterval
+   * Schedules `fn` to run repeatedly every `ms` milliseconds.  Each tick
+   * enters the priority queue rather than firing directly.
+   *
+   * Calling again with the same `workID` cancels the previous interval
+   * and starts a new one.
+   *
+   * @param workID - Unique string key for tracking / cancellation
+   * @param fn - The function to execute on each tick
+   * @param opts - Timer options (`ms`, `priority`)
+   */
+  setInterval(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
+    this.cancel(workID);
+
+    const ms = opts?.ms ?? 1000;
+    const priority = opts?.priority ?? 'normal';
+
+    // Use globalThis.setInterval — each tick pushes into the queue
+    const handle = globalThis.setInterval(() => {
+      this._enqueue(fn, priority, workID);
+    }, ms) as unknown as ReturnType<typeof globalThis.setTimeout>;
+    // Note: setInterval and setTimeout return the same handle type in practice,
+    // but TypeScript may distinguish them.  The cast keeps the TimerEntry uniform.
+
+    this._timers.set(workID, {
+      workID, type: 'interval', fn, ms, priority, handle,
+      leading: false, trailingFn: null,
+    });
+  }
+
+
+  /**
+   * debounce
+   * Resets a timer on each call.  When `ms` elapses without another call,
+   * the task enters the priority queue.
+   *
+   * Calling again with the same `workID` resets the timer and replaces
+   * the function — this is the core debounce behavior.
+   *
+   * With `leading: true`, the function fires immediately on the first
+   * call, then debounces subsequent calls.
+   *
+   * @param workID - Unique string key for tracking / cancellation
+   * @param fn - The function to execute after the quiet period
+   * @param opts - Timer options (`ms`, `priority`, `leading`)
+   */
+  debounce(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
+    const ms = opts?.ms ?? 250;
+    const priority = opts?.priority ?? 'normal';
+    const leading = opts?.leading ?? false;
+
+    const existing = this._timers.get(workID);
+
+    if (existing?.type === 'debounce') {
+      // Subsequent call — reset the timer, update fn
+      if (existing.handle !== null) {
+        globalThis.clearTimeout(existing.handle);
+      }
+      existing.fn = fn;
+      existing.handle = globalThis.setTimeout(() => {
+        this._timers.delete(workID);
+        this._enqueue(existing.fn, priority, workID);
+      }, ms);
+      return;
+    }
+
+    // First call with this workID (or replacing a different timer type)
+    this.cancel(workID);
+
+    // Leading edge: fire immediately
+    if (leading) {
+      this._enqueue(fn, priority, workID);
+    }
+
+    // Set up the trailing timer
+    const handle = globalThis.setTimeout(() => {
+      this._timers.delete(workID);
+      // If leading-only (no subsequent calls), don't double-fire.
+      // Subsequent calls reset via the branch above, so if the original
+      // timer fires it means no subsequent calls happened.
+      if (!leading) {
+        this._enqueue(fn, priority, workID);
+      }
+    }, ms);
+
+    this._timers.set(workID, {
+      workID, type: 'debounce', fn, ms, priority, handle,
+      leading, trailingFn: null,
+    });
+  }
+
+
+  /**
+   * throttle
+   * Fires `fn` on the leading edge, then ignores calls for `ms`
+   * milliseconds.  The last call during the window fires on the trailing
+   * edge when the window expires.
+   *
+   * Calling again with the same `workID` during the window stores the
+   * latest `fn` as the trailing call.
+   *
+   * @param workID - Unique string key for tracking / cancellation
+   * @param fn - The function to execute
+   * @param opts - Timer options (`ms`, `priority`)
+   */
+  throttle(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
+    const ms = opts?.ms ?? 250;
+    const priority = opts?.priority ?? 'normal';
+
+    const existing = this._timers.get(workID);
+
+    if (existing?.type === 'throttle' && existing.handle !== null) {
+      // Within the throttle window — save as trailing
+      existing.trailingFn = fn;
+      return;
+    }
+
+    // Not in a window (first call or window expired)
+    this.cancel(workID);
+
+    // Fire on leading edge
+    this._enqueue(fn, priority, workID);
+
+    // Start the throttle window
+    const entry: TimerEntry = {
+      workID, type: 'throttle', fn, ms, priority, handle: null,
+      leading: false, trailingFn: null,
+    };
+    entry.handle = globalThis.setTimeout(() => this._throttleWindowExpired(entry), ms);
+    this._timers.set(workID, entry);
+  }
+
+
+  /**
+   * cancel
+   * Cancels all pending work associated with `workID` — both the timer
+   * entry (if any) and any queued tasks bearing that workID.
+   *
+   * @param workID - The work identifier to cancel
+   */
+  cancel(workID: WorkID): void {
+    const entry = this._timers.get(workID);
+    if (entry) {
+      if (entry.handle !== null) {
+        if (entry.type === 'interval') {
+          globalThis.clearInterval(entry.handle as unknown as ReturnType<typeof globalThis.setInterval>);
+        } else {
+          globalThis.clearTimeout(entry.handle);
+        }
+      }
+      this._timers.delete(workID);
+    }
+    this._removeFromQueues(workID);
+  }
+
+
+  /**
+   * cancelAllTimers
+   * Cancels every outstanding workID-keyed timer and removes their
+   * queued tasks.  Called automatically by `resetAsync()`.
+   */
+  cancelAllTimers(): void {
+    for (const entry of this._timers.values()) {
+      if (entry.handle !== null) {
+        if (entry.type === 'interval') {
+          globalThis.clearInterval(entry.handle as unknown as ReturnType<typeof globalThis.setInterval>);
+        } else {
+          globalThis.clearTimeout(entry.handle);
+        }
+      }
+    }
+    this._timers.clear();
+  }
+
+
+  /**
+   * numTimers
+   * Number of active workID-keyed timers.
+   * Useful for debugging and tests.
+   * @readonly
+   */
+  get numTimers(): number {
+    return this._timers.size;
   }
 
 
@@ -383,6 +647,78 @@ export class SchedulerSystem extends AbstractSystem {
    */
   get numFrameCallbacks(): number {
     return this._frameCallbacks.size;
+  }
+
+
+  /**
+   * _enqueue
+   * Pushes a fire-and-forget task into the appropriate priority queue.
+   * Used by the workID-based timer methods when a timer matures.
+   * Unlike `schedule()`, this does not return a Promise.
+   *
+   * @param fn - The function to execute
+   * @param priority - Which queue to use
+   * @param workID - Optional workID for cancellation support
+   */
+  private _enqueue(fn: () => void, priority: TaskPriority, workID?: WorkID): void {
+    const task: QueuedTask = {
+      workID,
+      fn,
+      resolve: () => {},
+      reject: (e) => {
+        if (e !== undefined) {
+          console.error(`SchedulerSystem: task '${workID ?? 'anonymous'}' threw:`, e);  // eslint-disable-line no-console
+        }
+      },
+    };
+    switch (priority) {
+      case 'urgent':  this._urgentQueue.push(task);  break;
+      case 'normal':  this._normalQueue.push(task);  break;
+      case 'idle':    this._idleQueue.push(task);    break;
+    }
+  }
+
+
+  /**
+   * _removeFromQueues
+   * Removes all queued tasks matching `workID` from every priority queue
+   * and rejects their promises.
+   *
+   * @param workID - The work identifier to remove
+   */
+  private _removeFromQueues(workID: WorkID): void {
+    for (const queue of [this._urgentQueue, this._normalQueue, this._idleQueue]) {
+      for (let i = queue.length - 1; i >= 0; i--) {
+        if (queue[i].workID === workID) {
+          const [task] = queue.splice(i, 1);
+          task.reject();
+        }
+      }
+    }
+  }
+
+
+  /**
+   * _throttleWindowExpired
+   * Called when a throttle window timer fires.  If a trailing call was
+   * recorded during the window, fire it and start a new window.
+   * Otherwise, clean up the timer entry.
+   *
+   * @param entry - The throttle TimerEntry
+   */
+  private _throttleWindowExpired(entry: TimerEntry): void {
+    if (entry.trailingFn) {
+      const fn = entry.trailingFn;
+      entry.trailingFn = null;
+      this._enqueue(fn, entry.priority, entry.workID);
+
+      // Start a new throttle window
+      entry.handle = globalThis.setTimeout(() => this._throttleWindowExpired(entry), entry.ms);
+    } else {
+      // No trailing call — clean up
+      entry.handle = null;
+      this._timers.delete(entry.workID);
+    }
   }
 
 

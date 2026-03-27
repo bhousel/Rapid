@@ -554,6 +554,283 @@ describe('SchedulerSystem', () => {
       });
     });
 
+    // -------------------------------------------------------
+    // workID-keyed timer API
+    // -------------------------------------------------------
+
+    describe('setTimeout (workID)', () => {
+      it('executes a task after the delay via queue drainage', async () => {
+        let executed = false;
+        _scheduler.setTimeout('test-timeout', () => { executed = true; }, { ms: 10 });
+        assert.strictEqual(_scheduler.numTimers, 1);
+
+        // Wait for timer to mature + frame to drain
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        assert.isTrue(executed, 'task should have run');
+        assert.strictEqual(_scheduler.numTimers, 0, 'timer entry cleaned up');
+      });
+
+      it('defaults to 0ms delay', async () => {
+        let executed = false;
+        _scheduler.setTimeout('test-zero', () => { executed = true; });
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        assert.isTrue(executed);
+      });
+
+      it('replaces existing timer with same workID', async () => {
+        const order = [];
+        _scheduler.setTimeout('test-replace', () => order.push('first'), { ms: 10 });
+        _scheduler.setTimeout('test-replace', () => order.push('second'), { ms: 10 });
+        assert.strictEqual(_scheduler.numTimers, 1, 'only one timer');
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        assert.deepEqual(order, ['second'], 'only the replacement ran');
+      });
+
+      it('respects priority option', () => {
+        _scheduler.setTimeout('test-pri', () => {}, { ms: 5000, priority: 'urgent' });
+        const entry = _scheduler._timers.get('test-pri');
+        assert.strictEqual(entry.priority, 'urgent');
+        _scheduler.cancel('test-pri');
+      });
+    });
+
+    describe('setInterval (workID)', () => {
+      it('executes a task repeatedly via queue drainage', async () => {
+        let count = 0;
+        _scheduler.setInterval('test-interval', () => { count++; }, { ms: 20 });
+        assert.strictEqual(_scheduler.numTimers, 1);
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 120); });
+        _scheduler.cancel('test-interval');
+        assert.isAbove(count, 1, 'interval should have fired multiple times');
+        assert.strictEqual(_scheduler.numTimers, 0);
+      });
+
+      it('replaces existing interval with same workID', async () => {
+        let aCount = 0;
+        let bCount = 0;
+        _scheduler.setInterval('test-replace-iv', () => { aCount++; }, { ms: 15 });
+        _scheduler.setInterval('test-replace-iv', () => { bCount++; }, { ms: 15 });
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        _scheduler.cancel('test-replace-iv');
+        assert.strictEqual(aCount, 0, 'first interval should not have fired');
+        assert.isAbove(bCount, 0, 'replacement should have fired');
+      });
+    });
+
+    describe('debounce', () => {
+      it('fires after the quiet period', async () => {
+        let executed = false;
+        _scheduler.debounce('test-debounce', () => { executed = true; }, { ms: 30 });
+        assert.strictEqual(_scheduler.numTimers, 1);
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 100); });
+        assert.isTrue(executed, 'debounced fn should have run');
+        assert.strictEqual(_scheduler.numTimers, 0, 'timer entry cleaned up');
+      });
+
+      it('resets the timer on subsequent calls', async () => {
+        const timestamps = [];
+        const start = performance.now();
+
+        _scheduler.debounce('test-reset', () => { timestamps.push(performance.now() - start); }, { ms: 40 });
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 20); });
+        // Call again before the first timer fires — resets the 40ms window
+        _scheduler.debounce('test-reset', () => { timestamps.push(performance.now() - start); }, { ms: 40 });
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 100); });
+        assert.lengthOf(timestamps, 1, 'should have fired exactly once');
+        // The single fire should be at ~60ms+ (20ms wait + 40ms debounce), not at ~40ms
+        assert.isAbove(timestamps[0], 50, 'should have fired after the reset delay');
+      });
+
+      it('updates fn on subsequent calls', async () => {
+        const order = [];
+        _scheduler.debounce('test-fn-update', () => order.push('first'), { ms: 30 });
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 10); });
+        _scheduler.debounce('test-fn-update', () => order.push('second'), { ms: 30 });
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 100); });
+        assert.deepEqual(order, ['second'], 'only the latest fn should run');
+      });
+
+      it('leading: true fires immediately on first call', async () => {
+        const order = [];
+        _scheduler.debounce('test-leading', () => order.push('leading'), { ms: 30, leading: true });
+
+        // Wait a couple frames for the leading enqueue to drain
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        assert.include(order, 'leading', 'should have fired on leading edge');
+      });
+
+      it('leading: true + subsequent call fires both leading and trailing', async () => {
+        const order = [];
+        _scheduler.debounce('test-lead-trail', () => order.push('a'), { ms: 30, leading: true });
+
+        // Wait a frame for leading to drain, then debounce again
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 15); });
+        _scheduler.debounce('test-lead-trail', () => order.push('b'), { ms: 30 });
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 100); });
+        assert.deepEqual(order, ['a', 'b'], 'both leading and trailing should fire');
+      });
+    });
+
+    describe('throttle', () => {
+      it('fires on the leading edge', async () => {
+        let executed = false;
+        _scheduler.throttle('test-throttle', () => { executed = true; }, { ms: 50 });
+        assert.strictEqual(_scheduler.numTimers, 1);
+
+        // Wait for the leading enqueue to drain
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        assert.isTrue(executed, 'should have fired on leading edge');
+      });
+
+      it('ignores calls during the throttle window', async () => {
+        let count = 0;
+        _scheduler.throttle('test-ignore', () => { count++; }, { ms: 100 });
+        _scheduler.throttle('test-ignore', () => { count++; }, { ms: 100 });
+        _scheduler.throttle('test-ignore', () => { count++; }, { ms: 100 });
+
+        // Wait for leading + trailing to drain
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 200); });
+        // Leading fires once, plus the last trailing should fire once
+        assert.strictEqual(count, 2, 'leading + trailing = 2 executions');
+      });
+
+      it('fires trailing call after window expires', async () => {
+        const order = [];
+        _scheduler.throttle('test-trailing', () => order.push('leading'), { ms: 40 });
+        // Call during window — this becomes the trailing fn
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 10); });
+        _scheduler.throttle('test-trailing', () => order.push('trailing'), { ms: 40 });
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 120); });
+        assert.deepEqual(order, ['leading', 'trailing']);
+        assert.strictEqual(_scheduler.numTimers, 0, 'cleaned up after trailing');
+      });
+
+      it('cleans up when no trailing call', async () => {
+        _scheduler.throttle('test-cleanup', () => {}, { ms: 30 });
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        assert.strictEqual(_scheduler.numTimers, 0, 'should be cleaned up');
+      });
+
+      it('replaces different timer types with same workID', async () => {
+        _scheduler.setTimeout('test-replace-type', () => {}, { ms: 5000 });
+        assert.strictEqual(_scheduler.numTimers, 1);
+        assert.strictEqual(_scheduler._timers.get('test-replace-type').type, 'timeout');
+
+        _scheduler.throttle('test-replace-type', () => {}, { ms: 30 });
+        assert.strictEqual(_scheduler.numTimers, 1);
+        assert.strictEqual(_scheduler._timers.get('test-replace-type').type, 'throttle');
+
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+      });
+    });
+
+    describe('cancel', () => {
+      it('cancels a timeout by workID', async () => {
+        let executed = false;
+        _scheduler.setTimeout('test-cancel-to', () => { executed = true; }, { ms: 10 });
+        _scheduler.cancel('test-cancel-to');
+
+        assert.strictEqual(_scheduler.numTimers, 0);
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        assert.isFalse(executed);
+      });
+
+      it('cancels an interval by workID', async () => {
+        let count = 0;
+        _scheduler.setInterval('test-cancel-iv', () => { count++; }, { ms: 10 });
+        _scheduler.cancel('test-cancel-iv');
+
+        assert.strictEqual(_scheduler.numTimers, 0);
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        assert.strictEqual(count, 0);
+      });
+
+      it('cancels a debounce by workID', async () => {
+        let executed = false;
+        _scheduler.debounce('test-cancel-db', () => { executed = true; }, { ms: 10 });
+        _scheduler.cancel('test-cancel-db');
+
+        assert.strictEqual(_scheduler.numTimers, 0);
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        assert.isFalse(executed);
+      });
+
+      it('cancels a throttle by workID (including trailing)', async () => {
+        let count = 0;
+        _scheduler.throttle('test-cancel-th', () => { count++; }, { ms: 50 });
+        // Trailing call
+        _scheduler.throttle('test-cancel-th', () => { count++; }, { ms: 50 });
+        _scheduler.cancel('test-cancel-th');
+
+        // Wait for leading drain + check no trailing fires
+        await new Promise(resolve => { globalThis.setTimeout(resolve, 120); });
+        // The leading edge was enqueued before cancel — it might or might not
+        // have drained yet.  But after cancel, the trailing should not fire.
+        // Also, _removeFromQueues removes any pending enqueue.
+        assert.strictEqual(_scheduler.numTimers, 0);
+      });
+
+      it('removes queued tasks matching workID', () => {
+        _scheduler.schedule(() => {}, { priority: 'normal', workID: 'test-remove-q' }).catch(() => {});
+        assert.strictEqual(_scheduler.numPending, 1);
+        _scheduler.cancel('test-remove-q');
+        assert.strictEqual(_scheduler.numPending, 0);
+      });
+
+      it('does nothing for unknown workID', () => {
+        _scheduler.cancel('nonexistent');  // should not throw
+        assert.strictEqual(_scheduler.numTimers, 0);
+      });
+    });
+
+    describe('cancelAllTimers', () => {
+      it('cancels all workID-keyed timers', async () => {
+        _scheduler.setTimeout('a', () => {}, { ms: 5000 });
+        _scheduler.setInterval('b', () => {}, { ms: 5000 });
+        _scheduler.debounce('c', () => {}, { ms: 5000 });
+        assert.strictEqual(_scheduler.numTimers, 3);
+
+        _scheduler.cancelAllTimers();
+        assert.strictEqual(_scheduler.numTimers, 0);
+      });
+
+      it('does not affect legacy scheduleTimeout/scheduleInterval', () => {
+        const cancelTo = _scheduler.scheduleTimeout(() => {}, 5000);
+        const cancelIv = _scheduler.scheduleInterval(() => {}, 5000);
+        assert.strictEqual(_scheduler.numTimeouts, 1);
+        assert.strictEqual(_scheduler.numIntervals, 1);
+
+        _scheduler.cancelAllTimers();
+        assert.strictEqual(_scheduler.numTimeouts, 1, 'legacy timeout preserved');
+        assert.strictEqual(_scheduler.numIntervals, 1, 'legacy interval preserved');
+        cancelTo();
+        cancelIv();
+      });
+
+      it('resetAsync cancels both workID and legacy timers', async () => {
+        _scheduler.setTimeout('w', () => {}, { ms: 5000 });
+        _scheduler.scheduleTimeout(() => {}, 5000);
+        _scheduler.scheduleInterval(() => {}, 5000);
+        assert.strictEqual(_scheduler.numTimers, 1);
+        assert.strictEqual(_scheduler.numTimeouts, 1);
+        assert.strictEqual(_scheduler.numIntervals, 1);
+
+        await _scheduler.resetAsync();
+        assert.strictEqual(_scheduler.numTimers, 0);
+        assert.strictEqual(_scheduler.numTimeouts, 0);
+        assert.strictEqual(_scheduler.numIntervals, 0);
+      });
+    });
+
     describe('pause/resume interaction', () => {
       it('reference-counted pauses work with scheduling', async () => {
         const r1 = _scheduler.pause();
