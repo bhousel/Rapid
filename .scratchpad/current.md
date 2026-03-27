@@ -13,6 +13,7 @@ The longer-term fix is converting validators to proper classes with lifecycle ma
 - Per-dataset schema querying (different presets for Rapid vs OSM data)
 
 ## Recently Completed (one-liners)
+- **SchedulerSystem Phase 3: Frame-Aware Idle Execution** (Mar 2026) — Replaced `requestIdleCallback` backing with internal priority queues (urgent > normal > idle) drained per-frame within remaining budget. New `schedule(fn, opts)` API; `scheduleIdleTask` is now a convenience wrapper. `targetFrameTime` property (default ~16.7ms). Removed all rIC/cIC usage. 72 tests passing. See `.github/design/scheduler-system.md`.
 - **SchedulerSystem Phase 2: Own the Game Loop** (Mar 2026) — SchedulerSystem now owns the `requestAnimationFrame` loop. GraphicsSystem registers `_tick(deltaMS)` as a frame callback. `PIXI.Ticker.shared` no longer used. Frame callbacks: `addFrameCallback(id, fn)` / `removeFrameCallback(id)`. Loop stops on pause, restarts on resume. rAF polyfill added for test env. 60 tests passing. See `.github/design/scheduler-system.md`.
 - **SchedulerSystem Phase 1: Foundation** (Mar 2026) — Created SchedulerSystem with managed `scheduleIdleTask`, `scheduleTimeout`, `scheduleInterval`. Migrated all `requestIdleCallback` usage. Auto-cleanup on `resetAsync()`. `d3-timer`/`d3-transition` flagged as future migration targets (49 `.transition()` call sites in UI code).
 - **Validators folder rename** (Mar 2026) — `modules/validations/` → `modules/validators/`, `duplicate_way_segments` → `duplicate_segments`. Tests moved to `test/unit/validators/`. All imports updated.

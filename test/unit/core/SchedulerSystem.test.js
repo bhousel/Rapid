@@ -123,6 +123,28 @@ describe('SchedulerSystem', () => {
       });
     });
 
+    describe('targetFrameTime', () => {
+      it('defaults to ~16.7ms (60 fps)', () => {
+        assert.closeTo(_scheduler.targetFrameTime, 1000 / 60, 0.01);
+      });
+
+      it('can be set to a custom value', () => {
+        const original = _scheduler.targetFrameTime;
+        _scheduler.targetFrameTime = 8;
+        assert.strictEqual(_scheduler.targetFrameTime, 8);
+        _scheduler.targetFrameTime = original;
+      });
+
+      it('clamps to a minimum of 1ms', () => {
+        const original = _scheduler.targetFrameTime;
+        _scheduler.targetFrameTime = 0;
+        assert.strictEqual(_scheduler.targetFrameTime, 1);
+        _scheduler.targetFrameTime = -10;
+        assert.strictEqual(_scheduler.targetFrameTime, 1);
+        _scheduler.targetFrameTime = original;
+      });
+    });
+
     describe('scheduleIdleTask', () => {
       it('executes a task and resolves the returned promise', async () => {
         let executed = false;
@@ -162,7 +184,7 @@ describe('SchedulerSystem', () => {
         const prom = _scheduler.scheduleIdleTask(() => { executed = true; });
         assert.isFalse(executed, 'task should not run while paused');
 
-        // Resume — the 'resumed' event triggers _drainPending
+        // Resume — the loop starts and drains queued tasks
         release();
         await prom;
         assert.isTrue(executed, 'task should run after resume');
@@ -254,6 +276,81 @@ describe('SchedulerSystem', () => {
         let executed = false;
         await _scheduler.scheduleIdleTask(() => { executed = true; });
         assert.isTrue(executed, 'new task should run after cancel');
+      });
+    });
+
+    describe('schedule', () => {
+      it('executes a task with default priority (normal)', async () => {
+        let executed = false;
+        await _scheduler.schedule(() => { executed = true; });
+        assert.isTrue(executed);
+      });
+
+      it('executes a task with explicit normal priority', async () => {
+        let executed = false;
+        await _scheduler.schedule(() => { executed = true; }, { priority: 'normal' });
+        assert.isTrue(executed);
+      });
+
+      it('executes a task with urgent priority', async () => {
+        let executed = false;
+        await _scheduler.schedule(() => { executed = true; }, { priority: 'urgent' });
+        assert.isTrue(executed);
+      });
+
+      it('executes a task with idle priority', async () => {
+        let executed = false;
+        await _scheduler.schedule(() => { executed = true; }, { priority: 'idle' });
+        assert.isTrue(executed);
+      });
+
+      it('counts tasks from all priorities in numPending', () => {
+        _scheduler.schedule(() => {}, { priority: 'urgent' }).catch(() => {});
+        _scheduler.schedule(() => {}, { priority: 'normal' }).catch(() => {});
+        _scheduler.schedule(() => {}, { priority: 'idle' }).catch(() => {});
+        assert.strictEqual(_scheduler.numPending, 3);
+      });
+
+      it('drains urgent before normal before idle', async () => {
+        const order = [];
+        const p1 = _scheduler.schedule(() => order.push('idle'), { priority: 'idle' });
+        const p2 = _scheduler.schedule(() => order.push('normal'), { priority: 'normal' });
+        const p3 = _scheduler.schedule(() => order.push('urgent'), { priority: 'urgent' });
+        await Promise.all([p1, p2, p3]);
+        assert.deepEqual(order, ['urgent', 'normal', 'idle']);
+      });
+
+      it('rejects promise when task throws', async () => {
+        const prom = _scheduler.schedule(() => { throw new Error('oops'); });
+        try {
+          await prom;
+          assert.fail('Promise should have been rejected');
+        } catch (e) {
+          assert.instanceOf(e, Error);
+          assert.strictEqual(e.message, 'oops');
+        }
+      });
+
+      it('continues draining after a throwing task', async () => {
+        const order = [];
+        const p1 = _scheduler.schedule(() => order.push('a'), { priority: 'urgent' });
+        const p2 = _scheduler.schedule(() => { throw new Error('fail'); }, { priority: 'urgent' });
+        const p3 = _scheduler.schedule(() => order.push('c'), { priority: 'urgent' });
+
+        const results = await Promise.allSettled([p1, p2, p3]);
+        assert.strictEqual(results[0].status, 'fulfilled');
+        assert.strictEqual(results[1].status, 'rejected');
+        assert.strictEqual(results[2].status, 'fulfilled');
+        assert.deepEqual(order, ['a', 'c']);
+      });
+
+      it('cancelAllIdleTasks also cancels urgent and normal tasks', () => {
+        _scheduler.schedule(() => {}, { priority: 'urgent' }).catch(() => {});
+        _scheduler.schedule(() => {}, { priority: 'normal' }).catch(() => {});
+        _scheduler.schedule(() => {}, { priority: 'idle' }).catch(() => {});
+        assert.strictEqual(_scheduler.numPending, 3);
+        _scheduler.cancelAllIdleTasks();
+        assert.strictEqual(_scheduler.numPending, 0);
       });
     });
 

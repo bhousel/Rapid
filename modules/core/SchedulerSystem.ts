@@ -3,12 +3,19 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import type { Context } from '../Context.ts';
 
 
-/** Handle returned by `scheduleIdleTask`, used to cancel it */
-type IdleTaskHandle = number;
+/** Task priority — determines scheduling order within each frame */
+type TaskPriority = 'urgent' | 'normal' | 'idle';
 
-/** A deferred idle task, with its rejection callback for cleanup */
-interface IdleTask {
-  reject: () => void;
+/** A task waiting in an internal queue */
+interface QueuedTask {
+  fn: () => void;
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
+}
+
+/** Options for the general `schedule()` API */
+interface ScheduleOptions {
+  priority?: TaskPriority;
 }
 
 /** Opaque cancel function returned by `scheduleTimeout` and `scheduleInterval` */
@@ -23,6 +30,9 @@ type FrameCallback = (deltaMS: number) => void;
  */
 const MAX_DELTA_MS = 100;
 
+/** Default target: 60fps */
+const DEFAULT_TARGET_FRAME_TIME = 1000 / 60;
+
 
 /**
  * `SchedulerSystem` centralizes deferred and background work scheduling.
@@ -31,10 +41,11 @@ const MAX_DELTA_MS = 100;
  * (notably GraphicsSystem) register frame callbacks that the scheduler
  * calls each frame with the elapsed time (`deltaMS`).
  *
- * **Idle scheduling** — Wraps `requestIdleCallback` / `cancelIdleCallback`
- * behind a managed interface, so callers don't need to track handles or
- * deal with polyfill quirks.  When the system is paused, new idle tasks
- * are queued and deferred until the system resumes.
+ * **Task scheduling** — Queued tasks are drained at the end of each frame
+ * within the remaining frame budget.  Callers specify priority:
+ *   - `'urgent'`  — always runs this frame, even if over budget
+ *   - `'normal'`  — runs if budget remains after urgent tasks
+ *   - `'idle'`    — runs only if budget remains after normal tasks
  *
  * **Timer management** — Wraps `setTimeout` / `setInterval` so callers
  * don't need to track handles.  All managed timers are automatically
@@ -58,12 +69,13 @@ export class SchedulerSystem extends AbstractSystem {
   private _lastTimestamp: number;
   /** Milliseconds elapsed since the previous frame */
   private _deltaMS: number;
+  /** Target frame time in milliseconds — determines idle budget */
+  private _targetFrameTime: number;
 
-  // Idle tasks
-  /** Active idle tasks keyed by their requestIdleCallback handle */
-  private _idleTasks: Map<IdleTaskHandle, IdleTask>;
-  /** Tasks that arrived while paused — will be scheduled on resume */
-  private _pendingTasks: Array<{ fn: () => void; resolve: () => void; reject: () => void }>;
+  // Task queues (drained per-frame in priority order)
+  private _urgentQueue: QueuedTask[];
+  private _normalQueue: QueuedTask[];
+  private _idleQueue: QueuedTask[];
 
   // Timers
   /** Active managed timeouts keyed by their setTimeout handle */
@@ -86,9 +98,12 @@ export class SchedulerSystem extends AbstractSystem {
     this._rafHandle = 0;
     this._lastTimestamp = 0;
     this._deltaMS = 0;
+    this._targetFrameTime = DEFAULT_TARGET_FRAME_TIME;
 
-    this._idleTasks = new Map();
-    this._pendingTasks = [];
+    this._urgentQueue = [];
+    this._normalQueue = [];
+    this._idleQueue = [];
+
     this._timeouts = new Set();
     this._intervals = new Set();
   }
@@ -105,7 +120,6 @@ export class SchedulerSystem extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         this.on('resumed', () => {
-          this._drainPending();
           this._startLoop();
         });
         this.on('paused', () => {
@@ -146,55 +160,87 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * scheduleIdleTask
-   * Schedules a function to run during the browser's idle time.
-   * Returns a Promise that resolves after the task has executed.
+   * schedule
+   * Queues a function to run at the end of a future frame within the
+   * remaining frame budget.  Returns a Promise that resolves after the
+   * task has executed.
    *
-   * If the system is paused, the task is held until resumption.
+   * Priority controls ordering:
+   *   - `'urgent'`  — always runs this frame, even if over budget
+   *   - `'normal'`  — runs if budget remains after urgent tasks (default)
+   *   - `'idle'`    — runs only if budget remains after normal tasks
    *
-   * @param fn - The function to execute during idle time
-   * @return Promise resolved after the task completes
+   * Tasks queued while the system is paused accumulate and drain
+   * automatically when the game loop resumes.
+   *
+   * @param fn - The function to execute
+   * @param opts - Scheduling options (priority, etc.)
+   * @return Promise resolved after the task completes, rejected if the
+   *         task throws or is cancelled
    */
-  scheduleIdleTask(fn: () => void): Promise<void> {
+  schedule(fn: () => void, opts?: ScheduleOptions): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      if (this._paused) {
-        this._pendingTasks.push({ fn, resolve, reject });
-        return;
+      const task: QueuedTask = { fn, resolve, reject };
+      const priority = opts?.priority ?? 'normal';
+      switch (priority) {
+        case 'urgent':  this._urgentQueue.push(task);  break;
+        case 'normal':  this._normalQueue.push(task);  break;
+        case 'idle':    this._idleQueue.push(task);    break;
       }
-      this._scheduleOne(fn, resolve, reject);
     });
   }
 
 
   /**
+   * scheduleIdleTask
+   * Convenience wrapper — equivalent to `schedule(fn, { priority: 'idle' })`.
+   *
+   * @param fn - The function to execute during idle time
+   * @return Promise resolved after the task completes
+   */
+  scheduleIdleTask(fn: () => void): Promise<void> {
+    return this.schedule(fn, { priority: 'idle' });
+  }
+
+
+  /**
    * cancelAllIdleTasks
-   * Cancels every outstanding idle task and rejects pending tasks.
-   * Useful during reset or teardown.
+   * Cancels every outstanding queued task (urgent, normal, and idle)
+   * and rejects their promises.  Useful during reset or teardown.
    */
   cancelAllIdleTasks(): void {
-    // Cancel tasks already scheduled with requestIdleCallback
-    for (const [handle, task] of this._idleTasks) {
-      globalThis.cancelIdleCallback(handle);
-      task.reject();
+    const queues = [this._urgentQueue, this._normalQueue, this._idleQueue];
+    for (const queue of queues) {
+      for (const task of queue) {
+        task.reject();
+      }
+      queue.length = 0;
     }
-    this._idleTasks.clear();
-
-    // Reject tasks queued while paused
-    for (const pending of this._pendingTasks) {
-      pending.reject();
-    }
-    this._pendingTasks = [];
   }
 
 
   /**
    * numPending
-   * Number of idle tasks that are either scheduled or waiting to be scheduled.
+   * Total number of tasks waiting in all priority queues.
    * Useful for debugging and tests.
    * @readonly
    */
   get numPending(): number {
-    return this._idleTasks.size + this._pendingTasks.length;
+    return this._urgentQueue.length + this._normalQueue.length + this._idleQueue.length;
+  }
+
+
+  /**
+   * targetFrameTime
+   * Target frame duration in milliseconds.  Tasks are drained at the end
+   * of each frame only while `performance.now()` is below the deadline
+   * (`frameStart + targetFrameTime`).  Defaults to ~16.7ms (60 fps).
+   */
+  get targetFrameTime(): number {
+    return this._targetFrameTime;
+  }
+  set targetFrameTime(ms: number) {
+    this._targetFrameTime = Math.max(1, ms);
   }
 
 
@@ -341,33 +387,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _scheduleOne
-   * Internal: registers a single task with requestIdleCallback.
-   */
-  private _scheduleOne(fn: () => void, resolve: () => void, reject: () => void): void {
-    const handle = globalThis.requestIdleCallback(() => {
-      this._idleTasks.delete(handle);
-      fn();
-      resolve();
-    });
-    this._idleTasks.set(handle, { reject });
-  }
-
-
-  /**
-   * _drainPending
-   * Called on 'resumed' — schedules all tasks that were queued while paused.
-   */
-  private _drainPending(): void {
-    const tasks = this._pendingTasks;
-    this._pendingTasks = [];
-    for (const { fn, resolve, reject } of tasks) {
-      this._scheduleOne(fn, resolve, reject);
-    }
-  }
-
-
-  /**
    * _startLoop
    * Starts the `requestAnimationFrame` game loop if it isn't already running.
    */
@@ -394,8 +413,9 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * _onFrame
    * The core game loop callback, driven by `requestAnimationFrame`.
-   * Computes `deltaMS` from the browser-provided timestamp and calls
-   * all registered frame callbacks.
+   * Computes `deltaMS` from the browser-provided timestamp, calls
+   * all registered frame callbacks, then drains queued tasks with
+   * whatever frame budget remains.
    *
    * @param timestamp - `DOMHighResTimeStamp` from `requestAnimationFrame`
    */
@@ -416,6 +436,54 @@ export class SchedulerSystem extends AbstractSystem {
         fn(deltaMS);
       } catch (e) {
         console.error(`SchedulerSystem: frame callback '${id}' threw:`, e);  // eslint-disable-line no-console
+      }
+    }
+
+    // Drain queued tasks with remaining frame budget
+    const deadline = timestamp + this._targetFrameTime;
+    this._drainQueues(deadline);
+  }
+
+
+  /**
+   * _drainQueues
+   * Processes queued tasks in priority order within the frame budget.
+   * Urgent tasks always drain (even if over budget).  Normal and idle
+   * tasks only run while `performance.now()` is below the deadline.
+   *
+   * @param deadline - Absolute `performance.now()` time to stay under
+   */
+  private _drainQueues(deadline: number): void {
+    // Urgent: always drain fully, regardless of budget
+    this._drainQueue(this._urgentQueue, Infinity);
+
+    // Normal: drain within budget
+    this._drainQueue(this._normalQueue, deadline);
+
+    // Idle: drain with remaining budget
+    this._drainQueue(this._idleQueue, deadline);
+  }
+
+
+  /**
+   * _drainQueue
+   * Runs tasks from a single queue until the queue is empty or the
+   * deadline is exceeded.  Each task's promise is resolved on success
+   * or rejected if the task function throws.
+   *
+   * @param queue - The task queue to drain
+   * @param deadline - Absolute `performance.now()` time to stay under
+   *                   (pass `Infinity` to drain unconditionally)
+   */
+  private _drainQueue(queue: QueuedTask[], deadline: number): void {
+    while (queue.length > 0) {
+      if (deadline !== Infinity && performance.now() >= deadline) break;
+      const task = queue.shift()!;
+      try {
+        task.fn();
+        task.resolve();
+      } catch (e) {
+        task.reject(e);
       }
     }
   }

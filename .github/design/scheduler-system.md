@@ -251,12 +251,20 @@ SchedulerSystem exists with managed `scheduleIdleTask`, `scheduleTimeout`, and `
 - Added `requestAnimationFrame`/`cancelAnimationFrame` polyfill for test environments
 - 60 tests passing (12 new game loop tests)
 
-### Phase 3 — Frame-Aware Idle Execution
+### Phase 3 — Frame-Aware Idle Execution (done)
 
-- Replace `requestIdleCallback` backing with the internal idle queue
-- After render callbacks complete each frame, drain idle queue with remaining budget
-- Add task duration tracking (EMA per `workID`)
-- Add priority queues (urgent > normal > idle)
+- Replaced `requestIdleCallback`/`cancelIdleCallback` backing with internal priority queues
+- Three queues drained per-frame in priority order: urgent > normal > idle
+- New `schedule(fn, opts)` API with `{ priority: 'urgent' | 'normal' | 'idle' }` (default: `'normal'`)
+- `scheduleIdleTask(fn)` is now a convenience wrapper for `schedule(fn, { priority: 'idle' })`
+- Urgent tasks always drain (even if over budget); normal and idle respect the frame budget
+- `targetFrameTime` property (default ~16.7ms / 60fps) controls the per-frame deadline
+- No more `requestIdleCallback` / `cancelIdleCallback` usage — tasks accumulate in queues
+  naturally while paused and drain when the game loop resumes
+- Removed `_scheduleOne`, `_drainPending`, `_idleTasks`, `_pendingTasks`
+- Error handling: throwing tasks reject their Promise; subsequent tasks still drain
+- Task duration tracking (EMA per `workID`) deferred to Phase 4 when workIDs are introduced
+- 72 tests passing (12 new: schedule API, priority ordering, error handling, targetFrameTime)
 
 ### Phase 4 — Unified Timer API with `workID`
 

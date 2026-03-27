@@ -17,9 +17,12 @@ describe('ValidationSystem', () => {
   };
 
   beforeAll(() => {
+    const scheduler = context.systems.scheduler;
     const schema = context.systems.schema;
     schema.requestedAssetIDs = '';
-    return schema.initAsync()
+    return Promise.resolve()
+      .then(() => Promise.all([scheduler.initAsync(), schema.initAsync()]))
+      .then(() => Promise.all([scheduler.startAsync(), schema.startAsync()]))
       .then(() => schema.merge(osmRulesets));
   });
 
