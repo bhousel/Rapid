@@ -12,7 +12,13 @@ The longer-term fix is converting validators to proper classes with lifecycle ma
 - Have PixiLayerRapid call `styleMatch()` with a dataset/scope ID
 - Per-dataset schema querying (different presets for Rapid vs OSM data)
 
+### Performer-inspired statistics display
+- HUD overlay showing frame timing (APP/DRAW split), scene complexity, draw calls, texture usage, queue depth
+- Data sources: `scheduler.metrics`, GraphicsSystem performance marks (already in place, commented out), Pixi renderer stats, `scheduler.numPending`
+- Inspiration: SGI Performer's `pfStats`/`pfFrameStats` system (Chapter 23 of Performer Programmer's Guide)
+
 ## Recently Completed (one-liners)
+- **SchedulerSystem Phase 5: Backpressure** (Mar 2026) — Frame timing metrics (EMA of frame/render/idle time), dropped-frame ring buffer (60-frame window), pressure levels (none/light/moderate/heavy) with hysteresis, `'pressure'` event emission, idle queue throttling under pressure. 117 scheduler tests. See `.github/design/scheduler-system.md`.
 - **SchedulerSystem Phase 4a: Migrate lodash debounce/throttle** (Mar 2026) — Migrated all lodash `debounce`/`throttle` call sites (22 across 16 files) to SchedulerSystem's workID-keyed API. Added `leading` option to `throttle()`. Zero lodash debounce/throttle imports remain. Services use `if (shouldDebounce && scheduler)` fallback pattern so requests still fire when scheduler is absent. `scheduler` added to `optionalDependencies` in OsmService, TaginfoService, OsmWikibaseService.
 - **SchedulerSystem Phase 4: Unified Timer API with workID** (Mar 2026) — Added workID-keyed timer methods: `setTimeout`, `setInterval`, `debounce`, `throttle` with timer float (tasks enter priority queue instead of firing directly). `cancel(workID)` and `cancelAllTimers()` for named cancellation. Debounce supports `leading` option; setTimeout supports `exact` bypass. See `.github/design/scheduler-system.md`.
 - **SchedulerSystem Phase 3: Frame-Aware Idle Execution** (Mar 2026) — Replaced `requestIdleCallback` backing with internal priority queues (urgent > normal > idle) drained per-frame within remaining budget. New `schedule(fn, opts)` API; `scheduleIdleTask` is now a convenience wrapper. `targetFrameTime` property (default ~16.7ms). Removed all rIC/cIC usage. 72 tests passing. See `.github/design/scheduler-system.md`.

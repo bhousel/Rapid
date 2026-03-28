@@ -6,6 +6,25 @@ import type { Context } from '../Context.ts';
 /** Task priority — determines scheduling order within each frame */
 type TaskPriority = 'urgent' | 'normal' | 'idle';
 
+/** Pressure levels from least to most severe */
+type PressureLevel = 'none' | 'light' | 'moderate' | 'heavy';
+
+/** Frame timing metrics exposed to consumers */
+interface FrameMetrics {
+  /** Exponential moving average of total frame time (ms) */
+  avgFrameTime: number;
+  /** EMA of frame callback time — APP + DRAW (ms) */
+  avgRenderTime: number;
+  /** EMA of queue drain time (ms) */
+  avgIdleTime: number;
+  /** Count of over-budget frames in the recent window */
+  droppedFrames: number;
+  /** Current target frame time (ms) */
+  targetFrameTime: number;
+  /** Current pressure level */
+  pressure: PressureLevel;
+}
+
 /** A task waiting in an internal queue */
 interface QueuedTask {
   workID?: WorkID;
@@ -57,6 +76,33 @@ const MAX_DELTA_MS = 100;
 
 /** Default target: 60fps */
 const DEFAULT_TARGET_FRAME_TIME = 1000 / 60;
+
+/**
+ * EMA smoothing factor for frame timing metrics.
+ * alpha = 2 / (N + 1) where N is the effective window.
+ * 0.05 ≈ 39-frame window — responsive without jitter.
+ */
+const EMA_ALPHA = 0.05;
+
+/**
+ * Number of recent frames to track for dropped-frame ratio.
+ * At 60fps this is ~1 second of history.
+ */
+const PRESSURE_WINDOW = 60;
+
+/** Dropped-frame ratio thresholds for escalating pressure */
+const PRESSURE_ESCALATE = {
+  light:    0.15,   // 9+ of 60 frames dropped
+  moderate: 0.35,   // 21+ of 60 frames dropped
+  heavy:    0.50,   // 30+ of 60 frames dropped
+} as const;
+
+/** Dropped-frame ratio thresholds for recovering (lower = more hysteresis) */
+const PRESSURE_RECOVER = {
+  heavy:    0.40,   // heavy → moderate when below 40%
+  moderate: 0.20,   // moderate → light when below 20%
+  light:    0.05,   // light → none when below 5%
+} as const;
 
 
 /**
@@ -114,6 +160,22 @@ export class SchedulerSystem extends AbstractSystem {
   /** Active managed intervals keyed by their setInterval handle */
   private _intervals: Set<ReturnType<typeof setInterval>>;
 
+  // Backpressure — frame timing metrics and pressure tracking
+  /** EMA of total frame time (ms) */
+  private _avgFrameTime: number;
+  /** EMA of frame callback time (ms) */
+  private _avgRenderTime: number;
+  /** EMA of queue drain time (ms) */
+  private _avgIdleTime: number;
+  /** Ring buffer: true if that frame exceeded the budget */
+  private _droppedFrameRing: boolean[];
+  /** Write index into the ring buffer */
+  private _ringIndex: number;
+  /** Cached count of `true` values in the ring buffer */
+  private _droppedCount: number;
+  /** Current pressure level */
+  private _pressure: PressureLevel;
+
   /**
    * @constructor
    * @param context - Global shared application context
@@ -139,6 +201,14 @@ export class SchedulerSystem extends AbstractSystem {
 
     this._timeouts = new Set();
     this._intervals = new Set();
+
+    this._avgFrameTime = 0;
+    this._avgRenderTime = 0;
+    this._avgIdleTime = 0;
+    this._droppedFrameRing = new Array<boolean>(PRESSURE_WINDOW).fill(false);
+    this._ringIndex = 0;
+    this._droppedCount = 0;
+    this._pressure = 'none';
   }
 
 
@@ -189,6 +259,19 @@ export class SchedulerSystem extends AbstractSystem {
     this.cancelAllTimers();
     this.cancelAllTimeouts();
     this.cancelAllIntervals();
+
+    // Reset backpressure metrics so recovered state doesn't carry over
+    this._avgFrameTime = 0;
+    this._avgRenderTime = 0;
+    this._avgIdleTime = 0;
+    this._droppedFrameRing.fill(false);
+    this._ringIndex = 0;
+    this._droppedCount = 0;
+    if (this._pressure !== 'none') {
+      this._pressure = 'none';
+      this.emit('pressure', 'none');
+    }
+
     return Promise.resolve();
   }
 
@@ -622,6 +705,36 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
+   * pressure
+   * Current backpressure level.  The scheduler automatically adjusts
+   * idle-queue draining based on this level and emits `'pressure'`
+   * events when the level changes.
+   * @readonly
+   */
+  get pressure(): PressureLevel {
+    return this._pressure;
+  }
+
+
+  /**
+   * metrics
+   * Snapshot of the current frame timing metrics.
+   * All time values are in milliseconds.
+   * @readonly
+   */
+  get metrics(): FrameMetrics {
+    return {
+      avgFrameTime: this._avgFrameTime,
+      avgRenderTime: this._avgRenderTime,
+      avgIdleTime: this._avgIdleTime,
+      droppedFrames: this._droppedCount,
+      targetFrameTime: this._targetFrameTime,
+      pressure: this._pressure,
+    };
+  }
+
+
+  /**
    * addFrameCallback
    * Registers a callback to run once per frame in the game loop.
    * The callback receives `deltaMS` — milliseconds since the previous frame.
@@ -772,6 +885,8 @@ export class SchedulerSystem extends AbstractSystem {
     this._lastTimestamp = timestamp;
     this._deltaMS = deltaMS;
 
+    const frameStart = performance.now();
+
     // Call registered frame callbacks
     for (const [id, fn] of this._frameCallbacks) {
       try {
@@ -781,9 +896,18 @@ export class SchedulerSystem extends AbstractSystem {
       }
     }
 
+    const renderEnd = performance.now();
+
     // Drain queued tasks with remaining frame budget
     const deadline = timestamp + this._targetFrameTime;
     this._drainQueues(deadline);
+
+    const frameEnd = performance.now();
+
+    // Update timing metrics (skip the first frame where deltaMS is 0)
+    if (deltaMS > 0) {
+      this._updateMetrics(frameEnd - frameStart, renderEnd - frameStart, frameEnd - renderEnd);
+    }
   }
 
 
@@ -792,6 +916,10 @@ export class SchedulerSystem extends AbstractSystem {
    * Processes queued tasks in priority order within the frame budget.
    * Urgent tasks always drain (even if over budget).  Normal and idle
    * tasks only run while `performance.now()` is below the deadline.
+   *
+   * Under backpressure, idle queue draining is reduced or skipped:
+   *   - `'light'`    — idle tasks get half the remaining budget
+   *   - `'moderate'`/`'heavy'` — idle queue is skipped entirely
    *
    * @param deadline - Absolute `performance.now()` time to stay under
    */
@@ -802,8 +930,19 @@ export class SchedulerSystem extends AbstractSystem {
     // Normal: drain within budget
     this._drainQueue(this._normalQueue, deadline);
 
-    // Idle: drain with remaining budget
-    this._drainQueue(this._idleQueue, deadline);
+    // Idle: respect pressure level
+    const pressure = this._pressure;
+    if (pressure === 'none') {
+      this._drainQueue(this._idleQueue, deadline);
+    } else if (pressure === 'light') {
+      // Halve the remaining budget for idle work
+      const now = performance.now();
+      const remaining = deadline - now;
+      if (remaining > 0) {
+        this._drainQueue(this._idleQueue, now + remaining * 0.5);
+      }
+    }
+    // 'moderate' and 'heavy': skip idle queue entirely
   }
 
 
@@ -827,6 +966,79 @@ export class SchedulerSystem extends AbstractSystem {
       } catch (e) {
         task.reject(e);
       }
+    }
+  }
+
+
+  /**
+   * _updateMetrics
+   * Called at the end of each frame to update the exponential moving
+   * averages, the dropped-frame ring buffer, and the pressure level.
+   *
+   * @param frameTime - Total frame time (ms)
+   * @param renderTime - Frame callback time (ms)
+   * @param idleTime - Queue drain time (ms)
+   */
+  private _updateMetrics(frameTime: number, renderTime: number, idleTime: number): void {
+    const alpha = EMA_ALPHA;
+
+    // Bootstrap EMA on the first real frame
+    if (this._avgFrameTime === 0) {
+      this._avgFrameTime = frameTime;
+      this._avgRenderTime = renderTime;
+      this._avgIdleTime = idleTime;
+    } else {
+      this._avgFrameTime = alpha * frameTime + (1 - alpha) * this._avgFrameTime;
+      this._avgRenderTime = alpha * renderTime + (1 - alpha) * this._avgRenderTime;
+      this._avgIdleTime = alpha * idleTime + (1 - alpha) * this._avgIdleTime;
+    }
+
+    // Update dropped-frame ring buffer
+    const dropped = frameTime > this._targetFrameTime;
+    const idx = this._ringIndex % PRESSURE_WINDOW;
+    if (this._droppedFrameRing[idx] && !dropped) {
+      this._droppedCount--;
+    } else if (!this._droppedFrameRing[idx] && dropped) {
+      this._droppedCount++;
+    }
+    this._droppedFrameRing[idx] = dropped;
+    this._ringIndex++;
+
+    // Compute pressure level with hysteresis
+    this._computePressure();
+  }
+
+
+  /**
+   * _computePressure
+   * Determines the pressure level from the dropped-frame ratio and
+   * emits a `'pressure'` event if it changed.  Uses separate escalation
+   * and recovery thresholds to prevent oscillation.
+   */
+  private _computePressure(): void {
+    const ratio = this._droppedCount / PRESSURE_WINDOW;
+    const prev = this._pressure;
+    let next: PressureLevel;
+
+    // Escalation: only step up one level at a time
+    if (prev === 'none') {
+      next = ratio > PRESSURE_ESCALATE.light ? 'light' : 'none';
+    } else if (prev === 'light') {
+      if (ratio > PRESSURE_ESCALATE.moderate)       next = 'moderate';
+      else if (ratio < PRESSURE_RECOVER.light)      next = 'none';
+      else                                           next = 'light';
+    } else if (prev === 'moderate') {
+      if (ratio > PRESSURE_ESCALATE.heavy)           next = 'heavy';
+      else if (ratio < PRESSURE_RECOVER.moderate)    next = 'light';
+      else                                           next = 'moderate';
+    } else {
+      // prev === 'heavy'
+      next = ratio < PRESSURE_RECOVER.heavy ? 'moderate' : 'heavy';
+    }
+
+    if (next !== prev) {
+      this._pressure = next;
+      this.emit('pressure', next);
     }
   }
 }

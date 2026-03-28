@@ -1072,6 +1072,283 @@ describe('SchedulerSystem', () => {
           assert.isAbove(count, countBeforeReset, 'callback should still fire after reset');
         });
       });
+
+      describe('backpressure', () => {
+        describe('metrics getter', () => {
+          it('returns the expected shape', () => {
+            const m = _scheduler.metrics;
+            assert.isNumber(m.avgFrameTime);
+            assert.isNumber(m.avgRenderTime);
+            assert.isNumber(m.avgIdleTime);
+            assert.isNumber(m.droppedFrames);
+            assert.isNumber(m.targetFrameTime);
+            assert.isString(m.pressure);
+          });
+
+          it('starts with zeroed averages and pressure "none"', () => {
+            const m = _scheduler.metrics;
+            assert.strictEqual(m.avgFrameTime, 0);
+            assert.strictEqual(m.avgRenderTime, 0);
+            assert.strictEqual(m.avgIdleTime, 0);
+            assert.strictEqual(m.droppedFrames, 0);
+            assert.strictEqual(m.pressure, 'none');
+          });
+        });
+
+        describe('pressure getter', () => {
+          it('starts at "none"', () => {
+            assert.strictEqual(_scheduler.pressure, 'none');
+          });
+        });
+
+        describe('metrics update after frames', () => {
+          it('updates avgFrameTime after frames run', async () => {
+            // Register a lightweight callback so frames have measurable work
+            _scheduler.addFrameCallback('test', () => {});
+            await waitFrames(5);
+            _scheduler.removeFrameCallback('test');
+
+            const m = _scheduler.metrics;
+            assert.isAbove(m.avgFrameTime, 0, 'avgFrameTime should be positive after frames');
+          });
+
+          it('tracks render time from frame callbacks', async () => {
+            // Register a callback that does a little work
+            _scheduler.addFrameCallback('test', () => {
+              let sum = 0;
+              for (let i = 0; i < 100; i++) sum += i;
+            });
+            await waitFrames(5);
+            _scheduler.removeFrameCallback('test');
+
+            const m = _scheduler.metrics;
+            assert.isAtLeast(m.avgRenderTime, 0, 'avgRenderTime should be non-negative');
+          });
+        });
+
+        describe('pressure escalation via _updateMetrics', () => {
+          it('escalates to "light" when many frames are dropped', () => {
+            // Directly invoke _updateMetrics to simulate over-budget frames
+            // without waiting for real rAF frames
+            const budget = _scheduler.targetFrameTime;
+            for (let i = 0; i < 60; i++) {
+              _scheduler._updateMetrics(budget * 2, budget * 1.5, budget * 0.5);
+            }
+            assert.strictEqual(_scheduler.pressure, 'heavy');
+          });
+
+          it('escalates through light → moderate → heavy', () => {
+            const budget = _scheduler.targetFrameTime;
+            const overBudget = budget * 2;
+
+            // Fill ring buffer partially — should reach at least "light"
+            for (let i = 0; i < 10; i++) {
+              _scheduler._updateMetrics(overBudget, overBudget, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'light', 'should be light after 10/60 dropped');
+
+            // More drops — should reach "moderate"
+            for (let i = 0; i < 12; i++) {
+              _scheduler._updateMetrics(overBudget, overBudget, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'moderate', 'should be moderate after 22/60 dropped');
+
+            // More drops — should reach "heavy"
+            for (let i = 0; i < 18; i++) {
+              _scheduler._updateMetrics(overBudget, overBudget, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'heavy', 'should be heavy after 40/60 dropped');
+          });
+
+          it('stays "none" when frames are under budget', () => {
+            const budget = _scheduler.targetFrameTime;
+            for (let i = 0; i < 60; i++) {
+              _scheduler._updateMetrics(budget * 0.5, budget * 0.3, budget * 0.2);
+            }
+            assert.strictEqual(_scheduler.pressure, 'none');
+          });
+        });
+
+        describe('pressure recovery with hysteresis', () => {
+          it('recovers from heavy → moderate → light → none', () => {
+            const budget = _scheduler.targetFrameTime;
+            const overBudget = budget * 2;
+            const underBudget = budget * 0.5;
+
+            // Drive to heavy
+            for (let i = 0; i < 60; i++) {
+              _scheduler._updateMetrics(overBudget, overBudget, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'heavy');
+
+            // Add under-budget frames to start recovery.
+            // Ring buffer wraps, replacing dropped frames with good ones.
+            // Need enough good frames to drop ratio below 0.40 (heavy→moderate).
+            for (let i = 0; i < 37; i++) {
+              _scheduler._updateMetrics(underBudget, underBudget, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'moderate', 'should recover to moderate');
+
+            // More good frames — ratio drops below 0.20 (moderate→light)
+            for (let i = 0; i < 13; i++) {
+              _scheduler._updateMetrics(underBudget, underBudget, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'light', 'should recover to light');
+
+            // More good frames — ratio drops below 0.05 (light→none)
+            for (let i = 0; i < 10; i++) {
+              _scheduler._updateMetrics(underBudget, underBudget, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'none', 'should recover to none');
+          });
+
+          it('does not oscillate near thresholds', () => {
+            const budget = _scheduler.targetFrameTime;
+            const overBudget = budget * 2;
+            const underBudget = budget * 0.5;
+
+            // Fill to just above light escalation (10 dropped = 16.7%)
+            for (let i = 0; i < 10; i++) {
+              _scheduler._updateMetrics(overBudget, overBudget, 0);
+            }
+            for (let i = 0; i < 50; i++) {
+              _scheduler._updateMetrics(underBudget, underBudget, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'light', 'should be light at ~16.7%');
+
+            // Recovery threshold for light is 0.05 (3 of 60).
+            // Still at 10 dropped in the window — should stay light.
+            _scheduler._updateMetrics(underBudget, underBudget, 0);
+            assert.strictEqual(_scheduler.pressure, 'light', 'should not oscillate back to none');
+          });
+        });
+
+        describe('pressure event emission', () => {
+          it('emits "pressure" event when level changes', () => {
+            const levels = [];
+            _scheduler.on('pressure', (level) => levels.push(level));
+
+            const budget = _scheduler.targetFrameTime;
+            for (let i = 0; i < 60; i++) {
+              _scheduler._updateMetrics(budget * 2, budget * 2, 0);
+            }
+
+            _scheduler.off('pressure');
+
+            assert.include(levels, 'light', 'should emit light');
+            assert.include(levels, 'moderate', 'should emit moderate');
+            assert.include(levels, 'heavy', 'should emit heavy');
+            // Should not emit 'none' unless we recover
+            assert.notInclude(levels, 'none');
+          });
+
+          it('does not emit when level stays the same', () => {
+            const levels = [];
+            _scheduler.on('pressure', (level) => levels.push(level));
+
+            const budget = _scheduler.targetFrameTime;
+            // Two consecutive under-budget frames — both 'none', no event
+            _scheduler._updateMetrics(budget * 0.5, budget * 0.3, 0);
+            _scheduler._updateMetrics(budget * 0.5, budget * 0.3, 0);
+
+            _scheduler.off('pressure');
+
+            assert.deepEqual(levels, [], 'should not emit when staying at none');
+          });
+        });
+
+        describe('idle queue throttling under pressure', () => {
+          it('drains idle tasks normally at "none" pressure', async () => {
+            assert.strictEqual(_scheduler.pressure, 'none');
+            let executed = false;
+            await _scheduler.scheduleIdleTask(() => { executed = true; });
+            assert.isTrue(executed);
+          });
+
+          it('skips idle tasks under "moderate" pressure', async () => {
+            const budget = _scheduler.targetFrameTime;
+            // Drive to moderate
+            for (let i = 0; i < 25; i++) {
+              _scheduler._updateMetrics(budget * 2, budget * 2, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'moderate');
+
+            let executed = false;
+            _scheduler.scheduleIdleTask(() => { executed = true; }).catch(() => {});
+
+            // Wait a few frames — idle task should NOT drain
+            await waitFrames(3);
+            assert.isFalse(executed, 'idle task should be skipped under moderate pressure');
+
+            // Clean up: reset to recover pressure and drain
+            await _scheduler.resetAsync();
+          });
+
+          it('skips idle tasks under "heavy" pressure', async () => {
+            const budget = _scheduler.targetFrameTime;
+            // Drive to heavy
+            for (let i = 0; i < 60; i++) {
+              _scheduler._updateMetrics(budget * 2, budget * 2, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'heavy');
+
+            let executed = false;
+            _scheduler.scheduleIdleTask(() => { executed = true; }).catch(() => {});
+
+            await waitFrames(3);
+            assert.isFalse(executed, 'idle task should be skipped under heavy pressure');
+
+            await _scheduler.resetAsync();
+          });
+        });
+
+        describe('resetAsync resets metrics', () => {
+          it('resets all metrics and pressure to initial state', async () => {
+            const budget = _scheduler.targetFrameTime;
+            // Drive to heavy
+            for (let i = 0; i < 60; i++) {
+              _scheduler._updateMetrics(budget * 2, budget * 2, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'heavy');
+
+            await _scheduler.resetAsync();
+
+            const m = _scheduler.metrics;
+            assert.strictEqual(m.avgFrameTime, 0);
+            assert.strictEqual(m.avgRenderTime, 0);
+            assert.strictEqual(m.avgIdleTime, 0);
+            assert.strictEqual(m.droppedFrames, 0);
+            assert.strictEqual(m.pressure, 'none');
+            assert.strictEqual(_scheduler.pressure, 'none');
+          });
+
+          it('emits pressure "none" on resetAsync if was pressured', async () => {
+            const budget = _scheduler.targetFrameTime;
+            for (let i = 0; i < 60; i++) {
+              _scheduler._updateMetrics(budget * 2, budget * 2, 0);
+            }
+            assert.strictEqual(_scheduler.pressure, 'heavy');
+
+            const levels = [];
+            _scheduler.on('pressure', (level) => levels.push(level));
+            await _scheduler.resetAsync();
+            _scheduler.off('pressure');
+
+            assert.include(levels, 'none');
+          });
+
+          it('does not emit pressure event on resetAsync if already "none"', async () => {
+            assert.strictEqual(_scheduler.pressure, 'none');
+
+            const levels = [];
+            _scheduler.on('pressure', (level) => levels.push(level));
+            await _scheduler.resetAsync();
+            _scheduler.off('pressure');
+
+            assert.deepEqual(levels, []);
+          });
+        });
+      });
     });
   });
 });
