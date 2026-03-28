@@ -790,10 +790,10 @@ describe('SchedulerSystem', () => {
       });
 
       it('cancels a throttle by workID (including trailing)', async () => {
-        let count = 0;
-        _scheduler.throttle('test-cancel-th', () => { count++; }, { ms: 50 });
+        let _count = 0;
+        _scheduler.throttle('test-cancel-th', () => { _count++; }, { ms: 50 });
         // Trailing call
-        _scheduler.throttle('test-cancel-th', () => { count++; }, { ms: 50 });
+        _scheduler.throttle('test-cancel-th', () => { _count++; }, { ms: 50 });
         _scheduler.cancel('test-cancel-th');
 
         // Wait for leading drain + check no trailing fires
@@ -1115,8 +1115,8 @@ describe('SchedulerSystem', () => {
           it('tracks render time from frame callbacks', async () => {
             // Register a callback that does a little work
             _scheduler.addFrameCallback('test', () => {
-              let sum = 0;
-              for (let i = 0; i < 100; i++) sum += i;
+              let _sum = 0;
+              for (let i = 0; i < 100; i++) _sum += i;
             });
             await waitFrames(5);
             _scheduler.removeFrameCallback('test');
