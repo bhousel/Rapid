@@ -52,6 +52,24 @@ async function buildJS(): Promise<void> {
       sourcemap: 'linked',
       naming: 'rapid-dev.min.[ext]',  // .js
       minify: true
+    }),
+
+    // Worker script — loaded by SchedulerSystem via `new Worker(url)`
+    Bun.build({
+      entrypoints: ['./modules/worker.ts'],
+      outdir: outdir,
+      target: 'browser',
+      sourcemap: 'linked',
+      naming: 'rapid-worker.[ext]',  // .js
+    }),
+
+    Bun.build({
+      entrypoints: ['./modules/worker.ts'],
+      outdir: outdir,
+      target: 'browser',
+      sourcemap: 'linked',
+      naming: 'rapid-worker.min.[ext]',  // .js
+      minify: true
     })
   ]);
 

@@ -1350,5 +1350,178 @@ describe('SchedulerSystem', () => {
         });
       });
     });
+
+    describe('worker pool', () => {
+      const workerURL = new URL('../../../modules/worker.ts', import.meta.url).href;
+
+      afterEach(async () => {
+        _scheduler.terminateWorkers();
+        _scheduler.workerURL = null;
+        await _scheduler.resetAsync();
+      });
+
+      describe('workerURL', () => {
+        it('starts as null', () => {
+          assert.isNull(_scheduler.workerURL);
+        });
+
+        it('can be set and read back', () => {
+          _scheduler.workerURL = workerURL;
+          assert.strictEqual(_scheduler.workerURL, workerURL);
+        });
+      });
+
+      describe('maxWorkers', () => {
+        it('defaults to 2', () => {
+          assert.strictEqual(_scheduler.maxWorkers, 2);
+        });
+
+        it('can be changed', () => {
+          _scheduler.maxWorkers = 4;
+          assert.strictEqual(_scheduler.maxWorkers, 4);
+          _scheduler.maxWorkers = 2;  // reset
+        });
+
+        it('clamps to at least 1', () => {
+          _scheduler.maxWorkers = 0;
+          assert.strictEqual(_scheduler.maxWorkers, 1);
+          _scheduler.maxWorkers = 2;  // reset
+        });
+      });
+
+      describe('numWorkers', () => {
+        it('starts at 0', () => {
+          assert.strictEqual(_scheduler.numWorkers, 0);
+        });
+      });
+
+      describe('scheduleWorkerTask', () => {
+        it('rejects if workerURL is not set', async () => {
+          try {
+            await _scheduler.scheduleWorkerTask('ping', 'hello');
+            assert.fail('should have rejected');
+          } catch (e) {
+            assert.match(e.message, /workerURL not set/);
+          }
+        });
+
+        it('dispatches a ping task and receives the echoed result', async () => {
+          _scheduler.workerURL = workerURL;
+          const result = await _scheduler.scheduleWorkerTask('ping', 'hello');
+          assert.strictEqual(result, 'hello');
+        });
+
+        it('spawns a worker lazily on first task', async () => {
+          _scheduler.workerURL = workerURL;
+          assert.strictEqual(_scheduler.numWorkers, 0);
+          const p = _scheduler.scheduleWorkerTask('ping', 42);
+          assert.strictEqual(_scheduler.numWorkers, 1);
+          await p;
+        });
+
+        it('handles complex serializable data', async () => {
+          _scheduler.workerURL = workerURL;
+          const input = { key: 'value', arr: [1, 2, 3], nested: { deep: true } };
+          const result = await _scheduler.scheduleWorkerTask('ping', input);
+          assert.deepEqual(result, input);
+        });
+
+        it('rejects when task type is unknown', async () => {
+          _scheduler.workerURL = workerURL;
+          try {
+            await _scheduler.scheduleWorkerTask('nonexistent', {});
+            assert.fail('should have rejected');
+          } catch (e) {
+            assert.match(e.message, /Unknown task type/);
+          }
+        });
+
+        it('handles multiple concurrent tasks', async () => {
+          _scheduler.workerURL = workerURL;
+          const results = await Promise.all([
+            _scheduler.scheduleWorkerTask('ping', 'a'),
+            _scheduler.scheduleWorkerTask('ping', 'b'),
+            _scheduler.scheduleWorkerTask('ping', 'c'),
+          ]);
+          assert.deepEqual(results, ['a', 'b', 'c']);
+        });
+
+        it('tracks pending requests', async () => {
+          _scheduler.workerURL = workerURL;
+          assert.strictEqual(_scheduler.numPendingRequests, 0);
+          const p = _scheduler.scheduleWorkerTask('ping', 1);
+          assert.strictEqual(_scheduler.numPendingRequests, 1);
+          await p;
+          assert.strictEqual(_scheduler.numPendingRequests, 0);
+        });
+      });
+
+      describe('worker pool sizing', () => {
+        it('does not exceed maxWorkers', async () => {
+          _scheduler.workerURL = workerURL;
+          _scheduler.maxWorkers = 2;
+
+          // Dispatch more tasks than maxWorkers
+          const promises = [];
+          for (let i = 0; i < 5; i++) {
+            promises.push(_scheduler.scheduleWorkerTask('ping', i));
+          }
+          assert.isAtMost(_scheduler.numWorkers, 2);
+          await Promise.all(promises);
+        });
+
+        it('round-robins across workers', async () => {
+          _scheduler.workerURL = workerURL;
+          _scheduler.maxWorkers = 2;
+
+          // First task spawns worker 0, second spawns worker 1, third reuses worker 0
+          await _scheduler.scheduleWorkerTask('ping', 1);
+          assert.strictEqual(_scheduler.numWorkers, 1);
+          await _scheduler.scheduleWorkerTask('ping', 2);
+          assert.strictEqual(_scheduler.numWorkers, 2);
+          await _scheduler.scheduleWorkerTask('ping', 3);
+          assert.strictEqual(_scheduler.numWorkers, 2, 'should not spawn a third');
+        });
+      });
+
+      describe('terminateWorkers', () => {
+        it('terminates all workers and resets pool', async () => {
+          _scheduler.workerURL = workerURL;
+          await _scheduler.scheduleWorkerTask('ping', 1);
+          assert.isAbove(_scheduler.numWorkers, 0);
+
+          _scheduler.terminateWorkers();
+          assert.strictEqual(_scheduler.numWorkers, 0);
+          assert.strictEqual(_scheduler.numPendingRequests, 0);
+        });
+
+        it('rejects pending requests on terminate', async () => {
+          _scheduler.workerURL = workerURL;
+          _scheduler.maxWorkers = 1;
+
+          // Start a task but terminate before it resolves
+          const p = _scheduler.scheduleWorkerTask('ping', 'doomed');
+          _scheduler.terminateWorkers();
+
+          try {
+            await p;
+            assert.fail('should have rejected');
+          } catch (e) {
+            assert.match(e.message, /worker terminated/);
+          }
+        });
+      });
+
+      describe('resetAsync terminates workers', () => {
+        it('terminates workers on reset', async () => {
+          _scheduler.workerURL = workerURL;
+          await _scheduler.scheduleWorkerTask('ping', 1);
+          assert.isAbove(_scheduler.numWorkers, 0);
+
+          await _scheduler.resetAsync();
+          assert.strictEqual(_scheduler.numWorkers, 0);
+        });
+      });
+    });
   });
 });
