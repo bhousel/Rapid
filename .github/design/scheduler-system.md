@@ -328,19 +328,82 @@ Migration notes:
 - **Scheduler fallback pattern**: Service request paths (TaginfoService, OsmWikibaseService, OsmService) use `if (shouldDebounce && scheduler) { scheduler.debounce(...) } else { request() }` so requests still fire when scheduler is absent. UI render deferrals use `scheduler?.throttle()` — a no-op is harmless there.
 - `scheduler` added to `optionalDependencies` in OsmService, TaginfoService, OsmWikibaseService
 
-### Phase 5 — Backpressure
+### Phase 5 — Backpressure (done)
 
-- Track frame timing metrics (render time, idle time, dropped frames)
-- Implement pressure levels and automatic idle queue throttling
-- Emit `'pressure'` events for other systems to react
-- Wire up GraphicsSystem quality adjustments
-- Dynamic frame rate adjustment (e.g., drop to 30fps under sustained pressure)
+- Frame timing metrics tracked via EMA: total frame time, render time, idle time
+- Dropped-frame ring buffer (60-frame window ≈ 1 second at 60fps)
+- Four pressure levels: `none` → `light` → `moderate` → `heavy`
+- Hysteresis thresholds prevent oscillation (escalation thresholds > recovery thresholds)
+- Idle queue draining automatically throttled under pressure:
+  - `none`: unlimited idle tasks per frame
+  - `light`: max 3 idle tasks per frame
+  - `moderate`: max 1 idle tasks per frame
+  - `heavy`: idle tasks blocked entirely
+- `pressure` event emitted on level changes
+- `metrics` getter exposes `FrameMetrics` snapshot (avgFrameTime, avgRenderTime,
+  avgIdleTime, droppedFrames, targetFrameTime, pressure)
+- Dynamic frame rate adjustment (drop to 30fps) and GraphicsSystem quality wiring
+  deferred — `highQuality` is only read at Pixi renderer initialization, so toggling
+  it at runtime requires re-creating the renderer (a separate concern)
+- 117 tests passing (19 new backpressure tests)
 
-### Phase 6 — Worker Integration
+### Phase 6 — Worker Pool Integration (done)
 
-- SchedulerSystem spawns and pools web workers
-- Add `thread: 'worker'` option to `schedule()`
-- Prototype with validation as the first worker-offloaded task
+- New `modules/worker.ts` entry point — loads inside Web Workers spawned by
+  SchedulerSystem.  Uses `registerTaskHandler(taskType, handler)` registry pattern.
+  Built-in `ping` handler for health checks.  Supports async handlers.
+- Message protocol: Main→Worker `{ id, taskType, data }`, Worker→Main `{ id, result?, error? }`
+- Worker pool management on SchedulerSystem:
+  - `workerURL` getter/setter — host app sets path to built worker script
+  - `maxWorkers` getter/setter — pool size cap (default 2), lazy spawn
+  - `numWorkers`, `numPendingRequests` — read-only diagnostics
+  - `scheduleWorkerTask<T>(taskType, data?)` — dispatch to pooled worker, returns `Promise<T>`
+  - `terminateWorkers()` — tear down pool, reject pending requests
+- Workers spawned lazily on first task, dispatched round-robin
+- `resetAsync()` calls `terminateWorkers()` automatically
+- Build: two new `Bun.build()` entry points produce `rapid-worker.js` and
+  `rapid-worker.min.js` in `dist/js/`
+- 135 tests passing (18 new worker pool tests)
+
+### Phase 6a — Network offloading to workers
+
+**Full design**: See `.github/design/network-system.md`.
+
+Move fetch-and-parse work from services into the worker pool via a new
+`NetworkSystem` that centralizes fetch lifecycle management — request
+dispatch (via worker pool), inflight tracking, deduplication, timeouts,
+concurrency limiting, and abort.
+
+Prerequisite SchedulerSystem changes for Phase 6a:
+- **Worker-side abort** — extend the message protocol with `{ type: 'cancel', id }`
+  messages.  Worker entry point (`worker.ts`) maintains a
+  `Map<requestID, AbortController>`; task handlers receive an `AbortSignal`.
+  When a cancel message arrives, the worker aborts the in-progress fetch.
+  This prevents worker starvation when the user pans (dozens of stale tile
+  fetches would otherwise block the pool).
+- **`scheduleWorkerTask` accepts `AbortSignal`** — callers pass a signal;
+  when it fires, the scheduler sends the cancel message to the worker and
+  rejects the pending promise.
+- All worker tasks become abortable via this generic mechanism.
+
+**Migration tiers** (by service difficulty):
+
+| Tier | Services | Notes |
+|------|----------|-------|
+| Easy | WikipediaService, WikidataService, TaginfoService, OsmWikibaseService, NominatimService, GeoScribbleService | Pure JSON fetch + minimal post-processing |
+| Medium | WaybackService, MapRouletteService, OsmoseService, KeepRightService | Stateful coordination (pagination, split GET/POST) |
+| Hard | MapillaryService, VectorTileService, OsmService, EsriService, MapWithAIService, StreetsideService, KartaviewService | Complex post-processing, binary parsing, auth, graph integration |
+
+### Phase 7 — Validator offloading (future)
+
+Validators close over `context` at construction time (factory pattern), making
+them non-serializable.  Moving validation into workers requires restructuring
+validators to accept serializable input and return serializable results — the
+validator logic itself would run as a registered task handler, receiving a
+snapshot of the relevant graph data rather than accessing `context` directly.
+
+This is a worthwhile goal (validation is CPU-heavy and blocks the main thread)
+but requires significant refactoring of the validator architecture.
 
 ## Decisions
 

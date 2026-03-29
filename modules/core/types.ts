@@ -16,6 +16,7 @@ import type { LocalizationSystem } from './LocalizationSystem.ts';
 import type { LocationSystem } from './LocationSystem.ts';
 import type { MapSystem } from './MapSystem.ts';
 import type { Map3dSystem } from './Map3dSystem.ts';
+import type { NetworkSystem } from './NetworkSystem.ts';
 import type { PhotoSystem } from './PhotoSystem.ts';
 import type { RapidSystem } from './RapidSystem.ts';
 import type { SchedulerSystem } from './SchedulerSystem.ts';
@@ -50,6 +51,7 @@ export interface Systems {
   locations?: LocationSystem;
   map?: MapSystem;
   map3d?: Map3dSystem;
+  network?: NetworkSystem;
   photos?: PhotoSystem;
   rapid?: RapidSystem;
   scheduler?: SchedulerSystem;

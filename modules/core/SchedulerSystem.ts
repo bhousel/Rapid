@@ -86,6 +86,10 @@ interface WorkerResponse {
 interface PendingWorkerRequest {
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
+  /** The Worker that owns this request (for targeted cancel messages) */
+  worker: Worker;
+  /** Cleanup function to remove AbortSignal listener, if any */
+  signalCleanup: (() => void) | null;
 }
 
 /** Default max worker pool size */
@@ -852,23 +856,58 @@ export class SchedulerSystem extends AbstractSystem {
    * The `data` argument must be structured-clone-compatible (no
    * functions, DOM nodes, or non-transferable objects).
    *
+   * An optional `AbortSignal` can be passed to cancel the task.
+   * When the signal fires, a `{ type: 'cancel', id }` message is
+   * sent to the worker, the pending promise rejects with an AbortError,
+   * and the worker-side AbortController is triggered.
+   *
    * @param taskType - Registered task handler name in the worker
    * @param data - Serializable input for the task handler
+   * @param signal - Optional AbortSignal to cancel the task
    * @return Promise resolved with the task result, or rejected on error
    * @throws Error if `workerURL` has not been set
    */
-  scheduleWorkerTask<T = unknown>(taskType: string, data?: unknown): Promise<T> {
+  scheduleWorkerTask<T = unknown>(taskType: string, data?: unknown, signal?: AbortSignal): Promise<T> {
     if (!this._workerURL) {
       return Promise.reject(new Error('SchedulerSystem: workerURL not set'));
+    }
+
+    // Already aborted before we even start
+    if (signal?.aborted) {
+      const err = new Error('The operation was aborted.');
+      err.name = 'AbortError';
+      return Promise.reject(err);
     }
 
     const worker = this._getOrSpawnWorker();
     const id = this._nextRequestID++;
 
     return new Promise<T>((resolve, reject) => {
+      let signalCleanup: (() => void) | null = null;
+
+      if (signal) {
+        const onAbort = () => {
+          // Send cancel to the specific worker that owns this request
+          worker.postMessage({ type: 'cancel', id });
+          // Clean up and reject
+          const pending = this._pendingRequests.get(id);
+          if (pending) {
+            pending.signalCleanup = null;  // prevent double cleanup
+            this._pendingRequests.delete(id);
+            const err = new Error('The operation was aborted.');
+            err.name = 'AbortError';
+            reject(err);
+          }
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+        signalCleanup = () => signal.removeEventListener('abort', onAbort);
+      }
+
       this._pendingRequests.set(id, {
         resolve: resolve as (value: unknown) => void,
         reject,
+        worker,
+        signalCleanup,
       });
 
       const request: WorkerRequest = { id, taskType, data };
@@ -889,8 +928,9 @@ export class SchedulerSystem extends AbstractSystem {
     this._workers.length = 0;
     this._workerIndex = 0;
 
-    // Reject all pending requests
+    // Reject all pending requests and clean up signal listeners
     for (const [, pending] of this._pendingRequests) {
+      if (pending.signalCleanup) pending.signalCleanup();
       pending.reject(new Error('SchedulerSystem: worker terminated'));
     }
     this._pendingRequests.clear();
@@ -926,8 +966,10 @@ export class SchedulerSystem extends AbstractSystem {
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const { id, result, error } = event.data;
       const pending = this._pendingRequests.get(id);
-      if (!pending) return;  // stale response after terminate
+      if (!pending) return;  // stale response after terminate or cancel
       this._pendingRequests.delete(id);
+
+      if (pending.signalCleanup) pending.signalCleanup();
 
       if (error !== undefined) {
         pending.reject(new Error(error));

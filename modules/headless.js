@@ -20,6 +20,7 @@ export { ImagerySystem } from './core/ImagerySystem.ts';
 export { LocalizationSystem } from './core/LocalizationSystem.ts';
 export { LocationSystem } from './core/LocationSystem.ts';
 export { MapSystem } from './core/MapSystem.ts';
+export { NetworkSystem } from './core/NetworkSystem.ts';
 export { PhotoSystem } from './core/PhotoSystem.ts';
 export { RapidSystem } from './core/RapidSystem.ts';
 export { SchemaSystem } from './core/SchemaSystem.ts';

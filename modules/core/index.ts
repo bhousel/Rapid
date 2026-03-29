@@ -13,6 +13,7 @@ import { LocalizationSystem } from './LocalizationSystem.ts';
 import { LocationSystem } from './LocationSystem.ts';
 import { Map3dSystem } from './Map3dSystem.ts';
 import { MapSystem } from './MapSystem.ts';
+import { NetworkSystem } from './NetworkSystem.ts';
 import { PhotoSystem } from './PhotoSystem.ts';
 import { RapidSystem } from './RapidSystem.ts';
 import { SchedulerSystem } from './SchedulerSystem.ts';
@@ -36,6 +37,7 @@ export {
   LocationSystem,
   Map3dSystem,
   MapSystem,
+  NetworkSystem,
   PhotoSystem,
   RapidSystem,
   SchedulerSystem,
@@ -80,6 +82,7 @@ systems.available.set('l10n', LocalizationSystem);
 systems.available.set('locations', LocationSystem);
 systems.available.set('map', MapSystem);
 systems.available.set('map3d', Map3dSystem);
+systems.available.set('network', NetworkSystem);
 systems.available.set('photos', PhotoSystem);
 systems.available.set('rapid', RapidSystem);
 systems.available.set('scheduler', SchedulerSystem);

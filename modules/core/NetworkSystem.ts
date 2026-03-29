@@ -1,0 +1,499 @@
+import { AbstractSystem } from './AbstractSystem.ts';
+import { utilFetchResponse } from '../util/fetch_response.ts';
+
+import type { Context } from '../Context.ts';
+import type { SchedulerSystem } from './SchedulerSystem.ts';
+
+
+/** Options for network fetch requests */
+export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
+  /**
+   * Unique key for dedup and cancellation.  If another request with the
+   * same key is already inflight, the existing promise is returned.
+   * Default: `'${method} ${url}'` (e.g. `'GET https://example.com/data'`).
+   */
+  key?: string;
+
+  /**
+   * Timeout in milliseconds.  Overrides `defaultTimeout`.
+   * Set to 0 to disable.
+   */
+  timeout?: number;
+
+  /**
+   * Custom fetch function.  Replaces `globalThis.fetch` for this request.
+   * Used by OsmService to pass `this._oauth.fetch` for authenticated requests.
+   */
+  fetchFn?: typeof globalThis.fetch;
+
+  /**
+   * If true, skip worker dispatch and always fetch on the main thread.
+   * Default: false.
+   */
+  mainThread?: boolean;
+}
+
+
+/** Tracks a single inflight request */
+interface InflightRequest<T = unknown> {
+  /** Unique key for dedup and cancellation */
+  key: string;
+  /** The AbortController for this request */
+  controller: AbortController;
+  /** The in-progress promise (for dedup — second caller gets same promise) */
+  promise: Promise<T>;
+  /** Timestamp when the request was created (for diagnostics) */
+  created: number;
+}
+
+/** A queued request waiting for a concurrency slot */
+interface QueuedFetch {
+  key: string;
+  controller: AbortController;
+  /** Called when a concurrency slot opens */
+  run: () => void;
+}
+
+
+/** Default request timeout in milliseconds */
+const DEFAULT_TIMEOUT = 30_000;
+
+/** Default maximum concurrent inflight requests */
+const DEFAULT_MAX_INFLIGHT = 100;
+
+
+/**
+ * `NetworkSystem` centralizes fetch lifecycle management — inflight
+ * tracking, request deduplication, automatic timeouts, worker-based
+ * fetch offloading, and concurrency limiting.
+ *
+ * **Inflight tracking** — All active requests live in one `Map`.
+ * Cleanup happens in `.finally()`, so entries never leak (fixes #1451).
+ *
+ * **Timeouts** — Every request is automatically aborted after a
+ * configurable timeout (default 30s), solving #1487.
+ *
+ * **Worker offloading** — When SchedulerSystem is available with a
+ * configured `workerURL`, fetch + parse runs in a web worker, keeping
+ * the main thread free for rendering.
+ *
+ * **Deduplication** — If a request with the same key is already
+ * inflight, the existing promise is returned.
+ *
+ * **Concurrency limiting** — When the number of active (dispatched)
+ * requests reaches `maxInflight`, new requests enter a FIFO queue.
+ * Queued requests are abortable for free (no network request started yet).
+ *
+ * Events available:
+ *   `paused`     Fires when the system transitions from unpaused to paused
+ *   `resumed`    Fires when the system transitions from paused to unpaused
+ */
+export class NetworkSystem extends AbstractSystem {
+
+  /** All currently inflight requests, keyed by dedup key */
+  private _inflight: Map<string, InflightRequest>;
+  /** FIFO queue for requests waiting on a concurrency slot */
+  private _queue: QueuedFetch[];
+  /** Number of actively dispatched network requests (excludes queued) */
+  private _numActive: number;
+  /** Default timeout in milliseconds */
+  private _defaultTimeout: number;
+  /** Max concurrent active requests */
+  private _maxInflight: number;
+
+  /**
+   * @constructor
+   * @param context - Global shared application context
+   */
+  constructor(context: Context) {
+    super(context);
+    this.id = 'network';
+    this.requiredDependencies = new Set();
+    this.optionalDependencies = new Set<SystemID>(['scheduler']);
+
+    this._inflight = new Map();
+    this._queue = [];
+    this._numActive = 0;
+    this._defaultTimeout = DEFAULT_TIMEOUT;
+    this._maxInflight = DEFAULT_MAX_INFLIGHT;
+  }
+
+
+  /**
+   * initAsync
+   * Called after all core objects have been constructed.
+   * @return Promise resolved when this component has completed initialization
+   */
+  initAsync(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+    return this._initPromise = super.initAsync();
+  }
+
+
+  /**
+   * startAsync
+   * Called after all core objects have been initialized.
+   * @return Promise resolved when this component has completed startup
+   */
+  startAsync(): Promise<void> {
+    if (this._startPromise) return this._startPromise;
+    this._started = true;
+    return this._startPromise = Promise.resolve();
+  }
+
+
+  /**
+   * resetAsync
+   * Aborts all inflight requests and clears the queue.
+   * @return Promise resolved when this component has completed resetting
+   */
+  resetAsync(): Promise<void> {
+    this.abortAll();
+    return Promise.resolve();
+  }
+
+
+  /**
+   * defaultTimeout
+   * Default timeout in milliseconds for new requests.
+   */
+  get defaultTimeout(): number {
+    return this._defaultTimeout;
+  }
+  set defaultTimeout(ms: number) {
+    this._defaultTimeout = Math.max(0, ms);
+  }
+
+
+  /**
+   * maxInflight
+   * Maximum concurrent active requests.  Requests beyond this limit
+   * are queued (FIFO).
+   */
+  get maxInflight(): number {
+    return this._maxInflight;
+  }
+  set maxInflight(n: number) {
+    this._maxInflight = Math.max(1, n);
+  }
+
+
+  /**
+   * numInflight
+   * Total number of tracked requests (active + queued).
+   * For diagnostics / tests.
+   * @readonly
+   */
+  get numInflight(): number {
+    return this._inflight.size;
+  }
+
+
+  /**
+   * numActive
+   * Number of actively dispatched network requests (excludes queued).
+   * @readonly
+   */
+  get numActive(): number {
+    return this._numActive;
+  }
+
+
+  /**
+   * numQueued
+   * Number of requests waiting in the concurrency queue.
+   * @readonly
+   */
+  get numQueued(): number {
+    return this._queue.length;
+  }
+
+
+  /**
+   * isInflight
+   * Returns true if a request with the given key is currently tracked
+   * (either active or queued).
+   * @param key - The dedup/cancellation key
+   */
+  isInflight(key: string): boolean {
+    return this._inflight.has(key);
+  }
+
+
+  /**
+   * fetch
+   * The primary API.  Fetches a URL with automatic:
+   *   - Inflight dedup (by `key`)
+   *   - Timeout (default 30s, configurable)
+   *   - AbortController management
+   *   - Worker offloading (when scheduler + workerURL are available)
+   *   - Response parsing via `utilFetchResponse`
+   *   - Concurrency limiting
+   *
+   * @param url - The URL to fetch
+   * @param options - Fetch options + NetworkSystem extensions
+   * @return The parsed response
+   */
+  fetch<T = unknown>(url: string, options?: NetworkFetchOptions): Promise<T> {
+    const method = (options?.method ?? 'GET').toUpperCase();
+    const key = options?.key ?? `${method} ${url}`;
+    const timeout = options?.timeout ?? this._defaultTimeout;
+
+    // Dedup: if same key is already inflight, return existing promise
+    const existing = this._inflight.get(key);
+    if (existing) return existing.promise as Promise<T>;
+
+    const controller = new AbortController();
+    const signal = this._createCombinedSignal(controller, timeout);
+    const dispatch = (): Promise<T> => this._dispatchFetch<T>(url, signal, options);
+
+    const promise = this._trackAndDispatch<T>(key, controller, dispatch);
+    return promise;
+  }
+
+
+  /**
+   * fetchRaw
+   * Like `fetch` but returns the raw `Response` object without
+   * parsing through `utilFetchResponse`.  Useful for binary data,
+   * streams, or when the caller needs response headers.
+   *
+   * Inflight tracking, dedup, timeout, and abort still apply.
+   * Always runs on main thread (no worker dispatch).
+   *
+   * @param url - The URL to fetch
+   * @param options - Fetch options + NetworkSystem extensions
+   */
+  fetchRaw(url: string, options?: NetworkFetchOptions): Promise<Response> {
+    const method = (options?.method ?? 'GET').toUpperCase();
+    const key = options?.key ?? `${method} ${url}`;
+    const timeout = options?.timeout ?? this._defaultTimeout;
+
+    // Dedup
+    const existing = this._inflight.get(key);
+    if (existing) return existing.promise as Promise<Response>;
+
+    const controller = new AbortController();
+    const signal = this._createCombinedSignal(controller, timeout);
+    const dispatch = (): Promise<Response> => {
+      const fetchFn = options?.fetchFn ?? globalThis.fetch;
+      const init = this._buildInit(options, signal);
+      return fetchFn(url, init);
+    };
+
+    const promise = this._trackAndDispatch<Response>(key, controller, dispatch);
+    return promise;
+  }
+
+
+  /**
+   * abort
+   * Aborts a specific inflight request by key.
+   * No-op if the key is not inflight.
+   * @param key - The dedup/cancellation key
+   */
+  abort(key: string): void {
+    const inflight = this._inflight.get(key);
+    if (inflight) {
+      inflight.controller.abort();
+    }
+    // Also remove from queue if it hasn't dispatched yet
+    this._removeFromQueue(key);
+  }
+
+
+  /**
+   * abortAll
+   * Aborts every inflight request and clears the queue.
+   */
+  abortAll(): void {
+    for (const [, inflight] of this._inflight) {
+      inflight.controller.abort();
+    }
+    for (const queued of this._queue) {
+      queued.controller.abort();
+    }
+    this._queue.length = 0;
+  }
+
+
+  /**
+   * abortMatching
+   * Aborts all inflight requests whose key matches a predicate.
+   * Useful for viewport-based cleanup.
+   * @param predicate - Function that returns true for keys to abort
+   */
+  abortMatching(predicate: (key: string) => boolean): void {
+    for (const [key, inflight] of this._inflight) {
+      if (predicate(key)) {
+        inflight.controller.abort();
+      }
+    }
+    // Also clean up matching queued requests
+    for (let i = this._queue.length - 1; i >= 0; i--) {
+      if (predicate(this._queue[i].key)) {
+        this._queue[i].controller.abort();
+        this._queue.splice(i, 1);
+      }
+    }
+  }
+
+
+  // -------------------------------------------------------
+  // Private helpers
+  // -------------------------------------------------------
+
+  /**
+   * _trackAndDispatch
+   * Creates the tracked promise, registers it in `_inflight`, and either
+   * dispatches immediately or queues for later.  Returns the promise
+   * that the caller awaits.
+   *
+   * The `.finally()` cleanup is chained directly onto the returned promise
+   * so there is exactly one promise chain — no orphaned branches that
+   * could produce unhandled rejections.
+   */
+  private _trackAndDispatch<T>(
+    key: string,
+    controller: AbortController,
+    dispatch: () => Promise<T>,
+  ): Promise<T> {
+    let promise: Promise<T>;
+
+    if (this._numActive < this._maxInflight) {
+      // Dispatch immediately
+      this._numActive++;
+      promise = dispatch().finally(() => {
+        this._numActive--;
+        this._inflight.delete(key);
+        this._drainQueue();
+      });
+    } else {
+      // Queue for later dispatch
+      promise = new Promise<T>((resolve, reject) => {
+        if (controller.signal.aborted) {
+          const err = new Error('The operation was aborted.');
+          err.name = 'AbortError';
+          reject(err);
+          return;
+        }
+
+        const queued: QueuedFetch = {
+          key,
+          controller,
+          run: () => {
+            this._numActive++;
+            dispatch()
+              .finally(() => {
+                this._numActive--;
+                this._inflight.delete(key);
+                this._drainQueue();
+              })
+              .then(resolve as (v: unknown) => void, reject);
+          },
+        };
+        this._queue.push(queued);
+
+        // Listen for abort while queued
+        controller.signal.addEventListener('abort', () => {
+          this._removeFromQueue(key);
+          this._inflight.delete(key);
+          const err = new Error('The operation was aborted.');
+          err.name = 'AbortError';
+          reject(err);
+        }, { once: true });
+      });
+    }
+
+    // Track in inflight map (for dedup and abort)
+    const inflight: InflightRequest<T> = { key, controller, promise, created: Date.now() };
+    this._inflight.set(key, inflight);
+
+    return promise;
+  }
+
+
+  /**
+   * _createCombinedSignal
+   * Combines a manual AbortController signal with a timeout signal.
+   * Returns the combined signal, or just the controller's signal if no timeout.
+   */
+  private _createCombinedSignal(controller: AbortController, timeout: number): AbortSignal {
+    if (timeout > 0) {
+      return AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]);
+    }
+    return controller.signal;
+  }
+
+
+  /**
+   * _drainQueue
+   * Dispatches queued requests as concurrency slots become available.
+   */
+  private _drainQueue(): void {
+    while (this._queue.length > 0 && this._numActive < this._maxInflight) {
+      const queued = this._queue.shift()!;
+      // Skip if already aborted while waiting
+      if (queued.controller.signal.aborted) continue;
+      queued.run();
+    }
+  }
+
+
+  /**
+   * _removeFromQueue
+   * Removes a queued request by key.
+   */
+  private _removeFromQueue(key: string): void {
+    const idx = this._queue.findIndex(q => q.key === key);
+    if (idx !== -1) {
+      this._queue.splice(idx, 1);
+    }
+  }
+
+
+  /**
+   * _dispatchFetch
+   * Performs the actual fetch, either via worker or main thread.
+   */
+  private _dispatchFetch<T>(
+    url: string,
+    signal: AbortSignal,
+    options?: NetworkFetchOptions,
+  ): Promise<T> {
+    const scheduler = this.context.systems.scheduler as SchedulerSystem | undefined;
+    const fetchFn = options?.fetchFn;
+    const mainThread = options?.mainThread ?? false;
+
+    // Worker path: scheduler available with workerURL, no custom fetchFn, not forced main-thread
+    if (scheduler && scheduler.workerURL && !fetchFn && !mainThread) {
+      const init = this._buildInit(options, undefined);  // signal passed via scheduleWorkerTask
+      return scheduler.scheduleWorkerTask<T>(
+        'fetchAndParse',
+        { url, init },
+        signal,
+      );
+    }
+
+    // Main-thread path
+    const actualFetchFn = fetchFn ?? globalThis.fetch;
+    const init = this._buildInit(options, signal);
+    return actualFetchFn(url, init).then(utilFetchResponse) as Promise<T>;
+  }
+
+
+  /**
+   * _buildInit
+   * Builds a `RequestInit` from the options, excluding NetworkSystem-specific keys.
+   */
+  private _buildInit(options?: NetworkFetchOptions, signal?: AbortSignal): RequestInit {
+    if (!options) return signal ? { signal } : {};
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring to strip custom keys
+    const { key, timeout, fetchFn, mainThread, ...init } = options;
+    if (signal) {
+      (init as RequestInit).signal = signal;
+    }
+    return init as RequestInit;
+  }
+}

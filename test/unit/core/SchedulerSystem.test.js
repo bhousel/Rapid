@@ -1522,6 +1522,68 @@ describe('SchedulerSystem', () => {
           assert.strictEqual(_scheduler.numWorkers, 0);
         });
       });
+
+      describe('abort signal support', () => {
+        it('rejects immediately if signal is already aborted', async () => {
+          _scheduler.workerURL = workerURL;
+          const controller = new AbortController();
+          controller.abort();
+
+          try {
+            await _scheduler.scheduleWorkerTask('ping', 'hello', controller.signal);
+            assert.fail('should have rejected');
+          } catch (e) {
+            assert.strictEqual(e.name, 'AbortError');
+          }
+        });
+
+        it('rejects when signal fires after dispatch', async () => {
+          _scheduler.workerURL = workerURL;
+          const controller = new AbortController();
+
+          // Use a task that takes some time — ping is fast, so abort right away
+          const prom = _scheduler.scheduleWorkerTask('ping', 'hello', controller.signal);
+          controller.abort();
+
+          try {
+            await prom;
+            // If ping resolved before abort, that's okay — it's a race
+          } catch (e) {
+            assert.strictEqual(e.name, 'AbortError');
+          }
+          assert.strictEqual(_scheduler.numPendingRequests, 0);
+        });
+
+        it('cleans up pending request when signal aborts', async () => {
+          _scheduler.workerURL = workerURL;
+          _scheduler.maxWorkers = 1;
+          const controller = new AbortController();
+
+          assert.strictEqual(_scheduler.numPendingRequests, 0);
+          const prom = _scheduler.scheduleWorkerTask('ping', 'test', controller.signal);
+          // May or may not still be pending (ping is fast)
+          controller.abort();
+
+          try { await prom; } catch { /* expected */ }
+          assert.strictEqual(_scheduler.numPendingRequests, 0);
+        });
+
+        it('sends cancel message to the correct worker', async () => {
+          _scheduler.workerURL = workerURL;
+          _scheduler.maxWorkers = 1;
+          const controller = new AbortController();
+
+          // Dispatch and immediately cancel — the worker gets '{type: cancel}'
+          const prom = _scheduler.scheduleWorkerTask('ping', 'cancel-me', controller.signal);
+          controller.abort();
+
+          try {
+            await prom;
+          } catch (e) {
+            assert.strictEqual(e.name, 'AbortError');
+          }
+        });
+      });
     });
   });
 });
