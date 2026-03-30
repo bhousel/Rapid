@@ -12,6 +12,7 @@ describe('MapillaryService', () => {
     assets:  new Rapid.AssetSystem(context),
     gfx:     new Rapid.MockGfxSystem(context),
     l10n:    new Rapid.MockSystem(context),
+    network: new Rapid.NetworkSystem(context),
     photos:  new Rapid.MockSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
@@ -62,8 +63,6 @@ describe('MapillaryService', () => {
         return prom
           .then(() => {
             const cache = mapillary._cache;
-            assert.instanceOf(cache.inflight, Map);
-            assert.isEmpty(cache.inflight);
             assert.isNull(cache.images.lastv);
             assert.isNull(cache.detections.lastv);
             assert.isNull(cache.signs.lastv);
@@ -103,8 +102,6 @@ describe('MapillaryService', () => {
         return prom
           .then(() => {
             const cache = mapillary._cache;
-            assert.instanceOf(cache.inflight, Map);
-            assert.isEmpty(cache.inflight);
             assert.isNull(cache.images.lastv);
             assert.isNull(cache.detections.lastv);
             assert.isNull(cache.signs.lastv);

@@ -6,7 +6,6 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { JXON } from '../util/jxon.ts';
 import { OsmEntity, MarkerData } from '../data/index.ts';
 import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
@@ -54,8 +53,8 @@ interface TileCache {
   lastv: number | null;
   /** Set of tile IDs pending loading */
   toLoad: Set<string>;
-  /** Map of tile IDs to their in-flight abort controllers */
-  inflight: Record<string, AbortController>;
+  /** Map of tile IDs to their in-flight request IDs */
+  inflight: Record<string, RequestID>;
   /** Set of tile IDs that have already been loaded */
   seen: Set<string>;
 }
@@ -66,10 +65,10 @@ interface NoteCache {
   lastv: number | null;
   /** Set of tile IDs pending note loading */
   toLoad: Set<string>;
-  /** Map of tile IDs to their in-flight GET abort controllers */
-  inflight: Record<string, AbortController>;
-  /** Map of note IDs to their in-flight POST abort controllers */
-  inflightPost: Record<string, AbortController>;
+  /** Map of tile IDs to their in-flight GET request IDs */
+  inflight: Record<string, RequestID>;
+  /** Map of note IDs to their in-flight POST request IDs */
+  inflightPost: Record<string, RequestID>;
   /** Map of note IDs to their closed status */
   closed: Record<string, boolean>;
 }
@@ -84,8 +83,8 @@ interface UserCache {
 
 /** Changeset tracking state */
 interface ChangesetState {
-  /** Abort controller for the in-flight changeset request */
-  inflight?: AbortController | null;
+  /** Request ID for the in-flight changeset request */
+  inflight?: RequestID | null;
   /** The ID of the currently open changeset */
   openChangesetID?: string | null;
 }
@@ -243,7 +242,7 @@ export class OsmService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'osm';
-    this.requiredDependencies = new Set<SystemID>(['spatial']);
+    this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
     this.optionalDependencies = new Set<SystemID>(['editor', 'gfx', 'l10n', 'locations', 'scheduler']);
 
     // Some defaults that we will replace with whatever we fetch from the OSM API capabilities result.
@@ -282,6 +281,7 @@ export class OsmService extends AbstractSystem {
 
     this.reloadApiStatus = this.reloadApiStatus.bind(this);
     this.deferredReloadApiStatus = this.deferredReloadApiStatus.bind(this);
+    this._abortRequest = this._abortRequest.bind(this);
 
     // Calculate the deafult OAuth2 `redirect_uri`.
     // - `redirect_uri` should be a page that the authorizing server (e.g. `openstreetmap.org`)
@@ -377,17 +377,25 @@ export class OsmService extends AbstractSystem {
     this._userChangesets = null;
     this._userDetails = null;
 
+    const network = this.context.systems.network!;
+
     if (this._tileCache.inflight) {
-      Object.values(this._tileCache.inflight).forEach(this._abortRequest);
+      for (const requestID of Object.values(this._tileCache.inflight)) {
+        network.abort(requestID);
+      }
     }
     if (this._noteCache.inflight) {
-      Object.values(this._noteCache.inflight).forEach(this._abortRequest);
+      for (const requestID of Object.values(this._noteCache.inflight)) {
+        network.abort(requestID);
+      }
     }
     if (this._noteCache.inflightPost) {
-      Object.values(this._noteCache.inflightPost).forEach(this._abortRequest);
+      for (const requestID of Object.values(this._noteCache.inflightPost)) {
+        network.abort(requestID);
+      }
     }
     if (this._changeset.inflight) {
-      this._abortRequest(this._changeset.inflight);
+      network.abort(this._changeset.inflight);
     }
 
     this._tileCache = {
@@ -523,9 +531,10 @@ export class OsmService extends AbstractSystem {
    * @param   path - the url path to load data from
    * @param   callback - errback-style callback function to call with results
    * @param   options - parsing options
-   * @return  reference to an AbortController
+   * @param   requestID - optional requestID for NetworkSystem tracking
+   * @return  the RequestID used for this request
    */
-  loadFromAPI(path: string, callback: Errback | null, options: Partial<ParserOptions> = {}): AbortController {
+  loadFromAPI(path: string, callback: Errback | null, options: Partial<ParserOptions> = {}, requestID?: RequestID): RequestID {
     options.skipSeen ??= true;
 
     const cid = this._connectionID;
@@ -603,11 +612,11 @@ export class OsmService extends AbstractSystem {
 
     // Accept absolute or relative paths
     const url = /^http/i.test(path) ? path : (this._apiroot + path);
-    const controller = new AbortController();
-    const _fetch = this.authenticated() ? this._oauth.fetch : globalThis.fetch;
+    const network = this.context.systems.network!;
+    const computedID = requestID ?? (`GET ${url}` as RequestID);
+    const fetchFn = this.authenticated() ? this._oauth.fetch : undefined;
 
-    _fetch(url, { signal: controller.signal })
-      .then(utilFetchResponse)
+    network.fetch<any>(url, { requestID: computedID, fetchFn })
       .then((result: any) => gotResult(null, result))
       .catch((err: any) => {
         if (err.name === 'AbortError') return;  // ok
@@ -617,7 +626,7 @@ export class OsmService extends AbstractSystem {
         }
       });
 
-    return controller;
+    return computedID;
   }
 
 
@@ -1086,17 +1095,18 @@ export class OsmService extends AbstractSystem {
     }
 
     const errback = this._wrapcb(createdChangeset);
+    const network = this.context.systems.network!;
+    const requestID = 'osm-changeset-create' as RequestID;
     const resource = this._apiroot + '/api/0.6/changeset/create';
-    const controller = new AbortController();
-    const options = {
+
+    network.fetch<any>(resource, {
+      requestID,
       method: 'PUT',
       headers: { 'Content-Type': 'text/xml' },
       body: JXON.stringify(changeset.asJXON()),
-      signal: controller.signal
-    };
-
-    this._oauth.fetch(resource, options)
-      .then(utilFetchResponse)
+      fetchFn: this._oauth.fetch,
+      mainThread: true
+    })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
         this._changeset.inflight = null;
@@ -1107,7 +1117,7 @@ export class OsmService extends AbstractSystem {
         }
       });
 
-    this._changeset.inflight = controller;
+    this._changeset.inflight = requestID;
   }
 
 
@@ -1136,14 +1146,9 @@ export class OsmService extends AbstractSystem {
     };
 
     const errback = this._wrapcb(uploadedChangeset);
+    const network = this.context.systems.network!;
+    const requestID = `osm-changeset-upload-${changeset.id}` as RequestID;
     const resource = this._apiroot + `/api/0.6/changeset/${changeset.id}/upload`;
-    const controller = new AbortController();
-    const options = {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/xml' },
-      body: JXON.stringify(changeset.osmChangeJXON(changes)),
-      signal: controller.signal
-    };
 
     // Attempt to prevent user from creating duplicate changes - see iD#5200
     // Some users will refresh their tab as soon as the changeset is inflight.
@@ -1151,8 +1156,14 @@ export class OsmService extends AbstractSystem {
     const editor = this.context.systems.editor;
     editor?.clearBackup();
 
-    this._oauth.fetch(resource, options)
-      .then(utilFetchResponse)
+    network.fetch<any>(resource, {
+      requestID,
+      method: 'POST',
+      headers: { 'Content-Type': 'text/xml' },
+      body: JXON.stringify(changeset.osmChangeJXON(changes)),
+      fetchFn: this._oauth.fetch,
+      mainThread: true
+    })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
         this._changeset.inflight = null;
@@ -1163,7 +1174,7 @@ export class OsmService extends AbstractSystem {
         }
       });
 
-    this._changeset.inflight = controller;
+    this._changeset.inflight = requestID;
   }
 
 
@@ -1192,16 +1203,17 @@ export class OsmService extends AbstractSystem {
     };
 
     const errback = this._wrapcb(closedChangeset);
+    const network = this.context.systems.network!;
+    const requestID = `osm-changeset-close-${changeset.id}` as RequestID;
     const resource = this._apiroot + `/api/0.6/changeset/${changeset.id}/close`;
-    const controller = new AbortController();
-    const options = {
+
+    network.fetch<any>(resource, {
+      requestID,
       method: 'PUT',
       headers: { 'Content-Type': 'text/xml' },
-      signal: controller.signal
-    };
-
-    this._oauth.fetch(resource, options)
-      .then(utilFetchResponse)
+      fetchFn: this._oauth.fetch,
+      mainThread: true
+    })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
         this._changeset.inflight = null;
@@ -1212,7 +1224,7 @@ export class OsmService extends AbstractSystem {
         }
       });
 
-    this._changeset.inflight = controller;
+    this._changeset.inflight = requestID;
   }
 
 
@@ -1399,11 +1411,12 @@ export class OsmService extends AbstractSystem {
       }
     };
 
+    const tileRequestID = `osm-tile-${tileID}` as RequestID;
     const options = { skipSeen: true };
     const json = (this.preferJSON ? '.json' : '');
     const path = `/api/0.6/map${json}?bbox=` + tile.wgs84Extent.toParam();
 
-    cache.inflight[tileID] = this.loadFromAPI(path, gotTile, options);
+    cache.inflight[tileID] = this.loadFromAPI(path, gotTile, options, tileRequestID);
   }
 
 
@@ -1527,12 +1540,13 @@ export class OsmService extends AbstractSystem {
       }
     };
 
+    const tileRequestID = `osm-note-${tileID}` as RequestID;
     const json = (this.preferJSON ? '.json' : '');
     const options = { skipSeen: true, filter: new Set(['note']) };
     const path = `/api/0.6/notes${json}?limit=` + noteOptions.limit + '&closed='
       + noteOptions.closed + '&bbox=' + tile.wgs84Extent.toParam();
 
-    cache.inflight[tileID] = this.loadFromAPI(path, errback, options);
+    cache.inflight[tileID] = this.loadFromAPI(path, errback, options, tileRequestID);
   }
 
 
@@ -1613,13 +1627,17 @@ export class OsmService extends AbstractSystem {
     };
 
     const errback = this._wrapcb(createdNote);
+    const network = this.context.systems.network!;
+    const requestID = `osm-note-post-create-${noteID}` as RequestID;
     const resource = this._apiroot + '/api/0.6/notes?' +
       utilQsString({ lon: note.loc[0], lat: note.loc[1], text: note.props.newComment }, false);
-    const controller = new AbortController();
-    const options = { method: 'POST', signal: controller.signal };
 
-    this._oauth.fetch(resource, options)
-      .then(utilFetchResponse)
+    network.fetch<any>(resource, {
+      requestID,
+      method: 'POST',
+      fetchFn: this._oauth.fetch,
+      mainThread: true
+    })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
         this._changeset.inflight = null;
@@ -1630,7 +1648,7 @@ export class OsmService extends AbstractSystem {
         }
       });
 
-    this._noteCache.inflightPost[noteID] = controller;
+    this._noteCache.inflightPost[noteID] = requestID;
   }
 
 
@@ -1691,15 +1709,19 @@ export class OsmService extends AbstractSystem {
     };
 
     const errback = this._wrapcb(updatedNote);
+    const network = this.context.systems.network!;
+    const requestID = `osm-note-post-update-${noteID}` as RequestID;
     let resource = this._apiroot + `/api/0.6/notes/${noteID}/${action}`;
     if (note.props.newComment) {
       resource += '?' + utilQsString({ text: note.props.newComment }, false);
     }
-    const controller = new AbortController();
-    const options = { method: 'POST', signal: controller.signal };
 
-    this._oauth.fetch(resource, options)
-      .then(utilFetchResponse)
+    network.fetch<any>(resource, {
+      requestID,
+      method: 'POST',
+      fetchFn: this._oauth.fetch,
+      mainThread: true
+    })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
         this._changeset.inflight = null;
@@ -1710,7 +1732,7 @@ export class OsmService extends AbstractSystem {
         }
       });
 
-    this._noteCache.inflightPost[noteID] = controller;
+    this._noteCache.inflightPost[noteID] = requestID;
   }
 
 
@@ -1905,10 +1927,11 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  /** Aborts a single in-flight request by calling `abort()` on its controller */
-  _abortRequest(controller?: AbortController | null): void {
-    if (controller) {
-      controller.abort();
+  /** Aborts a single in-flight request by cancelling it in NetworkSystem */
+  _abortRequest(requestID?: RequestID | null): void {
+    if (requestID) {
+      const network = this.context.systems.network!;
+      network.abort(requestID);
     }
   }
 

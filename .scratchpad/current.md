@@ -2,6 +2,32 @@
 
 ## Active
 
+### NetworkSystem Phase 5 — Migrate Hard-tier services
+
+Remaining services to migrate (Easy+Medium done in Phase 6b). NsiService has no direct fetch (delegates to AssetSystem) — no migration needed. OvertureService uses PMTiles exclusively — explicitly excluded.
+
+**Order of attack:**
+
+| # | Service | Complexity | Key notes |
+|---|---------|------------|-----------|
+| 1 | MapWithAIService | Medium | `Record<string, AbortController>` per dataset; fixed-zoom tile loading; XML parsing; no OAuth |
+| 2 | KartaviewService | Medium | `Map<string, {promise,controller}>` with pagination (`nextPage` per tile); D3 viewer |
+| 3 | EsriService | Hard | Per-dataset `Map<string, AbortController>`; multi-dataset architecture; layer schema fetch |
+| 4 | VectorTileService | Hard | Per-source `Map<string, AbortController>`; protobuf MVT; polyclip; PMTiles paths bypass NetworkSystem |
+| 5 | OsmService | Hard | 3 inflight Records (tiles, notes GET, notes POST); OAuth via `fetchFn`+`mainThread:true`; rate limiting |
+| 6 | MapillaryService | Hard | `Map<string, {promise,controller}>` keyed by **URL** (not TileID); 3 vector tile layers; Mapillary viewer |
+| 7 | StreetsideService | Hard | Two-phase tile→metadata+bubbles; Pannellum 360° viewer; cubemap assembly |
+
+**Common migration pattern per service:**
+1. Add `'network'` to `requiredDependencies`
+2. Replace per-service inflight Map/Record + AbortController creation/cleanup with `network.fetch()` / `network.isInflight()` / `network.abortMatching()`
+3. Delete `_inflight`, `inflightTile`, `cache.inflight` fields from the cache struct
+4. `abortMatching` predicates use regex `.test()` with service-prefix convention, e.g. `/^mapwithai-/`
+5. Special cases:
+   - **OsmService** authenticated tiles: `{ fetchFn: this._oauth.fetch, mainThread: true }`
+   - **VectorTileService** PMTiles sources: skip NetworkSystem (PMTiles manages its own fetch)
+   - **MapillaryService** URL-keyed inflight: requestID = URL (or a stable hash/slug)
+
 ### Validator classes (schema-aware lifecycle)
 Validators are still factory functions instantiated once at init time. They now use **time-of-use** access for schema prerequisites (variables, rulesets) — lookups happen inline when needed, not hoisted to factory scope. Guard patterns vary by validator file (optional chaining, nullish coalescing, early returns).
 

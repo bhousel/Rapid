@@ -5,7 +5,7 @@ import { utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { uiIcon } from '../ui/icon.js';
-import { utilFetchResponse, utilSetTransform } from '../util/index.ts';
+import { utilSetTransform } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -25,14 +25,6 @@ const MAXRESULTS = 1000;
 const TILEZOOM = 14;
 
 
-/** Inflight request tracking */
-interface InflightEntry {
-  /** The pending fetch promise */
-  promise: Promise<void>;
-  /** Controller used to abort the fetch if no longer needed */
-  controller: AbortController;
-}
-
 /** Extended Tile with origID for pagination tracking */
 interface KartaviewTile extends Tile {
   /** Original tile ID before the page number suffix was appended */
@@ -41,8 +33,6 @@ interface KartaviewTile extends Tile {
 
 /** Internal cache for Kartaview tile data */
 interface KartaviewCache {
-  /** Currently active fetch requests, keyed by tile ID (including page suffix) */
-  inflight: Map<string, InflightEntry>;
   /** Next page number to fetch for each original tile ID */
   nextPage: Map<string, number>;
   /** Last viewport version that was loaded, to skip redundant updates */
@@ -153,7 +143,7 @@ export class KartaviewService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'kartaview';
-    this.requiredDependencies = new Set<SystemID>(['l10n', 'photos', 'spatial']);
+    this.requiredDependencies = new Set<SystemID>(['l10n', 'network', 'photos', 'spatial']);
     this.optionalDependencies = new Set<SystemID>(['gfx', 'ui']);
     this.autoStart = false;
 
@@ -280,14 +270,7 @@ export class KartaviewService extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    if (this._cache.inflight) {
-      for (const inflight of this._cache.inflight.values()) {
-        inflight.controller.abort();
-      }
-    }
-
     this._cache = {
-      inflight:  new Map(),   // Map<string, {Promise, AbortController}>
       nextPage:  new Map(),   // Map<TileID, Number>
       lastv:     null
     };
@@ -328,6 +311,7 @@ export class KartaviewService extends AbstractSystem {
    */
   loadTiles(): void {
     const cache = this._cache;
+    const network = this.context.systems.network!;
 
     const viewport = this.context.viewport;
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
@@ -337,12 +321,8 @@ export class KartaviewService extends AbstractSystem {
     const needTiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const [k, inflight] of cache.inflight) {
-      const needed = needTiles.some(tile => k.indexOf(tile.id) === 0);
-      if (!needed) {
-        inflight.controller.abort();
-      }
-    }
+    const neededIDs = new Set(needTiles.map(tile => `kartaview-${tile.id}` as RequestID));
+    network.abortMatching(id => /^kartaview-/.test(id) && !neededIDs.has(id));
 
     // Fetch files that are needed
     for (const tile of needTiles) {
@@ -570,7 +550,9 @@ export class KartaviewService extends AbstractSystem {
     // Modify the tile.id to include the page number.
     // This is the tile id that the spatial system will keep track of.
     const tileID = tile.id = `${tile.origID},${nextPage}`;
-    if (spatial.hasTile('kartaview-images', tileID) || cache.inflight.has(tileID)) {
+    const requestID = `kartaview-${tileID}` as RequestID;
+    const network = this.context.systems.network!;
+    if (spatial.hasTile('kartaview-images', tileID) || network.isInflight(requestID)) {
       return Promise.resolve();
     }
 
@@ -581,17 +563,13 @@ export class KartaviewService extends AbstractSystem {
       bbBottomRight: [bbox.minY, bbox.maxX].join(','),
     }, true);
 
-    const controller = new AbortController();
     const url = `${KARTAVIEW_API}/1.0/list/nearby-photos/`;
-    const options = {
+    const prom = network.fetch<any>(url, {
+      requestID,
       method: 'POST',
-      signal: controller.signal,
       body: params,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    };
-
-    const prom = fetch(url, options)
-      .then(utilFetchResponse)
+    })
       .then(response => {
         spatial.addTiles('kartaview-images', [tile]);   // mark as loaded
         const data = response?.currentPageItems || [];
@@ -649,12 +627,8 @@ export class KartaviewService extends AbstractSystem {
         if (err.name === 'AbortError') return;         // ok
         if (err instanceof Error) console.error(err);  // eslint-disable-line no-console
         spatial.addTiles('kartaview-images', [tile]);  // don't retry
-      })
-      .finally(() => {
-        cache.inflight.delete(tileID);
       });
 
-    cache.inflight.set(tileID, { promise: prom, controller: controller });
     return prom;
   }
 
@@ -681,9 +655,9 @@ export class KartaviewService extends AbstractSystem {
     }
 
     const url = `${OPENSTREETCAM_API}/2.0/photo/${imageID}`;
+    const network = this.context.systems.network!;
 
-    return fetch(url)
-      .then(utilFetchResponse)
+    return network.fetch<any>(url)
       .then(response => {
         const d = response?.result?.data;
         if (!d) throw new Error(`Image ${imageID} not found`);

@@ -12,6 +12,7 @@ describe('StreetsideService', () => {
     assets:  new Rapid.AssetSystem(context),
     gfx:     new Rapid.MockGfxSystem(context),
     l10n:    new Rapid.MockSystem(context),
+    network: new Rapid.NetworkSystem(context),
     photos:  new Rapid.MockSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
@@ -62,8 +63,6 @@ describe('StreetsideService', () => {
         return prom
           .then(() => {
             const cache = streetside._cache;
-            assert.instanceOf(cache.inflight, Map);
-            assert.isEmpty(cache.inflight);
             assert.isNull(cache.lastv);
           });
       });
@@ -101,8 +100,6 @@ describe('StreetsideService', () => {
         return prom
           .then(() => {
             const cache = streetside._cache;
-            assert.instanceOf(cache.inflight, Map);
-            assert.isEmpty(cache.inflight);
             assert.isNull(cache.lastv);
           });
       });

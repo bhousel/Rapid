@@ -10,7 +10,6 @@ import { utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { uiIcon } from '../ui/icon.js';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -59,18 +58,8 @@ const TILEZOOM = 16.5;
 const TILEMARGIN = 2;
 
 
-/** Inflight request tracking */
-interface InflightEntry {
-  /** The pending fetch promise */
-  promise: Promise<void>;
-  /** Controller to abort the inflight request */
-  controller: AbortController;
-}
-
 /** Internal cache for Streetside tile data */
 interface StreetsideCache {
-  /** Map of TileID to inflight request info */
-  inflight: Map<string, InflightEntry>;
   /** Set of bubble PhotoIDs not yet assigned to a sequence */
   unattachedBubbles: Set<PhotoID>;
   /** Map of bubble PhotoID to the set of SequenceIDs it belongs to */
@@ -175,7 +164,7 @@ export class StreetsideService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'streetside';
-    this.requiredDependencies = new Set<SystemID>(['assets', 'l10n', 'photos', 'spatial']);
+    this.requiredDependencies = new Set<SystemID>(['assets', 'l10n', 'network', 'photos', 'spatial']);
     this.optionalDependencies = new Set<SystemID>(['gfx', 'ui']);
     this.autoStart = false;
 
@@ -309,14 +298,7 @@ export class StreetsideService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    if (this._cache.inflight) {
-      for (const inflight of this._cache.inflight.values()) {
-        inflight.controller.abort();
-      }
-    }
-
     this._cache = {
-      inflight:            new Map(),  // Map<TileID, {Promise, AbortController}>
       unattachedBubbles:   new Set(),  // Set<PhotoID>
       bubbleHasSequences:  new Map(),  // Map<PhotoID, Set<SequenceID>>
       metadataPromise:     null,
@@ -370,17 +352,15 @@ export class StreetsideService extends AbstractSystem {
     const needTiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const [tileID, inflight] of cache.inflight) {
-      const isNeeded = needTiles.some(tile => tile.id === tileID);
-      if (!isNeeded) {
-        inflight.controller.abort();
-      }
-    }
+    const network = context.systems.network!;
+    const neededIDs = new Set(needTiles.map(tile => `streetside-${tile.id}`));
+    network.abortMatching(id => /^streetside-/.test(id) && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of needTiles) {
       const tileID = tile.id;
-      if (spatial.hasTile('streetside-images', tileID) || cache.inflight.has(tileID)) continue;
+      const requestID = `streetside-${tileID}` as RequestID;
+      if (spatial.hasTile('streetside-images', tileID) || network.isInflight(requestID)) continue;
 
       // Promise.all([this._fetchMetadataAsync(tile), this._loadTileAsync(tile)])
       this._loadTileAsync(tile);
@@ -1054,8 +1034,8 @@ export class StreetsideService extends AbstractSystem {
     const metadataKey = 'AoG8TaQvkPo6o8SlpRVmBs7WJwO_NDQklVRcAfpn7P8oiEMYWNY59XHSJU81sP1Y';
     const metadataURL = `${metadataURLBase}/${lat},${lon}?key=${metadataKey}`;
 
-    cache.metadataPromise = fetch(metadataURL)
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    cache.metadataPromise = network.fetch<any>(metadataURL)
       .then(data => {
         if (!data) throw new Error('no data');
         return data;
@@ -1069,9 +1049,10 @@ export class StreetsideService extends AbstractSystem {
    * see Rapid#1305, iD#10100
    */
   _loadTileAsync(tile: Tile): Promise<void> {
-    const cache = this._cache;
-    const inflight = cache.inflight.get(tile.id);
-    if (inflight) return inflight.promise;
+    const network = this.context.systems.network!;
+    const requestID = `streetside-${tile.id}` as RequestID;
+
+    if (network.isInflight(requestID)) return Promise.resolve();
 
     const [w, s, e, n] = tile.wgs84Extent.rectangle();
     const MAXRESULTS = 2000;
@@ -1080,21 +1061,12 @@ export class StreetsideService extends AbstractSystem {
     const bubbleKey = 'AuftgJsO0Xs8Ts4M1xZUQJQXJNsvmh3IV8DkNieCiy3tCwCUMq76-WpkrBtNAuEm';
     const bubbleURL = bubbleURLBase + utilQsString({ north: n, south: s, east: e, west: w, count: MAXRESULTS, key: bubbleKey }, false);
 
-    const controller = new AbortController();
-    const promise = fetch(bubbleURL, { signal: controller.signal })
-      .then(utilFetchResponse)
+    return network.fetch<string>(bubbleURL, { requestID })
       .then(data => this._gotTile(tile, JSON.parse(data)))  // Content-Type is 'text/plain' for some reason
       .catch(err => {
         if (err.name === 'AbortError') return;  // ok
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-      })
-      .finally(() => {
-        cache.inflight.delete(tile.id);
       });
-
-    cache.inflight.set(tile.id, { promise: promise, controller: controller });
-
-    return promise;
   }
 
 

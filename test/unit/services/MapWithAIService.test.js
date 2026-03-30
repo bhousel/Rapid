@@ -10,6 +10,7 @@ describe('MapWithAIService', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     gfx:     new Rapid.MockGfxSystem(context),
+    network: new Rapid.NetworkSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
 
@@ -152,7 +153,6 @@ describe('MapWithAIService', () => {
         assert.strictEqual(ds.id, 'test');
         assert.instanceOf(ds.graph, Rapid.Graph);
         assert.instanceOf(ds.tree, Rapid.Tree);
-        assert.deepEqual(ds.inflight, {});
         assert.instanceOf(ds.loaded, Set);
         assert.instanceOf(ds.seen, Set);
         assert.instanceOf(ds.seenFirstNodeID, Set);

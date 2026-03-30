@@ -11,6 +11,7 @@ describe('KartaviewService', () => {
   context.systems = {
     gfx:     new Rapid.MockGfxSystem(context),
     l10n:    new Rapid.MockSystem(context),
+    network: new Rapid.NetworkSystem(context),
     photos:  new Rapid.MockSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
@@ -61,9 +62,7 @@ describe('KartaviewService', () => {
         return prom
           .then(() => {
             const cache = kartaview._cache;
-            assert.instanceOf(cache.inflight, Map);
             assert.instanceOf(cache.nextPage, Map);
-            assert.isEmpty(cache.inflight);
             assert.isEmpty(cache.nextPage);
             assert.isNull(cache.lastv);
           });
@@ -99,9 +98,7 @@ describe('KartaviewService', () => {
         return prom
           .then(() => {
             const cache = kartaview._cache;
-            assert.instanceOf(cache.inflight, Map);
             assert.instanceOf(cache.nextPage, Map);
-            assert.isEmpty(cache.inflight);
             assert.isEmpty(cache.nextPage);
             assert.isNull(cache.lastv);
           });

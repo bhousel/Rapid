@@ -5,7 +5,6 @@ import Protobuf from 'pbf';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData, GeoJSONData } from '../data/index.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -38,16 +37,6 @@ const trafficSignTileUrl = `${baseTileUrl}/mly_map_feature_traffic_sign/2/{z}/{x
 const TILEZOOM = 14;
 
 
-/** Inflight request tracking */
-interface InflightEntry {
-  /** Tile identifier this request is for */
-  tileID: string;
-  /** The fetch promise for this request */
-  promise?: Promise<void>;
-  /** AbortController to cancel the request if no longer needed */
-  controller: AbortController;
-}
-
 /** Valid dataset identifiers for Mapillary tile data */
 type MapillaryDatasetID = 'images' | 'signs' | 'detections';
 
@@ -73,8 +62,6 @@ interface MapillaryCache {
   signs: DatasetCache;
   /** Decoded segmentation geometries keyed by segmentation ID */
   segmentations: SegmentationCache;
-  /** Requests currently in flight, keyed by URL */
-  inflight: Map<string, InflightEntry>;
   /** URLs that have already been fetched */
   loaded: Set<string>;
 }
@@ -231,7 +218,7 @@ export class MapillaryService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'mapillary';
-    this.requiredDependencies = new Set<SystemID>(['l10n', 'photos', 'spatial']);
+    this.requiredDependencies = new Set<SystemID>(['l10n', 'network', 'photos', 'spatial']);
     this.optionalDependencies = new Set<SystemID>(['gfx', 'ui']);
     this.autoStart = false;
 
@@ -316,18 +303,11 @@ export class MapillaryService extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    if (this._cache.inflight) {
-      for (const req of this._cache.inflight.values()) {
-        req.controller.abort();
-      }
-    }
-
     this._cache = {
       images:        { lastv: null },
       detections:    { lastv: null },
       signs:         { lastv: null },
       segmentations: { data: new Map() },   // Map<segmentationID, SegmentationData>
-      inflight: new Map(),  // Map<url, InflightEntry>
       loaded:   new Set()   // Set<url>
     };
 
@@ -507,13 +487,9 @@ export class MapillaryService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const req of this._cache.inflight.values()) {
-      if (!req.tileID) continue;
-      const needed = tiles.find(tile => tile.id === req.tileID);
-      if (!needed) {
-        req.controller.abort();
-      }
-    }
+    const network = this.context.systems.network!;
+    const neededIDs = new Set(tiles.map(tile => `mapillary-${datasetID}-${tile.id}`));
+    network.abortMatching(id => id.startsWith(`mapillary-${datasetID}-`) && !neededIDs.has(id));
 
     for (const tile of tiles) {
       this._loadTileAsync(datasetID, tile);
@@ -912,6 +888,7 @@ export class MapillaryService extends AbstractSystem {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
+    const network = context.systems.network!;
 
     const tileUrls: Record<MapillaryDatasetID, string> = {
       images: imageTileUrl,
@@ -926,23 +903,17 @@ export class MapillaryService extends AbstractSystem {
       .replace('{z}', tile.xyz[2].toString());
 
     const cache = this._cache;
+    const requestID = `mapillary-${datasetID}-${tile.id}` as RequestID;
 
     if (cache.loaded.has(url)) {
       return Promise.resolve();  // already done
     }
 
-    let req: InflightEntry | undefined = cache.inflight.get(url);
-    if (req) {
-      return req.promise!;
-    } else {
-      req = {
-        tileID: tile.id,
-        controller: new AbortController()
-      };
+    if (network.isInflight(requestID)) {
+      return Promise.resolve();
     }
 
-    const prom = fetch(url, { signal: req.controller.signal })
-      .then(utilFetchResponse)
+    return network.fetch<ArrayBuffer>(url, { requestID })
       .then(buffer => {
         cache.loaded.add(url);
         if (!buffer) {
@@ -967,14 +938,7 @@ export class MapillaryService extends AbstractSystem {
         if (err.name === 'AbortError') return;          // ok
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         cache.loaded.add(url);  // don't retry
-      })
-      .finally(() => {
-        cache.inflight.delete(url);
       });
-
-    req.promise = prom;
-    cache.inflight.set(url, req);
-    return prom;
   }
 
 
@@ -1082,8 +1046,8 @@ export class MapillaryService extends AbstractSystem {
     const fields = 'id,geometry,aligned_direction,first_seen_at,last_seen_at,object_value,object_type,images';
     const url = `${apiUrl}/${detectionID}?access_token=${accessToken}&fields=${fields}`;
 
-    return fetch(url)
-      .then(utilFetchResponse)
+    const network = context.systems.network!;
+    return network.fetch<any>(url)
       .then(response => {
         if (!response) {
           throw new Error('No Data');
@@ -1134,8 +1098,8 @@ export class MapillaryService extends AbstractSystem {
     const fields = 'id,created_at,geometry,image,value';
     const url = `${apiUrl}/${imageID}/detections?access_token=${accessToken}&fields=${fields}`;
 
-    return fetch(url)
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    return network.fetch<any>(url)
       .then(response => {
         if (!response) {
           throw new Error('No Data');
@@ -1190,8 +1154,8 @@ export class MapillaryService extends AbstractSystem {
     const fields = 'id,created_at,geometry,image,value';
     const url = `${apiUrl}/${detectionID}/detections?access_token=${accessToken}&fields=${fields}`;
 
-    return fetch(url)
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    return network.fetch<any>(url)
       .then(response => {
         if (!response) {
           throw new Error('No Data');

@@ -24,7 +24,7 @@ export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
    * Custom fetch function.  Replaces `globalThis.fetch` for this request.
    * Used by OsmService to pass `this._oauth.fetch` for authenticated requests.
    */
-  fetchFn?: typeof globalThis.fetch;
+  fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
 
   /**
    * If true, skip worker dispatch and always fetch on the main thread.

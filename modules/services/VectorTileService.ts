@@ -10,7 +10,6 @@ import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Tile } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
@@ -52,8 +51,8 @@ interface VTSource {
   displayName: string;
   /** URL template for fetching vector tiles (contains {x}, {y}, {z} placeholders) */
   template: string;
-  /** Map of in-flight tile requests keyed by tile ID, with their AbortControllers */
-  inflight: Map<string, AbortController>;
+  /** Map of in-flight PMTiles archive requests keyed by tile ID, with their AbortControllers */
+  inflightPMTiles: Map<string, AbortController>;
   /** Map of loaded tile IDs to their tile metadata */
   loaded: Map<string, Tile>;
   /** Map of zoom levels to their per-zoom feature caches */
@@ -95,6 +94,7 @@ export class VectorTileService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'vectortile';
+    this.requiredDependencies = new Set<SystemID>(['network']);
     this.optionalDependencies = new Set<SystemID>(['gfx']);
 
     // Sources are identified by their URL template..
@@ -129,13 +129,16 @@ export class VectorTileService extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
+    const network = this.context.systems.network!;
+    network.abortMatching(id => id.startsWith('vt-'));
+
     for (const source of this._sources.values()) {
-      for (const controller of source.inflight.values()) {
+      for (const controller of source.inflightPMTiles.values()) {
         controller.abort();
       }
 
       // free memory
-      source.inflight.clear();
+      source.inflightPMTiles.clear();
       source.loaded.clear();
       source.readyPromise = undefined;
       for (const cache of source.zoomCache.values()) {
@@ -215,11 +218,16 @@ export class VectorTileService extends AbstractSystem {
         const tiles = this._tiler.getTiles(viewport).tiles;
 
         // Abort inflight requests that are no longer needed..
-        for (const [tileID, controller] of source.inflight) {
-          const needed = tiles.find(tile => tile.id === tileID);
-          if (!needed) {
-            controller.abort();
+        if (source.pmtiles) {
+          for (const [tileID, controller] of source.inflightPMTiles) {
+            if (!tiles.find(tile => tile.id === tileID)) {
+              controller.abort();
+            }
           }
+        } else {
+          const network = this.context.systems.network!;
+          const neededIDs = new Set(tiles.map(t => `vt-${source.id}-${t.id}`));
+          network.abortMatching(id => id.startsWith(`vt-${source.id}-`) && !neededIDs.has(id));
         }
 
         // Issue new requests..
@@ -247,13 +255,13 @@ export class VectorTileService extends AbstractSystem {
       const filename = url.pathname.split('/').at(-1);
 
       source = {
-        id:           utilHashcode(template).toString(),
-        displayName:  hostname,
-        template:     template,
-        inflight:     new Map(),   // Map<tileID, AbortController>
-        loaded:       new Map(),   // Map<tileID, Tile>
-        zoomCache:    new Map(),   // Map<zoom, Object zoomCache>
-        lastv:        null         // viewport version last time we fetched data
+        id:                 utilHashcode(template).toString(),
+        displayName:        hostname,
+        template:           template,
+        inflightPMTiles:    new Map(),   // Map<tileID, AbortController> (PMTiles only)
+        loaded:             new Map(),   // Map<tileID, Tile>
+        zoomCache:          new Map(),   // Map<zoom, Object zoomCache>
+        lastv:              null         // viewport version last time we fetched data
       };
 
       this._sources.set(template, source);
@@ -312,20 +320,27 @@ export class VectorTileService extends AbstractSystem {
    */
   _loadTileAsync(source: VTSource, tile: Tile): Promise<void> | undefined {
     const tileID = tile.id;
-    if (source.loaded.has(tileID) || source.inflight.has(tileID)) return;
-
-    const controller = new AbortController();
-    source.inflight.set(tileID, controller);
+    if (source.loaded.has(tileID)) return;
 
     const [x, y, z] = tile.xyz;
-    let _fetch;
+    let _fetch: Promise<ArrayBuffer | undefined>;
 
     if (source.pmtiles) {
+      if (source.inflightPMTiles.has(tileID)) return;
+
+      const controller = new AbortController();
+      source.inflightPMTiles.set(tileID, controller);
+
       _fetch = source.pmtiles
         .getZxy(z, x, y, controller.signal)
-        .then(response => response?.data);
+        .then(response => response?.data)
+        .finally(() => source.inflightPMTiles.delete(tileID));
 
     } else {
+      const network = this.context.systems.network!;
+      const requestID = `vt-${source.id}-${tileID}` as RequestID;
+      if (network.isInflight(requestID)) return;
+
       const url = source.template
         .replace('{x}', x.toString())
         .replace('{y}', y.toString())
@@ -336,8 +351,7 @@ export class VectorTileService extends AbstractSystem {
           return subdomains[(x + y) % subdomains.length];
         });
 
-      _fetch = fetch(url, { signal: controller.signal })
-        .then(utilFetchResponse);
+      _fetch = network.fetch<ArrayBuffer>(url, { requestID });
     }
 
     return _fetch
@@ -348,9 +362,6 @@ export class VectorTileService extends AbstractSystem {
       .catch(err => {
         if (err.name === 'AbortError') return;          // ok
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-      })
-      .finally(() => {
-        source.inflight.delete(tileID);
       });
   }
 

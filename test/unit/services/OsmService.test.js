@@ -11,6 +11,7 @@ describe('OsmService', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     gfx:     new Rapid.MockGfxSystem(context),
+    network: new Rapid.NetworkSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
 

@@ -4,7 +4,6 @@ import { utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Graph, RapidDataset, Tree } from '../lib/index.ts';
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
@@ -26,8 +25,6 @@ const TILEZOOM = 14;
  * Internal cache structure for tracking tile fetching state per dataset.
  */
 interface EsriTileCache {
-  /** In-flight tile requests, keyed by tileID, with their AbortControllers */
-  inflight: Map<string, AbortController>;
   /** Tiles that have been fully loaded, keyed by tileID */
   loaded: Map<string, Tile>;
   /** Set of feature IDs already parsed, to avoid duplicates across tiles */
@@ -126,7 +123,7 @@ export class EsriService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'esri';
-    this.requiredDependencies = new Set<SystemID>(['spatial']);
+    this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
     this.optionalDependencies = new Set<SystemID>(['gfx', 'locations']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
@@ -168,14 +165,9 @@ export class EsriService extends AbstractSystem {
    */
   resetAsync(): Promise<void> {
     for (const [datasetID, ds] of this._datasets) {
-      for (const controller of ds.cache.inflight.values()) {
-        controller.abort();
-      }
-
       ds.graph = new Graph(this.context);
       ds.tree = new Tree(ds.graph, datasetID);
       ds.cache = {
-        inflight:  new Map(),   // Map<tileID, AbortController>
         loaded:    new Map(),   // Map<tileID, Tile>
         seen:      new Set()    // Set<featureID>
       };
@@ -298,6 +290,7 @@ export class EsriService extends AbstractSystem {
 
     const cache = ds.cache;
     const context = this.context;
+    const network = context.systems.network!;
     const locations = context.systems.locations;
     const viewport = context.viewport;
 
@@ -308,17 +301,13 @@ export class EsriService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const [tileID, controller] of cache.inflight) {
-      const isNeeded = tiles.some(tile => tile.id === tileID);
-      if (!isNeeded) {
-        controller.abort();
-        cache.inflight.delete(tileID);
-      }
-    }
+    const neededIDs = new Set(tiles.map(tile => `esri-${ds.id}-${tile.id}` as RequestID));
+    network.abortMatching(id => /^esri-/.test(id) && !neededIDs.has(id));
 
     for (const tile of tiles) {
       const tileID = tile.id;
-      if (cache.loaded.has(tileID) || cache.inflight.has(tileID)) continue;
+      const requestID = `esri-${ds.id}-${tileID}` as RequestID;
+      if (cache.loaded.has(tileID) || network.isInflight(requestID)) continue;
 
       if (locations) {
         // Skip if this tile covers a blocked region (all corners are blocked)
@@ -343,11 +332,11 @@ export class EsriService extends AbstractSystem {
   _loadDatasetsAsync(): Promise<Map<DatasetID, EsriDatasetEntry>> {
     if (this._datasetsPromise) return this._datasetsPromise;
 
+    const network = this.context.systems.network!;
     return this._datasetsPromise = new Promise((resolve, reject) => {
       // recursively fetch all pages of data
       const fetchMore = (page: number): void => {
-        fetch(this._searchURL(page))
-          .then(utilFetchResponse)
+        network.fetch<any>(this._searchURL(page))
           .then(json => {
             for (const ds of json.results ?? []) {
               this._parseDataset(ds);
@@ -381,7 +370,6 @@ export class EsriService extends AbstractSystem {
     ds.graph = new Graph(this.context);
     ds.tree = new Tree(ds.graph, ds.id);
     ds.cache = {
-      inflight:  new Map(),   // Map<tileID, AbortController>
       loaded:    new Map(),   // Map<tileID, Tile>
       seen:      new Set()    // Set<featureID>
     };
@@ -414,8 +402,8 @@ export class EsriService extends AbstractSystem {
       return Promise.resolve(ds.layer);
     }
 
-    return fetch(this._layerURL(ds.url))
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    return network.fetch<any>(this._layerURL(ds.url))
       .then(json => {
         if (!json.layers || !json.layers.length) {
           throw new Error(`Missing layer info for datasetID: ${ds.id}`);
@@ -523,12 +511,11 @@ export class EsriService extends AbstractSystem {
     const tileID = tile.id;
     if (cache.loaded.has(tileID)) return;
 
-    const controller = new AbortController();
-    cache.inflight.set(tileID, controller);
+    const network = this.context.systems.network!;
+    const requestID = `esri-${ds.id}-${tileID}` as RequestID;
     const url = this._tileURL(ds, tile, page);
 
-    fetch(url, { signal: controller.signal })
-      .then(utilFetchResponse)
+    network.fetch<any>(url, { requestID })
       .then(geojson => {
         if (!geojson) throw new Error('no geojson');
 
@@ -558,9 +545,6 @@ export class EsriService extends AbstractSystem {
       .catch(e => {
         if (e.name === 'AbortError') return;
         console.error(e);  // eslint-disable-line
-      })
-      .finally(() => {
-        cache.inflight.delete(tileID);
       });
   }
 

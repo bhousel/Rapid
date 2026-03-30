@@ -4,7 +4,6 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Graph, RapidDataset, Tree } from '../lib/index.ts';
 import { OsmNode, OsmWay } from '../data/index.ts';
 import { OsmXMLParser } from '../data/parsers/OsmXMLParser.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
@@ -29,8 +28,6 @@ interface DatasetCache {
   graph: Graph;
   /** Custom spatial tree for spatial queries on this dataset */
   tree: Tree;
-  /** Map of in-flight tile requests keyed by tile ID, with their AbortControllers */
-  inflight: Record<string, AbortController>;
   /** Set of tile IDs that have already been loaded */
   loaded: Set<EntityID>;
   /** Set of entity IDs already seen, to avoid processing duplicates */
@@ -63,7 +60,7 @@ export class MapWithAIService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'mapwithai';
-    this.requiredDependencies = new Set<SystemID>(['spatial']);
+    this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
     this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash']);
 
     this._XMLParser = new OsmXMLParser();
@@ -187,13 +184,8 @@ export class MapWithAIService extends AbstractSystem {
    */
   resetAsync(): Promise<void> {
     for (const [datasetID, ds] of this._datasets) {
-      if (ds.inflight) {
-        Object.values(ds.inflight).forEach(controller => controller.abort());
-      }
-
       ds.graph = new Graph(this.context);
       ds.tree = new Tree(ds.graph, datasetID);
-      ds.inflight = {};
       ds.loaded.clear();
       ds.seen.clear();
       ds.seenFirstNodeID.clear();
@@ -223,7 +215,6 @@ export class MapWithAIService extends AbstractSystem {
         id: datasetID,
         graph: graph,
         tree: tree,
-        inflight: {},
         loaded: new Set(),           // Set<TileID>
         seen: new Set(),             // Set<EntityID>
         seenFirstNodeID: new Set(),  // Set<EntityID>
@@ -260,6 +251,7 @@ export class MapWithAIService extends AbstractSystem {
     if (this._paused) return;
 
     const context = this.context;
+    const network = context.systems.network!;
     const viewport = context.viewport;
 
     const ds = this.getDataset(datasetID);  // create caches, if needed
@@ -270,13 +262,8 @@ export class MapWithAIService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const k of Object.keys(ds.inflight)) {
-      const wanted = tiles.find(tile => tile.id === k);
-      if (!wanted) {
-        ds.inflight[k].abort();
-        delete ds.inflight[k];
-      }
-    }
+    const neededIDs = new Set(tiles.map(tile => `mapwithai-${tile.id}` as RequestID));
+    network.abortMatching(id => /^mapwithai-/.test(id) && !neededIDs.has(id));
 
     for (const tile of tiles) {
       this.loadTile(ds, tile);
@@ -294,10 +281,12 @@ export class MapWithAIService extends AbstractSystem {
     if (!ds || this._paused) return;
 
     const context = this.context;
+    const network = context.systems.network!;
     const locations = context.systems.locations;
     const tileID = tile.id;
+    const requestID = `mapwithai-${tileID}` as RequestID;
 
-    if (ds.loaded.has(tileID) || ds.inflight[tileID]) return;
+    if (ds.loaded.has(tileID) || network.isInflight(requestID)) return;
 
     if (locations) {
       // Exit if this tile covers a blocked region (all corners are blocked)
@@ -310,19 +299,12 @@ export class MapWithAIService extends AbstractSystem {
     }
 
     const url = this._tileURL(ds, tile.wgs84Extent);
-    const controller = new AbortController();
-    fetch(url, { signal: controller.signal })
-      .then(utilFetchResponse)
+    network.fetch<Document>(url, { requestID })
       .then(xml => this._gotTile(xml, ds, tile))
       .catch(e => {
         if (e.name === 'AbortError') return;
         console.error(e);  // eslint-disable-line
-      })
-      .finally(() => {
-        delete ds.inflight[tileID];
       });
-
-    ds.inflight[tileID] = controller;
   }
 
 
