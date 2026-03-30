@@ -3,7 +3,7 @@ import { utilObjectOmit, utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 
 import type { Context } from '../Context.ts';
-
+import type { GeometryType } from '../core/SchemaSystem.ts';
 
 /** Base URL for the OpenStreetMap Taginfo API v4 */
 const TAGINFO_API = 'https://taginfo.openstreetmap.org/api/4/';
@@ -31,14 +31,13 @@ const tag_filters = {
   line: 'ways'
 };
 /** Maps geometry types to their member-fraction property name for role filtering */
-const tag_members_fractions: Record<string, string> = {
+const tag_members_fractions: Record<GeometryType, string> = {
   point: 'count_node_members_fraction',
   vertex: 'count_node_members_fraction',
   area: 'count_way_members_fraction',
   line: 'count_way_members_fraction',
   relation: 'count_relation_members_fraction'
 };
-
 
 
 /** Parameters for taginfo API requests */
@@ -64,7 +63,7 @@ interface TaginfoParams {
   /** Element type filter (e.g. 'nodes', 'ways') */
   filter?: string;
   /** Geometry type (e.g. 'point', 'line', 'area', 'vertex') */
-  geometry?: string;
+  geometry?: GeometryType;
   /** Whether to debounce the request */
   debounce?: boolean;
   /** Additional arbitrary parameters */
@@ -484,10 +483,11 @@ export class TaginfoService extends AbstractSystem {
   }
 
   /** Returns a filter function that excludes empty roles, uppercase, and low-fraction roles */
-  _filterRoles(geometry: string): (d: any) => boolean {
+  _filterRoles(geometry: GeometryType | ''): (d: any) => boolean {
     return (d: any) => {
       if (d.role === '') return false; // exclude empty role
       if (d.role.match(/[A-Z*;,]/) !== null) return false;  // exclude uppercase letters and some punctuation
+      if (geometry === '') return true;  // no filter, just include it
       return parseFloat(d[tag_members_fractions[geometry]]) > 0.0;
     };
   }
@@ -540,7 +540,13 @@ export class TaginfoService extends AbstractSystem {
    * @param callback - Errback-style callback for the results
    * @param loaded - Internal callback invoked when the fetch completes
    */
-  _request(url: string, params: TaginfoParams, exactMatch: boolean, callback: TaginfoCallback, loaded: (err: string | null, result?: any) => void): void {
+  _request(
+    url: string,
+    params: TaginfoParams,
+    exactMatch: boolean,
+    callback: TaginfoCallback,
+    loaded: (err: string | null, result?: any) => void
+  ): void {
     if (this._checkCache(url, params, exactMatch, callback)) return;
 
     const network = this.context.systems.network!;
