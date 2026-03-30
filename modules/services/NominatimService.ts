@@ -3,7 +3,6 @@ import { utilQsString } from '@rapid-sdk/util';
 import RBush from 'rbush';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
@@ -36,8 +35,6 @@ export class NominatimService extends AbstractSystem {
 
   /** Base URL for the Nominatim API */
   apibase: string;
-  /** Map of inflight request URLs to their AbortControllers */
-  _inflight: Record<string, AbortController>;
   /** Spatial index cache of previously fetched Nominatim results */
   _nominatimCache: RBush<NominatimCacheItem>;
 
@@ -48,10 +45,10 @@ export class NominatimService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'nominatim';
-    this.optionalDependencies = new Set(['l10n']);
+    this.requiredDependencies = new Set<SystemID>(['network']);
+    this.optionalDependencies = new Set<SystemID>(['l10n']);
 
     this.apibase = 'https://nominatim.openstreetmap.org/';
-    this._inflight = {};
     this._nominatimCache = new RBush<NominatimCacheItem>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -87,8 +84,9 @@ export class NominatimService extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    Object.values(this._inflight).forEach(controller => controller.abort());
-    this._inflight = {};
+    const network = this.context.systems.network!;
+    network.abortMatching(requestID => /nominatim\.openstreetmap\.org/.test(requestID));
+
     this._nominatimCache = new RBush<NominatimCacheItem>();
     return Promise.resolve();
   }
@@ -131,24 +129,14 @@ export class NominatimService extends AbstractSystem {
 
     const params = { zoom: 13, format: 'json', addressdetails: 1, lat: loc[1], lon: loc[0] };
     const url = this.apibase + 'reverse?' + utilQsString(params, false);
-    if (this._inflight[url]) return;
-
-    const controller = new AbortController();
-    this._inflight[url] = controller;
 
     const context = this.context;
     const l10n = context.systems.l10n;
+    const network = context.systems.network!;
     const localeCodes = l10n?.localeCodes || ['en-US', 'en'];
 
-    const opts = {
-      signal: controller.signal,
-      headers: { 'Accept-Language': localeCodes.join(',') }
-    };
-
-    fetch(url, opts)
-      .then(utilFetchResponse)
+    network.fetch<any>(url, { headers: { 'Accept-Language': localeCodes.join(',') } })
       .then(result => {
-        delete this._inflight[url];
         if (result?.error) {
           throw new Error(result.error);
         }
@@ -157,7 +145,6 @@ export class NominatimService extends AbstractSystem {
         if (callback) callback(null, result);
       })
       .catch(err => {
-        delete this._inflight[url];
         if (err.name === 'AbortError') return;
         if (callback) callback(err.message);
       });
@@ -173,31 +160,20 @@ export class NominatimService extends AbstractSystem {
   search(val: string, callback: NominatimCallback): void {
     const searchVal = encodeURIComponent(val);
     const url = this.apibase + `search?q=${searchVal}&limit=10&format=json`;
-    if (this._inflight[url]) return;
-
-    const controller = new AbortController();
-    this._inflight[url] = controller;
 
     const context = this.context;
     const l10n = context.systems.l10n;
+    const network = context.systems.network!;
     const localeCodes = l10n?.localeCodes || ['en-US', 'en'];
 
-    const opts = {
-      signal: controller.signal,
-      headers: { 'Accept-Language': localeCodes.join(',') }
-    };
-
-    fetch(url, opts)
-      .then(utilFetchResponse)
+    network.fetch<any>(url, { headers: { 'Accept-Language': localeCodes.join(',') } })
       .then(result => {
-        delete this._inflight[url];
         if (result?.error) {
           throw new Error(result.error);
         }
         if (callback) callback(null, result);
       })
       .catch(err => {
-        delete this._inflight[url];
         if (err.name === 'AbortError') return;
         if (callback) callback(err.message);
       });

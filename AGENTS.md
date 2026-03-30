@@ -379,6 +379,7 @@ behaviors.available.set('drag', DragBehavior);
 | `modeID` | `ModeID` |
 | `photoID` | `PhotoID` |
 | `presetID` | `PresetID` |
+| `requestID` | `RequestID` |
 | `scriptCode` | `ScriptCode` |
 | `sequenceID` | `SequenceID` |
 | `serviceID` | `ServiceID` |

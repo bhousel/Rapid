@@ -1,7 +1,6 @@
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 
@@ -54,8 +53,6 @@ export class OsmWikibaseService extends AbstractSystem {
   apibase: string;
   /** Internal cache for Wikibase entity data, keyed by sitelink title */
   _cache: Record<string, any>;
-  /** Map of in-flight requests keyed by URL to their AbortControllers */
-  _inflight: Map<string, AbortController>;
   /** Cache of locale language codes to their Wikibase entity QIDs (or `false` if not found) */
   _localeIDs: Record<string, string | false>;
 
@@ -67,11 +64,11 @@ export class OsmWikibaseService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'osmwikibase';
-    this.optionalDependencies = new Set(['l10n', 'scheduler']);
+    this.requiredDependencies = new Set<SystemID>(['network']);
+    this.optionalDependencies = new Set<SystemID>(['l10n', 'scheduler']);
     this.apibase = 'https://wiki.openstreetmap.org/w/api.php';
 
     this._cache = {};
-    this._inflight = new Map();        // Map<url, AbortController>
     this._localeIDs = { en: false };   // cache false to prevent repeated failed requests
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -110,12 +107,12 @@ export class OsmWikibaseService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    this.context.systems.scheduler?.cancel('osmwikibase-request');  // cancel any request in progress
+    const context = this.context;
+    const network = context.systems.network!;
+    const scheduler = context.systems.scheduler;
 
-    for (const controller of this._inflight.values()) {
-      controller.abort();
-    }
-    this._inflight.clear();
+    scheduler?.cancel('osmwikibase-request');  // cancel any request in progress
+    network.abortMatching(requestID => /wiki\.openstreetmap\.org/.test(requestID));
 
     return Promise.resolve();
   }
@@ -442,13 +439,9 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   _request(url: string, callback: WikibaseCallback): void {
-    if (this._inflight.has(url)) return;
+    const network = this.context.systems.network!;
 
-    const controller = new AbortController();
-    this._inflight.set(url, controller);
-
-    fetch(url, { signal: controller.signal })
-      .then(utilFetchResponse)
+    network.fetch<any>(url)
       .then(result => {
         if (callback) callback(null, result);
       })
@@ -456,9 +449,6 @@ export class OsmWikibaseService extends AbstractSystem {
         if (err.name === 'AbortError') return;
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         if (callback) callback(err.message);
-      })
-      .finally(() => {
-        this._inflight.delete(url);
       });
   }
 

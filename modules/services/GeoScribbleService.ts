@@ -3,7 +3,6 @@ import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { Tile } from '@rapid-sdk/math';
@@ -17,8 +16,6 @@ const GEOSCRIBBLE_API = 'https://geoscribble.osmz.ru/geojson';
 
 /** Internal cache for GeoScribble tile data */
 interface GeoScribbleCache {
-  /** Map of in-progress tile requests, keyed by tile ID, with their AbortControllers */
-  inflight: Map<TileID, AbortController>;
   /** Viewport version number from the last data fetch, used to skip redundant loads */
   lastv: number | null;
 }
@@ -45,8 +42,8 @@ export class GeoScribbleService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'geoscribble';
-    this.requiredDependencies = new Set(['spatial']);
-    this.optionalDependencies = new Set(['gfx']);
+    this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
+    this.optionalDependencies = new Set<SystemID>(['gfx']);
     this.autoStart = false;
 
     this._cache = {} as GeoScribbleCache;
@@ -83,19 +80,16 @@ export class GeoScribbleService extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    if (this._cache.inflight) {
-      for (const controller of this._cache.inflight.values()) {
-        controller.abort();
-      }
-    }
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+
+    network.abortMatching(requestID => /^geoscribble-/.test(requestID));
+    spatial.clearCache('geoscribble');
 
     this._cache = {
-      inflight:  new Map(),   // Map<tileID, AbortController>
-      lastv:     null         // viewport version last time we fetched data
+      lastv:  null  // viewport version last time we fetched data
     };
-
-    const spatial = this.context.systems.spatial!;
-    spatial.clearCache('geoscribble');
 
     return Promise.resolve();
   }
@@ -119,6 +113,7 @@ export class GeoScribbleService extends AbstractSystem {
   loadTiles(): void {
     const cache = this._cache;
     const context = this.context;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
     const viewport = context.viewport;
 
@@ -129,34 +124,28 @@ export class GeoScribbleService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const [tileID, controller] of cache.inflight) {
-      const isNeeded = tiles.some(tile => tile.id === tileID);
-      if (!isNeeded) {
-        controller.abort();
-      }
-    }
+    const neededTileIDs = new Set(tiles.map(t => t.id));
+    network.abortMatching(requestID => {
+      if (!/^geoscribble-/.test(requestID)) return false;
+      const tileID = requestID.slice('geoscribble-'.length) as TileID;
+      return !neededTileIDs.has(tileID);
+    });
 
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
-      if (spatial.hasTile('geoscribble', tileID) || cache.inflight.has(tileID)) continue;
+      const requestID = `geoscribble-${tileID}`;
+      if (spatial.hasTile('geoscribble', tileID) || network.isInflight(requestID)) continue;
 
       const rect = tile.wgs84Extent.rectangle().join(',');
       const url = GEOSCRIBBLE_API + '?' + utilQsString({ bbox: rect }, false);
 
-      const controller = new AbortController();
-      cache.inflight.set(tileID, controller);
-
-      fetch(url, { signal: controller.signal })
-        .then(utilFetchResponse)
+      network.fetch<any>(url, { requestID })
         .then(response => this._gotTile(tile, response))
         .catch(err => {
           if (err.name === 'AbortError') return;  // ok
           spatial.addTiles('geoscribble', [tile]);   // don't retry
           if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-        })
-        .finally(() => {
-          cache.inflight.delete(tileID);
         });
     }
   }

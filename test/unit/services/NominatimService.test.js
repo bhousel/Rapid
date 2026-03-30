@@ -13,6 +13,7 @@ function parseQueryString(url) {
 describe('NominatimService', () => {
   // Setup context..
   const context = new Rapid.MockContext();
+  context.systems.network = new Rapid.NetworkSystem(context);
 
   // Setup fetchMock..
   beforeAll(() => {
@@ -43,8 +44,6 @@ describe('NominatimService', () => {
         assert.instanceOf(nominatim.requiredDependencies, Set);
         assert.instanceOf(nominatim.optionalDependencies, Set);
         assert.isTrue(nominatim.autoStart);
-
-        assert.deepEqual(nominatim._inflight, {});
       });
     });
 

@@ -13,6 +13,7 @@ function parseQueryString(url) {
 describe('TaginfoService', () => {
   // Setup context..
   const context = new Rapid.MockContext();
+  context.systems.network = new Rapid.NetworkSystem(context);
 
   // Setup fetchMock..
   beforeAll(() => {
@@ -46,8 +47,6 @@ describe('TaginfoService', () => {
         assert.instanceOf(taginfo.requiredDependencies, Set);
         assert.instanceOf(taginfo.optionalDependencies, Set);
         assert.isTrue(taginfo.autoStart);
-
-        assert.deepEqual(taginfo._inflight, {});
       });
     });
 

@@ -12,6 +12,7 @@ describe('KeepRightService', () => {
     assets:  new Rapid.AssetSystem(context),
     gfx:     new Rapid.MockGfxSystem(context),
     l10n:    new Rapid.LocalizationSystem(context),
+    network: new Rapid.NetworkSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
 
@@ -65,10 +66,6 @@ describe('KeepRightService', () => {
         return prom
           .then(() => {
             const cache = keepright._cache;
-            assert.instanceOf(cache.inflightTile, Map);
-            assert.isEmpty(cache.inflightTile);
-            assert.instanceOf(cache.inflightPost, Map);
-            assert.isEmpty(cache.inflightPost);
             assert.deepEqual(cache.closed, {});
             assert.isNull(cache.lastv);
           });
@@ -104,10 +101,6 @@ describe('KeepRightService', () => {
         return prom
           .then(() => {
             const cache = keepright._cache;
-            assert.instanceOf(cache.inflightTile, Map);
-            assert.isEmpty(cache.inflightTile);
-            assert.instanceOf(cache.inflightPost, Map);
-            assert.isEmpty(cache.inflightPost);
             assert.deepEqual(cache.closed, {});
             assert.isNull(cache.lastv);
           });

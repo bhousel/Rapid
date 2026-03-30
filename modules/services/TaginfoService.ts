@@ -1,7 +1,6 @@
 import { utilObjectOmit, utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 
@@ -93,8 +92,6 @@ type TaginfoCallback = (err: string | null, data?: any[]) => void;
  */
 export class TaginfoService extends AbstractSystem {
 
-  /** Map of in-flight request URLs to their AbortControllers */
-  _inflight: Record<string, AbortController>;
   /** Cache of API responses keyed by request URL */
   _cache: Record<string, any[]>;
   /** Set of popular tag keys to exclude from value lookups (see iD#3955) */
@@ -107,9 +104,9 @@ export class TaginfoService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'taginfo';
-    this.optionalDependencies = new Set(['l10n', 'scheduler']);
+    this.requiredDependencies = new Set<SystemID>(['network']);
+    this.optionalDependencies = new Set<SystemID>(['l10n', 'scheduler']);
 
-    this._inflight = {};
     this._cache = {};
     this._popularKeys = {
       // manually exclude some keys – iD#5377, iD#7485
@@ -195,9 +192,12 @@ export class TaginfoService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    this.context.systems.scheduler?.cancel('taginfo-request');  // cancel any request in progress
-    Object.values(this._inflight).forEach(controller => controller.abort());
-    this._inflight = {};
+    const context = this.context;
+    const network = context.systems.network!;
+    const scheduler = context.systems.scheduler;
+
+    scheduler?.cancel('taginfo-request');  // cancel any request in progress
+    network.abortMatching(requestID => /taginfo\.openstreetmap\.org/.test(requestID));
 
     return Promise.resolve();
   }
@@ -541,20 +541,14 @@ export class TaginfoService extends AbstractSystem {
    * @param loaded - Internal callback invoked when the fetch completes
    */
   _request(url: string, params: TaginfoParams, exactMatch: boolean, callback: TaginfoCallback, loaded: (err: string | null, result?: any) => void): void {
-    if (this._inflight[url]) return;
     if (this._checkCache(url, params, exactMatch, callback)) return;
 
-    const controller = new AbortController();
-    this._inflight[url] = controller;
-
-    fetch(url, { signal: controller.signal })
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    network.fetch<any>(url)
       .then(result => {
-        delete this._inflight[url];
         if (loaded) loaded(null, result);
       })
       .catch(err => {
-        delete this._inflight[url];
         if (err.name === 'AbortError') return;
         if (loaded) loaded(err.message);
       });

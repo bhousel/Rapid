@@ -3,7 +3,6 @@ import { Tiler } from '@rapid-sdk/math';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData } from '../data/MarkerData.ts';
 import { utilExtractValues } from '../util/string.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
@@ -51,10 +50,6 @@ const MAPROULETTE_API = 'https://maproulette.org/api/v2';
 interface RequestEntry {
   /** Current request state: 'inflight', 'loaded', or 'error' */
   status?: string;
-  /** AbortController for cancelling an in-flight request */
-  controller?: AbortController;
-  /** The URL being fetched */
-  url?: string;
 }
 
 /** Closed task record */
@@ -97,8 +92,6 @@ interface MapRouletteCache {
   tileRequest: Map<TileID, RequestEntry>;
   /** Challenge request statuses keyed by challenge ID */
   challengeRequest: Map<string, RequestEntry>;
-  /** In-flight fetch controllers keyed by URL */
-  inflight: Map<string, AbortController>;
   /** Tasks closed during this editing session */
   closed: ClosedEntry[];
 }
@@ -132,8 +125,8 @@ export class MapRouletteService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'maproulette';
-    this.requiredDependencies = new Set(['spatial']);
-    this.optionalDependencies = new Set(['map', 'gfx', 'urlhash']);
+    this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
+    this.optionalDependencies = new Set<SystemID>(['map', 'gfx', 'urlhash']);
     this.autoStart = false;
 
     this._challengeIDs = new Set();  // Set<string> - if we want to filter only a specific challengeID
@@ -187,24 +180,21 @@ export class MapRouletteService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    if (this._cache.inflight) {
-      for (const controller of this._cache.inflight.values()) {
-        controller.abort();
-      }
-    }
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+
+    network.abortMatching(requestID => /^maproulette-/.test(requestID));
+    spatial.clearCache('maproulette');
 
     this._cache = {
       lastv: null,
       tasks: new Map(),             // Map<taskID, MarkerData>
       challenges: new Map(),        // Map<challengeID, Object>
-      tileRequest: new Map(),       // Map<tileID, { status, controller, url }>
-      challengeRequest: new Map(),  // Map<challengeID, { status, controller, url }>
-      inflight: new Map(),          // Map<url, controller>
+      tileRequest: new Map(),       // Map<tileID, { status }>
+      challengeRequest: new Map(),  // Map<challengeID, { status }>
       closed: []                    // Array<{ challengeID, taskID }>
     };
-
-    const spatial = this.context.systems.spatial!;
-    spatial.clearCache('maproulette');
 
     return Promise.resolve();
   }
@@ -285,6 +275,7 @@ export class MapRouletteService extends AbstractSystem {
     if (this._paused) return;
 
     const context = this.context;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
     const viewport = context.viewport;
     const cache = this._cache;
@@ -300,8 +291,7 @@ export class MapRouletteService extends AbstractSystem {
       if (request.status !== 'inflight') continue;
       const isNeeded = tiles.some(tile => tile.id === tileID);
       if (!isNeeded) {
-        request.controller!.abort();
-        cache.inflight.delete(request.url!);
+        network.abort(`maproulette-tile-${tileID}`);
       }
     }
 
@@ -321,6 +311,7 @@ export class MapRouletteService extends AbstractSystem {
    */
   loadTile(tile: Tile): void {
     const context = this.context;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
     const cache = this._cache;
@@ -329,13 +320,11 @@ export class MapRouletteService extends AbstractSystem {
     const extent = tile.wgs84Extent;
     const bbox = extent.rectangle().join('/');  // minX/minY/maxX/maxY
     const url = `${MAPROULETTE_API}/tasks/box/${bbox}`;
+    const requestID = `maproulette-tile-${tile.id}`;
 
-    const controller = new AbortController();
-    cache.inflight.set(url, controller);
-    cache.tileRequest.set(tile.id, { status: 'inflight', controller: controller, url: url });
+    cache.tileRequest.set(tile.id, { status: 'inflight' });
 
-    fetch(url, { signal: controller.signal })
-      .then(utilFetchResponse)
+    network.fetch<any>(url, { requestID })
       .then(data => {
         spatial.addTiles('maproulette', [tile]);   // mark as loaded
         cache.tileRequest.set(tile.id, { status: 'loaded' });
@@ -354,9 +343,6 @@ export class MapRouletteService extends AbstractSystem {
           spatial.addTiles('maproulette', [tile]);              // don't retry
           cache.tileRequest.set(tile.id, { status: 'error' });  // don't retry
         }
-      })
-      .finally(() => {
-        cache.inflight.delete(url);
       });
   }
 
@@ -370,20 +356,20 @@ export class MapRouletteService extends AbstractSystem {
 
     const context = this.context;
     const gfx = context.systems.gfx;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
     const cache = this._cache;
+
 
     for (const [challengeID, val] of cache.challengeRequest) {
       if (val.status) return;  // processed already
 
       const url = `${MAPROULETTE_API}/challenge/${challengeID}`;
+      const requestID = `maproulette-challenge-${challengeID}`;
 
-      const controller = new AbortController();
-      cache.inflight.set(url, controller);
-      cache.challengeRequest.set(challengeID, { status: 'inflight', controller: controller, url: url });
+      cache.challengeRequest.set(challengeID, { status: 'inflight' });
 
-      fetch(url, { signal: controller.signal })
-        .then(utilFetchResponse)
+      network.fetch<any>(url, { requestID })
         .then(challenge => {
           cache.challengeRequest.set(challengeID, { status: 'loaded' });
 
@@ -414,9 +400,6 @@ export class MapRouletteService extends AbstractSystem {
             console.error(err);    // eslint-disable-line no-console
             cache.challengeRequest.set(challengeID, { status: 'error' });  // don't retry
           }
-        })
-        .finally(() => {
-          cache.inflight.delete(url);
         });
     }
   }
@@ -432,11 +415,11 @@ export class MapRouletteService extends AbstractSystem {
   loadTaskDetailAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
     if (task.props.description !== undefined) return Promise.resolve(task);  // already done
 
+    const network = this.context.systems.network!;
     const challengeID = task.props.parentId;
     const url = `${MAPROULETTE_API}/challenge/${challengeID}`;
 
-    return fetch(url)
-      .then(utilFetchResponse)
+    return network.fetch<any>(url)
       .then(data => {
         task.props.instruction = data.instruction || '';
         task.props.description = data.description || '';
@@ -457,10 +440,10 @@ export class MapRouletteService extends AbstractSystem {
   loadTaskFeaturesAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
     if (task.props.taskFeatures !== undefined) return Promise.resolve(task);  // already done
 
+    const network = this.context.systems.network!;
     const url = `${MAPROULETTE_API}/task/${task.id}`;
 
-    return fetch(url)
-      .then(utilFetchResponse)
+    return network.fetch<any>(url)
       .then(data => {
         task.props.taskFeature = data?.geometries?.features || [];
         return task.touch();
@@ -474,8 +457,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param callback
    */
   postUpdate(task: MapRouletteTask, callback?: (err: string | null, task?: MapRouletteTask) => void): void {
-    const cache = this._cache;
-
+    const network = this.context.systems.network!;
     const taskID = task.id;
     const challengeID = task.props.parentId;
     const taskStatus = task.props.taskStatus;
@@ -483,61 +465,49 @@ export class MapRouletteService extends AbstractSystem {
     const apikey = task.props.mapRouletteApiKey;
 
     // A comment is optional, but if we have one, POST it..
-    const commentUrl = `${MAPROULETTE_API}/task/${taskID}/comment`;
-    if (taskComment && !cache.inflight.has(commentUrl)) {
-      const commentController = new AbortController();
-      cache.inflight.set(commentUrl, commentController);
-
-      fetch(commentUrl, {
+    const commentKey = `maproulette-comment-${taskID}`;
+    if (taskComment && !network.isInflight(commentKey)) {
+      network.fetch<any>(`${MAPROULETTE_API}/task/${taskID}/comment`, {
+        requestID: commentKey,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'apiKey': apikey as string
         },
-        body: JSON.stringify({ actionId: 2, comment: taskComment }),
-        signal: commentController.signal
+        body: JSON.stringify({ actionId: 2, comment: taskComment })
       })
-      .then(utilFetchResponse)
       .catch(err => {
         if (err.name === 'AbortError') {
           return;  // ok
         } else {  // real error
           console.error(err);    // eslint-disable-line no-console
         }
-      })
-      .finally(() => {
-        cache.inflight.delete(commentUrl);
       });
     }
 
     // update the status and release the task
     const updateTaskUrl = `${MAPROULETTE_API}/task/${taskID}/${taskStatus}`;
     const releaseTaskUrl = `${MAPROULETTE_API}/task/${taskID}/release`;
+    const updateKey = `maproulette-update-${taskID}`;
+    const releaseKey = `maproulette-release-${taskID}`;
 
-    if (!cache.inflight.has(updateTaskUrl) && !cache.inflight.has(releaseTaskUrl)) {
-      const updateTaskController = new AbortController();
-      const releaseTaskController = new AbortController();
-      cache.inflight.set(updateTaskUrl, updateTaskController);
-      cache.inflight.set(releaseTaskUrl, releaseTaskController);
-
-      fetch(updateTaskUrl, {
+    if (!network.isInflight(updateKey) && !network.isInflight(releaseKey)) {
+      network.fetch<any>(updateTaskUrl, {
+        requestID: updateKey,
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'apiKey': apikey as string
-        },
-        signal: updateTaskController.signal
+        }
       })
-      .then(utilFetchResponse)
       .then(() => {
-        return fetch(releaseTaskUrl, {
-          signal: releaseTaskController.signal,
+        return network.fetch<any>(releaseTaskUrl, {
+          requestID: releaseKey,
           headers: {
             'apiKey': apikey as string
           }
         });
       })
-      .then(utilFetchResponse)
       .then(() => {
         // All requests completed successfully
         if (taskStatus === 1) {  // only counts if the use chose "I Fixed It".
@@ -554,10 +524,6 @@ export class MapRouletteService extends AbstractSystem {
           console.error(err);    // eslint-disable-line no-console
           if (callback) callback(err.message);
         }
-      })
-      .finally(() => {
-        cache.inflight.delete(updateTaskUrl);
-        cache.inflight.delete(releaseTaskUrl);
       });
     }
   }
@@ -627,9 +593,9 @@ export class MapRouletteService extends AbstractSystem {
     if (cachedChallenge) {
       return Promise.resolve(cachedChallenge);
     } else {
+      const network = this.context.systems.network!;
       const challengeUrl = `${MAPROULETTE_API}/challenge/${challengeID}`;
-      return fetch(challengeUrl)
-        .then(utilFetchResponse);
+      return network.fetch<any>(challengeUrl);
     }
   }
 
@@ -644,9 +610,9 @@ export class MapRouletteService extends AbstractSystem {
   filterNearbyTasks(challengeID: string, taskID: string, zoom?: number): void {
     const nearbyTasksUrl = `${MAPROULETTE_API}/challenge/${challengeID}/tasksNearby/${taskID}?excludeSelfLocked=true&limit=1`;
     if (!taskID) return;
+    const network = this.context.systems.network!;
 
-    fetch(nearbyTasksUrl)
-      .then(utilFetchResponse)
+    network.fetch<any>(nearbyTasksUrl)
       .then((nearbyTasks: any[]) => {
         if (!nearbyTasks?.length) return;  // no nearby tasks?
 

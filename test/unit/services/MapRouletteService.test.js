@@ -10,6 +10,7 @@ describe('MapRouletteService', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     gfx:     new Rapid.MockGfxSystem(context),
+    network: new Rapid.NetworkSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
 
@@ -59,8 +60,6 @@ describe('MapRouletteService', () => {
         return prom
           .then(() => {
             const cache = maproulette._cache;
-            assert.instanceOf(cache.inflight, Map);
-            assert.isEmpty(cache.inflight);
             assert.instanceOf(cache.challenges, Map);
             assert.isEmpty(cache.challenges);
             assert.deepEqual(cache.closed, []);
@@ -98,8 +97,6 @@ describe('MapRouletteService', () => {
         return prom
           .then(() => {
             const cache = maproulette._cache;
-            assert.instanceOf(cache.inflight, Map);
-            assert.isEmpty(cache.inflight);
             assert.instanceOf(cache.challenges, Map);
             assert.isEmpty(cache.challenges);
             assert.deepEqual(cache.closed, []);

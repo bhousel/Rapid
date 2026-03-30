@@ -14,6 +14,7 @@ function parseQueryString(url) {
 describe('OsmWikibaseService', () => {
   // Setup context..
   const context = new Rapid.MockContext();
+  context.systems.network = new Rapid.NetworkSystem(context);
 
   // Setup fetchMock..
   beforeAll(() => {
@@ -40,8 +41,6 @@ describe('OsmWikibaseService', () => {
         assert.instanceOf(wikibase.requiredDependencies, Set);
         assert.instanceOf(wikibase.optionalDependencies, Set);
         assert.isTrue(wikibase.autoStart);
-
-        assert.instanceOf(wikibase._inflight, Map);
       });
     });
 

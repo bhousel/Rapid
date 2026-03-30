@@ -394,6 +394,13 @@ Prerequisite SchedulerSystem changes for Phase 6a:
 | Medium | WaybackService, MapRouletteService, OsmoseService, KeepRightService | Stateful coordination (pagination, split GET/POST) |
 | Hard | MapillaryService, VectorTileService, OsmService, EsriService, MapWithAIService, StreetsideService, KartaviewService | Complex post-processing, binary parsing, auth, graph integration |
 
+**Easy + Medium tiers: done.** All 10 services migrated. Each adds `'network'`
+to `requiredDependencies`.  Inflight tracking caches (`_inflight`, `inflightTile`,
+`inflightPost`) removed from individual services — NetworkSystem owns all inflight
+state.  `abortMatching` predicates use regex `.test()` (~10% faster than
+`startsWith`/`includes` per jsbench).  `key` renamed to `requestID` with
+`RequestID` global string ID type.  Tests updated (8 test files).  2939 tests pass.
+
 ### Phase 7 — Validator offloading (future)
 
 Validators close over `context` at construction time (factory pattern), making

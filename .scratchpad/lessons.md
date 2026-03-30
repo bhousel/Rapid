@@ -19,6 +19,11 @@ Things that went wrong once and shouldn't go wrong again.
 - **Validator tests: create after schema init** — Validators hoist schema prerequisites at construction time. Create the validator inside `beforeAll` after `schema.merge()`.
 - **Inline schema init pattern for tests** — Import `osm_rulesets.json5` directly (Bun native JSON5 import), create real `SchemaSystem`, init + merge in `beforeAll`. Single source of truth.
 
+## Network
+
+- **Not all `key` variables in services are requestIDs** — During the `key` → `requestID` rename, WaybackService had `const key = \`${tile.id}_${releaseDate}\`` used as a metadata cache lookup key. This local variable was intentionally NOT renamed — only the option property passed to `network.fetch()` became `requestID`. When doing bulk renames, check whether the variable represents the network request identity or an unrelated domain concept.
+- **`multi_replace_string_in_file` can silently break code** — When `oldString` includes text that spans a structural boundary (like `}\n    this._cache = {`), the replacement must include ALL the matched text. A partial replacement dropped the closing brace and object assignment in WaybackService. Always verify structural edits immediately.
+
 ## Runtime
 
 - **Mark features dirty when styles change** — `immediateRedraw()` alone doesn't work. Call `gfx.scene.dirtyScene()` before redraw so features re-fetch their style.

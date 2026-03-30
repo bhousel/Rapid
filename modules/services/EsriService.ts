@@ -126,8 +126,8 @@ export class EsriService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'esri';
-    this.requiredDependencies = new Set(['spatial']);
-    this.optionalDependencies = new Set(['gfx', 'locations']);
+    this.requiredDependencies = new Set<SystemID>(['spatial']);
+    this.optionalDependencies = new Set<SystemID>(['gfx', 'locations']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
     this._datasets = new Map();

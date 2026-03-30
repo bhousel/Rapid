@@ -64,6 +64,8 @@ export type PhotoLayerID = string;
 export type PhotoType = string;
 /** Preset ID - unique identifier for presets (e.g. 'highway/residential') */
 export type PresetID = string;
+/** Request ID - unique key for network request dedup and cancellation (e.g. 'keepright-tile-0,0,14') */
+export type RequestID = string;
 /** Ruleset ID - identifier for tag rulesets (e.g. 'surface_paved', 'connected_highway') */
 export type RulesetID = string;
 /** Scope ID - identifier for style/schema scopes (e.g. 'osm') */
@@ -124,6 +126,7 @@ declare global {
   type PhotoLayerID = string;
   type PhotoType = string;
   type PresetID = string;
+  type RequestID = string;
   type RulesetID = string;
   type ScopeID = string;
   type ScriptCode = string;

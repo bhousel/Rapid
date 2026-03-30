@@ -5,7 +5,6 @@ import { marked } from 'marked';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData } from '../data/MarkerData.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
@@ -40,10 +39,6 @@ const OSMOSE_API = 'https://osmose.openstreetmap.fr/api/0.3';
 
 /** Internal cache for Osmose tile data */
 interface OsmoseCache {
-  /** Map of in-flight tile requests keyed by tile ID, with their AbortControllers */
-  inflightTile: Map<TileID, AbortController>;
-  /** Map of in-flight POST requests (issue updates), keyed by entity ID */
-  inflightPost: Map<DataID, AbortController>;
   /** Map of issues marked as closed, keyed by entity ID */
   closed: Record<string, number>;
   lastv: number | null;
@@ -88,8 +83,8 @@ export class OsmoseService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'osmose';
-    this.requiredDependencies = new Set(['assets', 'spatial']);
-    this.optionalDependencies = new Set(['gfx', 'l10n']);
+    this.requiredDependencies = new Set<SystemID>(['assets', 'network', 'spatial']);
+    this.optionalDependencies = new Set<SystemID>(['gfx', 'l10n']);
     this.autoStart = false;
 
     // persistent data - loaded at start
@@ -147,14 +142,10 @@ export class OsmoseService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    if (this._cache.inflightTile) {
-      for (const controller of this._cache.inflightTile.values()) {
-        controller.abort();
-      }
-    }
+    const network = this.context.systems.network;
+    network?.abortMatching(requestID => /^osmose-/.test(requestID));
+
     this._cache = {
-      inflightTile:  new Map(),   // Map<tileID, AbortController>
-      inflightPost:  new Map(),   // Map<dataID, AbortController>
       closed:        {},
       lastv:         null         // viewport version last time we fetched data
     };
@@ -194,17 +185,17 @@ export class OsmoseService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const [tileID, controller] of cache.inflightTile) {
-      const isNeeded = tiles.some(tile => tile.id === tileID);
-      if (!isNeeded) {
-        controller.abort();
-      }
-    }
+    const network = context.systems.network!;
+    network.abortMatching(requestID => {
+      if (!/^osmose-tile-/.test(requestID)) return false;
+      const infTileID = requestID.slice('osmose-tile-'.length);
+      return !tiles.some(tile => tile.id === infTileID);
+    });
 
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
-      if (spatial.hasTile('osmose', tileID) || cache.inflightTile.has(tileID)) continue;
+      if (spatial.hasTile('osmose', tileID) || network.isInflight(`osmose-tile-${tileID}`)) continue;
       this.loadTile(tile);
     }
   }
@@ -216,27 +207,21 @@ export class OsmoseService extends AbstractSystem {
    * @param tile - Tile data
    */
   loadTile(tile: Tile): void {
+    const network = this.context.systems.network!;
     const spatial = this.context.systems.spatial!;
-    const cache = this._cache;
     const tileID = tile.id;
 
     const [x, y, z] = tile.xyz;
     const params = { item: this._osmoseData.types };   // Only request the types that we support
     const url = `${OSMOSE_API}/issues/${z}/${x}/${y}.geojson?` + utilQsString(params, false);
+    const requestID = `osmose-tile-${tileID}`;
 
-    const controller = new AbortController();
-    cache.inflightTile.set(tileID, controller);
-
-    fetch(url, { signal: controller.signal })
-      .then(utilFetchResponse)
+    network.fetch<any>(url, { requestID })
       .then(response => this._gotTile(tile, response))
       .catch(err => {
         if (err.name === 'AbortError') return;          // ok
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         spatial.addTiles('osmose', [tile]);             // don't retry
-      })
-      .finally(() => {
-        cache.inflightTile.delete(tileID);
       });
   }
 
@@ -298,12 +283,12 @@ export class OsmoseService extends AbstractSystem {
     if (issue.props.elems !== undefined) return Promise.resolve(issue);
 
     const l10n = this.context.systems.l10n;
+    const network = this.context.systems.network!;
     const localeCode = l10n?.localeCode || 'en-US';
 
     const url = `${OSMOSE_API}/issue/${issue.id}?langs=${localeCode}`;
 
-    return fetch(url)
-      .then(utilFetchResponse)
+    return network.fetch<any>(url)
       .then((data: any) => {
         // Associated elements used for highlighting
         // Assign directly for immediate use in the callback
@@ -365,28 +350,25 @@ export class OsmoseService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   postUpdate(issue: MarkerData, callback: (err: any, issue: MarkerData) => void): void {
-    const cache = this._cache;
+    const network = this.context.systems.network!;
     const issueID = issue.id;
     const status = issue.props.newStatus as string;
     const item = issue.props.item as string;
+    const requestID = `osmose-post-${issueID}`;
 
-    if (cache.inflightPost.has(issueID)) {
+    if (network.isInflight(requestID)) {
       return callback({ message: 'Issue update already inflight', status: -2 }, issue);
     }
 
     // UI sets the status to either 'done' or 'false'
     const url = `${OSMOSE_API}/issue/${issueID}/${status}`;
-    const controller = new AbortController();
-    cache.inflightPost.set(issueID, controller);
 
     let gotErr: any;
-    fetch(url, { signal: controller.signal })
+    network.fetchRaw(url, { requestID })
       .catch(err => {
         gotErr = err;  // capture any error but continue to `finally` block.
       })
       .finally(() => {
-        cache.inflightPost.delete(issueID);
-
         this.removeItem(issue);
 
         if (status === 'done') {
@@ -480,6 +462,7 @@ export class OsmoseService extends AbstractSystem {
     const stringData: Record<string, OsmoseIssueStrings> = {};
 
     const l10n = this.context.systems.l10n;
+    const network = this.context.systems.network!;
     const localeCode = l10n?.localeCode || 'en-US';
     this._osmoseStrings.set(localeCode, stringData);
 
@@ -522,8 +505,7 @@ export class OsmoseService extends AbstractSystem {
       const [item, cl] = itemType.split('-');
       const url = `${OSMOSE_API}/items/${item}/class/${cl}?langs=${localeCode}`;
 
-      return fetch(url)
-        .then(utilFetchResponse)
+      return network.fetch<any>(url)
         .then(handleResponse);
 
     }).filter(Boolean);

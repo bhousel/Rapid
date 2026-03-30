@@ -243,8 +243,8 @@ export class OsmService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'osm';
-    this.requiredDependencies = new Set(['spatial']);
-    this.optionalDependencies = new Set(['editor', 'gfx', 'l10n', 'locations', 'scheduler']);
+    this.requiredDependencies = new Set<SystemID>(['spatial']);
+    this.optionalDependencies = new Set<SystemID>(['editor', 'gfx', 'l10n', 'locations', 'scheduler']);
 
     // Some defaults that we will replace with whatever we fetch from the OSM API capabilities result.
     this._maxWayNodes = 2000;

@@ -11,6 +11,7 @@ describe('OsmoseService', () => {
   context.systems = {
     assets:  new Rapid.AssetSystem(context),
     gfx:     new Rapid.MockGfxSystem(context),
+    network: new Rapid.NetworkSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
 
@@ -69,10 +70,6 @@ describe('OsmoseService', () => {
         return prom
           .then(() => {
             const cache = osmose._cache;
-            assert.instanceOf(cache.inflightTile, Map);
-            assert.isEmpty(cache.inflightTile);
-            assert.instanceOf(cache.inflightPost, Map);
-            assert.isEmpty(cache.inflightPost);
             assert.deepEqual(cache.closed, {});
             assert.isNull(cache.lastv);
           });
@@ -108,10 +105,6 @@ describe('OsmoseService', () => {
         return prom
           .then(() => {
             const cache = osmose._cache;
-            assert.instanceOf(cache.inflightTile, Map);
-            assert.isEmpty(cache.inflightTile);
-            assert.instanceOf(cache.inflightPost, Map);
-            assert.isEmpty(cache.inflightPost);
             assert.deepEqual(cache.closed, {});
             assert.isNull(cache.lastv);
           });

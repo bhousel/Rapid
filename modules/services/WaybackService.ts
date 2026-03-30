@@ -3,7 +3,6 @@ import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilDateString } from '../util/date.ts';
-import { FetchError, utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { DateLike } from '../util/date.ts';
@@ -56,10 +55,8 @@ interface WaybackMetadata {
 
 /** Inflight request entry */
 interface InflightEntry {
-  /** The pending fetch promise */
+  /** The pending promise for the overall tile analysis */
   promise: Promise<string[] | void>;
-  /** AbortController used to cancel the request */
-  controller: AbortController;
 }
 
 /** Internal cache structure */
@@ -108,7 +105,7 @@ export class WaybackService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'wayback';
-    this.requiredDependencies = new Set(['assets' /*,'spatial'*/]);
+    this.requiredDependencies = new Set<SystemID>(['assets', 'network' /*,'spatial'*/]);
     this.optionalDependencies = new Set([]);
 
     this.allDates = [];                 // Array<releaseDate> ascending
@@ -207,9 +204,8 @@ export class WaybackService extends AbstractSystem {
    */
   resetAsync(): Promise<void> {
     if (this._cache.inflight) {
-      for (const request of this._cache.inflight.values()) {
-        request.controller.abort();
-      }
+      const network = this.context.systems.network!;
+      network.abortMatching(requestID => /^wayback-/.test(requestID));
     }
     this._cache = {
       inflight: new Map()  // Map<TileID, InflightEntry>
@@ -252,6 +248,7 @@ export class WaybackService extends AbstractSystem {
    */
   getLocalDatesAsync(): Promise<string[] | void> {
     const context = this.context;
+    const network = context.systems.network!;
     // const spatial = context.systems.spatial;
     const viewport = context.viewport;
     const cache = this._cache;
@@ -282,15 +279,12 @@ export class WaybackService extends AbstractSystem {
       return inflight.promise;
     }
     // Any other inflight requests are no longer needed..
-    for (const entry of cache.inflight.values()) {
-      entry.controller.abort();
-    }
+    network.abortMatching(requestID => /^wayback-/.test(requestID));
+    cache.inflight.clear();
 
-    const controller = new AbortController();
-    const opts = { signal: controller.signal };
     const prom = Promise.resolve()
-      .then(() => this.checkTilemapsAsync(tile, opts))
-      .then(releases => this.checkImagesAsync(releases, tile, opts))
+      .then(() => this.checkTilemapsAsync(tile))
+      .then(releases => this.checkImagesAsync(releases, tile))
       .then(releases => {
         const localDates = [...releases.keys()];
         this._localDates.set(tileID, localDates);
@@ -304,7 +298,7 @@ export class WaybackService extends AbstractSystem {
         cache.inflight.delete(tileID);
       });
 
-    cache.inflight.set(tileID, { promise: prom, controller: controller });
+    cache.inflight.set(tileID, { promise: prom });
     return prom;
   }
 
@@ -323,14 +317,14 @@ export class WaybackService extends AbstractSystem {
    * We continue fetching until we're back at the initial release (2014 release number '10')
    *
    * @param tile - the Tile to check
-   * @param opts - fetch options (use to pass an AbortController)
    * @return Promise resolved with a `Map<releaseDate, release>` candidate releases for the given tile
    */
-  checkTilemapsAsync(tile: Tile, opts: RequestInit): Promise<Map<string, WaybackRelease>> {
+  checkTilemapsAsync(tile: Tile): Promise<Map<string, WaybackRelease>> {
     const latestDate = this.allDates.at(-1);
     const latestRelease = latestDate ? this.byReleaseDate.get(latestDate) : undefined;
     const [x, y, z] = tile.xyz;
     const keepReleases = new Map<string, WaybackRelease>();  // Map<releaseDate, release>
+    const network = this.context.systems.network!;
 
     // Starting with latest release, fetch the tilemaps until we have them all..
     return new Promise<Map<string, WaybackRelease>>((resolve, reject) => {
@@ -338,9 +332,9 @@ export class WaybackService extends AbstractSystem {
         const releaseNumber = release.releaseNumber;
         const releaseDate = release.releaseDate;
         const url = `${WAYBACK_SERVICE_BASE_PROD}/tilemap/${releaseNumber}/${z}/${y}/${x}`;
+        const requestID = `wayback-tilemap-${tile.id}-${releaseNumber}`;
 
-        fetch(url, opts)
-          .then(utilFetchResponse)
+        network.fetch<any>(url, { requestID })
           .then(response => {
             const data = (response.data || [])[0];
             const select = (response.select || [])[0]?.toString();
@@ -390,12 +384,12 @@ export class WaybackService extends AbstractSystem {
    *
    * @param releases - Map of candidate releases to check
    * @param tile - the Tile to check
-   * @param opts - fetch options (use to pass an AbortController)
    * @return Promise resolved with a `Map<releaseDate, release>` candidate releases for the given tile
    */
-  checkImagesAsync(releases: Map<string, WaybackRelease>, tile: Tile, opts: RequestInit): Promise<Map<string, WaybackRelease>> {
+  checkImagesAsync(releases: Map<string, WaybackRelease>, tile: Tile): Promise<Map<string, WaybackRelease>> {
     const dates = [...releases.keys()].sort();  // sort as strings ascending
     const [x, y, z] = tile.xyz;
+    const network = this.context.systems.network!;
 
     // Generate promises for Promise.all, it can happen in parallel.
     const promises = dates.map(date => {
@@ -405,13 +399,14 @@ export class WaybackService extends AbstractSystem {
         .replaceAll('{row}', y.toString())
         .replaceAll('{col}', x.toString());
 
-      const options = Object.assign({ method: 'HEAD' }, opts);
+      const requestID = `wayback-image-${tile.id}-${date}`;
 
-      return fetch(url, options)
-        // Note: we are not using utilFetchResponse here because we need the content-length header
+      // Note: we use fertchRaw here because we're really looking at the content-length header
+      // This doesn't call `utilFetchResponse`, so we need to check `response.ok` ourselves.
+      return network.fetchRaw(url, { method: 'HEAD', requestID })
         .then(response => {
           if (!response.ok) {
-            throw new FetchError(response);
+            throw new Error(`HTTP ${response.status}`);
           }
 
           // get some information about the image
@@ -447,10 +442,9 @@ export class WaybackService extends AbstractSystem {
    * Get the metadata for the given tile and release date.
    * @param tile - the Tile to check
    * @param releaseDate - the releaseDate to check
-   * @param opts - fetch options (use to pass an AbortController)
    * @return Promise resolved with imagery metadata
    */
-  getMetadataAsync(tile: Tile, releaseDate: string, opts?: RequestInit): Promise<WaybackMetadata> {
+  getMetadataAsync(tile: Tile, releaseDate: string): Promise<WaybackMetadata> {
     const [lon, lat] = tile.wgs84Extent.center();
     const z = tile.xyz[2];
     const layerID = getLayerID(z);
@@ -482,9 +476,9 @@ export class WaybackService extends AbstractSystem {
     };
 
     const url = `${release.metadataLayerUrl}/${layerID}/query?` + utilQsString(params, false);
+    const network = this.context.systems.network!;
 
-    return fetch(url, opts)
-      .then(utilFetchResponse)
+    return network.fetch<any>(url, { requestID: `wayback-meta-${key}` })
       .then(response => {
         if (response.error) {
           throw new Error(response.error);

@@ -8,11 +8,11 @@ import type { SchedulerSystem } from './SchedulerSystem.ts';
 /** Options for network fetch requests */
 export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
   /**
-   * Unique key for dedup and cancellation.  If another request with the
-   * same key is already inflight, the existing promise is returned.
+   * Unique identifier for dedup and cancellation.  If another request with the
+   * same requestID is already inflight, the existing promise is returned.
    * Default: `'${method} ${url}'` (e.g. `'GET https://example.com/data'`).
    */
-  key?: string;
+  requestID?: RequestID;
 
   /**
    * Timeout in milliseconds.  Overrides `defaultTimeout`.
@@ -36,8 +36,8 @@ export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
 
 /** Tracks a single inflight request */
 interface InflightRequest<T = unknown> {
-  /** Unique key for dedup and cancellation */
-  key: string;
+  /** Unique identifier for dedup and cancellation */
+  requestID: RequestID;
   /** The AbortController for this request */
   controller: AbortController;
   /** The in-progress promise (for dedup — second caller gets same promise) */
@@ -48,7 +48,7 @@ interface InflightRequest<T = unknown> {
 
 /** A queued request waiting for a concurrency slot */
 interface QueuedFetch {
-  key: string;
+  requestID: RequestID;
   controller: AbortController;
   /** Called when a concurrency slot opens */
   run: () => void;
@@ -90,8 +90,8 @@ const DEFAULT_MAX_INFLIGHT = 100;
  */
 export class NetworkSystem extends AbstractSystem {
 
-  /** All currently inflight requests, keyed by dedup key */
-  private _inflight: Map<string, InflightRequest>;
+  /** All currently inflight requests, keyed by requestID */
+  private _inflight: Map<RequestID, InflightRequest>;
   /** FIFO queue for requests waiting on a concurrency slot */
   private _queue: QueuedFetch[];
   /** Number of actively dispatched network requests (excludes queued) */
@@ -211,12 +211,12 @@ export class NetworkSystem extends AbstractSystem {
 
   /**
    * isInflight
-   * Returns true if a request with the given key is currently tracked
+   * Returns true if a request with the given requestID is currently tracked
    * (either active or queued).
-   * @param key - The dedup/cancellation key
+   * @param requestID - The dedup/cancellation identifier
    */
-  isInflight(key: string): boolean {
-    return this._inflight.has(key);
+  isInflight(requestID: RequestID): boolean {
+    return this._inflight.has(requestID);
   }
 
 
@@ -236,18 +236,18 @@ export class NetworkSystem extends AbstractSystem {
    */
   fetch<T = unknown>(url: string, options?: NetworkFetchOptions): Promise<T> {
     const method = (options?.method ?? 'GET').toUpperCase();
-    const key = options?.key ?? `${method} ${url}`;
+    const requestID = options?.requestID ?? `${method} ${url}`;
     const timeout = options?.timeout ?? this._defaultTimeout;
 
-    // Dedup: if same key is already inflight, return existing promise
-    const existing = this._inflight.get(key);
+    // Dedup: if same requestID is already inflight, return existing promise
+    const existing = this._inflight.get(requestID);
     if (existing) return existing.promise as Promise<T>;
 
     const controller = new AbortController();
     const signal = this._createCombinedSignal(controller, timeout);
     const dispatch = (): Promise<T> => this._dispatchFetch<T>(url, signal, options);
 
-    const promise = this._trackAndDispatch<T>(key, controller, dispatch);
+    const promise = this._trackAndDispatch<T>(requestID, controller, dispatch);
     return promise;
   }
 
@@ -266,11 +266,11 @@ export class NetworkSystem extends AbstractSystem {
    */
   fetchRaw(url: string, options?: NetworkFetchOptions): Promise<Response> {
     const method = (options?.method ?? 'GET').toUpperCase();
-    const key = options?.key ?? `${method} ${url}`;
+    const requestID = options?.requestID ?? `${method} ${url}`;
     const timeout = options?.timeout ?? this._defaultTimeout;
 
     // Dedup
-    const existing = this._inflight.get(key);
+    const existing = this._inflight.get(requestID);
     if (existing) return existing.promise as Promise<Response>;
 
     const controller = new AbortController();
@@ -281,24 +281,24 @@ export class NetworkSystem extends AbstractSystem {
       return fetchFn(url, init);
     };
 
-    const promise = this._trackAndDispatch<Response>(key, controller, dispatch);
+    const promise = this._trackAndDispatch<Response>(requestID, controller, dispatch);
     return promise;
   }
 
 
   /**
    * abort
-   * Aborts a specific inflight request by key.
-   * No-op if the key is not inflight.
-   * @param key - The dedup/cancellation key
+   * Aborts a specific inflight request by requestID.
+   * No-op if the requestID is not inflight.
+   * @param requestID - The dedup/cancellation identifier
    */
-  abort(key: string): void {
-    const inflight = this._inflight.get(key);
+  abort(requestID: RequestID): void {
+    const inflight = this._inflight.get(requestID);
     if (inflight) {
       inflight.controller.abort();
     }
     // Also remove from queue if it hasn't dispatched yet
-    this._removeFromQueue(key);
+    this._removeFromQueue(requestID);
   }
 
 
@@ -319,19 +319,19 @@ export class NetworkSystem extends AbstractSystem {
 
   /**
    * abortMatching
-   * Aborts all inflight requests whose key matches a predicate.
+   * Aborts all inflight requests whose requestID matches a predicate.
    * Useful for viewport-based cleanup.
-   * @param predicate - Function that returns true for keys to abort
+   * @param predicate - Function that returns true for requestIDs to abort
    */
-  abortMatching(predicate: (key: string) => boolean): void {
-    for (const [key, inflight] of this._inflight) {
-      if (predicate(key)) {
+  abortMatching(predicate: (requestID: RequestID) => boolean): void {
+    for (const [requestID, inflight] of this._inflight) {
+      if (predicate(requestID)) {
         inflight.controller.abort();
       }
     }
     // Also clean up matching queued requests
     for (let i = this._queue.length - 1; i >= 0; i--) {
-      if (predicate(this._queue[i].key)) {
+      if (predicate(this._queue[i].requestID)) {
         this._queue[i].controller.abort();
         this._queue.splice(i, 1);
       }
@@ -354,7 +354,7 @@ export class NetworkSystem extends AbstractSystem {
    * could produce unhandled rejections.
    */
   private _trackAndDispatch<T>(
-    key: string,
+    requestID: RequestID,
     controller: AbortController,
     dispatch: () => Promise<T>,
   ): Promise<T> {
@@ -365,7 +365,7 @@ export class NetworkSystem extends AbstractSystem {
       this._numActive++;
       promise = dispatch().finally(() => {
         this._numActive--;
-        this._inflight.delete(key);
+        this._inflight.delete(requestID);
         this._drainQueue();
       });
     } else {
@@ -379,14 +379,14 @@ export class NetworkSystem extends AbstractSystem {
         }
 
         const queued: QueuedFetch = {
-          key,
+          requestID,
           controller,
           run: () => {
             this._numActive++;
             dispatch()
               .finally(() => {
                 this._numActive--;
-                this._inflight.delete(key);
+                this._inflight.delete(requestID);
                 this._drainQueue();
               })
               .then(resolve as (v: unknown) => void, reject);
@@ -396,8 +396,8 @@ export class NetworkSystem extends AbstractSystem {
 
         // Listen for abort while queued
         controller.signal.addEventListener('abort', () => {
-          this._removeFromQueue(key);
-          this._inflight.delete(key);
+          this._removeFromQueue(requestID);
+          this._inflight.delete(requestID);
           const err = new Error('The operation was aborted.');
           err.name = 'AbortError';
           reject(err);
@@ -406,8 +406,8 @@ export class NetworkSystem extends AbstractSystem {
     }
 
     // Track in inflight map (for dedup and abort)
-    const inflight: InflightRequest<T> = { key, controller, promise, created: Date.now() };
-    this._inflight.set(key, inflight);
+    const inflight: InflightRequest<T> = { requestID, controller, promise, created: Date.now() };
+    this._inflight.set(requestID, inflight);
 
     return promise;
   }
@@ -442,10 +442,10 @@ export class NetworkSystem extends AbstractSystem {
 
   /**
    * _removeFromQueue
-   * Removes a queued request by key.
+   * Removes a queued request by requestID.
    */
-  private _removeFromQueue(key: string): void {
-    const idx = this._queue.findIndex(q => q.key === key);
+  private _removeFromQueue(requestID: RequestID): void {
+    const idx = this._queue.findIndex(q => q.requestID === requestID);
     if (idx !== -1) {
       this._queue.splice(idx, 1);
     }
@@ -490,7 +490,7 @@ export class NetworkSystem extends AbstractSystem {
     if (!options) return signal ? { signal } : {};
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring to strip custom keys
-    const { key, timeout, fetchFn, mainThread, ...init } = options;
+    const { requestID, timeout, fetchFn, mainThread, ...init } = options;
     if (signal) {
       (init as RequestInit).signal = signal;
     }

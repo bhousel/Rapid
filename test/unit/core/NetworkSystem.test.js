@@ -120,7 +120,7 @@ describe('NetworkSystem', () => {
       assert.strictEqual(mockFetch.mock.calls.length, 1);
     });
 
-    it('uses METHOD + URL as the default key', async () => {
+    it('uses METHOD + URL as the default requestID', async () => {
       const mockFetch = mock(() =>
         Promise.resolve(new Response('{}', {
           headers: { 'content-type': 'application/json' },
@@ -134,7 +134,7 @@ describe('NetworkSystem', () => {
       await prom;
     });
 
-    it('uses a custom key when provided', async () => {
+    it('uses a custom requestID when provided', async () => {
       const mockFetch = mock(() =>
         Promise.resolve(new Response('{}', {
           headers: { 'content-type': 'application/json' },
@@ -142,7 +142,7 @@ describe('NetworkSystem', () => {
       );
       globalThis.fetch = mockFetch;
 
-      const prom = network.fetch('https://example.com/test.json', { key: 'my-key', timeout: 0 });
+      const prom = network.fetch('https://example.com/test.json', { requestID: 'my-key', timeout: 0 });
       assert.isTrue(network.isInflight('my-key'));
       assert.isFalse(network.isInflight('GET https://example.com/test.json'));
       await prom;
@@ -193,7 +193,7 @@ describe('NetworkSystem', () => {
   // -- abort --
 
   describe('abort', () => {
-    it('aborts a specific inflight request by key', async () => {
+    it('aborts a specific inflight request by requestID', async () => {
       const mockFetch = mock((url, init) => {
         return new Promise((resolve, reject) => {
           const onAbort = () => { const err = new Error('Aborted'); err.name = 'AbortError'; reject(err); };
@@ -203,7 +203,7 @@ describe('NetworkSystem', () => {
       });
       globalThis.fetch = mockFetch;
 
-      const prom = network.fetch('https://example.com/slow.json', { key: 'slow', timeout: 0 });
+      const prom = network.fetch('https://example.com/slow.json', { requestID: 'slow', timeout: 0 });
       assert.isTrue(network.isInflight('slow'));
 
       network.abort('slow');
@@ -217,7 +217,7 @@ describe('NetworkSystem', () => {
       assert.isFalse(network.isInflight('slow'));
     });
 
-    it('is a no-op for unknown keys', () => {
+    it('is a no-op for unknown requestIDs', () => {
       // Should not throw
       network.abort('nonexistent');
     });
@@ -237,8 +237,8 @@ describe('NetworkSystem', () => {
       });
       globalThis.fetch = mockFetch;
 
-      const prom1 = network.fetch('https://example.com/a.json', { key: 'a', timeout: 0 });
-      const prom2 = network.fetch('https://example.com/b.json', { key: 'b', timeout: 0 });
+      const prom1 = network.fetch('https://example.com/a.json', { requestID: 'a', timeout: 0 });
+      const prom2 = network.fetch('https://example.com/b.json', { requestID: 'b', timeout: 0 });
       assert.strictEqual(network.numInflight, 2);
 
       network.abortAll();
@@ -268,11 +268,11 @@ describe('NetworkSystem', () => {
       });
       globalThis.fetch = mockFetch;
 
-      const promAbort = network.fetch('https://example.com/tiles/1', { key: 'tile-1', timeout: 0 });
-      const promKeep = network.fetch('https://example.com/keep', { key: 'keep-1', timeout: 0 });
+      const promAbort = network.fetch('https://example.com/tiles/1', { requestID: 'tile-1', timeout: 0 });
+      const promKeep = network.fetch('https://example.com/keep', { requestID: 'keep-1', timeout: 0 });
       assert.strictEqual(network.numInflight, 2);
 
-      network.abortMatching(key => key.startsWith('tile-'));
+      network.abortMatching(requestID => requestID.startsWith('tile-'));
 
       const abortResult = await Promise.allSettled([promAbort]);
       assert.strictEqual(abortResult[0].status, 'rejected');
@@ -326,9 +326,9 @@ describe('NetworkSystem', () => {
       });
       globalThis.fetch = mockFetch;
 
-      const prom1 = network.fetch('https://example.com/1', { key: 'c1', timeout: 0 });
-      const prom2 = network.fetch('https://example.com/2', { key: 'c2', timeout: 0 });
-      const prom3 = network.fetch('https://example.com/3', { key: 'c3', timeout: 0 });
+      const prom1 = network.fetch('https://example.com/1', { requestID: 'c1', timeout: 0 });
+      const prom2 = network.fetch('https://example.com/2', { requestID: 'c2', timeout: 0 });
+      const prom3 = network.fetch('https://example.com/3', { requestID: 'c3', timeout: 0 });
 
       assert.strictEqual(network.numInflight, 3);  // all tracked
       assert.strictEqual(network.numQueued, 1);     // third is queued
@@ -358,8 +358,8 @@ describe('NetworkSystem', () => {
       });
       globalThis.fetch = mockFetch;
 
-      const prom1 = network.fetch('https://example.com/1', { key: 'q1', timeout: 0 });
-      const prom2 = network.fetch('https://example.com/2', { key: 'q2', timeout: 0 });
+      const prom1 = network.fetch('https://example.com/1', { requestID: 'q1', timeout: 0 });
+      const prom2 = network.fetch('https://example.com/2', { requestID: 'q2', timeout: 0 });
 
       assert.strictEqual(network.numQueued, 1);
       assert.strictEqual(mockFetch.mock.calls.length, 1);  // only first dispatched
@@ -414,7 +414,7 @@ describe('NetworkSystem', () => {
       });
       globalThis.fetch = mockFetch;
 
-      const prom = network.fetch('https://example.com/reset.json', { key: 'reset', timeout: 0 });
+      const prom = network.fetch('https://example.com/reset.json', { requestID: 'reset', timeout: 0 });
       assert.strictEqual(network.numInflight, 1);
 
       await network.resetAsync();
@@ -433,7 +433,7 @@ describe('NetworkSystem', () => {
       const mockFetch = mock(() => Promise.reject(new Error('network error')));
       globalThis.fetch = mockFetch;
 
-      const prom = network.fetch('https://example.com/fail.json', { key: 'fail', timeout: 0 });
+      const prom = network.fetch('https://example.com/fail.json', { requestID: 'fail', timeout: 0 });
       assert.isTrue(network.isInflight('fail'));
 
       try {

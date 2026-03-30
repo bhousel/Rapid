@@ -10,6 +10,7 @@ describe('GeoScribbleService', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     gfx:     new Rapid.MockGfxSystem(context),
+    network: new Rapid.NetworkSystem(context),
     spatial: new Rapid.SpatialSystem(context)
   };
 
@@ -59,8 +60,6 @@ describe('GeoScribbleService', () => {
         return prom
           .then(() => {
             const cache = geoscribble._cache;
-            assert.instanceOf(cache.inflight, Map);
-            assert.isEmpty(cache.inflight);
             assert.isNull(cache.lastv);
           });
       });
@@ -95,8 +94,6 @@ describe('GeoScribbleService', () => {
         return prom
           .then(() => {
             const cache = geoscribble._cache;
-            assert.instanceOf(cache.inflight, Map);
-            assert.isEmpty(cache.inflight);
             assert.isNull(cache.lastv);
           });
       });

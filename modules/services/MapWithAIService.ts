@@ -63,8 +63,8 @@ export class MapWithAIService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'mapwithai';
-    this.requiredDependencies = new Set(['spatial']);
-    this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash']);
+    this.requiredDependencies = new Set<SystemID>(['spatial']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash']);
 
     this._XMLParser = new OsmXMLParser();
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;

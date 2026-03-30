@@ -1,7 +1,6 @@
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 
@@ -23,6 +22,7 @@ export class WikipediaService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'wikipedia';
+    this.requiredDependencies = new Set<SystemID>(['network']);
   }
 
 
@@ -80,8 +80,8 @@ export class WikipediaService extends AbstractSystem {
         srsearch: query
       }, false);
 
-    fetch(url)
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    network.fetch<any>(url)
       .then(result => {
         if (result && result.error) {
           throw new Error(result.error);
@@ -122,8 +122,8 @@ export class WikipediaService extends AbstractSystem {
         search: query
       }, false);
 
-    fetch(url)
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    network.fetch<any>(url)
       .then(result => {
         if (result && result.error) {
           throw new Error(result.error);
@@ -161,8 +161,8 @@ export class WikipediaService extends AbstractSystem {
         titles: title
       }, false);
 
-    fetch(url)
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    network.fetch<any>(url)
       .then(result => {
         if (result && result.error) {
           throw new Error(result.error);

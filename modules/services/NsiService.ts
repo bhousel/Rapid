@@ -147,7 +147,7 @@ export class NsiService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'nsi';
-    this.requiredDependencies = new Set(['assets', 'schema', 'locations']);
+    this.requiredDependencies = new Set<SystemID>(['assets', 'schema', 'locations']);
 
     this.status = 'loading';  // 'loading', 'ok', 'failed'
 

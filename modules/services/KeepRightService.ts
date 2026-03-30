@@ -3,7 +3,6 @@ import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData } from '../data/MarkerData.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
@@ -84,10 +83,6 @@ KR_COLORS.set('400', 0xcc3355);
 
 /** Internal cache for KeepRight tile data */
 interface KeepRightCache {
-  /** Map of in-flight tile requests keyed by tile ID, with their AbortControllers */
-  inflightTile: Map<TileID, AbortController>;
-  /** Map of in-flight POST requests (issue updates), keyed by entity ID */
-  inflightPost: Map<DataID, AbortController>;
   /** Map of issues marked as closed, keyed by entity ID */
   closed: Record<string, boolean>;
   /** Last viewport version number used for change detection */
@@ -136,8 +131,8 @@ export class KeepRightService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'keepright';
-    this.requiredDependencies = new Set(['assets', 'l10n', 'spatial']);
-    this.optionalDependencies = new Set(['gfx']);
+    this.requiredDependencies = new Set<SystemID>(['assets', 'l10n', 'network', 'spatial']);
+    this.optionalDependencies = new Set<SystemID>(['gfx']);
     this.autoStart = false;
 
     // persistent data - loaded at init
@@ -184,21 +179,17 @@ export class KeepRightService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    if (this._cache.inflightTile) {
-      for (const controller of this._cache.inflightTile.values()) {
-        controller.abort();
-      }
-    }
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+
+    network.abortMatching(requestID => /^keepright-/.test(requestID));
+    spatial.clearCache('keepright');
 
     this._cache = {
-      inflightTile:  new Map(),   // Map<TileID, AbortController>
-      inflightPost:  new Map(),   // Map<DataID, AbortController>
-      closed:        {},
-      lastv:         null
+      closed: {},
+      lastv:  null
     };
-
-    const spatial = this.context.systems.spatial!;
-    spatial.clearCache('keepright');
 
     return Promise.resolve();
   }
@@ -222,6 +213,7 @@ export class KeepRightService extends AbstractSystem {
    */
   loadTiles(): void {
     const context = this.context;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
     const viewport = context.viewport;
     const cache = this._cache;
@@ -233,17 +225,16 @@ export class KeepRightService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const [tileID, controller] of cache.inflightTile) {
-      const isNeeded = tiles.some(tile => tile.id === tileID);
-      if (!isNeeded) {
-        controller.abort();
-      }
-    }
+    network.abortMatching(requestID => {
+      if (!/^keepright-tile-/.test(requestID)) return false;
+      const infTileID = requestID.slice('keepright-tile-'.length);
+      return !tiles.some(tile => tile.id === infTileID);
+    });
 
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
-      if (spatial.hasTile('keepright', tileID) || cache.inflightTile.has(tileID)) continue;
+      if (spatial.hasTile('keepright', tileID) || network.isInflight(`keepright-tile-${tileID}`)) continue;
       this.loadTile(tile);
     }
   }
@@ -256,27 +247,21 @@ export class KeepRightService extends AbstractSystem {
    */
   loadTile(tile: Tile): void {
     const spatial = this.context.systems.spatial!;
-    const cache = this._cache;
+    const network = this.context.systems.network!;
     const tileID = tile.id;
 
     const options = { format: 'geojson', ch: KR_RULES };
     const [ left, top, right, bottom ] = tile.wgs84Extent.rectangle();
     const params = Object.assign({}, options, { left, bottom, right, top });
     const url = `${KEEPRIGHT_API}/export.php?` + utilQsString(params, false);
+    const requestID = `keepright-tile-${tileID}`;
 
-    const controller = new AbortController();
-    cache.inflightTile.set(tileID, controller);
-
-    fetch(url, { signal: controller.signal })
-      .then(utilFetchResponse)
+    network.fetch<any>(url, { requestID })
       .then(response => this._gotTile(tile, response))
       .catch(err => {
         if (err.name === 'AbortError') return;          // ok
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
         spatial.addTiles('keepright', [tile]);          // don't retry
-      })
-      .finally(() => {
-        cache.inflightTile.delete(tileID);
       });
   }
 
@@ -387,9 +372,11 @@ export class KeepRightService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   postUpdate(item: MarkerData, callback: (err: any, item: MarkerData) => void): void {
-    const cache = this._cache;
+    const network = this.context.systems.network!;
     const dataID = item.id;
-    if (cache.inflightPost.has(dataID)) {
+    const postKey = `keepright-post-${dataID}`;
+
+    if (network.isInflight(postKey)) {
       return callback({ message: 'Error update already inflight', status: -2 }, item);
     }
 
@@ -406,19 +393,14 @@ export class KeepRightService extends AbstractSystem {
     // We don't care about the response, so this is fine.
     const url = `${KEEPRIGHT_API}/comment.php?` + utilQsString(params, false);
 
-    const controller = new AbortController();
-    cache.inflightPost.set(dataID, controller);
-
-    fetch(url, { signal: controller.signal, mode: 'no-cors' })
-      .then(utilFetchResponse)
+    network.fetchRaw(url, { requestID: postKey, mode: 'no-cors' })
+      .catch(() => {})  // ignore errors for no-cors requests
       .finally(() => {
-        cache.inflightPost.delete(dataID);
-
         if (item.props.newStatus === 'ignore') {    // ignore permanently (false positive)
           this.removeItem(item);
         } else if (item.props.newStatus === 'ignore_t') {   // ignore temporarily (error fixed)
           this.removeItem(item);
-          cache.closed[`${item.props.schema}:${dataID}`] = true;
+          this._cache.closed[`${item.props.schema}:${dataID}`] = true;
         } else {
           const replaced = this.replaceItem(item.update({
             comment: item.props.newComment,

@@ -9,7 +9,8 @@ describe('WaybackService', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets:  new Rapid.AssetSystem(context)
+    assets:  new Rapid.AssetSystem(context),
+    network: new Rapid.NetworkSystem(context)
   };
 
   // Supply cached wayback config

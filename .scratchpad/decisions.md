@@ -2,6 +2,21 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## NetworkSystem
+
+- **`RequestID` as a typed string ID** — Follows the established pattern in `ids.ts` (like `EntityID`, `TileID`). Used throughout `NetworkFetchOptions`, `InflightRequest`, `QueuedFetch`, and all public API methods. Default requestID is `'${METHOD} ${url}'` (e.g. `'GET https://example.com/data'`). Services pass domain-specific IDs like `'keepright-tile-0,0,14'`.
+- **Regex `.test()` for `abortMatching` predicates** — All predicates use `/^prefix-/.test(requestID)` instead of `requestID.startsWith('prefix-')`. ~10% faster per jsbench, and consistent across all services. Domain dots escaped (e.g. `/nominatim\.openstreetmap\.org/`).
+- **Worker offloading is transparent** — `network.fetch<T>()` automatically routes through `scheduleWorkerTask('fetchAndParse', ...)` when scheduler + workerURL are available and no custom `fetchFn` is provided. Callers don't know or care whether the fetch ran on main thread or worker. `fetchRaw()` always runs on main thread (returns `Response` object, not serializable).
+- **Concurrency limiting with FIFO queue** — When `numActive >= maxInflight`, new requests queue. Queued requests are abortable for free (no network request started). Queue drains in `.finally()` of completed requests. Default `maxInflight: 100`.
+- **WaybackService metadata cache key is NOT a requestID** — `getMetadataAsync()` has `const key = \`${tile.id}_${releaseDate}\`` which is a local cache lookup key. Only the property passed to `network.fetch()` uses the `requestID` name: `{ requestID: \`wayback-meta-${key}\` }`. Don't blindly rename all `key` variables in services.
+
+## Worker Architecture Vision
+
+- **Named operation registry** — Current worker only handles `'fetchAndParse'`. Future: workers register named handlers (e.g. `'processOsmTile'`), callers pass operation name + serializable data. Can't send closures across `postMessage`.
+- **Worker Context with limited systems** — Workers would get their own lightweight `Context` with `network`, `spatial`, etc. — but no `gfx`, `ui`, or DOM. Registry pattern already supports partial system sets.
+- **Stable graph snapshots for worker validation** — `EditSystem.stable` graph is the right trigger point. Only send to workers on stable transitions (not during drag/staging). Worker rebuilds spatial index from snapshot, runs validators, posts back issue props. No debouncing needed — edit workflow already produces the right cadence.
+- **Transferable snapshot format** — Large spatial snapshots should use `ArrayBuffer`/typed arrays for near-zero-copy `postMessage` transfer. R-tree bounding boxes are naturally float arrays.
+
 ## Architecture
 
 - **Scoped data, no aggregate caches** — Both StyleSystem and SchemaSystem store data in `_scopes: Map<ScopeID, ScopeData>`. No aggregate maps across scopes. Callers access scope data directly: `schema.getScope('osm')?.fields.get(id)`.

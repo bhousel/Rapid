@@ -95,7 +95,7 @@ export class VectorTileService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'vectortile';
-    this.optionalDependencies = new Set(['gfx']);
+    this.optionalDependencies = new Set<SystemID>(['gfx']);
 
     // Sources are identified by their URL template..
     this._sources = new Map();

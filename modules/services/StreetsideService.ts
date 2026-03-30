@@ -175,8 +175,8 @@ export class StreetsideService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'streetside';
-    this.requiredDependencies = new Set(['assets', 'l10n', 'photos', 'spatial']);
-    this.optionalDependencies = new Set(['gfx', 'ui']);
+    this.requiredDependencies = new Set<SystemID>(['assets', 'l10n', 'photos', 'spatial']);
+    this.optionalDependencies = new Set<SystemID>(['gfx', 'ui']);
     this.autoStart = false;
 
     this._loadPromise = null;

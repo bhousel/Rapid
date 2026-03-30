@@ -231,8 +231,8 @@ export class MapillaryService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'mapillary';
-    this.requiredDependencies = new Set(['l10n', 'photos', 'spatial']);
-    this.optionalDependencies = new Set(['gfx', 'ui']);
+    this.requiredDependencies = new Set<SystemID>(['l10n', 'photos', 'spatial']);
+    this.optionalDependencies = new Set<SystemID>(['gfx', 'ui']);
     this.autoStart = false;
 
     this._loadPromise = null;

@@ -1,7 +1,6 @@
 import { utilQsString } from '@rapid-sdk/util';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 
@@ -29,6 +28,7 @@ export class WikidataService extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'wikidata';
+    this.requiredDependencies = new Set<SystemID>(['network']);
     this.optionalDependencies = new Set(['l10n']);
 
     this._cache = new Map();  // Map<qid, entitydata>
@@ -91,8 +91,8 @@ export class WikidataService extends AbstractSystem {
       origin: '*'
     }, false);
 
-    fetch(url)
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    network.fetch<any>(url)
       .then(result => {
         if (result && result.error) {
           throw new Error(result.error);
@@ -130,8 +130,8 @@ export class WikidataService extends AbstractSystem {
       origin: '*'
     }, false);
 
-    fetch(url)
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    network.fetch<any>(url)
       .then(result => {
         if (result && result.error) {
           throw new Error(result.error);
@@ -188,8 +188,8 @@ export class WikidataService extends AbstractSystem {
       origin: '*'
     }, false);
 
-    fetch(url)
-      .then(utilFetchResponse)
+    const network = this.context.systems.network!;
+    network.fetch<any>(url)
       .then(result => {
         if (result && result.error) {
           throw new Error(result.error);
