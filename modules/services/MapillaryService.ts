@@ -303,6 +303,12 @@ export class MapillaryService extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+
+    network.abortMatching(id => /^mapillary-/.test(id));
+
     this._cache = {
       images:        { lastv: null },
       detections:    { lastv: null },
@@ -310,8 +316,6 @@ export class MapillaryService extends AbstractSystem {
       segmentations: { data: new Map() },   // Map<segmentationID, SegmentationData>
       loaded:   new Set()   // Set<url>
     };
-
-    const spatial = this.context.systems.spatial!;
     spatial.clearCache('mapillary-images');
     spatial.clearCache('mapillary-sequences');
     spatial.clearCache('mapillary-detections');

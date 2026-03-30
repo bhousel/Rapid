@@ -298,14 +298,18 @@ export class StreetsideService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+
+    network.abortMatching(id => /^streetside-/.test(id));
+
     this._cache = {
       unattachedBubbles:   new Set(),  // Set<PhotoID>
       bubbleHasSequences:  new Map(),  // Map<PhotoID, Set<SequenceID>>
       metadataPromise:     null,
       lastv:               null
     };
-
-    const spatial = this.context.systems.spatial!;
     spatial.clearCache('streetside-images');
     spatial.clearCache('streetside-sequences');
 

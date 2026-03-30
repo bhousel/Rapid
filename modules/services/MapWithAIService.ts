@@ -183,6 +183,10 @@ export class MapWithAIService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
+    const network = this.context.systems.network!;
+
+    network.abortMatching(id => /^mapwithai-/.test(id));
+
     for (const [datasetID, ds] of this._datasets) {
       ds.graph = new Graph(this.context);
       ds.tree = new Tree(ds.graph, datasetID);

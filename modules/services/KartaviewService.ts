@@ -270,12 +270,16 @@ export class KartaviewService extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+
+    network.abortMatching(id => /^kartaview-/.test(id));
+
     this._cache = {
       nextPage:  new Map(),   // Map<TileID, Number>
       lastv:     null
     };
-
-    const spatial = this.context.systems.spatial!;
     spatial.clearCache('kartaview-images');
     spatial.clearCache('kartaview-sequences');
 
