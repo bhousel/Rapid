@@ -257,6 +257,14 @@ If a cast seems necessary, consider whether the root cause is:
 - A type declaration that doesn't match reality (fix the declaration)
 - A genuine case where TypeScript can't infer the type (e.g., after `JSON.parse`)
 
+### Prefer Generic Type Parameters Over Element Casts
+- When constructing `Set`, `Map`, or other generic collections, **annotate the container** rather than casting each element
+- This is cleaner: one annotation on the container vs. repeated `as` casts on every element
+- ✅ `new Set<RequestID>(tiles.map(tile => `prefix-${tile.id}`))`
+- ❌ `new Set(tiles.map(tile => `prefix-${tile.id}` as RequestID))`
+- Same applies to `Map`: ✅ `new Map<EntityID, OsmNode>()` over casting keys/values individually
+- This pattern is already used for `SystemID`: `new Set<SystemID>(['network', 'spatial'])`
+
 ### Type Inference in Callbacks
 - Let TypeScript infer callback parameter types from the source array/collection
 - If `graph.childNodes()` returns `OsmNode[]`, then `.map(n => n.loc)` already knows `n` is `OsmNode`

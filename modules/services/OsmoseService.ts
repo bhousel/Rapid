@@ -142,16 +142,17 @@ export class OsmoseService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    const network = this.context.systems.network;
-    network?.abortMatching(requestID => /^osmose-/.test(requestID));
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+
+    network.abortMatching(id => /^osmose-/.test(id));
+    spatial.clearCache('osmose');
 
     this._cache = {
-      closed:        {},
-      lastv:         null         // viewport version last time we fetched data
+      closed: {},
+      lastv:  null  // viewport version last time we fetched data
     };
-
-    const spatial = this.context.systems.spatial!;
-    spatial.clearCache('osmose');
 
     return Promise.resolve();
   }
@@ -174,6 +175,7 @@ export class OsmoseService extends AbstractSystem {
    */
   loadTiles(): void {
     const context = this.context;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
     const viewport = context.viewport;
     const cache = this._cache;
@@ -185,12 +187,8 @@ export class OsmoseService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const network = context.systems.network!;
-    network.abortMatching(requestID => {
-      if (!/^osmose-tile-/.test(requestID)) return false;
-      const infTileID = requestID.slice('osmose-tile-'.length);
-      return !tiles.some(tile => tile.id === infTileID);
-    });
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `osmose-tile-${tile.id}`));
+    network.abortMatching(id => /^osmose-tile-/.test(id) && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {
@@ -207,8 +205,9 @@ export class OsmoseService extends AbstractSystem {
    * @param tile - Tile data
    */
   loadTile(tile: Tile): void {
-    const network = this.context.systems.network!;
-    const spatial = this.context.systems.spatial!;
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
     const tileID = tile.id;
 
     const [x, y, z] = tile.xyz;
@@ -282,8 +281,9 @@ export class OsmoseService extends AbstractSystem {
     // Issue details only need to be fetched once
     if (issue.props.elems !== undefined) return Promise.resolve(issue);
 
-    const l10n = this.context.systems.l10n;
-    const network = this.context.systems.network!;
+    const context = this.context;
+    const l10n = context.systems.l10n;
+    const network = context.systems.network!;
     const localeCode = l10n?.localeCode || 'en-US';
 
     const url = `${OSMOSE_API}/issue/${issue.id}?langs=${localeCode}`;
@@ -461,8 +461,9 @@ export class OsmoseService extends AbstractSystem {
     // Todo: support switching locales
     const stringData: Record<string, OsmoseIssueStrings> = {};
 
-    const l10n = this.context.systems.l10n;
-    const network = this.context.systems.network!;
+    const context = this.context;
+    const l10n = context.systems.l10n;
+    const network = context.systems.network!;
     const localeCode = l10n?.localeCode || 'en-US';
     this._osmoseStrings.set(localeCode, stringData);
 

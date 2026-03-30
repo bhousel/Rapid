@@ -101,6 +101,12 @@ describe('NetworkSystem', () => {
       network.maxInflight = 0;
       assert.strictEqual(network.maxInflight, 1);
     });
+
+    it('reports numInflight, numActive, and numQueued as 0 when idle', () => {
+      assert.strictEqual(network.numInflight, 0);
+      assert.strictEqual(network.numActive, 0);
+      assert.strictEqual(network.numQueued, 0);
+    });
   });
 
 
@@ -285,6 +291,57 @@ describe('NetworkSystem', () => {
   });
 
 
+  // -- hasMatching --
+
+  describe('hasMatching', () => {
+    it('returns false when nothing is inflight', () => {
+      assert.isFalse(network.hasMatching(() => true));
+    });
+
+    it('returns true when an inflight request matches the predicate', async () => {
+      let resolver;
+      const mockFetch = mock(() => new Promise(resolve => { resolver = resolve; }));
+      globalThis.fetch = mockFetch;
+
+      const prom = network.fetch('https://example.com/data', { requestID: 'osm-tile-1', timeout: 0 });
+      assert.isTrue(network.hasMatching(id => id.startsWith('osm-tile-')));
+      assert.isFalse(network.hasMatching(id => id.startsWith('osm-note-')));
+
+      resolver(new Response('{}', { headers: { 'content-type': 'application/json' } }));
+      await prom;
+    });
+
+    it('returns false after matching requests complete', async () => {
+      const mockFetch = mock(() =>
+        Promise.resolve(new Response('{}', { headers: { 'content-type': 'application/json' } }))
+      );
+      globalThis.fetch = mockFetch;
+
+      await network.fetch('https://example.com/data', { requestID: 'osm-changeset-create', timeout: 0 });
+      assert.isFalse(network.hasMatching(id => id.startsWith('osm-changeset-')));
+    });
+
+    it('matches queued requests too', async () => {
+      network.maxInflight = 1;
+      let resolver;
+      const mockFetch = mock(() => new Promise(resolve => { resolver = resolve; }));
+      globalThis.fetch = mockFetch;
+
+      const prom1 = network.fetch('https://example.com/1', { requestID: 'active-1', timeout: 0 });
+      const prom2 = network.fetch('https://example.com/2', { requestID: 'queued-1', timeout: 0 });
+      assert.strictEqual(network.numQueued, 1);
+
+      // queued request is still visible to hasMatching
+      assert.isTrue(network.hasMatching(id => id === 'queued-1'));
+
+      // Clean up
+      network.abort('queued-1');
+      resolver(new Response('{}', { headers: { 'content-type': 'application/json' } }));
+      await Promise.allSettled([prom1, prom2]);
+    });
+  });
+
+
   // -- fetchRaw --
 
   describe('fetchRaw', () => {
@@ -330,7 +387,8 @@ describe('NetworkSystem', () => {
       const prom2 = network.fetch('https://example.com/2', { requestID: 'c2', timeout: 0 });
       const prom3 = network.fetch('https://example.com/3', { requestID: 'c3', timeout: 0 });
 
-      assert.strictEqual(network.numInflight, 3);  // all tracked
+      assert.strictEqual(network.numInflight, 3);   // all tracked
+      assert.strictEqual(network.numActive, 2);     // two dispatched
       assert.strictEqual(network.numQueued, 1);     // third is queued
       assert.strictEqual(mockFetch.mock.calls.length, 2);  // only 2 dispatched
 

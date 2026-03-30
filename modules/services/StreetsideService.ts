@@ -303,15 +303,15 @@ export class StreetsideService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     network.abortMatching(id => /^streetside-/.test(id));
-
-    this._cache = {
-      unattachedBubbles:   new Set(),  // Set<PhotoID>
-      bubbleHasSequences:  new Map(),  // Map<PhotoID, Set<SequenceID>>
-      metadataPromise:     null,
-      lastv:               null
-    };
     spatial.clearCache('streetside-images');
     spatial.clearCache('streetside-sequences');
+
+    this._cache = {
+      unattachedBubbles: new Set(),   // Set<PhotoID>
+      bubbleHasSequences: new Map(),  // Map<PhotoID, Set<SequenceID>>
+      metadataPromise: null,
+      lastv: null
+    };
 
     return Promise.resolve();
   }
@@ -345,6 +345,7 @@ export class StreetsideService extends AbstractSystem {
    */
   loadTiles(): void {
     const context = this.context;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
     const viewport = context.viewport;
     const cache = this._cache;
@@ -356,8 +357,7 @@ export class StreetsideService extends AbstractSystem {
     const needTiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const network = context.systems.network!;
-    const neededIDs = new Set(needTiles.map(tile => `streetside-${tile.id}`));
+    const neededIDs = new Set<RequestID>(needTiles.map(tile => `streetside-${tile.id}`));
     network.abortMatching(id => /^streetside-/.test(id) && !neededIDs.has(id));
 
     // Issue new requests..

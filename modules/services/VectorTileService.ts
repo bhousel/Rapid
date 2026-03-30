@@ -51,7 +51,12 @@ interface VTSource {
   displayName: string;
   /** URL template for fetching vector tiles (contains {x}, {y}, {z} placeholders) */
   template: string;
-  /** Map of in-flight PMTiles archive requests keyed by tile ID, with their AbortControllers */
+  /**
+   * Map of in-flight PMTiles archive requests keyed by tile ID, with their AbortControllers.
+   * TODO: PMTiles owns its own fetch via `Source.getBytes()` — these requests bypass NetworkSystem.
+   * A custom PMTiles `Source` adapter delegating to `network.fetchRaw()` with Range headers could
+   * unify this under NetworkSystem, eliminating this separate inflight map.
+   */
   inflightPMTiles: Map<string, AbortController>;
   /** Map of loaded tile IDs to their tile metadata */
   loaded: Map<string, Tile>;
@@ -202,6 +207,10 @@ export class VectorTileService extends AbstractSystem {
   loadTiles(template: string): void {
     this._getSourceAsync(template)
       .then(source => {
+        const context = this.context;
+        const network = context.systems.network!;
+        const viewport = context.viewport;
+
         const header = source.header;
         if (header) {  // pmtiles - set up allowable zoom range
           this._tiler.zoomRange(header.minZoom, header.maxZoom);
@@ -210,7 +219,6 @@ export class VectorTileService extends AbstractSystem {
           }
         }
 
-        const viewport = this.context.viewport;
         if (source.lastv === viewport.v) return;  // exit early if the view is unchanged
         source.lastv = viewport.v;
 
@@ -225,8 +233,7 @@ export class VectorTileService extends AbstractSystem {
             }
           }
         } else {
-          const network = this.context.systems.network!;
-          const neededIDs = new Set(tiles.map(t => `vt-${source.id}-${t.id}`));
+          const neededIDs = new Set<RequestID>(tiles.map(t => `vt-${source.id}-${t.id}`));
           network.abortMatching(id => id.startsWith(`vt-${source.id}-`) && !neededIDs.has(id));
         }
 

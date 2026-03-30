@@ -85,7 +85,7 @@ export class NominatimService extends AbstractSystem {
    */
   resetAsync(): Promise<void> {
     const network = this.context.systems.network!;
-    network.abortMatching(requestID => /nominatim\.openstreetmap\.org/.test(requestID));
+    network.abortMatching(id => /nominatim\.openstreetmap\.org/.test(id));
 
     this._nominatimCache = new RBush<NominatimCacheItem>();
     return Promise.resolve();

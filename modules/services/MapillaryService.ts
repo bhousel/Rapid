@@ -62,8 +62,8 @@ interface MapillaryCache {
   signs: DatasetCache;
   /** Decoded segmentation geometries keyed by segmentation ID */
   segmentations: SegmentationCache;
-  /** URLs that have already been fetched */
-  loaded: Set<string>;
+  /** Requests that have already been loaded */
+  loaded: Set<RequestID>;
 }
 
 /** Properties passed to `_cacheImage` to create or update an image */
@@ -309,16 +309,17 @@ export class MapillaryService extends AbstractSystem {
 
     network.abortMatching(id => /^mapillary-/.test(id));
 
+    spatial.clearCache('mapillary-images');
+    spatial.clearCache('mapillary-sequences');
+    spatial.clearCache('mapillary-detections');
+
     this._cache = {
       images:        { lastv: null },
       detections:    { lastv: null },
       signs:         { lastv: null },
-      segmentations: { data: new Map() },   // Map<segmentationID, SegmentationData>
-      loaded:   new Set()   // Set<url>
+      segmentations: { data: new Map() },   // Map<SegmentationID, SegmentationData>
+      loaded:        new Set()              // Set<RequestID>
     };
-    spatial.clearCache('mapillary-images');
-    spatial.clearCache('mapillary-sequences');
-    spatial.clearCache('mapillary-detections');
 
     return Promise.resolve();
   }
@@ -482,8 +483,11 @@ export class MapillaryService extends AbstractSystem {
    * @param  datasetID - one of 'images', 'signs', or 'detections'
    */
   loadTiles(datasetID: MapillaryDatasetID): void {
+    const context = this.context;
+    const network = context.systems.network!;
+    const viewport = context.viewport;
+
     // exit early if the view is unchanged since the last time we loaded tiles
-    const viewport = this.context.viewport;
     if (this._cache[datasetID].lastv === viewport.v) return;
     this._cache[datasetID].lastv = viewport.v;
 
@@ -491,8 +495,7 @@ export class MapillaryService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const network = this.context.systems.network!;
-    const neededIDs = new Set(tiles.map(tile => `mapillary-${datasetID}-${tile.id}`));
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `mapillary-${datasetID}-${tile.id}`));
     network.abortMatching(id => id.startsWith(`mapillary-${datasetID}-`) && !neededIDs.has(id));
 
     for (const tile of tiles) {
@@ -909,17 +912,16 @@ export class MapillaryService extends AbstractSystem {
     const cache = this._cache;
     const requestID = `mapillary-${datasetID}-${tile.id}` as RequestID;
 
-    if (cache.loaded.has(url)) {
+    if (cache.loaded.has(requestID)) {
       return Promise.resolve();  // already done
     }
-
     if (network.isInflight(requestID)) {
       return Promise.resolve();
     }
 
     return network.fetch<ArrayBuffer>(url, { requestID })
       .then(buffer => {
-        cache.loaded.add(url);
+        cache.loaded.add(requestID);
         if (!buffer) {
           throw new Error('No Data');
         }
@@ -941,7 +943,7 @@ export class MapillaryService extends AbstractSystem {
       .catch(err => {
         if (err.name === 'AbortError') return;          // ok
         if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-        cache.loaded.add(url);  // don't retry
+        cache.loaded.add(requestID);  // don't retry
       });
   }
 
@@ -1038,6 +1040,7 @@ export class MapillaryService extends AbstractSystem {
   _loadDetectionAsync(detectionID: DetectionID): Promise<MapillaryDetection | void> {
     const context = this.context;
     const gfx = context.systems.gfx;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
     // Is data is cached already and includes the `images` Array?  If so, resolve immediately.
@@ -1050,7 +1053,6 @@ export class MapillaryService extends AbstractSystem {
     const fields = 'id,geometry,aligned_direction,first_seen_at,last_seen_at,object_value,object_type,images';
     const url = `${apiUrl}/${detectionID}?access_token=${accessToken}&fields=${fields}`;
 
-    const network = context.systems.network!;
     return network.fetch<any>(url)
       .then(response => {
         if (!response) {

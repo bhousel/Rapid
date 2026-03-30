@@ -8,6 +8,9 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
 - **Regex `.test()` for `abortMatching` predicates** — All predicates use `/^prefix-/.test(requestID)` instead of `requestID.startsWith('prefix-')`. ~10% faster per jsbench, and consistent across all services. Domain dots escaped (e.g. `/nominatim\.openstreetmap\.org/`).
 - **Worker offloading is transparent** — `network.fetch<T>()` automatically routes through `scheduleWorkerTask('fetchAndParse', ...)` when scheduler + workerURL are available and no custom `fetchFn` is provided. Callers don't know or care whether the fetch ran on main thread or worker. `fetchRaw()` always runs on main thread (returns `Response` object, not serializable).
 - **Concurrency limiting with FIFO queue** — When `numActive >= maxInflight`, new requests queue. Queued requests are abortable for free (no network request started). Queue drains in `.finally()` of completed requests. Default `maxInflight: 100`.
+- **`hasMatching()` checks `_inflight` only, not `_queue` separately** — All requests (both active and queued) are registered in `_inflight` at the bottom of `_trackAndDispatch`. The queue is a *subset* of inflight. `abortMatching()` touches `_queue` separately only to *splice out* entries (preventing them from dispatching on drain), not for visibility. Used by OsmService's `_isChangesetInflight()` guard.
+- **Note tile request IDs use `osm-note-tile-` prefix** — Original `osm-note-${tileID}` collided with `osm-note-post-create-*` and `osm-note-post-update-*`, requiring a complex abort predicate with negative lookahead. Renamed to `osm-note-tile-${tileID}` so `abortMatching` can simply test `/^osm-note-tile-/`. The broader `/^osm-note-/` regex in `setRateLimit` correctly aborts ALL note requests (tiles + posts) during rate limiting.
+- **OsmService request ID prefix conventions** — `osm-tile-${tileID}` (map data tiles), `osm-note-tile-${tileID}` (note tiles), `osm-note-post-create-${noteID}` (note creation), `osm-note-post-update-${noteID}` (note update), `osm-changeset-create` / `osm-changeset-upload-${id}` / `osm-changeset-close-${id}` (changeset operations). The `osm-` prefix lets `resetAsync` abort everything with one regex.
 - **WaybackService metadata cache key is NOT a requestID** — `getMetadataAsync()` has `const key = \`${tile.id}_${releaseDate}\`` which is a local cache lookup key. Only the property passed to `network.fetch()` uses the `requestID` name: `{ requestID: \`wayback-meta-${key}\` }`. Don't blindly rename all `key` variables in services.
 
 ## Worker Architecture Vision
@@ -30,6 +33,15 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
 - **`lifecycle` ruleset as config container** — The Set of prefixes is derived from its key patterns, not used for `match()` directly. `lifecycle_prefixes` variable is the canonical source.
 - **`match()` and excludes subtlety** — `match({k: v})` only sees the key/value pairs you pass. When excludes reference different keys than includes, pass the full tag object.
 - **Actions access schema via `graph.context.systems.schema`** — `Graph.context` is always set. This is fine and explicit.
+
+## PMTiles Fetching Bypasses NetworkSystem
+
+- **PMTiles library owns its own fetch** — `PMTiles.getZxy()` delegates to `Source.getBytes(offset, length, signal)` internally. The default `FetchSource` issues HTTP Range requests with `globalThis.fetch`. These requests bypass NetworkSystem entirely, so `inflightPMTiles: Map<string, AbortController>` tracks them separately on VTSource.
+- **Future unification** — A custom PMTiles `Source` adapter could delegate `getBytes()` to `network.fetchRaw()` with Range headers. This would eliminate `inflightPMTiles` and let NetworkSystem be the single source of truth for all inflight traffic. Low priority for now.
+
+## Generic Type Parameters Over Element Casts
+
+- **Annotate the container, not elements** — `new Set<RequestID>(...)` over `new Set(... as RequestID)`. One annotation vs. repeated casts. Already the pattern for `SystemID`; now applied consistently to `RequestID` and other ID types in Set/Map constructors.
 
 ## Dual-Props Pattern
 

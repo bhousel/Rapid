@@ -183,12 +183,13 @@ export class MapWithAIService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    const network = this.context.systems.network!;
+    const context = this.context;
+    const network = context.systems.network!;
 
     network.abortMatching(id => /^mapwithai-/.test(id));
 
     for (const [datasetID, ds] of this._datasets) {
-      ds.graph = new Graph(this.context);
+      ds.graph = new Graph(context);
       ds.tree = new Tree(ds.graph, datasetID);
       ds.loaded.clear();
       ds.seen.clear();
@@ -266,7 +267,7 @@ export class MapWithAIService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set(tiles.map(tile => `mapwithai-${tile.id}` as RequestID));
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `mapwithai-${tile.id}`));
     network.abortMatching(id => /^mapwithai-/.test(id) && !neededIDs.has(id));
 
     for (const tile of tiles) {

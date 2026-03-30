@@ -305,7 +305,7 @@ export class EsriService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set(tiles.map(tile => `esri-${ds.id}-${tile.id}` as RequestID));
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `esri-${ds.id}-${tile.id}`));
     network.abortMatching(id => /^esri-/.test(id) && !neededIDs.has(id));
 
     for (const tile of tiles) {

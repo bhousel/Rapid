@@ -106,7 +106,7 @@ export class WaybackService extends AbstractSystem {
     super(context);
     this.id = 'wayback';
     this.requiredDependencies = new Set<SystemID>(['assets', 'network' /*,'spatial'*/]);
-    this.optionalDependencies = new Set([]);
+    this.optionalDependencies = new Set<SystemID>([]);
 
     this.allDates = [];                 // Array<releaseDate> ascending
     this.byReleaseNumber = new Map();   // Map<releaseNumber, WaybackRelease>
@@ -203,10 +203,9 @@ export class WaybackService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    if (this._cache.inflight) {
-      const network = this.context.systems.network!;
-      network.abortMatching(requestID => /^wayback-/.test(requestID));
-    }
+    const network = this.context.systems.network!;
+    network.abortMatching(id => /^wayback-/.test(id));
+
     this._cache = {
       inflight: new Map()  // Map<TileID, InflightEntry>
     };
@@ -279,7 +278,7 @@ export class WaybackService extends AbstractSystem {
       return inflight.promise;
     }
     // Any other inflight requests are no longer needed..
-    network.abortMatching(requestID => /^wayback-/.test(requestID));
+    network.abortMatching(id => /^wayback-/.test(id));
     cache.inflight.clear();
 
     const prom = Promise.resolve()

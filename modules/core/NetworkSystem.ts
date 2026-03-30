@@ -339,6 +339,20 @@ export class NetworkSystem extends AbstractSystem {
   }
 
 
+  /**
+   * hasMatching
+   * Returns true if any inflight request matches the given predicate.
+   * Useful for guards that need to check if any request in a category is active.
+   * @param predicate - Function that returns true for matching requestIDs
+   */
+  hasMatching(predicate: (requestID: RequestID) => boolean): boolean {
+    for (const requestID of this._inflight.keys()) {
+      if (predicate(requestID)) return true;
+    }
+    return false;
+  }
+
+
   // -------------------------------------------------------
   // Private helpers
   // -------------------------------------------------------

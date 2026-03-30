@@ -276,12 +276,13 @@ export class KartaviewService extends AbstractSystem {
 
     network.abortMatching(id => /^kartaview-/.test(id));
 
+    spatial.clearCache('kartaview-images');
+    spatial.clearCache('kartaview-sequences');
+
     this._cache = {
       nextPage:  new Map(),   // Map<TileID, Number>
       lastv:     null
     };
-    spatial.clearCache('kartaview-images');
-    spatial.clearCache('kartaview-sequences');
 
     return Promise.resolve();
   }
@@ -315,9 +316,10 @@ export class KartaviewService extends AbstractSystem {
    */
   loadTiles(): void {
     const cache = this._cache;
-    const network = this.context.systems.network!;
+    const context = this.context;
+    const network = context.systems.network!;
+    const viewport = context.viewport;
 
-    const viewport = this.context.viewport;
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
     cache.lastv = viewport.v;
 
@@ -325,7 +327,7 @@ export class KartaviewService extends AbstractSystem {
     const needTiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set(needTiles.map(tile => `kartaview-${tile.id}` as RequestID));
+    const neededIDs = new Set<RequestID>(needTiles.map(tile => `kartaview-${tile.id}`));
     network.abortMatching(id => /^kartaview-/.test(id) && !neededIDs.has(id));
 
     // Fetch files that are needed
@@ -541,6 +543,7 @@ export class KartaviewService extends AbstractSystem {
 
     const context = this.context;
     const gfx = context.systems.gfx;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
     const cache = this._cache;
@@ -555,7 +558,6 @@ export class KartaviewService extends AbstractSystem {
     // This is the tile id that the spatial system will keep track of.
     const tileID = tile.id = `${tile.origID},${nextPage}`;
     const requestID = `kartaview-${tileID}` as RequestID;
-    const network = this.context.systems.network!;
     if (spatial.hasTile('kartaview-images', tileID) || network.isInflight(requestID)) {
       return Promise.resolve();
     }
@@ -649,6 +651,7 @@ export class KartaviewService extends AbstractSystem {
   _loadImageAsync(imageID: PhotoID): Promise<KartaviewImage | void> {
     const context = this.context;
     const gfx = context.systems.gfx;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
     // If the image is already cached with an imageUrl, we can just resolve.
@@ -659,7 +662,6 @@ export class KartaviewService extends AbstractSystem {
     }
 
     const url = `${OPENSTREETCAM_API}/2.0/photo/${imageID}`;
-    const network = this.context.systems.network!;
 
     return network.fetch<any>(url)
       .then(response => {

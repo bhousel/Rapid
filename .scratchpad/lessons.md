@@ -23,6 +23,10 @@ Things that went wrong once and shouldn't go wrong again.
 
 - **Not all `key` variables in services are requestIDs** — During the `key` → `requestID` rename, WaybackService had `const key = \`${tile.id}_${releaseDate}\`` used as a metadata cache lookup key. This local variable was intentionally NOT renamed — only the option property passed to `network.fetch()` became `requestID`. When doing bulk renames, check whether the variable represents the network request identity or an unrelated domain concept.
 - **`multi_replace_string_in_file` can silently break code** — When `oldString` includes text that spans a structural boundary (like `}\n    this._cache = {`), the replacement must include ALL the matched text. A partial replacement dropped the closing brace and object assignment in WaybackService. Always verify structural edits immediately.
+- **Copy-paste bugs in catch handlers** — OsmService's `postNoteCreate`/`postNoteUpdate` catch handlers had `this._changeset.inflight = null` — clearly copy-pasted from changeset methods. When removing manual inflight tracking, check ALL catch/finally blocks for mismatched cleanup that was hiding a bug.
+- **Request ID prefix collisions cause complex abort predicates** — Original `osm-note-${tileID}` collided with `osm-note-post-*`, requiring negative lookahead in `abortMatching`. Fix: choose non-overlapping prefixes (e.g. `osm-note-tile-` vs `osm-note-post-`). Design request ID schemes so each category can be selected with a simple prefix regex.
+- **Dead code in interfaces** — `_tileCache.seen: Set<string>` was declared in the interface, initialized in `_initCache()`, but never read anywhere. When auditing inflight caches, also check for other dead properties in the same interfaces.
+- **Manual mock fetch vs fetch-mock library** — Use `fetch-mock` for service tests where real URL routing/counting matters. For NetworkSystem tests (testing fetch lifecycle itself), manual mocks are better — most tests need deferred resolution, abort signal handling, or custom fetchFn, which fetch-mock doesn't naturally support.
 
 ## Runtime
 

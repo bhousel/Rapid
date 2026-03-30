@@ -183,7 +183,7 @@ export class KeepRightService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(requestID => /^keepright-/.test(requestID));
+    network.abortMatching(id => /^keepright-/.test(id));
     spatial.clearCache('keepright');
 
     this._cache = {
@@ -225,11 +225,8 @@ export class KeepRightService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    network.abortMatching(requestID => {
-      if (!/^keepright-tile-/.test(requestID)) return false;
-      const infTileID = requestID.slice('keepright-tile-'.length);
-      return !tiles.some(tile => tile.id === infTileID);
-    });
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `keepright-tile-${tile.id}`));
+    network.abortMatching(id => /^keepright-tile-/.test(id) && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {
@@ -246,8 +243,9 @@ export class KeepRightService extends AbstractSystem {
    * @param tile - Tile data
    */
   loadTile(tile: Tile): void {
-    const spatial = this.context.systems.spatial!;
-    const network = this.context.systems.network!;
+    const context = this.context;
+    const spatial = context.systems.spatial!;
+    const network = context.systems.network!;
     const tileID = tile.id;
 
     const options = { format: 'geojson', ch: KR_RULES };

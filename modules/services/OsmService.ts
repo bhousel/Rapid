@@ -53,10 +53,6 @@ interface TileCache {
   lastv: number | null;
   /** Set of tile IDs pending loading */
   toLoad: Set<string>;
-  /** Map of tile IDs to their in-flight request IDs */
-  inflight: Record<string, RequestID>;
-  /** Set of tile IDs that have already been loaded */
-  seen: Set<string>;
 }
 
 /** Cache for note loading state */
@@ -65,10 +61,6 @@ interface NoteCache {
   lastv: number | null;
   /** Set of tile IDs pending note loading */
   toLoad: Set<string>;
-  /** Map of tile IDs to their in-flight GET request IDs */
-  inflight: Record<string, RequestID>;
-  /** Map of note IDs to their in-flight POST request IDs */
-  inflightPost: Record<string, RequestID>;
   /** Map of note IDs to their closed status */
   closed: Record<string, boolean>;
 }
@@ -83,8 +75,6 @@ interface UserCache {
 
 /** Changeset tracking state */
 interface ChangesetState {
-  /** Request ID for the in-flight changeset request */
-  inflight?: RequestID | null;
   /** The ID of the currently open changeset */
   openChangesetID?: string | null;
 }
@@ -281,7 +271,6 @@ export class OsmService extends AbstractSystem {
 
     this.reloadApiStatus = this.reloadApiStatus.bind(this);
     this.deferredReloadApiStatus = this.deferredReloadApiStatus.bind(this);
-    this._abortRequest = this._abortRequest.bind(this);
 
     // Calculate the deafult OAuth2 `redirect_uri`.
     // - `redirect_uri` should be a page that the authorizing server (e.g. `openstreetmap.org`)
@@ -378,38 +367,16 @@ export class OsmService extends AbstractSystem {
     this._userDetails = null;
 
     const network = this.context.systems.network!;
-
-    if (this._tileCache.inflight) {
-      for (const requestID of Object.values(this._tileCache.inflight)) {
-        network.abort(requestID);
-      }
-    }
-    if (this._noteCache.inflight) {
-      for (const requestID of Object.values(this._noteCache.inflight)) {
-        network.abort(requestID);
-      }
-    }
-    if (this._noteCache.inflightPost) {
-      for (const requestID of Object.values(this._noteCache.inflightPost)) {
-        network.abort(requestID);
-      }
-    }
-    if (this._changeset.inflight) {
-      network.abort(this._changeset.inflight);
-    }
+    network.abortMatching(id => /^osm-/.test(id));
 
     this._tileCache = {
       lastv: null,
       toLoad: new Set(),
-      inflight: {},
-      seen: new Set()
     };
 
     this._noteCache = {
       lastv: null,
       toLoad: new Set(),
-      inflight: {},
-      inflightPost: {},
       closed: {},
     };
 
@@ -1074,14 +1041,13 @@ export class OsmService extends AbstractSystem {
    * @param  callback - errback-style callback called with the updated changeset
    */
   createChangeset(changeset: OsmChangeset, callback: Errback): void {
-    if (this._changeset.inflight) {
+    if (this._isChangesetInflight()) {
       return callback({ message: 'Changeset already inflight', status: -2 });
     } else if (!this.authenticated()) {
       return callback({ message: 'Not Authenticated', status: -3 });
     }
 
     const createdChangeset = (err: any, changesetID?: any): void => {
-      this._changeset.inflight = null;
       if (err) { return callback(err, changeset); }
 
       this._changeset.openChangesetID = changesetID;
@@ -1109,15 +1075,12 @@ export class OsmService extends AbstractSystem {
     })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
-        this._changeset.inflight = null;
         if (err.name === 'AbortError') return;  // ok
         if (err.name === 'FetchError') {
           errback(err);
           return;
         }
       });
-
-    this._changeset.inflight = requestID;
   }
 
 
@@ -1130,7 +1093,7 @@ export class OsmService extends AbstractSystem {
    * @param  callback - errback-style callback called when the upload completes
    */
   uploadChangeset(changeset: OsmChangeset, changes: OsmChanges, callback: Errback): void {
-    if (this._changeset.inflight) {
+    if (this._isChangesetInflight()) {
       return callback({ message: 'Changeset already inflight', status: -2 });
     } else if (!this.authenticated()) {
       return callback({ message: 'Not Authenticated', status: -3 });
@@ -1140,7 +1103,6 @@ export class OsmService extends AbstractSystem {
     }
 
     const uploadedChangeset = (err: any, /*result*/): void => {
-      this._changeset.inflight = null;
       // we do get a changeset diff result, but we don't currently use it for anything
       callback(err, changeset);
     };
@@ -1166,15 +1128,12 @@ export class OsmService extends AbstractSystem {
     })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
-        this._changeset.inflight = null;
         if (err.name === 'AbortError') return;  // ok
         if (err.name === 'FetchError') {
           errback(err);
           return;
         }
       });
-
-    this._changeset.inflight = requestID;
   }
 
 
@@ -1186,7 +1145,7 @@ export class OsmService extends AbstractSystem {
    * @param  callback - errback-style callback called when the close completes
    */
   closeChangeset(changeset: OsmChangeset, callback: Errback): void {
-    if (this._changeset.inflight) {
+    if (this._isChangesetInflight()) {
       return callback({ message: 'Changeset already inflight', status: -2 });
     } else if (!this.authenticated()) {
       return callback({ message: 'Not Authenticated', status: -3 });
@@ -1196,7 +1155,6 @@ export class OsmService extends AbstractSystem {
     }
 
     const closedChangeset = (err: any, /*result*/): void => {
-      this._changeset.inflight = null;
       this._changeset.openChangesetID = null;
       // there is no result to this call
       callback(err, changeset);
@@ -1216,15 +1174,12 @@ export class OsmService extends AbstractSystem {
     })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
-        this._changeset.inflight = null;
         if (err.name === 'AbortError') return;  // ok
         if (err.name === 'FetchError') {
           errback(err);
           return;
         }
       });
-
-    this._changeset.inflight = requestID;
   }
 
 
@@ -1292,7 +1247,9 @@ export class OsmService extends AbstractSystem {
     const tiles = (this._tiler.zoomRange(this._tileZoom) as Tiler).getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    this._abortUnwantedRequests(cache, tiles);
+    const network = this.context.systems.network!;
+    const neededIDs = new Set<RequestID>(tiles.map(t => `osm-tile-${t.id}` as RequestID));
+    network.abortMatching(id => /^osm-tile-/.test(id) && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {
@@ -1319,11 +1276,11 @@ export class OsmService extends AbstractSystem {
       return this._rateLimit;
     }
 
-    // Stop loading tiles, and cancel any inflight
+    // Stop loading tiles, and cancel any inflight tile/note requests
+    const network = this.context.systems.network!;
     this._tileCache.toLoad.clear();
     this._noteCache.toLoad.clear();
-    Object.values(this._tileCache.inflight).forEach(this._abortRequest);
-    Object.values(this._noteCache.inflight).forEach(this._abortRequest);
+    network.abortMatching(id => /^osm-tile-/.test(id) || /^osm-note-/.test(id));
 
     return this._rateLimit = {
       start: Math.floor(Date.now() / 1000),  // epoch seconds
@@ -1380,12 +1337,14 @@ export class OsmService extends AbstractSystem {
     const context = this.context;
     const cache = this._tileCache;
     const gfx = context.systems.gfx;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
     const locations = context.systems.locations;
     const tileID = tile.id;
+    const tileRequestID = `osm-tile-${tileID}` as RequestID;
 
     if (spatial.hasTile('osm-data', tileID)) return;
-    if (cache.inflight[tileID]) return;
+    if (network.isInflight(tileRequestID)) return;
 
     if (locations) {
       // Exit if this tile covers a blocked region (all corners are blocked)
@@ -1398,7 +1357,6 @@ export class OsmService extends AbstractSystem {
     }
 
     const gotTile = (err: any, results?: ParserResult): void => {
-      delete cache.inflight[tileID];
       if (!err) {
         cache.toLoad.delete(tileID);
         spatial.addTiles('osm-data', [tile]);
@@ -1411,12 +1369,11 @@ export class OsmService extends AbstractSystem {
       }
     };
 
-    const tileRequestID = `osm-tile-${tileID}` as RequestID;
     const options = { skipSeen: true };
     const json = (this.preferJSON ? '.json' : '');
     const path = `/api/0.6/map${json}?bbox=` + tile.wgs84Extent.toParam();
 
-    cache.inflight[tileID] = this.loadFromAPI(path, gotTile, options, tileRequestID);
+    this.loadFromAPI(path, gotTile, options, tileRequestID);
   }
 
 
@@ -1439,6 +1396,7 @@ export class OsmService extends AbstractSystem {
    * @param   callback - errback-style callback function to call with results
    */
   loadTileAtLoc(loc: Vec2, callback?: Errback | null): void {
+    const network = this.context.systems.network!;
     const spatial = this.context.systems.spatial!;
 
     if (this._paused || this.getRateLimit()) return;
@@ -1460,8 +1418,9 @@ export class OsmService extends AbstractSystem {
     const tiles = (this._tiler.zoomRange(this._tileZoom) as Tiler).getTiles(viewport).tiles;
 
     for (const tile of tiles) {
-      if (spatial.hasTile('osm-data', tile.id)) continue;                   // already loaded
-      if (cache.toLoad.has(tile.id) || cache.inflight[tile.id]) continue;   // queued or inflight
+      if (spatial.hasTile('osm-data', tile.id)) continue;   // already loaded
+      const tileRequestID = `osm-tile-${tile.id}` as RequestID;
+      if (cache.toLoad.has(tile.id) || network.isInflight(tileRequestID)) continue;   // queued or inflight
 
       cache.toLoad.add(tile.id);
       this.loadTile(tile, callback);
@@ -1490,13 +1449,16 @@ export class OsmService extends AbstractSystem {
     const tiles = (this._tiler.zoomRange(this._noteZoom) as Tiler).getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed
-    this._abortUnwantedRequests(cache, tiles);
+    const network = context.systems.network!;
+    const neededNoteIDs = new Set<RequestID>(tiles.map(t => `osm-note-tile-${t.id}` as RequestID));
+    network.abortMatching(id => /^osm-note-tile-/.test(id) && !neededNoteIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
       if (spatial.hasTile('osm-notes', tileID)) continue;
-      if (cache.inflight[tileID]) continue;
+      const tileRequestID = `osm-note-tile-${tileID}` as RequestID;
+      if (network.isInflight(tileRequestID)) continue;
 
       if (locations) {
         // Skip if this tile covers a blocked region (all corners are blocked)
@@ -1525,12 +1487,9 @@ export class OsmService extends AbstractSystem {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
-    const cache = this._noteCache;
     const tileID = tile.id;
 
     const errback = (err: any, results?: ParserResult): void => {
-      delete cache.inflight[tileID];
-
       if (results) {
         spatial.addTiles('osm-notes', [tile]);   // mark as loaded
         for (const props of (results.data ?? [])) {
@@ -1540,13 +1499,13 @@ export class OsmService extends AbstractSystem {
       }
     };
 
-    const tileRequestID = `osm-note-${tileID}` as RequestID;
+    const tileRequestID = `osm-note-tile-${tileID}` as RequestID;
     const json = (this.preferJSON ? '.json' : '');
     const options = { skipSeen: true, filter: new Set(['note']) };
     const path = `/api/0.6/notes${json}?limit=` + noteOptions.limit + '&closed='
       + noteOptions.closed + '&bbox=' + tile.wgs84Extent.toParam();
 
-    cache.inflight[tileID] = this.loadFromAPI(path, errback, options, tileRequestID);
+    this.loadFromAPI(path, errback, options, tileRequestID);
   }
 
 
@@ -1597,10 +1556,13 @@ export class OsmService extends AbstractSystem {
    * @param  callback - errback-style callback called with the created note
    */
   postNoteCreate(note: OsmNote, callback: Errback): void {
-    const gfx = this.context.systems.gfx;
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const network = context.systems.network!;
     const noteID = note.id;
+    const requestID = `osm-note-post-create-${noteID}` as RequestID;
 
-    if (this._noteCache.inflightPost[noteID]) {
+    if (network.isInflight(requestID)) {
       return callback({ message: 'Note update already inflight', status: -2 }, note);
     } else if (!this.authenticated()) {
       return callback({ message: 'Not Authenticated', status: -3 }, note);
@@ -1609,7 +1571,6 @@ export class OsmService extends AbstractSystem {
     if (!Array.isArray(note.loc) || !note.props.newComment) return;  // location & description required
 
     const createdNote = (err: any, xml?: any): void => {
-      delete this._noteCache.inflightPost[noteID];
       if (err) { return callback(err); }
 
       // we get the updated note back, remove from caches and reparse..
@@ -1627,8 +1588,6 @@ export class OsmService extends AbstractSystem {
     };
 
     const errback = this._wrapcb(createdNote);
-    const network = this.context.systems.network!;
-    const requestID = `osm-note-post-create-${noteID}` as RequestID;
     const resource = this._apiroot + '/api/0.6/notes?' +
       utilQsString({ lon: note.loc[0], lat: note.loc[1], text: note.props.newComment }, false);
 
@@ -1640,15 +1599,12 @@ export class OsmService extends AbstractSystem {
     })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
-        this._changeset.inflight = null;
         if (err.name === 'AbortError') return;  // ok
         if (err.name === 'FetchError') {
           errback(err);
           return;
         }
       });
-
-    this._noteCache.inflightPost[noteID] = requestID;
   }
 
 
@@ -1663,13 +1619,16 @@ export class OsmService extends AbstractSystem {
    * @param  callback - errback-style callback called with the updated note
    */
   postNoteUpdate(note: OsmNote, newStatus: string, callback: Errback): void {
-    const gfx = this.context.systems.gfx;
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const network = context.systems.network!;
     const noteID = note.id;
+    const requestID = `osm-note-post-update-${noteID}` as RequestID;
 
     if (!this.authenticated()) {
       return callback({ message: 'Not Authenticated', status: -3 }, note);
     }
-    if (this._noteCache.inflightPost[noteID]) {
+    if (network.isInflight(requestID)) {
       return callback({ message: 'Note update already inflight', status: -2 }, note);
     }
 
@@ -1684,7 +1643,6 @@ export class OsmService extends AbstractSystem {
     }
 
     const updatedNote = (err: any, xml?: any): void => {
-      delete this._noteCache.inflightPost[noteID];
       if (err) { return callback(err); }
 
       // we get the updated note back, remove from caches and reparse..
@@ -1709,8 +1667,6 @@ export class OsmService extends AbstractSystem {
     };
 
     const errback = this._wrapcb(updatedNote);
-    const network = this.context.systems.network!;
-    const requestID = `osm-note-post-update-${noteID}` as RequestID;
     let resource = this._apiroot + `/api/0.6/notes/${noteID}/${action}`;
     if (note.props.newComment) {
       resource += '?' + utilQsString({ text: note.props.newComment }, false);
@@ -1724,15 +1680,12 @@ export class OsmService extends AbstractSystem {
     })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
-        this._changeset.inflight = null;
         if (err.name === 'AbortError') return;  // ok
         if (err.name === 'FetchError') {
           errback(err);
           return;
         }
       });
-
-    this._noteCache.inflightPost[noteID] = requestID;
   }
 
 
@@ -1770,12 +1723,9 @@ export class OsmService extends AbstractSystem {
 
     if (obj.tile) {
       this._tileCache = obj.tile;
-      this._tileCache.inflight = {};
     }
     if (obj.note) {
       this._noteCache = obj.note;
-      this._noteCache.inflight = {};
-      this._noteCache.inflightPost = {};
     }
     if (obj.user) {
       this._userCache = obj.user;
@@ -1927,29 +1877,10 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  /** Aborts a single in-flight request by cancelling it in NetworkSystem */
-  _abortRequest(requestID?: RequestID | null): void {
-    if (requestID) {
-      const network = this.context.systems.network!;
-      network.abort(requestID);
-    }
-  }
-
-
-  /**
-   * _abortUnwantedRequests
-   * Cancels in-flight requests for tiles that are no longer queued or visible.
-   * @param  cache - the tile or note cache to check
-   * @param  visibleTiles - the tiles currently visible in the viewport
-   */
-  _abortUnwantedRequests(cache: TileCache | NoteCache, visibleTiles: Tile[]): void {
-    for (const k of Object.keys(cache.inflight)) {
-      if (cache.toLoad.has(k)) continue;
-      if (visibleTiles.some(tile => tile.id === k)) continue;
-
-      this._abortRequest(cache.inflight[k]);
-      delete cache.inflight[k];
-    }
+  /** Returns true if any changeset operation (create/upload/close) is currently inflight */
+  _isChangesetInflight(): boolean {
+    const network = this.context.systems.network!;
+    return network.hasMatching(id => /^osm-changeset-/.test(id));
   }
 
 
