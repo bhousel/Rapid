@@ -415,6 +415,13 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         }
       }
 
+// bhousel 4/1/26:  Meshes are not supported for
+// the new experimental Pixi Canvas renderer yet.
+const renderer = this.gfx!.pixi!.renderer;
+if (renderer.type === PIXI.RendererType.CANVAS) {
+  doFullFill = true;
+}
+
       if (doFullFill) {
         mask.visible = false;
         fill.mask = null;

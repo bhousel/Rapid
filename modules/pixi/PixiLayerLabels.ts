@@ -1037,6 +1037,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * This renders any of the Label objects in the view
    */
   renderObjects(): void {
+// bhousel 4/1/26:  MeshRope is not supported for
+// the new experimental Pixi Canvas renderer yet.
+const renderer = this.gfx!.pixi!.renderer;
+const isCanvas = (renderer.type === PIXI.RendererType.CANVAS);
+
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
     const labelOffset = this._labelOffset;
@@ -1078,7 +1083,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         label.objectID = objectID;
         this.labelContainer!.addChild(labelObj);
 
-      } else if (label.type === 'rope') {
+      } else if (label.type === 'rope' && !isCanvas) {
         const ropeProps = props as RopeLabelProps;
         const labelObj = ropeProps.labelObj as PIXI.Sprite;  // a PIXI.Sprite
         const points = ropeProps.coords.map(([x,y]) => new PIXI.Point(x, y));
