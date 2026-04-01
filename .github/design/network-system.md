@@ -214,7 +214,7 @@ This uses `AbortSignal.any()` (baseline 2024, all modern browsers) to combine ma
 When SchedulerSystem is available with a configured `workerURL`, `network.fetch()` dispatches work to the worker pool:
 
 ```typescript
-// In worker.ts — register the fetch+parse handler
+// In worker.ts — register the fetch+parse listener
 registerListener('fetchAndParse', async (data: unknown, signal: AbortSignal) => {
   const { url, init } = data as { url: string; init?: RequestInit };
   const response = await fetch(url, { ...init, signal });
@@ -251,7 +251,7 @@ Worker → Main:  { id: number, result?: unknown, error?: string }  // existing
 **Worker side** — the worker entry point maintains a `Map<requestID, AbortController>`.
 When a listener receives its data, it also receives an `AbortSignal` that is
 wired to a local controller.  When a `'cancel'` message arrives, the worker looks
-up the controller and calls `.abort()`.  The handler's `fetch()` throws
+up the controller and calls `.abort()`.  The listener's `fetch()` throws
 `AbortError`, and the worker posts back `{ id, error: 'AbortError' }`.
 
 ```typescript
@@ -274,15 +274,15 @@ self.onmessage = async (event: MessageEvent) => {
   const controller = new AbortController();
   activeControllers.set(id, controller);
 
-  const handler = handlers.get(listenerID);
-  if (!handler) {
+  const listener = listeners.get(listenerID);
+  if (!listener) {
     activeControllers.delete(id);
     self.postMessage({ id, error: `Unknown listener: '${listenerID}'` });
     return;
   }
 
   try {
-    const result = await handler(data, controller.signal);
+    const result = await listener(data, controller.signal);
     self.postMessage({ id, result });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

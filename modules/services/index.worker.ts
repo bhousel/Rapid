@@ -5,6 +5,6 @@
  * listener function exports from `*.worker.ts` companion files.
  *
  * Convention: each companion file exports `workerListeners: Record<ListenerID, WorkerListener>`.
- * ListenerIDs are namespaced: `'servicename:taskname'`.
+ * ListenerIDs are namespaced: `'servicename:operationname'`.
  */
-export { workerListeners as mapWithAITasks } from './MapWithAIService.worker.ts';
+export { workerListeners as mapWithAIListeners } from './MapWithAIService.worker.ts';

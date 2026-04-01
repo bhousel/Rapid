@@ -33,10 +33,10 @@ export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
   mainThread?: boolean;
 
   /**
-   * Named task to execute instead of the default fetch+parse.
+   * Named listener to invoke instead of the default fetch+parse.
    * When set, the request is dispatched to a registered listener
    * (on a worker if available, otherwise on the main thread).
-   * Task names are namespaced: `'mapwithai:fetchAndParse'`, etc.
+   * Listener names are namespaced: `'mapwithai:fetchAndParse'`, etc.
    */
   task?: ListenerID;
 

@@ -350,10 +350,10 @@ Migration notes:
 ### Phase 6 — Worker Pool Integration (done)
 
 - New `modules/worker.ts` entry point — loads inside Web Workers spawned by
-  SchedulerSystem.  Uses `registerListener(taskType, handler)` registry pattern.
-  Built-in `ping` handler for health checks.  Supports async handlers.
+  WorkerSystem.  Uses `registerListener(listenerID, listener)` registry pattern.
+  Built-in `ping` listener for health checks.  Supports async listeners.
 - Message protocol: Main→Worker `{ id, listenerID, data }`, Worker→Main `{ id, result?, error? }`
-- Worker pool management on SchedulerSystem:
+- Worker pool management on WorkerSystem:
   - `workerURL` getter/setter — host app sets path to built worker script
   - `maxWorkers` getter/setter — pool size cap (default 2), lazy spawn
   - `numWorkers`, `numPendingRequests` — read-only diagnostics
@@ -382,7 +382,7 @@ Prerequisite SchedulerSystem changes for Phase 6a:
   This prevents worker starvation when the user pans (dozens of stale tile
   fetches would otherwise block the pool).
 - **`dispatch` accepts `AbortSignal`** — callers pass a signal;
-  when it fires, the scheduler sends the cancel message to the worker and
+  when it fires, the worker system sends the cancel message to the worker and
   rejects the pending promise.
 - All worker tasks become abortable via this generic mechanism.
 

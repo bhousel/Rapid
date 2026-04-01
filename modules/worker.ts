@@ -1,5 +1,5 @@
 import { utilFetchResponse } from './util/fetch_response.ts';
-import { mapWithAITasks } from './services/index.worker.ts';
+import { mapWithAIListeners } from './services/index.worker.ts';
 
 import type { WorkerListener } from './core/types.ts';
 
@@ -66,7 +66,7 @@ registerListener('fetchAndParse', async (data: unknown, signal: AbortSignal) => 
 // Domain-specific listeners (from *.worker.ts companions)
 // -------------------------------------------------------
 
-for (const [listenerID, listener] of Object.entries(mapWithAITasks)) {
+for (const [listenerID, listener] of Object.entries(mapWithAIListeners)) {
   registerListener(listenerID, listener);
 }
 
