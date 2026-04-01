@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { AtlasAllocator, registerAtlasUploader } from './lib/AtlasAllocator.ts';
 
+import type { AtlasOptions } from './lib/AtlasAllocator.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 
@@ -96,28 +97,35 @@ export class PixiTextures {
     const renderer = gfx.pixi.renderer;
     registerAtlasUploader(renderer);
 
-    // Try to get the max texture size.
-    // We will prefer large atlas size of 8192 to avoid texture swapping, but can settle for less.
-    const trysize = 8192;
-    let maxsize = 2048;   // a reasonable default
+    // Try to determine a reasonable the max texture size.
+    // We will prefer large size of 8192 to avoid texture swapping, but can settle for less.
+    const trySize = 8192;
+    let maxSize = 2048;   // a reasonable default
+    let useCanvas = false;
     if (gfx.highQuality) {
       if (renderer.type === PIXI.RendererType.WEBGL) {
         const gl = (renderer as PIXI.WebGLRenderer).gl;
-        maxsize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
       } else if (renderer.type === PIXI.RendererType.WEBGPU) {
         const gpu = (renderer as PIXI.WebGPURenderer).gpu;
-        maxsize = gpu.adapter.limits.maxTextureDimension2D;
+        maxSize = gpu.adapter.limits.maxTextureDimension2D;
+      } else if (renderer.type === PIXI.RendererType.CANVAS) {
+        maxSize = trySize;
+        useCanvas = true;
       }
     }
-    const size = Math.min(trysize, maxsize);
+    const options: AtlasOptions = {
+      size: Math.min(trySize, maxSize),
+      useCanvas: useCanvas
+    };
 
-    // We store textures in 3 atlases, each one is for holding similar sized things.
+    // We store textures in 3 atlases, each one is for holding similar things.
     // Each "atlas" manages its own store of "TextureSources" - real textures that upload to the GPU.
     // This helps pack them efficiently and avoids swapping textures frequently as WebGL draws the scene.
     this._atlas = {
-      symbol: new AtlasAllocator('symbol', size),  // small graphics - markers, pins, symbols
-      text: new AtlasAllocator('text', size),      // text labels
-      tile: new AtlasAllocator('tile', size)       // 256 or 512px square imagery tiles
+      symbol: new AtlasAllocator({ label: 'symbol', ...options }),  // small graphics - markers, pins, symbols
+      text: new AtlasAllocator({ label: 'text', ...options }),      // text labels
+      tile: new AtlasAllocator({ label: 'tile', ...options })       // 256 or 512px square imagery tiles
     };
 
     this._textureData.clear();

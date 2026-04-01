@@ -5,12 +5,22 @@ import { GuilloteneAllocator, type AllocatedRect } from './GuilloteneAllocator.t
 
 
 /** Extended PIXI.Texture with bin allocation info */
-interface AtlasTexture extends PIXI.Texture {
+export interface AtlasTexture extends PIXI.Texture {
   __bin?: AllocatedRect;
 }
 
+/** Atlas constructor options */
+export interface AtlasOptions {
+  /** The size of the atlas slab textures to create (default 2048) */
+  size: number;
+  /** Optional label used to identify the AtlasAllocator, useful for debugging */
+  label?: string;
+  /** If true, atlas sources will be backed by a canvas element (default false) */
+  useCanvas?: boolean;
+}
+
 /** Item stored in the atlas slab */
-interface AtlasItem {
+export interface AtlasItem {
   uid: number;
   texture: AtlasTexture | null;
   imageData: ImageData | null;
@@ -31,17 +41,20 @@ export class AtlasAllocator {
   size: number;
   /** Array of texture slabs managed by this allocator */
   slabs: AtlasSource[];
+  /** Whether atlas sources should be backed by a canvas (for canvas renderer) */
+  private _useCanvas: boolean;
+
 
   /**
    * Creates an atlas allocator.
    * @constructor
-   * @param label - optional label, can be used for debugging
-   * @param size - the size of the textures to create
+   * @param options - options for the Atlas Allocator
    */
-  constructor(label: string = '', size: number = 2048) {
-    this.label = label;
-    this.size = size;
+  constructor(options: Partial<AtlasOptions> = {}) {
     this.slabs = [];
+    this.label = options.label ?? '';
+    this.size = options.size ?? 2048;
+    this._useCanvas = options.useCanvas ?? false;
   }
 
 
@@ -70,6 +83,7 @@ export class AtlasAllocator {
     };
 
     slab._items.set(uid, item);
+    slab._blitItemToCanvas(item);
     slab.update();
 
     return texture;
@@ -143,7 +157,7 @@ export class AtlasAllocator {
     }
 
     // Need another slab.
-    const slab = new AtlasSource(this.label, this.size);
+    const slab = new AtlasSource(this.label, this.size, this._useCanvas);
     this.slabs.push(slab);
 
     // Issue the texture from this blank slab.
@@ -176,7 +190,6 @@ export class AtlasAllocator {
     texture.__bin = bin;   // important to preserve this, it contains `__mem_area`
     return texture;
   }
-
 }
 
 
@@ -191,13 +204,16 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
   _items: Map<number, AtlasItem>;
   /** The bin packer for this slab */
   _binPacker: GuilloteneAllocator;
+  /** 2D context of the backing canvas, if canvas-backed (for canvas renderer) */
+  _canvasCtx: CanvasRenderingContext2D | null;
 
   /**
    * Creates a TextureSource for the textures in the atlas (aka a "slab")
    * @param label - optional label, can be used for debugging
    * @param size - the size of the textures to create
+   * @param useCanvas - if true, create a backing canvas as the resource (for canvas renderer)
    */
-  constructor(label: string, size: number) {
+  constructor(label: string, size: number, useCanvas: boolean = false) {
     super({
       antialias: false,
       autoGarbageCollect: false,
@@ -213,6 +229,72 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
 
     this._items = new Map();
     this._binPacker = new GuilloteneAllocator(size, size);
+
+    // For the canvas renderer, we need a backing canvas as the resource.
+    // The canvas renderer reads `source.resource` directly via `canvasUtils.getCanvasSource()`
+    // rather than using the upload pipeline, so the pixel data must live on a real canvas.
+    if (useCanvas) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      this._canvasCtx = canvas.getContext('2d')!;
+      (this as any).resource = canvas;  // type mismatch with BufferSourceOptions, but canvas renderer expects this
+    } else {
+      this._canvasCtx = null;
+    }
+  }
+
+
+  /**
+   * _getItemPixels
+   * Returns padded pixel data for an atlas item.
+   * Duplicates the 1px edge to avoid color bleeding into neighbor textures.
+   * Shared by the GL/GPU upload handlers and the canvas blit path.
+   * @param item - The atlas item to build pixels for
+   * @return Uint8Array of RGBA pixel data including 1px padding
+   */
+  _getItemPixels(item: AtlasItem): Uint8Array {
+    const bin = item.texture!.__bin!;
+    const { width: w, height: h } = bin;
+    const { data: src, width: srcW, height: srcH } = item.imageData!;
+
+    const pixels = new Uint8Array(w * h * 4);
+
+    for (let dstY = 0; dstY < h; dstY++) {
+      const srcY = numClamp(dstY - 1, 0, srcH - 1);
+
+      for (let dstX = 0; dstX < w; dstX++) {
+        const srcX = numClamp(dstX - 1, 0, srcW - 1);
+        const s = ((srcY * srcW) + srcX) * 4;
+        const d = ((dstY * w) + dstX) * 4;
+        pixels[d] = src[s];
+        pixels[d + 1] = src[s + 1];
+        pixels[d + 2] = src[s + 2];
+        pixels[d + 3] = src[s + 3];
+      }
+    }
+    return pixels;
+  }
+
+
+  /**
+   * _blitItemToCanvas
+   * Blit an item's pixels onto the backing canvas (canvas renderer only).
+   * This is a no-op if the slab is not canvas-backed.
+   * @param item - The atlas item to blit
+   */
+  _blitItemToCanvas(item: AtlasItem): void {
+    if (!this._canvasCtx) return;
+
+    const bin = item.texture!.__bin!;
+    const { x, y, width: w, height: h } = bin;
+    const pixels = this._getItemPixels(item);
+
+    // Cast needed because TypeScript thinks buffer could be SharedArrayBuffer
+    const imageData = new ImageData(new Uint8ClampedArray(pixels.buffer) as Uint8ClampedArray<ArrayBuffer>, w, h);
+    this._canvasCtx.putImageData(imageData, x, y);
+
+    item.uploaded = true;
   }
 }
 
@@ -273,27 +355,9 @@ const glUploadAtlasResource: GLUploadHandler = {
       if (item.uploaded) continue;
 
       const bin = item.texture!.__bin!;
-      const { x, y, width: w, height: h } = bin;
-      const { data: src, width: srcW, height: srcH } = item.imageData!;
+      const pixels = slab._getItemPixels(item);
 
-      // Copy image data to a new Uint8Array that duplicates the 1px edge
-      const pixels = new Uint8Array(w * h * 4);
-
-      for (let dstY = 0; dstY < h; dstY++) {
-        const srcY = numClamp(dstY-1, 0, srcH-1);
-
-        for (let dstX = 0; dstX < w; dstX++) {
-          const srcX = numClamp(dstX-1, 0, srcW-1);
-          const s = ((srcY * srcW) + srcX) * 4;
-          const d = ((dstY * w) + dstX) * 4;
-          pixels[d] = src[s];
-          pixels[d+1] = src[s+1];
-          pixels[d+2] = src[s+2];
-          pixels[d+3] = src[s+3];
-        }
-      }
-
-      gl.texSubImage2D(target, 0, x, y, w, h, format, type, pixels);
+      gl.texSubImage2D(target, 0, bin.x, bin.y, bin.width, bin.height, format, type, pixels);
 
       item.uploaded = true;
     }
@@ -311,29 +375,11 @@ const gpuUploadAtlasResource: GPUUploadHandler = {
       if (item.uploaded) continue;
 
       const bin = item.texture!.__bin!;
-      const { x, y, width: w, height: h } = bin;
-      const { data: src, width: srcW, height: srcH } = item.imageData!;
+      const pixels = slab._getItemPixels(item) as Uint8Array<ArrayBuffer>;
 
-      // Copy image data to a new Uint8Array that duplicates the 1px edge
-      const pixels = new Uint8Array(w * h * 4);
-
-      for (let dstY = 0; dstY < h; dstY++) {
-        const srcY = numClamp(dstY-1, 0, srcH-1);
-
-        for (let dstX = 0; dstX < w; dstX++) {
-          const srcX = numClamp(dstX-1, 0, srcW-1);
-          const s = ((srcY * srcW) + srcX) * 4;
-          const d = ((dstY * w) + dstX) * 4;
-          pixels[d] = src[s];
-          pixels[d+1] = src[s+1];
-          pixels[d+2] = src[s+2];
-          pixels[d+3] = src[s+3];
-        }
-      }
-
-      const destination = { origin: { x: x, y: y }, texture: gpuTexture };
-      const layout = { bytesPerRow: pixels.byteLength / h };
-      const size = { width: w, height: h };
+      const destination = { origin: { x: bin.x, y: bin.y }, texture: gpuTexture };
+      const layout = { bytesPerRow: pixels.byteLength / bin.height };
+      const size = { width: bin.width, height: bin.height };
 
       gpu.device.queue.writeTexture(destination, pixels, layout, size);
 
