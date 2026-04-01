@@ -405,5 +405,5 @@ export function registerAtlasUploader(renderer: PIXI.Renderer): void {
       textureSystem._uploads.atlas = gpuUploadAtlasResource;
       break;
   }
-  // by default do nothing - texture upload isn't needed for `PIXI.RenderType.CANVAS`
+  // by default do nothing - texture upload isn't needed for `PIXI.RendererType.CANVAS`
 }

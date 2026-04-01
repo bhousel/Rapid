@@ -1,5 +1,5 @@
 ---
-description: Stage and commit all changes in this repo
+description: Stage, commit, and push all changes in this repo
 argument-hint: commit detail to include, for example: `(closes ​#123)`
 ---
 

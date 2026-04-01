@@ -82,6 +82,16 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 - **No backward compat for old `initAsync()`** — It now only inits (doesn't start). Simple consumers use `context.run()`. v3 breaking change.
 - **`prepareAsync()` → `initAsync()` → `startAsync()`** — Each phase chains the previous. All idempotent. `run()` is a convenience that chains everything.
 
+## Canvas Renderer Atlas Support
+
+- **Canvas renderer bypasses the upload pipeline** — Pixi's canvas renderer has no `_uploads` map. It reads `TextureSource.resource` directly via `canvasUtils.getCanvasSource()` at draw time. If `resource` is falsy, it returns `null` and nothing draws.
+- **Canvas-backed `AtlasSource` as the fix** — When `useCanvas: true`, `AtlasSource` creates an `HTMLCanvasElement` matching the slab size and sets it as `this.resource`. The canvas renderer's `getCanvasSource()` returns this directly — zero copies, zero conversions (not PMA, no resize needed).
+- **Blit at allocation time, not upload time** — Because there's no upload hook for canvas, `_blitItemToCanvas()` is called in `AtlasAllocator.allocate()` right after the item is added. For GL/GPU, upload handlers still fire lazily at render time as before.
+- **`_getItemPixels()` shared across all three render paths** — Extracted the padded-pixel-copy loop (1px edge duplication) from the GL and GPU upload handlers into `AtlasSource._getItemPixels()`. This eliminates duplicated code and ensures all renderers produce identical atlas content.
+- **Canvas overhead only when needed** — The `useCanvas` option is only set to `true` when `RendererType.CANVAS` is detected. GL/GPU paths don't create backing canvases, avoiding the extra ~16MB per 2048×2048 slab.
+- **`(this as any).resource = canvas`** — Type mismatch: `AtlasSource extends TextureSource<BufferSourceOptions>` where the generic expects a TypedArray resource, but the canvas renderer needs an `HTMLCanvasElement`. The `as any` cast is intentional — the canvas renderer inspects `resource` dynamically, not via generic type constraints.
+- **No clear-on-free** — Freed atlas regions aren't cleared on the backing canvas, matching the GL/GPU behavior (they just `texSubImage2D` / `writeTexture` over freed space when it's reallocated).
+
 ## Style Resolution
 
 - **Fallback cascading is selective** — `fill.color` ← `base.color` or `stroke.color`; `marker.color` ← `base.color` only; etc. Not uniform `base.color` on everything.

@@ -29,6 +29,7 @@ Process each file below. For every file: fetch the source, read the local versio
 - `.gitattributes` — adapt file-type entries to match this project's actual file types (e.g. add `*.sh` if the project has shell scripts, drop `*.ts` if it doesn't use TypeScript); if local file exists, add missing entries without removing local-only ones
 - `.gitignore` — merge: add entries from source that are absent locally; do not remove local-only entries
 - `AGENTS.md` — the general guidelines section is portable; substitute project-specific references (scratchpad notes, file paths, tool names) with this project's equivalents; preserve any local sections that have no counterpart in the source
+- `CHANGELOG.md` — create if missing; adapt boilerplate text to match this project
 - `CONTRIBUTING.md` — adapt to this project's tooling and runtime (don't just string-replace tool names — rethink setup steps and commands if the build workflow differs); keep the source's structural sections
 - `LICENSE.md` — if the local license type matches this project's `package.json`, it's correct — skip regardless of what the source uses; only flag if the local file contradicts this project's own `package.json`
 - `README.md` — preserve this project's actual description, icon list, and any unique content; adopt structural sections (badge layout, contributing footer, license block) from the source if they are absent locally; do not overwrite meaningful local content with source content
