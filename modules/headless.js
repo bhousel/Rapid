@@ -31,6 +31,7 @@ export { StyleSystem } from './core/StyleSystem.ts';
 export { UploaderSystem } from './core/UploaderSystem.ts';
 export { UrlHashSystem } from './core/UrlHashSystem.ts';
 export { ValidationSystem } from './core/ValidationSystem.ts';
+export { WorkerSystem } from './core/WorkerSystem.ts';
 
 // Reexport only what our tests use, see iD#4379
 import * as D3 from 'd3';

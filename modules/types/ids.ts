@@ -14,85 +14,87 @@ export type AssetID = string;
 export type AtlasID = 'symbol' | 'text' | 'tile';
 /** Behavior ID (e.g. 'drag', 'draw', 'hover', 'select') */
 export type BehaviorID = string;
-/** Category ID - unique identifier for preset categories */
+/** Category ID - identifier for a preset category */
 export type CategoryID = string;
-/** Checkpoint ID - identifier for edit checkpoints */
+/** Checkpoint ID - identifier for an edit checkpoint */
 export type CheckpointID = string;
-/** Class ID for styling classes (e.g. 'hovered', 'selected', 'drawing') */
+/** Class ID - identifier for a styling class (e.g. 'hovered', 'selected', 'drawing') */
 export type ClassID = string;
-/** Data ID - unique identifier for any AbstractData subclass */
+/** Data ID - identifier for any AbstractData subclass */
 export type DataID = string;
 /** Dataset ID (e.g. 'fbRoads', 'msBuildings') */
 export type DatasetID = string;
-/** Detection ID - identifier for photo detections (e.g. mapillary signs) */
+/** Detection ID - identifier for a photo detection (e.g. mapillary signs) */
 export type DetectionID = string;
 /** Entity ID (e.g. 'n123', 'w456', 'r789' for nodes, ways, relations) */
 export type EntityID = string;
-/** Feature ID - unique identifier for rendered features */
+/** Feature ID - identifier for a rendered feature */
 export type FeatureID = string;
-/** Field ID - unique identifier for editor fields */
+/** Field ID - identifier for a preset field */
 export type FieldID = string;
-/** Filter ID - identifier for map filters (e.g. 'points', 'traffic_roads') */
+/** Filter ID - identifier for a filter (e.g. 'points', 'traffic_roads') */
 export type FilterID = string;
-/** Graph ID - unique identifier for a Graph instance (e.g. 'g-123') */
+/** Graph ID - identifier for a Graph instance (e.g. 'g-123') */
 export type GraphID = string;
-/** Group ID for scene groupings (e.g. 'points', 'vertices', 'lines') */
+/** Group ID - identifier for a scene render group (e.g. 'points', 'vertices', 'lines') */
 export type GroupID = string;
-/** Imagery Source ID - unique identifier for imagery sources (e.g. 'Bing', 'EsriWorldImagery') */
+/** Imagery Source ID - identifier for an imagery source (e.g. 'Bing', 'EsriWorldImagery') */
 export type ImagerySourceID = string;
-/** Issue ID - unique identifier for validation issues */
+/** Issue ID - identifier for a validation issue */
 export type IssueID = string;
-/** Label ID - unique identifier for labels in the label layer */
+/** Label ID - identifier for a label on the label layer */
 export type LabelID = string;
 /** Language Code - ISO 639 language code (e.g. 'en', 'de', 'zh') */
 export type LanguageCode = string;
-/** Layer ID for both photo and rendering layers (e.g. 'streetside', 'mapillary', 'osm') */
+/** Layer ID - identifier for a render layer (e.g. 'streetside', 'mapillary', 'osm') */
 export type LayerID = string;
+/** Listener ID - identifier for a listener, function eligible to run on a worker thread (e.g. 'mapwithai:fetchAndParse') */
+export type ListenerID = string;
 /** Locale Code - BCP 47 language tag (e.g. 'en', 'en-US', 'de') */
 export type LocaleCode = string;
-/** Location Set ID - identifier for validated location sets (e.g. '+[Q2]', '+[US,CA]') */
+/** LocationSet ID - identifier for a location set (e.g. '+[Q2]', '+[US,CA]') */
 export type LocationSetID = string;
 /** Mode ID (e.g. 'browse', 'select', 'draw-area') */
 export type ModeID = string;
 /** Operation ID (e.g. 'delete', 'merge', 'split') */
 export type OperationID = string;
-/** Photo ID - unique identifier for a photo */
+/** Photo ID - identifier for a photo */
 export type PhotoID = string;
-/** Photo layer ID (e.g. 'streetside', 'mapillary', 'kartaview') */
+/** Photo Layer ID (e.g. 'streetside', 'mapillary', 'kartaview') */
 export type PhotoLayerID = string;
 /** Photo type (e.g. 'flat', 'panoramic') */
 export type PhotoType = string;
-/** Preset ID - unique identifier for presets (e.g. 'highway/residential') */
+/** Preset ID - identifier for a preset (e.g. 'highway/residential') */
 export type PresetID = string;
-/** Request ID - unique key for network request dedup and cancellation (e.g. 'keepright-tile-0,0,14') */
+/** Request ID - identifier for network request (e.g. 'keepright-tile-8647,8192,14') */
 export type RequestID = string;
-/** Ruleset ID - identifier for tag rulesets (e.g. 'surface_paved', 'connected_highway') */
+/** Ruleset ID - identifier for a tagging ruleset (e.g. 'surface_paved', 'connected_highway') */
 export type RulesetID = string;
-/** Scope ID - identifier for style/schema scopes (e.g. 'osm') */
+/** Scope ID - identifier for a style/schema scope (e.g. 'osm') */
 export type ScopeID = string;
 /** Script Code - ISO 15924 script code (e.g. 'Latn', 'Cyrl', 'Hans') */
 export type ScriptCode = string;
-/** Sequence ID - identifier for sequence counters (e.g. 'node', 'way', 'relation') */
+/** Sequence ID - identifier for a sequence counter (e.g. 'node', 'way', 'relation') */
 export type SequenceID = string;
 /** Service ID (e.g. 'osm', 'mapillary', 'streetside') */
 export type ServiceID = string;
-/** String ID - identifier for localized strings (e.g. 'toolbar.undo', 'modes.add_area') */
+/** String ID - identifier for a localized string (e.g. 'toolbar.undo', 'modes.add_area') */
 export type StringID = string;
-/** Style ID - unique identifier for styles */
+/** Style ID - identifier for a style */
 export type StyleID = string;
-/** Style Selector ID - unique identifier for style selectors */
+/** Style Selector ID - identifier for a style selector */
 export type StyleSelectorID = string;
 /** System ID (e.g. 'editor', 'gfx', 'map') */
 export type SystemID = string;
-/** Tile ID - unique identifier for map tiles */
+/** Tile ID - identifier for a map tile (e.g. 'x,y,z', '8647,8192,14' */
 export type TileID = string;
-/** Texture ID - unique identifier for textures (e.g. 'boldPin', 'viewfield') */
+/** Texture ID - identifier for a texture (e.g. 'boldPin', 'viewfield') */
 export type TextureID = string;
-/** Validator ID - identifier for validation rule types */
+/** Validator ID - identifier for a validator (e.g. 'crossing_ways') */
 export type ValidatorID = string;
-/** Variable ID - identifier for named value lists in schema/style scopes (e.g. 'lifecycle_prefixes') */
+/** Variable ID - identifier for a named variable (e.g. 'lifecycle_prefixes') */
 export type VariableID = string;
-/** Work ID - identifier for scheduled work items (e.g. 'validation-run', 'sidebar-debounce') */
+/** Work ID - identifier for scheduled work (e.g. 'validation-run', 'sidebar-debounce') */
 export type WorkID = string;
 
 
@@ -113,6 +115,7 @@ declare global {
   type FilterID = string;
   type GraphID = string;
   type GroupID = string;
+  type ListenerID = string;
   type ImagerySourceID = string;
   type IssueID = string;
   type LabelID = string;

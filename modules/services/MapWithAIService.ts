@@ -3,11 +3,11 @@ import { Tiler } from '@rapid-sdk/math';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Graph, RapidDataset, Tree } from '../lib/index.ts';
 import { OsmNode, OsmWay } from '../data/index.ts';
-import { OsmXMLParser } from '../data/parsers/OsmXMLParser.ts';
+import { fetchAndParse as mapWithAIFetchAndParse, reset as mapWithAIReset } from './MapWithAIService.worker.ts';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { ParsedWay } from '../data/parsers/types.ts';
+import type { ParserResult, ParsedWay } from '../data/parsers/types.ts';
 import type { Extent, Tile } from '@rapid-sdk/math';
 
 
@@ -46,8 +46,6 @@ interface DatasetCache {
  * This service connects to the MapWithAI API to fetch data about Meta-hosted datasets.
  */
 export class MapWithAIService extends AbstractSystem {
-  /** Parser for converting OSM XML responses into entity props */
-  _XMLParser: OsmXMLParser;
   /** Tiler instance used to compute tile coverage for the current viewport */
   _tiler: Tiler;
   /** Map of dataset IDs to their DatasetCache objects */
@@ -61,9 +59,8 @@ export class MapWithAIService extends AbstractSystem {
     super(context);
     this.id = 'mapwithai';
     this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
-    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash', 'worker']);
 
-    this._XMLParser = new OsmXMLParser();
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
     this._datasets = new Map();
   }
@@ -78,6 +75,12 @@ export class MapWithAIService extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
+      .then(() => {
+        // Register worker listeners on WorkerSystem for main-thread fallback
+        const worker = this.context.systems.worker;
+        worker?.registerListener('mapwithai:fetchAndParse', mapWithAIFetchAndParse);
+        worker?.registerListener('mapwithai:reset', mapWithAIReset);
+      })
       .then(() => this.resetAsync())
       .then(() => {
         // allocate a special dataset for the rapid intro graph.
@@ -93,6 +96,31 @@ export class MapWithAIService extends AbstractSystem {
    */
   startAsync(): Promise<void> {
     return super.startAsync();
+  }
+
+
+  /**
+   * resetAsync
+   * Called after completing an edit session to reset any internal state
+   * @return Promise resolved when this component has completed resetting
+   */
+  resetAsync(): Promise<void> {
+    const context = this.context;
+    const network = context.systems.network!;
+
+    network.abortMatching(id => /^mapwithai-/.test(id));
+
+    for (const [datasetID, ds] of this._datasets) {
+      ds.graph = new Graph(context);
+      ds.tree = new Tree(ds.graph, datasetID);
+      ds.loaded.clear();
+      ds.seen.clear();
+      ds.seenFirstNodeID.clear();
+      ds.splitWays.clear();
+      ds.lastv = null;
+    }
+
+    return Promise.resolve();
   }
 
 
@@ -174,33 +202,6 @@ export class MapWithAIService extends AbstractSystem {
     });
 
     return [fbRoads, msBuildings, /*omdFootways, metaSyntheticFootways,*/ introGraph];
-  }
-
-
-  /**
-   * resetAsync
-   * Called after completing an edit session to reset any internal state
-   * @return Promise resolved when this component has completed resetting
-   */
-  resetAsync(): Promise<void> {
-    const context = this.context;
-    const network = context.systems.network!;
-
-    network.abortMatching(id => /^mapwithai-/.test(id));
-
-    for (const [datasetID, ds] of this._datasets) {
-      ds.graph = new Graph(context);
-      ds.tree = new Tree(ds.graph, datasetID);
-      ds.loaded.clear();
-      ds.seen.clear();
-      ds.seenFirstNodeID.clear();
-      ds.splitWays.clear();
-      ds.lastv = null;
-    }
-
-    this._XMLParser.reset();
-
-    return Promise.resolve();
   }
 
 
@@ -304,8 +305,13 @@ export class MapWithAIService extends AbstractSystem {
     }
 
     const url = this._tileURL(ds, tile.wgs84Extent);
-    network.fetch<Document>(url, { requestID })
-      .then(xml => this._gotTile(xml, ds, tile))
+
+    network.fetch<ParserResult>(url, {
+      requestID,
+      task: 'mapwithai:fetchAndParse',
+      taskData: { parserOptions: { skipSeen: false, filter: ['node', 'way'] } },
+    })
+      .then(results => this._gotTile(results, ds, tile))
       .catch(e => {
         if (e.name === 'AbortError') return;
         console.error(e);  // eslint-disable-line
@@ -315,13 +321,14 @@ export class MapWithAIService extends AbstractSystem {
 
   /**
    * _gotTile
-   * Process the response from the tile fetch.
-   * @param xml - the xml content to parse
+   * Process the parsed results from a tile fetch.
+   * Accepts a ParserResult (from either worker or main-thread parsing).
+   * @param results - the parsed data from OsmXMLParser
    * @param ds - the dataset info
    * @param tile - a tile object
    */
-  _gotTile(xml: Document, ds: DatasetCache, tile: Tile): void {
-    if (!xml) return;  // ignore empty responses
+  _gotTile(results: ParserResult, ds: DatasetCache, tile: Tile): void {
+    if (!results) return;  // ignore empty responses
 
     const context = this.context;
     const gfx = context.systems.gfx;
@@ -329,11 +336,6 @@ export class MapWithAIService extends AbstractSystem {
     const graph = ds.graph;
     const tree = ds.tree;
     const tileID = tile.id;
-
-    const results = this._XMLParser.parse(xml, {
-      skipSeen: false,                   // expect duplicate wayIDs that are split
-      filter: new Set(['node', 'way'])   // don't expect 'relation' from this service
-    });
 
     const entities: OsmEntity[] = [];
     for (const props of results.data) {

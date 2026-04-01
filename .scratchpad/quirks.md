@@ -6,3 +6,4 @@ Runtime issues, workarounds, and things that will bite you if you don't know abo
 - **FilterSystem.getMatches** — Skips vertices entirely (returns empty Set). Skips relations unless `tags.type === 'boundary'`. Multipolygon relations get `'area'` geometry, not `'relation'`.
 - **RapidSystem._datasetsChanged** — Color-assignment logic is acknowledged as "weird" in code comments. Legacy behavior from before Rapid#1642.
 - **ImagerySystem builtins** — `'none'` and `'custom'` sources always exist regardless of merged assets.
+- **Structured clone kills DOM objects in workers** — `utilFetchResponse` parses XML into xmldom `Document` objects. These can't survive `postMessage` (structured clone strips prototype methods like `getAttribute`). Services returning XML must either: (a) use `mainThread: true` on `network.fetch`, or (b) parse in the worker and return plain `ParserResult`. MapWithAIService uses approach (b) via `MapWithAIService.worker.ts`.

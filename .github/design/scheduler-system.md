@@ -350,14 +350,14 @@ Migration notes:
 ### Phase 6 — Worker Pool Integration (done)
 
 - New `modules/worker.ts` entry point — loads inside Web Workers spawned by
-  SchedulerSystem.  Uses `registerTaskHandler(taskType, handler)` registry pattern.
+  SchedulerSystem.  Uses `registerListener(taskType, handler)` registry pattern.
   Built-in `ping` handler for health checks.  Supports async handlers.
-- Message protocol: Main→Worker `{ id, taskType, data }`, Worker→Main `{ id, result?, error? }`
+- Message protocol: Main→Worker `{ id, listenerID, data }`, Worker→Main `{ id, result?, error? }`
 - Worker pool management on SchedulerSystem:
   - `workerURL` getter/setter — host app sets path to built worker script
   - `maxWorkers` getter/setter — pool size cap (default 2), lazy spawn
   - `numWorkers`, `numPendingRequests` — read-only diagnostics
-  - `scheduleWorkerTask<T>(taskType, data?)` — dispatch to pooled worker, returns `Promise<T>`
+  - `dispatch<T>(listenerID, data?)` — dispatch to pooled worker, returns `Promise<T>`
   - `terminateWorkers()` — tear down pool, reject pending requests
 - Workers spawned lazily on first task, dispatched round-robin
 - `resetAsync()` calls `terminateWorkers()` automatically
@@ -377,11 +377,11 @@ concurrency limiting, and abort.
 Prerequisite SchedulerSystem changes for Phase 6a:
 - **Worker-side abort** — extend the message protocol with `{ type: 'cancel', id }`
   messages.  Worker entry point (`worker.ts`) maintains a
-  `Map<requestID, AbortController>`; task handlers receive an `AbortSignal`.
+  `Map<requestID, AbortController>`; listeners receive an `AbortSignal`.
   When a cancel message arrives, the worker aborts the in-progress fetch.
   This prevents worker starvation when the user pans (dozens of stale tile
   fetches would otherwise block the pool).
-- **`scheduleWorkerTask` accepts `AbortSignal`** — callers pass a signal;
+- **`dispatch` accepts `AbortSignal`** — callers pass a signal;
   when it fires, the scheduler sends the cancel message to the worker and
   rejects the pending promise.
 - All worker tasks become abortable via this generic mechanism.
@@ -406,7 +406,7 @@ state.  `abortMatching` predicates use regex `.test()` (~10% faster than
 Validators close over `context` at construction time (factory pattern), making
 them non-serializable.  Moving validation into workers requires restructuring
 validators to accept serializable input and return serializable results — the
-validator logic itself would run as a registered task handler, receiving a
+validator logic itself would run as a registered listener, receiving a
 snapshot of the relevant graph data rather than accessing `context` directly.
 
 This is a worthwhile goal (validation is CPU-heavy and blocks the main thread)

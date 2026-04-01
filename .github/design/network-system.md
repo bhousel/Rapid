@@ -174,7 +174,7 @@ network.fetch(url, { key, timeout, fetchFn })
 │
 ├── Dispatch decision:
 │   ├── Has scheduler + workerURL + !mainThread + !fetchFn?
-│   │   └── YES → scheduleWorkerTask('fetchAndParse', { url, init })
+│   │   └── YES → dispatch('fetchAndParse', { url, init })
 │   └── NO  → fetch(url, { ...init, signal }) on main thread
 │             → utilFetchResponse(response)
 │
@@ -215,7 +215,7 @@ When SchedulerSystem is available with a configured `workerURL`, `network.fetch(
 
 ```typescript
 // In worker.ts — register the fetch+parse handler
-registerTaskHandler('fetchAndParse', async (data: unknown, signal: AbortSignal) => {
+registerListener('fetchAndParse', async (data: unknown, signal: AbortSignal) => {
   const { url, init } = data as { url: string; init?: RequestInit };
   const response = await fetch(url, { ...init, signal });
   return utilFetchResponse(response);
@@ -243,13 +243,13 @@ which is the opposite of what moving to workers should achieve.
 **Protocol extension** — one new message type, alongside the existing task dispatch:
 
 ```
-Main → Worker:  { id: number, taskType: string, data: unknown }   // existing
+Main → Worker:  { id: number, listenerID: ListenerID, data: unknown }   // existing
 Main → Worker:  { type: 'cancel', id: number }                    // new
 Worker → Main:  { id: number, result?: unknown, error?: string }  // existing
 ```
 
 **Worker side** — the worker entry point maintains a `Map<requestID, AbortController>`.
-When a task handler receives its data, it also receives an `AbortSignal` that is
+When a listener receives its data, it also receives an `AbortSignal` that is
 wired to a local controller.  When a `'cancel'` message arrives, the worker looks
 up the controller and calls `.abort()`.  The handler's `fetch()` throws
 `AbortError`, and the worker posts back `{ id, error: 'AbortError' }`.
@@ -270,14 +270,14 @@ self.onmessage = async (event: MessageEvent) => {
   }
 
   // Normal task dispatch
-  const { id, taskType, data } = msg;
+  const { id, listenerID, data } = msg;
   const controller = new AbortController();
   activeControllers.set(id, controller);
 
-  const handler = handlers.get(taskType);
+  const handler = handlers.get(listenerID);
   if (!handler) {
     activeControllers.delete(id);
-    self.postMessage({ id, error: `Unknown task type: '${taskType}'` });
+    self.postMessage({ id, error: `Unknown listener: '${listenerID}'` });
     return;
   }
 
@@ -293,10 +293,10 @@ self.onmessage = async (event: MessageEvent) => {
 };
 ```
 
-**Main thread side** — `scheduleWorkerTask` accepts an optional `AbortSignal`:
+**Main thread side** — `dispatch` accepts an optional `AbortSignal`:
 
 ```typescript
-scheduleWorkerTask<T>(taskType: string, data?: unknown, signal?: AbortSignal): Promise<T>
+dispatch<T>(listenerID: ListenerID, data?: unknown, signal?: AbortSignal): Promise<T>
 ```
 
 When the signal fires, SchedulerSystem:
@@ -307,7 +307,7 @@ When the signal fires, SchedulerSystem:
 NetworkSystem wires this together naturally:
 ```typescript
 // In NetworkSystem.fetch(), worker path:
-const result = await scheduler.scheduleWorkerTask(
+const result = await scheduler.dispatch(
   'fetchAndParse', { url, init }, controller.signal
 );
 ```
@@ -321,7 +321,7 @@ The cancel message is fire-and-forget — if the request already completed, the
 cancel is a no-op.  No race conditions.
 
 **All worker tasks are abortable**, not just fetch tasks.  The cancel protocol
-is generic: any task handler that receives an `AbortSignal` can use it to bail
+is generic: any listener that receives an `AbortSignal` can use it to bail
 out of long-running work.  For fetch-based tasks, this means aborting the HTTP
 request.  For CPU-bound tasks, it could mean checking `signal.aborted`
 periodically.
@@ -504,7 +504,7 @@ Register as `'network'` system. No services migrated yet.
 
 ### Phase 2 — Worker dispatch (done)
 
-Add `fetchAndParse` task handler to `worker.ts`. Wire `network.fetch()` to use `scheduleWorkerTask` when scheduler is available. Test that responses match the main-thread path.
+Add `fetchAndParse` listener to `worker.ts`. Wire `network.fetch()` to use `dispatch` when scheduler is available. Test that responses match the main-thread path.
 
 This needs `utilFetchResponse` + its dependencies (`@xmldom/xmldom`, `json5`) bundled into the worker. Since `worker.ts` would import `utilFetchResponse`, Bun handles this automatically.
 
@@ -545,7 +545,7 @@ Resolved design questions:
 
 2. **`.finally()` is mandatory for all requests.** This is the fix for #1451. The inflight entry is always removed, regardless of success, error, or abort. No exceptions.
 
-3. **Worker-side abort is mandatory.** Map tiling is exponential — a single viewport can generate 40+ tile fetches per service, and Rapid runs many services simultaneously. When the user pans, all those fetches become stale. Without worker-side abort, stale fetches starve the worker pool and waste bandwidth on large responses. The cancel protocol (`{ type: 'cancel', id }`) is simple, fire-and-forget, and race-condition-free. All worker task handlers receive an `AbortSignal`, making every worker task abortable — not just fetch tasks.
+3. **Worker-side abort is mandatory.** Map tiling is exponential — a single viewport can generate 40+ tile fetches per service, and Rapid runs many services simultaneously. When the user pans, all those fetches become stale. Without worker-side abort, stale fetches starve the worker pool and waste bandwidth on large responses. The cancel protocol (`{ type: 'cancel', id }`) is simple, fire-and-forget, and race-condition-free. All worker listeners receive an `AbortSignal`, making every worker task abortable — not just fetch tasks.
 
 4. **Global concurrency limit prevents fetch storms.** Instead of each service implementing its own queue-size guard, NetworkSystem enforces a global cap on simultaneous inflight requests. Requests that exceed the limit are queued (FIFO) and dispatched as slots free up. Queued requests are abortable for free (no network request was started).
 

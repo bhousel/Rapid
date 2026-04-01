@@ -64,7 +64,13 @@
           ];
 
           window.rapidContext = context;
-          context.runAsync();
+          context.prepareAsync()
+            .then(() => context.initAsync())
+            .then(() => {
+              const worker = context.systems.worker;
+              worker.workerURL = context.assetPath + 'js/rapid-worker.min.js';
+            })
+            .then(() => context.startAsync());
         }
       }
     </script>

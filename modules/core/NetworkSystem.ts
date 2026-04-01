@@ -2,7 +2,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
-import type { SchedulerSystem } from './SchedulerSystem.ts';
+import type { WorkerSystem } from './WorkerSystem.ts';
 
 
 /** Options for network fetch requests */
@@ -31,6 +31,20 @@ export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
    * Default: false.
    */
   mainThread?: boolean;
+
+  /**
+   * Named task to execute instead of the default fetch+parse.
+   * When set, the request is dispatched to a registered listener
+   * (on a worker if available, otherwise on the main thread).
+   * Task names are namespaced: `'mapwithai:fetchAndParse'`, etc.
+   */
+  task?: ListenerID;
+
+  /**
+   * Extra data to pass to the named listener alongside the URL.
+   * Only used when `task` is set.
+   */
+  taskData?: Record<string, unknown>;
 }
 
 
@@ -73,7 +87,7 @@ const DEFAULT_MAX_INFLIGHT = 100;
  * **Timeouts** — Every request is automatically aborted after a
  * configurable timeout (default 30s), solving #1487.
  *
- * **Worker offloading** — When SchedulerSystem is available with a
+ * **Worker offloading** — When WorkerSystem is available with a
  * configured `workerURL`, fetch + parse runs in a web worker, keeping
  * the main thread free for rendering.
  *
@@ -101,6 +115,7 @@ export class NetworkSystem extends AbstractSystem {
   /** Max concurrent active requests */
   private _maxInflight: number;
 
+
   /**
    * @constructor
    * @param context - Global shared application context
@@ -109,13 +124,14 @@ export class NetworkSystem extends AbstractSystem {
     super(context);
     this.id = 'network';
     this.requiredDependencies = new Set();
-    this.optionalDependencies = new Set<SystemID>(['scheduler']);
+    this.optionalDependencies = new Set<SystemID>(['worker']);
 
     this._inflight = new Map();
     this._queue = [];
     this._numActive = 0;
     this._defaultTimeout = DEFAULT_TIMEOUT;
     this._maxInflight = DEFAULT_MAX_INFLIGHT;
+
   }
 
 
@@ -226,7 +242,7 @@ export class NetworkSystem extends AbstractSystem {
    *   - Inflight dedup (by `key`)
    *   - Timeout (default 30s, configurable)
    *   - AbortController management
-   *   - Worker offloading (when scheduler + workerURL are available)
+   *   - Worker offloading (when worker + workerURL are available)
    *   - Response parsing via `utilFetchResponse`
    *   - Concurrency limiting
    *
@@ -469,30 +485,47 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * _dispatchFetch
    * Performs the actual fetch, either via worker or main thread.
+   *
+   * When a named `task` is provided, it is dispatched to the worker
+   * (via `dispatch`) when available, or executed directly
+   * on the main thread using the registered listener as fallback.
    */
   private _dispatchFetch<T>(
     url: string,
     signal: AbortSignal,
     options?: NetworkFetchOptions,
   ): Promise<T> {
-    const scheduler = this.context.systems.scheduler as SchedulerSystem | undefined;
+    const worker = this.context.systems.worker as WorkerSystem | undefined;
     const fetchFn = options?.fetchFn;
     const mainThread = options?.mainThread ?? false;
+    const task = options?.task;
+    const taskData = options?.taskData;
+    const useWorker = worker && worker.workerURL && !fetchFn && !mainThread;
 
-    // Worker path: scheduler available with workerURL, no custom fetchFn, not forced main-thread
-    if (scheduler && scheduler.workerURL && !fetchFn && !mainThread) {
-      const init = this._buildInit(options, undefined);  // signal passed via scheduleWorkerTask
-      return scheduler.scheduleWorkerTask<T>(
-        'fetchAndParse',
-        { url, init },
-        signal,
-      );
+    // Named task dispatch
+    if (task) {
+      const payload = { url, ...taskData };
+
+      if (useWorker) {
+        return worker.dispatch<T>(task, payload, signal);
+      }
+
+      // Main-thread fallback — call the registered listener directly
+      const listener = worker?.getListener(task);
+      if (listener) {
+        return Promise.resolve(listener(payload, signal)) as Promise<T>;
+      }
+      // No listener registered — fall through to default fetch+parse
     }
 
-    // Main-thread path
-    const actualFetchFn = fetchFn ?? globalThis.fetch;
-    const init = this._buildInit(options, signal);
-    return actualFetchFn(url, init).then(utilFetchResponse) as Promise<T>;
+    if (useWorker) {
+      const init = this._buildInit(options, undefined);  // signal passed via dispatch
+      return worker.dispatch<T>('fetchAndParse', { url, init }, signal );
+    } else {
+      const actualFetchFn = fetchFn ?? globalThis.fetch;
+      const init = this._buildInit(options, signal);
+      return actualFetchFn(url, init).then(utilFetchResponse) as Promise<T>;
+    }
   }
 
 
@@ -503,8 +536,8 @@ export class NetworkSystem extends AbstractSystem {
   private _buildInit(options?: NetworkFetchOptions, signal?: AbortSignal): RequestInit {
     if (!options) return signal ? { signal } : {};
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring to strip custom keys
-    const { requestID, timeout, fetchFn, mainThread, ...init } = options;
+    // Destructure to strip NetworkSystem-specific keys; only the rest becomes RequestInit
+    const { requestID: _rid, timeout: _to, fetchFn: _fn, mainThread: _mt, task: _t, taskData: _td, ...init } = options;
     if (signal) {
       (init as RequestInit).signal = signal;
     }

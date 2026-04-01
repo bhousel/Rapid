@@ -25,6 +25,7 @@ import { UiSystem } from './UiSystem.ts';
 import { UploaderSystem } from './UploaderSystem.ts';
 import { UrlHashSystem } from './UrlHashSystem.ts';
 import { ValidationSystem } from './ValidationSystem.ts';
+import { WorkerSystem } from './WorkerSystem.ts';
 
 export {
   AbstractSystem,
@@ -48,7 +49,8 @@ export {
   UiSystem,
   UploaderSystem,
   UrlHashSystem,
-  ValidationSystem
+  ValidationSystem,
+  WorkerSystem
 };
 
 // Re-export types from types.ts for convenience
@@ -94,3 +96,4 @@ systems.available.set('ui', UiSystem);
 systems.available.set('uploader', UploaderSystem);
 systems.available.set('urlhash', UrlHashSystem);
 systems.available.set('validator', ValidationSystem);
+systems.available.set('worker', WorkerSystem);

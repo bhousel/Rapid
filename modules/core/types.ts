@@ -28,9 +28,18 @@ import type { UiSystem } from './UiSystem.ts';
 import type { UploaderSystem } from './UploaderSystem.ts';
 import type { UrlHashSystem } from './UrlHashSystem.ts';
 import type { ValidationSystem } from './ValidationSystem.ts';
+import type { WorkerSystem } from './WorkerSystem.ts';
 
 /** A System class constructor */
 export type SystemConstructor = new (context: Context) => AbstractSystem;
+
+/**
+ * WorkerListener
+ * A function that runs inside the web worker.
+ * Receives arbitrary structured-clone-safe `data` and an `AbortSignal`.
+ * Must return a structured-clone-safe value (no DOM nodes, no prototypes).
+ */
+export type WorkerListener = (data: unknown, signal: AbortSignal) => unknown | Promise<unknown>;
 
 /**
  * Container interface for all system instances.
@@ -63,4 +72,5 @@ export interface Systems {
   uploader?: UploaderSystem;
   urlhash?: UrlHashSystem;
   validator?: ValidationSystem;
+  worker?: WorkerSystem;
 }

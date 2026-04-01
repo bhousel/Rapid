@@ -28,7 +28,7 @@ describe('NetworkSystem', () => {
         assert.strictEqual(sys.id, 'network');
         assert.strictEqual(sys.context, context);
         assert.strictEqual(sys.requiredDependencies.size, 0);
-        assert.isTrue(sys.optionalDependencies.has('scheduler'));
+        assert.isTrue(sys.optionalDependencies.has('worker'));
         assert.isTrue(sys.autoStart);
       });
     });
