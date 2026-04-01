@@ -32,7 +32,8 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
   _Example:_ `hashtags=%23hotosm-task-592,%23MissingMaps`
 * __`presets`__ - A comma-separated list of preset IDs. These will be the only presets the user may select.<br/>
   _Example:_ `presets=building,highway/residential,highway/unclassified`
-* __`renderer`__ - Force the renderer to use one of: `webgpu`, `webgl1`, or `webgl2` (the default)<br/>
+* __`renderer`__ - Force the renderer to use one of: `canvas`, `webgpu`, `webgl1`, or `webgl2` (the default).
+  Note that the 'canvas' and 'webgpu' options are considered experimental.<br/>
   _Example:_ `renderer=webgpu`
 * __`source`__ - Prefills the changeset source. Pass a URL-encoded string.<br/>
   _Example:_ `source=Bing%3BMapillary`

@@ -343,7 +343,6 @@ const gpuUploadAtlasResource: GPUUploadHandler = {
 };
 
 
-
 /**
  * Registers the upload handlers with the given Pixi renderer
  * @param renderer - The Pixi renderer to register handlers with
@@ -351,9 +350,14 @@ const gpuUploadAtlasResource: GPUUploadHandler = {
  */
 export function registerAtlasUploader(renderer: PIXI.Renderer): void {
   const textureSystem = renderer.texture as any;  // Access internal _uploads map
-  if (renderer.type === PIXI.RendererType.WEBGL) {
-    textureSystem._uploads.atlas = glUploadAtlasResource;
-  } else {
-    textureSystem._uploads.atlas = gpuUploadAtlasResource;
+
+  switch (renderer.type) {
+    case PIXI.RendererType.WEBGL:
+      textureSystem._uploads.atlas = glUploadAtlasResource;
+      break;
+    case PIXI.RendererType.WEBGPU:
+      textureSystem._uploads.atlas = gpuUploadAtlasResource;
+      break;
   }
+  // by default do nothing - texture upload isn't needed for `PIXI.RenderType.CANVAS`
 }

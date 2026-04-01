@@ -689,18 +689,26 @@ export class GraphicsSystem extends AbstractSystem {
 
     const context = this.context;
     const urlhash = context.systems.urlhash;
-    const renderParam = urlhash?.initialHashParams.get('renderer') ?? '';
 
     // For testing, allow user to override the renderer preference:
-    // `renderer=val` one of `webgl1`, `webgl2`/`webgl`, `webgpu`
-    let renderPreference: 'webgl' | 'webgpu' = 'webgl';
+    // `renderer=val` should be one of: 'canvas', 'webgpu', 'webgl1', 'webgl2', 'webgl'
+    const renderParam = urlhash?.initialHashParams.get('renderer') ?? '';
+    let renderPreference: 'canvas' | 'webgl' | 'webgpu';
     let renderGLVersion: 1 | 2 = 2;
     switch (renderParam) {
+      case 'canvas':
+        renderPreference = 'canvas';
+        break;
       case 'webgpu':
         renderPreference = 'webgpu';
         break;
       case 'webgl1':
+        renderPreference = 'webgl';
         renderGLVersion = 1;
+        break;
+      default:
+        renderPreference = 'webgl';
+        renderGLVersion = 2;
         break;
     }
 
