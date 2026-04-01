@@ -500,8 +500,8 @@ export class KeepRightService extends AbstractSystem {
     const issueTemplate = this._krData.errorTypes[props.whichType];
     if (!issueTemplate) {
       /* eslint-disable no-console */
-      console.log('No Template: ', props.whichType);
-      console.log('  ', props.description);
+      console.warn('No Template: ', props.whichType);
+      console.warn('  ', props.description);
       /* eslint-enable no-console */
       return;
     }
@@ -514,9 +514,9 @@ export class KeepRightService extends AbstractSystem {
     const errorMatch = errorRegex.exec(props.description);
     if (!errorMatch) {
       /* eslint-disable no-console */
-      console.log('Unmatched: ', props.whichType);
-      console.log('  ', props.description);
-      console.log('  ', errorRegex);
+      console.warn('Unmatched: ', props.whichType);
+      console.warn('  ', props.description);
+      console.warn('  ', errorRegex);
       /* eslint-enable no-console */
       return;
     }

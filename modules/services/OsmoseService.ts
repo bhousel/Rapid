@@ -479,7 +479,7 @@ export class OsmoseService extends AbstractSystem {
         // If null default value is reached, data wasn't as expected (or was empty)
         if (!cl) {
           /* eslint-disable no-console */
-          console.log(`Osmose strings request (${itemType}) had unexpected data`);
+          console.warn(`Osmose strings request (${itemType}) had unexpected data`);
           /* eslint-enable no-console */
           return;
         }

@@ -43,7 +43,7 @@ bun run test
 
 # Store in environment variable for later (replace below with the actual version)
 export VERSION=rapid-A.B.C-pre.D
-npm run build
+bun run build
 git add . && git commit -m  "$VERSION"
 
 # Update imagery

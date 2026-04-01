@@ -367,7 +367,7 @@ export class NsiService extends AbstractSystem {
       if (!item) continue;
 
       // At this point we have matched a canonical item and can suggest tag upgrades..
-      item = JSON.parse(JSON.stringify(item)) as NsiItem;   // deep copy
+      item = globalThis.structuredClone(item) as NsiItem;   // deep copy
       const tkv = item.tkv;
       const parts = tkv.split('/', 3);     // tkv = "tree/key/value"
       const k = parts[1];

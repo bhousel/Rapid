@@ -254,7 +254,7 @@ export class LocationSystem extends AbstractSystem {
       }
 
       // Important: here we use the locationSet `id` (`+[Q30]`), not the feature `id` (`Q30`)
-      const feature = JSON.parse(JSON.stringify(result.feature));   // deep clone the GeoJSONData feature
+      const feature = globalThis.structuredClone(result.feature);   // deep clone the GeoJSONData feature
       feature.id = locationSetID;
       feature.properties.id = locationSetID;
 
