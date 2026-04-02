@@ -20,6 +20,17 @@ declare global {
   /** Errback-style callback: `(err, result?) => void` */
   type Errback = (err: any, result?: any) => void;
 
+  /**
+   * An abortable function that can be run either on the main thread or a web worker.
+   * Receives arbitrary structured-clone-safe `data` and an `AbortSignal`.
+   * Must return a structured-clone-safe value (no DOM nodes, no prototypes).
+   */
+  type Listener = (data: unknown, signal: AbortSignal) => unknown | Promise<unknown>;
+
+  /** Mapping of available ListenerID -> Listener function */
+  type ListenerRegistry = Record<ListenerID, Listener>;
+
+
   // String ID types are defined in modules/types/ids.ts
   // They are both exported (for external consumers) and declared globally (for internal use)
 }

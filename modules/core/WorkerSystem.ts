@@ -1,7 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 
 import type { Context } from '../Context.ts';
-import type { WorkerListener } from './types.ts';
 
 
 /** Message sent from main thread → worker */
@@ -73,7 +72,7 @@ export class WorkerSystem extends AbstractSystem {
 
   // listener registry
   /** Registered listeners for worker/main-thread dispatch */
-  private _listeners: Map<ListenerID, WorkerListener>;
+  private _listeners: Map<ListenerID, Listener>;
 
   /**
    * @constructor
@@ -125,7 +124,11 @@ export class WorkerSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-    this.terminateWorkers();
+// todo: not sure whether we actually want this -
+// it will interfere with other code that is trying to
+// send "reset" messages to their workers.  Maybe we should just
+// establish that workers are long-lived and don't terminate on reset?
+//    this.terminateWorkers();
     return Promise.resolve();
   }
 
@@ -193,8 +196,8 @@ export class WorkerSystem extends AbstractSystem {
 
   /**
    * dispatch
-   * Dispatches a task to a given web worker listener function
-   * and returns a Promisethat resolves with the worker's result.
+   * Dispatches a message to a given web worker listener function
+   * and returns a Promise that resolves with the worker's result.
    *
    * The `data` argument must be structured-clone-compatible
    * (no functions, DOM nodes, or non-transferable objects).
@@ -286,7 +289,7 @@ export class WorkerSystem extends AbstractSystem {
    * @param listenerID - The id of the listener function
    * @param listener - Listener function
    */
-  registerListener(listenerID: ListenerID, listener: WorkerListener): void {
+  registerListener(listenerID: ListenerID, listener: Listener): void {
     this._listeners.set(listenerID, listener);
   }
 
@@ -307,7 +310,7 @@ export class WorkerSystem extends AbstractSystem {
    * @param listenerID - The id of the listener function
    * @return The listener function, or undefined if no such id exists
    */
-  getListener(listenerID: ListenerID): WorkerListener | undefined {
+  getListener(listenerID: ListenerID): Listener | undefined {
     return this._listeners.get(listenerID);
   }
 

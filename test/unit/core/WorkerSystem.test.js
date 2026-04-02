@@ -251,14 +251,15 @@ describe('WorkerSystem', () => {
       });
 
       describe('resetAsync terminates workers', () => {
-        it('terminates workers on reset', async () => {
-          _worker.workerURL = workerURL;
-          await _worker.dispatch('ping', 1);
-          assert.isAbove(_worker.numWorkers, 0);
-
-          await _worker.resetAsync();
-          assert.strictEqual(_worker.numWorkers, 0);
-        });
+// todo: not sure we want this - see note in WorkerSystem.resetAsync
+//        it('terminates workers on reset', async () => {
+//          _worker.workerURL = workerURL;
+//          await _worker.dispatch('ping', 1);
+//          assert.isAbove(_worker.numWorkers, 0);
+//
+//          await _worker.resetAsync();
+//          assert.strictEqual(_worker.numWorkers, 0);
+//        });
       });
 
       describe('abort signal support', () => {

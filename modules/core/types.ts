@@ -33,13 +33,6 @@ import type { WorkerSystem } from './WorkerSystem.ts';
 /** A System class constructor */
 export type SystemConstructor = new (context: Context) => AbstractSystem;
 
-/**
- * WorkerListener
- * A function that runs inside the web worker.
- * Receives arbitrary structured-clone-safe `data` and an `AbortSignal`.
- * Must return a structured-clone-safe value (no DOM nodes, no prototypes).
- */
-export type WorkerListener = (data: unknown, signal: AbortSignal) => unknown | Promise<unknown>;
 
 /**
  * Container interface for all system instances.

@@ -1,5 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
+import { networkListeners } from './NetworkSystem.worker.ts';
 
 import type { Context } from '../Context.ts';
 import type { WorkerSystem } from './WorkerSystem.ts';
@@ -36,15 +37,15 @@ export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
    * Named listener to invoke instead of the default fetch+parse.
    * When set, the request is dispatched to a registered listener
    * (on a worker if available, otherwise on the main thread).
-   * Listener names are namespaced: `'mapwithai:fetchAndParse'`, etc.
+   * Listener names are namespaced: `'network:fetchAndParse'`, etc.
    */
-  task?: ListenerID;
+  listenerID?: ListenerID;
 
   /**
    * Extra data to pass to the named listener alongside the URL.
    * Only used when `task` is set.
    */
-  taskData?: Record<string, unknown>;
+  listenerData?: Record<string, unknown>;
 }
 
 
@@ -131,7 +132,6 @@ export class NetworkSystem extends AbstractSystem {
     this._numActive = 0;
     this._defaultTimeout = DEFAULT_TIMEOUT;
     this._maxInflight = DEFAULT_MAX_INFLIGHT;
-
   }
 
 
@@ -142,7 +142,20 @@ export class NetworkSystem extends AbstractSystem {
    */
   initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
-    return this._initPromise = super.initAsync();
+
+    const worker = this.context.systems.worker;
+
+    return this._initPromise = super.initAsync()
+      .then(() => {
+        const prerequisites = [ worker?.initAsync() ];
+        return Promise.all(prerequisites.filter(Boolean));
+      })
+      .then(() => {
+        // Register available listeners with the WorkerSystem
+        for (const [listenerID, listener] of Object.entries(networkListeners)) {
+          worker?.registerListener(listenerID, listener);
+        }
+      });
   }
 
 
@@ -164,8 +177,15 @@ export class NetworkSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
+    const worker = this.context.systems.worker;
+
     this.abortAll();
-    return Promise.resolve();
+
+    if (worker) {
+      return worker.dispatch<void>('network:reset');
+    } else {
+      return Promise.resolve();
+    }
   }
 
 
@@ -486,7 +506,7 @@ export class NetworkSystem extends AbstractSystem {
    * _dispatchFetch
    * Performs the actual fetch, either via worker or main thread.
    *
-   * When a named `task` is provided, it is dispatched to the worker
+   * When a named `listenerID` is provided, it is dispatched to the worker
    * (via `dispatch`) when available, or executed directly
    * on the main thread using the registered listener as fallback.
    */
@@ -498,29 +518,30 @@ export class NetworkSystem extends AbstractSystem {
     const worker = this.context.systems.worker as WorkerSystem | undefined;
     const fetchFn = options?.fetchFn;
     const mainThread = options?.mainThread ?? false;
-    const task = options?.task;
-    const taskData = options?.taskData;
+    const listenerID = options?.listenerID;
+    const listenerData = options?.listenerData;
     const useWorker = worker && worker.workerURL && !fetchFn && !mainThread;
 
-    // Named task dispatch
-    if (task) {
-      const payload = { url, ...taskData };
+    // Dispatch to a named listener
+    if (listenerID) {
+      const payload = { url, ...listenerData };
 
       if (useWorker) {
-        return worker.dispatch<T>(task, payload, signal);
+        return worker.dispatch<T>(listenerID, payload, signal);
       }
 
       // Main-thread fallback — call the registered listener directly
-      const listener = worker?.getListener(task);
+      const listener = worker?.getListener(listenerID);
       if (listener) {
         return Promise.resolve(listener(payload, signal)) as Promise<T>;
       }
-      // No listener registered — fall through to default fetch+parse
+
+      return Promise.reject(new Error(`NetworkSystem: listener '${listenerID}' not registered`));
     }
 
     if (useWorker) {
       const init = this._buildInit(options, undefined);  // signal passed via dispatch
-      return worker.dispatch<T>('fetchAndParse', { url, init }, signal );
+      return worker.dispatch<T>('network:fetchAndParse', { url, init }, signal );
     } else {
       const actualFetchFn = fetchFn ?? globalThis.fetch;
       const init = this._buildInit(options, signal);
@@ -536,8 +557,17 @@ export class NetworkSystem extends AbstractSystem {
   private _buildInit(options?: NetworkFetchOptions, signal?: AbortSignal): RequestInit {
     if (!options) return signal ? { signal } : {};
 
-    // Destructure to strip NetworkSystem-specific keys; only the rest becomes RequestInit
-    const { requestID: _rid, timeout: _to, fetchFn: _fn, mainThread: _mt, task: _t, taskData: _td, ...init } = options;
+    // Rename the NetworkSystem-specific keys - the rest becomes RequestInit
+    const {
+      requestID: _rid,
+      timeout: _to,
+      fetchFn: _fn,
+      mainThread: _mt,
+      listenerID: _lid,
+      listenerData: _td,
+      ...init
+    } = options;
+
     if (signal) {
       (init as RequestInit).signal = signal;
     }

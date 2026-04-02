@@ -48,7 +48,7 @@ export type LabelID = string;
 export type LanguageCode = string;
 /** Layer ID - identifier for a render layer (e.g. 'streetside', 'mapillary', 'osm') */
 export type LayerID = string;
-/** Listener ID - identifier for a listener, function eligible to run on a worker thread (e.g. 'mapwithai:fetchAndParse') */
+/** Listener ID - identifier for a listener, function eligible to run on a worker thread (e.g. 'network:fetchAndParse') */
 export type ListenerID = string;
 /** Locale Code - BCP 47 language tag (e.g. 'en', 'en-US', 'de') */
 export type LocaleCode = string;

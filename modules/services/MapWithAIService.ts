@@ -3,7 +3,6 @@ import { Tiler } from '@rapid-sdk/math';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Graph, RapidDataset, Tree } from '../lib/index.ts';
 import { OsmNode, OsmWay } from '../data/index.ts';
-import { fetchAndParse as mapWithAIFetchAndParse, reset as mapWithAIReset } from './MapWithAIService.worker.ts';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
@@ -59,7 +58,7 @@ export class MapWithAIService extends AbstractSystem {
     super(context);
     this.id = 'mapwithai';
     this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
-    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash', 'worker']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
     this._datasets = new Map();
@@ -74,12 +73,12 @@ export class MapWithAIService extends AbstractSystem {
   initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
+    const network = this.context.systems.network!;
+
     return this._initPromise = super.initAsync()
       .then(() => {
-        // Register worker listeners on WorkerSystem for main-thread fallback
-        const worker = this.context.systems.worker;
-        worker?.registerListener('mapwithai:fetchAndParse', mapWithAIFetchAndParse);
-        worker?.registerListener('mapwithai:reset', mapWithAIReset);
+        const prerequisites = [ network.initAsync() ];
+        return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => this.resetAsync())
       .then(() => {
@@ -308,8 +307,8 @@ export class MapWithAIService extends AbstractSystem {
 
     network.fetch<ParserResult>(url, {
       requestID,
-      task: 'mapwithai:fetchAndParse',
-      taskData: { parserOptions: { skipSeen: false, filter: ['node', 'way'] } },
+      listenerID: 'network:fetchAndParseOsmXml',
+      listenerData: { parserOptions: { skipSeen: false, filter: ['node', 'way'] } },
     })
       .then(results => this._gotTile(results, ds, tile))
       .catch(e => {
@@ -322,7 +321,6 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * _gotTile
    * Process the parsed results from a tile fetch.
-   * Accepts a ParserResult (from either worker or main-thread parsing).
    * @param results - the parsed data from OsmXMLParser
    * @param ds - the dataset info
    * @param tile - a tile object

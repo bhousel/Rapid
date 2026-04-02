@@ -27,6 +27,7 @@ Things that went wrong once and shouldn't go wrong again.
 - **Request ID prefix collisions cause complex abort predicates** — Original `osm-note-${tileID}` collided with `osm-note-post-*`, requiring negative lookahead in `abortMatching`. Fix: choose non-overlapping prefixes (e.g. `osm-note-tile-` vs `osm-note-post-`). Design request ID schemes so each category can be selected with a simple prefix regex.
 - **Dead code in interfaces** — `_tileCache.seen: Set<string>` was declared in the interface, initialized in `_initCache()`, but never read anywhere. When auditing inflight caches, also check for other dead properties in the same interfaces.
 - **Manual mock fetch vs fetch-mock library** — Use `fetch-mock` for service tests where real URL routing/counting matters. For NetworkSystem tests (testing fetch lifecycle itself), manual mocks are better — most tests need deferred resolution, abort signal handling, or custom fetchFn, which fetch-mock doesn't naturally support.
+- **Silent fallthroughs mask bugs in dispatch logic** — `_dispatchFetch` originally fell through to generic fetch+parse when a named `listenerID` was provided but no listener was registered. This would return unparsed text instead of parsed OSM data — silently wrong. Fix: reject with a clear error when a requested listener is missing. General rule: if the caller explicitly asks for a specific behavior, don't silently give them a different one.
 
 ## Runtime
 

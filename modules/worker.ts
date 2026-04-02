@@ -1,7 +1,5 @@
-import { utilFetchResponse } from './util/fetch_response.ts';
-import { mapWithAIListeners } from './services/index.worker.ts';
-
-import type { WorkerListener } from './core/types.ts';
+import { coreListeners } from './core/index.worker.ts';
+import { serviceListeners } from './services/index.worker.ts';
 
 /**
  * Rapid Web Worker entry point.
@@ -21,11 +19,11 @@ import type { WorkerListener } from './core/types.ts';
  *
  * Listener functions live in companion `*.worker.ts` files next to
  * their main-thread counterparts.  Each folder provides an `index.worker.ts`
- * barrel that this entry point imports from.
+ * barrel file that this entry point imports from.
  */
 
-/** Map of listenerID → listener function */
-const listeners = new Map<ListenerID, WorkerListener>();
+/** Map of listenerID → Listener function */
+const listeners = new Map<ListenerID, Listener>();
 
 /** Active AbortControllers for in-progress tasks, keyed by request ID */
 const activeControllers = new Map<number, AbortController>();
@@ -39,7 +37,7 @@ const activeControllers = new Map<number, AbortController>();
  * @param listener - Function that processes the task data and returns a result.
  *                  Receives an AbortSignal that fires if the main thread cancels the task.
  */
-function registerListener(listenerID: ListenerID, listener: WorkerListener): void {
+function registerListener(listenerID: ListenerID, listener: Listener): void {
   listeners.set(listenerID, listener);
 }
 
@@ -47,26 +45,15 @@ function registerListener(listenerID: ListenerID, listener: WorkerListener): voi
 // -------------------------------------------------------
 // Built-in listeners
 // -------------------------------------------------------
-
 /** Ping — health check, echoes the input data */
 registerListener('ping', (data: unknown) => data);
 
-/**
- * fetchAndParse — fetches a URL and parses the response via utilFetchResponse.
- * Supports abort via the provided signal.
- */
-registerListener('fetchAndParse', async (data: unknown, signal: AbortSignal) => {
-  const { url, init } = data as { url: string; init?: RequestInit };
-  const response = await fetch(url, { ...init, signal });
-  return utilFetchResponse(response);
-});
-
 
 // -------------------------------------------------------
-// Domain-specific listeners (from *.worker.ts companions)
+// Imported listeners (from *.worker.ts companion files)
 // -------------------------------------------------------
-
-for (const [listenerID, listener] of Object.entries(mapWithAIListeners)) {
+const available = { ...coreListeners, ...serviceListeners };
+for (const [listenerID, listener] of Object.entries(available)) {
   registerListener(listenerID, listener);
 }
 
@@ -74,7 +61,6 @@ for (const [listenerID, listener] of Object.entries(mapWithAIListeners)) {
 // -------------------------------------------------------
 // Message handling
 // -------------------------------------------------------
-
 self.onmessage = async (event: MessageEvent) => {
   const msg = event.data;
 
