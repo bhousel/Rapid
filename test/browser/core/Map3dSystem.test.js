@@ -7,6 +7,7 @@ describe('Map3dSystem', () => {
     editor:   new Rapid.EditSystem(context),
     gfx:      new Rapid.MockGfxSystem(context),
     map:      new Rapid.MapSystem(context),
+    network:  new Rapid.NetworkSystem(context),
     spatial:  new Rapid.SpatialSystem(context),
     storage:  new Rapid.StorageSystem(context),
     styles:   new Rapid.StyleSystem(context),

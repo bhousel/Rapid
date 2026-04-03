@@ -3,13 +3,12 @@ import { Extent, type Viewport } from '@rapid-sdk/math';
 import { gpx, kml } from '@tmcw/togeojson';
 import { parse as wktParse } from 'wkt';
 
-import { geojsonFeatures } from '../util/util.ts';
-import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { GeoJSONData } from '../data/GeoJSONData.ts';
+import { geojsonFeatures } from '../util/util.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
@@ -494,6 +493,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param url - The URL to load
    */
   setUrl(url: string): void {
+    const network = this.context.systems.network!;
+
     this._clear();
     this._url = url;
     this.scene.disableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
@@ -506,13 +507,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const extension = isTask ? '.gpx' : this._getExtension(testUrl);
 
     if (extension) {   // Looks like a gpx, kml, geojson file.. load it!
-      fetch(url)
-        .then(utilFetchResponse)
+      network.fetch<string | XmlDocument | GeoJSON.GeoJsonObject | null>(url)
         .then(data => {
           this._setFile(data, extension);
           if (isTask) {
             this._dataUsed = null;    // A task boundary is not really a data source
-            this.context.systems.rapid?.setTaskExtentByGpxData(data);
+            this.context.systems.rapid?.setTaskExtentByGpxData(data as any);
           }
         })
         .catch(e => console.error(e));  // eslint-disable-line

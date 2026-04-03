@@ -17,6 +17,7 @@ describe('uiFieldLocalized', () => {
     assets:  new Rapid.AssetSystem(context),
     editor:  new MockEditSystem(context),
     l10n:    new Rapid.LocalizationSystem(context),
+    network: new Rapid.NetworkSystem(context),
     schema:  new Rapid.SchemaSystem(context)
   };
   context.container = () => selection;

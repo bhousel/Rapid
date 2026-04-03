@@ -11,6 +11,7 @@ describe('SchemaSystem', () => {
     assets:    new Rapid.AssetSystem(context),
     l10n:      new Rapid.LocalizationSystem(context),
     locations: new Rapid.LocationSystem(context),
+    network:   new Rapid.NetworkSystem(context),
     urlhash:   new Rapid.UrlHashSystem(context)
   };
 

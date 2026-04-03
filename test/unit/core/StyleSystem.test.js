@@ -10,6 +10,7 @@ describe('StyleSystem', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     assets:  new Rapid.AssetSystem(context),
+    network: new Rapid.NetworkSystem(context),
     schema:  new Rapid.SchemaSystem(context)
   };
 

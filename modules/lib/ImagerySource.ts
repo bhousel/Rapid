@@ -3,7 +3,6 @@ import { DEG2RAD, RAD2DEG, TAU, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rapid-sdk/util';
 
 import { utilDateString } from '../util/date.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { Vec2 } from '../lib/types.ts';
@@ -668,14 +667,14 @@ export class ImagerySourceEsri extends ImagerySource {
     const tilemapUrl = dummyUrl.replace(/tile\/[0-9]+\/[0-9]+\/[0-9]+\?blankTile=false/, 'tilemap') + '/' + z + '/' + y + '/' + x + '/8/8';
 
     // make the request and inspect the response from the tilemap server
-    fetch(tilemapUrl)
-      .then(utilFetchResponse as (response: Response) => any)
-      .then(tilemap => {
+    const network = this.context.systems.network!;
+    network.fetch(tilemapUrl)
+      .then((tilemap: any) => {
         if (!tilemap) {
           throw new Error('Unknown Error');
         }
         let hasTiles = true;
-        for (const d of (tilemap as any).data) {
+        for (const d of tilemap.data) {
           // 0 means an individual tile in the grid doesn't exist
           if (!d) {
             hasTiles = false;
@@ -697,6 +696,7 @@ export class ImagerySourceEsri extends ImagerySource {
   override getMetadata(tile: any, callback?: (err: string | null, metadata?: any) => void): void {
     const context = this.context;
     const l10n = context.systems.l10n;
+    const network = this.context.systems.network!;
 
     const loc = tile.wgs84Extent.center();
     const tileID = tile.xyz.join('/');
@@ -764,8 +764,8 @@ export class ImagerySourceEsri extends ImagerySource {
 
     } else {
       this._inflight[tileID] = true;
-      fetch(url)
-        .then(utilFetchResponse as (response: Response) => any)
+      const requestID = `esri-metadata-${tileID}` as RequestID;
+      network.fetch(url, { requestID })
         .then((result: any) => {
           delete this._inflight[tileID];
 

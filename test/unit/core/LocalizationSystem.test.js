@@ -7,7 +7,8 @@ describe('LocalizationSystem', () => {
   // Setup context with AssetSystem for most tests
   const context = new Rapid.MockContext();
   context.systems = {
-    assets: new Rapid.AssetSystem(context)
+    assets:  new Rapid.AssetSystem(context),
+    network: new Rapid.NetworkSystem(context)
   };
 
   // Setup mock asset data that LocalizationSystem attempts to load during initAsync.

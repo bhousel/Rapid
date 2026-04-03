@@ -112,6 +112,7 @@ export class ImagerySystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'imagery';
+    this.requiredDependencies = new Set(['network']);
     this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'storage', 'urlhash']);
 
     this._scopes = new Map();    // Map<ScopeID, ImageryScope>

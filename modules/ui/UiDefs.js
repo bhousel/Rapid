@@ -56,6 +56,7 @@ export class UiDefs {
 
     const context = this.context;
     const assets = context.systems.assets;
+    const network = context.systems.network;
 
     // create svg and defs if necessary
     $parent.selectAll('#rapid-defs')
@@ -76,8 +77,8 @@ export class UiDefs {
       .each((d, i, nodes) => {
         const $group = select(nodes[i]);
         const url = assets.getFileURL(`svg/${d}-sprite.svg`);
-        fetch(url)
-          // We need the browser's DOMParser here, so we can insert this spritesheet into the document.
+        // We need the browser's DOMParser here, so we can insert this spritesheet into the document.
+        network.fetchRaw(url, { requestID: `spritesheet-${d}` })
           .then(response => utilFetchResponse(response, new window.DOMParser()))
           .then(svg => $group.call(this._spritesheetLoaded, d, svg))
           .catch(e => console.error(e));  // eslint-disable-line

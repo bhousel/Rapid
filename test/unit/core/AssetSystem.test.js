@@ -8,6 +8,7 @@ describe('AssetSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
+    network: new Rapid.NetworkSystem(context),
     urlhash: new Rapid.UrlHashSystem(context)
   };
 
@@ -30,7 +31,6 @@ describe('AssetSystem', () => {
         assert.deepEqual(assets.fileReplacements, {});
 
         assert.isObject(assets._loaded);
-        assert.isObject(assets._inflight);
       });
     });
 

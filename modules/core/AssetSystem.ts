@@ -1,5 +1,4 @@
 import { AbstractSystem } from './AbstractSystem.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
@@ -104,8 +103,6 @@ export class AssetSystem extends AbstractSystem {
 
   /** Cache of loaded asset data, keyed by asset identifier */
   private _loaded: Record<AssetID, unknown>;
-  /** In-flight fetch promises, keyed by URL */
-  private _inflight: Record<string, Promise<unknown>>;
 
 
   /**
@@ -115,7 +112,8 @@ export class AssetSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'assets';
-    this.optionalDependencies = new Set(['urlhash']);
+    this.requiredDependencies = new Set<SystemID>(['network']);
+    this.optionalDependencies = new Set<SystemID>(['urlhash']);
 
     this.sources = {
       'address_formats':      { preferred: 'data/address_formats.min.json' },
@@ -153,7 +151,6 @@ export class AssetSystem extends AbstractSystem {
     this.fileReplacements = {};
 
     this._loaded = {};
-    this._inflight = {};
   }
 
 
@@ -313,29 +310,21 @@ export class AssetSystem extends AbstractSystem {
       return Promise.reject((err as Error).message);
     }
 
-    let loadPromise = this._inflight[url];
-    if (!loadPromise) {
-      this._inflight[url] = loadPromise = fetch(url)
-        .then(utilFetchResponse)
-        .then(data => {
-          if (!data) {
-            throw new Error('No data');
-          }
-          this._loaded[assetID] = data;
-          return data;
-        })
-        .catch(err => {
-          const info = { assetID, url };
-          const message = `AssetSystem: ${err.message}\n`;
-          console.error(message, JSON.stringify(info));  // eslint-disable-line no-console
-          throw new Error(err);
-        })
-        .finally(() => {
-          delete this._inflight[url];
-        });
-    }
-
-    return loadPromise;
+    const network = this.context.systems.network!;
+    return network.fetch(url, { requestID: `asset-${assetID}` as RequestID })
+      .then(data => {
+        if (!data) {
+          throw new Error('No data');
+        }
+        this._loaded[assetID] = data;
+        return data;
+      })
+      .catch(err => {
+        const info = { assetID, url };
+        const message = `AssetSystem: ${err.message}\n`;
+        console.error(message, JSON.stringify(info));  // eslint-disable-line no-console
+        throw new Error(err);
+      });
   }
 
 
@@ -356,6 +345,7 @@ export class AssetSystem extends AbstractSystem {
       return Promise.reject(`AssetSystem: Unknown bundle assetID "${assetID}"`);
     }
 
+    const network = this.context.systems.network!;
     const partIDs: BundlePartID[] = Object.keys(bundle.parts);
     const partPromises = partIDs.map(partID => {
       const source = bundle.parts[partID];
@@ -363,9 +353,9 @@ export class AssetSystem extends AbstractSystem {
       if (!path) {
         return Promise.reject(`No asset path found for bundle part "${partID}"`);
       }
+
       const url = this.getFileURL(path);
-      return fetch(url)
-        .then(utilFetchResponse)
+      return network.fetch(url, { requestID: `asset-${assetID}-${partID}` as RequestID })
         .then(data => {
           if (!data) {
             throw new Error(`No data`);

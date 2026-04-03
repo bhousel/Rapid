@@ -8,7 +8,8 @@ describe('ImagerySystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
-    assets: new Rapid.AssetSystem(context)
+    assets: new Rapid.AssetSystem(context),
+    network: new Rapid.NetworkSystem(context)
   };
 
   // Setup mock asset data that ImagerySystem attempts to load at init time.

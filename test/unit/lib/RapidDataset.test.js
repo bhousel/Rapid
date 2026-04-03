@@ -6,7 +6,8 @@ import * as Rapid from '../../../modules/headless.js';
 describe('RapidDataset', () => {
   const context = new Rapid.MockContext();
   context.systems = {
-    assets: new Rapid.AssetSystem(context)
+    assets:  new Rapid.AssetSystem(context),
+    network: new Rapid.NetworkSystem(context)
   };
 
 

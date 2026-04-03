@@ -62,7 +62,7 @@ export class UiSystem extends AbstractSystem {
     super(context);
     this.id = 'ui';
     // Require any systems that might be required by any UI component.
-    this.requiredDependencies = new Set(['assets', 'editor', 'gfx', 'imagery', 'l10n', 'map', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set(['assets', 'editor', 'gfx', 'imagery', 'l10n', 'map', 'network', 'storage', 'urlhash']);
     this.optionalDependencies = new Set(['scheduler']);
 
     this._mapRect = null;
@@ -110,6 +110,7 @@ export class UiSystem extends AbstractSystem {
     const assets = context.systems.assets!;
     const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
+    const network = context.systems.network!;
     const urlhash = context.systems.urlhash!;
 
     // Many UI components require l10n and gfx (for scene/layers)
@@ -118,8 +119,9 @@ export class UiSystem extends AbstractSystem {
       .then(() => {
         const prerequisites = [
           assets.initAsync(),
-          l10n.initAsync(),
           gfx.initAsync(),
+          l10n.initAsync(),
+          network.initAsync(),
           urlhash.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
