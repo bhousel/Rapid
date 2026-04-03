@@ -70,6 +70,13 @@ interface QueuedFetch {
 }
 
 
+/**
+ * Function that can modify a request before it is dispatched.
+ * Interceptors run on the main thread, producing a serializable `RequestInit`
+ * that can be sent to a web worker.
+ */
+export type RequestInterceptor = (url: string, init: RequestInit) => RequestInit;
+
 /** Default request timeout in milliseconds */
 const DEFAULT_TIMEOUT = 30_000;
 
@@ -115,6 +122,8 @@ export class NetworkSystem extends AbstractSystem {
   private _defaultTimeout: number;
   /** Max concurrent active requests */
   private _maxInflight: number;
+  /** Registered request interceptors, applied before dispatch */
+  private _interceptors: RequestInterceptor[];
 
 
   /**
@@ -132,6 +141,7 @@ export class NetworkSystem extends AbstractSystem {
     this._numActive = 0;
     this._defaultTimeout = DEFAULT_TIMEOUT;
     this._maxInflight = DEFAULT_MAX_INFLIGHT;
+    this._interceptors = [];
   }
 
 
@@ -313,7 +323,7 @@ export class NetworkSystem extends AbstractSystem {
     const signal = this._createCombinedSignal(controller, timeout);
     const dispatch = (): Promise<Response> => {
       const fetchFn = options?.fetchFn ?? globalThis.fetch;
-      const init = this._buildInit(options, signal);
+      const init = this._applyInterceptors(url, this._buildInit(options, signal));
       return fetchFn(url, init);
     };
 
@@ -386,6 +396,35 @@ export class NetworkSystem extends AbstractSystem {
       if (predicate(requestID)) return true;
     }
     return false;
+  }
+
+
+  /**
+   * addRequestInterceptor
+   * Registers a function that can modify outgoing requests before dispatch.
+   * Interceptors run in registration order on the main thread, producing a
+   * serializable `RequestInit` that can be sent to a web worker.
+   *
+   * Common uses: adding Authorization headers, custom logging, or
+   * request-level metrics.
+   *
+   * @param interceptor - Receives (url, init) and returns a (possibly modified) init
+   */
+  addRequestInterceptor(interceptor: RequestInterceptor): void {
+    this._interceptors.push(interceptor);
+  }
+
+
+  /**
+   * removeRequestInterceptor
+   * Removes a previously registered request interceptor.
+   * @param interceptor - The same function reference passed to `addRequestInterceptor`
+   */
+  removeRequestInterceptor(interceptor: RequestInterceptor): void {
+    const idx = this._interceptors.indexOf(interceptor);
+    if (idx !== -1) {
+      this._interceptors.splice(idx, 1);
+    }
   }
 
 
@@ -503,8 +542,25 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
+   * _applyInterceptors
+   * Runs all registered interceptors on the (url, init) pair.
+   * Interceptors run in registration order; each receives the output of the previous.
+   */
+  private _applyInterceptors(url: string, init: RequestInit): RequestInit {
+    for (const interceptor of this._interceptors) {
+      init = interceptor(url, init);
+    }
+    return init;
+  }
+
+
+  /**
    * _dispatchFetch
    * Performs the actual fetch, either via worker or main thread.
+   *
+   * Request interceptors are applied first, producing a serializable
+   * `RequestInit` that includes any headers added by interceptors
+   * (e.g. Authorization).  This init is safe to send to a web worker.
    *
    * When a named `listenerID` is provided, it is dispatched to the worker
    * (via `dispatch`) when available, or executed directly
@@ -522,9 +578,14 @@ export class NetworkSystem extends AbstractSystem {
     const listenerData = options?.listenerData;
     const useWorker = worker && worker.workerURL && !fetchFn && !mainThread;
 
+    // Build base init (without signal) and apply interceptors.
+    // Interceptors run on the main thread, producing serializable headers
+    // (e.g. Authorization) that can be sent to a worker.
+    const init = this._applyInterceptors(url, this._buildInit(options));
+
     // Dispatch to a named listener
     if (listenerID) {
-      const payload = { url, ...listenerData };
+      const payload = { url, init, ...listenerData };
 
       if (useWorker) {
         return worker.dispatch<T>(listenerID, payload, signal);
@@ -539,12 +600,12 @@ export class NetworkSystem extends AbstractSystem {
       return Promise.reject(new Error(`NetworkSystem: listener '${listenerID}' not registered`));
     }
 
+    // Default fetch+parse path
     if (useWorker) {
-      const init = this._buildInit(options, undefined);  // signal passed via dispatch
-      return worker.dispatch<T>('network:fetchAndParse', { url, init }, signal );
+      return worker.dispatch<T>('network:fetchAndParse', { url, init }, signal);
     } else {
       const actualFetchFn = fetchFn ?? globalThis.fetch;
-      const init = this._buildInit(options, signal);
+      init.signal = signal;
       return actualFetchFn(url, init).then(utilFetchResponse) as Promise<T>;
     }
   }

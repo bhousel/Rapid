@@ -120,15 +120,9 @@ export class WorkerSystem extends AbstractSystem {
   /**
    * resetAsync
    * Called after completing an edit session to reset any internal state.
-   * Terminates all workers and rejects pending requests.
    * @return Promise resolved when this component has completed resetting
    */
   resetAsync(): Promise<void> {
-// todo: not sure whether we actually want this -
-// it will interfere with other code that is trying to
-// send "reset" messages to their workers.  Maybe we should just
-// establish that workers are long-lived and don't terminate on reset?
-//    this.terminateWorkers();
     return Promise.resolve();
   }
 

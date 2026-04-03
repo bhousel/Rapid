@@ -29,6 +29,9 @@ Things that went wrong once and shouldn't go wrong again.
 - **Manual mock fetch vs fetch-mock library** — Use `fetch-mock` for service tests where real URL routing/counting matters. For NetworkSystem tests (testing fetch lifecycle itself), manual mocks are better — most tests need deferred resolution, abort signal handling, or custom fetchFn, which fetch-mock doesn't naturally support.
 - **Silent fallthroughs mask bugs in dispatch logic** — `_dispatchFetch` originally fell through to generic fetch+parse when a named `listenerID` was provided but no listener was registered. This would return unparsed text instead of parsed OSM data — silently wrong. Fix: reject with a clear error when a requested listener is missing. General rule: if the caller explicitly asks for a specific behavior, don't silently give them a different one.
 
+- **`globalThis.localStorage` unavailable in unit tests** — Bun's `test:unit` script runs WITHOUT the happy-dom preload (`--preload ./test/test_setup.js`). Only `test:browser` gets the preload. This means `globalThis.localStorage` is `undefined` in unit tests. osm-auth handles this with an internal mock Map store (v3.1.1). If you need to read tokens that osm-auth stored, you must also have a fallback that doesn't depend on localStorage — e.g. reading from `oauth.options().access_token` for preauth scenarios.
+- **osm-auth v3.1.1 mock store is functional** — When `localStorage` is unavailable, osm-auth creates a mock store backed by `new Map()`. Unlike older versions (which had no-op setItem), the v3.1.1 mock store actually stores and retrieves values. So `preauth` works and `authenticated()` returns `true` — but external code reading `globalThis.localStorage` directly won't see the values.
+
 ## Runtime
 
 - **Mark features dirty when styles change** — `immediateRedraw()` alone doesn't work. Call `gfx.scene.dirtyScene()` before redraw so features re-fetch their style.

@@ -21,6 +21,15 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
 - **NetworkSystem owns network I/O** — Fetch lifecycle, inflight tracking, dedup, abort, concurrency limiting, timeout. Dispatches to WorkerSystem when available (`worker` is an optional dependency). Falls back to main-thread listener via `worker.getListener()`.
 - **Host app sets `worker.workerURL`** — in `dist/index.html` / `dist/index-dev.html` after `initAsync()`. This is the only configuration needed for worker support.
 
+## Request Interceptor API
+
+- **Interceptors run on the main thread before dispatch** — They produce a serializable `RequestInit` that can be sent to a web worker. This is the key design: auth headers are added on the main thread (where localStorage/token access is available), then the modified init goes to the worker.
+- **Registration order matters** — Interceptors run in registration order, each receiving the output of the previous. This allows composable request modification.
+- **OsmService `_authInterceptor`** — Reads Bearer token from osm-auth's storage. Primary path: `globalThis.localStorage` (browser). Fallback: `_oauth.options().access_token` (unit tests with osm-auth's mock Map store). The fallback is needed because unit tests run without happy-dom preload, so `globalThis.localStorage` is undefined.
+- **Interceptors replace `fetchFn` for auth** — OsmService no longer passes `fetchFn: this._oauth.fetch` to `network.fetch()`. Instead, the interceptor adds the Authorization header transparently. `fetchFn` remains in the API as an escape hatch.
+- **`mainThread: true` on `loadFromAPI`** — Keeps OSM API GET requests on main thread for now. Future work: switch to `listenerID: 'network:fetchAndParseOsmJson'` for full worker offloading. Currently blocked by the double-parse issue (utilFetchResponse parses, then OsmService parses again).
+- **Write operations stay `mainThread: true`** — Changeset create/upload/close and note post operations are infrequent and don't benefit from worker offloading.
+
 ## Worker Architecture Vision
 
 - **Named operation registry** — Current worker only handles `'fetchAndParse'`. Future: workers register named listeners (e.g. `'processOsmTile'`), callers pass operation name + serializable data. Can't send closures across `postMessage`.

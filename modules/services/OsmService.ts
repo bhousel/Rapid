@@ -12,6 +12,7 @@ import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { OsmChangeset, OsmChanges } from '../data/OsmChangeset.ts';
 import type { ParserOptions, ParserResult, ParsedApi, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
+import type { RequestInterceptor } from '../core/NetworkSystem.ts';
 
 
 /** Properties specific to OSM note markers */
@@ -268,6 +269,7 @@ export class OsmService extends AbstractSystem {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._authLoading = this._authLoading.bind(this);
     this._authDone = this._authDone.bind(this);
+    this._authInterceptor = this._authInterceptor.bind(this);
 
     this.reloadApiStatus = this.reloadApiStatus.bind(this);
     this.deferredReloadApiStatus = this.deferredReloadApiStatus.bind(this);
@@ -339,7 +341,12 @@ export class OsmService extends AbstractSystem {
   initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
+    const network = this.context.systems.network!;
+
     return this._initPromise = super.initAsync()
+      .then(() => {
+        network.addRequestInterceptor(this._authInterceptor);
+      })
       .then(() => this.resetAsync());
   }
 
@@ -581,9 +588,8 @@ export class OsmService extends AbstractSystem {
     const url = /^http/i.test(path) ? path : (this._apiroot + path);
     const network = this.context.systems.network!;
     const computedID = requestID ?? (`GET ${url}` as RequestID);
-    const fetchFn = this.authenticated() ? this._oauth.fetch : undefined;
 
-    network.fetch<any>(url, { requestID: computedID, fetchFn })
+    network.fetch<any>(url, { requestID: computedID })
       .then((result: any) => gotResult(null, result))
       .catch((err: any) => {
         if (err.name === 'AbortError') return;  // ok
@@ -1070,7 +1076,6 @@ export class OsmService extends AbstractSystem {
       method: 'PUT',
       headers: { 'Content-Type': 'text/xml' },
       body: JXON.stringify(changeset.asJXON()),
-      fetchFn: this._oauth.fetch,
       mainThread: true
     })
       .then((result: any) => errback(null, result))
@@ -1123,7 +1128,6 @@ export class OsmService extends AbstractSystem {
       method: 'POST',
       headers: { 'Content-Type': 'text/xml' },
       body: JXON.stringify(changeset.osmChangeJXON(changes)),
-      fetchFn: this._oauth.fetch,
       mainThread: true
     })
       .then((result: any) => errback(null, result))
@@ -1169,7 +1173,6 @@ export class OsmService extends AbstractSystem {
       requestID,
       method: 'PUT',
       headers: { 'Content-Type': 'text/xml' },
-      fetchFn: this._oauth.fetch,
       mainThread: true
     })
       .then((result: any) => errback(null, result))
@@ -1594,7 +1597,6 @@ export class OsmService extends AbstractSystem {
     network.fetch<any>(resource, {
       requestID,
       method: 'POST',
-      fetchFn: this._oauth.fetch,
       mainThread: true
     })
       .then((result: any) => errback(null, result))
@@ -1675,7 +1677,6 @@ export class OsmService extends AbstractSystem {
     network.fetch<any>(resource, {
       requestID,
       method: 'POST',
-      fetchFn: this._oauth.fetch,
       mainThread: true
     })
       .then((result: any) => errback(null, result))
@@ -1874,6 +1875,39 @@ export class OsmService extends AbstractSystem {
   /** Emits the `authDone` event (called when the auth popup closes) */
   _authDone(): void {
     this.emit('authDone');
+  }
+
+
+  /**
+   * _authInterceptor
+   * Request interceptor that adds the OAuth2 Bearer token to OSM API requests.
+   * Registered with NetworkSystem at init time so that all fetch paths
+   * (including web workers) receive the correct Authorization header.
+   *
+   * osm-auth stores the token in localStorage under `<websiteURL>oauth2_access_token`.
+   * There is no public API to read the token directly, so we read it the same
+   * way osm-auth does internally.
+   */
+  _authInterceptor(url: string, init: RequestInit): RequestInit {
+    if (this._oauth.authenticated() && url.startsWith(this._apiroot)) {
+      // Primary: read from localStorage (works in browser environments).
+      // osm-auth stores the token under `<websiteURL>oauth2_access_token`.
+      let accessToken = globalThis.localStorage
+        ?.getItem(this._wwwroot + 'oauth2_access_token')
+        ?.replace(/"/g, '') ?? '';   // osm-auth strips legacy double-quotes
+
+      // Fallback: read from the options object (works with osm-auth's mock store
+      // in environments without localStorage, e.g. unit tests using preauth).
+      if (!accessToken) {
+        accessToken = this._oauth.options().access_token ?? '';
+      }
+
+      if (accessToken) {
+        const headers = (init.headers ?? {}) as Record<string, string>;
+        return { ...init, headers: { ...headers, 'Authorization': `Bearer ${accessToken}` } };
+      }
+    }
+    return init;
   }
 
 
