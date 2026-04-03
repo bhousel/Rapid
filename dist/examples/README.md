@@ -9,7 +9,7 @@ This method can allow your project to always run the latest Rapid code without n
 Copy this file to your own HTTP server, or use the code below as the basis for embedding Rapid in your project. <br/>
 
 Live link: http://rapideditor.org/canary/examples/latest/latest.html <br/>
-Or `npm run start` then run locally: http://127.0.0.1:8080/dist/examples/latest/latest.html <br/>
+Or `bun run start` then run locally: http://127.0.0.1:8080/dist/examples/latest/latest.html <br/>
 
 
 ### `iframe/`
@@ -37,4 +37,4 @@ This example demonstrates:
 * parent and child url hashes being kept in sync
 
 Live link: http://rapideditor.org/canary/examples/iframe/parent.html <br/>
-Or `npm run start` then run locally:  http://127.0.0.1:8080/dist/examples/iframe/parent.html <br/>
+Or `bun run start` then run locally:  http://127.0.0.1:8080/dist/examples/iframe/parent.html <br/>

@@ -2,7 +2,7 @@ import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { utilArrayIdentical, utilCleanTags } from '@rapid-sdk/util';
 import deepEqual from 'fast-deep-equal';
 
-import { actionChangeTags, actionSyncCrossingTags } from '../actions/index.js';
+import { actionChangeTags, actionSyncCrossingTags } from '../actions/index.ts';
 import { uiIcon } from './icon.js';
 import { utilRebind } from '../util/rebind.ts';
 

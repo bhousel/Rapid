@@ -1885,9 +1885,7 @@ export class OsmService extends AbstractSystem {
    * Registered with NetworkSystem at init time so that all fetch paths
    * (including web workers) receive the correct Authorization header.
    *
-   * osm-auth stores the token in localStorage under `<websiteURL>oauth2_access_token`.
-   * There is no public API to read the token directly, so we read it the same
-   * way osm-auth does internally.
+   * Uses `oauth.getAccessToken()` — the public API added in osm-auth v3.2.0.
    */
   _authInterceptor(url: string, init: RequestInit): RequestInit {
     if (this._oauth.authenticated() && url.startsWith(this._apiroot)) {

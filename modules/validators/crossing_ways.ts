@@ -4,7 +4,7 @@ import {
   vecAngle, vecLength
 } from '@rapid-sdk/math';
 
-import { actionAddMidpoint, actionChangeTags, actionMergeNodes, actionSplit, actionSyncCrossingTags } from '../actions/index.js';
+import { actionAddMidpoint, actionChangeTags, actionMergeNodes, actionSplit, actionSyncCrossingTags } from '../actions/index.ts';
 import { OsmNode } from '../data/OsmNode.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';

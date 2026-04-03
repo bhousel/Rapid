@@ -3,7 +3,7 @@ import {
   DEG2RAD, vecAdd, vecEqual, vecInterp, vecLength,
   vecNormalize, vecProject, vecScale, vecSubtract
 } from '@rapid-sdk/math';
-import { geoOrthoCalcScore, geoOrthoCanOrthogonalize, geoOrthoNormalizedDotProduct } from '../geo/index.js';
+import { geoOrthoCalcScore, geoOrthoCanOrthogonalize, geoOrthoNormalizedDotProduct } from '../geo/ortho.ts';
 import { Graph } from '../lib/Graph.ts';
 import { OsmNode } from '../data/OsmNode.ts';
 import { OsmWay } from '../data/OsmWay.ts';

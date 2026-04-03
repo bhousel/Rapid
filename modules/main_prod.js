@@ -1,4 +1,3 @@
-// Polyfills for missing JavaScript features.
 import './polyfills.ts';
 
 import * as RAPID from './index.js';

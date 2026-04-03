@@ -25,10 +25,11 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
 
 - **Interceptors run on the main thread before dispatch** — They produce a serializable `RequestInit` that can be sent to a web worker. This is the key design: auth headers are added on the main thread (where localStorage/token access is available), then the modified init goes to the worker.
 - **Registration order matters** — Interceptors run in registration order, each receiving the output of the previous. This allows composable request modification.
-- **OsmService `_authInterceptor`** — Reads Bearer token from osm-auth's storage. Primary path: `globalThis.localStorage` (browser). Fallback: `_oauth.options().access_token` (unit tests with osm-auth's mock Map store). The fallback is needed because unit tests run without happy-dom preload, so `globalThis.localStorage` is undefined.
+- **OsmService `_authInterceptor`** — Uses `oauth.getAccessToken()` from osm-auth v3.2.0, which was added specifically for this use case (osmlab/osm-auth#149). Previous approach probed `globalThis.localStorage` directly with a fallback to `oauth.options().access_token`. The public API is cleaner and works correctly in all environments (browser, workers, Node/test).
 - **Interceptors replace `fetchFn` for auth** — OsmService no longer passes `fetchFn: this._oauth.fetch` to `network.fetch()`. Instead, the interceptor adds the Authorization header transparently. `fetchFn` remains in the API as an escape hatch.
 - **`mainThread: true` on `loadFromAPI`** — Keeps OSM API GET requests on main thread for now. Future work: switch to `listenerID: 'network:fetchAndParseOsmJson'` for full worker offloading. Currently blocked by the double-parse issue (utilFetchResponse parses, then OsmService parses again).
 - **Write operations stay `mainThread: true`** — Changeset create/upload/close and note post operations are infrequent and don't benefit from worker offloading.
+- **`.trimStart()` before `parseFromString()`** — xmldom 0.9.x throws `ParseError` if an XML declaration (`<?xml ...>`) is not at byte position 0. Applied `.trimStart()` at all three production XML parsing sites (`fetch_response.ts`, `OsmXMLParser.ts`, `PixiLayerCustomData.ts`). Handles real-world server responses with leading whitespace. Alternative considered: `onError` handler to suppress the specific error — rejected because it requires matching on error message strings and risks masking real parse errors.
 
 ## Worker Architecture Vision
 

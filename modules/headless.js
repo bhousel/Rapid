@@ -8,7 +8,7 @@ export * from './geo/index.ts';
 export * from './lib/index.ts';
 export * from './services/index.ts';
 export * from './util/index.ts';
-export * from './validators/index.js';
+export * from './validators/index.ts';
 export * from './mocks.ts';
 
 // These Systems and Services can work without browser and UI.
