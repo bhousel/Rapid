@@ -12,7 +12,6 @@ import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { OsmChangeset, OsmChanges } from '../data/OsmChangeset.ts';
 import type { ParserOptions, ParserResult, ParsedApi, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
-import type { RequestInterceptor } from '../core/NetworkSystem.ts';
 
 
 /** Properties specific to OSM note markers */
@@ -156,6 +155,8 @@ interface OsmAuthInstance {
   fetch(resource: string, options?: RequestInit): Promise<Response>;
   /** Returns whether the user is currently authenticated */
   authenticated(): boolean;
+  /** Returns the access token if the user is authenticated, empty string if not */
+  getAccessToken(): string;
   /** Initiates the OAuth2 authentication flow */
   authenticate(callback: Errback, options?: { switchUser?: boolean }): void;
   /** Brings the auth popup window to front, if open */
@@ -509,9 +510,10 @@ export class OsmService extends AbstractSystem {
    * @return  the RequestID used for this request
    */
   loadFromAPI(path: string, callback: Errback | null, options: Partial<ParserOptions> = {}, requestID?: RequestID): RequestID {
-    options.skipSeen ??= true;
+    const network = this.context.systems.network!;
 
     const cid = this._connectionID;
+    options.skipSeen ??= true;
 
     const gotResult: Errback = (err, content): void => {
       // The user switched connection while the request was inflight
@@ -586,7 +588,6 @@ export class OsmService extends AbstractSystem {
 
     // Accept absolute or relative paths
     const url = /^http/i.test(path) ? path : (this._apiroot + path);
-    const network = this.context.systems.network!;
     const computedID = requestID ?? (`GET ${url}` as RequestID);
 
     network.fetch<any>(url, { requestID: computedID })
@@ -1890,18 +1891,7 @@ export class OsmService extends AbstractSystem {
    */
   _authInterceptor(url: string, init: RequestInit): RequestInit {
     if (this._oauth.authenticated() && url.startsWith(this._apiroot)) {
-      // Primary: read from localStorage (works in browser environments).
-      // osm-auth stores the token under `<websiteURL>oauth2_access_token`.
-      let accessToken = globalThis.localStorage
-        ?.getItem(this._wwwroot + 'oauth2_access_token')
-        ?.replace(/"/g, '') ?? '';   // osm-auth strips legacy double-quotes
-
-      // Fallback: read from the options object (works with osm-auth's mock store
-      // in environments without localStorage, e.g. unit tests using preauth).
-      if (!accessToken) {
-        accessToken = this._oauth.options().access_token ?? '';
-      }
-
+      const accessToken = this._oauth.getAccessToken();
       if (accessToken) {
         const headers = (init.headers ?? {}) as Record<string, string>;
         return { ...init, headers: { ...headers, 'Authorization': `Bearer ${accessToken}` } };

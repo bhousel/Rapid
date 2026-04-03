@@ -11,6 +11,7 @@ import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 
@@ -570,17 +571,17 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param data - The file data
    * @param extension - The file extension
    */
-  private _setFile(data: string | Document | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
+  private _setFile(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
     if (!data) return;
 
     const isString = (typeof data === 'string');
     let geojson: GeoJSON.GeoJsonObject | undefined;
     switch (extension) {
       case '.gpx':
-        geojson = gpx(isString ? _parseXML(data as string) : data as Document);
+        geojson = gpx(isString ? _parseXML(data as string) : data as XmlDocument);
         break;
       case '.kml':
-        geojson = kml(isString ? _parseXML(data as string) : data as Document);
+        geojson = kml(isString ? _parseXML(data as string) : data as XmlDocument);
         break;
       case '.geojson':
       case '.json':
@@ -610,8 +611,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
     }
 
-    function _parseXML(text: string): Document {
-      return (new DOMParser()).parseFromString(text, 'text/xml');
+    function _parseXML(text: string): XmlDocument {
+      return (new DOMParser()).parseFromString(text.trimStart(), 'text/xml');
     }
   }
 

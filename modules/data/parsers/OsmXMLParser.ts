@@ -1,5 +1,6 @@
 import { DOMParser } from '@xmldom/xmldom';
 
+import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type {
   ParserDataType,
   ParserOptions,
@@ -113,7 +114,7 @@ export class OsmXMLParser {
    * @return  Result object containing the information parsed
    * @throws  Will throw if nothing could be parsed, or errors found
    */
-  parse(content: Document | string, options: Partial<ParserOptions> = {}): ParserResult {
+  parse(content: XmlDocument | string, options: Partial<ParserOptions> = {}): ParserResult {
     if (!content)  {
       throw new Error('No content');
     }
@@ -133,7 +134,7 @@ export class OsmXMLParser {
 
     // Note: I'd like to try to find a way to avoid seenIDs, See note in EditSystem.merge()..
     const results: ParserResult = { osm: {}, data: [], seenIDs: new Set() };
-    const xml: Document = (typeof content === 'string' ? new DOMParser().parseFromString(content, 'application/xml') : content);
+    const xml: XmlDocument = (typeof content === 'string' ? new DOMParser().parseFromString(content.trimStart(), 'application/xml') : content);
 
     if (!xml?.childNodes) {
       throw new Error('No XML');

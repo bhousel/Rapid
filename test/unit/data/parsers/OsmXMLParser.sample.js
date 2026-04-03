@@ -336,8 +336,8 @@ export const user2 = `
 // GET /api/0.6/user/#id
 // GET /api/0.6/user/details
 // GET /api/0.6/users.json?users=#id1,#id2,…,#idn
-export const usersXML = `
-<?xml version="1.0" encoding="UTF-8"?>
+export const usersXML =
+`<?xml version="1.0" encoding="UTF-8"?>
 <osm version="0.6" generator="OpenStreetMap server" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
   ${user1}
   ${user2}
@@ -367,8 +367,8 @@ export const userBlock2 = `
 // This covers responses to calls like:
 // GET /api/0.6/user_blocks/#id
 // GET /user/blocks/active
-export const userBlocksXML = `
-<?xml version="1.0" encoding="UTF-8"?>
+export const userBlocksXML =
+`<?xml version="1.0" encoding="UTF-8"?>
 <osm version="0.6" generator="OpenStreetMap server" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
   ${userBlock1}
   ${userBlock2}
@@ -380,8 +380,8 @@ export const userBlocksXML = `
 
 // Preferences of the logged-in user are returned in a `preferences` element.
 // GET /api/0.6/user/preferences
-export const preferencesXML = `
-<?xml version="1.0" encoding="UTF-8"?>
+export const preferencesXML =
+`<?xml version="1.0" encoding="UTF-8"?>
 <osm version="0.6" generator="OpenStreetMap server" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
   <preferences>
     <preference k="foo" v="bar"/>
