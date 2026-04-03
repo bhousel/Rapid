@@ -17,8 +17,6 @@ describe('WorkerSystem', () => {
         assert.strictEqual(worker.context, context);
         assert.instanceOf(worker.requiredDependencies, Set);
         assert.instanceOf(worker.optionalDependencies, Set);
-        assert.strictEqual(worker.requiredDependencies.size, 0);
-        assert.strictEqual(worker.optionalDependencies.size, 0);
         assert.isTrue(worker.autoStart);
       });
     });

@@ -527,6 +527,7 @@ export class OsmService extends AbstractSystem {
       requestID: computedID,
       listenerID: 'osmService:fetchAndParse',
       listenerData: { format, parserOptions: options },
+      resultPriority: 'normal',
     })
       .then((response: OsmFetchResult) => {
         // The user switched connection while the request was inflight.

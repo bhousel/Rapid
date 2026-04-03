@@ -25,6 +25,27 @@ interface PendingWorkerRequest {
   worker: Worker;
   /** Cleanup function to remove AbortSignal listener, if any */
   signalCleanup: (() => void) | null;
+  /** When set, resolution is deferred through SchedulerSystem instead of resolving immediately */
+  resultPriority: 'urgent' | 'normal' | 'idle' | null;
+}
+
+/** Options for `dispatch()` */
+export interface DispatchOptions {
+  /**
+   * When set, the returned promise is resolved through SchedulerSystem
+   * at the given priority instead of resolving immediately in the
+   * worker's `onmessage` handler.
+   *
+   * This prevents worker results from triggering heavy synchronous
+   * microtask chains (entity construction, graph rebase, etc.) that
+   * blow the frame budget.  Each deferred result gets its own slot in
+   * the scheduler's drain loop, allowing the frame to yield between
+   * results.
+   *
+   * When SchedulerSystem is unavailable (tests, CLI), the result
+   * resolves immediately — no worse than the current behavior.
+   */
+  resultPriority?: 'urgent' | 'normal' | 'idle';
 }
 
 /** Default max worker pool size */
@@ -42,6 +63,9 @@ const DEFAULT_MAX_WORKERS = 2;
  *   These functions can run either in the worker or on the main thread as a fallback.
  *
  * This system has no required dependencies and should be available very early.
+ * SchedulerSystem is an optional dependency — when present, `dispatch()` can
+ * defer result resolution through the scheduler's frame-budget-aware queues
+ * (see `DispatchOptions.resultPriority`).
  * Host apps must set `workerURL` before dispatching tasks (typically right
  * after `initAsync`).
  *
@@ -81,9 +105,8 @@ export class WorkerSystem extends AbstractSystem {
   constructor(context: Context) {
     super(context);
     this.id = 'worker';
-    // No required dependencies — this system should be available very early.
     this.requiredDependencies = new Set();
-    this.optionalDependencies = new Set();
+    this.optionalDependencies = new Set<SystemID>(['scheduler']);
 
     this._workerURL = null;
     this._workers = [];
@@ -204,10 +227,11 @@ export class WorkerSystem extends AbstractSystem {
    * @param listenerID - The id of the listener function
    * @param data - Serializable input for the listener
    * @param signal - Optional AbortSignal to cancel the task
+   * @param options - Optional dispatch options (e.g. deferred result priority)
    * @return Promise resolved with the task result, or rejected on error
    * @throws Error if `workerURL` has not been set
    */
-  dispatch<T = unknown>(listenerID: ListenerID, data?: unknown, signal?: AbortSignal): Promise<T> {
+  dispatch<T = unknown>(listenerID: ListenerID, data?: unknown, signal?: AbortSignal, options?: DispatchOptions): Promise<T> {
     if (!this._workerURL) {
       return Promise.reject(new Error('WorkerSystem: workerURL not set'));
     }
@@ -248,6 +272,7 @@ export class WorkerSystem extends AbstractSystem {
         reject,
         worker,
         signalCleanup,
+        resultPriority: options?.resultPriority ?? null,
       });
 
       const request: WorkerRequest = { id, listenerID, data };
@@ -333,6 +358,7 @@ export class WorkerSystem extends AbstractSystem {
    * Creates a new Worker and wires up message/error handlers.
    */
   private _spawnWorker(): Worker {
+    const scheduler = this.context.systems.scheduler;
     const worker = new Worker(this._workerURL!, { type: 'module' });
 
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
@@ -345,6 +371,14 @@ export class WorkerSystem extends AbstractSystem {
 
       if (error !== undefined) {
         pending.reject(new Error(error));
+      } else if (pending.resultPriority) {
+        // Defer resolution through SchedulerSystem so heavy .then() chains
+        // (entity construction, graph rebase) run within frame budget.
+        if (scheduler) {
+          scheduler.schedule(() => pending.resolve(result), { priority: pending.resultPriority });
+        } else {
+          pending.resolve(result);  // fallback: resolve immediately
+        }
       } else {
         pending.resolve(result);
       }

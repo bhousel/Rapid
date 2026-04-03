@@ -357,7 +357,9 @@ Migration notes:
   - `workerURL` getter/setter — host app sets path to built worker script
   - `maxWorkers` getter/setter — pool size cap (default 2), lazy spawn
   - `numWorkers`, `numPendingRequests` — read-only diagnostics
-  - `dispatch<T>(listenerID, data?)` — dispatch to pooled worker, returns `Promise<T>`
+  - `dispatch<T>(listenerID, data?, signal?, options?)` — dispatch to pooled worker, returns `Promise<T>`.
+    Accepts an `AbortSignal` to cancel in-flight tasks and `DispatchOptions` for deferred
+    result resolution (`resultPriority`).
   - `terminateWorkers()` — tear down pool, reject pending requests
 - Workers spawned lazily on first task, dispatched round-robin
 - `resetAsync()` calls `terminateWorkers()` automatically
@@ -400,6 +402,35 @@ to `requiredDependencies`.  Inflight tracking caches (`_inflight`, `inflightTile
 state.  `abortMatching` predicates use regex `.test()` (~10% faster than
 `startsWith`/`includes` per jsbench).  `key` renamed to `requestID` with
 `RequestID` global string ID type.  Tests updated (8 test files).  2939 tests pass.
+
+**Hard tier — OsmService: done.** OsmService `loadFromAPI` dispatches to a
+dedicated `osmService:fetchAndParse` listener on the worker via
+`listenerID` + `listenerData`.  Parsing (`OsmJSONParser`/`OsmXMLParser`)
+runs on the worker; parser instances are module-scoped in
+`OsmService.worker.ts`.  Result envelope pattern (`OsmFetchResult`) returns
+HTTP error details (status, body text) without throwing, so the main thread
+can branch on status codes.  Write operations (changeset, notes) remain
+`mainThread: true`.
+
+### Phase 6b — Deferred worker result resolution (done)
+
+Worker `onmessage` resolves promises immediately, which triggers `.then()`
+chains as microtasks.  Microtasks are non-preemptible — the browser must
+drain them all before the next `requestAnimationFrame`.  When multiple tile
+results arrive in one frame, the cascading main-thread work (entity
+construction via `createOsmEntity`, `graph.rebase`, `tree.rebase` — ~11ms
+per tile) blows the frame budget.
+
+Fix: `WorkerSystem.dispatch()` accepts `DispatchOptions.resultPriority`
+(`'urgent' | 'normal' | 'idle'`).  When set, the result is deferred through
+`scheduler.schedule()` instead of resolving immediately.  Each deferred
+result gets its own slot in `_drainQueues`, so the frame loop can check the
+budget and yield between results.  When `SchedulerSystem` is not available
+(tests, CLI), resolution is immediate — no worse than before.
+
+Wired through `NetworkFetchOptions.resultPriority` →
+`NetworkSystem._dispatchFetch()` → `worker.dispatch(_, _, _, { resultPriority })`.
+OsmService tile loading uses `resultPriority: 'normal'`.
 
 ### Phase 7 — Validator offloading (future)
 

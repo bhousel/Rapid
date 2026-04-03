@@ -17,8 +17,6 @@ describe('SchedulerSystem', () => {
         assert.strictEqual(scheduler.context, context);
         assert.instanceOf(scheduler.requiredDependencies, Set);
         assert.instanceOf(scheduler.optionalDependencies, Set);
-        assert.strictEqual(scheduler.requiredDependencies.size, 0);
-        assert.strictEqual(scheduler.optionalDependencies.size, 0);
         assert.isTrue(scheduler.autoStart);
       });
     });

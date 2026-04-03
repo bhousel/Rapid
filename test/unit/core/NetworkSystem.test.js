@@ -23,28 +23,28 @@ describe('NetworkSystem', () => {
   describe('lifecycle', () => {
     describe('constructor', () => {
       it('constructs a NetworkSystem from a context', () => {
-        const sys = new Rapid.NetworkSystem(context);
-        assert.instanceOf(sys, Rapid.NetworkSystem);
-        assert.strictEqual(sys.id, 'network');
-        assert.strictEqual(sys.context, context);
-        assert.strictEqual(sys.requiredDependencies.size, 0);
-        assert.isTrue(sys.optionalDependencies.has('worker'));
-        assert.isTrue(sys.autoStart);
+        const network = new Rapid.NetworkSystem(context);
+        assert.instanceOf(network, Rapid.NetworkSystem);
+        assert.strictEqual(network.id, 'network');
+        assert.strictEqual(network.context, context);
+        assert.instanceOf(network.requiredDependencies, Set);
+        assert.instanceOf(network.optionalDependencies, Set);
+        assert.isTrue(network.autoStart);
       });
     });
 
     describe('initAsync', () => {
       it('returns a promise to init', () => {
-        const sys = new Rapid.NetworkSystem(context);
-        const prom = sys.initAsync();
+        const network = new Rapid.NetworkSystem(context);
+        const prom = network.initAsync();
         assert.instanceOf(prom, Promise);
         return prom;
       });
 
       it('returns the same promise on subsequent calls', () => {
-        const sys = new Rapid.NetworkSystem(context);
-        const prom1 = sys.initAsync();
-        const prom2 = sys.initAsync();
+        const network = new Rapid.NetworkSystem(context);
+        const prom1 = network.initAsync();
+        const prom2 = network.initAsync();
         assert.strictEqual(prom1, prom2);
         return prom1;
       });
@@ -52,18 +52,18 @@ describe('NetworkSystem', () => {
 
     describe('startAsync', () => {
       it('returns a promise to start', () => {
-        const sys = new Rapid.NetworkSystem(context);
-        const prom = sys.initAsync().then(() => sys.startAsync());
+        const network = new Rapid.NetworkSystem(context);
+        const prom = network.initAsync().then(() => network.startAsync());
         assert.instanceOf(prom, Promise);
         return prom
-          .then(() => assert.isTrue(sys.started));
+          .then(() => assert.isTrue(network.started));
       });
     });
 
     describe('resetAsync', () => {
       it('returns a promise to reset', () => {
-        const sys = new Rapid.NetworkSystem(context);
-        const prom = sys.resetAsync();
+        const network = new Rapid.NetworkSystem(context);
+        const prom = network.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom;
       });

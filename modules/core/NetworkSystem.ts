@@ -3,7 +3,7 @@ import { utilFetchResponse } from '../util/fetch_response.ts';
 import { networkListeners } from './NetworkSystem.worker.ts';
 
 import type { Context } from '../Context.ts';
-import type { WorkerSystem } from './WorkerSystem.ts';
+import type { DispatchOptions } from './WorkerSystem.ts';
 
 
 /** Options for network fetch requests */
@@ -23,7 +23,7 @@ export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
 
   /**
    * Custom fetch function.  Replaces `globalThis.fetch` for this request.
-   * Used by OsmService to pass `this._oauth.fetch` for authenticated requests.
+   * Useful as an escape hatch when request interceptors are insufficient.
    */
   fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -43,9 +43,17 @@ export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
 
   /**
    * Extra data to pass to the named listener alongside the URL.
-   * Only used when `task` is set.
+   * Only used when `listenerID` is set.
    */
   listenerData?: Record<string, unknown>;
+
+  /**
+   * When set, worker results are deferred through SchedulerSystem at
+   * the given priority.  Prevents heavy `.then()` chains from blowing
+   * the frame budget.  Passed through to `WorkerSystem.dispatch()`.
+   * @see DispatchOptions.resultPriority
+   */
+  resultPriority?: DispatchOptions['resultPriority'];
 }
 
 
@@ -572,11 +580,13 @@ export class NetworkSystem extends AbstractSystem {
     signal: AbortSignal,
     options?: NetworkFetchOptions,
   ): Promise<T> {
-    const worker = this.context.systems.worker as WorkerSystem | undefined;
+    const worker = this.context.systems.worker;
+
     const fetchFn = options?.fetchFn;
     const mainThread = options?.mainThread ?? false;
     const listenerID = options?.listenerID;
     const listenerData = options?.listenerData;
+    const resultPriority = options?.resultPriority;
     const useWorker = worker && worker.workerURL && !fetchFn && !mainThread;
 
     // Build base init (without signal) and apply interceptors.
@@ -587,9 +597,10 @@ export class NetworkSystem extends AbstractSystem {
     // Dispatch to a named listener
     if (listenerID) {
       const payload = { url, init, ...listenerData };
+      const dispatchOpts: DispatchOptions | undefined = resultPriority ? { resultPriority } : undefined;
 
       if (useWorker) {
-        return worker.dispatch<T>(listenerID, payload, signal);
+        return worker.dispatch<T>(listenerID, payload, signal, dispatchOpts);
       }
 
       // Main-thread fallback — call the registered listener directly
@@ -627,6 +638,7 @@ export class NetworkSystem extends AbstractSystem {
       mainThread: _mt,
       listenerID: _lid,
       listenerData: _td,
+      resultPriority: _rp,
       ...init
     } = options;
 
