@@ -1,0 +1,31 @@
+# Completed Work Archive
+
+Chronological one-liners. Details live in git history — these are just breadcrumbs.
+
+- **Deferred worker result resolution** (Apr 2026) — Added `resultPriority` option to `WorkerSystem.dispatch()`. When set (`'urgent'`/`'normal'`/`'idle'`), the returned promise resolves through SchedulerSystem instead of immediately in `onmessage`. Prevents heavy `.then()` chains from blowing frame budgets. Wired through `NetworkFetchOptions.resultPriority` → `_dispatchFetch()` → `worker.dispatch()`. OsmService tile loading (`loadFromAPI`) uses `resultPriority: 'normal'`. Falls back to immediate resolution when SchedulerSystem is absent (tests, CLI). New `DispatchOptions` interface exported from WorkerSystem.
+- **OsmService worker-based fetch+parse** (Apr 2026) — Created `OsmService.worker.ts` with `fetchAndParse` + `reset` listeners. OsmService `loadFromAPI` dispatches to worker via `listenerID: 'osmService:fetchAndParse'` with result envelope pattern (`OsmFetchResult`). Parser instances (`OsmJSONParser`/`OsmXMLParser`) live on the worker, not main thread. Reset simplified to call imported listener directly. 2950 tests pass, tsc clean.
+- **Canvas-backed atlas textures** (Apr 2026) — Added optional canvas-backing for `AtlasAllocator` to support Pixi.js v8.16+ experimental canvas renderer. Root cause: canvas renderer reads `TextureSource.resource` via `canvasUtils.getCanvasSource()` at draw time — it has no upload pipeline like GL/GPU. Fix: when `useCanvas: true`, `AtlasSource` creates a backing `HTMLCanvasElement` as the resource and blits padded pixel data at allocation time via `putImageData`. GL/GPU paths unchanged. Extracted shared `_getItemPixels()`. `PixiTextures.reset()` detects `RendererType.CANVAS` and passes `useCanvas: true`.
+- **Experimental canvas renderer URL flag** (Apr 2026) — `renderer=canvas` URL param selects the Pixi canvas renderer (no WebGL/WebGPU). Added in `GraphicsSystem._initPixi()`. Known limitation: no Mesh support. Requires Pixi.js v8.16.0+.
+- **Request interceptor API + OsmService migration** (Apr 2026) — Added `RequestInterceptor` type and `addRequestInterceptor` / `removeRequestInterceptor` API to NetworkSystem. Interceptors run on main thread before dispatch, produce serializable `RequestInit` for workers. OsmService migrated from `fetchFn: this._oauth.fetch` to `_authInterceptor` using `oauth.getAccessToken()` (osm-auth v3.2.0). Write operations keep `mainThread: true`.
+- **xmldom 0.9.x migration** (Apr 2026) — Two breaking changes: (1) xmldom owns its own `Document` type — fixed with `import type { Document as XmlDocument }`. (2) Throws `ParseError` if `<?xml` not at position 0 — fixed with `.trimStart()` at all three XML-parsing sites.
+- **Worker companion convention** (Mar 2026) — Established `*.worker.ts` companion file convention. `NetworkSystem.worker.ts` provides core listeners. `_dispatchFetch` routes named tasks (`listenerID` + `listenerData`) to WorkerSystem or calls listener directly as fallback.
+- **WorkerSystem extraction** (Mar 2026) — Extracted worker pool + listener registry from SchedulerSystem and NetworkSystem into dedicated `WorkerSystem`. Workers are long-lived (resetAsync does NOT terminate them). NetworkSystem changed optional dependency from `'scheduler'` to `'worker'`.
+- **NetworkSystem service migration — COMPLETE** (Mar 2026) — All services migrated to NetworkSystem. OsmService was last: removed 3 redundant inflight caches, added `hasMatching()`, fixed copy-paste bug in note POST handlers, renamed `osm-note-` → `osm-note-tile-`.
+- **NetworkSystem Phase 6b** (Mar 2026) — All 10 Easy+Medium tier services migrated. `key` → `requestID` with `RequestID` global string ID type. `abortMatching` predicates use regex `.test()`. 2939 tests pass.
+- **NetworkSystem Phase 6a** (Mar 2026) — `NetworkSystem` centralizes fetch lifecycle: inflight tracking, dedup, timeout, WorkerSystem.dispatch offloading, concurrency limiting. Committed as `74a291f18`.
+- **SchedulerSystem Phase 5: Backpressure** (Mar 2026) — EMA frame metrics, dropped-frame ring buffer, pressure levels (none/light/moderate/heavy) with hysteresis, idle queue throttling. 117 tests.
+- **SchedulerSystem Phase 4a** (Mar 2026) — Migrated all lodash debounce/throttle (22 sites, 16 files) to SchedulerSystem workID-keyed API.
+- **SchedulerSystem Phase 4** (Mar 2026) — workID-keyed timer API: `setTimeout`, `setInterval`, `debounce`, `throttle`. `cancel(workID)` / `cancelAllTimers()`.
+- **SchedulerSystem Phase 3** (Mar 2026) — Priority queues (urgent/normal/idle) drained per-frame within budget. New `schedule(fn, opts)` API. `targetFrameTime` property.
+- **SchedulerSystem Phase 2** (Mar 2026) — SchedulerSystem owns the rAF game loop. GraphicsSystem registers `_tick(deltaMS)` as a frame callback. PIXI.Ticker removed.
+- **SchedulerSystem Phase 1** (Mar 2026) — Foundation: `scheduleIdleTask`, `scheduleTimeout`, `scheduleInterval`. All `requestIdleCallback` usage migrated.
+- **Validators TS conversion + JSDoc** (Mar 2026) — All 19 validator files converted. `ValidatorResult` is now `{ issues, provisional? }`. Entity narrowing pattern applied.
+- **Validators folder rename** (Mar 2026) — `modules/validations/` → `modules/validators/`, `duplicate_way_segments` → `duplicate_segments`.
+- **Data class renames** (Mar 2026) — `Tags` → `OsmTags`, `GeoJSON` → `GeoJSONData`, `Marker` → `MarkerData`.
+- **Context lifecycle split** (Mar 2026) — `prepareAsync()` → `initAsync()` → `startAsync()` → `run()`.
+- **JSON Schema validation** (Mar 2026) — 13 schemas in `data/schema/`, validated via `bun run validate:json`.
+- **Scope-owned tag rulesets** (Mar 2026) — All tag globals eliminated. Rulesets on `SchemaScope`. `tags.ts` deleted.
+- **Variables system** (Mar 2026) — `Variable` class with `var()` refs in SchemaSystem and StyleSystem. Dual-props pattern for resolution.
+- **Scoped customization** (Feb 2026) — `_scopes: Map<ScopeID, ScopeData>` as sole source of truth in StyleSystem and SchemaSystem. `'*'` common scope for fallbacks.
+- **Dynamic styling fixes** (Feb 2026) — `dirtyScene()` before redraw, removed hardcoded marker styles, single `styleDefaults`.
+- **Services TS conversion** (Feb 2026) — All 19 service files converted. Generic `MarkerData<P>` / `GeoJSONData<P>` for typed props.
