@@ -191,9 +191,10 @@ export class NetworkSystem extends AbstractSystem {
 
     this.abortAll();
 
-    if (worker) {
+    if (worker?.workerURL) {
       return worker.dispatch<void>('network:reset');
     } else {
+      networkListeners['network:reset'](undefined, new AbortController().signal);
       return Promise.resolve();
     }
   }

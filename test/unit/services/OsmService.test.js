@@ -12,7 +12,8 @@ describe('OsmService', () => {
   context.systems = {
     gfx:     new Rapid.MockGfxSystem(context),
     network: new Rapid.NetworkSystem(context),
-    spatial: new Rapid.SpatialSystem(context)
+    spatial: new Rapid.SpatialSystem(context),
+    worker:  new Rapid.WorkerSystem(context),
   };
 
   // Spy on redraws..

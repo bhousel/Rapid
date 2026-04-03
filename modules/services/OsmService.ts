@@ -5,12 +5,13 @@ import { osmAuth } from 'osm-auth';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { JXON } from '../util/jxon.ts';
 import { OsmEntity, MarkerData } from '../data/index.ts';
-import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.ts';
+import { osmServiceListeners } from './OsmService.worker.ts';
 
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { OsmChangeset, OsmChanges } from '../data/OsmChangeset.ts';
+import type { OsmFetchResult } from './OsmService.worker.ts';
 import type { ParserOptions, ParserResult, ParsedApi, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
 
 
@@ -194,10 +195,6 @@ export class OsmService extends AbstractSystem {
   _wwwroot: string;
   /** Base URL of the OSM API (e.g. 'https://api.openstreetmap.org') */
   _apiroot: string;
-  /** Parser for OSM JSON responses */
-  _JSONParser: OsmJSONParser;
-  /** Parser for OSM XML responses */
-  _XMLParser: OsmXMLParser;
   /** Cache for tile loading state */
   _tileCache: TileCache;
   /** Cache for note loading state */
@@ -235,7 +232,7 @@ export class OsmService extends AbstractSystem {
     super(context);
     this.id = 'osm';
     this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
-    this.optionalDependencies = new Set<SystemID>(['editor', 'gfx', 'l10n', 'locations', 'scheduler']);
+    this.optionalDependencies = new Set<SystemID>(['editor', 'gfx', 'l10n', 'locations', 'scheduler', 'worker']);
 
     // Some defaults that we will replace with whatever we fetch from the OSM API capabilities result.
     this._maxWayNodes = 2000;
@@ -249,8 +246,6 @@ export class OsmService extends AbstractSystem {
     // Using JSON can be much more efficient because it avoids the overhead
     // of parsing and creating a Document and DOM objects.
     this.preferJSON = true;
-    this._JSONParser = new OsmJSONParser();
-    this._XMLParser = new OsmXMLParser();
 
     this._tileCache = {} as TileCache;
     this._noteCache = {} as NoteCache;
@@ -271,7 +266,6 @@ export class OsmService extends AbstractSystem {
     this._authLoading = this._authLoading.bind(this);
     this._authDone = this._authDone.bind(this);
     this._authInterceptor = this._authInterceptor.bind(this);
-
     this.reloadApiStatus = this.reloadApiStatus.bind(this);
     this.deferredReloadApiStatus = this.deferredReloadApiStatus.bind(this);
 
@@ -342,11 +336,18 @@ export class OsmService extends AbstractSystem {
   initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
-    const network = this.context.systems.network!;
+    const context = this.context;
+    const network = context.systems.network!;
+    const worker = context.systems.worker;
 
     return this._initPromise = super.initAsync()
       .then(() => {
         network.addRequestInterceptor(this._authInterceptor);
+
+        // Register listeners for worker dispatch (and main-thread fallback)
+        for (const [listenerID, listener] of Object.entries(osmServiceListeners)) {
+          worker?.registerListener(listenerID, listener);
+        }
       })
       .then(() => this.resetAsync());
   }
@@ -374,35 +375,28 @@ export class OsmService extends AbstractSystem {
     this._userChangesets = null;
     this._userDetails = null;
 
-    const network = this.context.systems.network!;
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+    const worker = context.systems.worker;
+
     network.abortMatching(id => /^osm-/.test(id));
 
-    this._tileCache = {
-      lastv: null,
-      toLoad: new Set(),
-    };
-
-    this._noteCache = {
-      lastv: null,
-      toLoad: new Set(),
-      closed: {},
-    };
-
-    this._userCache = {
-      toLoad: new Set(),
-      user: {}
-    };
-
+    this._tileCache = { lastv: null, toLoad: new Set() };
+    this._noteCache = { lastv: null, toLoad: new Set(), closed: {} };
+    this._userCache = { toLoad: new Set(), user: {} };
     this._changeset = {};
 
-    const spatial = this.context.systems.spatial!;
     spatial.clearCache('osm-data');
     spatial.clearCache('osm-notes');
 
-    this._JSONParser.reset();
-    this._XMLParser.reset();
-
-    return Promise.resolve();
+    // Reset the worker-side parser instances
+    if (worker?.workerURL) {
+      return worker.dispatch<void>('osmService:reset');
+    } else {
+      osmServiceListeners['osmService:reset'](undefined, new AbortController().signal);
+      return Promise.resolve();
+    }
   }
 
 
@@ -412,7 +406,8 @@ export class OsmService extends AbstractSystem {
    * @return  Promise resolved when this component has completed resetting
    */
   switchAsync(newOptions: SwitchOptions): Promise<void> {
-    const gfx = this.context.systems.gfx;
+    const context = this.context;
+    const gfx = context.systems.gfx;
 
     this._wwwroot = newOptions.url;
     this._apiroot = newOptions.apiUrl;
@@ -503,6 +498,12 @@ export class OsmService extends AbstractSystem {
    * loadFromAPI
    * Generic method to load data from the OSM API.
    * Can handle either auth or unauth calls.
+   *
+   * Fetching and parsing are dispatched to a web worker via the
+   * `osmService:fetchAndParse` listener.  The listener returns a
+   * discriminated result type (`OsmFetchResult`) so that HTTP error
+   * details (status, body text) survive the worker boundary.
+   *
    * @param   path - the url path to load data from
    * @param   callback - errback-style callback function to call with results
    * @param   options - parsing options
@@ -510,43 +511,53 @@ export class OsmService extends AbstractSystem {
    * @return  the RequestID used for this request
    */
   loadFromAPI(path: string, callback: Errback | null, options: Partial<ParserOptions> = {}, requestID?: RequestID): RequestID {
-    const network = this.context.systems.network!;
+    const context = this.context;
+    const network = context.systems.network!;
 
     const cid = this._connectionID;
     options.skipSeen ??= true;
 
-    const gotResult: Errback = (err, content): void => {
-      // The user switched connection while the request was inflight
-      // Ignore content and raise an error.
-      if (this._connectionID !== cid) {
-        if (callback) callback({ message: 'Connection Switched', status: -1 });
-        return;
-      }
+    const format: 'json' | 'xml' = path.includes('.json') ? 'json' : 'xml';
 
-      // 400 Bad Request, 401 Unauthorized, 403 Forbidden (while logged in)
-      // An issue has occurred with the user's credentials.
-      // Logout and retry the request..
-      const isAuthenticated = this.authenticated();
-      if (isAuthenticated && (err?.status === 400 || err?.status === 401 || err?.status === 403)) {
-        this.logout();
-        this.loadFromAPI(path, callback, options);  // retry
-        return;
+    // Accept absolute or relative paths
+    const url = /^http/i.test(path) ? path : (this._apiroot + path);
+    const computedID = requestID ?? (`GET ${url}` as RequestID);
 
-      } else {  // No retry.. We will relay any error and results to the callback.
+    network.fetch<OsmFetchResult>(url, {
+      requestID: computedID,
+      listenerID: 'osmService:fetchAndParse',
+      listenerData: { format, parserOptions: options },
+    })
+      .then((response: OsmFetchResult) => {
+        // The user switched connection while the request was inflight.
+        // Ignore content and raise an error.
+        if (this._connectionID !== cid) {
+          if (callback) callback({ message: 'Connection Switched', status: -1 });
+          return;
+        }
 
-        if (err) {
+        if (!response.ok) {
+          const { status, statusText, message, responseText } = response;
+
+          // 400 Bad Request, 401 Unauthorized, 403 Forbidden (while logged in)
+          // An issue has occurred with the user's credentials.
+          // Logout and retry the request..
+          const isAuthenticated = this.authenticated();
+          if (isAuthenticated && (status === 400 || status === 401 || status === 403)) {
+            this.logout();
+            this.loadFromAPI(path, callback, options);  // retry
+            return;
+          }
+
           // 509 Bandwidth Limit Exceeded, 429 Too Many Requests
-          if (err.status === 509 || err.status === 429) {
-            err.response.text()   // capture the rate limit details
-              .then((message: string) => {
-                let duration = 10;  // default 10sec, see if response contains a better value
-                const match = message.match(/ (\d+) seconds/);
-                if (match) {
-                  duration = parseInt(match[1], 10);
-                }
-                this.setRateLimit(duration);
-              })
-              .then(() => this.deferredReloadApiStatus());  // reload status / raise warning
+          if (status === 509 || status === 429) {
+            let duration = 10;  // default 10sec, see if response contains a better value
+            const match = responseText.match(/ (\d+) seconds/);
+            if (match) {
+              duration = parseInt(match[1], 10);
+            }
+            this.setRateLimit(duration);
+            this.deferredReloadApiStatus();  // reload status / raise warning
 
           // Some other error.. Note that these are not automatically API issues.
           // May be 404 Not Found, etc, but it is worth checking the API status now.
@@ -556,48 +567,31 @@ export class OsmService extends AbstractSystem {
             }
           }
 
-        } else {  // no error
-          if (this._rateLimit) {               // if had rate limit before
-            this._rateLimit = null;            // clear rate limit
-            this.deferredReloadApiStatus();    // reload status / clear warning
-          }
-          if (this._apiStatus === 'error') {   // if had error before
-            this.deferredReloadApiStatus();    // reload status / clear warning
-          }
-        }
-
-        if (callback) {
-          if (err) {
-            return callback(err);
-          } else {
-            try {
-              let results;
-              if (path.includes('.json')) {
-                results = this._JSONParser.parse(content, options);
-              } else {
-                results = this._XMLParser.parse(content, options);
-              }
-              return callback(null, results);
-            } catch (err2) {
-              return callback(err2);
-            }
-          }
-        }
-      }
-    };
-
-    // Accept absolute or relative paths
-    const url = /^http/i.test(path) ? path : (this._apiroot + path);
-    const computedID = requestID ?? (`GET ${url}` as RequestID);
-
-    network.fetch<any>(url, { requestID: computedID })
-      .then((result: any) => gotResult(null, result))
-      .catch((err: any) => {
-        if (err.name === 'AbortError') return;  // ok
-        if (err.name === 'FetchError') {
-          gotResult(err);
+          if (callback) callback({ message, status, statusText });
           return;
         }
+
+        // Success path — data was fetched and parsed on the worker
+        if (this._rateLimit) {               // if had rate limit before
+          this._rateLimit = null;            // clear rate limit
+          this.deferredReloadApiStatus();    // reload status / clear warning
+        }
+        if (this._apiStatus === 'error') {   // if had error before
+          this.deferredReloadApiStatus();    // reload status / clear warning
+        }
+
+        if (callback) callback(null, response.results);
+      })
+      .catch((err: any) => {
+        if (err.name === 'AbortError') return;  // ok
+
+        // The user switched connection while the request was inflight
+        if (this._connectionID !== cid) {
+          if (callback) callback({ message: 'Connection Switched', status: -1 });
+          return;
+        }
+
+        if (callback) callback(err);
       });
 
     return computedID;
@@ -1054,6 +1048,9 @@ export class OsmService extends AbstractSystem {
       return callback({ message: 'Not Authenticated', status: -3 });
     }
 
+    const context = this.context;
+    const network = context.systems.network!;
+
     const createdChangeset = (err: any, changesetID?: any): void => {
       if (err) { return callback(err, changeset); }
 
@@ -1068,7 +1065,6 @@ export class OsmService extends AbstractSystem {
     }
 
     const errback = this._wrapcb(createdChangeset);
-    const network = this.context.systems.network!;
     const requestID = 'osm-changeset-create' as RequestID;
     const resource = this._apiroot + '/api/0.6/changeset/create';
 
@@ -1108,20 +1104,22 @@ export class OsmService extends AbstractSystem {
       return callback({ message: 'Changeset ID mismatch', status: -4 });
     }
 
+    const context = this.context;
+    const editor = context.systems.editor;
+    const network = context.systems.network!;
+
     const uploadedChangeset = (err: any, /*result*/): void => {
       // we do get a changeset diff result, but we don't currently use it for anything
       callback(err, changeset);
     };
 
     const errback = this._wrapcb(uploadedChangeset);
-    const network = this.context.systems.network!;
     const requestID = `osm-changeset-upload-${changeset.id}` as RequestID;
     const resource = this._apiroot + `/api/0.6/changeset/${changeset.id}/upload`;
 
     // Attempt to prevent user from creating duplicate changes - see iD#5200
     // Some users will refresh their tab as soon as the changeset is inflight.
     // We don't want to offer to restore these same changes when their browser refreshes.
-    const editor = this.context.systems.editor;
     editor?.clearBackup();
 
     network.fetch<any>(resource, {
@@ -1159,6 +1157,9 @@ export class OsmService extends AbstractSystem {
       return callback({ message: 'Changeset ID mismatch', status: -4 });
     }
 
+    const context = this.context;
+    const network = context.systems.network!;
+
     const closedChangeset = (err: any, /*result*/): void => {
       this._changeset.openChangesetID = null;
       // there is no result to this call
@@ -1166,7 +1167,6 @@ export class OsmService extends AbstractSystem {
     };
 
     const errback = this._wrapcb(closedChangeset);
-    const network = this.context.systems.network!;
     const requestID = `osm-changeset-close-${changeset.id}` as RequestID;
     const resource = this._apiroot + `/api/0.6/changeset/${changeset.id}/close`;
 
@@ -1238,8 +1238,11 @@ export class OsmService extends AbstractSystem {
       return;
     }
 
+    const context = this.context;
+    const network = context.systems.network!;
+    const viewport = context.viewport;
+
     const cache = this._tileCache;
-    const viewport = this.context.viewport;
     if (cache.lastv === viewport.v) {  // exit early if the view is unchanged
       if (callback) callback(null, { data: [] });
       return;
@@ -1251,7 +1254,6 @@ export class OsmService extends AbstractSystem {
     const tiles = (this._tiler.zoomRange(this._tileZoom) as Tiler).getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const network = this.context.systems.network!;
     const neededIDs = new Set<RequestID>(tiles.map(t => `osm-tile-${t.id}` as RequestID));
     network.abortMatching(id => /^osm-tile-/.test(id) && !neededIDs.has(id));
 
@@ -1280,8 +1282,10 @@ export class OsmService extends AbstractSystem {
       return this._rateLimit;
     }
 
+    const context = this.context;
+    const network = context.systems.network!;
+
     // Stop loading tiles, and cancel any inflight tile/note requests
-    const network = this.context.systems.network!;
     this._tileCache.toLoad.clear();
     this._noteCache.toLoad.clear();
     network.abortMatching(id => /^osm-tile-/.test(id) || /^osm-note-/.test(id));
@@ -1400,8 +1404,9 @@ export class OsmService extends AbstractSystem {
    * @param   callback - errback-style callback function to call with results
    */
   loadTileAtLoc(loc: Vec2, callback?: Errback | null): void {
-    const network = this.context.systems.network!;
-    const spatial = this.context.systems.spatial!;
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
 
     if (this._paused || this.getRateLimit()) return;
     const cache = this._tileCache;
@@ -1441,11 +1446,12 @@ export class OsmService extends AbstractSystem {
     if (this._paused || this.getRateLimit()) return;
 
     const context = this.context;
-    const cache = this._noteCache;
     const locations = context.systems.locations;
+    const network = context.systems.network!;
     const spatial = context.systems.spatial!;
     const viewport = context.viewport;
 
+    const cache = this._noteCache;
     if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
     cache.lastv = viewport.v;
 
@@ -1453,7 +1459,6 @@ export class OsmService extends AbstractSystem {
     const tiles = (this._tiler.zoomRange(this._noteZoom) as Tiler).getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed
-    const network = context.systems.network!;
     const neededNoteIDs = new Set<RequestID>(tiles.map(t => `osm-note-tile-${t.id}` as RequestID));
     network.abortMatching(id => /^osm-note-tile-/.test(id) && !neededNoteIDs.has(id));
 

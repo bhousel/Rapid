@@ -1,7 +1,6 @@
-// TODO: Not using this one now - will replace with others
-//import { mapWithAIListeners } from './MapWithAIService.worker.ts';
+import { osmServiceListeners } from './OsmService.worker.ts';
 
 /** Listeners provided by this file */
 export const serviceListeners: ListenerRegistry = {
-  //...mapWithAIListeners
+  ...osmServiceListeners,
 };
