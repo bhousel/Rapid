@@ -67,14 +67,7 @@ This file loads Rapid in an iframe. The parent frame can access and control it.
           ];
 
           window.rapidContext = context;
-          context.prepareAsync()
-            .then(() => {
-              // Configure systems
-              const worker = context.systems.worker;
-              worker.workerURL = context.assetPath + 'js/rapid-worker.min.js';
-            })
-            .then(() => context.initAsync())
-            .then(() => context.startAsync());
+          context.runAsync();
         }
       }
     </script>

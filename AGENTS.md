@@ -525,8 +525,15 @@ After making changes:
 1. Run `bun tsc --noEmit` to check types
 2. Run `bun run lint` to perform linting
 3. Run `bun run build:js` to verify build
-4. Run `bun test` for full test suite
+4. Run `bun run test` for full test suite (or the sub-commands below for faster iteration)
 5. Run `bun run validate:json` to validate data files against JSON schemas
+
+### Test Commands
+- `bun run test` — runs lint + unit + browser + type-check (the full suite)
+- `bun run test:unit` — unit tests only (`test/unit/`)
+- `bun run test:browser` — browser tests with happy-dom preload (`test/browser/`)
+- `bun run test:ts` — type-check via `tsc --noEmit`
+- **Do NOT use bare `bun test`** — it skips the `--preload ./test/test_setup.js` that provides happy-dom globals. Browser tests will fail with misleading errors about missing DOM APIs.
 
 ### JSON Schemas
 - Data files in `data/` are validated by JSON Schema definitions in `data/schema/`

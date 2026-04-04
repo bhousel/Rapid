@@ -20,6 +20,7 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
 - **SchedulerSystem owns "when to run"** — Game loop (rAF), priority queues (urgent/normal/idle), timers (debounce/throttle/setTimeout/setInterval), frame callbacks, backpressure. No worker knowledge.
 - **NetworkSystem owns network I/O** — Fetch lifecycle, inflight tracking, dedup, abort, concurrency limiting, timeout. Dispatches to WorkerSystem when available (`worker` is an optional dependency). Falls back to main-thread listener via `worker.getListener()`.
 - **Host app sets `worker.workerURL` BEFORE `initAsync()`** — in `dist/index.html` / `dist/index-dev.html` during `prepareAsync().then(...)`, before calling `initAsync()`. Setting it after `initAsync` means all fetches during init (asset loading, schema loading, etc.) run on the main thread instead of the worker. Set it in `prepareAsync` since systems are constructed but not yet initialized at that point.
+- **`workerURL` auto-detected in WorkerSystem constructor** — `Context.scriptURL` (captured from `document.currentScript.src` at bundle eval time) is used to derive the worker URL (same directory, matching `.min.` status). Detection happens at construction time (during `prepareAsync`'s system construction loop), so host apps can override or set `null` at any time before workers are first spawned. This eliminates boilerplate from every host page.
 
 ## Request Interceptor API
 

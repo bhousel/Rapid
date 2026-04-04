@@ -63,16 +63,6 @@ const DEFAULT_MAX_WORKERS = 2;
  *   These functions can run either in the worker or on the main thread as a fallback.
  *
  * This system has no required dependencies and should be available very early.
- * Host apps must set `workerURL` before calling `initAsync` so that
- * init-time fetches (asset loading, schema, etc.) use the worker immediately.
- * The correct pattern:
- * ```js
- * context.prepareAsync()
- *   .then(() => { worker.workerURL = '...js/rapid-worker.js'; })
- *   .then(() => context.initAsync())
- *   .then(() => context.startAsync());
- * ```
- *
  * Design rationale:
  * - SchedulerSystem = **when** to run (game loop, queues, timers, backpressure)
  * - WorkerSystem = **where** to run (worker pool, task dispatch, listener registry)
@@ -112,7 +102,19 @@ export class WorkerSystem extends AbstractSystem {
     this.requiredDependencies = new Set();
     this.optionalDependencies = new Set<SystemID>(['scheduler']);
 
-    this._workerURL = null;
+    // Set a default value for _workerURL here.
+    // We expect to find a 'rapid-worker.js' file alongside the main 'rapid.js' file.
+    // Host apps can override this value or disable workers completely by setting
+    // `worker.workerURL = null` after construction time
+    const scriptURL = context.scriptURL;
+    if (scriptURL) {
+      const dir = scriptURL.substring(0, scriptURL.lastIndexOf('/') + 1);
+      const isMin = scriptURL.includes('.min.');
+      this._workerURL = dir + (isMin ? 'rapid-worker.min.js' : 'rapid-worker.js');
+    } else {
+      this._workerURL = null;
+    }
+
     this._workers = [];
     this._maxWorkers = DEFAULT_MAX_WORKERS;
     this._workerIndex = 0;
@@ -162,15 +164,16 @@ export class WorkerSystem extends AbstractSystem {
   // ID; the worker posts back a response with the same ID so the
   // system can resolve the correct Promise.
   //
-  // Host app must set `workerURL` before dispatching tasks.
+  // `workerURL` is auto-detected from the Rapid script URL during
+  // `prepareAsync()`.  Host apps can override or set to null.
   // Workers are terminated on `resetAsync()` and `terminateWorkers()`.
   // -------------------------------------------------------
 
   /**
    * workerURL
-   * URL to the built worker script.  Must be set by the host app
-   * before calling `dispatch`.  Typically something like
-   * `assetPath + 'rapid-worker.js'`.
+   * URL to the built worker script.  Auto-detected from the Rapid bundle
+   * location during `prepareAsync()`.  Override with a custom URL, or set
+   * to `null` to disable worker offloading.
    */
   get workerURL(): string | null {
     return this._workerURL;

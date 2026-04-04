@@ -91,6 +91,9 @@ export class Context extends EventEmitter {
   /** Version number for the "what's new" screen */
   whatsNewVersion: number;
 
+  /** The url for the main rapid.js bundle. */
+  scriptURL: string | null;
+
   /** Build identifier from CI/CD */
   buildID: string;
   /** Git SHA from CI/CD */
@@ -186,6 +189,9 @@ export class Context extends EventEmitter {
     // Just bump these dates to a higher number to get the screen to come back.
     this.privacyVersion = 20201202;    // whether to show the "welcome" screen
     this.whatsNewVersion = 20241222;   // whether show the "what's new" screen
+
+    // The url for the main rapid.js bundle.
+    this.scriptURL = (globalThis as any).Rapid?.scriptURL ?? null;
 
     // These may be set by our continuous deployment scripts, or left empty
     this.buildID = '';
