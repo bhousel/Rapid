@@ -109,8 +109,11 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 | `LocationSystem.ts` | Geocoding and location services |
 | `Map3dSystem.ts` | Manages the 3D map view (MapLibre) |
 | `MapSystem.ts` | Core map state (zoom, pan, projection) |
+| `NetworkSystem.ts` | Central fetch lifecycle — inflight tracking, dedup, timeout, concurrency, worker dispatch |
+| `NetworkSystem.worker.ts` | Worker-side listener for `network:fetchAndParse` and related messages |
 | `PhotoSystem.ts` | Manages street-level photo integration |
 | `RapidSystem.ts` | Manages Rapid AI features and datasets |
+| `SchedulerSystem.ts` | Game-loop, task queues, timers, and backpressure for deferred work |
 | `SchemaSystem.ts` | Loads and provides access to presets, fields, rulesets, and variables |
 | `SpatialSystem.ts` | Spatial indexing for fast geographic queries |
 | `StorageSystem.ts` | Persistent storage (localStorage wrapper) |
@@ -119,6 +122,7 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 | `UploaderSystem.ts` | Handles uploading changes to OSM |
 | `UrlHashSystem.ts` | Manages URL hash state (bookmarkable URLs) |
 | `ValidationSystem.ts` | Runs validation checks on map data |
+| `WorkerSystem.ts` | Worker pool (lazy spawn, round-robin), task dispatch, and listener registry |
 | `types.ts` | TypeScript type definitions for core systems |
 
 ## Accessing Systems

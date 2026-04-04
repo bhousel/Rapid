@@ -19,7 +19,7 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
 - **WorkerSystem owns "where to run"** — Worker pool (lazy spawn, round-robin, workerURL config, maxWorkers, terminateWorkers) + listener registry (registerListener, unregisterListener, getListener). Extracted from SchedulerSystem (pool) and NetworkSystem (listener registry) to avoid a 1000+ line monolith and give worker management a clear home.
 - **SchedulerSystem owns "when to run"** — Game loop (rAF), priority queues (urgent/normal/idle), timers (debounce/throttle/setTimeout/setInterval), frame callbacks, backpressure. No worker knowledge.
 - **NetworkSystem owns network I/O** — Fetch lifecycle, inflight tracking, dedup, abort, concurrency limiting, timeout. Dispatches to WorkerSystem when available (`worker` is an optional dependency). Falls back to main-thread listener via `worker.getListener()`.
-- **Host app sets `worker.workerURL`** — in `dist/index.html` / `dist/index-dev.html` after `initAsync()`. This is the only configuration needed for worker support.
+- **Host app sets `worker.workerURL` BEFORE `initAsync()`** — in `dist/index.html` / `dist/index-dev.html` during `prepareAsync().then(...)`, before calling `initAsync()`. Setting it after `initAsync` means all fetches during init (asset loading, schema loading, etc.) run on the main thread instead of the worker. Set it in `prepareAsync` since systems are constructed but not yet initialized at that point.
 
 ## Request Interceptor API
 
@@ -39,6 +39,12 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
 - **Worker Context with limited systems** — Workers would get their own lightweight `Context` with `network`, `spatial`, etc. — but no `gfx`, `ui`, or DOM. Registry pattern already supports partial system sets.
 - **Stable graph snapshots for worker validation** — `EditSystem.stable` graph is the right trigger point. Only send to workers on stable transitions (not during drag/staging). Worker rebuilds spatial index from snapshot, runs validators, posts back issue props. No debouncing needed — edit workflow already produces the right cadence.
 - **Transferable snapshot format** — Large spatial snapshots should use `ArrayBuffer`/typed arrays for near-zero-copy `postMessage` transfer. R-tree bounding boxes are naturally float arrays.
+
+## Relative URL Resolution in Workers
+
+- **Workers resolve relative URLs against their own script path** — A worker script at `js/rapid-worker.js` resolves `data/foo.json` as `js/data/foo.json`, not `data/foo.json` from the page root. This means all relative asset paths fail with 404 when dispatched to a worker.
+- **Fix is in `NetworkSystem._dispatchFetch`** — When `useWorker` is true, relative URLs are resolved to absolute via `new URL(url, globalThis.location?.href)` before being sent. Absolute URLs (`http://`, `https://`, `data:`, `blob:`) pass through unchanged. `_resolveURL` is a private helper that encapsulates this logic.
+- **`globalThis.location` may be undefined (tests/CLI)** — The `try/catch` in `_resolveURL` handles this: if `new URL()` throws (no base URL), the original URL is returned unchanged. Tests don't use workers so this is harmless.
 
 ## Worker Companion Convention (`*.worker.ts`)
 

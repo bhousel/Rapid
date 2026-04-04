@@ -63,11 +63,15 @@ const DEFAULT_MAX_WORKERS = 2;
  *   These functions can run either in the worker or on the main thread as a fallback.
  *
  * This system has no required dependencies and should be available very early.
- * SchedulerSystem is an optional dependency — when present, `dispatch()` can
- * defer result resolution through the scheduler's frame-budget-aware queues
- * (see `DispatchOptions.resultPriority`).
- * Host apps must set `workerURL` before dispatching tasks (typically right
- * after `initAsync`).
+ * Host apps must set `workerURL` before calling `initAsync` so that
+ * init-time fetches (asset loading, schema, etc.) use the worker immediately.
+ * The correct pattern:
+ * ```js
+ * context.prepareAsync()
+ *   .then(() => { worker.workerURL = '...js/rapid-worker.js'; })
+ *   .then(() => context.initAsync())
+ *   .then(() => context.startAsync());
+ * ```
  *
  * Design rationale:
  * - SchedulerSystem = **when** to run (game loop, queues, timers, backpressure)

@@ -12,45 +12,52 @@ Services handle communication with various APIs to fetch map data, imagery, QA i
 
 | File | Description |
 |------|-------------|
-| `EsriService.js` | Esri feature services |
-| `MapWithAIService.js` | Meta's MapWithAI road and building data |
-| `OsmService.js` | OpenStreetMap API (editing, data fetching) |
-| `OvertureService.js` | Overture Maps Foundation data |
-| `VectorTileService.js` | Vector tile fetching and parsing |
+| `EsriService.ts` | Esri feature services |
+| `MapWithAIService.ts` | Meta's MapWithAI road and building data |
+| `OsmService.ts` | OpenStreetMap API (editing, data fetching) |
+| `OvertureService.ts` | Overture Maps Foundation data |
+| `VectorTileService.ts` | Vector tile fetching and parsing |
 
 ### Photo Services
 
 | File | Description |
 |------|-------------|
-| `MapillaryService.js` | Mapillary street-level imagery |
-| `KartaviewService.js` | KartaView (OpenStreetCam) imagery |
-| `StreetsideService.js` | Bing Streetside imagery |
+| `MapillaryService.ts` | Mapillary street-level imagery |
+| `KartaviewService.ts` | KartaView (OpenStreetCam) imagery |
+| `StreetsideService.ts` | Bing Streetside imagery |
 
 ### QA Services
 
 | File | Description |
 |------|-------------|
-| `KeepRightService.js` | KeepRight QA tool |
-| `OsmoseService.js` | Osmose QA tool |
-| `MapRouletteService.js` | MapRoulette challenges |
+| `KeepRightService.ts` | KeepRight QA tool |
+| `OsmoseService.ts` | Osmose QA tool |
+| `MapRouletteService.ts` | MapRoulette challenges |
 
 ### Reference Data Services
 
 | File | Description |
 |------|-------------|
-| `NominatimService.js` | Nominatim geocoding/search |
-| `NsiService.js` | Name Suggestion Index |
-| `TaginfoService.js` | Taginfo tag statistics |
-| `OsmWikibaseService.js` | OSM Wikibase (Data Items) |
-| `WikidataService.js` | Wikidata entities |
-| `WikipediaService.js` | Wikipedia articles |
+| `NominatimService.ts` | Nominatim geocoding/search |
+| `NsiService.ts` | Name Suggestion Index |
+| `TaginfoService.ts` | Taginfo tag statistics |
+| `OsmWikibaseService.ts` | OSM Wikibase (Data Items) |
+| `WikidataService.ts` | Wikidata entities |
+| `WikipediaService.ts` | Wikipedia articles |
 
 ### Other Services
 
 | File | Description |
 |------|-------------|
-| `GeoScribbleService.js` | GeoScribble annotations |
-| `WaybackService.js` | Esri Wayback imagery |
+| `GeoScribbleService.ts` | GeoScribble annotations |
+| `WaybackService.ts` | Esri Wayback imagery |
+
+### Worker Companion Files
+
+| File | Description |
+|------|-------------|
+| `OsmService.worker.ts` | Worker-side listener for `osmService:fetchAndParse` — handles OSM XML/JSON parsing off the main thread |
+| `index.worker.ts` | Barrel that re-exports all service worker listeners for bundling into `worker.ts` |
 
 ## Service Lifecycle
 

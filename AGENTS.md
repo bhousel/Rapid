@@ -15,7 +15,7 @@ At the start of a session, read `.scratchpad/current.md` for active work context
 - `lessons.md` — patterns and gotchas to avoid repeating mistakes
 - `quirks.md` — known runtime issues and workarounds
 
-As you work, update these files. When work completes, move the "why" to `decisions.md`, lessons to `lessons.md`, and delete the rest from `current.md`. See `.scratchpad/README.md` for conventions.
+As you work, update these files. When work completes: add a one-liner to `completed.md`, move the "why" to `decisions.md`, lessons to `lessons.md`, and delete the rest from `current.md`. See `.scratchpad/README.md` for conventions.
 
 ## Prompt Files
 

@@ -574,6 +574,10 @@ export class NetworkSystem extends AbstractSystem {
    * When a named `listenerID` is provided, it is dispatched to the worker
    * (via `dispatch`) when available, or executed directly
    * on the main thread using the registered listener as fallback.
+   *
+   * Relative URLs are resolved to absolute before dispatching to a worker,
+   * because the worker script runs in a different path context and would
+   * resolve relative URLs against its own location.
    */
   private _dispatchFetch<T>(
     url: string,
@@ -588,6 +592,12 @@ export class NetworkSystem extends AbstractSystem {
     const listenerData = options?.listenerData;
     const resultPriority = options?.resultPriority;
     const useWorker = worker && worker.workerURL && !fetchFn && !mainThread;
+
+    // Resolve relative URLs to absolute so that worker-dispatched fetches
+    // resolve against the page origin, not the worker script's location.
+    if (useWorker) {
+      url = this._resolveURL(url);
+    }
 
     // Build base init (without signal) and apply interceptors.
     // Interceptors run on the main thread, producing serializable headers
@@ -619,6 +629,25 @@ export class NetworkSystem extends AbstractSystem {
       const actualFetchFn = fetchFn ?? globalThis.fetch;
       init.signal = signal;
       return actualFetchFn(url, init).then(utilFetchResponse) as Promise<T>;
+    }
+  }
+
+
+  /**
+   * _resolveURL
+   * Resolves a potentially relative URL to an absolute URL using the
+   * page's base URI.  This ensures that when a URL is dispatched to a
+   * web worker, it resolves against the main page's origin rather than
+   * the worker script's location.
+   *
+   * Absolute URLs (http://, https://, data:, blob:) pass through unchanged.
+   */
+  private _resolveURL(url: string): string {
+    if (/^(https?|data|blob):/i.test(url)) return url;
+    try {
+      return new URL(url, globalThis.location?.href).href;
+    } catch {
+      return url;  // If URL construction fails, return as-is
     }
   }
 
