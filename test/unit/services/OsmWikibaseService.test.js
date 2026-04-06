@@ -154,6 +154,105 @@ describe('OsmWikibaseService', () => {
         en: 'Key:bridge:movable'
       });
     });
+
+
+    describe('getDocs', () => {
+      it('returns docs for a key+value pair with Commons image and wiki link', () => {
+        fetchMock.route(/action=wbgetentities/, sample.entityResponseSuccess);
+        const getDocs = promisify(_wikibase.getDocs).bind(_wikibase);
+
+        return getDocs({ key: 'amenity', value: 'parking' })
+          .then(result => {
+            assert.strictEqual(result.title, 'Item:Q13');
+            assert.strictEqual(result.description, 'French description');
+            assert.strictEqual(result.descriptionLocaleCode, 'fr');
+            assert.strictEqual(result.editURL, 'https://wiki.openstreetmap.org/wiki/Item:Q13');
+            assert.include(result.imageURL, 'commons.wikimedia.org');
+            assert.include(result.imageURL, 'Primary%20image.jpg');
+            assert.deepEqual(result.wiki, {
+              title: 'Key:bridge:movable',
+              text: 'inspector.wiki_reference',
+              url: 'https://wiki.openstreetmap.org/wiki/Key:bridge:movable'
+            });
+          });
+      });
+
+      it('returns docs for a key-only query with OSM wiki P28 image', () => {
+        // Build an entity where P28 has 'preferred' rank (claimToValue only picks preferred)
+        // and the sitelink matches the key being requested (Key:highway)
+        const keyOnlyEntity = Object.assign({}, sample.keyData, {
+          claims: Object.assign({}, sample.keyData.claims, {
+            P28: [{
+              mainsnak: { snaktype: 'value', datatype: 'string', datavalue: { value: 'TestImage.png', type: 'string' } },
+              type: 'statement',
+              rank: 'preferred'
+            }]
+          }),
+          sitelinks: { wiki: { site: 'wiki', title: 'Key:highway', badges: [] } }
+        });
+        fetchMock.route(/action=wbgetentities/, { entities: { Q42: keyOnlyEntity }, success: 1 });
+        const getDocs = promisify(_wikibase.getDocs).bind(_wikibase);
+
+        return getDocs({ key: 'highway' })
+          .then(result => {
+            assert.strictEqual(result.title, 'Item:Q42');
+            assert.strictEqual(result.editURL, 'https://wiki.openstreetmap.org/wiki/Item:Q42');
+            assert.include(result.imageURL, 'wiki.openstreetmap.org/w/index.php');
+            assert.include(result.imageURL, 'TestImage.png');
+          });
+      });
+
+      it('calls back with "No entity" when no matching entity is found', () => {
+        fetchMock.route(/action=wbgetentities/, { entities: {}, success: 1 });
+
+        return new Promise((resolve, reject) => {
+          _wikibase.getDocs({ key: 'nonexistent' }, (err) => {
+            try {
+              assert.strictEqual(err, 'No entity');
+              resolve();
+            } catch (e) {
+              reject(e);
+            }
+          });
+        });
+      });
+
+      it('propagates fetch errors to the callback', () => {
+        // Use an uncached key so that a real fetch is attempted
+        fetchMock.route(/action=wbgetentities/, { throws: new Error('network error') });
+
+        return new Promise((resolve, reject) => {
+          _wikibase.getDocs({ key: 'building' }, (err) => {
+            try {
+              assert.ok(err);
+              resolve();
+            } catch (e) {
+              reject(e);
+            }
+          });
+        });
+      });
+    });
+
+
+    describe('_request', () => {
+      it('calls back with the error message on network failure', () => {
+        const url = 'https://wiki.openstreetmap.org/w/api.php?action=test';
+        fetchMock.route(/action=test/, { throws: new Error('network failure') });
+
+        return new Promise((resolve, reject) => {
+          _wikibase._request(url, (err) => {
+            try {
+              assert.strictEqual(err, 'network failure');
+              resolve();
+            } catch (e) {
+              reject(e);
+            }
+          });
+        });
+      });
+
+    });
   });
 
 });
