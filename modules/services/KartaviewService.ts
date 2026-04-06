@@ -556,6 +556,8 @@ export class KartaviewService extends AbstractSystem {
 
     // Modify the tile.id to include the page number.
     // This is the tile id that the spatial system will keep track of.
+    // TODO: I am not completely sure it is ok to embed the page number in the tileID here.
+    // `spatial.addTiles` will not match with `spatial.hasTile`?
     const tileID = tile.id = `${tile.origID},${nextPage}`;
     const requestID = `kartaview-${tileID}` as RequestID;
     if (spatial.hasTile('kartaview-images', tileID) || network.isInflight(requestID)) {

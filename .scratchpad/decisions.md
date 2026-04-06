@@ -73,6 +73,13 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
 - **`match()` and excludes subtlety** — `match({k: v})` only sees the key/value pairs you pass. When excludes reference different keys than includes, pass the full tag object.
 - **Actions access schema via `graph.context.systems.schema`** — `Graph.context` is always set. This is fine and explicit.
 
+## MVT Protobuf Parsing on Worker
+
+- **`network:fetchAndParseMVT` as a standard listener** — Generic enough for any MVT tile source. Accepts `{ url, init, tileXYZ }`, fetches URL via `fetchAndParse` (reusing the existing generic listener internally), decodes with `VectorTile`/`Protobuf`, converts each feature to GeoJSON, returns `MVTFeatureResult[]` with `layerID`, `origID`, and `feature`. The caller decides what to do with each layer.
+- **Both services converge** — VectorTileService (standard MVT path) and MapillaryService both use the same listener. Layer-specific logic (caching images vs. creating GeoJSONData with merge queues) stays on the main thread where it needs `Context`.
+- **VectorTileService split: `_parseTileBuffer` vs `_processVTResults`** — PMTiles path still decodes on the main thread via `_parseTileBuffer` (which builds `MVTFeatureResult[]` from a raw buffer), then delegates to `_processVTResults`. Standard MVT path receives pre-parsed `MVTFeatureResult[]` directly from the worker. Both paths share `_processVTResults` for property stringification, prophash computation, multi→single splitting, GeoJSONData creation, caching, and merge queue logic.
+- **No buffer-accepting variant (yet)** — The listener only accepts a URL, not a pre-fetched `ArrayBuffer`. The PMTiles path would need this (PMTiles owns its own fetch, then hands us a buffer to decode). Deferred until we think through PMTiles lifecycle on the worker.
+
 ## PMTiles Fetching Bypasses NetworkSystem
 
 - **PMTiles library owns its own fetch** — `PMTiles.getZxy()` delegates to `Source.getBytes(offset, length, signal)` internally. The default `FetchSource` issues HTTP Range requests with `globalThis.fetch`. These requests bypass NetworkSystem entirely, so `inflightPMTiles: Map<string, AbortController>` tracks them separately on VTSource.

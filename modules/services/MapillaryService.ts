@@ -10,6 +10,7 @@ import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
+import type { MVTFeatureResult } from '../core/NetworkSystem.worker.ts';
 import type {
   ComponentSize as MlyComponentSize, FilterExpression, Image as MlyImage, NavigationDirection,
   OutlineTag, OutlineTagOptions, PolygonGeometry, SequenceComponent, TagComponent, Viewer,
@@ -499,7 +500,7 @@ export class MapillaryService extends AbstractSystem {
     network.abortMatching(id => id.startsWith(`mapillary-${datasetID}-`) && !neededIDs.has(id));
 
     for (const tile of tiles) {
-      this._loadTileAsync(datasetID, tile);
+      this._loadTile(datasetID, tile);
     }
   }
 
@@ -883,15 +884,14 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _loadTileAsync
+   * _loadTile
    * Load a vector tile of data for the given dataset.
    * This uses `https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=XXX`
    * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
    * @param  datasetID - one of 'images', 'signs', or 'detections'
    * @param  tile - a tile object
-   * @return  Promise settled when the request is completed
    */
-  _loadTileAsync(datasetID: MapillaryDatasetID, tile: Tile): Promise<void> {
+  _loadTile(datasetID: MapillaryDatasetID, tile: Tile): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
@@ -912,21 +912,19 @@ export class MapillaryService extends AbstractSystem {
     const cache = this._cache;
     const requestID = `mapillary-${datasetID}-${tile.id}` as RequestID;
 
-    if (cache.loaded.has(requestID)) {
-      return Promise.resolve();  // already done
-    }
-    if (network.isInflight(requestID)) {
-      return Promise.resolve();
+    if (cache.loaded.has(requestID) || network.isInflight(requestID)) {
+      return;
     }
 
-    return network.fetch<ArrayBuffer>(url, { requestID })
-      .then(buffer => {
+    network.fetch<MVTFeatureResult[]>(url, {
+      requestID,
+      listenerID: 'network:fetchAndParseMVT',
+      listenerData: { tileXYZ: tile.xyz }
+    })
+      .then(results => {
         cache.loaded.add(requestID);
-        if (!buffer) {
-          throw new Error('No Data');
-        }
 
-        this._gotTile(buffer, tile);
+        this._gotTile(results);
 
         gfx?.deferredRedraw();
 
@@ -950,23 +948,18 @@ export class MapillaryService extends AbstractSystem {
 
   /**
    * _gotTile
-   * Process vector tile data
+   * Process pre-parsed vector tile features
    * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
-   * @param  buffer - the tile data
-   * @param  tile - a tile object
+   * @param  results - parsed MVT features from the worker
    */
-  _gotTile(buffer: ArrayBuffer, tile: Tile): void {
+  _gotTile(results: MVTFeatureResult[]): void {
     const context = this.context;
     const spatial = context.systems.spatial!;
 
-    const vectorTile = new VectorTile(new Protobuf(buffer));
+    for (const { layerID, feature } of results) {
+      if (!feature) continue;
 
-    if (vectorTile.layers.hasOwnProperty('image')) {
-      const layer = vectorTile.layers.image;
-      for (let i = 0; i < layer.length; i++) {
-        const feature = layer.feature(i).toGeoJSON(tile.xyz[0], tile.xyz[1], tile.xyz[2]);
-        if (!feature) continue;
-
+      if (layerID === 'image') {
         this._cacheImage({
           id:          feature.properties!.id.toString(),
           loc:         (feature.geometry as any).coordinates,
@@ -975,15 +968,8 @@ export class MapillaryService extends AbstractSystem {
           ca:          feature.properties!.compass_angle,
           isPano:      feature.properties!.is_pano,
         });
-      }
-    }
 
-    if (vectorTile.layers.hasOwnProperty('sequence')) {
-      const layer = vectorTile.layers.sequence;
-      for (let i = 0; i < layer.length; i++) {
-        const feature = layer.feature(i).toGeoJSON(tile.xyz[0], tile.xyz[1], tile.xyz[2]);
-        if (!feature) continue;
-
+      } else if (layerID === 'sequence') {
         const sequenceID = feature.properties!.id.toString();
         let sequence = spatial.getData<GeoJSONData>('mapillary-sequences', sequenceID);
         if (!sequence) {
@@ -1001,19 +987,8 @@ export class MapillaryService extends AbstractSystem {
         (sequence.props.geojson as GeoJSON.FeatureCollection).features.push(feature);  // updating it in-place, hope this is ok.
         sequence.updateGeometry().touch();
         spatial.replaceData('mapillary-sequences', sequence);
-      }
-    }
 
-    // 'point' and 'traffic_sign' are both detection layers.
-    // Both of these are stored in the `detections` cache.
-    for (const type of ['point', 'traffic_sign']) {
-      if (!vectorTile.layers.hasOwnProperty(type)) continue;
-
-      const layer = vectorTile.layers[type];
-      for (let i = 0; i < layer.length; i++) {
-        const feature = layer.feature(i).toGeoJSON(tile.xyz[0], tile.xyz[1], tile.xyz[2]);
-        if (!feature) continue;
-
+      } else if (layerID === 'point' || layerID === 'traffic_sign') {
         // Note that the tile API _does not_ give us `images` or `aligned_direction`
         this._cacheDetection({
           id:            feature.properties!.id.toString(),
@@ -1021,7 +996,7 @@ export class MapillaryService extends AbstractSystem {
           first_seen_at: feature.properties!.first_seen_at,
           last_seen_at:  feature.properties!.last_seen_at,
           value:         feature.properties!.value,
-          object_type:   type
+          object_type:   layerID
         });
       }
     }

@@ -13,6 +13,7 @@ import { GeoJSONData } from '../data/GeoJSONData.ts';
 
 import type { Tile } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
+import type { MVTFeatureResult } from '../core/NetworkSystem.worker.ts';
 
 
 /** RBush box with associated data */
@@ -330,7 +331,6 @@ export class VectorTileService extends AbstractSystem {
     if (source.loaded.has(tileID)) return;
 
     const [x, y, z] = tile.xyz;
-    let _fetch: Promise<ArrayBuffer | undefined>;
 
     if (source.pmtiles) {
       if (source.inflightPMTiles.has(tileID)) return;
@@ -338,10 +338,18 @@ export class VectorTileService extends AbstractSystem {
       const controller = new AbortController();
       source.inflightPMTiles.set(tileID, controller);
 
-      _fetch = source.pmtiles
+      return source.pmtiles
         .getZxy(z, x, y, controller.signal)
         .then(response => response?.data)
-        .finally(() => source.inflightPMTiles.delete(tileID));
+        .finally(() => source.inflightPMTiles.delete(tileID))
+        .then(buffer => {
+          source.loaded.set(tileID, tile);
+          this._parseTileBuffer(source, tile, buffer);
+        })
+        .catch(err => {
+          if (err.name === 'AbortError') return;          // ok
+          if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
+        });
 
     } else {
       const network = this.context.systems.network!;
@@ -358,29 +366,74 @@ export class VectorTileService extends AbstractSystem {
           return subdomains[(x + y) % subdomains.length];
         });
 
-      _fetch = network.fetch<ArrayBuffer>(url, { requestID });
-    }
-
-    return _fetch
-      .then(buffer => {
-        source.loaded.set(tileID, tile);
-        this._parseTileBuffer(source, tile, buffer);
+      return network.fetch<MVTFeatureResult[]>(url, {
+        requestID,
+        listenerID: 'network:fetchAndParseMVT',
+        listenerData: { tileXYZ: [x, y, z] }
       })
-      .catch(err => {
-        if (err.name === 'AbortError') return;          // ok
-        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-      });
+        .then(results => {
+          source.loaded.set(tileID, tile);
+          this._processVTResults(source, tile, results);
+        })
+        .catch(err => {
+          if (err.name === 'AbortError') return;          // ok
+          if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
+        });
+    }
   }
 
 
   /**
    * _parseTileBuffer
+   * Decode a raw MVT protobuf buffer into features and process them.
+   * Used by the PMTiles path (standard MVT tiles are parsed on the worker).
    * @param  source
    * @param  tile
    * @param  buffer
    */
   _parseTileBuffer(source: VTSource, tile: Tile, buffer: ArrayBuffer | undefined): void {
     if (!buffer) return;  // 'no data' is ok
+
+    const [x, y, z] = tile.xyz;
+    const vt = new VectorTile(new Protobuf(buffer));
+    const results: MVTFeatureResult[] = [];
+
+    for (const [layerID, vtLayer] of Object.entries(vt.layers)) {
+      if (!vtLayer) continue;
+
+      // Tile coordinate space bounds — features wholly outside are on neighbor tiles
+      const min = 0;
+      const max = vtLayer.extent;  // default 4096
+
+      for (let i = 0; i < vtLayer.length; i++) {
+        const vtFeature = vtLayer.feature(i);
+        const [left, top, right, bottom] = vtFeature.bbox();
+
+        // This feature is wholly on a neighbor tile - it just spills onto this tile in the buffer..
+        if (left > max || top > max || right < min || bottom < min) continue;
+
+        const feature = vtFeature.toGeoJSON(x, y, z);
+        if (!feature) continue;
+
+        results.push({ layerID, origID: vtFeature.id, feature });
+      }
+    }
+
+    this._processVTResults(source, tile, results);
+  }
+
+
+  /**
+   * _processVTResults
+   * Process pre-parsed MVT features: stringify properties, compute prophash,
+   * split multi-geometries, create GeoJSONData, and cache/queue merges.
+   * Both the worker-parsed path and the PMTiles path converge here.
+   * @param  source
+   * @param  tile
+   * @param  results - array of parsed MVT features
+   */
+  _processVTResults(source: VTSource, tile: Tile, results: MVTFeatureResult[]): void {
+    if (!results || !results.length) return;
 
     // Get some info about this tile and its neighbors
     const [x, y, z] = tile.xyz;
@@ -399,70 +452,46 @@ export class VectorTileService extends AbstractSystem {
     const topEdge = `${x},${y-1},${z}-${tileID}`;
     const bottomEdge = `${tileID}-${x},${y+1},${z}`;
 
-    const vt = new VectorTile(new Protobuf(buffer));
     const cache = this._getZoomCache(source, z);
 
     const newFeatures = [];
-    for (const [layerID, vtLayer] of Object.entries(vt.layers)) {
-      if (!vtLayer) continue;
+    for (const { layerID, origID, feature: orig } of results) {
+      // Force all properties to strings
+      for (const [k, v] of Object.entries(orig.properties ?? {})) {
+        orig.properties![k] = String(v);
+      }
 
-      // Determine extent of tile coordinates
-      const min = 0;
-      const max = vtLayer.extent;  // default 4096
+      // When features have the same properties, we'll consider them mergeable.
+      const prophash = utilHashcode(stringify(orig.properties)).toString();
 
-      // For each feature on the vector tile...
-      for (let i = 0; i < vtLayer.length; i++) {
-        const vtFeature = vtLayer.feature(i);
-        const [left, top, right, bottom] = vtFeature.bbox();
+      // It's common for a vector tile to return 'Multi' GeoJSON features..
+      // e.g. All the roads together in one `MultiLineString`.
+      // For our purposes, we really want to work with them as single part features..
+      for (const part of this._toSingleFeatures(orig)) {
+        const extent = this._calcExtent(part);
+        if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
 
-        // This feature is wholly on a neighbor tile - it just spills onto this tile in the buffer..
-        if (left > max || top > max || right < min || bottom < min) continue;
+        // If it has an ID, remove it.  We'll generate a unique one.
+        delete part.id;
 
-        // Force all properties to strings
-        for (const [k, v] of Object.entries(vtFeature.properties)) {
-          vtFeature.properties[k] = v.toString();
+        part._prophash = prophash;
+        part._layerID = layerID;
+        part._origID = origID;
+
+        const feat = new GeoJSONData(this.context, { geojson: part });
+        const featureID = feat.id;  // the generated ID
+        // rewind?  really something that `GeometryPart` should handle now
+
+        // For Polygons only, determine if this feature clips to a tile edge.
+        // If so, we'll try to merge it with similar features on the neighboring tile
+        if (part.geometry.type === 'Polygon') {
+          if (extent.min[0] < tileExtent.min[0]) { this._queueMerge(cache, featureID, prophash, leftEdge); }
+          if (extent.max[0] > tileExtent.max[0]) { this._queueMerge(cache, featureID, prophash, rightEdge); }
+          if (extent.min[1] < tileExtent.min[1]) { this._queueMerge(cache, featureID, prophash, bottomEdge); }
+          if (extent.max[1] > tileExtent.max[1]) { this._queueMerge(cache, featureID, prophash, topEdge); }
         }
 
-        // When features have the same properties, we'll consider them mergeable.
-        const prophash = utilHashcode(stringify(vtFeature.properties)).toString();
-
-        // From vector-tile-spec: A feature MAY contain an id field. If a feature has an id field,
-        // the value of the id SHOULD be unique among the features of the parent layer.
-        // (This means we should probably not rely on the ids being unique enough for our needs)
-        const origID = vtFeature.id;
-
-        // Convert to GeoJSONData
-        const orig = vtFeature.toGeoJSON(x, y, z);
-
-        // It's common for a vector tile to return 'Multi' GeoJSONData features..
-        // e.g. All the roads together in one `MultiLineString`.
-        // For our purposes, we really want to work with them as single part features..
-        for (const part of this._toSingleFeatures(orig)) {
-          const extent = this._calcExtent(part);
-          if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
-
-          // If it has an ID, remove it.  We'll generate a unique one.
-          delete part.id;
-
-          part._prophash = prophash;
-          part._layerID = layerID;
-          part._origID = origID;
-
-          const feat = new GeoJSONData(this.context, { geojson: part });
-          const featureID = feat.id;  // the generated ID
-          // rewind?  really something that `GeometryPart` should handle now
-
-          // For Polygons only, determine if this feature clips to a tile edge.
-          // If so, we'll try to merge it with similar features on the neighboring tile
-          if (part.geometry.type === 'Polygon') {
-            if (extent.min[0] < tileExtent.min[0]) { this._queueMerge(cache, featureID, prophash, leftEdge); }
-            if (extent.max[0] > tileExtent.max[0]) { this._queueMerge(cache, featureID, prophash, rightEdge); }
-            if (extent.min[1] < tileExtent.min[1]) { this._queueMerge(cache, featureID, prophash, bottomEdge); }
-            if (extent.max[1] > tileExtent.max[1]) { this._queueMerge(cache, featureID, prophash, topEdge); }
-          }
-
-          newFeatures.push(feat);
-        }
+        newFeatures.push(feat);
       }
     }
 

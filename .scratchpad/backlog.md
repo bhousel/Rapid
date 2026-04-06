@@ -17,8 +17,9 @@ Items planned but not yet started.
 - Subscribe to `schemachange` events, refresh cached prerequisites on change
 - Current state: time-of-use lookups for rulesets/variables (done); full class lifecycle (future)
 
-## Worker offloading — remaining services
-- Esri, MapWithAI, Mapillary, VectorTile, KartaView, Streetside — complex post-processing, binary parsing, graph integration
+## Worker offloading — remaining opportunities
+- **PMTiles fetch+parse on worker** — PMTiles library owns its own HTTP Range requests via `Source.getBytes()`. Moving the `PMTiles` instance to the worker requires thinking through lifecycle (header caching, archive identity). Could write a custom `Source` adapter that delegates to `network.fetchRaw()` with Range headers. VectorTileService PMTiles path currently decodes protobuf on the main thread.
+- Esri, MapWithAI, KartaView, Streetside — remaining services with complex post-processing or graph integration
 - Use `resultPriority: 'normal'` on any fetch that triggers `editor.merge()`
 - Evaluate chunked `EditSystem.merge()` for large tiles (single-tile budget overruns)
 

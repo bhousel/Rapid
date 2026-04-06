@@ -14,7 +14,8 @@ describe('MapillaryService', () => {
     l10n:    new Rapid.MockSystem(context),
     network: new Rapid.NetworkSystem(context),
     photos:  new Rapid.MockSystem(context),
-    spatial: new Rapid.SpatialSystem(context)
+    spatial: new Rapid.SpatialSystem(context),
+    worker:  new Rapid.WorkerSystem(context)
   };
 
   // Spy on redraws..
@@ -117,7 +118,8 @@ describe('MapillaryService', () => {
 
     beforeAll(() => {
       _mapillary = new Rapid.MapillaryService(context);
-      return _mapillary.initAsync();
+      return context.systems.network.initAsync()
+        .then(() => _mapillary.initAsync());
         //.then(() => _mapillary.startAsync());
         // for now, expect start to fail when run headlessly
     });
