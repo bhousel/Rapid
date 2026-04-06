@@ -5,7 +5,7 @@ This file documents efforts toward establishing a public API for Rapid.
 Rapid supports many URL parameters, listed below.
 When constructing a URL to Rapid the parameters should appear in the
 [fragment](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Fragment)
-part of the URL. For example: `https://rapideditor.com/edit#<param1>=<val1>&<param2>=<val2>…`
+part of the URL. For example: `https://rapideditor.org/edit#<param1>=<val1>&<param2>=<val2>…`
 
 By convention Rapid expects these parameters to look like:
 - simple strings, for example  `thing=true`

@@ -1,5 +1,4 @@
 import { $, Glob } from 'bun';
-$.nothrow();  // If a shell command returns nonzero, keep going.
 
 import stringify from 'json-stringify-pretty-compact';
 import { styleText } from 'node:util';

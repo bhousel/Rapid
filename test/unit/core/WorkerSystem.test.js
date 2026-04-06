@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, it } from 'bun:test';
+import { afterEach, beforeAll, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -18,6 +18,29 @@ describe('WorkerSystem', () => {
         assert.instanceOf(worker.requiredDependencies, Set);
         assert.instanceOf(worker.optionalDependencies, Set);
         assert.isTrue(worker.autoStart);
+      });
+
+      it('auto-detects workerURL from context.scriptURL', () => {
+        const ctx = new Rapid.MockContext();
+        ctx.scriptURL = 'https://cdn.example.com/js/rapid.js';
+
+        const worker = new Rapid.WorkerSystem(ctx);
+        assert.strictEqual(worker.workerURL, 'https://cdn.example.com/js/rapid-worker.js');
+      });
+
+      it('detects minified worker URL from minified script URL', () => {
+        const ctx = new Rapid.MockContext();
+        ctx.scriptURL = 'https://cdn.example.com/js/rapid.min.js';
+
+        const worker = new Rapid.WorkerSystem(ctx);
+        assert.strictEqual(worker.workerURL, 'https://cdn.example.com/js/rapid-worker.min.js');
+      });
+
+      it('sets workerURL to null when context.scriptURL is not set', () => {
+        const ctx = new Rapid.MockContext();
+        // scriptURL is undefined by default on MockContext
+        const worker = new Rapid.WorkerSystem(ctx);
+        assert.isNull(worker.workerURL);
       });
     });
 
@@ -306,6 +329,55 @@ describe('WorkerSystem', () => {
             await prom;
           } catch (e) {
             assert.strictEqual(e.name, 'AbortError');
+          }
+        });
+      });
+
+
+      describe('resultPriority (scheduler deferred resolution)', () => {
+        it('resolves immediately when no scheduler is available', async () => {
+          _worker.workerURL = workerURL;
+          // MockContext doesn't provide context.systems.scheduler, so the
+          // fallback path (resolve immediately) should fire.
+          const result = await _worker.dispatch('ping', 'deferred', undefined, { resultPriority: 'normal' });
+          assert.strictEqual(result, 'deferred');
+        });
+
+        it('defers resolution through scheduler.schedule when scheduler exists', async () => {
+          _worker.workerURL = workerURL;
+
+          // Install a mock scheduler that captures scheduled callbacks
+          const scheduled = [];
+          const mockScheduler = {
+            schedule: mock((fn, opts) => {
+              scheduled.push({ fn, opts });
+            }),
+          };
+          context.systems.scheduler = mockScheduler;
+
+          try {
+            const prom = _worker.dispatch('ping', 'defer-me', undefined, { resultPriority: 'idle' });
+
+            // Wait for the worker to post back (the onmessage handler runs the scheduler branch)
+            // We need to poll briefly because the worker response is async
+            await new Promise(resolve => { setTimeout(resolve, 200); });
+
+            // The scheduler should have been called instead of resolving the promise directly
+            assert.isAbove(scheduled.length, 0, 'scheduler.schedule should have been called');
+            assert.deepStrictEqual(scheduled[0].opts, { priority: 'idle' });
+
+            // The promise should still be pending because the scheduler hasn't run the callback
+            let resolved = false;
+            prom.then(() => { resolved = true; });
+            await new Promise(resolve => { setTimeout(resolve, 10); });
+            assert.isFalse(resolved, 'promise should not resolve until scheduler runs the callback');
+
+            // Now run the scheduled callback — this should resolve the promise
+            scheduled[0].fn();
+            const result = await prom;
+            assert.strictEqual(result, 'defer-me');
+          } finally {
+            delete context.systems.scheduler;
           }
         });
       });

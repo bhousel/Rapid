@@ -28,3 +28,6 @@ Items planned but not yet started.
 - Goal: replace with `scheduler.tween(workID, fn, { duration, easing })` or CSS transitions
 - `d3-timer`: 1 direct import in `flash.js` — trivial to replace today
 - `d3-transition`: large surface area, best done alongside the UI TypeScript conversion
+
+## Deferred test cleanup
+- Replace non-assertive smoke tests like `assert.isTrue(true)` / bare rejection catches with stronger state or error assertions where practical

@@ -9,6 +9,7 @@ await validateJSON();
 async function validateJSON(): Promise<void> {
   const START = '🔎   ' + styleText('yellow', 'Validating json…');
   const END = '👍  ' + styleText('green', 'json validated');
+  let hasErrors = false;
 
   console.log('');
   console.log(START);
@@ -47,6 +48,7 @@ async function validateJSON(): Promise<void> {
     const validationErrors = validator.validate(contents, main, { nestedErrors: true }).errors;
 
     if (validationErrors.length) {
+      hasErrors = true;
       console.error(styleText('red', '\nError - Schema validation:'));
       console.error('  ' + styleText('yellow', filepath + ': '));
       for (const e of validationErrors) {
@@ -61,4 +63,8 @@ async function validateJSON(): Promise<void> {
   }
 
   console.timeEnd(END);
+
+  if (hasErrors) {
+    process.exit(1);
+  }
 }

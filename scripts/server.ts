@@ -1,4 +1,3 @@
-import { $ } from 'bun';
 import { styleText } from 'node:util';
 
 const project = '@rapideditor/rapid';
@@ -58,7 +57,7 @@ const server = Bun.serve({
     // see: http://goo.gle/devtools-automatic-workspace-folders
     if (url.pathname === '/.well-known/appspecific/com.chrome.devtools.json') {
       const contentType = 'application/json;charset=utf-8';
-      const root = (await $`pwd`.text()).replace(/[\r\n]/g, '');
+      const root = process.cwd();
       const json = {
         workspace: {
           root: root,
