@@ -113,12 +113,22 @@ describe('KeepRightService', () => {
   describe('methods', () => {
     let _keepright;
 
+    const origError = console.error;
+    const spyError = mock();
+
     beforeAll(() => {
+      console.error = spyError;
       _keepright = new Rapid.KeepRightService(context);
       return _keepright.initAsync().then(() => _keepright.startAsync());
     });
 
+    afterAll(() => {
+      console.error = origError;
+    });
+
     beforeEach(() => {
+      spyError.mockClear();
+
       // reset viewport
       context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       context.viewport.dimensions = [64, 64];
@@ -128,16 +138,52 @@ describe('KeepRightService', () => {
 
     describe('loadTiles', () => {
       it('loads a tile of data and requests a redraw', done => {
-        fetchMock.route(/export\.php/, sample.data10);
+        fetchMock.route(/export\.php/, sample.data10, { delay: 1 });
         _keepright.loadTiles();
         setTimeout(() => {
-          assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
-          assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
+          assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
+          assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
 
           const spatial = context.systems.spatial;
-          assert.isTrue(spatial.hasTileAtLoc('keepright', [10, 0]));  // tile is loaded here
+          assert.isTrue(spatial.hasTileAtLoc('keepright', [10, 0]), 'tile at [10°, 0°] was loaded');
           done();
-        }, 1);
+        }, 5);
+      });
+
+      it('aborts unwanted tile requests', done => {
+        fetchMock.route(/export\.php/, sample.data10, { delay: 1 });
+        _keepright.loadTiles();
+
+        // Move the viewport while fetches are still pending
+        context.viewport.transform = { x: -233017, y: 0, z: 14 };  // [20°, 0°]
+        _keepright.loadTiles();
+
+        setTimeout(() => {
+          const spatial = context.systems.spatial;
+          assert.isFalse(spatial.hasTileAtLoc('keepright', [10, 0]), 'tile at [10°, 0°] was not loaded');
+          assert.isTrue(spatial.hasTileAtLoc('keepright', [20, 0]), 'tile at [20°, 0°] was loaded');
+          assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice');
+          assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+          assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
+          done();
+        }, 5);
+      });
+
+      it(`doesn't retry errored tiles`, done => {
+        const errResponse = { status: 403, body: 'Forbidden', headers: { 'Content-Type': 'text/plain' } };
+        fetchMock.route(/export\.php/, errResponse, { delay: 1 });
+        _keepright.loadTiles();
+        _keepright.loadTiles();  // try twice
+
+        setTimeout(() => {
+          const spatial = context.systems.spatial;
+          assert.isTrue(spatial.hasTileAtLoc('keepright', [10, 0]), 'tile at [10°, 0°] is considered loaded');
+          assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
+          assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
+          assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
+          assert.match(spyError.mock.lastCall[0], /Forbidden/i);
+          done();
+        }, 5);
       });
     });
 
@@ -146,9 +192,9 @@ describe('KeepRightService', () => {
       beforeEach(() => {
         // load the data around [10°, 0°]
         // (this needs to be beforeEach because the parent beforeEach resets)
-        fetchMock.route(/export\.php/, sample.data10);
+        fetchMock.route(/export\.php/, sample.data10, { delay: 1 });
         _keepright.loadTiles();
-        return new Promise(resolve => { setTimeout(resolve, 1); });
+        return new Promise(resolve => { setTimeout(resolve, 5); });
       });
 
       describe('getData', () => {

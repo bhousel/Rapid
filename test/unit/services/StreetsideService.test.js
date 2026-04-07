@@ -111,7 +111,11 @@ describe('StreetsideService', () => {
   describe('methods', () => {
     let _streetside;
 
+    const origError = console.error;
+    const spyError = mock();
+
     beforeAll(() => {
+      console.error = spyError;
       _streetside = new Rapid.StreetsideService(context);
 
       // We will replace the tiler to make testing a little easier.
@@ -124,7 +128,13 @@ describe('StreetsideService', () => {
         // for now, expect start to fail when run headlessly
     });
 
+    afterAll(() => {
+      console.error = origError;
+    });
+
     beforeEach(() => {
+      spyError.mockClear();
+
       // reset viewport
       context.viewport.transform = { x: -116508, y: 0, z: 14 };  // [10°, 0°]
       context.viewport.dimensions = [64, 64];
@@ -138,18 +148,59 @@ describe('StreetsideService', () => {
             body: JSON.stringify(sample.bubbles10),
             status: 200,
             headers: { 'Content-Type': 'text/plain' }
-          });
+          }, { delay: 1 });
 
         _streetside.loadTiles();
 
         setTimeout(() => {
-          assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
-          assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
+          assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
+          assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
 
           const spatial = context.systems.spatial;
-          assert.isTrue(spatial.hasTileAtLoc('streetside-images', [10, 0]));  // tile is loaded here
+          assert.isTrue(spatial.hasTileAtLoc('streetside-images', [10, 0]), 'tile at [10°, 0°] was loaded');
           done();
-        }, 1);
+        }, 5);
+      });
+
+      it('aborts unwanted tile requests', done => {
+        fetchMock
+          .route(/StreetSideBubbleMetaData/, {
+            body: JSON.stringify(sample.bubbles10),
+            status: 200,
+            headers: { 'Content-Type': 'text/plain' }
+          }, { delay: 1 });
+
+        _streetside.loadTiles();
+
+        // Move the viewport while fetches are still pending
+        context.viewport.transform = { x: -233017, y: 0, z: 14 };  // [20°, 0°]
+        _streetside.loadTiles();
+
+        setTimeout(() => {
+          const spatial = context.systems.spatial;
+          assert.isFalse(spatial.hasTileAtLoc('streetside-images', [10, 0]), 'tile at [10°, 0°] was not loaded');
+          assert.isTrue(spatial.hasTileAtLoc('streetside-images', [20, 0]), 'tile at [20°, 0°] was loaded');
+          assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice');
+          assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+          assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
+          done();
+        }, 5);
+      });
+
+      it('allows retrying errored tiles', done => {
+        const errResponse = { status: 403, body: 'Forbidden', headers: { 'Content-Type': 'text/plain' } };
+        fetchMock.route(/StreetSideBubbleMetaData/, errResponse, { delay: 1 });
+        _streetside.loadTiles();
+        _streetside.loadTiles();  // try twice
+
+        setTimeout(() => {
+          const spatial = context.systems.spatial;
+          assert.isFalse(spatial.hasTileAtLoc('streetside-images', [10, 0]), 'tile at [10°, 0°] is NOT considered loaded');
+          assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
+          assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
+          assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
+          done();
+        }, 5);
       });
     });
 
@@ -163,9 +214,9 @@ describe('StreetsideService', () => {
             body: JSON.stringify(sample.bubbles10),
             status: 200,
             headers: { 'Content-Type': 'text/plain' }
-          });
+          }, { delay: 1 });
         _streetside.loadTiles();
-        return new Promise(resolve => { setTimeout(resolve, 1); });
+        return new Promise(resolve => { setTimeout(resolve, 5); });
       });
 
       describe('getImages', () => {

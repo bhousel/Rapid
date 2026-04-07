@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, it } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import { promisify } from 'bun:util';
 import fetchMock from 'fetch-mock';
@@ -89,13 +89,21 @@ describe('OsmWikibaseService', () => {
   // Test an already-constructed instance of the service..
   describe('methods', () => {
     let _wikibase;
+    const origError = console.error;
+    const spyError = mock();
 
     beforeAll(() => {
+      console.error = spyError;
       _wikibase = new Rapid.OsmWikibaseService(context);
       return _wikibase.initAsync().then(() => _wikibase.startAsync());
     });
 
+    afterAll(() => {
+      console.error = origError;
+    });
+
     beforeEach(() => {
+      spyError.mockClear();
       return _wikibase.resetAsync();
     });
 
@@ -225,6 +233,8 @@ describe('OsmWikibaseService', () => {
           _wikibase.getDocs({ key: 'building' }, (err) => {
             try {
               assert.ok(err);
+              assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
+              assert.match(spyError.mock.lastCall[0], /network error/i);
               resolve();
             } catch (e) {
               reject(e);
@@ -244,6 +254,8 @@ describe('OsmWikibaseService', () => {
           _wikibase._request(url, (err) => {
             try {
               assert.strictEqual(err, 'network failure');
+              assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
+              assert.match(spyError.mock.lastCall[0], /network failure/i);
               resolve();
             } catch (e) {
               reject(e);
