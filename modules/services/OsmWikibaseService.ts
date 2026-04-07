@@ -329,9 +329,10 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   getDocs(params: GetDocsParams, callback: WikibaseCallback): void {
+    // If `params.langCodes` not set, try to fetch docs in the user's language.
     const l10n = this.context.systems.l10n;
     const langCodes = l10n?.localeCodes || ['en-US', 'en'];
-    params.langCodes = langCodes.map(code => code.toLowerCase());
+    params.langCodes ??= langCodes.map(code => code.toLowerCase());
 
     this.getEntity(params, (err, data) => {
       if (err) {

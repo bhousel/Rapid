@@ -1369,9 +1369,8 @@ export class OsmService extends AbstractSystem {
       if (!err) {
         cache.toLoad.delete(tileID);
         spatial.addTiles('osm-data', [tile]);
+        gfx?.deferredRedraw();
       }
-
-      gfx?.deferredRedraw();
 
       if (callback) {
         callback(err, Object.assign({}, results, { tile: tile }));

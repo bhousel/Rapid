@@ -141,20 +141,50 @@ describe('OsmoseService', () => {
 
 
     describe('loadTiles', () => {
-      it('loads a tile of data and requests a redraw', done => {
+      it('loads a tile of data and requests a redraw', async () => {
+        const spatial = context.systems.spatial;
         fetchMock.route(/issues/, sample.data10, { delay: 1 });
         _osmose.loadTiles();
-        setTimeout(() => {
-          assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-          assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
 
-          const spatial = context.systems.spatial;
-          assert.isTrue(spatial.hasTileAtLoc('osmose', [10, 0]), 'tile at [10°, 0°] was loaded');
-          done();
-        }, 5);
+        await Bun.sleep(5);  // after all fetches have settled
+        assert.isTrue(spatial.hasTileAtLoc('osmose', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
+        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
-      it('aborts unwanted tile requests', done => {
+      it(`doesn't retry inflight tiles`, async () => {
+        const spatial = context.systems.spatial;
+        fetchMock.route(/issues/, sample.data10, { delay: 1 });
+        _osmose.loadTiles();
+        context.viewport.transform.v++;  // touch viewport
+        _osmose.loadTiles();             // try again
+
+        await Bun.sleep(5);  // after all fetches have settled
+        assert.isTrue(spatial.hasTileAtLoc('osmose', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
+        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+      });
+
+      it(`doesn't retry loaded tiles`, async () => {
+        const spatial = context.systems.spatial;
+        fetchMock.route(/issues/, sample.data10, { delay: 1 });
+        _osmose.loadTiles();
+
+        await Bun.sleep(5);  // after all fetches have settled
+        assert.isTrue(spatial.hasTileAtLoc('osmose', [10, 0]), 'tile at [10°, 0°] was loaded');
+
+        context.viewport.transform.v++;  // touch viewport
+        _osmose.loadTiles();             // try again
+
+        await Bun.sleep(5);  // after all fetches have settled
+        assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
+        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
+      });
+
+      it('aborts unwanted tile requests', async () => {
+        const spatial = context.systems.spatial;
         fetchMock.route(/issues/, sample.data10, { delay: 1 });
         _osmose.loadTiles();
 
@@ -162,32 +192,34 @@ describe('OsmoseService', () => {
         context.viewport.transform = { x: -233017, y: 0, z: 14 };  // [20°, 0°]
         _osmose.loadTiles();
 
-        setTimeout(() => {
-          const spatial = context.systems.spatial;
-          assert.isFalse(spatial.hasTileAtLoc('osmose', [10, 0]), 'tile at [10°, 0°] was not loaded');
-          assert.isTrue(spatial.hasTileAtLoc('osmose', [20, 0]), 'tile at [20°, 0°] was loaded');
-          assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice');
-          assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
-          assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
-          done();
-        }, 5);
+        await Bun.sleep(5);  // after all fetches have settled
+        assert.isFalse(spatial.hasTileAtLoc('osmose', [10, 0]), 'tile at [10°, 0°] was not loaded');
+        assert.isTrue(spatial.hasTileAtLoc('osmose', [20, 0]), 'tile at [20°, 0°] was loaded');
+        assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice - but one was aborted');
+        assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
+        assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
-      it(`doesn't retry errored tiles`, done => {
+      it(`doesn't retry errored tiles`, async () => {
+        const spatial = context.systems.spatial;
         const errResponse = { status: 403, body: 'Forbidden', headers: { 'Content-Type': 'text/plain' } };
         fetchMock.route(/issues/, errResponse, { delay: 1 });
         _osmose.loadTiles();
-        _osmose.loadTiles();  // try twice
 
-        setTimeout(() => {
-          const spatial = context.systems.spatial;
-          assert.isTrue(spatial.hasTileAtLoc('osmose', [10, 0]), 'tile at [10°, 0°] is considered loaded');
-          assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
-          assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
-          assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
-          assert.match(spyError.mock.lastCall[0], /Forbidden/i);
-          done();
-        }, 5);
+        await Bun.sleep(5);  // after all fetches have settled
+        assert.isTrue(spatial.hasTileAtLoc('osmose', [10, 0]), 'tile at [10°, 0°] considered loaded');
+        assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
+        assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
+        assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
+        assert.match(spyError.mock.lastCall[0], /Forbidden/i);
+
+        context.viewport.transform.v++;  // touch viewport
+        _osmose.loadTiles();             // try again
+
+        await Bun.sleep(5);  // after all fetches have settled
+        assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch still called once');
+        assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw still not called');
+        assert.lengthOf(spyError.mock.calls, 1, 'console.error still called once');
       });
     });
 
@@ -196,9 +228,9 @@ describe('OsmoseService', () => {
       beforeEach(() => {
         // load the data around [10°, 0°]
         // (this needs to be beforeEach because the parent beforeEach resets)
-        fetchMock.route(/issues/, sample.data10, { delay: 1 });
+        fetchMock.route(/issues/, sample.data10);
         _osmose.loadTiles();
-        return new Promise(resolve => { setTimeout(resolve, 5); });
+        return Bun.sleep(5);  // after all fetches have settled
       });
 
       describe('getData', () => {

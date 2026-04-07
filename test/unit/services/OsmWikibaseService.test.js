@@ -169,7 +169,7 @@ describe('OsmWikibaseService', () => {
         fetchMock.route(/action=wbgetentities/, sample.entityResponseSuccess);
         const getDocs = promisify(_wikibase.getDocs).bind(_wikibase);
 
-        return getDocs({ key: 'amenity', value: 'parking' })
+        return getDocs({ key: 'amenity', value: 'parking', langCodes: ['fr'] })
           .then(result => {
             assert.strictEqual(result.title, 'Item:Q13');
             assert.strictEqual(result.description, 'French description');
