@@ -203,7 +203,7 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
         }
       }
 
-      const item = Object.assign({}, arr[i]);   // shallow copy
+      const item = { ...arr[i] };   // shallow copy
       arr[i].index = -1;   // mark as dead
       item.index = toIndex;
       arr.splice(toIndex, 0, item);
@@ -215,7 +215,7 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
     function withIndex(arr: any[]): IndexedMember[] {
       const result = new Array(arr.length);
       for (let i = 0; i < arr.length; i++) {
-        result[i] = Object.assign({}, arr[i]);   // shallow copy
+        result[i] = { ...arr[i] };   // shallow copy
         result[i].index = i;
       }
       return result;

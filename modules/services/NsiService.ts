@@ -278,7 +278,7 @@ export class NsiService extends AbstractSystem {
    * @return The result, or `null` if no changes suggested
    */
   upgradeTags(tags: OsmTags, loc: Vec2): UpgradeResult | null {
-    const newTags: OsmTags = Object.assign({}, tags);  // shallow copy
+    const newTags: OsmTags = { ...tags };  // shallow copy
     let changed = false;
 
     // Before anything, perform trivial Wikipedia/Wikidata replacements

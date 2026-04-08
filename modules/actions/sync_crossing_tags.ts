@@ -120,7 +120,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
    * @param   skipChildID - Optional, if the change originated from `syncChildToParents`, skip the original child nodeID
    */
   function syncParentToChildren(parent: OsmWay, graph: Graph, skipChildID?: EntityID): void {
-    let parentTags: OsmTags = Object.assign({}, parent.tags);  // copy
+    let parentTags: OsmTags = { ...parent.tags };  // shallow copy
     parentTags = cleanCrossingTags(parentTags);
 
     // These are the two conditions where we want to attempt syncing the parent crossing tags to child nodes:
@@ -190,7 +190,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
     // Sync the tags to the child nodes..
     const isInformalCrossing = ['informal', 'no'].includes(syncTags.crossing);
     for (const child of childNodes) {
-      const childTags: OsmTags = Object.assign({}, child.tags);  // copy
+      const childTags: OsmTags = { ...child.tags };  // shallow copy
 
       for (const [k, v] of Object.entries(syncTags)) {
         if (v) {
@@ -234,7 +234,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
   function syncChildToParents(child: OsmNode, graph: Graph): void {
     const parentWays = graph.parentWays(child);
 
-    let childTags: OsmTags = Object.assign({}, child.tags);  // copy
+    let childTags: OsmTags = { ...child.tags };  // shallow copy
     childTags = cleanCrossingTags(childTags);
 
     // Is the child vertex
@@ -271,7 +271,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
     // Sync the tags to the parent ways..
     for (let parent of crossingWays) {
-      const parentTags: OsmTags = Object.assign({}, parent.tags);  // copy
+      const parentTags: OsmTags = { ...parent.tags };  // shallow copy
 
       for (const [k, v] of Object.entries(syncTags)) {
         if (v) {
@@ -312,7 +312,7 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
     // Bail out if any of these tags include semicolons..
     if (crossing.includes(';') || crossingref.includes(';') || markings.includes(';') || signals.includes(';')) return t;
 
-    const tags: OsmTags = Object.assign({}, t);  // copy
+    const tags: OsmTags = { ...t };  // shallow copy
 
     // First, consider `crossing_ref` tag
     if (crossingref) {  // Assign default `crossing:markings`, if it doesn't exist yet..

@@ -167,8 +167,8 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
     if (wayA.tags.step_count) {
       const stepCount = parseFloat(wayA.tags.step_count);
       if (stepCount && isFinite(stepCount) && stepCount > 0 && Math.round(stepCount) === stepCount) {
-        const tagsA = Object.assign({}, wayA.tags);  // copy
-        const tagsB = Object.assign({}, wayB.tags);  // copy
+        const tagsA = { ...wayA.tags };  // shallow copy
+        const tagsB = { ...wayB.tags };  // shallow copy
 
         const ratioA = lengthA / (lengthA + lengthB);
         const countA = Math.round(stepCount * ratioA);

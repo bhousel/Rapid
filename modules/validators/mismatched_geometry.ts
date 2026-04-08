@@ -167,7 +167,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
             const entityID = this.issue.entityIds[0];
             const graph = editor.staging.graph;
             const entity = graph.entity(entityID);
-            const tags = Object.assign({}, entity.tags);  // shallow copy
+            const tags = { ...entity.tags };  // shallow copy
             for (const key in tagSuggestingArea) {
               delete tags[key];
             }
@@ -366,7 +366,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
     const entityID = this.entityIds[0];
     const graph = editor.staging.graph;
     const entity = graph.entity(entityID) as OsmWay;
-    const tags = Object.assign({}, entity.tags);  // shallow copy
+    const tags = { ...entity.tags };  // shallow copy
     delete tags.area;
 
     if (!entity.tagSuggestingArea(tags)) {
@@ -375,7 +375,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
         const entityID = this.issue.entityIds[0];
         const graph = editor.staging.graph;
         const entity = graph.entity(entityID);
-        const tags = Object.assign({}, entity.tags);  // shallow copy
+        const tags = { ...entity.tags };  // shallow copy
         if (tags.area) {
           delete tags.area;
         }

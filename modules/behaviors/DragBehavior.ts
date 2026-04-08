@@ -184,7 +184,7 @@ export class DragBehavior extends AbstractBehavior {
       if (dist >= tolerance) {
         // Save the target, *and set it to be non-interactive*.
         // This lets us catch events for what other objects it passes over as the user drags it.
-        const target: EventTarget = Object.assign({}, down.target);  // shallow copy
+        const target: EventTarget = { ...down.target };  // shallow copy
         this.dragTarget = target;
         target.feature!.allowInteraction = false;
 
@@ -250,7 +250,7 @@ export class DragBehavior extends AbstractBehavior {
       if (this._snappingDisabled()) {
         up.target = null;
       } else {
-        up.target = Object.assign({}, up.target);
+        up.target = { ...up.target } as EventTarget;
       }
     }
 
@@ -313,7 +313,7 @@ export class DragBehavior extends AbstractBehavior {
    */
   _doMove(): void {
     if (!this._enabled || !this.lastMove) return;  // nothing to do
-    const eventData: EventData = Object.assign({}, this.lastMove);  // shallow copy
+    const eventData: EventData = { ...this.lastMove };  // shallow copy
 
     // If a modifier key is down, discard the target to prevent snap/hover.
     if (this._snappingDisabled()) {

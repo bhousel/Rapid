@@ -38,7 +38,7 @@ export function actionUpgradeTags(entityID: EntityID, oldTags: OsmTags, replaceT
 
   return (graph: Graph): Graph => {
     const entity = graph.entity(entityID);
-    const tags: OsmTags = Object.assign({}, entity.tags);      // shallow copy
+    const tags: OsmTags = { ...entity.tags };  // shallow copy
     let transferValue: string | undefined;
     let semiIndex: number | undefined;
 

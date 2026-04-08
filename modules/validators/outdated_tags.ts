@@ -82,7 +82,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
       }
     }
 
-    const oldTags: OsmTags = Object.assign({}, entity.tags);  // shallow copy
+    const oldTags: OsmTags = { ...entity.tags };  // shallow copy
     let subtype = 'deprecated_tags';
 
     // Note: We are going to modify `graph` and `entity` locally in here, but these things will not change.
@@ -108,7 +108,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
     }
 
     // Add missing addTags from the detected preset
-    let newTags: OsmTags = Object.assign({}, entity.tags);  // shallow copy
+    let newTags: OsmTags = { ...entity.tags };  // shallow copy
     if (preset.tags !== preset.addTags) {
       for (const [k, v] of Object.entries(preset.addTags)) {
         if (!newTags[k]) {
@@ -215,7 +215,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
       const currEntity = graph.hasEntity(entity.id);
       if (!currEntity) return graph;
 
-      const newTags: OsmTags = Object.assign({}, currEntity.tags);  // shallow copy
+      const newTags: OsmTags = { ...currEntity.tags };  // shallow copy
       for (const diff of tagDiff) {
         if (diff.type === '-') {
           delete newTags[diff.key];
@@ -241,7 +241,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
       const item = nsiResult?.matched;
       if (!item) return graph;
 
-      const newTags: OsmTags = Object.assign({}, currEntity.tags);  // shallow copy
+      const newTags: OsmTags = { ...currEntity.tags };  // shallow copy
       const wd = item.mainTag;     // e.g. `brand:wikidata`
       const notwd = `not:${wd}`;   // e.g. `not:brand:wikidata`
       const qid = item.tags[wd];

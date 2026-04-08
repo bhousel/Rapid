@@ -107,7 +107,7 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
 
     // Rapid tagnosticRoadCombine - allow combining highways with conflicting tags
     if (options.tagnosticRoadCombine && ways.length && ways[0].tags.highway) {
-      const newTags: OsmTags = Object.assign({}, survivor.tags);
+      const newTags: OsmTags = { ...survivor.tags };  // shallow copy
       newTags.highway = ways[0].tags.highway;
       survivor = survivor.update({ tags: newTags });
       graph.replace(survivor);
@@ -140,7 +140,7 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
       graph.replace(survivor);
       graph = actionDeleteRelation(multipolygon.id, true, true /* allow untagged members */)(graph);
 
-      const tags: OsmTags = Object.assign({}, survivor.tags);
+      const tags: OsmTags = { ...survivor.tags };  // shallow copy
       if (survivor.geometry(graph) !== 'area') {
         // ensure the feature persists as an area
         tags.area = 'yes';

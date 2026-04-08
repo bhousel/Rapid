@@ -657,7 +657,7 @@ export class VectorTileService extends AbstractSystem {
         type: 'MultiPolygon',
         coordinates: mergedCoords
       },
-      properties: Object.assign({}, source.properties)   // shallow copy
+      properties: { ...source.properties }   // shallow copy
     };
 
     // Convert whatever we got into new single part Polygons
@@ -797,7 +797,7 @@ export class VectorTileService extends AbstractSystem {
           type: type.replace('Multi', ''),
           coordinates: part
         },
-        properties: Object.assign({}, geojson.properties)   // shallow copy
+        properties: { ...geojson.properties }   // shallow copy
       });
     }
     return result;

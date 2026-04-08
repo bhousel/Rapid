@@ -169,7 +169,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
           title: l10n.t('issues.fix.tag_as_disconnected.title'),
           onClick: function(this: any) {
             const nodeID = this.issue.entityIds[1];
-            const tags = Object.assign({}, graph.entity(nodeID).tags);
+            const tags = { ...graph.entity(nodeID).tags };
             tags.noexit = 'yes';
             editor.perform(actionChangeTags(nodeID, tags));
             editor.commit({

@@ -62,7 +62,7 @@ export function actionOrthogonalize(
 
     // since we're squaring, remove indication that this is physically unsquare
     if (way.tags.nonsquare) {
-      const tags = Object.assign({}, way.tags);  // shallow copy
+      const tags = { ...way.tags };  // shallow copy
       delete tags.nonsquare;
       way = way.update({ tags: tags });
     }

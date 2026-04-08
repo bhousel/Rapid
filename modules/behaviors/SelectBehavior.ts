@@ -350,7 +350,7 @@ export class SelectBehavior extends AbstractBehavior {
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
     const isMultiselect = modifiers.has('Shift');
-    const eventData: EventData = Object.assign({}, this.lastClick);  // shallow copy
+    const eventData: EventData = { ...this.lastClick };  // shallow copy
 
     // If a modifier key is down, discard the target to prevent snap/hover.
     if (disableSnap) {
@@ -521,7 +521,7 @@ export class SelectBehavior extends AbstractBehavior {
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
-    const eventData: EventData = Object.assign({}, this.lastClick);  // shallow copy
+    const eventData: EventData = { ...this.lastClick };  // shallow copy
 
     // If a modifier key is down, discard the target to prevent snap/hover.
     if (disableSnap) {

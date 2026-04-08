@@ -72,7 +72,7 @@ export function actionMerge(entityIDs: EntityID[]): Action {
     });
 
     if (target.tags.area === 'yes') {
-      const tags = Object.assign({}, target.tags);  // shallow copy
+      const tags = { ...target.tags };  // shallow copy
       delete tags.area;
       if (target.tagSuggestingArea(tags)) {
         // remove the `area` tag if area geometry is now implied - iD#3851

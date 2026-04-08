@@ -118,7 +118,7 @@ export class HoverBehavior extends AbstractBehavior {
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
-    const eventData: EventData = Object.assign({}, this.lastMove);  // shallow copy
+    const eventData: EventData = { ...this.lastMove };  // shallow copy
 
     // Handle situations where we don't want to hover a target way...
     const isActiveTarget = false;
@@ -164,7 +164,7 @@ export class HoverBehavior extends AbstractBehavior {
     const prevID = this.hoverTarget?.featureID || null;
     const currID = eventData?.target?.featureID || null;
     if (prevID !== currID) {
-      this.hoverTarget = Object.assign({}, eventData.target);  // shallow copy
+      this.hoverTarget = { ...eventData.target } as EventTarget;  // shallow copy
       this.emit('hoverchange', eventData);
     }
   }

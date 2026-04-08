@@ -128,7 +128,7 @@ export function uiCommit(context) {
   // Calculates tags based on the user's editing session
   //
   function updateSessionChangesetTags() {
-    const tags = Object.assign({}, uploader.changeset.tags);   // shallow copy
+    const tags = { ...uploader.changeset.tags };   // shallow copy
 
     // Sync up the `rapid:poweruser` tag
     // Set to true if the user had poweruser on at any point during their editing
@@ -535,7 +535,7 @@ export function uiCommit(context) {
 
     tagSection
       .call(rawTagEditor
-        .tags(Object.assign({}, uploader.changeset.tags))   // shallow copy
+        .tags({ ...uploader.changeset.tags })   // shallow copy
         .render
       );
 
@@ -557,7 +557,7 @@ export function uiCommit(context) {
 
       tagSection
         .call(rawTagEditor
-          .tags(Object.assign({}, uploader.changeset.tags))   // shallow copy
+          .tags({ ...uploader.changeset.tags })   // shallow copy
           .render
         );
     }
@@ -664,7 +664,7 @@ export function uiCommit(context) {
 
 
   function updateChangeset(changed, onInput) {
-    let tags = Object.assign({}, uploader.changeset.tags);   // shallow copy
+    let tags = { ...uploader.changeset.tags };   // shallow copy
 
     Object.keys(changed).forEach(function(k) {
       let v = changed[k];

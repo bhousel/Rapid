@@ -135,7 +135,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @returns JSON representation of this data element
    */
   asJSON(): Partial<OsmEntityProps> {
-    return Object.assign({}, this.props);
+    return { ...this.props };
   }
 
   /**
@@ -316,7 +316,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @returns A new Entity copied from this Entity, but with the updated tags
    */
   mergeTags(tags: OsmTags): this {
-    const merged: OsmTags = Object.assign({}, this.props.tags);  // copy
+    const merged: OsmTags = { ...this.props.tags };  // shallow copy
     let changed = false;
     for (const k in tags) {
       const t1 = merged[k];

@@ -75,7 +75,7 @@ export function actionExtract(entityID: EntityID, viewport: Viewport): ExtractAc
     const isBuilding = (entity.tags.building && entity.tags.building !== 'no') ||
       (entity.tags['building:part'] && entity.tags['building:part'] !== 'no');
 
-    const entityTags: OsmTags = Object.assign({}, entity.tags);  // shallow copy
+    const entityTags: OsmTags = { ...entity.tags };  // shallow copy
     const extractTags: OsmTags = {};
 
     for (const key in entityTags) {

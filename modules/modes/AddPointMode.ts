@@ -175,7 +175,7 @@ export class AddPointMode extends AbstractMode {
       return;
     }
 
-    const tags: OsmTags = Object.assign({}, node.tags);  // shallow copy
+    const tags: OsmTags = { ...node.tags };  // shallow copy
     for (const k in this.defaultTags) {
       tags[k] = this.defaultTags[k];
     }

@@ -285,7 +285,7 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
           if (!way) return;
 
           if (setTags) {
-            const tags = Object.assign({}, way.tags);
+            const tags = { ...way.tags };  // shallow copy
             for (const [k, v] of Object.entries(setTags)) {
               if (v) {
                 tags[k] = v;

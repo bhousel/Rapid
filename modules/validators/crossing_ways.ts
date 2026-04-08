@@ -790,7 +790,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
             .map(id => graph.entity(id))
             .find(way => (way as OsmWay).nodes.includes(structEndNode1.id) && (way as OsmWay).nodes.includes(structEndNode2.id)) as OsmWay;
 
-          const tags = Object.assign({}, structureWay.tags); // copy tags
+          const tags = { ...structureWay.tags };  // copy tags
           if (bridgeOrTunnel === 'bridge') {
             tags.bridge = 'yes';
             tags.layer = '1';
@@ -933,7 +933,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         const entity = graph.hasEntity(selectedID);
         if (!entity) return;
 
-        const tags = Object.assign({}, entity.tags);   // shallow copy
+        const tags = { ...entity.tags };   // shallow copy
         let layer = tags.layer && Number(tags.layer);
         if (layer && !isNaN(layer)) {
           if (higherOrLower === 'higher') {

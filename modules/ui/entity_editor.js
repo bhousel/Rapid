@@ -250,7 +250,7 @@ export function uiEntityEditor(context) {
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;
 
-      let tags = Object.assign({}, entity.tags);   // shallow copy
+      let tags = { ...entity.tags };   // shallow copy
       let involvesCrossing = false;
 
       for (const [k, v] of Object.entries(changed)) {
@@ -312,7 +312,7 @@ export function uiEntityEditor(context) {
       const currGraph = editor.staging.graph;
       const original = baseGraph.hasEntity(entityID);
       const current = currGraph.entity(entityID);
-      let tags = Object.assign({}, current.tags);   // shallow copy
+      let tags = { ...current.tags };   // shallow copy
 
       let changed = {};
       for (const key of keys) {

@@ -228,7 +228,7 @@ export function uiFieldWikidata(context, uifield) {
 
         for (const entityID of initEntityIDs) {
           const entity = graph.entity(entityID);
-          const asyncTags = Object.assign({}, entity.tags);  // shallow copy
+          const asyncTags = { ...entity.tags };  // shallow copy
 
           if (newValue === null) {  // remove wikipedia tag
             if (!asyncTags[_wikipediaKey]) continue;  // no change

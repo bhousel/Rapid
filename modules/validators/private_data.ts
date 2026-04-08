@@ -94,7 +94,7 @@ export function validatePrivateData(context: Context): ValidatorFunction {
       const currEntity = graph.hasEntity(entity.id);
       if (!currEntity) return graph;
 
-      const newTags = Object.assign({}, currEntity.tags);  // shallow copy
+      const newTags = { ...currEntity.tags };  // shallow copy
       for (const diff of tagDiff) {
         if (diff.type === '-') {
           delete newTags[diff.key];

@@ -434,7 +434,7 @@ export class Context extends EventEmitter {
     return this._preauth;
   }
   set preauth(options: PreauthOptions | null) {
-    this._preauth = options ? Object.assign({}, options) : null;  // copy and remember for init time
+    this._preauth = options ? { ...options } : null;  // copy and remember for init time
   }
 
   /**

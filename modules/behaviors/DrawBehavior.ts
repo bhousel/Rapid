@@ -280,7 +280,7 @@ export class DrawBehavior extends AbstractBehavior {
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
-    const eventData: EventData = Object.assign({}, this.lastMove);  // shallow copy
+    const eventData: EventData = { ...this.lastMove };  // shallow copy
 
     // Handle situations where we don't want to hover a target way...
     const isActiveTarget = false;
@@ -342,7 +342,7 @@ export class DrawBehavior extends AbstractBehavior {
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
-    const eventData: EventData = Object.assign({}, this.lastClick);  // shallow copy
+    const eventData: EventData = { ...this.lastClick };  // shallow copy
 
     // Handle situations where we don't want to hover a target way...
     const isActiveTarget = false;

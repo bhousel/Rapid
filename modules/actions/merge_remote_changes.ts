@@ -205,7 +205,7 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
     const b: OsmTags = remote.tags ?? {};
     const keys = utilArrayUnion(utilArrayUnion(Object.keys(o), Object.keys(a)), Object.keys(b))
         .filter((k: string) => { return !discardTags[k]; });
-    const tags: OsmTags = Object.assign({}, a);   // shallow copy
+    const tags: OsmTags = { ...a };   // shallow copy
     let changed = false;
 
     for (const k of keys) {

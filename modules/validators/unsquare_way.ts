@@ -138,7 +138,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
               const graph = editor.staging.graph;
               const entityID = this.issue.entityIds[0];
               const entity = graph.entity(entityID);
-              const tags = Object.assign({}, entity.tags);  // shallow copy
+              const tags = { ...entity.tags };  // shallow copy
               tags.nonsquare = 'yes';
               editor.perform(actionChangeTags(entityID, tags));
               editor.commit({

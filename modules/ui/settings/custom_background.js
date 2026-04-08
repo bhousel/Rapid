@@ -14,7 +14,7 @@ export function uiSettingsCustomBackground(context) {
   function render(selection) {
     // keep separate copies of original and current settings
     let _origSettings = { template: storage.getItem('background-custom-template') };
-    let _currSettings = Object.assign({}, _origSettings);
+    let _currSettings = { ..._origSettings };  // shallow copy
 
     let modal = uiConfirm(context, selection).okButton();
 

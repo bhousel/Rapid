@@ -70,7 +70,7 @@ export function operationDowngrade(context, selectedIDs) {
         const type = downgradeTypeForEntityID(entityID);
         if (!type) continue;
 
-        const tags = Object.assign({}, graph.entity(entityID).tags);  // shallow copy
+        const tags = { ...graph.entity(entityID).tags };  // shallow copy
         for (let key in tags) {
           if (type === 'address' && addressKeysToKeep.indexOf(key) !== -1) continue;
           if (type === 'building' && buildingKeysToRetain.test(key)) continue;

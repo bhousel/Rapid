@@ -483,7 +483,7 @@ export class Preset {
     const schema = this.context.systems.schema;
 
     const addTags = this.addTags;
-    tags = Object.assign({}, tags);   // shallow copy
+    tags = { ...tags };   // shallow copy
 
     for (const k in addTags) {
       if (addTags[k] === '*') {

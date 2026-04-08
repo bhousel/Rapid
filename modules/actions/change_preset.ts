@@ -21,7 +21,7 @@ export function actionChangePreset(entityID: EntityID, oldPreset: Preset | null,
   return (graph: Graph): Graph => {
     const entity = graph.entity(entityID) as OsmEntity;
     const geometry = entity.geometry(graph);
-    const origTags = Object.assign({}, entity.tags);
+    const origTags = { ...entity.tags };  // shallow copy
     let tags = entity.tags;
 
     // preserve tags that the new preset might care about, if any
