@@ -664,19 +664,17 @@ describe('OsmService', () => {
 
 
     describe('loadNotes', () => {
-      it('loads a tile of notes and requests a redraw', done => {
+      it('loads a tile of notes and requests a redraw', async () => {
         fetchMock.route(/notes/, sample.notesJSON);
         _osm.loadNotes({ /*no options*/ });
         // no errback to promisify :-(
 
-        setTimeout(() => {
-          assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
-          assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
+        await Bun.sleep(10);
+        assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
+        assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
-          const spatial = context.systems.spatial;
-          assert.isTrue(spatial.hasTileAtLoc('osm-notes', [10, 0]));  // tile is loaded here
-          done();
-        }, 10);  // give requestIdleCallback polyfill a change to complete the xml parsing
+        const spatial = context.systems.spatial;
+        assert.isTrue(spatial.hasTileAtLoc('osm-notes', [10, 0]));  // tile is loaded here
       });
     });
 
@@ -687,7 +685,7 @@ describe('OsmService', () => {
         // (this needs to be beforeEach because the parent beforeEach resets)
         fetchMock.route(/notes/, sample.notesJSON);
         _osm.loadNotes({ /*no options*/ });
-        return new Promise(resolve => { setTimeout(() => { resolve(); }, 10); });
+        return Bun.sleep(10);
       });
 
       describe('getNotes', () => {

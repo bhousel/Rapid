@@ -355,48 +355,48 @@ describe('SchedulerSystem', () => {
     describe('scheduleTimeout', () => {
       it('executes a task after the specified delay', async () => {
         let executed = false;
-        _scheduler.scheduleTimeout(() => { executed = true; }, 10);
+        _scheduler.scheduleTimeout(() => { executed = true; }, 5);
         assert.isFalse(executed, 'task should not run synchronously');
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        await Bun.sleep(10);
         assert.isTrue(executed, 'task should have run after delay');
       });
 
       it('defaults to 0ms delay', async () => {
         let executed = false;
         _scheduler.scheduleTimeout(() => { executed = true; });
-        await new Promise(resolve => { setTimeout(resolve, 20); });
+        await Bun.sleep(10);
         assert.isTrue(executed, 'task should have run');
       });
 
       it('returns a cancel function', () => {
-        const cancel = _scheduler.scheduleTimeout(() => {}, 5000);
+        const cancel = _scheduler.scheduleTimeout(() => {}, 5);
         assert.isFunction(cancel);
       });
 
       it('tracks the timeout in numTimeouts', () => {
         assert.strictEqual(_scheduler.numTimeouts, 0);
-        const cancel = _scheduler.scheduleTimeout(() => {}, 5000);
+        const cancel = _scheduler.scheduleTimeout(() => {}, 5);
         assert.strictEqual(_scheduler.numTimeouts, 1);
         cancel();
       });
 
       it('cancel function prevents execution', async () => {
         let executed = false;
-        const cancel = _scheduler.scheduleTimeout(() => { executed = true; }, 10);
+        const cancel = _scheduler.scheduleTimeout(() => { executed = true; }, 5);
         cancel();
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        await Bun.sleep(10);
         assert.isFalse(executed, 'cancelled task should not run');
       });
 
       it('cancel function removes from tracking', () => {
-        const cancel = _scheduler.scheduleTimeout(() => {}, 5000);
+        const cancel = _scheduler.scheduleTimeout(() => {}, 5);
         assert.strictEqual(_scheduler.numTimeouts, 1);
         cancel();
         assert.strictEqual(_scheduler.numTimeouts, 0);
       });
 
       it('cancel function is idempotent', () => {
-        const cancel = _scheduler.scheduleTimeout(() => {}, 5000);
+        const cancel = _scheduler.scheduleTimeout(() => {}, 5);
         cancel();
         cancel();  // should not throw or double-decrement
         assert.strictEqual(_scheduler.numTimeouts, 0);
@@ -405,18 +405,18 @@ describe('SchedulerSystem', () => {
       it('removes from tracking after natural completion', async () => {
         _scheduler.scheduleTimeout(() => {}, 5);
         assert.strictEqual(_scheduler.numTimeouts, 1);
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        await Bun.sleep(10);
         assert.strictEqual(_scheduler.numTimeouts, 0, 'should auto-clean after firing');
       });
 
       it('handles multiple concurrent timeouts', async () => {
         const results = [];
         _scheduler.scheduleTimeout(() => results.push('a'), 10);
-        _scheduler.scheduleTimeout(() => results.push('b'), 20);
-        _scheduler.scheduleTimeout(() => results.push('c'), 30);
+        _scheduler.scheduleTimeout(() => results.push('b'), 15);
+        _scheduler.scheduleTimeout(() => results.push('c'), 20);
         assert.strictEqual(_scheduler.numTimeouts, 3);
 
-        await new Promise(resolve => { setTimeout(resolve, 80); });
+        await Bun.sleep(30);
         assert.sameMembers(results, ['a', 'b', 'c'], 'all timeouts should have fired');
         assert.strictEqual(_scheduler.numTimeouts, 0);
       });
@@ -424,11 +424,11 @@ describe('SchedulerSystem', () => {
       it('cancel only affects the targeted timeout', async () => {
         let aRan = false;
         let bRan = false;
-        const cancelA = _scheduler.scheduleTimeout(() => { aRan = true; }, 10);
-        _scheduler.scheduleTimeout(() => { bRan = true; }, 10);
+        const cancelA = _scheduler.scheduleTimeout(() => { aRan = true; }, 5);
+        _scheduler.scheduleTimeout(() => { bRan = true; }, 5);
         cancelA();
 
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        await Bun.sleep(30);
         assert.isFalse(aRan, 'cancelled timeout should not run');
         assert.isTrue(bRan, 'other timeout should still run');
       });
@@ -437,14 +437,14 @@ describe('SchedulerSystem', () => {
     describe('cancelAllTimeouts', () => {
       it('cancels all active timeouts', async () => {
         let count = 0;
-        _scheduler.scheduleTimeout(() => { count++; }, 10);
-        _scheduler.scheduleTimeout(() => { count++; }, 20);
+        _scheduler.scheduleTimeout(() => { count++; }, 5);
+        _scheduler.scheduleTimeout(() => { count++; }, 5);
         assert.strictEqual(_scheduler.numTimeouts, 2);
 
         _scheduler.cancelAllTimeouts();
         assert.strictEqual(_scheduler.numTimeouts, 0);
 
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        await Bun.sleep(30);
         assert.strictEqual(count, 0, 'no timeouts should have fired');
       });
 
@@ -455,12 +455,12 @@ describe('SchedulerSystem', () => {
       });
 
       it('allows new timeouts after cancellation', async () => {
-        _scheduler.scheduleTimeout(() => {}, 5000);
+        _scheduler.scheduleTimeout(() => {}, 5);
         _scheduler.cancelAllTimeouts();
 
         let executed = false;
         _scheduler.scheduleTimeout(() => { executed = true; }, 5);
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        await Bun.sleep(10);
         assert.isTrue(executed);
       });
     });
@@ -468,37 +468,37 @@ describe('SchedulerSystem', () => {
     describe('scheduleInterval', () => {
       it('executes a task repeatedly', async () => {
         let count = 0;
-        const cancel = _scheduler.scheduleInterval(() => { count++; }, 15);
-        await new Promise(resolve => { setTimeout(resolve, 100); });
+        const cancel = _scheduler.scheduleInterval(() => { count++; }, 5);
+        await Bun.sleep(15);
         cancel();
         assert.isAbove(count, 1, 'interval should have fired multiple times');
       });
 
       it('returns a cancel function', () => {
-        const cancel = _scheduler.scheduleInterval(() => {}, 5000);
+        const cancel = _scheduler.scheduleInterval(() => {}, 5);
         assert.isFunction(cancel);
         cancel();
       });
 
       it('tracks the interval in numIntervals', () => {
         assert.strictEqual(_scheduler.numIntervals, 0);
-        const cancel = _scheduler.scheduleInterval(() => {}, 5000);
+        const cancel = _scheduler.scheduleInterval(() => {}, 5);
         assert.strictEqual(_scheduler.numIntervals, 1);
         cancel();
       });
 
       it('cancel function stops further execution', async () => {
         let count = 0;
-        const cancel = _scheduler.scheduleInterval(() => { count++; }, 10);
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        const cancel = _scheduler.scheduleInterval(() => { count++; }, 5);
+        await Bun.sleep(15);
         cancel();
         const countAtCancel = count;
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        await Bun.sleep(15);
         assert.strictEqual(count, countAtCancel, 'no more ticks after cancel');
       });
 
       it('cancel function removes from tracking', () => {
-        const cancel = _scheduler.scheduleInterval(() => {}, 5000);
+        const cancel = _scheduler.scheduleInterval(() => {}, 5);
         assert.strictEqual(_scheduler.numIntervals, 1);
         cancel();
         assert.strictEqual(_scheduler.numIntervals, 0);
@@ -507,11 +507,11 @@ describe('SchedulerSystem', () => {
       it('handles multiple concurrent intervals', async () => {
         let aCount = 0;
         let bCount = 0;
-        const cancelA = _scheduler.scheduleInterval(() => { aCount++; }, 15);
-        const cancelB = _scheduler.scheduleInterval(() => { bCount++; }, 15);
+        const cancelA = _scheduler.scheduleInterval(() => { aCount++; }, 5);
+        const cancelB = _scheduler.scheduleInterval(() => { bCount++; }, 5);
         assert.strictEqual(_scheduler.numIntervals, 2);
 
-        await new Promise(resolve => { setTimeout(resolve, 80); });
+        await Bun.sleep(15);
         cancelA();
         cancelB();
         assert.isAbove(aCount, 0);
@@ -523,14 +523,14 @@ describe('SchedulerSystem', () => {
     describe('cancelAllIntervals', () => {
       it('cancels all active intervals', async () => {
         let count = 0;
-        _scheduler.scheduleInterval(() => { count++; }, 10);
-        _scheduler.scheduleInterval(() => { count++; }, 10);
+        _scheduler.scheduleInterval(() => { count++; }, 5);
+        _scheduler.scheduleInterval(() => { count++; }, 5);
         assert.strictEqual(_scheduler.numIntervals, 2);
 
         _scheduler.cancelAllIntervals();
         assert.strictEqual(_scheduler.numIntervals, 0);
 
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        await Bun.sleep(15);
         assert.strictEqual(count, 0, 'no intervals should have fired');
       });
 
@@ -545,8 +545,8 @@ describe('SchedulerSystem', () => {
         _scheduler.cancelAllIntervals();
 
         let count = 0;
-        const cancel = _scheduler.scheduleInterval(() => { count++; }, 10);
-        await new Promise(resolve => { setTimeout(resolve, 50); });
+        const cancel = _scheduler.scheduleInterval(() => { count++; }, 5);
+        await Bun.sleep(15);
         cancel();
         assert.isAbove(count, 0);
       });
@@ -559,11 +559,11 @@ describe('SchedulerSystem', () => {
     describe('setTimeout (workID)', () => {
       it('executes a task after the delay via queue drainage', async () => {
         let executed = false;
-        _scheduler.setTimeout('test-timeout', () => { executed = true; }, { ms: 10 });
+        _scheduler.setTimeout('test-timeout', () => { executed = true; }, { ms: 5 });
         assert.strictEqual(_scheduler.numTimers, 1);
 
         // Wait for timer to mature + frame to drain
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        await Bun.sleep(30);
         assert.isTrue(executed, 'task should have run');
         assert.strictEqual(_scheduler.numTimers, 0, 'timer entry cleaned up');
       });
@@ -571,22 +571,23 @@ describe('SchedulerSystem', () => {
       it('defaults to 0ms delay', async () => {
         let executed = false;
         _scheduler.setTimeout('test-zero', () => { executed = true; });
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+
+        await Bun.sleep(30);
         assert.isTrue(executed);
       });
 
       it('replaces existing timer with same workID', async () => {
         const order = [];
-        _scheduler.setTimeout('test-replace', () => order.push('first'), { ms: 10 });
-        _scheduler.setTimeout('test-replace', () => order.push('second'), { ms: 10 });
+        _scheduler.setTimeout('test-replace', () => order.push('first'), { ms: 5 });
+        _scheduler.setTimeout('test-replace', () => order.push('second'), { ms: 5 });
         assert.strictEqual(_scheduler.numTimers, 1, 'only one timer');
 
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        await Bun.sleep(30);
         assert.deepEqual(order, ['second'], 'only the replacement ran');
       });
 
       it('respects priority option', () => {
-        _scheduler.setTimeout('test-pri', () => {}, { ms: 5000, priority: 'urgent' });
+        _scheduler.setTimeout('test-pri', () => {}, { ms: 5, priority: 'urgent' });
         const entry = _scheduler._timers.get('test-pri');
         assert.strictEqual(entry.priority, 'urgent');
         _scheduler.cancel('test-pri');
@@ -596,10 +597,10 @@ describe('SchedulerSystem', () => {
     describe('setInterval (workID)', () => {
       it('executes a task repeatedly via queue drainage', async () => {
         let count = 0;
-        _scheduler.setInterval('test-interval', () => { count++; }, { ms: 20 });
+        _scheduler.setInterval('test-interval', () => { count++; }, { ms: 5 });
         assert.strictEqual(_scheduler.numTimers, 1);
 
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 120); });
+        await Bun.sleep(30);
         _scheduler.cancel('test-interval');
         assert.isAbove(count, 1, 'interval should have fired multiple times');
         assert.strictEqual(_scheduler.numTimers, 0);
@@ -608,10 +609,10 @@ describe('SchedulerSystem', () => {
       it('replaces existing interval with same workID', async () => {
         let aCount = 0;
         let bCount = 0;
-        _scheduler.setInterval('test-replace-iv', () => { aCount++; }, { ms: 15 });
-        _scheduler.setInterval('test-replace-iv', () => { bCount++; }, { ms: 15 });
+        _scheduler.setInterval('test-replace-iv', () => { aCount++; }, { ms: 5 });
+        _scheduler.setInterval('test-replace-iv', () => { bCount++; }, { ms: 5 });
 
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        await Bun.sleep(30);
         _scheduler.cancel('test-replace-iv');
         assert.strictEqual(aCount, 0, 'first interval should not have fired');
         assert.isAbove(bCount, 0, 'replacement should have fired');
@@ -621,10 +622,10 @@ describe('SchedulerSystem', () => {
     describe('debounce', () => {
       it('fires after the quiet period', async () => {
         let executed = false;
-        _scheduler.debounce('test-debounce', () => { executed = true; }, { ms: 30 });
+        _scheduler.debounce('test-debounce', () => { executed = true; }, { ms: 10 });
         assert.strictEqual(_scheduler.numTimers, 1);
 
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 100); });
+        await Bun.sleep(30);
         assert.isTrue(executed, 'debounced fn should have run');
         assert.strictEqual(_scheduler.numTimers, 0, 'timer entry cleaned up');
       });
@@ -633,45 +634,45 @@ describe('SchedulerSystem', () => {
         const timestamps = [];
         const start = performance.now();
 
-        _scheduler.debounce('test-reset', () => { timestamps.push(performance.now() - start); }, { ms: 40 });
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 20); });
-        // Call again before the first timer fires — resets the 40ms window
-        _scheduler.debounce('test-reset', () => { timestamps.push(performance.now() - start); }, { ms: 40 });
+        _scheduler.debounce('test-reset', () => { timestamps.push(performance.now() - start); }, { ms: 10 });
+        await Bun.sleep(5);
+        // Call again before the first timer fires — resets the 10ms window
+        _scheduler.debounce('test-reset', () => { timestamps.push(performance.now() - start); }, { ms: 10 });
 
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 100); });
+        await Bun.sleep(30);
         assert.lengthOf(timestamps, 1, 'should have fired exactly once');
-        // The single fire should be at ~60ms+ (20ms wait + 40ms debounce), not at ~40ms
-        assert.isAbove(timestamps[0], 50, 'should have fired after the reset delay');
+        // The single fire should be at ~15ms+ (5ms wait + 10ms debounce), not at ~10ms
+        assert.isAbove(timestamps[0], 15, 'should have fired after the reset delay');
       });
 
       it('updates fn on subsequent calls', async () => {
         const order = [];
-        _scheduler.debounce('test-fn-update', () => order.push('first'), { ms: 30 });
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 10); });
-        _scheduler.debounce('test-fn-update', () => order.push('second'), { ms: 30 });
+        _scheduler.debounce('test-fn-update', () => order.push('first'), { ms: 10 });
+        await Bun.sleep(5);
+        _scheduler.debounce('test-fn-update', () => order.push('second'), { ms: 10 });
 
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 100); });
+        await Bun.sleep(30);
         assert.deepEqual(order, ['second'], 'only the latest fn should run');
       });
 
       it('leading: true fires immediately on first call', async () => {
         const order = [];
-        _scheduler.debounce('test-leading', () => order.push('leading'), { ms: 30, leading: true });
+        _scheduler.debounce('test-leading', () => order.push('leading'), { ms: 10, leading: true });
 
         // Wait a couple frames for the leading enqueue to drain
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        await Bun.sleep(30);
         assert.include(order, 'leading', 'should have fired on leading edge');
       });
 
       it('leading: true + subsequent call fires both leading and trailing', async () => {
         const order = [];
-        _scheduler.debounce('test-lead-trail', () => order.push('a'), { ms: 30, leading: true });
+        _scheduler.debounce('test-lead-trail', () => order.push('a'), { ms: 10, leading: true });
 
         // Wait a frame for leading to drain, then debounce again
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 15); });
-        _scheduler.debounce('test-lead-trail', () => order.push('b'), { ms: 30 });
+        await Bun.sleep(30);
+        _scheduler.debounce('test-lead-trail', () => order.push('b'), { ms: 10 });
 
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 100); });
+        await Bun.sleep(30);
         assert.deepEqual(order, ['a', 'b'], 'both leading and trailing should fire');
       });
     });
@@ -679,79 +680,77 @@ describe('SchedulerSystem', () => {
     describe('throttle', () => {
       it('fires on the leading edge', async () => {
         let executed = false;
-        _scheduler.throttle('test-throttle', () => { executed = true; }, { ms: 50 });
+        _scheduler.throttle('test-throttle', () => { executed = true; }, { ms: 10 });
         assert.strictEqual(_scheduler.numTimers, 1);
 
         // Wait for the leading enqueue to drain
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        await Bun.sleep(30);
         assert.isTrue(executed, 'should have fired on leading edge');
       });
 
       it('ignores calls during the throttle window', async () => {
         let count = 0;
-        _scheduler.throttle('test-ignore', () => { count++; }, { ms: 100 });
-        _scheduler.throttle('test-ignore', () => { count++; }, { ms: 100 });
-        _scheduler.throttle('test-ignore', () => { count++; }, { ms: 100 });
+        _scheduler.throttle('test-ignore', () => { count++; }, { ms: 10 });
+        _scheduler.throttle('test-ignore', () => { count++; }, { ms: 10 });
+        _scheduler.throttle('test-ignore', () => { count++; }, { ms: 10 });
 
         // Wait for leading + trailing to drain
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 200); });
+        await Bun.sleep(30);
         // Leading fires once, plus the last trailing should fire once
         assert.strictEqual(count, 2, 'leading + trailing = 2 executions');
       });
 
       it('fires trailing call after window expires', async () => {
         const order = [];
-        _scheduler.throttle('test-trailing', () => order.push('leading'), { ms: 40 });
+        _scheduler.throttle('test-trailing', () => order.push('leading'), { ms: 10 });
         // Call during window — this becomes the trailing fn
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 10); });
-        _scheduler.throttle('test-trailing', () => order.push('trailing'), { ms: 40 });
+        await Bun.sleep(5);
+        _scheduler.throttle('test-trailing', () => order.push('trailing'), { ms: 10 });
 
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 120); });
+        await Bun.sleep(30);
         assert.deepEqual(order, ['leading', 'trailing']);
         assert.strictEqual(_scheduler.numTimers, 0, 'cleaned up after trailing');
       });
 
       it('cleans up when no trailing call', async () => {
-        _scheduler.throttle('test-cleanup', () => {}, { ms: 30 });
+        _scheduler.throttle('test-cleanup', () => {}, { ms: 10 });
 
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        await Bun.sleep(30);
         assert.strictEqual(_scheduler.numTimers, 0, 'should be cleaned up');
       });
 
       it('replaces different timer types with same workID', async () => {
-        _scheduler.setTimeout('test-replace-type', () => {}, { ms: 5000 });
+        _scheduler.setTimeout('test-replace-type', () => {}, { ms: 10 });
         assert.strictEqual(_scheduler.numTimers, 1);
         assert.strictEqual(_scheduler._timers.get('test-replace-type').type, 'timeout');
 
-        _scheduler.throttle('test-replace-type', () => {}, { ms: 30 });
+        _scheduler.throttle('test-replace-type', () => {}, { ms: 10 });
         assert.strictEqual(_scheduler.numTimers, 1);
         assert.strictEqual(_scheduler._timers.get('test-replace-type').type, 'throttle');
-
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
       });
 
       it('leading: false defers first call to trailing edge', async () => {
         const order = [];
-        _scheduler.throttle('test-no-lead', () => order.push('first'), { ms: 40, leading: false });
+        _scheduler.throttle('test-no-lead', () => order.push('first'), { ms: 10, leading: false });
 
         // Leading should NOT have fired
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 10); });
+        await Bun.sleep(5);
         assert.deepEqual(order, [], 'should not fire on leading edge');
 
         // After window expires, trailing should fire
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 80); });
+        await Bun.sleep(30);
         assert.deepEqual(order, ['first'], 'should fire on trailing edge');
         assert.strictEqual(_scheduler.numTimers, 0, 'cleaned up');
       });
 
       it('leading: false with multiple calls fires only trailing', async () => {
         let count = 0;
-        _scheduler.throttle('test-no-lead-multi', () => { count++; }, { ms: 60, leading: false });
-        _scheduler.throttle('test-no-lead-multi', () => { count++; }, { ms: 60, leading: false });
-        _scheduler.throttle('test-no-lead-multi', () => { count++; }, { ms: 60, leading: false });
+        _scheduler.throttle('test-no-lead-multi', () => { count++; }, { ms: 10, leading: false });
+        _scheduler.throttle('test-no-lead-multi', () => { count++; }, { ms: 10, leading: false });
+        _scheduler.throttle('test-no-lead-multi', () => { count++; }, { ms: 10, leading: false });
 
         // After window expires, only the latest trailing should fire
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 120); });
+        await Bun.sleep(30);
         assert.strictEqual(count, 1, 'only trailing fires once');
       });
     });
@@ -759,21 +758,21 @@ describe('SchedulerSystem', () => {
     describe('cancel', () => {
       it('cancels a timeout by workID', async () => {
         let executed = false;
-        _scheduler.setTimeout('test-cancel-to', () => { executed = true; }, { ms: 10 });
+        _scheduler.setTimeout('test-cancel-to', () => { executed = true; }, { ms: 5 });
         _scheduler.cancel('test-cancel-to');
 
         assert.strictEqual(_scheduler.numTimers, 0);
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        await Bun.sleep(30);
         assert.isFalse(executed);
       });
 
       it('cancels an interval by workID', async () => {
         let count = 0;
-        _scheduler.setInterval('test-cancel-iv', () => { count++; }, { ms: 10 });
+        _scheduler.setInterval('test-cancel-iv', () => { count++; }, { ms: 5 });
         _scheduler.cancel('test-cancel-iv');
 
         assert.strictEqual(_scheduler.numTimers, 0);
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        await Bun.sleep(30);
         assert.strictEqual(count, 0);
       });
 
@@ -783,19 +782,19 @@ describe('SchedulerSystem', () => {
         _scheduler.cancel('test-cancel-db');
 
         assert.strictEqual(_scheduler.numTimers, 0);
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 50); });
+        await Bun.sleep(30);
         assert.isFalse(executed);
       });
 
       it('cancels a throttle by workID (including trailing)', async () => {
         let _count = 0;
-        _scheduler.throttle('test-cancel-th', () => { _count++; }, { ms: 50 });
+        _scheduler.throttle('test-cancel-th', () => { _count++; }, { ms: 10 });
         // Trailing call
-        _scheduler.throttle('test-cancel-th', () => { _count++; }, { ms: 50 });
+        _scheduler.throttle('test-cancel-th', () => { _count++; }, { ms: 10 });
         _scheduler.cancel('test-cancel-th');
 
         // Wait for leading drain + check no trailing fires
-        await new Promise(resolve => { globalThis.setTimeout(resolve, 120); });
+        await Bun.sleep(30);
         // The leading edge was enqueued before cancel — it might or might not
         // have drained yet.  But after cancel, the trailing should not fire.
         // Also, _removeFromQueues removes any pending enqueue.
@@ -817,9 +816,9 @@ describe('SchedulerSystem', () => {
 
     describe('cancelAllTimers', () => {
       it('cancels all workID-keyed timers', async () => {
-        _scheduler.setTimeout('a', () => {}, { ms: 5000 });
-        _scheduler.setInterval('b', () => {}, { ms: 5000 });
-        _scheduler.debounce('c', () => {}, { ms: 5000 });
+        _scheduler.setTimeout('a', () => {}, { ms: 5 });
+        _scheduler.setInterval('b', () => {}, { ms: 5 });
+        _scheduler.debounce('c', () => {}, { ms: 5 });
         assert.strictEqual(_scheduler.numTimers, 3);
 
         _scheduler.cancelAllTimers();
@@ -827,8 +826,8 @@ describe('SchedulerSystem', () => {
       });
 
       it('does not affect legacy scheduleTimeout/scheduleInterval', () => {
-        const cancelTo = _scheduler.scheduleTimeout(() => {}, 5000);
-        const cancelIv = _scheduler.scheduleInterval(() => {}, 5000);
+        const cancelTo = _scheduler.scheduleTimeout(() => {}, 5);
+        const cancelIv = _scheduler.scheduleInterval(() => {}, 5);
         assert.strictEqual(_scheduler.numTimeouts, 1);
         assert.strictEqual(_scheduler.numIntervals, 1);
 
@@ -840,9 +839,9 @@ describe('SchedulerSystem', () => {
       });
 
       it('resetAsync cancels both workID and legacy timers', async () => {
-        _scheduler.setTimeout('w', () => {}, { ms: 5000 });
-        _scheduler.scheduleTimeout(() => {}, 5000);
-        _scheduler.scheduleInterval(() => {}, 5000);
+        _scheduler.setTimeout('w', () => {}, { ms: 5 });
+        _scheduler.scheduleTimeout(() => {}, 5);
+        _scheduler.scheduleInterval(() => {}, 5);
         assert.strictEqual(_scheduler.numTimers, 1);
         assert.strictEqual(_scheduler.numTimeouts, 1);
         assert.strictEqual(_scheduler.numIntervals, 1);
@@ -896,7 +895,7 @@ describe('SchedulerSystem', () => {
         release();
 
         // Give idle callbacks a chance to fire
-        await new Promise(resolve => { setTimeout(resolve, 60); });
+        await Bun.sleep(30);
         assert.isFalse(executed, 'cancelled task should never run');
       });
     });
@@ -1045,7 +1044,7 @@ describe('SchedulerSystem', () => {
 
           const release = _scheduler.pause();
           // Wait a bit — no frames should fire
-          await new Promise(resolve => { setTimeout(resolve, 60); });
+          await Bun.sleep(30);
           assert.strictEqual(count, countBeforePause, 'no callbacks while paused');
 
           release();

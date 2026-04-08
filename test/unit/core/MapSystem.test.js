@@ -94,24 +94,20 @@ describe('MapSystem', () => {
 
 
     describe('zoomIn', () => {
-      it('increments zoom', done => {
+      it('increments zoom', async () => {
         assert.strictEqual(_map.zoom(4), _map);  // set
         _map.zoomIn();
-        setTimeout(() => {
-          assert.closeTo(_map.zoom(), 5, 1e-6);  // get
-          done();
-        }, 1);
+        await Bun.sleep(1);
+        assert.closeTo(_map.zoom(), 5, 1e-6);  // get
       });
     });
 
     describe('zoomOut', () => {
-      it('decrements zoom', done => {
+      it('decrements zoom', async () => {
         assert.strictEqual(_map.zoom(4), _map);  // set
         _map.zoomOut();
-        setTimeout(() => {
-          assert.closeTo(_map.zoom(), 3, 1e-6);  // get
-          done();
-        }, 1);
+        await Bun.sleep(1);
+        assert.closeTo(_map.zoom(), 3, 1e-6);  // get
       });
     });
 
@@ -128,25 +124,21 @@ describe('MapSystem', () => {
     });
 
     describe('centerEase', () => {
-      it('sets center', done => {
+      it('sets center', async () => {
         assert.strictEqual(_map.centerEase([20, 20], 0), _map);  // set
-        setTimeout(() => {
-          assert.closeTo(_map.center()[0], 20, 1e-6);  // get
-          assert.closeTo(_map.center()[1], 20, 1e-6);  // get
-          done();
-        }, 1);
+        await Bun.sleep(1);
+        assert.closeTo(_map.center()[0], 20, 1e-6);  // get
+        assert.closeTo(_map.center()[1], 20, 1e-6);  // get
       });
     });
 
     describe('centerZoom', () => {
-      it('gets and sets center and zoom', done => {
+      it('gets and sets center and zoom', async () => {
         assert.strictEqual(_map.centerZoom([20, 25], 4), _map);  // set
-        setTimeout(() => {
-          assert.closeTo(_map.center()[0], 20, 1e-6);  // get
-          assert.closeTo(_map.center()[1], 25, 1e-6);  // get
-          assert.strictEqual(_map.zoom(), 4);          // get
-          done();
-        }, 1);
+        await Bun.sleep(1);
+        assert.closeTo(_map.center()[0], 20, 1e-6);  // get
+        assert.closeTo(_map.center()[1], 25, 1e-6);  // get
+        assert.strictEqual(_map.zoom(), 4);          // get
       });
     });
 

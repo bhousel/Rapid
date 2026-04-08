@@ -360,7 +360,7 @@ describe('WorkerSystem', () => {
 
             // Wait for the worker to post back (the onmessage handler runs the scheduler branch)
             // We need to poll briefly because the worker response is async
-            await new Promise(resolve => { setTimeout(resolve, 200); });
+            await Bun.sleep(100);
 
             // The scheduler should have been called instead of resolving the promise directly
             assert.isAbove(scheduled.length, 0, 'scheduler.schedule should have been called');
@@ -369,7 +369,7 @@ describe('WorkerSystem', () => {
             // The promise should still be pending because the scheduler hasn't run the callback
             let resolved = false;
             prom.then(() => { resolved = true; });
-            await new Promise(resolve => { setTimeout(resolve, 10); });
+            await Bun.sleep(10);
             assert.isFalse(resolved, 'promise should not resolve until scheduler runs the callback');
 
             // Now run the scheduled callback — this should resolve the promise

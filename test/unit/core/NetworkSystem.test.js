@@ -469,9 +469,7 @@ describe('NetworkSystem', () => {
       resolvers[0](new Response('{}', { headers: { 'content-type': 'application/json' } }));
       await prom1;
 
-      // Give microtask queue a chance to drain
-      await new Promise(r => { setTimeout(r, 10); });
-
+      await Bun.sleep(5);  // Give microtask queue a chance to drain
       assert.strictEqual(_network.numQueued, 0);
       assert.strictEqual(mockFetch.mock.calls.length, 3);  // all 3 dispatched now
 
