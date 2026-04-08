@@ -13,9 +13,10 @@ import { utilGetSetValue, utilRebind } from '../util/index.ts';
 //       terms:   ['search terms'] // optional
 //   }, ...]
 
-var _comboHideTimerID;
 
 export function uiCombobox(context, klass) {
+    const scheduler = context.systems.scheduler;
+
     var dispatch = d3_dispatch('accept', 'cancel');
     var container = context.container();
 
@@ -106,13 +107,13 @@ export function uiCombobox(context, klass) {
             var combo = container.selectAll('.combobox');
             if (combo.empty() || combo.datum() !== input.node()) {
                 var tOrig = _tDown;
-                window.setTimeout(function() {
+                scheduler.setTimeout('ui-combobox-show', function() {
                     if (tOrig !== _tDown) return;   // exit if user double clicked
                     fetchComboData('', function() {
                         show();
                         render();
                     });
-                }, 250);
+                }, { ms: 250 });
 
             } else {
                 hide();
@@ -126,7 +127,7 @@ export function uiCombobox(context, klass) {
 
 
         function blur() {
-            _comboHideTimerID = window.setTimeout(hide, 75);
+            scheduler.setTimeout('ui-combobox-hide', hide, { ms: 75 });
         }
 
 
@@ -151,10 +152,7 @@ export function uiCombobox(context, klass) {
 
 
         function hide() {
-            if (_comboHideTimerID) {
-                window.clearTimeout(_comboHideTimerID);
-                _comboHideTimerID = undefined;
-            }
+            scheduler.cancel('ui-combobox-hide');
 
             container.selectAll('.combobox')
                 .remove();
@@ -334,7 +332,7 @@ export function uiCombobox(context, klass) {
             var val = _caseSensitive ? value() : value().toLowerCase();
             if (!val) return;
 
-            // Don't autocomplete if user is typing a number - #4935
+            // Don't autocomplete if user is typing a number - iD#4935
             if (!isNaN(parseFloat(val)) && isFinite(val)) return;
 
             var bestIndex = -1;

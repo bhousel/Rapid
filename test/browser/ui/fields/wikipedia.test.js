@@ -22,11 +22,12 @@ describe('uiFieldWikipedia', () => {
     wikidata: new MockWikidataService()
   };
   context.systems = {
-    assets:  new Rapid.AssetSystem(context),
-    editor:  new MockEditSystem(context),
-    l10n:    new Rapid.LocalizationSystem(context),
-    network: new Rapid.NetworkSystem(context),
-    schema:  new Rapid.SchemaSystem(context)
+    assets:     new Rapid.AssetSystem(context),
+    editor:     new MockEditSystem(context),
+    l10n:       new Rapid.LocalizationSystem(context),
+    network:    new Rapid.NetworkSystem(context),
+    scheduler:  new Rapid.SchedulerSystem(context),
+    schema:     new Rapid.SchemaSystem(context)
   };
   context.container = () => selection;
 
@@ -43,7 +44,10 @@ describe('uiFieldWikipedia', () => {
     assets._loaded.l10n_imagery_en = { en: {} };
     assets._loaded.l10n_community_en = { en: {} };
 
-    return context.systems.l10n.initAsync();
+    const l10n = context.systems.l10n;
+    const scheduler = context.systems.scheduler;
+    return Promise.all([l10n.initAsync(), scheduler.initAsync()])
+      .then(() => Promise.all([l10n.startAsync(), scheduler.startAsync()]));
   });
 
   beforeEach(() => {

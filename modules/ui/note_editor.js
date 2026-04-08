@@ -11,6 +11,8 @@ import { utilNoAuto, utilRebind } from '../util/index.ts';
 
 export function uiNoteEditor(context) {
   const l10n = context.systems.l10n;
+  const scheduler = context.systems.scheduler;
+
   const dispatch = d3_dispatch('change');
   const noteComments = uiNoteComments(context);
   const noteHeader = uiNoteHeader(context);
@@ -145,7 +147,7 @@ export function uiNoteEditor(context) {
         .on('keydown.note-input', null);
 
       // focus on button and submit
-      window.setTimeout(() => {
+      scheduler.setTimeout('keydown-note-submit', () => {
         if (_note.isNew) {
           $noteSave.selectAll('.save-button').node().focus();
           clickSave(_note);
@@ -153,7 +155,7 @@ export function uiNoteEditor(context) {
           $noteSave.selectAll('.comment-button').node().focus();
           clickComment(_note);
         }
-      }, 10);
+      }, { ms: 10 });
     }
 
 

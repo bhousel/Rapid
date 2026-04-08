@@ -41,8 +41,6 @@ export class SelectBehavior extends AbstractBehavior {
   private _multiSelection: Set<EntityID>;
   /** Whether spacebar clicking is temporarily disabled */
   private _spaceClickDisabled: boolean;
-  /** Timeout ID for long press detection */
-  private _longPressTimeout: ReturnType<typeof setTimeout> | null;
   /** Whether the context menu is currently shown */
   private _showsMenu: boolean;
   /** Whether the MapRoulette menu is currently shown */
@@ -58,7 +56,6 @@ export class SelectBehavior extends AbstractBehavior {
 
     this._multiSelection = new Set();
     this._spaceClickDisabled = false;
-    this._longPressTimeout = null;
     this._showsMenu = false;
     this._showsMapRouletteMenu = false;
 
@@ -90,7 +87,6 @@ export class SelectBehavior extends AbstractBehavior {
     this._enabled = true;
     this._multiSelection.clear();
     this._spaceClickDisabled = false;
-    this._longPressTimeout = null;
     this._showsMenu = false;
     this._showsMapRouletteMenu = false;
 
@@ -121,7 +117,6 @@ export class SelectBehavior extends AbstractBehavior {
     this._enabled = false;
     this._multiSelection.clear();
     this._spaceClickDisabled = false;
-    this._longPressTimeout = null;
     this._showsMenu = false;
     this._showsMapRouletteMenu = false;
 
@@ -204,6 +199,7 @@ export class SelectBehavior extends AbstractBehavior {
     if (this.lastDown) return;  // a pointer is already down
 
     const context = this.context;
+    const scheduler = context.systems.scheduler!;
     const ui = context.systems.ui!;
 
     ui.closeEditMenu();
@@ -220,7 +216,7 @@ export class SelectBehavior extends AbstractBehavior {
 
     // For touch devices, we want to make sure that the context menu is accessible via long press.
     if (e.pointerType === 'touch') {
-      this._longPressTimeout = setTimeout(this._doLongPress, 750, down);
+      scheduler.setTimeout('longpress', () => this._doLongPress(down), { ms: 750 });
     }
   }
 
@@ -344,6 +340,7 @@ export class SelectBehavior extends AbstractBehavior {
     const context = this.context;
     const gfx = context.systems.gfx!;
     const photos = context.systems.photos;
+    const scheduler = context.systems.scheduler!;
     const eventManager = gfx.eventManager!;
 
     const modifiers = eventManager.modifierKeys;
@@ -366,7 +363,7 @@ export class SelectBehavior extends AbstractBehavior {
     if (data) {
       const behavior = context.behaviors.mapInteraction as MapInteractionBehavior;
       behavior.doubleClickEnabled = false;
-      window.setTimeout(() => behavior.doubleClickEnabled = true, 500);
+      scheduler.setTimeout('doubleclick-enable', () => behavior.doubleClickEnabled = true, { ms: 500 });
     }
 
     // Clicked a midpoint..
@@ -431,10 +428,9 @@ export class SelectBehavior extends AbstractBehavior {
    * _cancelLongPress
    */
   _cancelLongPress(): void {
-    if (!this._longPressTimeout) return;
+    const scheduler = this.context.systems.scheduler!;
 
-    window.clearTimeout(this._longPressTimeout);
-    this._longPressTimeout = null;
+    scheduler.cancel('longpress');
     this._showsMenu = false;
     this._showsMapRouletteMenu = false;
   }
@@ -447,8 +443,6 @@ export class SelectBehavior extends AbstractBehavior {
    * @param  down - EventData Object for the original down event
    */
   _doLongPress(down: EventData): void {
-    this._longPressTimeout = null;
-
     if (this.lastDown === down && !down.isCancelled) {   // still down
       this.lastClick = down;    // We will accept this as a click
       down.isCancelled = true;  // cancel it so that we don't get *another* click when the user lifts up

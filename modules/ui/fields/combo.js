@@ -20,7 +20,9 @@ export {
 export function uiFieldCombo(context, uifield) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const scheduler = context.systems.scheduler;
   const schema = context.systems.schema;
+
   const dispatch = d3_dispatch('change');
   const presetField = uifield.presetField;
 
@@ -283,7 +285,7 @@ export function uiFieldCombo(context, uifield) {
                 t[uifield.key] = context.cleanTagValue(utilArrayUniq(arr).filter(Boolean).join(';'));
             }
 
-            window.setTimeout(function() { _input.node().focus(); }, 10);
+            scheduler.setTimeout('ui-combo-focus', function () { _input.node().focus(); }, { ms: 10 });
 
         } else {
             var rawValue = utilGetSetValue(_input);
@@ -356,7 +358,7 @@ export function uiFieldCombo(context, uifield) {
                 .append('ul')
                 .attr('class', listClass)
                 .on('click', function() {
-                    window.setTimeout(function() { _input.node().focus(); }, 10);
+                    scheduler.setTimeout('ui-combo-focus', function() { _input.node().focus(); }, { ms: 10 });
                 })
                 .merge(_container);
 

@@ -27,7 +27,7 @@ export class UiGeolocateControl {
 
     this._isSupported = (typeof navigator?.geolocation?.getCurrentPosition === 'function');
     this._isActive = false;
-    this._timeoutID = null;
+    this._isInitial = false;  // only pan the map after the initial geolocate
 
     // Create child components
     this.Tooltip = uiTooltip(context);
@@ -173,6 +173,7 @@ export class UiGeolocateControl {
     const context = this.context;
     const gfx = context.systems.gfx;
     const map = context.systems.map;
+    const scheduler = context.systems.scheduler;
     const layer = gfx.scene.layers.get('map-ui');
 
     if (this._isActive) {   // User may have disabled it before the callback fires..
@@ -181,18 +182,18 @@ export class UiGeolocateControl {
       layer.geolocationData = result;
       gfx.deferredRedraw();
 
-      // If `_timeoutID` has a value, this is the first successful result we've received.
+      // If `_isInitial`, this is the first successful result we've received.
       // Recenter the map and clear the timeout.
-      if (this._timeoutID) {
-        window.clearTimeout(this._timeoutID);
-        this._timeoutID = null;
+      if (this._isInitial) {
+        this._isInitial = false;
+        scheduler.cancel('ui-geolocate-initial');
         map.centerZoomEase(extent.center(), Math.min(20, map.extentZoom(extent)));
       }
 
       // Keep geolocating until user turns the feature off..
-      window.setTimeout(() => {
+      scheduler.setTimeout('ui-geolocate', () => {
         navigator.geolocation.getCurrentPosition(this.success, this.error, GEOLOCATE_OPTIONS);
-      }, GEOLOCATE_REPEAT);
+      }, { ms: GEOLOCATE_REPEAT });
     }
 
     this.unblock();
@@ -225,7 +226,9 @@ export class UiGeolocateControl {
   block() {
     // The timeout ensures that we complete even if the success/error callbacks never get called.
     // This can happen if the user declines to share their location.
-    this._timeoutID = window.setTimeout(this.error, GEOLOCATE_TIMEOUT);
+    const scheduler = this.context.systems.scheduler;
+    scheduler.setTimeout('ui-geolocate-initial', this.error, GEOLOCATE_TIMEOUT);
+    this._isInitial = true;
 
     this.context.container().call(this.Loading);  // Block UI
   }
@@ -236,10 +239,9 @@ export class UiGeolocateControl {
    * This unblocks the UI, after the initial request either completed or timed out.
    */
   unblock() {
-    if (this._timeoutID) {
-      window.clearTimeout(this._timeoutID);
-      this._timeoutID = null;
-    }
+    const scheduler = this.context.systems.scheduler;
+    scheduler.cancel('ui-geolocate-initial');
+    this._isInitial = false;
 
     this.Loading.close();  // Unblock UI
   }

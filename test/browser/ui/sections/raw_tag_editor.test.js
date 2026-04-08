@@ -5,11 +5,15 @@ describe('uiSectionRawTagEditor', () => {
   let rawTagEditor, wrap;
 
   context.systems = {
-    l10n:  new Rapid.LocalizationSystem(context)
+    l10n:      new Rapid.LocalizationSystem(context),
+    scheduler: new Rapid.SchedulerSystem(context)
   };
 
   before(() => {
-    return context.systems.l10n.initAsync();
+    const l10n = context.systems.l10n;
+    const scheduler = context.systems.scheduler;
+    return Promise.all([ l10n.initAsync(), scheduler.initAsync() ])
+      .then(() => Promise.all([l10n.startAsync(), scheduler.startAsync()]));
   });
 
   beforeEach(() => {
@@ -54,7 +58,7 @@ describe('uiSectionRawTagEditor', () => {
   it('adds tags when clicking the add button', () => {
     const target = wrap.selectAll('button.add-tag').node();
     target.dispatchEvent(new MouseEvent('click'));
-    return delay(20)
+    return delay(40)
       .then(() => {
         assert.isEmpty(wrap.select('.tag-list').selectAll('input').nodes()[2].value);
         assert.isEmpty(wrap.select('.tag-list').selectAll('input').nodes()[3].value);
@@ -75,7 +79,7 @@ describe('uiSectionRawTagEditor', () => {
     assert.lengthOf(wrap.selectAll('.tag-list li').nodes(), 1);
     const input = d3.select('.tag-list li:last-child input.value').node();
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', keyCode: 9 }));
-    return delay(20)
+    return delay(40)
       .then(() => {
         assert.lengthOf(wrap.selectAll('.tag-list li').nodes(), 2);
         assert.isEmpty(wrap.select('.tag-list').selectAll('input').nodes()[2].value);

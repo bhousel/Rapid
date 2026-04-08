@@ -12,6 +12,7 @@ import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 export function uiSectionRawTagEditor(context, id) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const scheduler = context.systems.scheduler;
   const schema = context.systems.schema;
   const storage = context.systems.storage;
   const taginfo = context.services.taginfo;
@@ -547,11 +548,11 @@ export function uiSectionRawTagEditor(context, id) {
   function addTag() {
     // Delay render in case this click is blurring an edited combo.
     // Without the setTimeout, the `content` render would wipe out the pending tag change.
-    window.setTimeout(function() {
+    scheduler.setTimeout('ui-raw-tag-editor-add-tag', function() {
       _showBlank = true;
       section.reRender();
       section.selection().selectAll('.tag-list li:last-child input.key').node().focus();
-    }, 20);
+    }, { ms: 20 });
   }
 
 
@@ -565,11 +566,11 @@ export function uiSectionRawTagEditor(context, id) {
     const entityIDs = _entityIDs;
 
     // Delay change in case this change is blurring an edited combo. - iD#5878
-    window.setTimeout(function() {
+    scheduler.setTimeout('ui-raw-tag-editor-change', function() {
       if (!_pendingChange) return;
       dispatch.call('change', this, entityIDs, _pendingChange);
       _pendingChange = null;
-    }, 10);
+    }, { ms: 10 });
   }
 
 

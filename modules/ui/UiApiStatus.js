@@ -16,6 +16,9 @@ export class UiApiStatus {
    */
   constructor(context) {
     this.context = context;
+    const editor = context.systems.editor;
+    const gfx = context.systems.gfx;
+    const scheduler = context.systems.scheduler;
 
     this._apiStatus = null;
     this._backupStatus = null;
@@ -32,8 +35,6 @@ export class UiApiStatus {
     this._onGfxStatusChange = this._onGfxStatusChange.bind(this);
 
     // Setup event listeners
-    const editor = context.systems.editor;
-    const gfx = context.systems.gfx;
     editor.on('backupstatuschange', this._onBackupStatusChange);
     gfx.on('statuschange', this._onGfxStatusChange);
 
@@ -41,16 +42,16 @@ export class UiApiStatus {
     const osm = context.services.osm;
     if (osm) {
       // Count down once per second if we're under a rate limit..
-      window.setInterval(() => {
+      scheduler.setInterval('ui-check-rate-limit', () => {
         if (this._apiStatus === 'ratelimit') {
           this.render();
         }
-      }, 1000);
+      }, { ms: 1000 });
 
       // Refresh status periodically regardless of other factors..
-      window.setInterval(() => {
+      scheduler.setInterval('ui-check-api-status', () => {
         osm.reloadApiStatus();
-      }, 90000);
+      }, { ms: 90000 });
 
       // Load the initial status in case no OSM data was loaded yet
       osm.reloadApiStatus();

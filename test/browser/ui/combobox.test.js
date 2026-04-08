@@ -3,6 +3,15 @@ describe('uiCombobox', () => {
   const context = new Rapid.MockContext();
   let body, container, content, input, combobox;
 
+  context.systems = {
+    scheduler: new Rapid.SchedulerSystem(context)
+  };
+
+  before(() => {
+    const scheduler = context.systems.scheduler;
+    return scheduler.initAsync().then(() => scheduler.startAsync());
+  });
+
   beforeEach(() => {
     body = d3.select('body');
     container = body.append('div').attr('class', 'container');

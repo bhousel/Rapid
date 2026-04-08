@@ -840,6 +840,9 @@ export class GraphicsSystem extends AbstractSystem {
   _handleGLContextLost(e: Event): void {
     e.preventDefault();
 
+    const context = this.context;
+    const scheduler = context.systems.scheduler!;
+
     this._isContextLost = true;
     this._drawPending = false;
 
@@ -855,7 +858,7 @@ export class GraphicsSystem extends AbstractSystem {
     // If the user happened to be editing something when the context was lost, that's too bad.
     // We may be able to handle this better eventually, but for now we will just
     // assume the whole graphics system is getting thrown out.
-    this.context.enter('browse');
+    context.enter('browse');
     this.emit('statuschange', 'contextlost');
 
     // Normally Pixi's `GLContextSystem` would try to restore context if we call `render()`
@@ -866,9 +869,8 @@ export class GraphicsSystem extends AbstractSystem {
     const ext = renderer.context.extensions.loseContext; // WEBGL_lose_context extension
     if (!ext) return;  // I think all browsers we target should have this
 
-    Promise.resolve()
-      .then(() => new Promise(resolve => { window.setTimeout(resolve, 10); }))  // wait 10ms
-      .then(() => ext.restoreContext());
+    // Attempt to restore context after a brief delay..
+    scheduler.setTimeout('gfx-restore-context', () => ext.restoreContext(), { ms: 10 });
   }
 
 
@@ -878,13 +880,17 @@ export class GraphicsSystem extends AbstractSystem {
    * @param  _e  - The WebGLContextEvent (unused)
    */
   _handleGLContextRestored(_e: Event): void {
+    const context = this.context;
+    const scheduler = context.systems.scheduler!;
+
+    scheduler.cancel('gfx-restore-context');  // cancel any pending timeout
+
     Promise.resolve()
       .then(() => this._destroyPixi())
       .then(() => this._initPixiAsync())
       .then(() => this._afterPixiInit())
       .then(() => {
         // We just replaced the texture manager, so we have to tell it about the available SVG icons.
-        const context = this.context;
         const $container: D3Selection = context.container();
         $container.selectAll('#rapid-defs symbol')
           .each((_d, i, nodes) => {

@@ -119,7 +119,7 @@ export class UiDownloadTool {
     document.body.appendChild(a);
 
     // Set the HREF to a Blob representation of the data to be downloaded
-    a.href = window.URL.createObjectURL(new Blob([data]));
+    a.href = URL.createObjectURL(new Blob([data]));
 
     // Use download attribute to set set desired file name
     a.setAttribute('download', fileName);
@@ -128,7 +128,7 @@ export class UiDownloadTool {
     a.click();
 
     // Cleanup
-    window.URL.revokeObjectURL(a.href);
+    URL.revokeObjectURL(a.href);
     document.body.removeChild(a);
   }
 

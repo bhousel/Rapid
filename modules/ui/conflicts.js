@@ -12,6 +12,7 @@ export function uiConflicts(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
+  const scheduler = context.systems.scheduler;
 
   const dispatch = d3_dispatch('cancel', 'save');
   const keybinding = utilKeybinding('conflicts');
@@ -86,7 +87,7 @@ export function uiConflicts(context) {
 
     // All except IE11 and Edge
     linkEnter
-      .attr('href', window.URL.createObjectURL(blob)) // download the data as a file
+      .attr('href', URL.createObjectURL(blob)) // download the data as a file
       .attr('download', fileName);
 
     linkEnter
@@ -133,7 +134,7 @@ export function uiConflicts(context) {
 
     // enable save button if this is the last conflict being reviewed..
     if (index === _conflictList.length - 1) {
-      window.setTimeout(() => {
+      scheduler.setTimeout('conflicts-enable-save', () => {
         parent.select('.conflicts-button')
           .attr('disabled', null);
 
@@ -141,7 +142,7 @@ export function uiConflicts(context) {
           .transition()
           .attr('opacity', 1)
           .style('display', 'block');
-      }, 250);
+      }, { ms: 250 });
     }
 
     let conflict = selection

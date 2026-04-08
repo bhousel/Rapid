@@ -14,6 +14,7 @@ export function uiIntroArea(context, curtain) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
+  const scheduler = context.systems.scheduler;
   const schema = context.systems.schema;
   const ui = context.systems.ui;
 
@@ -283,7 +284,7 @@ export function uiIntroArea(context, curtain) {
             });
         }
 
-        window.setTimeout(() => {
+        scheduler.setTimeout('walkthrough-area-click-addfield', () => {
           curtain.reveal({
             revealSelector: '.more-fields .combobox-input',
             revealPadding: 5,
@@ -296,18 +297,20 @@ export function uiIntroArea(context, curtain) {
           container.select('.more-fields .combobox-input')
             .on('click.intro', () => {
               // Watch for the combobox to appear...
-              const watcher = window.setInterval(() => {
+              scheduler.setInterval('walkthrough-area-waitfor-morefields', () => {
                 if (!container.select('div.combobox').empty()) {
-                  window.clearInterval(watcher);
+                  scheduler.cancel('walkthrough-area-waitfor-morefields');
                   resolve(chooseDescriptionFieldAsync);
                 }
-              }, 300);
+              }, { ms: 300 });
             });
-        }, 300);  // after "Add Field" visible
+        }, { ms: 300 });  // after "Add Field" visible
 
       }))
       .finally(() => {
         _onModeChange = null;
+        scheduler.cancel('walkthrough-area-click-addfield');
+        scheduler.cancel('walkthrough-area-waitfor-morefields');
         container.select('.inspector-wrap').on('wheel.intro', null);
         container.select('.more-fields .combobox-input').on('click.intro', null);
       });
@@ -329,24 +332,23 @@ export function uiIntroArea(context, curtain) {
       return Promise.resolve(clickAddFieldAsync);
     }
 
-    let watcher;
     return new Promise((resolve, reject) => {
       _rejectStep = reject;
       _onModeChange = reject;   // disallow mode change;
 
       // Watch for the combobox to close..
-      watcher = window.setInterval(() => {
+      scheduler.setInterval('walkthrough-area-waitfor-combo-close', () => {
         if (container.select('div.combobox').empty()) {
-          window.clearInterval(watcher);
-          window.setTimeout(() => {
+          scheduler.cancel('walkthrough-area-waitfor-combo-close');
+          scheduler.setTimeout('walkthrough-area-waitfor-choose-description', () => {
             if (container.select('.form-field-description').empty()) {
               resolve(retryChooseDescriptionAsync);
             } else {
               resolve(describePlaygroundAsync);
             }
-          }, 300);  // after description field added.
+          }, { ms: 300 });  // after description field added.
         }
-      }, 300);
+      }, { ms: 300 });
 
       ui.Sidebar.showEntityEditor();
 
@@ -358,8 +360,9 @@ export function uiIntroArea(context, curtain) {
 
     })
     .finally(() => {
+      scheduler.cancel('walkthrough-area-waitfor-combo-close');
+      scheduler.cancel('walkthrough-area-waitfor-choose-description');
       _onModeChange = null;
-      if (watcher) window.clearInterval(watcher);
     });
   }
 
