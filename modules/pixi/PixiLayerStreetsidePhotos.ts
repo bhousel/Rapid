@@ -14,10 +14,10 @@ const MINZOOM = 12;
 const STREETSIDE_TEAL = 0x0fffc4;
 const SELECTED = 0xffee00;
 
-const LINESTYLE = {
+const LINESTYLE: Partial<MatchedStyle> = {
   casing: { opacity: 0 },  // disable
   stroke: { opacity: 0.7, width: 4, color: STREETSIDE_TEAL }
-} as Partial<MatchedStyle>;
+};
 
 const MARKERSTYLE: Partial<MatchedStyle> = {
   marker: { color: STREETSIDE_TEAL, opacity: 0.8, image: 'mediumCircle' },
@@ -267,7 +267,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style: Partial<MatchedStyle> = Object.assign({}, MARKERSTYLE);
+        const style: Partial<MatchedStyle> = globalThis.structuredClone(MARKERSTYLE);
 
         if (feature.hasClass('selectphoto')) {  // selected photo style
           const viewer = streetside._viewer;
@@ -278,7 +278,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
           style.viewfield!.image = 'viewfield';
           style.viewfield!.opacity = 1;
           style.viewfield!.color = SELECTED;
-          style.marker = Object.assign({}, style.marker, { color: SELECTED });
+          style.marker!.color = SELECTED;
           const s = 2.0;
           const fw = fovWidthInterp(fov);
           const fl = fovLengthInterp(fov);
@@ -291,7 +291,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
             style.viewfield!.opacity = 1;
             style.viewfield!.color = SELECTED;
-            style.marker = Object.assign({}, style.marker, { color: SELECTED });
+            style.marker!.color = SELECTED;
           }
         }
 

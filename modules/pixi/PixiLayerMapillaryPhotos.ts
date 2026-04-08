@@ -14,10 +14,10 @@ const MINZOOM = 12;
 const MAPILLARY_GREEN = 0x05cb63;
 const SELECTED = 0xffee00;
 
-const LINESTYLE = {
+const LINESTYLE: Partial<MatchedStyle> = {
   casing: { opacity: 0 },  // disable
   stroke: { opacity: 0.7, width: 4, color: MAPILLARY_GREEN }
-} as Partial<MatchedStyle>;
+};
 
 const MARKERSTYLE: Partial<MatchedStyle> = {
   marker:    { color: MAPILLARY_GREEN, opacity: 0.8, image: 'mediumCircle' },
@@ -308,14 +308,14 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style: Partial<MatchedStyle> = Object.assign({}, MARKERSTYLE);
+        const style: Partial<MatchedStyle> = globalThis.structuredClone(MARKERSTYLE);
 
         if (feature.hasClass('selectphoto')) {  // selected photo style
           style.viewfield!.angles = [this._viewerBearing ?? (d.props.ca as number)];
           style.viewfield!.image = 'viewfield';
           style.viewfield!.opacity = 1;
           style.viewfield!.color = SELECTED;
-          style.marker = Object.assign({}, style.marker, { color: SELECTED });
+          style.marker!.color = SELECTED;
           const s = 2.0;
           const fw = fovWidthInterp(this._viewerFov ?? 55);
           const fl = fovLengthInterp(this._viewerFov ?? 55);
@@ -328,7 +328,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
             style.viewfield!.opacity = 1;
             style.viewfield!.color = SELECTED;
-            style.marker = Object.assign({}, style.marker, { color: SELECTED });
+            style.marker!.color = SELECTED;
           }
         }
 

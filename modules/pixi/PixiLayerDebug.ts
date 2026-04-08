@@ -103,7 +103,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
           // Start with default style, and apply adjustments
           // set style = red if collides, green if not
-          const style = Object.assign({}, DEFAULTSTYLE);
+          const style = globalThis.structuredClone(DEFAULTSTYLE);
           const box = { minX: poi![0], minY: poi![1], maxX: poi![0], maxY: poi![1] };
           // does this test point hit an OSM building?
           const didHitBuilding = spatial.getDataAtBox('osm', box).some(hit => _isBuilding(hit.contents as OsmEntity));

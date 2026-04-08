@@ -12,10 +12,10 @@ const MINZOOM = 12;
 const KARTAVIEW_BLUE = 0x20c4ff;
 const SELECTED = 0xffee00;
 
-const LINESTYLE = {
+const LINESTYLE: Partial<MatchedStyle> = {
   casing: { opacity: 0 },  // disable
   stroke: { opacity: 0.7, width: 4, color: KARTAVIEW_BLUE }
-} as Partial<MatchedStyle>;
+};
 
 const MARKERSTYLE: Partial<MatchedStyle> = {
   marker: { color: KARTAVIEW_BLUE, opacity: 0.8, image: 'mediumCircle' },
@@ -234,7 +234,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style: Partial<MatchedStyle> = Object.assign({}, MARKERSTYLE);
+        const style: Partial<MatchedStyle> = globalThis.structuredClone(MARKERSTYLE);
 
 // todo handle pano
         if (feature.hasClass('selectphoto')) {  // selected photo style
@@ -243,7 +243,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
           style.viewfield!.image = 'viewfield';
           style.viewfield!.opacity = 1;
           style.viewfield!.color = SELECTED;
-          style.marker = Object.assign({}, style.marker, { color: SELECTED });
+          style.marker!.color = SELECTED;
           style.viewfield!.scale = 2.0;
 
         } else {
@@ -253,7 +253,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
           if (feature.hasClass('highlightphoto')) {  // highlighted photo style
             style.viewfield!.opacity = 1;
             style.viewfield!.color = SELECTED;
-            style.marker = Object.assign({}, style.marker, { color: SELECTED });
+            style.marker!.color = SELECTED;
           }
         }
 
