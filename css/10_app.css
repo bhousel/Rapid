@@ -4753,10 +4753,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   margin-left: 5px;
 }
 
-.project-links .icon.bugnub {
-  color: #ff26db;
-}
-
 
 /* Notification Badges
 ------------------------------------------------------- */

@@ -58,11 +58,10 @@ export class UiProjectLinks {
       .attr('class', 'project-links');
 
     $$wrap
-      .append('button')
-      .attr('class', 'bugnub')
-      .attr('tabindex', -1)
+      .append('a')
+      .attr('target', '_blank')
       .on('click', this.reportIssue)
-      .call(uiIcon('#rapid-icon-bug', 'bugnub'))
+      .call(uiIcon('#rapid-icon-bug', 'light'))
       .call(this.BugTooltip);
 
     $$wrap
