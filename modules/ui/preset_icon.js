@@ -258,7 +258,7 @@ export function uiPresetIcon(context) {
     const showLine = isPreset && (geom === 'line');
     const showArea = isPreset && (geom === 'area');
     const showRoute = isPreset && (geom === 'route') && (p.id !== 'type/route');
-    const style = styles.styleMatch(tags);
+    const style = styles.styleMatch(tags, _geometry, 'osm');
 
     container
       .classed('showing-img', !!imageURL);

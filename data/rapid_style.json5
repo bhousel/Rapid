@@ -123,39 +123,48 @@
       // Path styles - pedestrian ways
       "pedestrian": {
         "casing": { "width": 7, "color": 0xffffff },
-        "stroke": { "width": 5, "color": 0x998888, "dash": [8, 8], "cap": "butt" }
+        "stroke": { "width": 5, "color": 0x998888, "dash": [8, 8], "cap": "butt" },
+        "label":  { "color": 0xffffff }
       },
       "path": {
         "casing": { "width": 5, "color": 0xddccaa },
-        "stroke": { "width": 3, "color": 0x998888, "dash": [6, 6], "cap": "butt" }
+        "stroke": { "width": 3, "color": 0x998888, "dash": [6, 6], "cap": "butt" },
+        "label":  { "color": 0xddccaa }
       },
       "footway": {
         "casing": { "width": 5, "color": 0xffffff },
-        "stroke": { "width": 3, "color": 0x998888, "dash": [6, 6], "cap": "butt" }
+        "stroke": { "width": 3, "color": 0x998888, "dash": [6, 6], "cap": "butt" },
+        "label":  { "color": 0xffffff }
       },
-      "crossing_marked": {
+      "crossing_improved": {
         "casing": { "width": 5, "color": 0xddccaa },
-        "stroke": { "width": 3, "color": 0x4c4444, "dash": [6, 3], "cap": "butt" }
+        "stroke": { "width": 3, "color": 0x4c4444, "dash": [6, 3], "cap": "butt" },
+        "label":  { "color": 0xddccaa }
       },
-      "crossing_unmarked": {
+      "crossing_unimproved": {
         "casing": { "width": 5, "color": 0xddccaa },
-        "stroke": { "width": 3, "color": 0x776a6a, "dash": [6, 4], "cap": "butt" }
+        "stroke": { "width": 3, "color": 0x776a6a, "dash": [6, 4], "cap": "butt" },
+        "label":  { "color": 0xddccaa }
       },
       "cycleway": {
         "casing": { "width": 5, "color": 0xffffff },
-        "stroke": { "width": 3, "color": 0x58a9ed, "dash": [6, 6], "cap": "butt" }
+        "stroke": { "width": 3, "color": 0x58a9ed, "dash": [6, 6], "cap": "butt" },
+        "label":  { "color": 0xffffff }
       },
       "bridleway": {
         "casing": { "width": 5, "color": 0xffffff },
-        "stroke": { "width": 3, "color": 0xe06d5f, "dash": [6, 6], "cap": "butt" }
+        "stroke": { "width": 3, "color": 0xe06d5f, "dash": [6, 6], "cap": "butt" },
+        "label":  { "color": 0xffffff }
       },
       "corridor": {
         "casing": { "width": 5, "color": 0xffffff },
-        "stroke": { "width": 3, "color": 0x8cd05f, "dash": [2, 8], "cap": "round" }
+        "stroke": { "width": 3, "color": 0x8cd05f, "dash": [2, 8], "cap": "round" },
+        "label":  { "color": 0xffffff }
       },
       "steps": {
         "casing": { "width": 5, "color": 0xffffff },
-        "stroke": { "width": 3, "color": 0x81d25c, "dash": [3, 3], "cap": "butt" }
+        "stroke": { "width": 3, "color": 0x81d25c, "dash": [3, 3], "cap": "butt" },
+        "label":  { "color": 0xffffff }
       },
 
       // Waterway styles
@@ -282,21 +291,29 @@
       // aeroway
       "aeroway-runway": {
         "styleIDs": ["runway"],
-        "match": { "tags": [{ "key": "aeroway", "value": "runway" }] },
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "aeroway", "value": "runway" }]
+        },
       },
       "aeroway-taxiway": {
         "styleIDs": ["taxiway"],
-        "match": { "tags": [{ "key": "aeroway", "value": "taxiway" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "aeroway", "value": "taxiway" }]
+        }
       },
 
       // amenity
-      "amenity-childcare": {
+      "amenity-education": {
         "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "amenity", "value": "childcare" }] }
-      },
-      "amenity-college": {
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "amenity", "value": "college" }] }
+        "match": {
+          "tags": [{
+            "key": "amenity",
+            "op": "in",
+            "value": ["childcare", "college", "kindergarten", "research_institute", "school", "university"]
+          }]
+        }
       },
       "amenity-fountain": {
         "styleIDs": ["blue", "pattern-pond"],
@@ -306,43 +323,25 @@
         "styleIDs": ["lightgreen", "pattern-cemetery"],
         "match": { "tags": [{ "key": "amenity", "value": "grave_yard" }] }
       },
-      "amenity-kindergarten": {
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "amenity", "value": "kindergarten" }] }
-      },
       "amenity-parking": {
         "styleIDs": ["darkgray"],
         "match": { "tags": [{ "key": "amenity", "value": "parking" }] }
       },
-      "amenity-research_institute": {
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "amenity", "value": "research_institute" }] }
-      },
-      "amenity-school": {
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "amenity", "value": "school" }] }
-      },
-      "amenity-university": {
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "amenity", "value": "university" }] }
-      },
 
       // barrier
-      "barrier-city_wall": {
+      "barrier-wall": {
         "styleIDs": ["barrier_wall"],
-        "match": { "tags": [{ "key": "barrier", "value": "city_wall" }] }
+        "match": {
+          "tags": [{
+            "key": "barrier",
+            "op": "in",
+            "value": ["city_wall", "retaining_wall", "wall"]
+          }]
+        }
       },
       "barrier-hedge": {
         "styleIDs": ["barrier_hedge"],
         "match": { "tags": [{ "key": "barrier", "value": "hedge" }] }
-      },
-      "barrier-retaining_wall": {
-        "styleIDs": ["barrier_wall"],
-        "match": { "tags": [{ "key": "barrier", "value": "retaining_wall" }] }
-      },
-      "barrier-wall": {
-        "styleIDs": ["barrier_wall"],
-        "match": { "tags": [{ "key": "barrier", "value": "wall" }] }
       },
       "barrier-any": {
         "styleIDs": ["barrier"],
@@ -370,25 +369,23 @@
       },
 
       // crossing
-      "crossing-marked": {
-        "styleIDs": ["crossing_marked"],
-        "match": { "tags": [{ "key": "crossing", "value": "marked" }] }
+      "crossing-improved": {
+        "styleIDs": ["crossing_improved"],
+        "match": {
+          "geometry": "line",
+          "tags": [{
+            "key": "crossing",
+            "op": "in",
+            "value": ["marked", "traffic_signals", "uncontrolled", "zebra"]
+          }]
+        }
       },
-      "crossing-traffic_signals": {
-        "styleIDs": ["crossing_marked"],
-        "match": { "tags": [{ "key": "crossing", "value": "traffic_signals" }] }
-      },
-      "crossing-uncontrolled": {
-        "styleIDs": ["crossing_marked"],
-        "match": { "tags": [{ "key": "crossing", "value": "uncontrolled" }] }
-      },
-      "crossing-zebra": {
-        "styleIDs": ["crossing_marked"],
-        "match": { "tags": [{ "key": "crossing", "value": "zebra" }] }
-      },
-      "crossing-any": {
-        "styleIDs": ["crossing_unmarked"],
-        "match": { "tags": [{ "key": "crossing" }] }
+      "crossing-unimproved": {
+        "styleIDs": ["crossing_unimproved"],
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "crossing" }]
+        }
       },
 
       // golf
@@ -400,119 +397,153 @@
       // highway
       "highway-bridleway": {
         "styleIDs": ["bridleway"],
-        "match": { "tags": [{ "key": "highway", "value": "bridleway" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "bridleway" }]
+        }
       },
       "highway-bus_guideway": {
-        "styleIDs": ["railway"],
-        "match": { "tags": [{ "key": "highway", "value": "bus_guideway" }] }
+        "styleIDs": ["railway"],  // note: style these like a railway
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "bus_guideway" }]
+        }
       },
       "highway-busway": {
         "styleIDs": ["special_service"],
-        "match": { "tags": [{ "key": "highway", "value": "busway" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "busway" }]
+        }
       },
       "highway-corridor": {
         "styleIDs": ["corridor"],
-        "match": { "tags": [{ "key": "highway", "value": "corridor" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "corridor" }]
+        }
       },
       "highway-construction": {
         "styleIDs": ["construction"],
-        "match": { "tags": [{ "key": "highway", "value": "construction" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "construction" }]
+        }
       },
       "highway-cycleway": {
         "styleIDs": ["cycleway"],
-        "match": { "tags": [{ "key": "highway", "value": "cycleway" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "cycleway" }]
+        }
       },
       "highway-footway": {
         "styleIDs": ["footway"],
-        "match": { "tags": [{ "key": "highway", "value": "footway" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "footway" }]
+        }
       },
       "highway-living_street": {
         "styleIDs": ["living_street"],
-        "match": { "tags": [{ "key": "highway", "value": "living_street" }] }
-      },
-      "highway-living_street_link": {
-        "styleIDs": ["living_street"],
-        "match": { "tags": [{ "key": "highway", "value": "living_street_link" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "living_street" }]
+        }
       },
       "highway-motorway": {
         "styleIDs": ["motorway"],
-        "match": { "tags": [{ "key": "highway", "value": "motorway" }] }
-      },
-      "highway-motorway_link": {
-        "styleIDs": ["motorway"],
-        "match": { "tags": [{ "key": "highway", "value": "motorway_link" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "op": "in", "value": ["motorway", "motorway_link"] }]
+        }
       },
       "highway-path": {
         "styleIDs": ["path"],
-        "match": { "tags": [{ "key": "highway", "value": "path" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "path" }]
+        }
       },
       "highway-pedestrian": {
         "styleIDs": ["pedestrian"],
-        "match": { "tags": [{ "key": "highway", "value": "pedestrian" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "pedestrian" }]
+        }
       },
       "highway-primary": {
         "styleIDs": ["primary"],
-        "match": { "tags": [{ "key": "highway", "value": "primary" }] }
-      },
-      "highway-primary_link": {
-        "styleIDs": ["primary"],
-        "match": { "tags": [{ "key": "highway", "value": "primary_link" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "op": "in", "value": ["primary", "primary_link"] }]
+        }
       },
       "highway-residential": {
         "styleIDs": ["residential"],
-        "match": { "tags": [{ "key": "highway", "value": "residential" }] }
-      },
-      "highway-residential_link": {
-        "styleIDs": ["residential"],
-        "match": { "tags": [{ "key": "highway", "value": "residential_link" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "residential" }]
+        }
       },
       "highway-secondary": {
         "styleIDs": ["secondary"],
-        "match": { "tags": [{ "key": "highway", "value": "secondary" }] }
-      },
-      "highway-secondary_link": {
-        "styleIDs": ["secondary"],
-        "match": { "tags": [{ "key": "highway", "value": "secondary_link" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "op": "in", "value": ["secondary", "secondary_link"] }]
+        }
       },
       "highway-service": {
         "styleIDs": ["service"],
-        "match": { "tags": [{ "key": "highway", "value": "service" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "service" }]
+        }
       },
-      "highway-service_link": {
-        "styleIDs": ["service"],
-        "match": { "tags": [{ "key": "highway", "value": "service_link" }] }
+      // service roads - `highway=service` + `service=*`
+      "highway-service-tagged": {
+        "styleIDs": ["special_service"],
+        "match": {
+          "tags": [
+            { "key": "highway", "value": "service" },
+            { "key": "service" },
+          ]
+        }
       },
       "highway-steps": {
         "styleIDs": ["steps"],
-        "match": { "tags": [{ "key": "highway", "value": "steps" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "steps" }]
+        }
       },
       "highway-tertiary": {
         "styleIDs": ["tertiary"],
-        "match": { "tags": [{ "key": "highway", "value": "tertiary" }] }
-      },
-      "highway-tertiary_link": {
-        "styleIDs": ["tertiary"],
-        "match": { "tags": [{ "key": "highway", "value": "tertiary_link" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "op": "in", "value": ["tertiary", "tertiary_link"] }]
+        }
       },
       "highway-track": {
         "styleIDs": ["track"],
-        "match": { "tags": [{ "key": "highway", "value": "track" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "track" }]
+        }
       },
       "highway-trunk": {
         "styleIDs": ["trunk"],
-        "match": { "tags": [{ "key": "highway", "value": "trunk" }] }
-      },
-      "highway-trunk_link": {
-        "styleIDs": ["trunk"],
-        "match": { "tags": [{ "key": "highway", "value": "trunk_link" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "op": "in", "value": ["trunk", "trunk_link"] }]
+        }
       },
       "highway-unclassified": {
         "styleIDs": ["unclassified"],
-        "match": { "tags": [{ "key": "highway", "value": "unclassified" }] }
-      },
-      "highway-unclassified_link": {
-        "styleIDs": ["unclassified"],
-        "match": { "tags": [{ "key": "highway", "value": "unclassified_link" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "highway", "value": "unclassified" }]
+        }
       },
 
       // landuse
@@ -536,10 +567,6 @@
         "styleIDs": ["tan", "pattern-farmyard"],
         "match": { "tags": [{ "key": "landuse", "value": "farmyard" }] }
       },
-      "landuse-flowerbed": {
-        "styleIDs": ["green"],
-        "match": { "tags": [{ "key": "landuse", "value": "flowerbed" }] }
-      },
       "landuse-forest": {
         "styleIDs": ["green", "pattern-forest"],
         "match": { "tags": [{ "key": "landuse", "value": "forest" }] }
@@ -548,9 +575,17 @@
         "styleIDs": ["green", "pattern-grass"],
         "match": { "tags": [{ "key": "landuse", "value": "grass" }] }
       },
-      "landuse-grave_yard": {
+      "landuse-graveyard": {
         "styleIDs": ["lightgreen", "pattern-cemetery"],
         "match": { "tags": [{ "key": "landuse", "value": "grave_yard" }] }
+      },
+      "landuse-greenery": {
+        "styleIDs": ["green"],
+        "match": { "tags": [{
+          "key": "landuse",
+          "op": "in",
+          "value": ["flowerbed", "recreation_ground", "village_green"]
+        }] }
       },
       "landuse-industrial": {
         "styleIDs": ["pink"],
@@ -580,10 +615,6 @@
         "styleIDs": ["darkgray"],
         "match": { "tags": [{ "key": "landuse", "value": "railway" }] }
       },
-      "landuse-recreation_ground": {
-        "styleIDs": ["green"],
-        "match": { "tags": [{ "key": "landuse", "value": "recreation_ground" }] }
-      },
       "landuse-residential": {
         "styleIDs": ["gold"],
         "match": { "tags": [{ "key": "landuse", "value": "residential" }] }
@@ -592,41 +623,25 @@
         "styleIDs": ["orange"],
         "match": { "tags": [{ "key": "landuse", "value": "retail" }] }
       },
-      "landuse-village_green": {
-        "styleIDs": ["green"],
-        "match": { "tags": [{ "key": "landuse", "value": "village_green" }] }
-      },
       "landuse-vineyard": {
         "styleIDs": ["lightgreen", "pattern-vineyard"],
         "match": { "tags": [{ "key": "landuse", "value": "vineyard" }] }
       },
 
       // leisure
-      "leisure-garden": {
+      "leisure-greenery": {
         "styleIDs": ["green"],
-        "match": { "tags": [{ "key": "leisure", "value": "garden" }] }
+        "match": { "tags": [{
+          "key": "leisure",
+          "op": "in",
+          "value": ["garden", "golf_course", "nature_reserve", "park", "pitch"]
+        }] }
       },
-      "leisure-golf_course": {
-        "styleIDs": ["green"],
-        "match": { "tags": [{ "key": "leisure", "value": "golf_course" }] }
-      },
-      "leisure-nature_reserve": {
-        "styleIDs": ["green"],
-        "match": { "tags": [{ "key": "leisure", "value": "nature_reserve" }] }
-      },
-      "leisure-park": {
-        "styleIDs": ["green"],
-        "match": { "tags": [{ "key": "leisure", "value": "park" }] }
-      },
-      "leisure-pitch": {
-        "styleIDs": ["green"],
-        "match": { "tags": [{ "key": "leisure", "value": "pitch" }] }
-      },
-      "leisure-swimming_pool": {
+      "leisure-water": {
         "styleIDs": ["blue"],
         "match": { "tags": [{ "key": "leisure", "value": "swimming_pool" }] }
       },
-      "leisure-track": {
+      "leisure-yellow": {
         "styleIDs": ["yellow"],
         "match": { "tags": [{ "key": "leisure", "value": "track" }] }
       },
@@ -638,11 +653,7 @@
       },
       "man_made-breakwater": {
         "styleIDs": ["barrier_wall"],
-        "match": { "tags": [{ "key": "man_made", "value": "breakwater" }] }
-      },
-      "man_made-groyne": {
-        "styleIDs": ["barrier_wall"],
-        "match": { "tags": [{ "key": "man_made", "value": "groyne" }] }
+        "match": { "tags": [{ "key": "man_made", "op": "in", "value": ["breakwater", "groyne"] }] }
       },
       "man_made-pipeline": {
         "styleIDs": ["pipeline"],
@@ -656,26 +667,6 @@
       },
 
       // natural
-      "natural-bare_rock": {
-        "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "natural", "value": "bare_rock" }] }
-      },
-      "natural-bay": {
-        "styleIDs": ["blue", "pattern-waves"],
-        "match": { "tags": [{ "key": "natural", "value": "bay" }] }
-      },
-      "natural-beach": {
-        "styleIDs": ["yellow", "pattern-dots"],
-        "match": { "tags": [{ "key": "natural", "value": "beach" }] }
-      },
-      "natural-cave_entrance": {
-        "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "natural", "value": "cave_entrance" }] }
-      },
-      "natural-cliff": {
-        "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "natural", "value": "cliff" }] }
-      },
       "natural-glacier": {
         "styleIDs": ["lightgray"],
         "match": { "tags": [{ "key": "natural", "value": "glacier" }] }
@@ -686,43 +677,51 @@
       },
       "natural-ridge": {
         "styleIDs": ["ridge"],
-        "match": { "tags": [{ "key": "natural", "value": "ridge" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "natural", "value": "ridge" }]
+        }
       },
       "natural-rock": {
         "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "natural", "value": "rock" }] }
+        "match": {
+          "tags": [{
+            "key": "natural",
+            "op": "in",
+            "value": ["bare_rock", "cave_entrance", "cliff", "rock", "scree", "shingle", "stone"]
+          }]
+        }
       },
       "natural-sand": {
         "styleIDs": ["yellow", "pattern-dots"],
-        "match": { "tags": [{ "key": "natural", "value": "sand" }] }
-      },
-      "natural-scree": {
-        "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "natural", "value": "scree" }] }
+        "match": {
+          "tags": [{
+            "key": "natural",
+            "op": "in",
+            "value": ["beach", "sand"]
+          }]
+        }
       },
       "natural-scrub": {
         "styleIDs": ["yellow", "pattern-bushes"],
         "match": { "tags": [{ "key": "natural", "value": "scrub" }] }
       },
-      "natural-shingle": {
-        "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "natural", "value": "shingle" }] }
-      },
-      "natural-stone": {
-        "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "natural", "value": "stone" }] }
-      },
-      "natural-strait": {
-        "styleIDs": ["blue", "pattern-waves"],
-        "match": { "tags": [{ "key": "natural", "value": "strait" }] }
-      },
       "natural-tree_row": {
         "styleIDs": ["tree_row"],
-        "match": { "tags": [{ "key": "natural", "value": "tree_row" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "natural", "value": "tree_row" }]
+        }
       },
       "natural-water": {
         "styleIDs": ["blue", "pattern-waves"],
-        "match": { "tags": [{ "key": "natural", "value": "water" }] }
+        "match": {
+          "tags": [{
+            "key": "natural",
+            "op": "in",
+            "value": ["bay", "strait", "water"]
+          }]
+        }
       },
       "natural-wetland": {
         "styleIDs": ["teal", "pattern-wetland"],
@@ -746,46 +745,35 @@
       // railway
       "railway-platform": {
         "styleIDs": ["footway"],
-        "match": { "tags": [{ "key": "railway", "value": "platform" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "railway", "value": "platform" }]
+        }
       },
       "railway-any": {
         "styleIDs": ["railway"],
-        "match": { "tags": [{ "key": "railway" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "railway" }]
+        }
       },
 
       // roller_coaster
       "roller_coaster-track": {
         "styleIDs": ["roller_coaster"],
-        "match": { "tags": [{ "key": "roller_coaster", "value": "track" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "roller_coaster", "value": "track" }]
+        }
       },
 
       // route
       "route-ferry": {
         "styleIDs": ["ferry"],
-        "match": { "tags": [{ "key": "route", "value": "ferry" }] }
-      },
-
-      // service - requires highway=* to match (issue Rapid#1252)
-      // These are more specific than highway selectors (2 conditions vs 1), so they win
-      "service-alley": {
-        "styleIDs": ["special_service"],
-        "match": { "tags": [{ "key": "service", "value": "alley" }, { "key": "highway" }] }
-      },
-      "service-driveway": {
-        "styleIDs": ["special_service"],
-        "match": { "tags": [{ "key": "service", "value": "driveway" }, { "key": "highway" }] }
-      },
-      "service-drive-through": {
-        "styleIDs": ["special_service"],
-        "match": { "tags": [{ "key": "service", "value": "drive-through" }, { "key": "highway" }] }
-      },
-      "service-parking_aisle": {
-        "styleIDs": ["special_service"],
-        "match": { "tags": [{ "key": "service", "value": "parking_aisle" }, { "key": "highway" }] }
-      },
-      "service-any": {
-        "styleIDs": ["special_service"],
-        "match": { "tags": [{ "key": "service" }, { "key": "highway" }] }
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "route", "value": "ferry" }]
+        }
       },
 
       // sport
@@ -822,12 +810,10 @@
         "match": { "tags": [{ "key": "waterway", "value": "river" }] }
       },
       "waterway-dam": {
-        "styleIDs": ["DEFAULTS"],
-        "match": { "tags": [{ "key": "waterway", "value": "dam" }] }
-      },
-      "waterway-weir": {
-        "styleIDs": ["DEFAULTS"],
-        "match": { "tags": [{ "key": "waterway", "value": "weir" }] }
+        "styleIDs": ["lightgray"],
+        "match": {
+          "tags": [{ "key": "waterway", "op": "in", "value": ["dam", "weir"] }]
+        }
       },
       "waterway-any": {
         "styleIDs": ["stream"],

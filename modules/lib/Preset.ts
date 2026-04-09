@@ -4,7 +4,6 @@ import { utilGatherTokens } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { Field } from './Field.ts';
-import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { LocationSet } from '@rapideditor/location-conflation';
 import type { OsmTags, TagKeyValueLookup } from '../data/types.ts';
 

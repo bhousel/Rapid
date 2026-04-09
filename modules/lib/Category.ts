@@ -2,7 +2,6 @@ import { utilSafeString } from '@rapid-sdk/util';
 import { utilGatherTokens } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
-import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { Preset } from './Preset.ts';
 import type { LocationSet } from '@rapideditor/location-conflation';
 

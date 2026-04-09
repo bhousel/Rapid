@@ -12,7 +12,6 @@ import type { StyleProps, FillStyleProps, LineStyleProps, PointStyleProps, Label
 import type { StyleSelectorProps } from '../lib/StyleSelector.ts';
 import type { VariableValue, VariableProps } from '../lib/Variable.ts';
 import type { OneOrMore } from '../util/iterable.ts';
-import type { GeometryType } from './SchemaSystem.ts';
 
 
 /** Style Groups supported by the style system */
@@ -544,8 +543,8 @@ export class StyleSystem extends AbstractSystem {
     }
 
     // Find all matching selectors, sorted by specificity (highest first)
-    const featureInfo = { tags };
-    const matchingSelectors = StyleSelector.findAll(scopeSelectors.values(), featureInfo);
+    const matchInfo = { tags, geometry };
+    const matchingSelectors = StyleSelector.findAll(scopeSelectors.values(), matchInfo);
 
     // Start with an empty style and apply matching selectors in order of increasing specificity.
     // DEFAULTS is passed to resolvedStyle() separately so it doesn't block cascade fallbacks.

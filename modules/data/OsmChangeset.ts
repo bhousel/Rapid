@@ -2,7 +2,6 @@ import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { GeoJSONObject } from '../lib/types.ts';
 
 import type { Context } from '../Context.ts';
-import type { GeometryType } from '../core/SchemaSystem.ts';
 
 
 /**

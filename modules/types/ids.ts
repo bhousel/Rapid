@@ -34,6 +34,8 @@ export type FeatureID = string;
 export type FieldID = string;
 /** Filter ID - identifier for a filter (e.g. 'points', 'traffic_roads') */
 export type FilterID = string;
+/** Geometry types supported by Rapid */
+export type GeometryType = 'point' | 'vertex' | 'line' | 'area' | 'relation';
 /** Graph ID - identifier for a Graph instance (e.g. 'g-123') */
 export type GraphID = string;
 /** Group ID - identifier for a scene render group (e.g. 'points', 'vertices', 'lines') */
@@ -113,6 +115,7 @@ declare global {
   type FeatureID = string;
   type FieldID = string;
   type FilterID = string;
+  type GeometryType = 'point' | 'vertex' | 'line' | 'area' | 'relation';
   type GraphID = string;
   type GroupID = string;
   type ListenerID = string;

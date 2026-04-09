@@ -555,7 +555,7 @@ export class Map3dSystem extends AbstractSystem {
       let fillColor = '#cccccc';
       let strokeColor = '#888888';
       if (styles) {
-        const style = styles.styleMatch(entity.tags);
+        const style = styles.styleMatch(entity.tags, entity.geometry(graph), 'osm');
         fillColor = new Color(style.fill.color).toHex();
         strokeColor = new Color(style.stroke.color).toHex();
       }
@@ -605,7 +605,7 @@ export class Map3dSystem extends AbstractSystem {
       let casingColor = '#444444';
       let strokeColor = '#ffffff';
       if (styles) {
-        const style = styles.styleMatch(entity.tags);
+        const style = styles.styleMatch(entity.tags, entity.geometry(graph), 'osm');
         casingColor = new Color(style.casing.color).toHex();
         strokeColor = new Color(style.stroke.color).toHex();
       }

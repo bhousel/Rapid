@@ -369,7 +369,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           const preset = schema.match(entity, graph);
 
           const geometry = entity.geometry(graph);
-          const style = styles.styleMatch(entity.tags, geometry) as MatchedStyle;
+          const style = styles.styleMatch(entity.tags, geometry, 'osm') as MatchedStyle;
           feature.style = style;
 
           const label = l10n.displayPOIName(entity.tags);
@@ -537,7 +537,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
               }
             }
 
-            const style = styles.styleMatch(tags, geometry) as MatchedStyle;
+            const style = styles.styleMatch(tags, geometry, 'osm') as MatchedStyle;
             // Todo: handle alternating/two-way case too
             if (geometry === 'line') {
               if (entity.isOneWay()) {
@@ -643,7 +643,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       feature.parentContainer = parentContainer;   // change layer stacking if necessary
 
       if (feature.dirty) {
-        const markerStyle = styles.styleMatch(node.tags, 'vertex') as MatchedStyle;
+        const markerStyle = styles.styleMatch(node.tags, 'vertex', 'osm') as MatchedStyle;
 
         // If we have an icon, increase the size of the marker..
         if (markerStyle.icon.image) {
@@ -722,7 +722,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this.syncFeatureClasses(feature);
 
       if (feature.dirty) {
-        const markerStyle = styles.styleMatch(node.tags, 'point') as MatchedStyle;
+        const markerStyle = styles.styleMatch(node.tags, 'point', 'osm') as MatchedStyle;
 
         if (hasWikidata(node)) {
           markerStyle.marker.image = 'boldPin';

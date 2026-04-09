@@ -3,7 +3,7 @@ import { utilObjectOmit, utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 
 import type { Context } from '../Context.ts';
-import type { GeometryType } from '../core/SchemaSystem.ts';
+
 
 /** Base URL for the OpenStreetMap Taginfo API v4 */
 const TAGINFO_API = 'https://taginfo.openstreetmap.org/api/4/';

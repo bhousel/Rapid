@@ -3,7 +3,6 @@ import { utilArrayUnion, utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
 
 import type { Context } from '../Context.ts';
-import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmTags } from './types.ts';

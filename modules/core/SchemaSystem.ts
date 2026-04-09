@@ -26,9 +26,6 @@ const MAXRECENTS = 30;       // how many recents to store in localstorage
 const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
 
 
-/** Geometry types supported by the schema system */
-export type GeometryType = 'point' | 'vertex' | 'line' | 'area' | 'relation';
-
 /** Field types supported by Rapid's UI */
 export type FieldType =
   | 'access' | 'address' | 'check' | 'combo' | 'cycleway' | 'defaultCheck' | 'email'
@@ -134,7 +131,6 @@ export interface DeprecationRule {
   /** Optional replacement tags */
   replace?: Record<string, string>;
 }
-
 
 
 /**

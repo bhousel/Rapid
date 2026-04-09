@@ -4,7 +4,6 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
-import type { GeometryType } from './SchemaSystem.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from '../data/index.ts';
 

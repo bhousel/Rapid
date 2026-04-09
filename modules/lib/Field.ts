@@ -1,7 +1,6 @@
 import { utilSafeString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
-import type { GeometryType } from '../core/SchemaSystem.ts';
 import type { LocationSet } from '@rapideditor/location-conflation';
 
 
