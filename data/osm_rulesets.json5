@@ -120,6 +120,7 @@
             "mixed_lift", "platter", "rope_tow", "t-bar", "zip_line"
           ]},
           { key: "conveying", value: "forward" },
+          { key: "golf", value: "hole" },
           { key: "highway", value: "motorway" },
           { key: "junction", op: "in", value: ["circular", "roundabout"] },
           { key: "man_made", op: "in", value: ["goods_conveyor", "piste:halfpipe"] },
