@@ -25,9 +25,9 @@ export function uiDetectionHeader(context) {
       iconName = d.props.value;
     } else {
       const service = context.services[d.props.serviceID];
-      const presetID = service && service.getDetectionPresetID(d.props.value);
+      const presetID = service?.getDetectionPresetID(d.props.value);
       const preset = presetID && schema.getScope('osm').presets.get(presetID);
-      iconName = preset?.icon || 'fas-question';
+      iconName = preset?.props?.icon || 'fas-question';
     }
 
     // Some values we don't have icons for, check first - Rapid#1518

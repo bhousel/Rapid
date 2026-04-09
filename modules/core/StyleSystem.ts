@@ -586,7 +586,7 @@ export class StyleSystem extends AbstractSystem {
     if (!result.icon.image && geometry) {
       if (schema) {
         let preset = schema.matchTags(tags, geometry);
-        let iconName = preset?.props.icon;
+        let iconName = preset?.props?.icon;
 
         // If we didn't get an icon for a point, try matching it as a 'vertex'.
         // This is just to choose a better icon for an otherwise empty-looking pin.
