@@ -165,14 +165,15 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       if (!Number.isFinite(anchorY)) anchorY = 0.5;
       marker.anchor.set(anchorX, anchorY);
 
-      // size, no default (size will be determined by the texture)
+      // size, if unset, size will be determined by the texture
       const markerSize = style.marker.size;
       const markerScale = style.marker.scale || [];
       let [scaleX, scaleY] = Array.isArray(markerScale) ? markerScale : [markerScale];
       if (!Number.isFinite(scaleX) || scaleX === 0) scaleX = 1;
       if (!Number.isFinite(scaleY) || scaleY === 0) scaleY = scaleX;
       if (Number.isFinite(markerSize)) {
-        marker.setSize(markerSize! * scaleX!, markerSize! * scaleY!);
+        marker.width = markerSize! * scaleX!;
+        marker.height = markerSize! * scaleY!;
       } else {
         marker.scale.set(scaleX, scaleY);
       }
@@ -199,7 +200,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       let [scaleX, scaleY] = Array.isArray(iconScale) ? iconScale : [iconScale];
       if (!Number.isFinite(scaleX) || scaleX === 0) scaleX = 1;
       if (!Number.isFinite(scaleY) || scaleY === 0) scaleY = scaleX;
-      // icon.setSize(iconSize * scaleX!, iconSize * scaleY!);
       icon.width = iconSize * scaleX!;
       icon.height = iconSize * scaleY!;
 

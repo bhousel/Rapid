@@ -129,11 +129,11 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
         let style: Partial<MatchedStyle>;
         if (hasIcon) {
           style = {
-            marker: { image: d.props.value as string }
+            marker: { image: d.props.value as string, size: 24 }
           };
         } else {
           style = {
-            marker: { image: 'xlargeSquare' },
+            marker: { image: 'xlargeSquare', size: 24 },
             icon: { image: 'fas-question', color: 0x000000, size: 16 }
           };
         }
@@ -143,13 +143,6 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
         feature.parentContainer = parentContainer;
         feature.setCoords(part);
         feature.setData(dataID, d);
-
-        const marker = feature.marker;
-        const ICONSIZE = 24;
-        if (marker) {
-          marker.width = ICONSIZE;
-          marker.height = ICONSIZE;
-        }
       }
 
       this.syncFeatureClasses(feature);
