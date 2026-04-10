@@ -6,10 +6,14 @@ import { DashLine } from './lib/DashLine.ts';
 import { getLineSegments, lineToPoly, type LineToPolyResult } from './helpers.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { DashLineOptions } from './lib/DashLine.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const ONEWAY_SPACING = 35;
 const SIDED_SPACING = 30;
+
+/* Intersection type that includes both Pixi Stroke and DashLineOptions  */
+type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 
 
 /**
@@ -224,7 +228,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
           width = 1;
         }
 
-        const bufferStyle = {
+        const bufferStyle: PIXI.StrokeStyle = {
           alpha: 1,
           alignment: 0.5,  // middle of line
           color: 0x000000,
@@ -280,9 +284,9 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     let g: PIXI.Graphics | DashLine = graphic.clear();
-    if (partStyle?.opacity === 0) return;
+    if (partStyle?.opacity === 0) return;  // remove completely
 
-    const strokeStyle = {
+    const strokeStyle: StrokeStyleWithDash = {
       color: partStyle.color,
       width: width,
       alpha: partStyle.opacity ?? 1.0,
@@ -349,7 +353,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         haloContainer.addChild(this.halo);
       }
 
-      const HALO_STYLE = {
+      const HALO_STYLE: StrokeStyleWithDash = {
         alpha: 0.9,
         dash: [6, 3],
         width: 2,   // px

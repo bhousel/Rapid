@@ -7,10 +7,13 @@ import { DashLine } from './lib/DashLine.ts';
 import { lineToPoly, type LineToPolyResult } from './helpers.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { DashLineOptions } from './lib/DashLine.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;
 
+/* Intersection type that includes both Pixi Stroke and DashLineOptions  */
+type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 
 /** SSR (smallest surrounding rectangle) data for a polygon */
 interface SSRData {
@@ -340,15 +343,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       strokes.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
 
       const lineWidth = isWireframeMode ? 1 : style.fill?.width || 2;
-      const strokeStyle: {
-        alpha: number;
-        alignment: number;
-        color: number;
-        width: number;
-        cap: PIXI.LineCap;
-        join: PIXI.LineJoin;
-        dash?: number[];
-      } = {
+      const strokeStyle: StrokeStyleWithDash = {
         alpha: 1,
         alignment: 0.5,  // middle of line
         color: color,
@@ -356,7 +351,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         cap: 'butt',
         join: 'miter'
       };
-      const bufferStyle = {
+      const bufferStyle: PIXI.StrokeStyle = {
         alpha: 1,
         alignment: 0.5,  // middle of line
         color: 0x000000,
@@ -398,7 +393,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     if (fill.visible && rings.length) {
       fill.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
 
-      const fillStyle = {
+      const fillStyle: PIXI.FillStyle = {
         color: color,
         alpha: opacity,
         texture: texture, // Optional: include only if texture is used
@@ -427,14 +422,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
         fill.mask = null;
 
       } else {  // partial fill
-        const maskStyle: {
-          alpha: number;
-          color: number;
-          width: number;
-          cap: PIXI.LineCap;
-          join: PIXI.LineJoin;
-          alignment?: number;
-        } = {
+        const maskStyle: PIXI.StrokeStyle = {
           alpha: 1,
           color: 0xff0000,
           width: PARTIALFILLWIDTH,

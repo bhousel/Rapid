@@ -58,19 +58,62 @@
         "stroke": { "dash": [7, 3], "cap": "butt" }
       },
 
-      // Fill color styles - used for areas
-      "red":        { "fill": { "color": 0xe06e5f, "opacity": 0.3 } },   // rgb(224, 110, 95)
-      "green":      { "fill": { "color": 0x8cd05f, "opacity": 0.3 } },   // rgb(140, 208, 95)
-      "blue":       { "fill": { "color": 0x77d4de, "opacity": 0.3 } },   // rgb(119, 211, 222)
-      "yellow":     { "fill": { "color": 0xffff94, "opacity": 0.25 } },  // rgb(255, 255, 148)
-      "gold":       { "fill": { "color": 0xc4be19, "opacity": 0.3 } },   // rgb(196, 189, 25)
-      "orange":     { "fill": { "color": 0xd6881a, "opacity": 0.3 } },   // rgb(214, 136, 26)
-      "pink":       { "fill": { "color": 0xe3a4f5, "opacity": 0.3 } },   // rgb(228, 164, 245)
-      "teal":       { "fill": { "color": 0x99e1aa, "opacity": 0.3 } },   // rgb(153, 225, 170)
-      "lightgreen": { "fill": { "color": 0xbee83f, "opacity": 0.3 } },   // rgb(191, 232, 63)
-      "tan":        { "fill": { "color": 0xf5dcba, "opacity": 0.3 } },   // rgb(245, 220, 186)
-      "darkgray":   { "fill": { "color": 0x8c8c8c, "opacity": 0.5 } },   // rgb(140, 140, 140)
-      "lightgray":  { "fill": { "color": 0xaaaaaa, "opacity": 0.3 } },   // rgb(170, 170, 170)
+      // Generic color styles, mostly used for polygon filling.
+      // We'll prefer to stick to this common limited color pallete rather than
+      // trying to specify a different color for every possible map feature.
+      // These colors should be relatively bright to contrast against background imagery.
+      "red": {
+        "fill":   { "color": 0xe06e5f, "opacity": 0.3 },  // rgb(224, 110, 95)
+        "stroke": { "color": 0xe06e5f }
+      },
+      "green": {
+        "fill":   { "color": 0x8cd05f, "opacity": 0.3 },  // rgb(140, 208, 95)
+        "stroke": { "color": 0x8cd05f }
+      },
+      "blue": {
+        "fill":   { "color": 0x77d4de, "opacity": 0.3 },  // rgb(119, 211, 222)
+        "stroke": { "color": 0x77d4de }
+      },
+      "yellow": {
+        "fill":   { "color": 0xffff94, "opacity": 0.25 }, // rgb(255, 255, 148)
+        "stroke": { "color": 0xffff94 }
+      },
+      "gold": {
+        "fill":   { "color": 0xc4be19, "opacity": 0.3 },  // rgb(196, 189, 25)
+        "stroke": { "color": 0xc4be19 }
+      },
+      "orange": {
+        "fill":   { "color": 0xd6881a, "opacity": 0.3 },  // rgb(214, 136, 26)
+        "stroke": { "color": 0xd6881a }
+      },
+      "pink": {
+        "fill":   { "color": 0xe3a4f5, "opacity": 0.3 },  // rgb(228, 164, 245)
+        "stroke": { "color": 0xe3a4f5 }
+      },
+      "teal": {
+        "fill":   { "color": 0x99e1aa, "opacity": 0.3 },  // rgb(153, 225, 170)
+        "stroke": { "color": 0x99e1aa }
+      },
+      "lightgreen": {
+        "fill":   { "color": 0xbee83f, "opacity": 0.3 },  // rgb(191, 232, 63)
+        "stroke": { "color": 0xbee83f }
+      },
+      "tan": {
+        "fill":   { "color": 0xf5dcba, "opacity": 0.3 },  // rgb(245, 220, 186)
+        "stroke": { "color": 0xf5dcba }
+      },
+      "darkgray": {
+        "fill":   { "color": 0x8c8c8c, "opacity": 0.5 },  // rgb(140, 140, 140)
+        "stroke": { "color": 0x8c8c8c }
+      },
+      "lightgray": {
+        "fill":   { "color": 0xaaaaaa, "opacity": 0.3 },  // rgb(170, 170, 170)
+        "stroke": { "color": 0xaaaaaa }
+      },
+      "white": {
+        "fill":   { "color": 0xffffff, "opacity": 0.3 },  // rgb(255, 255, 255)
+        "stroke": { "color": 0xffffff }
+      },
 
       "line_wide":   {
         "casing": { "width": 10 },
@@ -109,11 +152,9 @@
 
       // Road styles - minor roads
       "unclassified": {
-        "casing": { "color": 0x444444 },
         "stroke": { "color": 0xddccaa }
       },
       "residential": {
-        "casing": { "color": 0x444444 },
         "stroke": { "color": 0xffffff }
       },
       "living_street": {
@@ -121,11 +162,9 @@
         "stroke": { "color": 0xcccccc }
       },
       "service": {
-        "casing": { "color": 0x444444 },
         "stroke": { "color": 0xffffff }
       },
       "service_tagged": {
-        "casing": { "color": 0x444444 },
         "stroke": { "color": 0xddccaa }
       },
       "track": {
@@ -133,7 +172,7 @@
         "stroke": { "color": 0xc5b59f }
       },
 
-      // Path styles - pedestrian ways
+      // Path styles - non-motorized traffic
       "pedestrian": {
         "label":  { "color": 0xffffff },
         "casing": { "color": 0xffffff },
@@ -149,15 +188,15 @@
         "casing": { "color": 0xffffff },
         "stroke": { "color": 0x998888, "dash": [6, 6], "cap": "butt" }
       },
+      "crossing_default": {
+        "label":  { "color": 0xddccaa },
+        "casing": { "color": 0xddccaa },
+        "stroke": { "color": 0x776a6a, "dash": [6, 4], "cap": "butt" }
+      },
       "crossing_improved": {
         "label":  { "color": 0xddccaa },
         "casing": { "color": 0xddccaa },
         "stroke": { "color": 0x4c4444, "dash": [6, 3], "cap": "butt" }
-      },
-      "crossing_unimproved": {
-        "label":  { "color": 0xddccaa },
-        "casing": { "color": 0xddccaa },
-        "stroke": { "color": 0x776a6a, "dash": [6, 4], "cap": "butt" }
       },
       "cycleway": {
         "label":  { "color": 0xffffff },
@@ -180,28 +219,16 @@
         "stroke": { "color": 0x81d25c, "dash": [3, 3], "cap": "butt" }
       },
 
-      // Waterway styles
-      "river": {
-        "fill":   { "color": 0x77d4de, "opacity": 0.3 },   // rgb(119, 211, 222)
-        "casing": { "color": 0x444444 },
-        "stroke": { "color": 0x77dddd }
-      },
-      "stream": {
-        "fill":   { "color": 0x77d4de, "opacity": 0.3 },   // rgb(119, 211, 222)
-        "casing": { "color": 0x444444 },
-        "stroke": { "color": 0x77dddd }
-      },
-
       // Other linear features
-      "ridge": {
-        "stroke": { "color": 0x8cd05f, "width": 2 }  // rgb(140, 208, 95)
+      "waterway": {
+        "fill":   { "color": 0x77d4de, "opacity": 0.3 },   // rgb(119, 211, 222)
+        "stroke": { "color": 0x77dddd }
       },
       "runway": {
         "casing": { "color": 0x000000, "cap": "butt" },
         "stroke": { "color": 0xffffff, "dash": [24, 48], "cap": "butt" }
       },
       "taxiway": {
-        "casing": { "color": 0x444444 },
         "stroke": { "color": 0xffff00 }
       },
       "railway": {
@@ -211,6 +238,12 @@
       "ferry": {
         "casing": { "opacity": 0 },  // disable casing
         "stroke": { "color": 0x58a9ed, "width": 3, "dash": [12, 8], "cap": "butt" }
+      },
+      "pipeline": {
+        "stroke": { "color": 0xdddddd, "dash": [80, 2], "cap": "butt" }
+      },
+      "roller_coaster": {
+        "stroke": { "color": 0xdddddd, "dash": [10, 1], "cap": "butt" }
       },
 
       // Boundary styles
@@ -239,21 +272,9 @@
       },
 
       // Miscellaneous
-      "tree_row": {
-        "casing": { "color": 0x444444 },
-        "stroke": { "color": 0x8cd05f }
-      },
       "construction": {
         "casing": { "color": 0xffffff },
         "stroke": { "color": 0xfc6c14, "dash": [10, 10], "cap": "butt" }
-      },
-      "pipeline": {
-        "casing": { "color": 0x444444, },
-        "stroke": { "color": 0xdddddd, "dash": [80, 2], "cap": "butt" }
-      },
-      "roller_coaster": {
-        "casing": { "color": 0x444444, },
-        "stroke": { "color": 0xdddddd, "dash": [10, 1], "cap": "butt" }
       },
 
       // Pattern Styles
@@ -290,7 +311,7 @@
     //
     // Style Selectors
     // A "Style Selector" maps tag conditions to styles that will be applied.
-    // All matching selectors are applied, sorted by specificity (more conditions wins).
+    // All matching selectors are applied, those with a higher "weight" apply later.
     // Each selector has:
     // - match: conditions for matching (tags, geometry, dataset)
     // - styleIDs: array of style IDs to apply (merged in order, later styles override earlier)
@@ -342,7 +363,12 @@
       },
 
       // barrier
+      "barrier-deafult": {
+        "styleIDs": ["barrier"],
+        "match": { "tags": [{ "key": "barrier" }] }
+      },
       "barrier-wall": {
+        "weight": 2,
         "styleIDs": ["barrier_wall"],
         "match": {
           "tags": [{
@@ -353,15 +379,17 @@
         }
       },
       "barrier-hedge": {
+        "weight": 2,
         "styleIDs": ["barrier_hedge"],
         "match": { "tags": [{ "key": "barrier", "value": "hedge" }] }
       },
-      "barrier-deafult": {
-        "styleIDs": ["barrier"],
-        "match": { "tags": [{ "key": "barrier" }] }
-      },
 
       // boundary
+      "boundary-default": {
+        "weight": 0.9,
+        "styleIDs": ["boundary"],
+        "match": { "tags": [{ "key": "boundary" }] }
+      },
       "boundary-protected_area": {
         "styleIDs": ["boundary_park"],
         "match": { "tags": [{ "key": "boundary", "value": "protected_area" }] }
@@ -370,34 +398,29 @@
         "styleIDs": ["boundary_park"],
         "match": { "tags": [{ "key": "boundary", "value": "national_park" }] }
       },
-      "boundary-default": {
-        "styleIDs": ["boundary"],
-        "match": { "tags": [{ "key": "boundary" }] }
-      },
 
-      // building
-      "building-default": {
-        "styleIDs": ["red"],
-        "match": { "tags": [{ "key": "building" }] }
-      },
-
-      // crossing
-      "crossing-improved": {
-        "styleIDs": ["crossing_improved"],
-        "match": {
-          "geometry": "line",
-          "tags": [{
-            "key": "crossing",
-            "op": "in",
-            "value": ["marked", "traffic_signals", "uncontrolled", "zebra"]
-          }]
-        }
-      },
-      "crossing-unimproved": {
-        "styleIDs": ["crossing_unimproved"],
+      // crossings - darker strokes for crossings tagged with markings
+      "crossing-default": {
+        "styleIDs": ["crossing_default"],
         "match": {
           "geometry": "line",
           "tags": [{ "key": "crossing" }]
+        }
+      },
+      "crossing-improved": {
+        "weight": 2,
+        "styleIDs": ["crossing_improved"],
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "crossing", "op": "in", "value": ["marked", "traffic_signals", "uncontrolled", "zebra"] }]
+        }
+      },
+      "crossing-markings": {
+        "weight": 2,
+        "styleIDs": ["crossing_improved"],
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "crossing:markings" }]
         }
       },
 
@@ -607,7 +630,7 @@
         "styleIDs": ["green", "pattern-grass"],
         "match": { "tags": [{ "key": "landuse", "value": "grass" }] }
       },
-      "landuse-graveyard": {
+      "landuse-grave_yard": {
         "styleIDs": ["lightgreen", "pattern-cemetery"],
         "match": { "tags": [{ "key": "landuse", "value": "grave_yard" }] }
       },
@@ -669,11 +692,11 @@
           "value": ["garden", "golf_course", "nature_reserve", "park", "pitch"]
         }] }
       },
-      "leisure-water": {
-        "styleIDs": ["blue"],
+      "leisure-swimming_pool": {
+        "styleIDs": ["blue", "pattern-lines"],
         "match": { "tags": [{ "key": "leisure", "value": "swimming_pool" }] }
       },
-      "leisure-yellow": {
+      "leisure-track": {
         "styleIDs": ["yellow"],
         "match": { "tags": [{ "key": "leisure", "value": "track" }] }
       },
@@ -695,13 +718,18 @@
         }
       },
 
-      // military
+      // military (often dual-tagged with `landuse=military`, but not always)
       "military-default": {
         "styleIDs": ["orange"],
         "match": { "tags": [{ "key": "military" }] }
       },
 
       // natural
+      "natural-default": {
+        "weight": 0.9,
+        "styleIDs": ["green"],
+        "match": { "tags": [{ "key": "natural" }] }
+      },
       "natural-glacier": {
         "styleIDs": ["lightgray"],
         "match": { "tags": [{ "key": "natural", "value": "glacier" }] }
@@ -710,20 +738,13 @@
         "styleIDs": ["green", "pattern-grass"],
         "match": { "tags": [{ "key": "natural", "value": "grassland" }] }
       },
-      "natural-ridge": {
-        "styleIDs": ["ridge"],
-        "match": {
-          "geometry": "line",
-          "tags": [{ "key": "natural", "value": "ridge" }]
-        }
-      },
       "natural-rock": {
         "styleIDs": ["darkgray"],
         "match": {
           "tags": [{
             "key": "natural",
             "op": "in",
-            "value": ["bare_rock", "cave_entrance", "cliff", "rock", "scree", "shingle", "stone"]
+            "value": ["bare_rock", "cave_entrance", "cliff", "ridge", "rock", "scree", "shingle", "stone"]
           }]
         }
       },
@@ -740,13 +761,6 @@
       "natural-scrub": {
         "styleIDs": ["yellow", "pattern-bushes"],
         "match": { "tags": [{ "key": "natural", "value": "scrub" }] }
-      },
-      "natural-tree_row": {
-        "styleIDs": ["tree_row", "line_medium"],
-        "match": {
-          "geometry": "line",
-          "tags": [{ "key": "natural", "value": "tree_row" }]
-        }
       },
       "natural-water": {
         "styleIDs": ["blue", "pattern-waves"],
@@ -766,30 +780,27 @@
         "styleIDs": ["green", "pattern-forest"],
         "match": { "tags": [{ "key": "natural", "value": "wood" }] }
       },
-      "natural-default": {
-        "styleIDs": ["green"],
-        "match": { "tags": [{ "key": "natural" }] }
-      },
 
-      // power
+      // power plant (often dual-tagged with `landuse=industrial`, but not always)
       "power-plant": {
         "styleIDs": ["pink"],
         "match": { "tags": [{ "key": "power", "value": "plant" }] }
       },
 
       // railway
-      "railway-platform": {
-        "styleIDs": ["footway"],
-        "match": {
-          "geometry": "line",
-          "tags": [{ "key": "railway", "value": "platform" }]
-        }
-      },
       "railway-default": {
         "styleIDs": ["railway"],
         "match": {
           "geometry": "line",
           "tags": [{ "key": "railway" }]
+        }
+      },
+      "railway-platform": {
+        "weight": 2,
+        "styleIDs": ["footway"],
+        "match": {
+          "geometry": "line",
+          "tags": [{ "key": "railway", "value": "platform" }]
         }
       },
 
@@ -811,120 +822,148 @@
         }
       },
 
-      // sport
-      "sport-baseball": {
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "sport", "value": "baseball" }] }
-      },
-      "sport-basketball": {
-        "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "sport", "value": "basketball" }] }
-      },
-      "sport-beachvolleyball": {
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "sport", "value": "beachvolleyball" }] }
-      },
-      "sport-skateboard": {
-        "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "sport", "value": "skateboard" }] }
-      },
-      "sport-softball": {
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "sport", "value": "softball" }] }
-      },
-
       // type
       "type-waterway": {
-        "styleIDs": ["river", "line_wide"],
+        "styleIDs": ["waterway", "line_wide"],
         "match": { "tags": [{ "key": "type", "value": "waterway" }] }
       },
 
       // waterway
+      "waterway-default": {
+        "styleIDs": ["waterway", "line_medium"],
+        "match": { "tags": [{ "key": "waterway" }] }
+      },
       "waterway-river": {
-        "styleIDs": ["river", "line_wide"],
+        "weight": 2,
+        "styleIDs": ["waterway", "line_wide"],
         "match": { "tags": [{ "key": "waterway", "value": "river" }] }
       },
       "waterway-dam": {
+        "weight": 2,
         "styleIDs": ["lightgray", "line_medium"],
         "match": { "tags": [{ "key": "waterway", "op": "in", "value": ["dam", "weir"] }] }
       },
-      "waterway-default": {
-        "styleIDs": ["stream", "line_medium"],
-        "match": { "tags": [{ "key": "waterway" }] }
+
+      // "Override" selectors
+      // These selectors are weighted higher and will override anything that matches earlier.
+
+      // building - always style things with a building tag as red.
+      "building-default": {
+        "weight": 10,
+        "styleIDs": ["red"],
+        "match": { "tags": [{ "key": "building" }] }
       },
 
-      //
-      // Refinement selectors
-      // These override patterns from base selectors when more specific tags are present.
-      // For example, a feature with both `landuse=forest` and `leaf_type=needleleaved`
-      // will match both `landuse-forest` and `leaf_type-needleleaved`.
-      // ALL matching selectors are applied in specificity order.
-      //
-
-      // leaf_type refinements - override forest patterns
+      // leaf_type overrides - apply specific pattern
       "leaf_type-broadleaved": {
+        "weight": 5,
         "styleIDs": ["pattern-forest_broadleaved"],
         "match": { "tags": [{ "key": "leaf_type", "value": "broadleaved" }] }
       },
       "leaf_type-leafless": {
+        "weight": 5,
         "styleIDs": ["pattern-forest_leafless"],
         "match": { "tags": [{ "key": "leaf_type", "value": "leafless" }] }
       },
       "leaf_type-needleleaved": {
+        "weight": 5,
         "styleIDs": ["pattern-forest_needleleaved"],
         "match": { "tags": [{ "key": "leaf_type", "value": "needleleaved" }] }
       },
 
-      // religion refinements - override cemetery patterns
+      // religion overrides - apply specific pattern
       "religion-buddhist": {
+        "weight": 5,
         "styleIDs": ["pattern-cemetery_buddhist"],
         "match": { "tags": [{ "key": "religion", "value": "buddhist" }] }
       },
       "religion-christian": {
+        "weight": 5,
         "styleIDs": ["pattern-cemetery_christian"],
         "match": { "tags": [{ "key": "religion", "value": "christian" }] }
       },
       "religion-jewish": {
+        "weight": 5,
         "styleIDs": ["pattern-cemetery_jewish"],
         "match": { "tags": [{ "key": "religion", "value": "jewish" }] }
       },
       "religion-muslim": {
+        "weight": 5,
         "styleIDs": ["pattern-cemetery_muslim"],
         "match": { "tags": [{ "key": "religion", "value": "muslim" }] }
       },
 
-      // water refinements - override water patterns
+      // water overrides - apply specific pattern
       "water-pond": {
+        "weight": 5,
         "styleIDs": ["pattern-pond"],
         "match": { "tags": [{ "key": "water", "value": "pond" }] }
       },
       "water-reservoir": {
+        "weight": 5,
         "styleIDs": ["pattern-lines"],
         "match": { "tags": [{ "key": "water", "value": "reservoir" }] }
       },
 
-      // wetland refinements - override wetland patterns
+      // wetland overrides - apply specific pattern
       "wetland-bog": {
+        "weight": 5,
         "styleIDs": ["pattern-wetland_bog"],
         "match": { "tags": [{ "key": "wetland", "value": "bog" }] }
       },
       "wetland-marsh": {
+        "weight": 5,
         "styleIDs": ["pattern-wetland_marsh"],
         "match": { "tags": [{ "key": "wetland", "value": "marsh" }] }
       },
       "wetland-reedbed": {
+        "weight": 5,
         "styleIDs": ["pattern-wetland_reedbed"],
         "match": { "tags": [{ "key": "wetland", "value": "reedbed" }] }
       },
       "wetland-swamp": {
+        "weight": 5,
         "styleIDs": ["pattern-wetland_swamp"],
         "match": { "tags": [{ "key": "wetland", "value": "swamp" }] }
       },
 
-      // surface refinements
+      // sport overrides - apply specific color/pattern
+      "sport-baseball": {
+        "weight": 5,
+        "styleIDs": ["yellow"],
+        "match": { "tags": [{ "key": "sport", "value": "baseball" }] }
+      },
+      "sport-basketball": {
+        "weight": 5,
+        "styleIDs": ["darkgray"],
+        "match": { "tags": [{ "key": "sport", "value": "basketball" }] }
+      },
+      "sport-beachvolleyball": {
+        "weight": 5,
+        "styleIDs": ["yellow"],
+        "match": { "tags": [{ "key": "sport", "value": "beachvolleyball" }] }
+      },
+      "sport-skateboard": {
+        "weight": 5,
+        "styleIDs": ["darkgray"],
+        "match": { "tags": [{ "key": "sport", "value": "skateboard" }] }
+      },
+      "sport-softball": {
+        "weight": 5,
+        "styleIDs": ["yellow"],
+        "match": { "tags": [{ "key": "sport", "value": "softball" }] }
+      },
+
+      // surface overrides - apply specific patterns
       "surface-grass": {
+        "weight": 6,
         "styleIDs": ["pattern-grass"],
         "match": { "tags": [{ "key": "surface", "value": "grass" }] }
+      },
+      "surface-sand": {
+        "weight": 6,
+        "styleIDs": ["pattern-dots"],
+        "match": { "tags": [{ "key": "surface", "value": "sand" }] }
       }
     }
 

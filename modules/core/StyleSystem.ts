@@ -105,9 +105,9 @@ function getTag(tags: OsmTags, key: string): string | undefined {
  * processes Variables before Styles/Selectors (since they may contain `var()` references).
  *
  * **Style Matching (`styleMatch`):**
- * All matching selectors are collected and sorted by specificity (more conditions = higher
- * specificity). Styles from matching selectors are deep-merged in order of increasing
- * specificity, so more specific selectors override less specific ones.
+ * All matching selectors are collected and sorted by weight.
+ * Styles from matching selectors are deep-merged in order of increasing
+ * weight, so higher weighted selectors override lower weighted selectors.
  *
  * **Default assets loaded at init time:**
  * - `rapid_style` — Style declarations, selectors, and variables (from `data/rapid_style.json5`)
@@ -542,17 +542,16 @@ export class StyleSystem extends AbstractSystem {
       defaults = new Style(context, { id: 'DEFAULTS', ...styleDefaults });
     }
 
-    // Find all matching selectors, sorted by specificity (highest first)
+    // Find all matching selectors, ordered by weight increasing (higher overrides lower)
     const matchInfo = { tags, geometry };
     const matchingSelectors = StyleSelector.findAll(scopeSelectors.values(), matchInfo);
 
-    // Start with an empty style and apply matching selectors in order of increasing specificity.
-    // DEFAULTS is passed to resolvedStyle() separately so it doesn't block cascade fallbacks.
+    // Start with an empty style and apply matching selectors in order of increasing weight.
+    // (note that `defaults` gets applied later, only to fill in missing values)
     let combinedProps: Partial<StyleProps> = {};
     const combinedIDs = new Set<string>();
 
-    for (let i = matchingSelectors.length - 1; i >= 0; i--) {
-      const selector = matchingSelectors[i];
+    for (const selector of matchingSelectors) {
       for (const styleID of selector.styleIDs) {
         const style = scopeStyles.get(styleID);
         if (style) {

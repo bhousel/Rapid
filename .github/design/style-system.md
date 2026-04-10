@@ -115,22 +115,22 @@ A **StyleSelector** describes *when to apply a style*. It contains matching cond
 interface StyleSelectorProps {
   id: StyleSelectorID;
   styleIDs: StyleID[];   // Styles to apply (merged in order)
+  weight?: number;       // Override cascade order (default: 1)
   match: {
-    dataset?: DatasetID | DatasetID[];  // 'osm', 'rapid', '*'
     geometry?: GeometryType | GeometryType[];  // 'point', 'line', 'area', '*'
     tags?: PropMatcher[];          // Tag conditions (AND logic)
   };
 }
 ```
 
-**Specificity** determines which selectors win when multiple match:
-- Dataset condition: +100
-- Geometry condition: +50
-- Each tag matcher: +10
+**Weight** determines which selectors win when multiple match. Selectors
+with a higher `weight` are applied later and override lower-weighted ones.
+The default weight is `1`. Selectors with the same weight preserve their
+insertion order (stable sort).
 
 **Examples:**
 ```json5
-// Match all buildings on any dataset (specificity: 10)
+// Match all buildings (weight: default 1)
 "building-default": {
   "styleIDs": ["building_red"],
   "match": {
@@ -138,7 +138,7 @@ interface StyleSelectorProps {
   }
 }
 
-// Match motorways (specificity: 10)
+// Match motorways (weight: default 1)
 "highway-motorway": {
   "styleIDs": ["motorway"],
   "match": {
@@ -146,16 +146,16 @@ interface StyleSelectorProps {
   }
 }
 
-// Dataset-specific styling for Rapid AI suggestions (specificity: 110)
-"rapid-building": {
-  "styleIDs": ["building_rapid"],
+// Higher weight overrides other selectors
+"building-override": {
+  "styleIDs": ["building_red"],
+  "weight": 10,
   "match": {
-    "dataset": "rapid",
     "tags": [{ "key": "building" }]
   }
 }
 
-// Compose color + pattern (specificity: 10)
+// Compose color + pattern (weight: default 1)
 "landuse-forest": {
   "styleIDs": ["green", "pattern-forest"],
   "match": {
@@ -219,27 +219,25 @@ When determining the style for a feature, **all matching selectors are applied**
 
 1. **Collect matching selectors**: Iterate through all StyleSelectors and find those whose `match` conditions are satisfied by the feature.
 
-2. **Sort by specificity**: Higher specificity wins. Specificity = dataset (+100) + geometry (+50) + tags (+10 each).
+2. **Sort by weight**: Lower weight applies first, higher weight applies later (and wins).
 
-3. **Merge all styles**: Starting from DEFAULTS, merge all matching selectors in order (lowest specificity first, so higher specificity wins).
+3. **Merge all styles**: Starting from an empty style, merge all matching selectors in order of increasing weight. DEFAULTS is applied later only to fill in missing values.
 
 ```typescript
 function styleMatch(tags: Tags): MatchedStyle {
   const featureInfo = { tags };
   const matchingSelectors = StyleSelector.findAll(selectors.values(), featureInfo);
 
-  // Start with defaults, merge all matching selectors
-  // Iterate in reverse (lowest specificity first) so higher specificity wins
-  let matched = styles.get('DEFAULTS');
+  // Start empty, merge all matching selectors in weight order (ascending)
+  let combinedProps = {};
 
-  for (let i = matchingSelectors.length - 1; i >= 0; i--) {
-    const selector = matchingSelectors[i];
+  for (const selector of matchingSelectors) {
     for (const styleID of selector.styleIDs) {
-      matched = matched.merge(styles.get(styleID));
+      combinedProps = deepMerge(combinedProps, styles.get(styleID));
     }
   }
 
-  return matched.resolvedStyle();  // applies defaults and fallbacks
+  return new Style(combinedProps).resolvedStyle(defaults);
 }
 ```
 
@@ -282,13 +280,13 @@ interface MatchedStyle {
 A feature with `landuse=forest` and `leaf_type=needleleaved` matches two selectors:
 
 ```json5
-// Base selector (specificity: 10)
+// Base selector (weight: default 1)
 "landuse-forest": {
   "styleIDs": ["green", "pattern-forest"],
   "match": { "tags": [{ "key": "landuse", "value": "forest" }] }
 }
 
-// Refinement selector (specificity: 10)
+// Refinement selector (weight: default 1)
 "leaf_type-needleleaved": {
   "styleIDs": ["pattern-forest_needleleaved"],
   "match": { "tags": [{ "key": "leaf_type", "value": "needleleaved" }] }
@@ -354,15 +352,19 @@ Style data is stored in JSON5 format for human readability (supports comments, t
 
 ### Phase 4 (Complete)
 - Multi-selector matching: all matching selectors applied, not just best
-- Removed explicit `priority` in favor of calculated specificity
+- Replaced `priority` with calculated specificity (Phase 4), then replaced specificity with `weight` property (Phase 5)
 - Style composition via `styleIDs` array
 - Refinement selectors for patterns (e.g., `leaf_type=needleleaved`)
 
-### Phase 5 (Future)
+### Phase 5 (Complete)
+- Replaced auto-computed specificity with explicit `weight` property
+- Default weight is 1; higher weight selectors override lower weight
+- Removed `findBest()`, `specificity()`, `toString()`, and `StyleGeometry` type
+
+### Phase 6 (Future)
 - MapCSS import tool (transforms subset of MapCSS → Rapid style format)
 - UI for editing styles in-app
 - Style "themes" (complete swappable style sets)
-- Optional `matchScore` property if finer control needed (like Preset.matchScore)
 
 ## Comparison with Other Systems
 
@@ -372,7 +374,7 @@ Style data is stored in JSON5 format for human readability (supports comments, t
 | SchemaSystem | `Preset`, `Field`, `Category` | Classes with methods (localization, matching) |
 | StyleSystem | `Style`, `StyleSelector` | Classes with methods (`resolvedStyle`, `merge`, `clone`) |
 
-The Style class has `resolvedStyle()` for applying defaults and fallbacks, `merge()` for composing styles, and `clone()` for copying. StyleSelector has `findAll()` for matching.
+The Style class has `resolvedStyle()` for applying defaults and fallbacks, `merge()` for composing styles, and `clone()` for copying. StyleSelector has `findAll()` for matching and `weight` for controlling cascade order.
 
 ## Inspiration
 
@@ -391,7 +393,7 @@ The goal is to be simpler than MapCSS while supporting the most useful subset of
 1. ~~**Pattern handling**: Should patterns move into `fill.pattern` in declarations, or stay as separate pattern selectors?~~ **Resolved**: Patterns are now in `fill.pattern` and composed via multi-selector matching.
 2. **Lifecycle styles**: How do `new`, `modified`, `deleted` states interact with selectors? Currently handled via tag scanning after style match.
 3. **Caching**: Should we cache selector matches per feature, or is matching fast enough?
-4. **matchScore**: If specificity alone isn't sufficient, we could add an optional `matchScore` property (like Preset) to weight specific selectors.
+4. ~~**matchScore**: If specificity alone isn't sufficient, we could add an optional `matchScore` property (like Preset) to weight specific selectors.~~ **Resolved**: Added `weight` property to StyleSelector.
 
 ## Future: PropMatcher as Side Project
 

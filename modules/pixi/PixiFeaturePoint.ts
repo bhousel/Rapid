@@ -5,7 +5,11 @@ import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import type { DashLineOptions } from './lib/DashLine.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
+
+/* Intersection type that includes both Pixi Stroke and DashLineOptions  */
+type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 
 
 /**
@@ -417,7 +421,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         haloContainer.addChild(this.halo);
       }
 
-      const HALO_STYLE = {
+      const HALO_STYLE: StrokeStyleWithDash = {
         alpha: 0.9,
         dash: [6, 3],
         width: 2,   // px

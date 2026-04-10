@@ -51,8 +51,6 @@ const dashLineOptionsDefault: ResolvedDashLineOptions = {
 };
 
 
-
-
 export class DashLine {
   /** Reference to the GraphicsSystem for texture caching */
   gfx: any;

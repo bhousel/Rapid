@@ -10,8 +10,7 @@ import type { Variable } from './Variable.ts';
  * A StyleSelector describes *when to apply a style*. It contains matching
  * conditions (geometry, tags) and references one or more Styles.
  *
- * All matching selectors are applied in specificity order (more conditions = higher specificity).
- * Selectors with the same specificity are applied in the order they were added.
+ * Selectors can have a 'weight' property to control the order in which they apply.
  *
  * @example
  * // Match highway=motorway
@@ -36,16 +35,12 @@ import type { Variable } from './Variable.ts';
  */
 
 
-/** Geometry types supported by the style system */
-export type StyleGeometry = 'point' | 'vertex' | 'line' | 'area' | 'relation';
-
-
 /**
  * Match conditions for a StyleSelector.
  */
 export interface StyleMatchConditions {
   /** Geometry type(s) to match. Use '*' or omit to match all geometries. */
-  geometry?: StyleGeometry | StyleGeometry[] | '*';
+  geometry?: GeometryType | GeometryType[] | '*';
   /** Tag conditions to match (AND logic - all must match). */
   tags?: PropMatcherProps[];
 }
@@ -66,6 +61,8 @@ export interface StyleSelectorProps {
   styleIDs: StyleID[];
   /** Conditions that must be met for this selector to match */
   match: StyleMatchConditions;
+  /** Weight (default 1) - when applying styles, the selector with weight overrides those with lower weight. */
+  weight?: number;
 }
 
 /**
@@ -73,7 +70,7 @@ export interface StyleSelectorProps {
  */
 export interface FeatureMatchInfo {
   /** The geometry type of the feature */
-  geometry?: StyleGeometry;
+  geometry?: GeometryType;
   /** The tags/properties of the feature */
   tags?: Record<string, unknown>;
 }
@@ -83,9 +80,10 @@ export interface FeatureMatchInfo {
  * StyleSelector - Determines when a style should be applied.
  *
  * Properties you can access:
- *   `id`             Unique identifier for this selector
- *   `styleIDs`       IDs of Styles to apply (merged in order)
- *   `props`          The full props object
+ *   `id`        Unique identifier for this selector
+ *   `styleIDs`  IDs of Styles to apply (merged in order)
+ *   `weight`    The weight of this selector (higher weights override lower weights)
+ *   `props`     The full props object
  */
 export class StyleSelector {
   context: Context;
@@ -141,6 +139,15 @@ export class StyleSelector {
   }
 
   /**
+   * Return the "weight" of this selector.
+   * Higher weight selectors are applied later and override lower weight selectors.
+   * @return weight score
+   */
+  get weight(): number {
+    return this.props.weight ?? 1;
+  }
+
+  /**
    * Get the tag matchers, lazily creating PropMatcher instances.
    */
   get tagMatchers(): PropMatcher[] {
@@ -181,29 +188,6 @@ export class StyleSelector {
 
 
   /**
-   * Calculate a specificity score for this selector.
-   * More specific selectors (more conditions) get higher scores.
-   * Higher specificity selectors are applied later and win.
-   *
-   * @return Specificity score
-   */
-  specificity(): number {
-    let score = 0;
-    const { match } = this.props;
-
-    // Geometry specificity
-    if (match.geometry !== undefined && match.geometry !== '*') {
-      score += 50;
-    }
-
-    // Tag specificity (more matchers = more specific)
-    score += this.tagMatchers.length * 10;
-
-    return score;
-  }
-
-
-  /**
    * Resolve any `var()` references in this selector's tag matchers.
    * Delegates to each PropMatcher's `resolveVariables()`.
    * @param variables - Map of VariableID to Variable instances
@@ -217,14 +201,12 @@ export class StyleSelector {
 
   /**
    * Compare this selector to another for sorting.
-   * Returns negative if this should come before other (higher specificity wins).
-   *
+   * Sorts the selectors by weight ascending.
    * @param other - Another StyleSelector
-   * @return Comparison result (-1, 0, or 1)
+   * @return Negative if this weight is less, positive if greater, zero if equal
    */
   compare(other: StyleSelector): number {
-    // Higher specificity wins
-    return other.specificity() - this.specificity();
+    return this.weight - other.weight;
   }
 
 
@@ -252,53 +234,11 @@ export class StyleSelector {
 
 
   /**
-   * String representation for debugging.
-   */
-  toString(): string {
-    const parts: string[] = [];
-    const { match } = this.props;
-
-    if (match.geometry !== undefined && match.geometry !== '*') {
-      const geom = Array.isArray(match.geometry) ? match.geometry.join('|') : match.geometry;
-      parts.push(`geometry=${geom}`);
-    }
-
-    for (const matcher of this.tagMatchers) {
-      parts.push(matcher.toString());
-    }
-
-    return `StyleSelector[${this.id}](${parts.join(', ')}) → [${this.styleIDs.join(', ')}]`;
-  }
-
-
-  /**
-   * Find the best matching selector from a list.
+   * Find all matching selectors from a list, sorted by weight.
    *
    * @param selectors - Array or iterable of StyleSelectors
    * @param feature - Feature to match
-   * @return The best matching selector, or undefined if none match
-   */
-  static findBest(selectors: Iterable<StyleSelector>, feature: FeatureMatchInfo): StyleSelector | undefined {
-    let best: StyleSelector | undefined;
-
-    for (const selector of selectors) {
-      if (!selector.matches(feature)) continue;
-
-      if (best === undefined || selector.compare(best) < 0) {
-        best = selector;
-      }
-    }
-
-    return best;
-  }
-
-
-  /**
-   * Find all matching selectors from a list, sorted by specificity.
-   *
-   * @param selectors - Array or iterable of StyleSelectors
-   * @param feature - Feature to match
-   * @return Array of matching selectors, sorted by specificity (highest first)
+   * @return Array of matching selectors, sorted by weight ascending (lowest first, highest last)
    */
   static findAll(selectors: Iterable<StyleSelector>, feature: FeatureMatchInfo): StyleSelector[] {
     const matches: StyleSelector[] = [];
@@ -309,7 +249,7 @@ export class StyleSelector {
       }
     }
 
-    // Sort by specificity (highest first)
+    // Sort by weight ascending
     matches.sort((a, b) => a.compare(b));
 
     return matches;
