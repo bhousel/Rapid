@@ -415,7 +415,7 @@ export class ImagerySource {
         }
       });
 
-    } else if (this.type === 'tms') {
+    } else if (this.type === 'tms' || this.type === 'wayback') {
       let isRetina = false;
       if ('window' in globalThis) {
         const _window = globalThis.window;
