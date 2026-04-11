@@ -2,7 +2,7 @@ import { selection } from 'd3-selection';
 import { interpolateNumber } from 'd3-interpolate';
 import { Extent, vecLength } from '@rapid-sdk/math';
 
-import { GeoJSONData, MarkerData, OsmEntity } from '../data/index.ts';
+import { GeoJSONData, MarkerData, OsmEntity, OsmNode } from '../data/index.ts';
 import { uiDataEditor } from './data_editor.js';
 import { UiFeatureList } from './UiFeatureList.js';
 import { UiInspector } from './UiInspector.js';
@@ -70,6 +70,7 @@ export class UiSidebar {
     this.$featureList = null;
     this.$inspector = null;
 
+    this._currTargetID = null;
     this._startPointerID = null;
     this._startCoord = null;
     this._startWidth = null;
@@ -96,7 +97,7 @@ export class UiSidebar {
      * @param  {Object}  target - data element to target
      */
     this.hover = (target) => {
-      this.context.systems.scheduler?.throttle('UiSidebar-hover', () => this._hover(target), { ms: 200 });
+      context.systems.scheduler?.throttle('UiSidebar-hover', () => this._hover(target), { ms: 200 });
     };
 
     // Setup event handlers
@@ -186,19 +187,40 @@ export class UiSidebar {
    */
   _hoverchange(eventData) {
     const context = this.context;
+    const editor = context.systems.editor;
+    const graph = editor.staging.graph;
     const gfx = context.systems.gfx;
     const scene = gfx.scene;
 
+    const modeID = context.mode?.id;
     const target = eventData.target;
     const layer = target?.layer;
-    const dataID = target?.dataID;
-    const data = target?.data;
+    let dataID = target?.dataID;
+    let data = target?.data;
 
-    const modeID = context.mode?.id;
+    // Note: This code probably doesn't really belong here.  The Sidebar shouldn't "own" this problem.
+    // When hovering on a line, its vertexes will appear.
+    // The user may then hover on these vertexes, but when that happens,
+    // we don't want to "steal" the hover from the line.
+    if (modeID === 'browse') {
+      if (data instanceof OsmNode) {
+        const parents = graph.parentWays(data);
+        if (parents.length === 1) {    // hovering over a vertex with one parent
+          data = parents[0];           // target the parent instead
+          dataID = data.id;
+        }
+      }
+    }
+
+    if (this._currTargetID === dataID) return;    // no change
+    this._currTargetID = dataID;
+
+    // Update the sidebar..
     if (modeID !== 'select' && modeID !== 'select-osm') {
       this.hover(data);
     }
 
+    // Update 'hover' class, controlling which map elements appear highlighted..
     scene.clearClass('hover');
     if (layer && dataID) {
       // Only set hover class if this target isn't currently drawing
