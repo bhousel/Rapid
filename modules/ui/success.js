@@ -166,7 +166,7 @@ export function uiSuccess(context) {
         // Gather the communities
         let communities = [];
         oci.resources.forEach(resource => {
-          const area = validHere[resource.locationSetID];
+          const area = validHere.get(resource.locationSetID);
           if (!area) return;
 
           // Resolve strings

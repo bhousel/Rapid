@@ -95,10 +95,13 @@ describe('LocationSystem', () => {
 
 
     describe('mergeCustomGeoJSON', () => {
-      it('merges geojson into lococation-conflation cache', () => {
+      it('merges geojson into location-conflation cache', () => {
         _locations.mergeCustomGeoJSON(fc);
-        const loco = _locations._loco;
-        assert.deepEqual(loco._cache.get('colorado.geojson'), colorado);
+        const resolver = _locations.resolver();
+        const cached = resolver._cache.get('colorado.geojson');
+        assert.isOk(cached);
+        assert.strictEqual(cached.id, 'colorado.geojson');
+        assert.isNumber(cached.properties.area);
       });
     });
 
@@ -142,41 +145,10 @@ describe('LocationSystem', () => {
     });
 
 
-    describe('locationSetID', () => {
-      it('calculates a locationSetID for a locationSet', () => {
-        assert.strictEqual(_locations.locationSetID({ include: ['usa'] }), '+[Q30]');
-      });
-
-      it('falls back to the world locationSetID in case of errors', () => {
-        assert.strictEqual(_locations.locationSetID({ foo: 'bar' }), '+[Q2]');
-        assert.strictEqual(_locations.locationSetID({ include: ['fake.geojson'] }), '+[Q2]');
-      });
-    });
-
-
-    describe('getFeature', () => {
-      it('has the world locationSet pre-resolved', () => {
-        const result = _locations.getFeature('+[Q2]');
-        assert.instanceOf(result, Rapid.GeoJSONData);
-        assert.deepInclude(result.props.geojson, { type: 'Feature', id: '+[Q2]' });
-      });
-
-      it('falls back to the world locationSetID in case of errors', () => {
-        const result = _locations.getFeature('fake');
-        assert.instanceOf(result, Rapid.GeoJSONData);
-        assert.deepInclude(result.props.geojson, { type: 'Feature', id: '+[Q2]' });
-      });
-    });
-
-
     describe('locationSetsAt', () => {
-      it('has the world locationSet pre-resolved', () => {
-        const result1 = _locations.locationSetsAt([-108.557, 39.065]);  // Grand Junction
-        assert.hasAllKeys(result1, ['+[Q2]']);
-        const result2 = _locations.locationSetsAt([-74.481, 40.797]);   // Morristown
-        assert.hasAllKeys(result2, ['+[Q2]']);
-        const result3 = _locations.locationSetsAt([13.575, 41.207]);    // Gaeta
-        assert.hasAllKeys(result3, ['+[Q2]']);
+      it('returns default world result even when no locationSets have been registered', () => {
+        const result = _locations.locationSetsAt([-108.557, 39.065]);
+        assert.hasAllKeys(result, ['+[Q2]']);
       });
 
       it('returns valid locationSets at a given lon,lat', () => {

@@ -349,8 +349,8 @@ describe('SchemaSystem', () => {
 
         describe('locations', () => {
           it('adds custom locations in FeatureCollection', () => {
-            const loco = context.systems.locations._loco;
-            assert.isOk(loco._cache.get('surf-city-nj.geojson'));  // added to LocationConflation cache
+            const resolver = context.systems.locations._resolver;
+            assert.isOk(resolver._cache.get('surf-city-nj.geojson'));  // added to LocationConflation cache
           });
 
           it('resolved custom locations on fields', () => {
@@ -437,8 +437,8 @@ describe('SchemaSystem', () => {
 
         describe('locations', () => {
           it('adds custom locations in FeatureCollection', () => {
-            const loco = context.systems.locations._loco;
-            assert.isOk(loco._cache.get('surf-city-nc.geojson'));  // added to LocationConflation cache
+            const resolver = context.systems.locations._resolver;
+            assert.isOk(resolver._cache.get('surf-city-nc.geojson'));  // added to LocationConflation cache
           });
 
           it('resolved custom locations on fields', () => {

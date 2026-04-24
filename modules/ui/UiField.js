@@ -426,7 +426,7 @@ export class UiField {
     const locID = presetField.props.locationSetID;
     if (locID && this.entityExtent) {   // if !locID, field is valid everywhere
       const validHere = locations.locationSetsAt(this.entityExtent.center());
-      if (!validHere[locID]) return false;
+      if (!validHere.has(locID)) return false;
     }
 
     // Does this field require another tag to be set first?

@@ -3,6 +3,7 @@ import { Matcher } from 'name-suggestion-index';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 
 import type { LocationSet } from '@rapideditor/location-conflation';
+import type { NsiData as NsiMatcherData } from 'name-suggestion-index';
 import type { Context } from '../Context.ts';
 import type { OsmTags } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -29,7 +30,7 @@ interface NsiItem {
   /** Regex patterns for tags that should not be overwritten during upgrades */
   preserveTags?: string[];
   /** LocationSet defining where this item is valid */
-  locationSet?: object;
+  locationSet?: LocationSet;
   [key: string]: any;
 }
 
@@ -66,8 +67,8 @@ interface NsiData {
   qids: Map<string, string>;
   /** Map of NSI item ID to the item object */
   ids: Map<string, NsiItem>;
-  /** Matcher instance, monkey-patched with custom locationIndex — see HACK section */
-  matcher: any;
+  /** Matcher instance */
+  matcher: Matcher;
 }
 
 /** Priority types */
@@ -526,57 +527,13 @@ export class NsiService extends AbstractSystem {
           ids:           new Map()               // Map<id, NSI item>
         } as NsiData;
 
-        const matcher: any = this._nsi.matcher = new Matcher();
-        matcher.buildMatchIndex(this._nsi.data!);
 
-// *** BEGIN HACK ***
+        const matcher = this._nsi.matcher = new Matcher();
+        matcher.buildMatchIndex(this._nsi.data! as unknown as NsiMatcherData);
 
-// old - built in matcher will set up its own locationindex by resolving all the locationSets one-by-one
-        // matcher.buildLocationIndex(this._nsi.data, locations.loco());
-
-// new - Use Rapid's LocationSystem instead of redoing that work
-// It has already processed the presets at this point
-
-// We need to monkeypatch a few of the collections that the NSI matcher depends on.
-// The `itemLocation` structure maps itemIDs to locationSetIDs
-matcher.itemLocation = new Map();
-
-// The `locationSets` structure maps locationSetIDs to GeoJSON
-// We definitely need this, but don't need full geojson, just { properties: { area: xxx }}
-matcher.locationSets = new Map();
-
-for (const category of Object.values(this._nsi.data!)) {
-  for (const item of category.items ?? []) {
-    if (matcher.itemLocation.has(item.id)) continue;   // we've seen item id already - shouldn't be possible?
-
-    const locationSetID = locations.locationSetID(item.locationSet as LocationSet);
-    matcher.itemLocation.set(item.id, locationSetID);
-
-    if (matcher.locationSets.has(locationSetID)) continue;   // we've seen this locationSet before..
-
-    const fakeFeature = { id: locationSetID, properties: { id: locationSetID, area: 1 } };
-    matcher.locationSets.set(locationSetID, fakeFeature);
-  }
-}
-
-// The `locationIndex` is an instance of which-polygon spatial index for the locationSets.
-// We only really need this to _look like_ which-polygon query `_wp.locationIndex(bbox, true);`
-// i.e. it needs to return the properties of the locationsets
-matcher.locationIndex = (bbox: Vec2): any[] => {
-  const validHere = locations.locationSetsAt([bbox[0], bbox[1]]);
-  const results: any[] = [];
-
-  for (const [locationSetID, area] of Object.entries(validHere)) {
-    const fakeFeature = matcher.locationSets.get(locationSetID);
-    if (fakeFeature) {
-      fakeFeature.properties.area = area;
-      results.push(fakeFeature);
-    }
-  }
-  return results;
-};
-
-// *** END HACK ***
+        // Share Rapid's LocationConflation instance so the matcher and the rest of the app
+        // use a single registry and spatial index (no duplicate resolution or indexing).
+        matcher.buildLocationIndex(this._nsi.data! as unknown as NsiMatcherData, locations.resolver());
 
         Object.keys(this._nsi.data!).forEach(tkv => {
           const category = this._nsi.data![tkv];

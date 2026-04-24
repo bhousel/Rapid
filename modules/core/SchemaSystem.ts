@@ -7,10 +7,10 @@ import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
 import type { CategoryProps } from '../lib/Category.ts';
+import type { HasLocationSet } from '@rapideditor/location-conflation';
 import type { Context } from '../Context.ts';
 import type { FieldProps } from '../lib/Field.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { HasLocationSet } from '../core/LocationSystem.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { OsmEntity, OsmNode, OsmTags, TagKeyValueLookup, Vec2 } from '../data/types.ts';
 import type { PresetProps } from '../lib/Preset.ts';
@@ -835,16 +835,16 @@ gfx?.scene?.reset();  // throw it all away
 
     const context = this.context;
     const locations = context.systems.locations;
-    const filterLocationSets = Array.isArray(loc) ? locations?.locationSetsAt(loc) : null;
+    const validHere = Array.isArray(loc) ? locations?.locationSetsAt(loc) : null;
 
     const _filter = (result: SearchResult): boolean => {
       const item = scope.presets.get(result.id) ?? scope.categories.get(result.id);
       if (!item) return false;
       if (!filterGeometries.isSubsetOf(item.geometries)) return false;
 
-      if (filterLocationSets) {
+      if (validHere) {
         const locID = (item.props as any).locationSetID as string | undefined;
-        if (locID && !filterLocationSets[locID]) return false;   // if !locID, item is valid everywhere
+        if (locID && !validHere.has(locID)) return false;   // if !locID, item is valid everywhere
       }
       return true;
     };
@@ -962,7 +962,7 @@ gfx?.scene?.reset();  // throw it all away
 
         // Exclude candidate if it is scoped to a location not valid here
         const locID = candidate.props.locationSetID;
-        if (validHere && locID && !validHere[locID]) continue;
+        if (validHere && locID && !validHere.has(locID)) continue;
 
         matchCandidates.push({ score, candidate });
 
@@ -1234,7 +1234,7 @@ gfx?.scene?.reset();  // throw it all away
       const validHere = locations.locationSetsAt(loc);
       arr = arr.filter(item => {
         const locID = (item.props as any).locationSetID as string | undefined;
-        return !locID || validHere[locID];   // if !locID, item is valid everywhere
+        return !locID || validHere.has(locID);   // if !locID, item is valid everywhere
       });
     }
 
