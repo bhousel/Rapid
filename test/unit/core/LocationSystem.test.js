@@ -98,10 +98,10 @@ describe('LocationSystem', () => {
       it('merges geojson into location-conflation cache', () => {
         _locations.mergeCustomGeoJSON(fc);
         const resolver = _locations.resolver();
-        const cached = resolver._cache.get('colorado.geojson');
-        assert.isOk(cached);
-        assert.strictEqual(cached.id, 'colorado.geojson');
-        assert.isNumber(cached.properties.area);
+        const resolved = resolver.resolveLocation('colorado.geojson');
+        assert.isOk(resolved);
+        assert.strictEqual(resolved.feature.id, 'colorado.geojson');
+        assert.isNumber(resolved.feature.properties.area);
       });
     });
 
