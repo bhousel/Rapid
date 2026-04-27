@@ -2,12 +2,33 @@ import { Matcher } from 'name-suggestion-index';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 
-import type { LocationSet } from '@rapideditor/location-conflation';
-import type { NsiData as NsiMatcherData } from 'name-suggestion-index';
+import type {
+  DissolvedMap,
+  MatchHit,
+  NsiData,
+  NsiDissolved,
+  NsiItem as NsiOrigItem,
+  NsiJSON,
+  NsiPath,
+  NsiReplacementsJSON,
+  NsiTree,
+  NsiTreesJSON,
+  OsmTags
+} from 'name-suggestion-index';
 import type { Context } from '../Context.ts';
-import type { OsmTags } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
+
+/**
+ * NSI item with some additional runtime-added bookkeeping fields that NsiService attaches:
+ *   `tkv` (the tree/key/value path) and `mainTag` (e.g. `brand:wikidata`).
+ */
+interface NsiItem extends NsiOrigItem {
+  /** Tree/key/value path, e.g. `"brands/amenity/restaurant"` */
+  tkv: NsiPath;
+  /** The primary wikidata tag key, e.g. `"brand:wikidata"` */
+  mainTag: string;
+}
 
 /** Result from `upgradeTags` when a match is found */
 interface UpgradeResult {
@@ -17,53 +38,19 @@ interface UpgradeResult {
   matched: NsiItem | null;
 }
 
-/** An NSI item entry */
-interface NsiItem {
-  /** Unique identifier for this NSI item */
-  id: string;
-  /** Tree/key/value path, e.g. `"brands/amenity/restaurant"` */
-  tkv: string;
-  /** The primary wikidata tag key, e.g. `"brand:wikidata"` */
-  mainTag: string;
-  /** OSM tags associated with this item */
-  tags: OsmTags;
-  /** Regex patterns for tags that should not be overwritten during upgrades */
-  preserveTags?: string[];
-  /** LocationSet defining where this item is valid */
-  locationSet?: LocationSet;
-  [key: string]: any;
-}
-
-/** An NSI category with items */
-interface NsiCategory {
-  /** Category-level properties, including default `preserveTags` patterns */
-  properties?: { preserveTags?: string[]; [key: string]: any };
-  /** NSI items belonging to this category */
-  items?: NsiItem[];
-  [key: string]: any;
-}
-
-/** Replacement entry for wikidata/wikipedia */
-interface NsiReplacement {
-  /** Replacement Wikidata QID, or empty string to delete the tag */
-  wikidata?: string;
-  /** Replacement Wikipedia article reference, or empty string to delete the tag */
-  wikipedia?: string;
-}
-
 /** Internal NSI data cache */
-interface NsiData {
+interface NsiServiceCache {
   /** Raw NSI data keyed by tree/key/value path */
-  data: Record<string, NsiCategory>;
-  /** Map of dissolved (defunct) item IDs */
-  dissolved: Record<string, boolean>;
+  data: NsiData;
+  /** Map of dissolved (defunct) item IDs to dissolution records */
+  dissolved: DissolvedMap;
   /** Trivial old-to-new Wikidata QID replacements */
-  replacements: Record<string, NsiReplacement>;
+  replacements: NsiReplacementsJSON['replacements'];
   /** Metadata about NSI trees (brands, operators, flags, transit) */
-  trees: Record<string, { mainTag: string; [key: string]: any }>;
+  trees: NsiTreesJSON['trees'];
   /** Reverse index: key → value → tree name */
-  kvt: Map<string, Map<string, string>>;
-  /** Map of Wikidata/Wikipedia tag values to canonical QIDs */
+  kvt: Map<string, Map<string, NsiTree>>;
+  /** Map of Wikidata QID tag values to canonical QIDs */
   qids: Map<string, string>;
   /** Map of NSI item ID to the item object */
   ids: Map<string, NsiItem>;
@@ -139,7 +126,7 @@ export class NsiService extends AbstractSystem {
   status: 'loading' | 'ok' | 'failed';
 
   /** Internal NSI data cache */
-  _nsi: Partial<NsiData>;
+  _nsi: Partial<NsiServiceCache>;
 
   /**
    * @constructor
@@ -280,35 +267,7 @@ export class NsiService extends AbstractSystem {
    */
   upgradeTags(tags: OsmTags, loc: Vec2): UpgradeResult | null {
     const newTags: OsmTags = { ...tags };  // shallow copy
-    let changed = false;
-
-    // Before anything, perform trivial Wikipedia/Wikidata replacements
-    for (const osmkey of Object.keys(newTags)) {
-      const matchTag = osmkey.match(/^(\w+:)?wikidata$/);
-      if (matchTag) {                         // Look at '*:wikidata' tags
-        const prefix = (matchTag[1] || '');
-        const wd = newTags[osmkey];
-        const replace = this._nsi.replacements?.[wd];    // If it matches a QID in the replacement list...
-
-        if (replace?.wikidata !== undefined) {   // replace or delete `*:wikidata` tag
-          changed = true;
-          if (replace.wikidata) {
-            newTags[osmkey] = replace.wikidata;
-          } else {
-            delete newTags[osmkey];
-          }
-        }
-        if (replace?.wikipedia !== undefined) {  // replace or delete `*:wikipedia` tag
-          changed = true;
-          const wpkey = `${prefix}wikipedia`;
-          if (replace.wikipedia) {
-            newTags[wpkey] = replace.wikipedia;
-          } else {
-            delete newTags[wpkey];
-          }
-        }
-      }
-    }
+    const changed = this._applyWikidataReplacements(newTags);
 
     // Match a 'route_master' as if it were a 'route' - name-suggestion-index#5184
     const isRouteMaster = (tags.type === 'route_master');
@@ -322,9 +281,9 @@ export class NsiService extends AbstractSystem {
     // Gather namelike tag values to try to match
     const tryNames = this._gatherNames(tags);
 
-    // Do `wikidata=*` or `wikipedia=*` tags identify this entity as a chain? - See iD#6416
-    // If so, these tags can be swapped to e.g. `brand:wikidata`/`brand:wikipedia`.
-    const foundQID = this._nsi.qids?.get(tags.wikidata) || this._nsi.qids?.get(tags.wikipedia);
+    // Do `wikidata=*` tags identify this entity as a chain? - See iD#6416
+    // If so, these tags can be swapped to e.g. `brand:wikidata`.
+    const foundQID = this._nsi.qids?.get(tags.wikidata);
     if (foundQID) tryNames.primary.add(foundQID);  // matcher will recognize the Wikidata QID as name too
 
     if (!tryNames.primary.size && !tryNames.alternate.size) {
@@ -341,34 +300,13 @@ export class NsiService extends AbstractSystem {
 
       // A match may contain multiple results, the first one is likely the best one for this location
       // e.g. `['pfk-a54c14', 'kfc-1ff19c', 'kfc-658eea']`
-      let itemID: string | undefined;
-      let item: NsiItem | null | undefined;
-      for (const hit of hits) {
-        itemID = hit.itemID;
-        if (this._nsi.dissolved?.[itemID!]) continue;       // Don't upgrade to a dissolved item
+      const match = this._selectMatchedItem(hits, newTags);
+      if (!match) continue;  // Can't use any of these hits, try next tuple..
 
-        item = this._nsi.ids?.get(itemID!);
-        if (!item) continue;
-        const mainTag = item.mainTag;               // e.g. `brand:wikidata`
-        const itemQID = item.tags[mainTag];         // e.g. `brand:wikidata` qid
-        const notQID = newTags[`not:${mainTag}`];   // e.g. `not:brand:wikidata` qid
-
-        if (                                        // Exceptions, skip this hit
-          (!itemQID || itemQID === notQID) ||       // No `*:wikidata` or matched a `not:*:wikidata`
-          (newTags.office && !item.tags.office)     // feature may be a corporate office for a brand? - iD#6416
-        ) {
-          item = null;
-          continue;  // continue looking
-        } else {
-          break;     // use `item`
-        }
-      }
-
-      // Can't use any of these hits, try next tuple..
-      if (!item) continue;
+      const { itemID } = match;
+      const item: NsiItem = globalThis.structuredClone(match.item) as NsiItem;   // deep copy
 
       // At this point we have matched a canonical item and can suggest tag upgrades..
-      item = globalThis.structuredClone(item) as NsiItem;   // deep copy
       const tkv = item.tkv;
       const parts = tkv.split('/', 3);     // tkv = "tree/key/value"
       const k = parts[1];
@@ -381,9 +319,9 @@ export class NsiService extends AbstractSystem {
 
       // These tags are worth preserving too - see iD#8615
       // We'll only _replace_ the tag value if this tag is the toplevel/defining tag for the matched item (`k`)
-      ['building', 'emergency', 'internet_access', 'opening_hours', 'takeaway'].forEach(osmkey => {
+      for (const osmkey of ['building', 'emergency', 'internet_access', 'opening_hours', 'takeaway']) {
         if (k !== osmkey) preserveTags.push(`^${osmkey}$`);
-      });
+      }
 
       const regexes = preserveTags.map(s => new RegExp(s, 'i'));
 
@@ -396,11 +334,11 @@ export class NsiService extends AbstractSystem {
 
       // Remove any primary tags ("amenity", "craft", "shop", "man_made", "route", etc) that have a
       // value like `amenity=yes` or `shop=yes` (exceptions have already been added to `keepTags` above)
-      this._nsi.kvt!.forEach((vmap, k) => {
+      for (const k of this._nsi.kvt!.keys()) {
         if (newTags[k] === 'yes') delete newTags[k];
-      });
+      }
 
-      // Replace mistagged `wikidata`/`wikipedia` with e.g. `brand:wikidata`/`brand:wikipedia`
+      // Replace mistagged `wikidata` with e.g. `brand:wikidata`
       if (foundQID) {
         delete newTags.wikipedia;
         delete newTags.wikidata;
@@ -415,54 +353,134 @@ export class NsiService extends AbstractSystem {
         delete newTags.route;
       }
 
-      // Special `branch` splitting rules - IF..
-      // - NSI is suggesting to replace `name`, AND
-      // - `branch` doesn't already contain something, AND
-      // - original name has not moved to an alternate name (e.g. "Dunkin' Donuts" -> "Dunkin'"), AND
-      // - original name is "some name" + "some stuff", THEN
-      // consider splitting `name` into `name`/`branch`..
-      const origName = tags.name;
-      const newName = newTags.name;
-      if (newName && origName && newName !== origName && !newTags.branch) {
-        const newNames = this._gatherNames(newTags);
-        const newSet = new Set([...newNames.primary, ...newNames.alternate]);
-        const isMoved = newSet.has(origName);   // another tag holds the original name now
-
-        if (!isMoved) {
-          // Test name fragments, longest to shortest, to fit them into a "Name Branch" pattern.
-          // e.g. "TUI ReiseCenter - Neuss Innenstadt" -> ["TUI", "ReiseCenter", "Neuss", "Innenstadt"]
-          const nameParts = origName.split(/[\s\-\/,.]/);
-          for (let split = nameParts.length; split > 0; split--) {
-            const name = nameParts.slice(0, split).join(' ');  // e.g. "TUI ReiseCenter"
-            const branch = nameParts.slice(split).join(' ');   // e.g. "Neuss Innenstadt"
-            const nameHits = this._nsi.matcher?.match(k, v, name, loc);
-            if (!nameHits || !nameHits.length) continue;    // no match, try next name fragment
-
-            if (nameHits.some((hit: any) => hit.itemID === itemID)) {   // matched the name fragment to the same itemID above
-              if (branch) {
-                if (notBranches.test(branch)) {   // "branch" was detected but is noise ("factory outlet", etc)
-                  newTags.name = origName;        // Leave `name` alone, this part of the name may be significant..
-                } else {
-                  const branchHits = this._nsi.matcher?.match(k, v, branch, loc);
-                  if (branchHits && branchHits.length) {                                             // if "branch" matched something else in NSI..
-                    if (branchHits[0].match === 'primary' || branchHits[0].match === 'alternate') {  // if another brand! (e.g. "KFC - Taco Bell"?)
-                      return null;                                                                   //   bail out - can't suggest tags in this case
-                    }                                                                                // else a generic (e.g. "gas", "cafe") - ignore
-                  } else {                     // "branch" is not noise and not something in NSI
-                    newTags.branch = branch;   // Stick it in the `branch` tag..
-                  }
-                }
-              }
-              break;
-            }
-          }
-        }
-      }
+      if (this._applyBranchSplit(tags, newTags, k, v, itemID, loc)) return null;
 
       return { newTags: newTags, matched: item };
     }
 
     return changed ? { newTags: newTags, matched: null } : null;
+  }
+
+
+  /**
+   * _applyWikidataReplacements
+   * Performs trivial Wikidata QID replacements on any `*:wikidata` tags in `newTags`.
+   * Mutates `newTags` in place.
+   * @param newTags - Mutable copy of the feature's OSM tags
+   * @return `true` if any tag was changed or deleted
+   */
+  _applyWikidataReplacements(newTags: OsmTags): boolean {
+    let changed = false;
+    for (const osmkey of Object.keys(newTags)) {
+      const matchTag = osmkey.match(/^(\w+:)?wikidata$/);
+      if (matchTag) {                         // Look at '*:wikidata' tags
+        const wd = newTags[osmkey];
+        const replace = this._nsi.replacements?.[wd];    // If it matches a QID in the replacement list...
+
+        if (replace?.wikidata !== undefined) {   // replace or delete `*:wikidata` tag
+          changed = true;
+          if (replace.wikidata) {
+            newTags[osmkey] = replace.wikidata;
+          } else {
+            delete newTags[osmkey];
+          }
+        }
+      }
+    }
+    return changed;
+  }
+
+
+  /**
+   * _selectMatchedItem
+   * From a list of NSI match hits, select the best non-dissolved, non-excepted item.
+   * @param hits - Match hits returned by the NSI Matcher
+   * @param newTags - The (possibly modified) tags of the feature being upgraded
+   * @return The matched item and its ID, or `null` if no usable hit was found
+   */
+  _selectMatchedItem(hits: MatchHit[], newTags: OsmTags): { itemID: string; item: NsiItem } | null {
+    for (const hit of hits) {
+      const itemID = hit.itemID;
+      if (!itemID) continue;
+      if (this._nsi.dissolved?.[itemID]) continue;   // Don't upgrade to a dissolved item
+
+      const item = this._nsi.ids?.get(itemID);
+      if (!item) continue;
+      const mainTag = item.mainTag;               // e.g. `brand:wikidata`
+      const itemQID = item.tags[mainTag];         // e.g. `brand:wikidata` qid
+      const notQID = newTags[`not:${mainTag}`];   // e.g. `not:brand:wikidata` qid
+
+      if (                                        // Exceptions, skip this hit
+        (!itemQID || itemQID === notQID) ||       // No `*:wikidata` or matched a `not:*:wikidata`
+        (newTags.office && !item.tags.office)     // feature may be a corporate office for a brand? - iD#6416
+      ) {
+        continue;  // keep looking
+      }
+
+      return { itemID, item };
+    }
+    return null;
+  }
+
+
+  /**
+   * _applyBranchSplit
+   * Applies "Name Branch" splitting: if NSI suggests replacing `name` and the original
+   * name looks like "Brand SomeBranch", splits it into `name`/`branch` tags.
+   * Mutates `newTags` in place.
+   *
+   * Rules — IF:
+   * - NSI is suggesting to replace `name`, AND
+   * - `branch` doesn't already contain something, AND
+   * - original name has not moved to an alternate name (e.g. "Dunkin' Donuts" -> "Dunkin'"), AND
+   * - original name is "some name" + "some stuff"
+   * THEN consider splitting `name` into `name`/`branch`.
+   *
+   * @param tags - Original (unmodified) OSM tags
+   * @param newTags - Mutable upgraded tag set
+   * @param k - The matched NSI key (e.g. `"amenity"`)
+   * @param v - The matched NSI value (e.g. `"fast_food"`)
+   * @param itemID - The matched NSI item ID
+   * @param loc - Location of the feature
+   * @return `true` if the caller should bail out and return `null` (conflicting brand detected)
+   */
+  _applyBranchSplit(tags: OsmTags, newTags: OsmTags, k: string, v: string, itemID: string, loc: Vec2): boolean {
+    const origName = tags.name;
+    const newName = newTags.name;
+    if (!newName || !origName || newName === origName || newTags.branch) return false;
+
+    const newNames = this._gatherNames(newTags);
+    const newSet = new Set([...newNames.primary, ...newNames.alternate]);
+    if (newSet.has(origName)) return false;   // another tag holds the original name now
+
+    // Test name fragments, longest to shortest, to fit them into a "Name Branch" pattern.
+    // e.g. "TUI ReiseCenter - Neuss Innenstadt" -> ["TUI", "ReiseCenter", "Neuss", "Innenstadt"]
+    const nameParts = origName.split(/[\s\-\/,.]/);
+    for (let split = nameParts.length; split > 0; split--) {
+      const name = nameParts.slice(0, split).join(' ');  // e.g. "TUI ReiseCenter"
+      const branch = nameParts.slice(split).join(' ');   // e.g. "Neuss Innenstadt"
+      const nameHits = this._nsi.matcher?.match(k, v, name, loc);
+      if (!nameHits || !nameHits.length) continue;    // no match, try next name fragment
+
+      if (nameHits.some((hit: any) => hit.itemID === itemID)) {   // matched the name fragment to the same itemID above
+        if (branch) {
+          if (notBranches.test(branch)) {   // "branch" was detected but is noise ("factory outlet", etc)
+            newTags.name = origName;        // Leave `name` alone, this part of the name may be significant..
+          } else {
+            const branchHits = this._nsi.matcher?.match(k, v, branch, loc);
+            if (branchHits && branchHits.length) {                                             // if "branch" matched something else in NSI..
+              if (branchHits[0].match === 'primary' || branchHits[0].match === 'alternate') {  // if another brand! (e.g. "KFC - Taco Bell"?)
+                return true;                                                                   //   bail out - can't suggest tags in this case
+              }                                                                                // else a generic (e.g. "gas", "cafe") - ignore
+            } else {                     // "branch" is not noise and not something in NSI
+              newTags.branch = branch;   // Stick it in the `branch` tag..
+            }
+          }
+        }
+        break;
+      }
+    }
+    return false;
   }
 
 
@@ -483,7 +501,9 @@ export class NsiService extends AbstractSystem {
       .then((vals: any[]) => {
         // Add `suggestion=true` to all the NSI presets
         // The preset json schema doesn't include it, but the Rapid code still uses it
-        Object.values(vals[0].presets).forEach((preset: any) => preset.suggestion = true);
+        for (const preset of Object.values(vals[0].presets) as any[]) {
+          preset.suggestion = true;
+        }
 
         // Merge the name-suggestion-index presets...
         const nsiVersion = vals[0]._meta?.version || 'unknown';
@@ -518,26 +538,26 @@ export class NsiService extends AbstractSystem {
       ])
       .then((vals: any[]) => {
         this._nsi = {
-          data:          vals[0].nsi,            // the raw name-suggestion-index data
-          dissolved:     vals[1].dissolved,      // list of dissolved items
-          replacements:  vals[2].replacements,   // trivial old->new qid replacements
-          trees:         vals[3].trees,          // metadata about trees, main tags
+          data:          (vals[0] as NsiJSON).nsi,                        // the raw name-suggestion-index data
+          dissolved:     (vals[1] as NsiDissolved).dissolved,             // list of dissolved items
+          replacements:  (vals[2] as NsiReplacementsJSON).replacements,   // trivial old->new qid replacements
+          trees:         (vals[3] as NsiTreesJSON).trees,                 // metadata about trees, main tags
           kvt:           new Map(),              // Map<k, Map<v, t>>
-          qids:          new Map(),              // Map<wd/wp tag values, qids>
+          qids:          new Map(),              // Map<wikidata QID → canonical QID>
           ids:           new Map()               // Map<id, NSI item>
-        } as NsiData;
+        } as NsiServiceCache;
 
 
         const matcher = this._nsi.matcher = new Matcher();
-        matcher.buildMatchIndex(this._nsi.data! as unknown as NsiMatcherData);
+        matcher.buildMatchIndex(this._nsi.data!);
 
         // Share Rapid's LocationConflation instance so the matcher and the rest of the app
         // use a single registry and spatial index (no duplicate resolution or indexing).
-        matcher.buildLocationIndex(this._nsi.data! as unknown as NsiMatcherData, locations.resolver());
+        matcher.buildLocationIndex(this._nsi.data!, locations.resolver());
 
-        Object.keys(this._nsi.data!).forEach(tkv => {
+        for (const tkv of Object.keys(this._nsi.data!) as NsiPath[]) {
           const category = this._nsi.data![tkv];
-          const [t, k, v] = tkv.split('/', 3);     // tkv = "tree/key/value"
+          const [t, k, v] = tkv.split('/', 3) as [NsiTree, string, string];     // tkv = "tree/key/value"
 
           // Build a reverse index of keys -> values -> trees present in the name-suggestion-index
           // Collect primary keys  (e.g. "amenity", "craft", "shop", "man_made", "route", etc)
@@ -554,20 +574,18 @@ export class NsiService extends AbstractSystem {
           const tree = this._nsi.trees![t];  // e.g. "brands", "operators"
           const mainTag = tree.mainTag;     // e.g. "brand:wikidata", "operator:wikidata", etc
 
-          const items = category.items || [];
-          items.forEach(item => {
+          for (const baseItem of category.items ?? []) {
             // Remember some useful things for later, cache NSI id -> item
+            const item = baseItem as NsiItem;
             item.tkv = tkv;
             item.mainTag = mainTag;
             this._nsi.ids!.set(item.id, item);
 
-            // Cache Wikidata/Wikipedia values -> qid, for iD#6416
+            // Cache Wikidata values -> qid, for iD#6416
             const wd = item.tags[mainTag];
-            const wp = item.tags[mainTag.replace('wikidata', 'wikipedia')];
-            if (wd)         this._nsi.qids!.set(wd, wd);
-            if (wp && wd)   this._nsi.qids!.set(wp, wd);
-          });
-        });
+            if (wd) this._nsi.qids!.set(wd, wd);
+          }
+        }
       })
     );
   }

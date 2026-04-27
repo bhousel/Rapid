@@ -2,6 +2,12 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## NsiService
+
+- **`NsiTreeProperties` removed from imports** — NSI v7 exports this type but we use `NsiTreesJSON['trees']` directly for the `trees` cache property, making the standalone type import unused.
+- **`tags.wikipedia` qids lookup was dead code** — NSI used to cache both `wikidata QID → canonical QID` and `wikipedia URL → wikidata QID` in the replacements data. When we upgraded to NSI v7, which dropped wikipedia tracking, we removed the wp-caching loop in `_loadNsiDataAsync`. This made `this._nsi.qids?.get(tags.wikipedia)` in `upgradeTags` always return `undefined`. Removed the dead branch; `delete newTags.wikipedia` further down remains valid (strips bare `wikipedia=*` when a wikidata match is found).
+- **Local `NsiItem` extends upstream `NsiItem`** — NSI v7's `NsiItem` type doesn't include runtime-populated fields `tkv` (tree/key/value path) and `mainTag` (e.g. `brand:wikidata`). We extend it locally to type those fields without casting everywhere.
+
 ## StyleSystem / StyleSelector
 
 - **`weight` replaces auto-computed `specificity`** — The old specificity scoring (geometry +50, each tag matcher +10) couldn't express "building always overrides amenity" because both had 1 tag condition = same score. Adding more tag matchers to artificially increase specificity was fragile. `weight` gives the data author explicit control over cascade order, consistent with how presets use `matchScore`.

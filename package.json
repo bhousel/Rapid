@@ -65,7 +65,7 @@
     "maplibre-gl": "^5.23.0",
     "marked": "^18.0.2",
     "minisearch": "^7.2.0",
-    "name-suggestion-index": "../name-suggestion-index",
+    "name-suggestion-index": "~7.1.20260428",
     "node-diff3": "^3.2.0",
     "osm-auth": "~3.2.0",
     "osm-community-index": "~6.0.0",
