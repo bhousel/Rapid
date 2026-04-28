@@ -1,9 +1,10 @@
-import { Matcher } from 'name-suggestion-index';
+import { Matcher, buildIDPresets } from 'name-suggestion-index';
 
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 
 import type {
   DissolvedMap,
+  IDPreset,
   MatchHit,
   NsiData,
   NsiDissolved,
@@ -13,9 +14,12 @@ import type {
   NsiReplacementsJSON,
   NsiTree,
   NsiTreesJSON,
+  NsiWikidataJSON,
   OsmTags
 } from 'name-suggestion-index';
+
 import type { Context } from '../Context.ts';
+import type { PresetProps } from '../lib/Preset.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -44,10 +48,14 @@ interface NsiServiceCache {
   data: NsiData;
   /** Map of dissolved (defunct) item IDs to dissolution records */
   dissolved: DissolvedMap;
+  /** Custom Features to merge into the location manager */
+  features: GeoJSON.FeatureCollection;
   /** Trivial old-to-new Wikidata QID replacements */
   replacements: NsiReplacementsJSON['replacements'];
   /** Metadata about NSI trees (brands, operators, flags, transit) */
   trees: NsiTreesJSON['trees'];
+  /** Metadata retrieved from Wikidata (logos, websites, social media accounts) */
+  wikidata: NsiWikidataJSON['wikidata'];
   /** Reverse index: key → value → tree name */
   kvt: Map<string, Map<string, NsiTree>>;
   /** Map of Wikidata QID tag values to canonical QIDs */
@@ -111,7 +119,6 @@ const notBranches = /(coop|express|wireless|factory|outlet)/i;
 
 
 /**
- * `NsiService`
  * This service contains all the code related to the **name-suggestion-index** (aka 'NSI').
  * NSI contains the most correct tagging for many commonly mapped features.
  * NSI data is distributed in large data files, we load them at startup and
@@ -144,7 +151,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -157,40 +163,50 @@ export class NsiService extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         // Tell the AssetSystem what to load..
-        const latestPath = 'https://cdn.jsdelivr.net/npm/name-suggestion-index@6.0/dist';
-        const localPath = 'data/modules/name-suggestion-index';
+        // NSI v7 ships JSON data under `dist/json/` and Wikidata logos under `dist/wikidata/`.
+        const latestPath = 'https://cdn.jsdelivr.net/npm/name-suggestion-index@7.1/dist';
+        const localPath = 'data/modules/name-suggestion-index/dist';
 
         assets.registerAsset('nsi_data', {
-          latest: `${latestPath}/nsi.min.json`,
-          local:  `${localPath}/nsi.min.json`
+          latest: `${latestPath}/json/nsi.min.json`,
+          local:  `${localPath}/json/nsi.min.json`
         });
         assets.registerAsset('nsi_dissolved', {
-          latest: `${latestPath}/dissolved.min.json`,
-          local:  `${localPath}/dissolved.min.json`
+          latest: `${latestPath}/wikidata/dissolved.min.json`,
+          local:  `${localPath}/wikidata/dissolved.min.json`
         });
         assets.registerAsset('nsi_features', {
-          latest: `${latestPath}/featureCollection.min.json`,
-          local:  `${localPath}/featureCollection.min.json`
+          latest: `${latestPath}/json/featureCollection.min.json`,
+          local:  `${localPath}/json/featureCollection.min.json`
         });
         assets.registerAsset('nsi_generics', {
-          latest: `${latestPath}/genericWords.min.json`,
-          local:  `${localPath}/genericWords.min.json`
-        });
-        assets.registerAsset('nsi_presets', {
-          latest: `${latestPath}/presets/nsi-id-presets.min.json`,
-          local:  `${localPath}/presets/nsi-id-presets.min.json`
+          latest: `${latestPath}/json/genericWords.min.json`,
+          local:  `${localPath}/json/genericWords.min.json`
         });
         assets.registerAsset('nsi_replacements', {
-          latest: `${latestPath}/replacements.min.json`,
-          local:  `${localPath}/replacements.min.json`
+          latest: `${latestPath}/json/replacements.min.json`,
+          local:  `${localPath}/json/replacements.min.json`
         });
         assets.registerAsset('nsi_trees', {
-          latest: `${latestPath}/trees.min.json`,
-          local:  `${localPath}/trees.min.json`
+          latest: `${latestPath}/json/trees.min.json`,
+          local:  `${localPath}/json/trees.min.json`
         });
-      })
-      .then(() => this._loadNsiPresetsAsync())
+        assets.registerAsset('nsi_wikidata', {
+          latest: `${latestPath}/wikidata/wikidata.min.json`,
+          local:  `${localPath}/wikidata/wikidata.min.json`
+        });
+      });
+  }
+
+
+  /**
+   * Called after all core objects have been initialized.
+   * @return Promise resolved when this component has completed startup
+   */
+  startAsync(): Promise<void> {
+    return super.startAsync()
       .then(() => this._loadNsiDataAsync())
+      .then(() => this._generateNsiPresetsAsync())
       .then(() => { this.status = 'ok'; })
       .catch(err => {
         console.error(err);  // eslint-disable-line
@@ -201,17 +217,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * startAsync
-   * Called after all core objects have been initialized.
-   * @return Promise resolved when this component has completed startup
-   */
-  startAsync(): Promise<void> {
-    return super.startAsync();
-  }
-
-
-  /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -221,7 +226,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * isGenericName
    * Is the `name` tag generic?
    * @param tags - Object containing the feature's OSM tags
    * @return `true` if it is generic, `false` if not
@@ -252,7 +256,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * upgradeTags
    * Suggest tag upgrades.
    * This function will not modify the input tags, it makes a copy.
    * Returns a result about the suggested tags, and the item that matched:
@@ -363,7 +366,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * _applyWikidataReplacements
    * Performs trivial Wikidata QID replacements on any `*:wikidata` tags in `newTags`.
    * Mutates `newTags` in place.
    * @param newTags - Mutable copy of the feature's OSM tags
@@ -392,7 +394,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * _selectMatchedItem
    * From a list of NSI match hits, select the best non-dissolved, non-excepted item.
    * @param hits - Match hits returned by the NSI Matcher
    * @param newTags - The (possibly modified) tags of the feature being upgraded
@@ -424,7 +425,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * _applyBranchSplit
    * Applies "Name Branch" splitting: if NSI suggests replacing `name` and the original
    * name looks like "Brand SomeBranch", splits it into `name`/`branch` tags.
    * Mutates `newTags` in place.
@@ -485,35 +485,58 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * _loadNsiPresetsAsync
-   * @return Promise fulfilled when the presets have been downloaded and merged into Rapid.
+   * Generates NSI presets on the fly using `buildIDPresets()` and merges them into the schema.
+   * Inputs:
+   *  - The raw NSI data (already loaded into `this._nsi.data` by `_loadNsiDataAsync`).
+   *  - The dissolved-items map (already loaded into `this._nsi.dissolved`).
+   *  - The id-tagging-schema source presets (loaded as the `id_tagging_schema` bundle).
+   *    The AssetSystem cache dedupes this with SchemaSystem's load.
+   *  - The Wikidata logos map (used to source preset `imageURL` values).
+   *  - The NSI feature collection (passed through to `schema.merge` for location-conflation).
+   *
+   * Generating presets locally avoids downloading the ~20MB `nsi-id-presets.min.json` file
+   * that NSI used to ship.
+   *
+   * @return Promise fulfilled when the generated presets have been merged into Rapid.
    */
-  _loadNsiPresetsAsync(): Promise<void> {
+  _generateNsiPresetsAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets!;
     const schema = context.systems.schema!;
 
     return (
-      Promise.all([
-        assets.loadAssetAsync('nsi_presets'),
-        assets.loadAssetAsync('nsi_features')
-      ])
-      .then((vals: any[]) => {
-        // Add `suggestion=true` to all the NSI presets
-        // The preset json schema doesn't include it, but the Rapid code still uses it
-        for (const preset of Object.values(vals[0].presets) as any[]) {
-          preset.suggestion = true;
+      assets.loadAssetAsync('id_tagging_schema')
+      .then((val: any) => {
+        // Generate the NSI presets from data already in hand.
+        const result = buildIDPresets(this._nsi.data!, {
+          sourcePresets:  val.presets as Record<string, IDPreset>,
+          wikidata:       this._nsi.wikidata,
+          dissolved:      this._nsi.dissolved
+        });
+
+        // Add `suggestion=true` to all the generated presets.
+        // The preset json schema doesn't include it, but the Rapid code still uses it.
+        for (const preset of Object.values(result.presets)) {
+          (preset as IDPreset & { suggestion?: boolean }).suggestion = true;
         }
 
-        // Merge the name-suggestion-index presets...
-        const nsiVersion = vals[0]._meta?.version || 'unknown';
+        // The version we tag the schema with is the NSI library/data version we built against.
+        const nsiMeta = (this._nsi.data as unknown as { _meta?: { version?: string } })._meta;
+        const nsiVersion = nsiMeta?.version ?? 'unknown';
+
+        // Merge the generated name-suggestion-index presets into the schema.
+        // `merge()` accepts `Partial<PresetProps>`, and SchemaSystem fills in defaults
+        // (id from the Record key, aliases, terms, etc.) when constructing each Preset.
+        // The remaining structural mismatch is `IDPreset.geometry: string[]` vs the
+        // narrower `GeometryType[]` — the runtime values are valid, so go through
+        // `unknown` to bridge it.
         schema.merge({
           assetID: `name-suggestion-index@${nsiVersion}`,
           scopes: [{
             scope: 'osm',
-            presets: vals[0].presets,
+            presets: result.presets as unknown as Record<PresetID, Partial<PresetProps>>,
           }],
-          featureCollection: vals[1]
+          featureCollection: this._nsi.features
         });
       })
     );
@@ -521,7 +544,7 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * _loadNsiDataAsync
+   * Loads the NSI-related assets.
    * @return Promise fulfilled when the other data have been downloaded and processed
    */
   _loadNsiDataAsync(): Promise<void> {
@@ -533,15 +556,20 @@ export class NsiService extends AbstractSystem {
       Promise.all([
         assets.loadAssetAsync('nsi_data'),
         assets.loadAssetAsync('nsi_dissolved'),
+        assets.loadAssetAsync('nsi_features'),
         assets.loadAssetAsync('nsi_replacements'),
-        assets.loadAssetAsync('nsi_trees')
+        assets.loadAssetAsync('nsi_trees'),
+        assets.loadAssetAsync('nsi_wikidata')
+
       ])
       .then((vals: any[]) => {
         this._nsi = {
           data:          (vals[0] as NsiJSON).nsi,                        // the raw name-suggestion-index data
           dissolved:     (vals[1] as NsiDissolved).dissolved,             // list of dissolved items
-          replacements:  (vals[2] as NsiReplacementsJSON).replacements,   // trivial old->new qid replacements
-          trees:         (vals[3] as NsiTreesJSON).trees,                 // metadata about trees, main tags
+          features:      (vals[2] as GeoJSON.FeatureCollection),          // custom features to merge into the location manager
+          replacements:  (vals[3] as NsiReplacementsJSON).replacements,   // trivial old->new qid replacements
+          trees:         (vals[4] as NsiTreesJSON).trees,                 // metadata about trees, main tags
+          wikidata:      (vals[5] as NsiWikidataJSON).wikidata,           // metadata about wikidata and logos
           kvt:           new Map(),              // Map<k, Map<v, t>>
           qids:          new Map(),              // Map<wikidata QID → canonical QID>
           ids:           new Map()               // Map<id, NSI item>
@@ -592,7 +620,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * _gatherKVs
    * Gather all the key/value pairs that we will run through the NSI matcher.
    * An OSM tags object can contain anything, but only a few tags will be interesting to NSI.
    *
@@ -647,7 +674,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * _identifyTree
    * NSI has a concept of trees: "brands", "operators", "flags", "transit".
    * The tree determines things like which tags are namelike, and which tags hold important wikidata.
    * This takes an Object of tags and tries to identify what tree to use.
@@ -685,7 +711,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * _gatherNames
    * Gather all the namelike values that we will run through the NSI matcher.
    * It will gather values primarily from tags `name`, `name:ru`, `flag:name`
    *  and fallback to alternate tags like `brand`, `brand:ru`, `alt_name`
@@ -798,7 +823,6 @@ export class NsiService extends AbstractSystem {
 
 
   /**
-   * _gatherTuples
    * Generate all combinations of [key,value,name] that we want to test.
    * This prioritizes them so that the primary name and key/value pairs go first.
    *
