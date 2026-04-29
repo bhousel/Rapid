@@ -15,7 +15,7 @@ You are performing a git commit for this repo. Do the following steps in order:
      ```
      printf '%s\n' 'First line' '' 'Second line' 'Third line' > /tmp/commitmsg.txt
      git commit -F /tmp/commitmsg.txt
-     rm /tmp/commitmsg.txt
+     rm -f /tmp/commitmsg.txt
      ```
    - If a commit detail argument was provided (e.g. `closes #123`), include it on its own line after the first line (subject), separated by a blank line:
      ```

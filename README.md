@@ -32,6 +32,11 @@ Folders under `dist/examples/` contain example code to help you learn how to int
 * https://github.com/facebook/Rapid/tree/main/dist/examples
 
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and contribution guidelines.
+
+
 ## License
 
 Rapid is available under the [ISC License](https://opensource.org/licenses/ISC).

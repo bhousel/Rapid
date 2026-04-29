@@ -5,6 +5,8 @@ argument-hint: additional optional context
 
 Find concrete improvements and flag things worth tracking for future work. Respect the existing style; don't over-engineer. Report findings only — do not make edits. The user will choose which suggestions to implement.
 
+If the user provided additional context with the prompt, treat it as a focus area (e.g. "focus on TypeScript types", "performance only").
+
 ## Steps
 
 1. Read `AGENTS.md` to understand the project structure.

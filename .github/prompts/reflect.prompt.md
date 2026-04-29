@@ -17,4 +17,4 @@ Update all project documentation to match the current state of the code. Fix gap
 - Inline documentation (JSDoc, comments)
 - Markdown files (`README`, design docs, contributing guides)
 - Agent instructions (`AGENTS.md`, `copilot-instructions`, etc.)
-- Working memory (`.scratchpad/*`)
+- Working memory — e.g. `SCRATCHPAD.md`, `.scratchpad/*`, or whatever convention this project uses (see `AGENTS.md`)

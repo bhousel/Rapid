@@ -19,15 +19,7 @@ As you work, update these files. When work completes: add a one-liner to `comple
 
 ## Prompt Files
 
-This project has reusable Copilot prompt files in `.github/prompts/`:
-
-- `/commit` — stage and commit all changes
-- `/reflect` — update all project documentation with the current state of the code
-- `/release` — prepare a new release (CHANGELOG entry + version bump); accepts version number as input
-- `/suggest` — review the codebase and suggest concrete improvements
-- `/sync` — sync scaffold files against a source repo; accepts source repo URL as input
-
-When asked to do one of these tasks, prefer using the prompt file rather than improvising.
+This project has reusable Copilot prompt files in `.github/prompts/`. Your editor surfaces them via the `/` menu (or equivalent). When a task matches an existing prompt, prefer invoking it over improvising — the prompts encode project-specific conventions.
 
 ## General Guidelines
 
@@ -41,6 +33,7 @@ When asked to do one of these tasks, prefer using the prompt file rather than im
 - **Don't just implement what's asked** — briefly flag if you see a concern. The user values a 1-2 sentence heads-up over silent compliance.
 - This includes: unnecessary abstractions, deprecated patterns, simpler alternatives, or potential footguns.
 - When the user proposes a solution, briefly evaluate whether a more elegant solution exists.
+- Keep it proportional: a heads-up is a sentence, not a paragraph. Skip it entirely for trivial changes.
 
 ### Secrets hygiene
 - Before making any edit or commit, ask: **could this write a secret in plaintext somewhere it shouldn't be?**
@@ -51,12 +44,19 @@ When asked to do one of these tasks, prefer using the prompt file rather than im
   - The comment applies to code being removed
   - The meaning of the code has changed
   - Specifically asked to remove them
-- Comments contain valuable domain knowledge - preserve them
+- Comments contain valuable domain knowledge — preserve them.
+- Also **don't add unsolicited comments or docstrings** to code you're modifying. Only add explanatory comments when the user asks, when documenting a non-obvious decision (magic numbers, workarounds), or when the code is genuinely confusing without them.
 
 ### Lint warnings
 - **Never circumvent lint warnings** by renaming, reformatting, or otherwise disguising the triggering code (e.g. rewriting `todo` as `@TODO` to dodge `no-warning-comments`).
 - Lint warnings like `todo`/`fixme` are intentional project health signals — they should remain visible.
 - If your change introduces a new lint warning, mention it; don't silently suppress it.
+
+### File Operations
+- Use VS Code file tools (`create_file`, `replace_string_in_file`, `multi_replace_string_in_file`) instead of terminal commands. This shows changes in VS Code's diff view for easier review.
+- For bulk/repetitive edits across multiple files, use `multi_replace_string_in_file` with explicit before/after context in each replacement. The exact-match requirement prevents silent damage that regex-based tools can cause.
+- **Do not use `sed`, `perl -i`, or inline Python/Node scripts to edit source files.** Greedy regexes (especially around whitespace and line boundaries) can collapse or corrupt code in ways that are hard to spot without a full re-read. If an edit feels too repetitive for `multi_replace_string_in_file`, that's a signal to slow down, not to reach for a script.
+- Avoid `cat` with heredoc or other terminal-based file writing.
 
 ---
 
@@ -67,11 +67,6 @@ When asked to do one of these tasks, prefer using the prompt file rather than im
 - Prefer `??` (nullish coalescing) over `||` for defaults
 - Use `?.` (optional chaining) for safe property access
 - **No trailing whitespace** - ensure lines don't end with spaces or tabs
-
-### File Operations
-- Use VS Code file tools (`create_file`, `replace_string_in_file`) instead of terminal commands
-- This shows changes in VS Code's diff view for easier review
-- Avoid using `cat` with heredoc or other terminal-based file writing
 
 ### Function Structure and Dependencies
 - **Group system/service access at the top of functions** - this makes it easy to scan what a function depends on and understand coupling

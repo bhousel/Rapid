@@ -3,12 +3,10 @@
 This project uses **GitHub** to track issues and manage our source code.
 - Check out the [Git Guides](https://github.com/git-guides) to learn more.
 
-This project uses the **JavaScript** programming language.
-- [MDN's JavaScript guide](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide) is a great resource for learning about JavaScript.
-
 This project uses the **TypeScript** programming language.
 - Check out the [TypeScript Docs](https://www.typescriptlang.org/docs/) to learn more.
 - (It's a superset of JavaScript, so knowing that already will help you a lot).
+- [MDN's JavaScript guide](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide) is a great resource for learning about JavaScript.
 
 This project uses **Bun** as our development environment.
 - Check out the [Bun Docs](https://bun.com/docs) to learn more.
@@ -22,14 +20,17 @@ If you want to contribute to Rapid, you'll probably need to:
 - `bun install` the dependencies
 
 As you change things, you'll want to `bun run all` to ensure that things are working.
-(This command runs `clean` and `build`, which includes validation, bundling, etc.)
+(This command runs `clean`, `check`, and `build`.)
+
+You can also type-check the project without emitting files:
+- `bun run check:ts` — runs `tsc --noEmit` across the source, scripts, and test files.
 
 You can also test in a local server:
 - `bun start` — builds the project and starts a local dev server
 
 It's also good to check on the dependencies sometimes with commands like:
 - `bun outdated` — what packages have updates available?
-- `bun update` — update dependencies to the latest versions within their ranges
+- `bun update --interactive` — choose which updates to apply
 
 Try to keep things simple!
 
