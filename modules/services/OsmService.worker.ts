@@ -5,7 +5,7 @@ import type { ParserOptions, ParserResult } from '../data/parsers/types.ts';
 
 
 /**
- * Result type for osmService:fetchAndParse.
+ * Result type for `osmService:fetchAndParse`.
  *
  * On success the listener returns `{ ok: true, results }`.
  * On HTTP error it reads the response body and returns the status
@@ -33,7 +33,6 @@ const osmXmlParser = new OsmXMLParser();
 
 
 /**
- * osmService:fetchAndParse
  * Fetches OSM data and parses it on the worker.
  *
  * Unlike the generic network listeners, this one never throws for
@@ -44,6 +43,10 @@ const osmXmlParser = new OsmXMLParser();
  *
  * AbortErrors still propagate as thrown errors so the existing
  * cancellation logic works unchanged.
+ * @listens `osmService:fetchAndParse`
+ * @param  data    Message data - expects the url, optional RequestInit, format, and additional parser options
+ * @param  signal  Abort signal
+ * @return  Promise resolved with an OsmFetchResult
  */
 export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise<OsmFetchResult> {
   const { url, init, format, parserOptions } = data as OsmFetchOptions;
@@ -80,8 +83,8 @@ export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise
 
 
 /**
- * osmService:reset
  * Resets the long-lived parser instances.
+ * @listens `osmService:reset`
  */
 export function reset(_data: unknown, _signal: AbortSignal): void {
   osmJsonParser.reset();

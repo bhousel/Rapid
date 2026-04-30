@@ -41,8 +41,8 @@ export interface MVTFeatureResult {
 
 
 /**
- * network:fetchAndParse
  * Fetches generic data from a URL and parses the response via utilFetchResponse.
+ * @listens `network:fetchAndParse`
  * @param  data    Message data - expects the url and optional RequestInit passed to `fetch`
  * @param  signal  Abort signal
  * @return  Promise resolved with the data, or rejected if error
@@ -54,8 +54,8 @@ export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise
 };
 
 /**
- * network:fetchAndParseOsmJSON
- * Fetches OSM JSON data from a URL and parses the response via utilFetchResponse.
+ * Fetches OSM JSON data from a URL and parses the response via `utilFetchResponse`.
+ * @listens `network:fetchAndParseOsmJSON`
  * @param  data    Message data - expects the url, optional RequestInit passed to `fetch`, and optional parser options
  * @param  signal  Abort signal
  * @return  Promise resolved with the data, or rejected if error
@@ -67,8 +67,8 @@ export async function fetchAndParseOsmJson(data: unknown, signal: AbortSignal): 
 };
 
 /**
- * network:fetchAndParseOsmXML
- * Fetches OSM XML data from a URL and parses the response via utilFetchResponse.
+ * Fetches OSM XML data from a URL and parses the response via `utilFetchResponse`.
+ * @listens `network:fetchAndParseOsmXML`
  * @param  data    Message data - expects the url, optional RequestInit passed to `fetch`, and optional parser options
  * @param  signal  Abort signal
  * @return  Promise resolved with the data, or rejected if error
@@ -80,9 +80,8 @@ export async function fetchAndParseOsmXml(data: unknown, signal: AbortSignal): P
 };
 
 /**
- * network:fetchAndParseMVT
- * Fetches a Mapbox Vector Tile from a URL, decodes the protobuf, and converts
- * each feature to GeoJSON.
+ * Fetches a Mapbox Vector Tile from a URL, decodes the protobuf, and converts each feature to GeoJSON.
+ * @listens `network:fetchAndParseMVT`
  * @param  data    Message data - expects the url, optional RequestInit, and tileXYZ coordinates
  * @param  signal  Abort signal
  * @return  Promise resolved with an array of MVTFeatureResult
@@ -122,10 +121,10 @@ export async function fetchAndParseMVT(data: unknown, signal: AbortSignal): Prom
 };
 
 /**
- * network:reset
  * Resets the long-lived parsers.
  * (They have internal "seen" state).
  * Called when the main thread resets its session.
+ * @listens `network:reset`
  */
 export function reset(_data: unknown, _signal: AbortSignal): void {
   osmJsonParser.reset();
