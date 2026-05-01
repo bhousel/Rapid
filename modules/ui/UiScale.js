@@ -6,7 +6,6 @@ const TICKHEIGHT = 8;
 
 
 /**
- * UiScale
  * This component adds the scale bar.
  */
 export class UiScale {
@@ -42,7 +41,6 @@ export class UiScale {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -80,7 +78,6 @@ export class UiScale {
 
 
   /**
-   * updateScale
    * Updates the length and text of the scale bar.
    */
   updateScale() {
@@ -136,7 +133,6 @@ export class UiScale {
 
 
   /**
-   * toggleUnits
    * Toggle the scale bar between imperial and metric
    */
   toggleUnits() {

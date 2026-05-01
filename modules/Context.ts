@@ -270,7 +270,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * prepareAsync
    * Constructs all available components: systems, modes, behaviors, and services,
    * then applies any pre-init configuration (asset paths, locale, etc.).
    * After this resolves, all available components exist
@@ -336,7 +335,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * initAsync
    * Initializes all systems and services.
    * Implicitly calls `prepareAsync()` first if it hasn't been called yet.
    * After this resolves, components are initialized and can accept configuration
@@ -363,7 +361,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * startAsync
    * Starts all systems and services that have `autoStart` enabled.
    * Implicitly calls `initAsync()` first if it hasn't been called yet.
    * After this resolves, Rapid is fully running.
@@ -384,7 +381,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * runAsync
    * Convenience method that calls `prepareAsync()`, `initAsync()`, and `startAsync()`.
    * Equivalent to calling `startAsync()` directly (which chains all steps),
    * but makes the intent clearer for simple use cases.
@@ -396,7 +392,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * resetAsync
    * Call after completing an edit session to reset any internal state.
    * @return  Promise resolved when Rapid is finished resetting
    */
@@ -415,7 +410,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * keybinding
    * Returns the keybinding manager for the application.
    * (not a System yet, but should be one)
    * @return  The keybinding manager
@@ -426,7 +420,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * preauth
    * OAuth/authentication credentials for connecting to the OSM API.
    * Set this before calling `initAsync()` to use preauth credentials.
    */
@@ -438,7 +431,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * apiConnections
    * Connection options for the source switcher (optional).
    */
   get apiConnections(): ApiConnection[] | null     { return this._apiConnections; }
@@ -453,7 +445,6 @@ export class Context extends EventEmitter {
 //  - directly accessing the LocalizationSystem
 // and both of _those_ should be made dynamic so locale can switch while Rapid is running
   /**
-   * locale
    * A string or array of locale codes to prefer over the browser's settings.
    * Must be set before `initAsync()` is called.
    * @deprecated  Set locale via urlhash param or LocalizationSystem instead
@@ -463,7 +454,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * loadTiles
    * Loads OSM tiles for the current viewport.
    * Will only load tiles if zoom level is sufficient and editing is enabled.
    */
@@ -484,7 +474,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * loadTileAtLoc
    * Loads the OSM tile containing the given location.
    * @param  loc  The [lon, lat] location to load tile for
    */
@@ -502,7 +491,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * loadEntityAsync
    * Downloads the full entity and its parent relations from OSM.
    * @param  entityID  The entity ID to load (e.g. 'n123', 'w456', 'r789')
    * @return  Promise resolved when the entity is loaded
@@ -551,7 +539,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * cleanTagKey
    * Cleans and truncates a string for use as an OSM tag key.
    * @param  val  The value to clean
    * @return  Cleaned string, truncated to max allowed characters
@@ -561,7 +548,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * cleanTagValue
    * Cleans and truncates a string for use as an OSM tag value.
    * @param  val  The value to clean
    * @return  Cleaned string, truncated to max allowed characters
@@ -571,7 +557,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * cleanRelationRole
    * Cleans and truncates a string for use as an OSM relation role.
    * @param  val  The value to clean
    * @return  Cleaned string, truncated to max allowed characters
@@ -582,7 +567,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * mode
    * The current editing mode.
    * Returns `null` until UiSystem.render initializes the map and enters browse mode.
    * @readonly
@@ -593,7 +577,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * enter
    * Enters the given mode, with an optional bunch of features selected.
    * If the mode could not be entered for whatever reason, falls back to browse mode.
    * @param  modeOrModeID  Mode object or string identifying the mode to enter
@@ -637,7 +620,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * selectedData
    * Returns a Map containing the current selected features.
    * Can contain multiple items of various types (e.g. OSM data, Rapid data, etc.)
    * @return  The current selected features as a `Map(datumID -> datum)`
@@ -648,7 +630,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * selectedIDs
    * Returns just the IDs of the selected features.
    * @return  Array of selected entity IDs
    */
@@ -659,7 +640,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * enableBehaviors
    * Enables the given behaviors, disabling all others.
    * @param  behaviorIDs  Single behavior ID or array of behavior IDs to enable
    */
@@ -682,14 +662,12 @@ export class Context extends EventEmitter {
 
 
   /**
-   * copyGraph
    * The graph snapshot used for copy/paste operations.
    */
   get copyGraph(): Graph | null     { return this._copyGraph; }
   set copyGraph(val: Graph | null)  { this._copyGraph = val; }
 
   /**
-   * copyIDs
    * Entity IDs that have been copied for paste operations.
    * Setting this also captures the current staging graph as `copyGraph`.
    */
@@ -700,7 +678,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * copyLoc
    * The [lon, lat] location where entities were copied from.
    */
   get copyLoc(): Vec2 | null     { return this._copyLoc; }
@@ -708,7 +685,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * debugFlags
    * Returns all debug flags.
    * @return  Object containing all debug flags
    */
@@ -717,7 +693,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * getDebug
    * Gets the value of a specific debug flag.
    * @param  flag  The debug flag name to check
    * @return  True if the flag is enabled
@@ -727,7 +702,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * setDebug
    * Sets the value of a specific debug flag and triggers a redraw.
    * @param  flag  The debug flag name to set
    * @param  val   The value to set (defaults to true)
@@ -743,7 +717,6 @@ export class Context extends EventEmitter {
 
 
   /**
-   * container
    * Gets or sets the container element as a D3 selection.
    * @param  val  Optional D3 selection to set as the container
    * @return  The container selection (if no argument), or `this` for chaining
@@ -758,7 +731,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * containerNode
    * The container DOM element.
    */
   get containerNode(): Element | null {
@@ -769,7 +741,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * embed
    * Gets or sets whether the editor is in embedded mode.
    * @param  val  Optional boolean to set embedded mode
    * @return  The embed value (if no argument), or `this` for chaining
@@ -781,7 +752,6 @@ export class Context extends EventEmitter {
   }
 
   /**
-   * next
    * Returns the next number for the given sequence.
    * Numbers start at 1 and increase by 1 each time `next` is called.
    * @param  sequenceID  Which sequence to get next number from (e.g. 'node', 'way', 'relation')

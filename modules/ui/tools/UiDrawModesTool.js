@@ -5,7 +5,6 @@ import { uiTooltip } from '../tooltip.js';
 
 
 /**
- * UiDrawModesTool
  * A toolbar section for the mode buttons
  */
 export class UiDrawModesTool {
@@ -87,7 +86,6 @@ export class UiDrawModesTool {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -188,7 +186,6 @@ export class UiDrawModesTool {
 
 
   /**
-   * choose
    * @param  {Event}  e? - triggering event (if any)
    * @param  {Object} d? - object bound to the selection (i.e. the command)
    */
@@ -211,7 +208,6 @@ export class UiDrawModesTool {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

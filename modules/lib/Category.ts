@@ -115,7 +115,6 @@ export class Category {
 
 
   /**
-   * reset
    * Resets all cached data.
    * This should happen whenever SchemaSystem merges in new data.
    * You must add the Category to the SchemaSystem and call `reset` before using the Category.
@@ -143,7 +142,6 @@ export class Category {
 
 
   /**
-   * setLocale
    * Changes the locale and re-localizes the strings.
    * This should happen whenever LocalizationSystem changes the locale.
    * This is done early because we want the strings indexed by the SchemaSystem for searching.
@@ -192,7 +190,6 @@ export class Category {
 
 
   /**
-   * name
    * The name is the main display name of the Category, as shown in the user interface.
    * @return  Localized name
    * @readonly
@@ -202,7 +199,6 @@ export class Category {
   }
 
   /**
-   * aliases
    * Aliases are alternate names for this Category, they may be displayed in the user interface.
    * This is not currently used by Categories, so it will always return an empty Array, '[]'.
    * @return  Localized aliases, always empty Array '[]' for Categories
@@ -213,7 +209,6 @@ export class Category {
   }
 
   /**
-   * terms
    * Terms are related words used for seraching for this Preset.
    * This is not currently used by Categories, so it will always return an empty Array, '[]'.
    * @return  Localized search terms, always empty Array '[]' for Categories
@@ -224,7 +219,6 @@ export class Category {
   }
 
   /**
-   * matchScore
    * Matchscore is used for ranking search results.  Always returns `-1` for Categories
    * @return  Always returns `-1` for Categories
    */
@@ -233,7 +227,6 @@ export class Category {
   }
 
   /**
-   * isFallback
    * Is this a fallback preset?  Always returns `false` for Categories.
    * @return  Always returns `false` for Categories
    */
@@ -242,7 +235,6 @@ export class Category {
   }
 
   /**
-   * isBuiltin
    * Is this one of the builtin objects?
    * We consider it "builtin" if it doesn't have a `assetID` (i.e. added via a merge).
    * (There are not builtin categories at this time, only the fallback presets are builtin).

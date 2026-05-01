@@ -357,14 +357,13 @@ function sortObject(obj: Record<string, unknown>): Record<string, unknown> | nul
 
 
 /**
- * minifyJSON
  * This function creates a minified `.min.json` file in the same place as an original `.json` file.
  *
  * JSDelivr CDN does not yet have automatic support for serving `.min.json`.
  * We can watch this issue to see if they add it:  https://github.com/jsdelivr/jsdelivr/issues/18604
  * Then maybe remove this code.
  *
- * @param  {string}  filepath - the path to the file we want to minify
+ * @param  filepath - the path to the file we want to minify
  */
 async function minifyJSON(filepath: string): Promise<void> {
   const outpath = filepath.replace('.json', '.min.json');

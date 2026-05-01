@@ -81,7 +81,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -91,7 +90,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -101,7 +99,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -111,7 +108,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * _resolveBlock
    * Resolves a blocked region's locationSet into a GeoJSONData feature, assigning
    * `locationSetID` on the block in place. Returns `undefined` if resolution fails.
    */
@@ -138,7 +134,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * resolver
    * The underlying `LocationConflation` instance.
    * Exposed so other systems (e.g. NSI's `Matcher.buildLocationIndex`) can share
    * the same resolver/registry/spatial index.
@@ -149,7 +144,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * mergeCustomGeoJSON
    * Accepts a FeatureCollection-like object containing custom locations.
    * Each feature must have a filename-like `id`, for example: `something.geojson`.
    * Delegates to `LocationConflation.addFeatures`.
@@ -162,7 +156,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * mergeLocationSets
    * Accepts an Array of Objects containing `locationSet` properties:
    * [
    *  { id: 'preset1', locationSet: {…} },
@@ -189,7 +182,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * locationSetsAt
    * Find all the locationSets valid at the given location.
    * Results include the area (in km²) to facilitate sorting.
    *
@@ -210,7 +202,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * isBlockedAt
    * Is editing blocked at the given location?
    * @param loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
    * @return `true` if a block exists there, `false` if not
@@ -221,7 +212,6 @@ export class LocationSystem extends AbstractSystem {
 
 
   /**
-   * getBlocks
    * Returns any blocked regions that exist within the given extent.
    * @param extent - the extent to query
    * @return Array of GeoJSONData data objects

@@ -43,7 +43,6 @@ export class LassoBehavior extends AbstractBehavior {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -62,7 +61,6 @@ export class LassoBehavior extends AbstractBehavior {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -81,7 +79,6 @@ export class LassoBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerdown
    * Handler for pointerdown events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -107,7 +104,6 @@ export class LassoBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -134,7 +130,6 @@ export class LassoBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerup
    * Handler for pointerup events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -160,7 +155,6 @@ export class LassoBehavior extends AbstractBehavior {
 
 
   /**
-   * _normalize
    * After unprojecting from screen coordintes to wgs84 coordinates
    * we need to fix min/max (in screen +y is down, in wgs84 +y is up)
    * @param  a - First coordinate
@@ -176,7 +170,6 @@ export class LassoBehavior extends AbstractBehavior {
 
 
   /**
-   * _lassoed
    * Returns array of entity IDs that are within the lasso polygon
    * @return  Array of entity IDs
    */

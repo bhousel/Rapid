@@ -2,7 +2,6 @@ import { uiModal } from './modal.js';
 
 
 /**
- * UiRapidPowerUserFeatures
  * This is the modal where the user can toggle on and off power user features.
  * It is shown by clicking the "Beta" button in the top menu, if `&poweruser=true` is in the url.
  */
@@ -42,7 +41,6 @@ export class UiRapidPowerUserFeatures {
 
 
   /**
-   * show
    * This shows the poweruser features modal if it isn't already being shown.
    * For this kind of popup component, must first `show()` to create the modal.
    */
@@ -68,7 +66,6 @@ export class UiRapidPowerUserFeatures {
 
 
   /**
-   * render
    * Renders the content inside the modal.
    * Note that most `render` functions accept a parent selection,
    *  this one doesn't need it - `$modal` is always the parent.
@@ -159,7 +156,6 @@ export class UiRapidPowerUserFeatures {
 
 
   /**
-   * renderFeatureFlags
    * Renders the list of feature flag checkboxes into the `.rapid-features-container` div.
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this component should render itself into
    */
@@ -222,7 +218,6 @@ export class UiRapidPowerUserFeatures {
 
 
   /**
-   * updateFeatureFlags
    * On any change in poweruser setting, update the storage for the flags.
    * If user is not currently a poweruser, move all the feature flags to a different storage space.
    * @param  currParams   Map(key -> value) of the current hash parameters
@@ -261,7 +256,6 @@ export class UiRapidPowerUserFeatures {
 
 
   /**
-   * isFeatureEnabled
    * Test whether the given feature flag is enabled.
    * @param   {string}   featureFlag - the feature flag to test
    * @return  {boolean}  `true` if the flag is enabled, `false` if not
@@ -273,7 +267,6 @@ export class UiRapidPowerUserFeatures {
 
 
   /**
-   * toggleFeature
    * Toggles the given feature flag between on/off
    * @param  {Event}   e? - triggering event (if any)
    * @param  {string}  featureFlag - the feature flag to toggle

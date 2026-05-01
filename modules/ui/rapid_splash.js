@@ -4,7 +4,6 @@ import { uiModal } from './modal.js';
 
 
 /**
- * uiRapidSplash
  * This is the screen we show to the users if they have never used Rapid before.
  */
 export function uiRapidSplash(context) {

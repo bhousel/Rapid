@@ -4,7 +4,6 @@ import type { OsmTags } from '../data/types.ts';
 
 
 /**
- * actionChangeTags
  * Changes the tags on an entity.
  * @param entityID - The ID of the entity to modify
  * @param tags - The new tags to set

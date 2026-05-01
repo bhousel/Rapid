@@ -201,7 +201,6 @@ export function uiEditMenu(context) {
 
 
   /*
-   * _updatePosition
    * Called whenever the map moves so that the menu can be repostioned to match the map.
    */
   function _updatePosition() {
@@ -306,7 +305,6 @@ export function uiEditMenu(context) {
 
 
   /*
-   * close
    * This removes the menu and unbinds the event handlers
    */
   editMenu.close = function () {
@@ -320,7 +318,6 @@ export function uiEditMenu(context) {
 
 
   /*
-   * anchorLoc
    * Array [lon,lat] wgs84 coordinate where the menu should be anchored
    */
   editMenu.anchorLoc = function(val) {
@@ -331,7 +328,6 @@ export function uiEditMenu(context) {
 
 
   /*
-   * triggerType
    * String  'touch', 'pen', or 'rightclick' that triggered the menu
    */
   editMenu.triggerType = function(val) {
@@ -342,7 +338,6 @@ export function uiEditMenu(context) {
 
 
   /*
-   * operations
    * Array of operations requested to appear on the menu
    * Some operations may be skipped if we've detected pen/touch input
    */

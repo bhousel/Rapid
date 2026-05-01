@@ -7,7 +7,6 @@ import type { OsmRelation } from '../data/OsmRelation.ts';
 
 
 /**
- * actionDeleteRelation
  * Deletes a relation and removes it from all parent relations.
  * Also deletes child members that are no longer needed.
  * If doDeleteDegenerate is true, also deletes any relations that

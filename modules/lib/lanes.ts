@@ -82,7 +82,6 @@ export interface LanesInfo {
 
 
 /**
- * osmLanes
  * Parse lane information from an OSM way entity.
  * @param entity - The way entity to parse lanes from
  * @returns Parsed lane information, or null if not applicable

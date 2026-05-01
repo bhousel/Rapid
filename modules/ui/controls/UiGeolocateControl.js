@@ -14,7 +14,6 @@ const GEOLOCATE_OPTIONS = {
 
 
 /**
- * UiGeolocateControl
  */
 export class UiGeolocateControl {
 
@@ -51,7 +50,6 @@ export class UiGeolocateControl {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -96,7 +94,6 @@ export class UiGeolocateControl {
 
 
   /**
-   * toggle
    * @param  {Event} e? - triggering event (if any)
    */
   toggle(e) {
@@ -113,7 +110,6 @@ export class UiGeolocateControl {
 
 
   /**
-   * start
    * Start geolocating - enable the button, block the UI, and initiate a geolocate request.
    * @see https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/getCurrentPosition
    * @param  {Event} e? - triggering event (if any)
@@ -137,7 +133,6 @@ export class UiGeolocateControl {
 
 
   /**
-   * stop
    * Stop geolocating - disable the button and remove any saved data
    * @param  {Event} e? - triggering event (if any)
    */
@@ -162,7 +157,6 @@ export class UiGeolocateControl {
 
 
   /**
-   * success
    * Callback called with a successful geolocation result.
    * This will continue the requests every few seconds until the user stops it.
    * @see https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/getCurrentPosition
@@ -201,7 +195,6 @@ export class UiGeolocateControl {
 
 
   /**
-   * error
    * Callback called when geolocation request either fails or times out.
    */
   error() {
@@ -220,7 +213,6 @@ export class UiGeolocateControl {
 
 
   /**
-   * block
    * This blocks the UI, only initially when the user first requests geolocation.
    */
   block() {
@@ -235,7 +227,6 @@ export class UiGeolocateControl {
 
 
   /**
-   * unblock
    * This unblocks the UI, after the initial request either completed or timed out.
    */
   unblock() {

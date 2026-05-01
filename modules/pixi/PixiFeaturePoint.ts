@@ -13,7 +13,6 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 
 
 /**
- * PixiFeaturePoint
  *
  * Properties you can access:
  *   `geom`        PixiGeometryPart() class containing all the information about the geometry
@@ -74,7 +73,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * destroy
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
@@ -97,7 +95,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * update
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
    */
@@ -112,7 +109,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * updateGeometry
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
    */
@@ -135,7 +131,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * updateStyle
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
    */
@@ -385,7 +380,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * updateHalo
    * Show/Hide halo (requires `this.container.hitArea` to be already set up by `updateHitArea` as a supported shape)
    */
   updateHalo(): void {

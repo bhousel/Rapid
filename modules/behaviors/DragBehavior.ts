@@ -57,7 +57,6 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -81,7 +80,6 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -116,7 +114,6 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
    * @param  e - A Pixi FederatedPointerEvent
@@ -143,7 +140,6 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -234,7 +230,6 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerup
    * Handler for pointerup events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -267,7 +262,6 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointercancel
    * Handler for pointercancel events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -289,7 +283,6 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
-   * _snappingDisabled
    * @return  `true` if line snapping is disabled, `false` if line snapping is enabled.
    */
   _snappingDisabled(): boolean {
@@ -307,7 +300,6 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
-   * _doMove
    * Checks lastMove and emits a 'move' event if needed.
    * This may also be fired if we detect a change in the modifier keys.
    */

@@ -31,7 +31,6 @@ export class AbstractUiCard {
 
 
   /**
-   * visible
    * @readonly
    */
   get visible() {
@@ -40,7 +39,6 @@ export class AbstractUiCard {
 
 
   /**
-   * show
    * Shows the component
    * @param  {Event} e? - triggering event (if any)
    */
@@ -67,7 +65,6 @@ export class AbstractUiCard {
 
 
   /**
-   * hide
    * Hides the component
    * @param  {Event} e? - triggering event (if any)
    */
@@ -89,7 +86,6 @@ export class AbstractUiCard {
 
 
   /**
-   * toggle
    * Toggles the component between shown/hidden
    * @param  {Event} e? - triggering event (if any)
    */

@@ -184,7 +184,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * localeCode
    * The current locale code (e.g. 'en-US', 'de', 'zh-CN')
    */
   get localeCode(): LocaleCode {
@@ -192,7 +191,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * localeCodes
    * Array of locale codes in priority order, with the current locale first followed by fallbacks
    */
   get localeCodes(): LocaleCode[] {
@@ -200,7 +198,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * languageCode
    * The language portion of the current locale (e.g. 'en' from 'en-US')
    */
   get languageCode(): LanguageCode {
@@ -208,7 +205,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * textDirection
    * The text direction for the current locale ('ltr' or 'rtl')
    */
   get textDirection(): 'ltr' | 'rtl' {
@@ -216,7 +212,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * isMetric
    * Whether the current locale uses metric units (true for most locales, false for 'en-US')
    */
   get isMetric(): boolean {
@@ -224,7 +219,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * languageNames
    * Map of language codes to their localized display names
    */
   get languageNames(): Record<LanguageCode, string> {
@@ -232,7 +226,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * scriptNames
    * Map of script codes to their localized display names
    */
   get scriptNames(): Record<ScriptCode, string> {
@@ -240,7 +233,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * languages
    * All known language codes and their info (native name, base, script).
    * This is used for language pickers in the UI.
    */
@@ -249,7 +241,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * territoryLanguages
    * Map of territory/country codes to arrays of language codes, sorted by population.
    * Used to suggest relevant languages based on geographic location.
    */
@@ -258,7 +249,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * isRTL
    * Whether the current locale uses right-to-left text direction
    */
   get isRTL(): boolean {
@@ -266,7 +256,6 @@ export class LocalizationSystem extends AbstractSystem {
   }
 
   /**
-   * preferredLocaleCodes
    * Allows the user to manually set the locale, overriding the locales specified by the browser
    * If you're going to use this, you must call it before `initAsync` starts fetching data.
    * @param codes - Array or String of preferred locales
@@ -285,7 +274,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved after the files have been loaded
    */
@@ -337,7 +325,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -347,7 +334,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -357,7 +343,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * _selectLocale
    * Returns a Promise to select the locale.
    * @return Promise resolved when the locale has been selected and strings loaded
    */
@@ -391,7 +376,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * _loadStringsAsync
    * Returns a Promise to load the strings for the requested locale
    * Note that this returns a `Promise.allSettled` because some of these may
    *   fail/reject if a particular language pack doesn't exist.
@@ -441,7 +425,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -479,7 +462,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * pluralRule
    * Returns the plural rule for the given `number` with the given `code`.
    * see: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/PluralRules/select
    *
@@ -499,7 +481,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * _resolveString
    * Try to find a localized string matching the given `stringID`.
    * This function will recurse through all `searchLocales` until a string is found.
    * or until we run out of locales, then we will return a special "Missing translation" string.
@@ -631,7 +612,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * hasTextForStringID
    * Returns true if the given string id will return a string
    *
    * @param stringID - string identifier
@@ -643,7 +623,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * t
    * Returns only the localized text, discarding the locale info
    * @param stringID      - string identifier
    * @param replacements  - token replacements and default string
@@ -704,7 +683,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * htmlForLocalizedText
    * Just returns the given text wrapped in an HTML span element encoding the locale
    * @param text       - the text content for the span
    * @param localeCode - the locale code for the span
@@ -716,7 +694,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * languageName
    * Returns a display-ready string for a given language code
    * @param code    - the language code (e.g. 'de')
    * @param options - options object with optional `localOnly` property
@@ -758,7 +735,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * displayName
    * Get a localized display name for a map feature
    * @param tags        - OSM tags object
    * @param hideNetwork - If true, the `network` tag will not be used in the name to prevent
@@ -836,7 +812,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * displayPOIName
    * This is like `displayName`, but more useful for POI display names (includes brand)
    * @param tags - OSM tags object
    * @return A name string suitable for display
@@ -851,7 +826,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * displayType
    * @param entityID - OSM-like ID that starts with 'n', 'w', or 'r'
    * @return Localized string for 'Node', 'Way', or 'Relation'
    */
@@ -865,7 +839,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * displayLabel
    * Returns a string suitable for display
    * By default returns something like name/ref, fallback to preset type, fallback to OSM type
    *   "Main Street" or "Tertiary Road"
@@ -998,7 +971,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * displayShortDate
    * Displays a date in its localized short format, for example in US would be 'Jan 01, 2025'.
    * It treats dates as UTC, to avoid timezone surprises.
    * Accepts a date, a numeric timestamp, or a string that looks like a Date.
@@ -1123,7 +1095,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * _getSupportedLocales
    * Returns the locales from `requestedLocales` that are actually supported
    * In here we also correct the capitalization/hyphenation to make the locales look like BCP47.
    * @param requested - locale codes to consider, in priority order
@@ -1166,7 +1137,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * _localeChanged
    * Called whenever something about the locale has changed.
    * This should happen after all locale files have been fetched.
    * This will trigger a redraw, and emit a 'localechange' event.

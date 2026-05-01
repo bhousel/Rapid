@@ -42,7 +42,6 @@ export class HoverBehavior extends AbstractBehavior {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -62,7 +61,6 @@ export class HoverBehavior extends AbstractBehavior {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -89,7 +87,6 @@ export class HoverBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -102,7 +99,6 @@ export class HoverBehavior extends AbstractBehavior {
 
 
   /**
-   * _doHover
    * Emits a 'hoverchange' event if needed
    * This may also be fired if we detect a change in the modifier keys.
    */

@@ -52,7 +52,6 @@ export class GeoScribbleService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -65,7 +64,6 @@ export class GeoScribbleService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -75,7 +73,6 @@ export class GeoScribbleService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -96,7 +93,6 @@ export class GeoScribbleService extends AbstractSystem {
 
 
   /**
-   * getData
    * Get already loaded data that appears in the current map view
    * @return  Array of data
    */
@@ -107,7 +103,6 @@ export class GeoScribbleService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view
    */
   loadTiles(): void {
@@ -148,7 +143,6 @@ export class GeoScribbleService extends AbstractSystem {
 
 
   /**
-   * _gotTile
    * Parse the response from the tile fetch
    * @param tile - Tile data
    * @param response - Response data

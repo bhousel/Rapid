@@ -10,7 +10,6 @@ const MINZOOM = 12;
 
 
 /**
- * PixiLayerKeepRight
  * @class
  */
 export class PixiLayerKeepRight extends AbstractPixiLayer {
@@ -26,7 +25,6 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
 
   /**
-   * supported
    * Whether the Layer's service exists
    */
   get supported() {
@@ -35,7 +33,6 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
@@ -61,7 +58,6 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset() {
@@ -70,7 +66,6 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering

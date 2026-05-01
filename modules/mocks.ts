@@ -11,7 +11,6 @@ import type { Keybinding } from './util/keybinding.ts';
 // This file contains minimal mocks useful for testing.
 
 /**
- * MockSystem
  * @class
  */
 export class MockSystem extends AbstractSystem {
@@ -22,7 +21,6 @@ export class MockSystem extends AbstractSystem {
 }
 
 /**
- * MockContext
  * @class
  */
 export class MockContext {
@@ -56,7 +54,6 @@ export class MockContext {
 
 
 /**
- * MockGfxSystem
  * @class
  */
 export class MockGfxSystem extends MockSystem {

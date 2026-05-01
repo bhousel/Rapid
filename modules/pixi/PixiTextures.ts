@@ -85,7 +85,6 @@ export class PixiTextures {
 
 
   /**
-   * reset
    * Replace any Pixi objects and internal state.
    */
   reset(): void {
@@ -165,7 +164,6 @@ export class PixiTextures {
 
 
   /**
-   * getTexture
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
    * @returns The texture (or `null` if not found)
@@ -187,7 +185,6 @@ export class PixiTextures {
 
 
   /**
-   * getPatternTexture
    * These are just like any other texture except that they can't live in an atlas.
    * PixiFeaturePolygon.ts has some comments on it, maybe a Pixi bug or limitation.
    * @param textureID - e.g. 'bushes'
@@ -200,7 +197,6 @@ export class PixiTextures {
 
 
   /**
-   * getDebugTexture
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @returns Texture for the specified atlas
    * @throws Throws if passed an invalid atlasID
@@ -219,7 +215,6 @@ export class PixiTextures {
 
 
   /**
-   * allocate
    * This packs an asset into one of the atlases and tracks it in the textureData map
    * The asset must be one of:  ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement
    * @param atlasID - One of 'symbol', 'text', or 'tile'
@@ -296,7 +291,6 @@ export class PixiTextures {
 
 
   /**
-   * free
    * Unpacks a texture from the atlas and frees its resources
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
@@ -324,7 +318,6 @@ export class PixiTextures {
 
 
   /**
-   * createTexture
    * Convert frequently used graphics to textures for performance.
    * https://stackoverflow.com/questions/50940737/how-to-convert-a-graphic-to-a-sprite-in-pixijs
    *
@@ -381,7 +374,6 @@ export class PixiTextures {
 
 
   /**
-   * registerSvgIcon
    * Because SVGs take some time to rasterize, store a placeholder and only rasterize when needed
    * @param textureID - Icon identifier (e.g. 'temaki-school')
    * @param symbol - The SVG Symbol element for the icon
@@ -392,7 +384,6 @@ export class PixiTextures {
 
 
   /**
-   * _svgIconToTexture
    * @param textureID - Icon identifier (e.g. 'temaki-school')
    */
   private _svgIconToTexture(textureID: TextureID): void {
@@ -467,7 +458,6 @@ export class PixiTextures {
 
 
   /**
-   * _cacheGraphics
    * Convert frequently used graphics to textures/sprites for performance
    * https://stackoverflow.com/questions/50940737/how-to-convert-a-graphic-to-a-sprite-in-pixijs
    * For example, rather than drawing a pin, we draw a square with a pin texture on it.

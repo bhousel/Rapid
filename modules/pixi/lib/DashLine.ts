@@ -125,7 +125,6 @@ export class DashLine {
 
 
   /**
-   * moveTo
    * Move to a position to prepare to draw a line.
    * This is essentially our 'reset' function.
    */
@@ -139,7 +138,6 @@ export class DashLine {
 
 
   /**
-   * lineTo
    * Extend the line to given x,y coordinate
    */
   lineTo(x: number, y: number, doClosePath?: boolean): this {
@@ -254,7 +252,6 @@ export class DashLine {
 
 
   /**
-   * circle
    * Draw a dashed circle
    * @param x - Center x coordinate
    * @param y - Center y coordinate
@@ -285,7 +282,6 @@ export class DashLine {
 
 
   /**
-   * ellipse
    * Draw a dashed ellipse
    * @param x - Center x coordinate
    * @param y - Center y coordinate
@@ -324,7 +320,6 @@ export class DashLine {
 
 
   /**
-   * poly
    * Draw a dashed polygon from points
    * @param points - Array of points (either PIXI.Point[] or flat number[])
    * @param matrix - Optional transformation matrix
@@ -379,7 +374,6 @@ export class DashLine {
 
 
   /**
-   * rect
    * Draw a dashed rectangle
    * @param x - Top-left x coordinate
    * @param y - Top-left y coordinate
@@ -430,7 +424,6 @@ export class DashLine {
 
 
   /**
-   * _getTexture
    * Creates or uses cached texture for dashed line pattern
    * @param options - DashLine options
    * @param dashSize - Total size of the dash pattern

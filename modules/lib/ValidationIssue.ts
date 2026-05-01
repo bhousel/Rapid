@@ -42,7 +42,6 @@ export interface ValidationIssueProps {
 
 
 /**
- * ValidationIssue
  * Represents a validation problem detected in the map data.
  * Each issue has a type, severity, affected entities, and possible fixes.
  */
@@ -103,7 +102,6 @@ export class ValidationIssue {
 
 
   /**
-   * extent
    * Returns the geographic extent of the issue.
    * @param graph - The graph to look up entities in
    * @return The extent of the issue, or null if not determinable
@@ -120,7 +118,6 @@ export class ValidationIssue {
 
 
   /**
-   * fixes
    * Returns the available fixes for this issue.
    * @return Array of ValidationFix objects
    */
@@ -152,7 +149,6 @@ export class ValidationIssue {
 
 
   /**
-   * _generateID
    * A unique, deterministic string hash.
    * Issues with identical id values are considered identical.
    */
@@ -179,7 +175,6 @@ export class ValidationIssue {
 
 
   /**
-   * _generateKey
    * An identifier suitable for use as the second argument to d3.selection#data().
    * (i.e. this should change whenever the data needs to be refreshed)
    */

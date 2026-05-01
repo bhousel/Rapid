@@ -5,7 +5,6 @@ import { uiModal } from './modal.js';
 
 
 /**
- * uiWhatsNew
  * This is the "whats new" screen we show to the users if:
  *   - They have used Rapid before and seen the welcome screen
  *   - They do not have backup changes to restore

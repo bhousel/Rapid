@@ -5,7 +5,6 @@ import { uiTooltip } from '../tooltip.js';
 
 
 /**
- * UiZoomToControl
  */
 export class UiZoomToControl {
 
@@ -44,7 +43,6 @@ export class UiZoomToControl {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -85,7 +83,6 @@ export class UiZoomToControl {
 
 
   /**
-   * isDisabled
    * The button is disabled if there is nothing selected that the user can zoom in to (or out from).
    * @return  {boolean}  `true` if the button disabled, `false` if not
    */
@@ -96,7 +93,6 @@ export class UiZoomToControl {
 
 
   /**
-   * modechange
    * When changing modes, reset the previous transform and rerender
    */
   modechange() {
@@ -106,7 +102,6 @@ export class UiZoomToControl {
 
 
   /**
-   * zoomTo
    * This zooms in on the selected feature(s), or unzooms out from them
    * @param  {Event} e? - triggering event (if any)
    */
@@ -141,7 +136,6 @@ export class UiZoomToControl {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

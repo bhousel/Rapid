@@ -23,7 +23,6 @@ export interface OsmChanges {
 
 
 /**
- * OsmChangeset
  * @see https://wiki.openstreetmap.org/wiki/Changeset
  *
  * Properties you can access:
@@ -53,7 +52,6 @@ export class OsmChangeset extends OsmEntity {
   }
 
   /**
-   * asGeoJSON
    * Returns a GeoJSON representation of the OsmChangeset.
    * (This currently returns an unlocated Feature, but we could return a bounding box or something)
    * @return An empty object
@@ -68,7 +66,6 @@ export class OsmChangeset extends OsmEntity {
   }
 
   /**
-   * asJXON
    * Returns a JXON representation of the OsmChangeset.
    * For OSM Entities, this is used to prepare an OSM changeset XML.
    * @return JXON representation of the OsmChangeset
@@ -88,7 +85,6 @@ export class OsmChangeset extends OsmEntity {
   }
 
   /**
-   * geometry
    * Returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type.
    * @param graph - the Graph that holds the topology needed
    * @returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type
@@ -98,7 +94,6 @@ export class OsmChangeset extends OsmEntity {
   }
 
   /**
-   * osmChangeJXON
    * @see http://wiki.openstreetmap.org/wiki/OsmChange
    * @return JXON representation of an osmChange document
    */

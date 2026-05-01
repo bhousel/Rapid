@@ -42,7 +42,6 @@ export class AbstractMode extends EventEmitter {
 
 
   /**
-   * enter
    * Every mode should have an `enter` function to peform any necessary setup tasks
    * @param  options - Optional object of options passed to the mode
    * @return `true` if mode could be entered, `false` if not
@@ -54,7 +53,6 @@ export class AbstractMode extends EventEmitter {
 
 
   /**
-   * exit
    * Every mode should have a `exit` function to perform any necessary teardown tasks
    */
   exit(): void {
@@ -63,7 +61,6 @@ export class AbstractMode extends EventEmitter {
 
 
   /**
-   * modeID
    * Unique string to identify this Mode.
    * @readonly
    */
@@ -73,7 +70,6 @@ export class AbstractMode extends EventEmitter {
 
 
   /**
-   * active
    * Whether the mode is active
    * @readonly
    */
@@ -83,7 +79,6 @@ export class AbstractMode extends EventEmitter {
 
 
   /**
-   * selectedData
    * @readonly
    */
   get selectedData(): Map<DataID, AbstractData> {
@@ -92,7 +87,6 @@ export class AbstractMode extends EventEmitter {
 
 
   /**
-   * selectedIDs
    * @readonly
    */
   get selectedIDs(): DataID[] {

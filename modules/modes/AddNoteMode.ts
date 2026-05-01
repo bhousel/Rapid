@@ -29,7 +29,6 @@ export class AddNoteMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * @return `true` if mode could be entered, `false` if not
    */
@@ -52,7 +51,6 @@ export class AddNoteMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, removing event listeners from draw behavior.
    */
   exit(): void {
@@ -72,7 +70,6 @@ export class AddNoteMode extends AbstractMode {
 
 
   /**
-   * _click
    * Add a Note at the mouse click coords
    */
   private _click(eventData: EventData): void {
@@ -95,7 +92,6 @@ export class AddNoteMode extends AbstractMode {
 
 
   /**
-   * _cancel
    * Return to browse mode without doing anything
    */
   private _cancel(): void {

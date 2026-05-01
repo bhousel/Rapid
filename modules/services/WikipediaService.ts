@@ -27,7 +27,6 @@ export class WikipediaService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -37,7 +36,6 @@ export class WikipediaService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -47,7 +45,6 @@ export class WikipediaService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -57,7 +54,6 @@ export class WikipediaService extends AbstractSystem {
 
 
   /**
-   * search
    * @param lang - language code
    * @param query - string to search for
    * @param callback - errback-style callback function to call with results
@@ -100,7 +96,6 @@ export class WikipediaService extends AbstractSystem {
 
 
   /**
-   * suggestions
    * @param lang - language code
    * @param query - string to search for
    * @param callback - errback-style callback function to call with results
@@ -139,7 +134,6 @@ export class WikipediaService extends AbstractSystem {
 
 
   /**
-   * translations
    * @param lang - language code
    * @param title - string to search for
    * @param callback - errback-style callback function to call with results

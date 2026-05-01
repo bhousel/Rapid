@@ -30,7 +30,6 @@ import type { Viewport } from '@rapid-sdk/math';
 
 
 /**
- * PixiScene
  * The "scene" maintains useful collections of Features.
  *
  * Features are organized into thematic Layers that can be enabled or disabled if needed.
@@ -108,7 +107,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * reset
    * Replace any Pixi objects and internal state.
    * Also calls each Layer's `reset' method to do the same for that layer.
    */
@@ -155,7 +153,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * render
    * Calls each Layer's `render` and `cull` methods
    * - `render` will create and update the Features that belong in the scene
    * - `cull` will make invisible or destroy Features that aren't in the scene anymore
@@ -180,7 +177,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * enableLayers
    * Enables the layers with the given layerIDs, other layers will not be affected
    * @param layerIDs - layerIDs to enable
    */
@@ -196,7 +192,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * disableLayers
    * Disables the layers with the given layerIDs, other layers will not be affected
    * @param layerIDs - layerIDs to disable
    */
@@ -212,7 +207,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * toggleLayers
    * Toggles the layers with the given layerIDs, other layers will not be affected
    * @param layerIDs - layerIDs to toggle
    */
@@ -228,7 +222,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * onlyLayers
    * LayerIDs in the given list will be enabled, all others will be disabled
    * @param layerIDs - layerIDs to keep enabled
    */
@@ -242,7 +235,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * addFeature
    * Add a feature to the scene feature cache.
    * @param feature - A render feature (point, line, multipolygon)
    */
@@ -252,7 +244,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * removeFeature
    * Remove a Feature from the scene feature cache.
    * @param feature - A render feature (point, line, multipolygon)
    */
@@ -262,7 +253,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * setClass
    * Sets a dataID as being classed a certain way (e.g. 'hover')
    * @param classID - classID (e.g. 'hover')
    * @param layerID - layerID (e.g. 'osm')
@@ -274,7 +264,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * unsetClass
    * Unsets a dataID from being classed a certain way (e.g. 'hover')
    * @param classID - classID (e.g. 'hover')
    * @param layerID - layerID (e.g. 'osm')
@@ -286,7 +275,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * clearClass
    * Clear out all uses of the given classID across all layers.
    * @param classID - classID (e.g. 'hover')
    */
@@ -298,7 +286,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * dirtyScene
    * Mark the whole scene as `dirty`, for example when changing zooms.
    * During the next "APP" pass, dirty features will be rebuilt.
    */
@@ -310,7 +297,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * dirtyLayers
    * Mark all features on a given layer as `dirty`
    * @param layerIDs - layerIDs to flag as 'dirty'
    */
@@ -322,7 +308,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * dirtyFeatures
    * Mark specific features features as `dirty`
    * During the next "APP" pass, dirty features will be rebuilt.
    * @param featureIDs - featureIDs to flag as 'dirty'
@@ -338,7 +323,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * dirtyData
    * Mark any features bound to a given dataID as `dirty`
    * DataIDs are only consistent within a Layer, therefore the layerID is required here.
    * @param layerID - layerID that is rendering the data
@@ -350,7 +334,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * _layerChanged
    * Called whenever the enabled layers change.
    * This will trigger a redraw and emit a 'layerchange' event.
    */

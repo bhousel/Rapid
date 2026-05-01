@@ -7,7 +7,6 @@ import type { Preset } from '../lib/Preset.ts';
 
 
 /**
- * actionChangePreset
  * Changes an entity's tags from one preset to another.
  * Handles tag cleanup and crossing tag synchronization.
  *

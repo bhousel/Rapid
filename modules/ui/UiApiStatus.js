@@ -4,7 +4,6 @@ import { uiIcon } from './icon.js';
 
 
 /**
- * UiApiStatus
  * This component displays a status message in a bar across the bottom of the map,
  * for example with the OSM API is unavailable.
  */
@@ -62,7 +61,6 @@ export class UiApiStatus {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -154,7 +152,6 @@ export class UiApiStatus {
 
 
   /**
-   * _onApiStatusChange
    * Callback function called on any API status change by the OSM service.
    * @param  {string}  apiStatus - probably 'online', 'readonly', or 'offline'
    */
@@ -165,7 +162,6 @@ export class UiApiStatus {
 
 
   /**
-   * _onBackupStatusChange
    * Callback function called on any backup status change by the EditSystem
    * @param  {boolean}  wasSuccessful - `true` if backups are successful, `false` if not
    */
@@ -176,7 +172,6 @@ export class UiApiStatus {
 
 
   /**
-   * _onGfxStatusChange
    * Callback function called when the GraphicsSystem loses context
    * @param  {string}  status - one of 'contextlost' or 'contextrestored'
    */

@@ -6,7 +6,6 @@ import { uiIcon } from './icon.js';
 import { utilRebind } from '../util/rebind.ts';
 
 /**
- * uiMapRouletteMenu
  * Creates a MapRoulette menu UI component.
  * @param   {Object}   context
  * @return  {Function}  The MapRoulette menu component.
@@ -39,7 +38,6 @@ export function uiMapRouletteMenu(context) {
 
 
   /**
-   * mapRouletteMenu
    * Initializes and displays the MapRoulette menu.
    * @param  {d3-selection}  $selection
    */
@@ -115,7 +113,6 @@ export function uiMapRouletteMenu(context) {
 
 
   /**
-   * executeAction
    * Executes the specified action based on the user's selection.
    * @param  {string}  actionId - The ID of the action to execute.
    * @param  {Event}   d3_event
@@ -139,7 +136,6 @@ export function uiMapRouletteMenu(context) {
 
 
   /**
-   * _updatePosition
    * Updates the position of the menu based on the viewport and anchor location.
    */
   function _updatePosition() {
@@ -184,7 +180,6 @@ export function uiMapRouletteMenu(context) {
 
 
     /**
-     * displayOnLeft
      * Determines whether the menu should be displayed on the left or right.
      * @param {DOMRect} surfaceRect - The bounding rectangle of the surface.
      * @return {boolean} True if the menu should be displayed on the left, false otherwise.
@@ -209,7 +204,6 @@ export function uiMapRouletteMenu(context) {
 
 
   /**
-   * fixedIt
    * Marks the task as fixed and submits it.
    * @param {Event} d3_event - The D3 event object.
    * @param {Object} d - The task data.
@@ -221,7 +215,6 @@ export function uiMapRouletteMenu(context) {
 
 
   /**
-   * cantComplete
    * Marks the task as cannot be completed and submits it.
    * @param {Event} d3_event - The D3 event object.
    * @param {Object} d - The task data.
@@ -233,7 +226,6 @@ export function uiMapRouletteMenu(context) {
 
 
   /**
-   * alreadyFixed
    * Marks the task as already fixed and submits it.
    * @param {Event} d3_event - The D3 event object.
    * @param {Object} d - The task data.
@@ -245,7 +237,6 @@ export function uiMapRouletteMenu(context) {
 
 
   /**
-   * notAnIssue
    * Marks the task as not an issue and submits it.
    * @param {Event} d3_event - The D3 event object.
    * @param {Object} d - The task data.
@@ -257,7 +248,6 @@ export function uiMapRouletteMenu(context) {
 
 
   /**
-   * submitTask
    * Submits the task to MapRoulette with the updated status.
    * @param {Event} d3_event - The D3 event object.
    * @param {Object} d - The task data.
@@ -299,7 +289,6 @@ export function uiMapRouletteMenu(context) {
 
 
   /**
-   * getMapRouletteApiKey
    * Retrieves the MapRoulette API key from the user's preferences.
    * @param {Object} context - The application context.
    * @param {Function} callback - Callback function to handle the API key retrieval.

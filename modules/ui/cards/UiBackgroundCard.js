@@ -9,7 +9,6 @@ const METADATA_KEYS = ['zoom', 'vintage', 'source', 'description', 'resolution',
 
 
 /**
- * UiBackgroundCard
  */
 export class UiBackgroundCard extends AbstractUiCard {
 
@@ -54,7 +53,6 @@ export class UiBackgroundCard extends AbstractUiCard {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -172,7 +170,6 @@ export class UiBackgroundCard extends AbstractUiCard {
 
 
   /**
-   * updateMetadata
    */
   updateMetadata() {
     if (!this.visible) return;
@@ -251,7 +248,6 @@ export class UiBackgroundCard extends AbstractUiCard {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

@@ -49,7 +49,6 @@ export class DragNoteMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * @param  options - Optional object of options passed to the new mode
    * @return `true` if the mode can be entered, `false` if not
@@ -89,7 +88,6 @@ export class DragNoteMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, clearing state and removing event listeners.
    */
   exit(): void {
@@ -113,7 +111,6 @@ export class DragNoteMode extends AbstractMode {
 
 
   /**
-   * _move
    * Move the dragging node
    * @param  eventData - Data received from the drag behavior
    */
@@ -153,7 +150,6 @@ export class DragNoteMode extends AbstractMode {
 
 
   /**
-   * _nudge
    * This event fires on map pans at the edge of the screen.
    * We want to move the dragging note opposite of the pixels panned to keep it in the same place.
    * @param  nudge - [x,y] amount of map pan in pixels
@@ -186,7 +182,6 @@ export class DragNoteMode extends AbstractMode {
 
 
   /**
-   * _end
    * Complete the drag and keep the note selected.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
@@ -201,7 +196,6 @@ export class DragNoteMode extends AbstractMode {
 
 
   /**
-   * _cancel
    * Return to browse mode
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */

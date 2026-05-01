@@ -13,7 +13,6 @@ const CUSTOM_COLOR = 0x2eff2e;
 
 
 /**
- * PixiLayerGeoScribble
  * This class contains any geo scribbles that should be 'drawn over' the map.
  * Originally from the EveryDoor folks - reference: https://github.com/Zverik/every_door/issues/197
  * This data comes from API at https://geoscribble.osmz.ru/docs#/default/scribbles_scribbles_get.
@@ -35,7 +34,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
-   * supported
    * Whether the Layer's service exists
    */
   get supported() {
@@ -44,7 +42,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * Whether the user has chosen to see the Layer
    * Make sure to start the service.
    */
@@ -70,7 +67,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset() {
@@ -97,7 +93,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render the geojson custom data
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -123,7 +118,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
-   * getLineStyle
    * @param props - The GeoJSONData properties object, may contain:
    * `thin`   (boolean)
    * `dashed` (boolean)
@@ -152,7 +146,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
-   * renderLines
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
@@ -204,7 +197,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
-   * renderPoints
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering

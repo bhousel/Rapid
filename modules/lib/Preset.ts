@@ -83,7 +83,6 @@ interface ResolvedFields {
 
 
 /**
- * Preset
  * A Preset represents a set of tags that identify a feature type on OpenStreetMap.
  * Every feature in Rapid is matched to a Preset based on its tags.
  * Users can pick from the available Presets in the Rapid editor.
@@ -174,7 +173,6 @@ export class Preset {
 
 
   /**
-   * reset
    * Resets all cached data.
    * This should happen whenever SchemaSystem merges in new data.
    * You must add the Preset to the SchemaSystem and call `reset` before using the Preset.
@@ -191,7 +189,6 @@ export class Preset {
 
 
   /**
-   * setLocale
    * Changes the locale and re-localizes the strings.
    * This should happen whenever LocalizationSystem changes the locale.
    * This is done early because we need the strings indexed by the SchemaSystem for searching.
@@ -278,7 +275,6 @@ export class Preset {
   }
 
   /**
-   * name
    * The name is the main display name of the Preset, as shown in the user interface.
    * @return Localized name
    * @readonly
@@ -288,7 +284,6 @@ export class Preset {
   }
 
   /**
-   * aliases
    * Aliases are alternate names for this Preset, they may be displayed in the user interface.
    * @return Localized aliases
    * @readonly
@@ -298,7 +293,6 @@ export class Preset {
   }
 
   /**
-   * terms
    * Terms are related words used for seraching for this Preset.
    * (For suggestion presets, the terms are alternate names)
    * @return Localized search terms
@@ -309,7 +303,6 @@ export class Preset {
   }
 
   /**
-   * fields
    * Returns the fields for this Preset.
    * @return The Fields for this preset
    */
@@ -318,7 +311,6 @@ export class Preset {
   }
 
   /**
-   * moreFields
    * Returns the "more" Fields for this Preset.  These are Fields that are offered
    *  if the user expands the "more fields" combobox.
    * @return The "more" Fields for this preset
@@ -329,7 +321,6 @@ export class Preset {
 
 
   /**
-   * matchScore
    * Matchscore is used for ranking search results.
    * It is calculated by checking how many tags match the Preset tags.
    * @param matchTags - Tags to match
@@ -365,7 +356,6 @@ export class Preset {
 
 
   /**
-   * subtitle
    * Returns a subtitle, but only for suggestion presets.
    * Rapid displays the preset name on a second line below the brand name.
    * @return Localized preset subtitle, or `null` if not applicable
@@ -388,7 +378,6 @@ export class Preset {
 
 
   /**
-   * isFallback
    * Is this a fallback preset?
    * Fallback presets are created by the `SchemaSystem` at init time and can't be overridden.
    * The fallback presets are: 'point', 'line', 'area', 'relation'.
@@ -399,7 +388,6 @@ export class Preset {
   }
 
   /**
-   * isBuiltin
    * Is this one of the builtin objects?
    * We consider it "builtin" if it doesn't have a `assetID` (i.e. added via a merge).
    * (At this time, only the fallback presets are builtin).
@@ -411,7 +399,6 @@ export class Preset {
 
 
   /**
-   * reference
    * Returns some data about how to lookup reference information about this Preset.
    * If there is a `wikidata` identifier, lookup the QID on Wikidata.
    * Otherwise, use whatever `key`/`value` pair is specified for the reference,
@@ -444,7 +431,6 @@ export class Preset {
 
 
   /**
-   * unsetTags
    * Called when changing Presets, this removes tags that go with the old Preset.
    * @param tags - the initial tags for the Entity
    * @param geometry - the geometry for the Entity
@@ -471,7 +457,6 @@ export class Preset {
   }
 
   /**
-   * setTags
    * Called when changing Presets, this adds tags that go with the new Preset.
    * @param tags - the initial tags for the Entity
    * @param geometry - the geometry for the Entity
@@ -532,7 +517,6 @@ export class Preset {
 
 
   /**
-   * _resolveReference
    * Presets can inherit a property from another Preset.
    * If the property value contains a `{presetID}` placeholder, return the other Preset with that id.
    * @param prop - the property to lookup
@@ -559,7 +543,6 @@ export class Preset {
 
 
   /**
-   * _resolveFields
    * For a Preset without its own Fields, inherit fields from another Preset.
    * Replace `{presetID}` placeholders with the fields of the other preset.
    * @param prop - the property to lookup (either 'fields' or 'moreFields')
@@ -619,7 +602,6 @@ export class Preset {
 
 
   /**
-   * _gatherSuggestionTerms
    * A simpler version of `utilGatherTokens` to gather 'terms' from suggestion presets
    * The `terms` is already an Array of strings that can function as search names.
    */
@@ -639,7 +621,6 @@ export class Preset {
   }
 
   /**
-   * _gatherSuggestionTags
    * A simpler version of `utilGatherTokens` to gather 'tags' from suggestion presets.
    */
   private _gatherSuggestionTags(primary: Set<string>, alternate: Set<string>): void {

@@ -27,7 +27,6 @@ globalThis.jsonpCache = jsonpCache;
 
 
 /**
- * jsonpRequest
  * Makes a JSONP request to the given URL.
  * The URL should contain `{callback}` or `%7Bcallback%7D` placeholder.
  *

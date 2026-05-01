@@ -10,7 +10,6 @@ const MAXRESULTS = 100;
 
 
 /**
- * UiRapidCatalog
  * This is the modal where the user can browse the catalog of datasets.
  *
  * Events available:
@@ -56,7 +55,6 @@ export class UiRapidCatalog extends EventEmitter {
 
 
   /**
-   * show
    * This shows the catalog if it isn't alreaday being shown.
    * For this kind of popup component, must first `show()` to create the modal.
    */
@@ -132,7 +130,6 @@ export class UiRapidCatalog extends EventEmitter {
 
 
   /**
-   * render
    * Renders the content inside the modal.
    * Note that most `render` functions accept a parent selection,
    *  this one doesn't need it - `$modal` is always the parent.
@@ -317,7 +314,6 @@ export class UiRapidCatalog extends EventEmitter {
 
 
   /**
-   * renderDatasets
    * Renders datasets details into the `.rapid-catalog-datasets-section` div.
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this component should render itself into
    */
@@ -507,7 +503,6 @@ export class UiRapidCatalog extends EventEmitter {
 
 
   /**
-   * sortDatasets
    * Added datasets to the beginning
    * Featured datasets next
    * All others sort by name
@@ -522,7 +517,6 @@ export class UiRapidCatalog extends EventEmitter {
 
 
   /**
-   * sortCategories
    * Featured before everything else
    * Preview after everything else
    * All others sort alphabetically
@@ -537,7 +531,6 @@ export class UiRapidCatalog extends EventEmitter {
 
 
   /**
-   * toggleDataset
    * Toggles the given dataset between added/removed.
    * @param  {Event}         e? - triggering event (if any)
    * @param  {RapidDataset}  d - bound datum (the dataset in this case)
@@ -562,7 +555,6 @@ export class UiRapidCatalog extends EventEmitter {
 
 
   /**
-   * highlight
    */
   highlight(needle, haystack) {
     let html = haystack;

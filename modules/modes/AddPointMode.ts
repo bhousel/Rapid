@@ -37,7 +37,6 @@ export class AddPointMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * @return `true` if mode could be entered, `false` if not
    */
@@ -63,7 +62,6 @@ export class AddPointMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, removing event listeners and resetting cursor.
    */
   exit(): void {
@@ -87,7 +85,6 @@ export class AddPointMode extends AbstractMode {
 
 
   /**
-   * _click
    * Process whatever the user clicked on
    */
   private _click(eventData: EventData): void {
@@ -129,7 +126,6 @@ export class AddPointMode extends AbstractMode {
 
 
   /**
-   * _clickNothing
    * Clicked on nothing, create the point at given `loc`
    */
   private _clickNothing(loc: Vec2): void {
@@ -146,7 +142,6 @@ export class AddPointMode extends AbstractMode {
 
 
   /**
-   * _clickWay
    * Clicked on an existing way, add a midpoint along the `edge` at given `loc`
    */
   private _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
@@ -162,7 +157,6 @@ export class AddPointMode extends AbstractMode {
 
 
   /**
-   * _clickNode
    * Clicked on an existing node, merge `defaultTags` into it, if any, then select the node
    */
   private _clickNode(_loc: Vec2, node: OsmNode): void {
@@ -187,7 +181,6 @@ export class AddPointMode extends AbstractMode {
 
 
   /**
-   * _cancel
    * Return to browse mode without doing anything
    */
   private _cancel(): void {

@@ -7,7 +7,6 @@ import type { Graph } from '../lib/Graph.ts';
 
 
 /**
- * actionDeleteMultiple
  * Deletes multiple entities by dispatching to the appropriate delete action
  * based on entity type.
  *

@@ -32,7 +32,6 @@ export class PasteBehavior extends AbstractBehavior {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -46,7 +45,6 @@ export class PasteBehavior extends AbstractBehavior {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -60,7 +58,6 @@ export class PasteBehavior extends AbstractBehavior {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
@@ -74,7 +71,6 @@ export class PasteBehavior extends AbstractBehavior {
 
 
   /**
-   * _doPaste
    * Pastes copied features onto the map, if possible
    * @param  e - A DOM KeyboardEvent
    */

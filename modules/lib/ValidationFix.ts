@@ -20,7 +20,6 @@ export interface ValidationFixProps {
 
 
 /**
- * ValidationFix
  * Represents a possible fix for a validation issue.
  * Each ValidationIssue can have multiple possible fixes that the user can choose from.
  */

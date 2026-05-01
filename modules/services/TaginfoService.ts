@@ -132,7 +132,6 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -142,7 +141,6 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -186,7 +184,6 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -203,7 +200,6 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * keys
    * @param params
    * @param callback - errback-style callback function to call with results
    */
@@ -245,7 +241,6 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * multikeys
    * @param params
    * @param callback - errback-style callback function to call with results
    */
@@ -288,7 +283,6 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * values
    * @param params
    * @param callback - errback-style callback function to call with results
    */
@@ -343,7 +337,6 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * roles
    * @param params
    * @param callback - errback-style callback function to call with results
    */
@@ -386,7 +379,6 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * docs
    * @param params
    * @param callback - errback-style callback function to call with results
    */

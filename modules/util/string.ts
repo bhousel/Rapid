@@ -2,7 +2,6 @@ import diacritics from 'diacritics';
 
 
 /**
- * utilNormalizeString
  * This converts a string into a "normalized" version useful for searching and comparisons.
  * (Various versions of this exist in other projects, see NSI, OCI, etc.)
  *
@@ -39,7 +38,6 @@ export function utilNormalizeString(str: string): string {
 
 
 /**
- * utilGatherTokens
  * This is used by the Preset code to extract tokens from the given string.
  * It sorts them into either the 'primary' or 'alternate' set based on the given `isPrimary` param.
  * This function also automatically checks whether removing diacritics would result in
@@ -88,7 +86,6 @@ export function utilGatherTokens(str: string, primary: Set<string>, alternate: S
 
 
 /**
- * utilWildcard
  * This checks if a string looks like a "wildcard" string (contains '*' or '?')
  * and if so, converts it to a regular expression.
  *
@@ -121,7 +118,6 @@ interface KeyedCollection {
 };
 
 /**
- * utilWildcardDelete
  * Delete keys from a keyed collection (Map, Set, etc.) that match a wildcard pattern ('*' or '?').
  */
 export function utilWildcardDelete(collection: KeyedCollection, pattern: string): void {
@@ -141,7 +137,6 @@ export function utilWildcardDelete(collection: KeyedCollection, pattern: string)
 
 
 /**
- * utilExtractValues
  * This extracts multiple values from a string, typically used as a URL parameter.
  * If separator is not provided, a default list of separator characters will be used.
  * Note that empty values are not filtered - caller should append `.filter(Boolean)` if you want this.

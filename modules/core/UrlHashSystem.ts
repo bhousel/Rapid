@@ -132,7 +132,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -170,7 +169,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -190,7 +188,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -200,7 +197,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * initialHashParams
    * Get the initial urlhash parameters  (was: `context.initialHashParams`)
    * This were the values that were present when Rapid initally started up.
    * @readonly
@@ -211,7 +207,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * getParam
    * Gets the current parameter value for a given key.
    * @param k - The parameter key to get
    * @return The parameter's current value, or `undefined`
@@ -222,7 +217,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * setParam
    * Sets a `key=value` pair that will be added to the urlhash params.
    * Values passed as `undefined` or `null` will be deleted from the query params
    * Values passed as empty string '' will remain in the query params
@@ -245,7 +239,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * _updateHash
    * Updates the hash (by calling `window.history.replaceState()`) to match _currParams;
    * This updates the URL hash without affecting the browser navigation stack.
    */
@@ -264,7 +257,6 @@ export class UrlHashSystem extends AbstractSystem {
   }
 
   /**
-   * _deferredUpdateHash
    * Uses `throttle` to avoid performing updates too frequently.
    */
   _deferredUpdateHash(): void {
@@ -278,7 +270,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * _updateTitle
    * Updates the title of the tab (by setting `document.title`)
    */
   _updateTitle(): void {
@@ -328,7 +319,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * _deferredUpdateTitle
    * Uses `throttle` to avoid performing updates too frequently.
    */
   _deferredUpdateTitle(): void {
@@ -342,7 +332,6 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Called on hashchange event (user changes url manually), and when enabling the hash behavior
    * Receiving code will receive copies of both the current and previous parameters.
    */

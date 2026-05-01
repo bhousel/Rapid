@@ -218,7 +218,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -257,7 +256,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -267,7 +265,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -286,7 +283,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * _reset
    * Internal reset of all stored data
    */
   private _reset(): void {
@@ -320,7 +316,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * base
    * The `base` edit is the initial edit in the history.  It contains the Base Graph.
    * It will not contain any actual user edits, sources, annotation.
    * @return The initial Edit containing the Base Graph
@@ -330,7 +325,6 @@ export class EditSystem extends AbstractSystem {
   }
 
   /**
-   * stable
    * The `stable` edit is the latest accepted edit in the history, as indicated by `_index`.
    * The `stable` edit is suitable for validation or backups.
    * Before the user edits anything, `_index === 0`, so the `stable === base`.
@@ -342,7 +336,6 @@ export class EditSystem extends AbstractSystem {
   }
 
   /**
-   * staging
    * The `staging` edit will be a placeholder work-in-progress edit in the chain immediately
    * following the `stable` edit.  The user may be drawing a feature or editing tags.
    * The `staging` edit has not been added to the history yet.
@@ -353,7 +346,6 @@ export class EditSystem extends AbstractSystem {
   }
 
   /**
-   * tree
    * The tree is a spatial index that keeps itself in sync with the `staging` graph.
    * @return The Tree (spatial index)
    */
@@ -362,7 +354,6 @@ export class EditSystem extends AbstractSystem {
   }
 
   /**
-   * history
    * A shallow copy of the history.
    * @return A shallow copy of the history
    */
@@ -371,7 +362,6 @@ export class EditSystem extends AbstractSystem {
   }
 
   /**
-   * index
    * Index pointing to the current `stable` Edit
    * @return Index pointing to the current `stable` Edit
    */
@@ -380,7 +370,6 @@ export class EditSystem extends AbstractSystem {
   }
 
   /**
-   * hasWorkInProgress
    * Is there work in progress in the `staging` edit?
    * @return `true` if there is work in progress in the `staging` edit.
    */
@@ -390,7 +379,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * perform
    * This performs a bit of work.  Perform accepts a variable number of "action" arguments.
    * "Actions" are functions that accept a Graph and return a modified Graph.
    * All work is performed against the `staging` work-in-progress edit.
@@ -407,7 +395,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * performAsync
    * Promisified version of `perform` that can support eased edits in a transition.
    * This version of `perform` accepts a single Action function argument.
    * If the Action is marked as being "transitionable", run it multiple times with
@@ -465,7 +452,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * revert
    * This reverts the `staging` work-in-progress by replacing `staging` with a fresh copy of `stable`.
    * (It's more like what `git reset --hard` does, but we can't call it "reset")
    */
@@ -479,7 +465,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * commit
    * This finalizes the `staging` work-in-progress edit.
    * (It's somewhat like what `git commit` does.)
    *  - Set annotation, sources, and other edit metadata properties
@@ -529,7 +514,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * commitAppend
    * This is like `commit`, but instead of adding `staging` after stable,
    *   it replaces `stable` with `staging` and does not advance the history.
    * (It's somewhat like what `git commit --append` does.)
@@ -586,7 +570,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * undo
    * If there is work-in-progress on the `staging` edit, revert to `stable`
    * Otherwise, move the `stable` index back to the previous Edit (or `_index = 0`).
    * Note that all work-in-progress in the `staging` Edit is lost when calling `undo()`.
@@ -630,7 +613,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * redo
    * Move the `stable` index forward to the next Edit (if any)
    * Note that all work-in-progress in the `staging` Edit is lost when calling `redo()`.
    *
@@ -666,7 +648,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * setCheckpoint
    * This saves the `history` and `index` as a "checkpoint" that we can return to later.
    * If the given checkpointID exists, it will be overwritten.
    * @param checkpointID - A string to identify the checkpoint
@@ -684,7 +665,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * restoreCheckpoint
    * This returns the `history` and `index` back to the edit identified by the given checkpointID.
    * Note that all work-in-progress in the `staging` Edit is lost when calling `restoreCheckpoint()`.
    * @param checkpointID - A string to identify the checkpoint
@@ -708,7 +688,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * deleteCheckpoint
    * This removes the checkpoint identified by the given checkpointID.
    * @param checkpointID - A string to identify the checkpoint
    */
@@ -719,7 +698,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   *  merge
    *  Merge new entities into the Base Graph.
    *  (Sorry, but this one is not like what `git merge` does.)
    *
@@ -796,7 +774,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * beginTransaction
    * Prevents `stagingchange` and `stablechange` events from being emitted.
    * During a transaction, edits can be performed but no `change` events will be emitted.
    * This is to prevent other parts of the code from rendering/validating partial or incomplete edits.
@@ -807,7 +784,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * endTransaction
    * This marks the transaction as complete, and allows events to be emitted again.
    * Any `stagingchange` and `stablechange` events will be emitted that cover
    *   the difference from the beginning -> end of the transaction.
@@ -819,7 +795,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * getUndoAnnotation
    * @return The previous undo annotation, or `undefined` if none
    */
   getUndoAnnotation(): string | undefined {
@@ -833,7 +808,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * getRedoAnnotation
    * @return The next redo annotation, or `undefined` if none
    */
   getRedoAnnotation(): string | undefined {
@@ -847,7 +821,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * intersects
    * Returns the entities from the `staging` graph with bounding boxes overlapping the given `extent`.
    * @param extent - the extent to test
    * @return Entities intersecting the given Extent
@@ -858,7 +831,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * difference
    * Returns a `Difference` containing all edits from `base` -> `stable`
    * We use this pretty frequently, so it's cached in `this._fullDifference`
    *  and recomputed by the `_emitChanges` function only when `stable` changes.
@@ -870,7 +842,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * changes
    * This returns a summery of all changes made from `base` -> `stable`
    * Optionally includes a given action function to apply to the `stable` graph.
    * @param action - Optional action to apply to the `stable` graph
@@ -894,7 +865,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * hasChanges
    * This counts meangful edits only (modified, created, deleted).
    * For example, we could perform a bunch of no-op edits and it would still return false.
    * @return `true` if the user has made any meaningful edits
@@ -905,7 +875,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * sourcesUsed
    * This prepares the list of all sources used during the user's editing session.
    * This is called by `commit.js` when preparing the changeset before uploading.
    * @return Object of all sources used during the user's editing session
@@ -933,7 +902,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * toIntroGraph
    * This is used to export the intro graph used by the walkthrough.
    * This function is indended to be called manually by developers.
    * We only use this on very rare occasions to change the walkthrough data.
@@ -1025,7 +993,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * toJSON
    * Save the edit history to JSON.
    * @return A String containing the JSON, or `undefined` if nothing to save
    */
@@ -1133,7 +1100,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * fromJSONAsync
    * Restore the edit history from a JSON string.
    * Because the restore process can involve fetching additional information from the OSM API,
    *  this function needs to be async, and should be chained after a `context.resetAsync()` to ensure
@@ -1330,7 +1296,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * immediateBackup
    * Backup the user's edits to a JSON string in localStorage.
    * This code runs occasionally as the user edits.
    */
@@ -1357,7 +1322,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * deferredBackup
    * Backup the user's edits after a delay.
    * Uses `debounce` to avoid performing backups too frequently.
    */
@@ -1372,7 +1336,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * canRestoreBackup
    * This flag will be `true` if `initAsync` has determined that there is a restorable
    *  backup, and we are waiting on the user to make a decision about what to do with it.
    * @return `true` if there is a backup to restore
@@ -1384,7 +1347,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * restoreBackup
    * Restore the user's backup from localStorage.
    * This happens when:
    * - The user chooses to "Restore my changes" from the restore screen
@@ -1405,7 +1367,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * clearBackup
    * Remove any backup stored in localStorage.
    * This happens when:
    * - The user chooses to "Discard my changes" from the restore screen
@@ -1429,7 +1390,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * _backupKey
    * Generate a key used to store/retrieve backup edits.
    * It uses `window.location.origin` avoid conflicts with other instances of Rapid.
    * @return The key used to store/retrieve backup edits in localStorage
@@ -1441,7 +1401,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * _gatherSources
    * Get the sources used to make the `staging` edit.
    * @param annotation - Rapid edits may optionally use an annotation that includes the data source used
    * @return sources Object containing `imagery`, `photos`, `data` properties
@@ -1483,7 +1442,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * _perform
    * Internal `_perform`, accepts both Actions array and eased time,
    * Performs the edits and emits no events.
    * @param actions - Array of Action functions to perform
@@ -1504,7 +1462,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * _replaceStaging
    * This replaces the `staging` work-in-progress edit with a fresh copy of `stable`.
    * Rolls back the edits and emits no events.
    */
@@ -1515,7 +1472,6 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * _emitChanges
    * Recalculate the differences and emit `stablechange` and `stagingchange` events.
    * @return Difference between before and after of `staging` Edit
    */

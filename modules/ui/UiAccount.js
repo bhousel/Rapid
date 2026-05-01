@@ -4,7 +4,6 @@ import { uiIcon } from './icon.js';
 
 
 /**
- * UiAccount
  * This component adds the user account info to the footer.
  */
 export class UiAccount {
@@ -37,7 +36,6 @@ export class UiAccount {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -149,7 +147,6 @@ export class UiAccount {
 
 
   /**
-   * getUserDetails
    * Gets the user details, then calls render again.
    */
   getUserDetails() {
@@ -175,7 +172,6 @@ export class UiAccount {
 
 
   /**
-   * tryLogout
    * OAuth2's idea of "logout" is just to get rid of the bearer token.
    * If we try to "login" again, it will just grab the token again.
    * What a user probably _really_ expects is to logout of OSM so that they can switch users.

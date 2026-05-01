@@ -98,7 +98,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -111,7 +110,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -137,7 +135,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -159,7 +156,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * getData
    * Get already loaded data that appears in the current map view
    * @return Array of data
    */
@@ -170,7 +166,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view
    */
   loadTiles(): void {
@@ -200,7 +195,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * loadTile
    * Load a single tile of data.
    * @param tile - Tile data
    */
@@ -226,7 +220,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * _gotTile
    * Parse the response from the tile fetch
    * @param tile - Tile data
    * @param response - Response data
@@ -272,7 +265,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * loadIssueDetailAsync
    * Fetch additional issue details when needed.
    * @param issue
    * @return Promise resolved once the data has been fetched
@@ -306,7 +298,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * getStrings
    * @param itemType
    * @param locale
    * @return stringdata
@@ -321,7 +312,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * getColor
    * Get the color associated with this issue type
    * @param itemInt
    * @return hex color
@@ -332,7 +322,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * getIcon
    * Get the icon to use for the given itemType
    * @param itemType
    * @return icon name
@@ -343,7 +332,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * postUpdate
    * Called to change some properies (status, comments) about the Osmose data item.
    * Will send the update to the Osmose API and refresh the local data cache.
    * @param issue
@@ -387,7 +375,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * getError
    * Get item with given id from cache
    * @param dataID
    * @return the cached item, or `undefined` if not found
@@ -399,7 +386,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * replaceItem
    * Replace a single item in the cache
    * @param item - item to replace
    * @return the item, or `null` if it couldn't be replaced
@@ -414,7 +400,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * removeItem
    * Remove a single item from the cache
    * @param item - item to remove
    */
@@ -428,7 +413,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * getClosedCounts
    * Used to populate `closed:osmose:*` changeset tags
    * @return the closed cache
    */
@@ -438,7 +422,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * itemURL
    * Returns the URL to link to details about an item
    * @param item
    * @return the url
@@ -449,7 +432,6 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * _loadStringsAsync
    * Load the strings for the types of issues that we support
    * @return Promise
    */

@@ -50,7 +50,6 @@ export class OvertureService extends AbstractSystem {
 
 
   /**
-   * _loadS3CatalogAsync
    * Load and parse the overture catalog data
    * @return  Promise resolved when the data has been loaded
    */
@@ -72,7 +71,6 @@ export class OvertureService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -88,7 +86,6 @@ export class OvertureService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -104,7 +101,6 @@ export class OvertureService extends AbstractSystem {
 
 
   /**
-   * getAvailableDatasets
    * Called by `RapidSystem` to get the datasets that this service provides.
    * @return  The datasets this service provides
    */
@@ -128,7 +124,6 @@ export class OvertureService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Use the vector tile service to schedule any data requests needed to cover the current map view
    * @param  datasetID - dataset to load tiles for
    */
@@ -146,7 +141,6 @@ export class OvertureService extends AbstractSystem {
 
 
   /**
-   * getData
    * Get already loaded data that appears in the current map view
    * @param  datasetID - datasetID to get data for
    * @return Array of data

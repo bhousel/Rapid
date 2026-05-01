@@ -6,7 +6,6 @@ import { utilCmd, utilKeybinding } from '../../util/index.ts';
 
 
 /**
- * UiZoomControl
  */
 export class UiZoomControl {
 
@@ -69,7 +68,6 @@ export class UiZoomControl {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -125,7 +123,6 @@ export class UiZoomControl {
 
 
   /**
-   * zoomIn
    * @param  {Event} e? - triggering event (if any)
    */
   zoomIn(e) {
@@ -135,7 +132,6 @@ export class UiZoomControl {
   }
 
   /**
-   * zoomOut
    * @param  {Event} e? - triggering event (if any)
    */
   zoomOut(e) {
@@ -145,7 +141,6 @@ export class UiZoomControl {
   }
 
   /**
-   * zoomInFurther
    * @param  {Event} e? - triggering event (if any)
    */
   zoomInFurther(e) {
@@ -155,7 +150,6 @@ export class UiZoomControl {
   }
 
   /**
-   * zoomOutFurther
    * @param  {Event} e? - triggering event (if any)
    */
   zoomOutFurther(e) {

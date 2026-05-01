@@ -7,7 +7,6 @@ import { utilCmd } from '../../util/cmd.ts';
 
 
 /**
- * UiHistoryCard
  */
 export class UiHistoryCard extends AbstractUiCard {
 
@@ -49,7 +48,6 @@ export class UiHistoryCard extends AbstractUiCard {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -155,7 +153,6 @@ export class UiHistoryCard extends AbstractUiCard {
 
 
   /**
-   * renderNote
    * @param  {d3-selection} $selection - A d3-selection to a HTMLElement that this function should render itself into
    * @param  {Note}         note       - The OSM Note to display details for
    */
@@ -209,7 +206,6 @@ export class UiHistoryCard extends AbstractUiCard {
 
 
   /**
-   * renderEntity
    * @param  {d3-selection} $selection - A d3-selection to a HTMLElement that this function should render itself into
    * @param  {Entity}       entity     - The OSM entity (node, way, relation) to display details for
    */
@@ -275,7 +271,6 @@ export class UiHistoryCard extends AbstractUiCard {
 
 
   /**
-   * displayTimestamp
    * @param  {string}  stringified timestamp
    * @return {string}  localized `String` for the given timestamp (or localized 'unknown' string)
    */
@@ -299,7 +294,6 @@ export class UiHistoryCard extends AbstractUiCard {
 
 
   /**
-   * renderUser
    * @param  {d3-selection} $selection - A d3-selection to a HTMLElement that this function should render itself into
    * @param  {string}       username   - The OSM username to display details for
    */
@@ -344,7 +338,6 @@ export class UiHistoryCard extends AbstractUiCard {
 
 
   /**
-   * renderChangeset
    * @param  {d3-selection} $selection  - A d3-selection to a HTMLElement that this function should render itself into
    * @param  {string}       changesetID - The OSM changeset id to display details for
    */
@@ -395,7 +388,6 @@ export class UiHistoryCard extends AbstractUiCard {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

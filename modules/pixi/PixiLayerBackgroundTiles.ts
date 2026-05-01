@@ -40,7 +40,6 @@ const sharpenMatrix = [
 
 
 /**
- * PixiLayerBackgroundTiles
  *
  * Properties you can access:
  *   `isMinimap` - set this to `true` if this is a minimap background layer.
@@ -88,7 +87,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset(): void {
@@ -105,7 +103,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * render
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering
@@ -167,7 +164,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * renderSource
    * @param timestamp - Timestamp in milliseconds
    * @param viewport - Pixi viewport to use for rendering
    * @param source - Imagery source Object
@@ -362,7 +358,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * destroyAll
    * Frees all the resources used by all sources
    */
   destroyAll(): void {
@@ -382,7 +377,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * destroySource
    * Frees all the resources used by a source
    * @param sourceID - the sourceID to free
    */
@@ -405,7 +399,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * destroyTile
    * Frees all the resources used by a tile
    * @param tile - Tile object
    */
@@ -434,7 +427,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * getSourceContainer
    * Gets a PIXI.Container to hold the tiles for the given sourceID, creating one if needed
    * @param sourceID - the sourceID get a container for
    * @return A PIXI.Container to render tiles into
@@ -454,7 +446,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * applyFilters
    * Adds an adjustment filter for brightness/contrast/saturation and
    * a sharpen/blur filter, depending on the UI slider settings.
    * @param sourceContainer - The PIXI.Container that contains the tiles
@@ -496,7 +487,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * setBrightness
    * @param val - the brightness value
    */
   setBrightness(val: number): void {
@@ -504,7 +494,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   }
 
   /**
-   * setContrast
    * @param val - the contrast value
    */
   setContrast(val: number): void {
@@ -512,7 +501,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   }
 
   /**
-   * setSaturation
    * @param val - the saturation value
    */
   setSaturation(val: number): void {
@@ -520,7 +508,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   }
 
   /**
-   * setSharpness
    * @param val - the sharpness value
    */
   setSharpness(val: number): void {

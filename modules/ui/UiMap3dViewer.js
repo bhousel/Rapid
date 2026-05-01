@@ -1,7 +1,6 @@
 import { selection } from 'd3-selection';
 
 /**
- * UiMap3dViewer
  * A wrapper for the 3dMap
  * Someday we should make this more like the photoviewer
  */
@@ -24,7 +23,6 @@ export class UiMap3dViewer {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into

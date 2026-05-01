@@ -4,7 +4,6 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
 
 
 /**
- * actionAddEntity
  * Adds an entity to the graph.
  * @param entity - The entity to add
  * @return Action that adds the entity to the graph

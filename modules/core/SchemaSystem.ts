@@ -244,7 +244,6 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -293,7 +292,6 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -303,7 +301,6 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -315,7 +312,6 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
-   * loadSchemaAssetsAsync
    * @return Promise fulfilled when the schema assets have been loaded
    */
   loadSchemaAssetsAsync(): Promise<void> {
@@ -400,7 +396,6 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
-   * resetAll
    * This puts the SchemaSystem internal data back to its initial state.
    * i.e. nothing loaded, only fallback presets.
    */
@@ -477,7 +472,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * defaultAssetIDs
    * Returns the default assetIDs. These are the schema assets that Rapid will load by default.
    * @return  Default assetIDs
    * @readonly
@@ -487,7 +481,6 @@ gfx?.scene?.reset();  // throw it all away
   }
 
   /**
-   * loadedAssetIDs
    * Returns the loaded assetIDs, along with their version numbers if known.
    * @return  Loaded assetIDs
    * @readonly
@@ -497,7 +490,6 @@ gfx?.scene?.reset();  // throw it all away
   }
 
   /**
-   * requestedAssetIDs
    * Allows user to request different schema asset files than what Rapid uses by default.
    *
    * If set before init time, these assets will be loaded at init time when init calls `loadSchemaAssetsAsync`.
@@ -535,7 +527,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * merge
    * Accepts schema data in scoped format:
    * ```
    * {
@@ -748,7 +739,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * getScope
    * Get the scope data for a specific scope ID.
    * If the scope doesn't exist yet, it is created and cached automatically.
    * @param scopeID - ID of the scope to look up
@@ -792,7 +782,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * search
    * Performs a full-text search across Presets and Categories for a given scope.
    * This is powered by the Minisearch library and returns a result like:
    *  {
@@ -899,7 +888,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * match
    * Find the best matching Preset for the given entity.
    * Results are cached as a transient on the entity.
    * @param   entity  - the Entity to test
@@ -920,7 +908,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * matchTags
    * Find the best matching Preset for the given tags and geometry.
    * Uses the per-scope match index for fast lookup, and filters by location if provided.
    * @param   tags - OSM tags to match
@@ -988,7 +975,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * allowsVertex
    * @param   entity  - the Entity to test
    * @param   graph   - the Graph containing this Entity
    * @return  `true` if this entity can be a vertex, `false` if not
@@ -1012,7 +998,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * areaKeys
    * Because of the open nature of tagging, we will never have a complete
    * list of tags used in OSM, so we want it to have logic like "assume
    * that a closed way with an amenity tag is an area, unless the amenity
@@ -1067,7 +1052,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * removeLifecyclePrefix
    * Removes a lifecycle prefix from a tag key if present (e.g. 'disused:railway' → 'railway').
    * The set of recognized lifecycle prefixes comes from the 'lifecycle_prefixes' variable.
    *
@@ -1090,7 +1074,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * getDeprecatedTags
    * Returns any tag deprecations that match the given tags.
    * Checks whether the entity's tags match any known deprecated tag patterns.
    *
@@ -1152,7 +1135,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * getFallback
    * Gets the fallback preset for the given geometry.
    * For most geometries we just return the Preset with that `id`, but for `vertex' we return 'point'.
    * @param   geometry - 'point', 'vertex', 'line', 'area', or 'relation'
@@ -1169,7 +1151,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * getDefaults
    * Defaults are the Presets and Categories offered to the user when adding a new feature.
    * Each geometry type has its own set of defaults.
    * The fallback preset for the given geometry is appended to the list automatically.
@@ -1243,7 +1224,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * getRecents
    * Returns the recently used presets.
    * If this._recentIDs is unset, try to load them from localStorage
    * @param   scopeID - Scope to query (defaults to 'osm')
@@ -1279,7 +1259,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * setMostRecent
    * Prepends a preset to the recently used Presets array.
    * @param  preset - A preset to add
    */
@@ -1300,7 +1279,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * _registerDefaultAssets
    * Tell the AssetSystem where to find the default schema files.
    * This is called during initAsync before loading the assets.
    */
@@ -1352,7 +1330,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -1374,7 +1351,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * _localeChanged
    * Call this whenever the locale changes.
    * It will lock in the new locale and prepare a search index for that locale.
    * These are cached, so switching back to an already-seen locale should be fast.
@@ -1405,7 +1381,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * _prepareSearchIndex
    * Prepares a MiniSearch index for the current locale code, per scope.
    * These are cached, so switching back to an already-seen locale should be fast.
    */
@@ -1436,7 +1411,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * _rebuildSearchIndex
    * Rebuild the MiniSearch full-text search index for a given scope.
    * This happens when we switch to a new search index for the first time.
    * This may be a bit slow, so consider making this async.
@@ -1462,7 +1436,6 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
-   * _schemaChanged
    * Called whenever the available schemas has changed.
    * This should happen after new schema data has been merged in.
    * Remove all cached data and cached fulltext search index.

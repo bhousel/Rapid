@@ -144,7 +144,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -157,7 +156,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -174,7 +172,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -196,7 +193,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * getData
    * Get already loaded data that appears in the current map view
    * @return Array of data
    */
@@ -207,7 +203,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view.
    * KeepRight API:  http://osm.mueschelsoft.de/keepright/interfacing.php
    */
@@ -238,7 +233,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * loadTile
    * Load a single tile of data.
    * @param tile - Tile data
    */
@@ -265,7 +259,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * _gotTile
    * Parse the response from the tile fetch.
    * @param tile - Tile data
    * @param response - Response data
@@ -363,7 +356,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * postUpdate
    * Called to change some properies (status, comments) about the KeepRight data item.
    * Will send the update to the KeepRight API and refresh the local data cache.
    * @param item - the MarkerData item to update
@@ -414,7 +406,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * getError
    * Get item with given id from cache
    * @param dataID - the data ID to look up
    * @return the cached item, or `undefined` if not found
@@ -426,7 +417,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * getColor
    * Get the color associated with this issue type
    * @param parentIssueType - the parent issue type key
    * @return hex color
@@ -437,7 +427,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * replaceItem
    * Replace a single item in the cache
    * @param item - MarkerData to replace
    * @return the item, or `null` if it couldn't be replaced
@@ -452,7 +441,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * removeItem
    * Remove a single item from the cache
    * @param item - MarkerData to remove
    */
@@ -465,7 +453,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * issueURL
    * Returns the URL to link to details about an item
    * @param item - the MarkerData item
    * @return the url
@@ -475,7 +462,6 @@ export class KeepRightService extends AbstractSystem {
   }
 
   /**
-   * getClosedIDs
    * Get an array of issues closed during this session.
    * Used to populate `closed:keepright` changeset tag
    * @return Array of closed item ids
@@ -486,7 +472,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * _tokenReplacements
    * Build a map of token replacements for templating a KeepRight error description.
    * Parses the description using the error type's regex and links any captured IDs.
    * @param props - Properties of the KeepRight issue
@@ -543,7 +528,6 @@ export class KeepRightService extends AbstractSystem {
 
 
   /**
-   * _parseError
    * Parse a single captured group from an error description regex match.
    * Localizes known strings and wraps IDs/URLs in linkable HTML elements.
    * @param capture - The captured text to parse

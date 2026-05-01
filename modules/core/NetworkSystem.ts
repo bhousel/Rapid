@@ -154,7 +154,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -178,7 +177,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -190,7 +188,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Aborts all inflight requests and clears the queue.
    * @return Promise resolved when this component has completed resetting
    */
@@ -209,7 +206,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * defaultTimeout
    * Default timeout in milliseconds for new requests.
    */
   get defaultTimeout(): number {
@@ -221,7 +217,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * maxInflight
    * Maximum concurrent active requests.  Requests beyond this limit
    * are queued (FIFO).
    */
@@ -234,7 +229,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * numInflight
    * Total number of tracked requests (active + queued).
    * For diagnostics / tests.
    * @readonly
@@ -245,7 +239,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * numActive
    * Number of actively dispatched network requests (excludes queued).
    * @readonly
    */
@@ -255,7 +248,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * numQueued
    * Number of requests waiting in the concurrency queue.
    * @readonly
    */
@@ -265,7 +257,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * isInflight
    * Returns true if a request with the given requestID is currently tracked
    * (either active or queued).
    * @param requestID - The dedup/cancellation identifier
@@ -276,7 +267,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * fetch
    * The primary API.  Fetches a URL with automatic:
    *   - Inflight dedup (by `key`)
    *   - Timeout (default 30s, configurable)
@@ -308,7 +298,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * fetchRaw
    * Like `fetch` but returns the raw `Response` object without
    * parsing through `utilFetchResponse`.  Useful for binary data,
    * streams, or when the caller needs response headers.
@@ -342,7 +331,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * abort
    * Aborts a specific inflight request by requestID.
    * No-op if the requestID is not inflight.
    * @param requestID - The dedup/cancellation identifier
@@ -358,7 +346,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * abortAll
    * Aborts every inflight request and clears the queue.
    */
   abortAll(): void {
@@ -373,7 +360,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * abortMatching
    * Aborts all inflight requests whose requestID matches a predicate.
    * Useful for viewport-based cleanup.
    * @param predicate - Function that returns true for requestIDs to abort
@@ -395,7 +381,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * hasMatching
    * Returns true if any inflight request matches the given predicate.
    * Useful for guards that need to check if any request in a category is active.
    * @param predicate - Function that returns true for matching requestIDs
@@ -409,7 +394,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * addRequestInterceptor
    * Registers a function that can modify outgoing requests before dispatch.
    * Interceptors run in registration order on the main thread, producing a
    * serializable `RequestInit` that can be sent to a web worker.
@@ -425,7 +409,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * removeRequestInterceptor
    * Removes a previously registered request interceptor.
    * @param interceptor - The same function reference passed to `addRequestInterceptor`
    */
@@ -442,7 +425,6 @@ export class NetworkSystem extends AbstractSystem {
   // -------------------------------------------------------
 
   /**
-   * _trackAndDispatch
    * Creates the tracked promise, registers it in `_inflight`, and either
    * dispatches immediately or queues for later.  Returns the promise
    * that the caller awaits.
@@ -512,7 +494,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * _createCombinedSignal
    * Combines a manual AbortController signal with a timeout signal.
    * Returns the combined signal, or just the controller's signal if no timeout.
    */
@@ -525,7 +506,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * _drainQueue
    * Dispatches queued requests as concurrency slots become available.
    */
   private _drainQueue(): void {
@@ -539,7 +519,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * _removeFromQueue
    * Removes a queued request by requestID.
    */
   private _removeFromQueue(requestID: RequestID): void {
@@ -551,7 +530,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * _applyInterceptors
    * Runs all registered interceptors on the (url, init) pair.
    * Interceptors run in registration order; each receives the output of the previous.
    */
@@ -564,7 +542,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * _dispatchFetch
    * Performs the actual fetch, either via worker or main thread.
    *
    * Request interceptors are applied first, producing a serializable
@@ -634,7 +611,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * _resolveURL
    * Resolves a potentially relative URL to an absolute URL using the
    * page's base URI.  This ensures that when a URL is dispatched to a
    * web worker, it resolves against the main page's origin rather than
@@ -653,7 +629,6 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * _buildInit
    * Builds a `RequestInit` from the options, excluding NetworkSystem-specific keys.
    */
   private _buildInit(options?: NetworkFetchOptions, signal?: AbortSignal): RequestInit {

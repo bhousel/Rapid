@@ -30,7 +30,6 @@ const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7,
 
 
 /**
- * PixiLayerMapillaryPhotos
  * @class
  */
 export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
@@ -64,7 +63,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset() {
@@ -73,7 +71,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * _bearingchanged
    * Called whenever the viewer's compass bearing has changed (user pans around)
    * @param bearing - the new bearing value in degrees
    */
@@ -84,7 +81,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * _fovchanged
    * Called whenever the viewer's field of view has changed (user zooms/unzooms)
    * @param fov - the new field of view value in degrees
    */
@@ -95,7 +91,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * _dirtyCurrentPhoto
    * If we are interacting with the viewer (zooming / panning),
    * dirty the current photo so its view cone gets redrawn
    */
@@ -119,7 +114,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * supported
    * Whether the Layer's service exists
    */
   get supported() {
@@ -128,7 +122,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
@@ -154,7 +147,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * filterMarkers
    * @param markers - all markers
    * @return markers with filtering applied
    */
@@ -190,7 +182,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * filterSequences
    * Note - a 'sequence' is now a FeatureCollection containing a LineString or MultiLineString, post Rapid#776
    * This is because we can get multiple linestrings for sequences that cross a vector tile boundary.
    * We just look at the first item in the features Array to determine whether to keep/filter the sequence.
@@ -229,7 +220,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * renderMarkers
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering
@@ -343,7 +333,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering

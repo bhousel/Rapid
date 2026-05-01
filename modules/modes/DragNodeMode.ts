@@ -71,7 +71,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * @param  options - Optional options object
    * @return `true` if the mode can be entered, `false` if not
@@ -156,7 +155,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, clearing drawing classes and removing event listeners.
    */
   exit(): void {
@@ -187,7 +185,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * _refreshEntities
    *  Gets the latest version the drag node from the graph after any modifications.
    *  Updates `selectedData` collection to include the dragging node
    */
@@ -210,7 +207,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * _move
    * Move the dragging node
    * @param  eventData - Data received from the drag behavior
    */
@@ -267,7 +263,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * _nudge
    * This event fires on map pans at the edge of the screen.
    * We want to move the dragging node opposite of the pixels panned to keep it in the same place.
    * @param  nudge - [x,y] amount of map pan in pixels
@@ -299,7 +294,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * _end
    * Complete the drag.
    * This calls `commit` to finalize the staging edit.
    * @param  eventData - Data received from the drag behavior
@@ -361,7 +355,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * _moveAnnotation
    * Generate the annotation text for a move operation.
    * @return The localized annotation string, or undefined if dragNode is missing
    */
@@ -379,7 +372,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * _connectAnnotation
    * Generate the annotation text for a connect operation.
    * The annotation varies based on the geometries involved (vertex, point, line, etc.)
    * @param  target - The entity we are connecting the dragNode to
@@ -414,7 +406,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * _canSnapToNode
    * Determine if the drag node can snap to the target node.
    * A vertex can snap to another vertex, or to a node that allows vertices.
    * @param  target - The entity we are considering snapping the node to
@@ -434,7 +425,6 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * _cancel
    * Return to browse mode without doing anything
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */

@@ -34,7 +34,6 @@ export type * from './types.ts';
 
 
 /**
- * createOsmEntity
  * This function allows us to construct the correct OSM Entity type.
  * If passed another OSM Entity, inspect its constructor.
  * If passed context and properties, inspect its `id` or `type` properties.

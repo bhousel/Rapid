@@ -53,7 +53,6 @@ const DEFAULT_MAX_WORKERS = 2;
 
 
 /**
- * WorkerSystem
  * Manages the web worker pool and listener registry.
  *
  * Responsibilities:
@@ -125,7 +124,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -136,7 +134,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -147,7 +144,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state.
    * @return Promise resolved when this component has completed resetting
    */
@@ -170,7 +166,6 @@ export class WorkerSystem extends AbstractSystem {
   // -------------------------------------------------------
 
   /**
-   * workerURL
    * URL to the built worker script.  Auto-detected from the Rapid bundle
    * location during `prepareAsync()`.  Override with a custom URL, or set
    * to `null` to disable worker offloading.
@@ -184,7 +179,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * maxWorkers
    * Maximum number of workers in the pool.  Workers are spawned
    * lazily, so setting this higher doesn't immediately spawn them.
    * Defaults to 2.
@@ -198,7 +192,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * numWorkers
    * Number of workers currently alive in the pool.
    * @readonly
    */
@@ -208,7 +201,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * numPendingRequests
    * Number of worker requests awaiting a response.
    * Useful for debugging and tests.
    * @readonly
@@ -219,7 +211,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * dispatch
    * Dispatches a message to a given web worker listener function
    * and returns a Promise that resolves with the worker's result.
    *
@@ -289,7 +280,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * terminateWorkers
    * Terminates all workers in the pool and rejects any pending
    * requests.  Called automatically by `resetAsync()`.
    */
@@ -310,7 +300,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * registerListener
    * Registers a named listener function.
    * @param listenerID - The id of the listener function
    * @param listener - Listener function
@@ -321,7 +310,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * unregisterListener
    * Removes a previously registered listener function.
    * @param listenerID - The id of the listener function
    */
@@ -331,7 +319,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * getListener
    * Returns the listener function for a given listenerID, or undefined.
    * @param listenerID - The id of the listener function
    * @return The listener function, or undefined if no such id exists
@@ -342,7 +329,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * _getOrSpawnWorker
    * Returns the next worker from the pool (round-robin), spawning
    * a new one if the pool isn't full yet.
    */
@@ -361,7 +347,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * _spawnWorker
    * Creates a new Worker and wires up message/error handlers.
    */
   private _spawnWorker(): Worker {

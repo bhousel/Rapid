@@ -19,7 +19,6 @@ export interface OsmNodeProps extends OsmEntityProps {
 
 
 /**
- * OsmNode
  * @see https://wiki.openstreetmap.org/wiki/Node
  *
  * Properties you can access:
@@ -53,7 +52,6 @@ export class OsmNode extends OsmEntity {
 
 
   /**
-   * loc
    * Geographic location in WGS84 [lon, lat]
    * @readonly
    */
@@ -62,7 +60,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * asGeoJSON
    * Returns a GeoJSON representation of the OsmNode.
    * Nodes are represented by a Feature with a Point geometry.
    * @param _graph - Unused for OsmNode
@@ -88,7 +85,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * asJXON
    * Returns a JXON representation of the OsmNode.
    * For OSM Entities, this is used to prepare an OSM changeset XML.
    * @param changesetID - optional changeset ID to include in the output
@@ -114,7 +110,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * geometry
    * Returns 'point' if this Node is standalone, or 'vertex' if is along a parent Way.
    * @param graph - the Graph that holds the topology needed
    * @returns 'point' or 'vertex'
@@ -127,7 +122,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * move
    * Moves this node to a new location.
    * @param loc - the new location, in WGS84 coordinate [longitude, latitude]
    * @returns A new Node copied from this Node, but with the updated location
@@ -137,7 +131,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * isDegenerate
    * A node is "degenerate" if its location is not a proper WGS84 [longitude,latitude] coordinate.
    * @returns `true` if the node is degenerate, `false` if not.
    */
@@ -151,7 +144,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * directions
    * Returns the directions, in degrees, that this node points, given the tags present.
    * @param graph - the Graph that holds the topology needed
    * @returns Array of azimuth angles in degrees
@@ -252,7 +244,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * isEndpoint
    * Returns `true` if this node is an endpoint of a parent way.
    * @param graph - the Graph that holds the topology needed
    * @returns `true` if this node is an endpoint on a parent way, `false` if not
@@ -267,7 +258,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * isConnected
    * Returns `true` if this node is connected to multiple parent ways
    * @param graph - the Graph that holds the topology needed
    * @returns `true` if this node is connected to multiple parent ways, `false` if not
@@ -296,7 +286,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * isShared
    * Returns `true` if this node has multiple connections:
    *  - a Node with multiple parents, OR
    *  - a Node connected to a single parent in multiple places.
@@ -324,7 +313,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * parentIntersectionWays
    * Returns an array of parent ways that intersect at this node.
    * Only linear parent ways with tagging for 'highway', 'railway', 'aeroway', 'waterway' are considered.
    * @param graph - the Graph that holds the topology needed
@@ -343,7 +331,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * isIntersection
    * Returns `true` if this node is an intersection, see `parentIntersectionWays`.
    * @param graph - the Graph that holds the topology needed
    * @returns `true` if this node is an intersection of parent ways, `false` if not
@@ -353,7 +340,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * isHighwayIntersection
    * Like `isIntersection`, but just for highways.
    * @param graph - the Graph that holds the topology needed
    * @returns `true` if this node is an intersection of parent highways, `false` if not
@@ -368,7 +354,6 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
-   * isOnAddressLine
    * Returns `true` if this node is along an address interpolation line.
    * @param graph - the Graph that holds the topology needed
    * @returns `true` if this node is along an address interpolation line, `false` if not

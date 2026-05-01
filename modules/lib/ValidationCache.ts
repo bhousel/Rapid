@@ -72,7 +72,6 @@ export class ValidationCache {
 
 
   /**
-   * cacheIssue
    * Add an issue to the cache
    * @param issue - The ValidationIssue to cache
    */
@@ -103,7 +102,6 @@ export class ValidationCache {
 
 
   /**
-   * uncacheIssue
    * Remove an issue from the cache
    * @param issue - The ValidationIssue to remove
    */
@@ -128,7 +126,6 @@ export class ValidationCache {
 
 
   /**
-   * cacheIssues
    * Add multiple issues to the cache
    * @param issues - Array of ValidationIssues to cache
    */
@@ -140,7 +137,6 @@ export class ValidationCache {
 
 
   /**
-   * uncacheIssues
    * Remove multiple issues from the cache
    * @param issues - Array of ValidationIssues to remove
    */
@@ -152,7 +148,6 @@ export class ValidationCache {
 
 
   /**
-   * uncacheIssuesOfType
    * Remove all issues of a specific type from the cache
    * @param type - The issue type to remove (e.g. 'unsquare_way')
    */
@@ -164,7 +159,6 @@ export class ValidationCache {
 
 
   /**
-   * uncacheEntityID
    * Remove a single entity and all its related issues from the caches
    * @param entityID - The entity ID to remove
    */
@@ -183,7 +177,6 @@ export class ValidationCache {
 
 
   /**
-   * withAllRelatedEntities
    * Returns an expanded set of `entityIDs` that need to also be validated alongside the given `entityIDs`
    * - Entities involved in the same issues
    * - Entities connected to the given entities

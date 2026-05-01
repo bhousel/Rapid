@@ -69,7 +69,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -98,7 +97,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -127,7 +125,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
@@ -150,7 +147,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * _keyup
    * Handler for keyup events on the window.
    * @param  e - A DOM KeyboardEvent
    */
@@ -165,7 +161,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
    * @param  e - A Pixi FederatedPointerEvent
@@ -181,7 +176,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -211,7 +205,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerup
    * Handler for pointerup events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -233,7 +226,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointercancel
    * Handler for pointercancel events.
    */
   _pointercancel(): void {
@@ -242,7 +234,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * _spacebar
    * Handler for `keydown` events of the spacebar. We use these to simulate clicks.
    * Note that the spacebar will repeat, so we can get many of these.
    */
@@ -263,7 +254,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * _doMove
    * Checks lastMove and emits a 'move' event if needed.
    * This may also be fired if we detect a change in the modifier keys.
    */
@@ -326,7 +316,6 @@ export class DrawBehavior extends AbstractBehavior {
 
 
   /**
-   * _doClick
    * Checks lastClick and emits a 'click' event if needed
    */
   _doClick(): void {

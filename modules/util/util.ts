@@ -11,7 +11,6 @@ type GeoJSONInput = GeoJSON.Feature | GeoJSON.FeatureCollection;
 
 
 /**
- * utilTotalExtent
  * Returns an `Extent` that contains all of the given Entities or entityIDs.
  * @param vals - Entities -or- EntityIDs
  * @param graph - The graph to look up entities
@@ -33,7 +32,6 @@ export function utilTotalExtent(vals: Iterable<OsmEntity | EntityID>, graph: Gra
 
 
 /**
- * geojsonFeatures
  * The given GeoJSON may be a single Feature or a FeatureCollection.
  * Here we expand it to an Array of Features.
  * @param geojson - A GeoJSON Feature or FeatureCollection
@@ -46,7 +44,6 @@ export function geojsonFeatures(geojson: Nullable<GeoJSONInput>): GeoJSON.Featur
 
 
 /**
- * geojsonExtent
  * Calculates the bounding extent of a GeoJSON Feature or FeatureCollection.
  * @param geojson - A GeoJSON Feature or FeatureCollection
  * @returns The bounding Extent
@@ -91,7 +88,6 @@ export function geojsonExtent(geojson: Nullable<GeoJSONInput>): Extent {
 
 
 /**
- * utilHighlightEntities
  * Adds or removes highlight styling for the specified entities.
  * @param context - The application context
  * @param entityIDs - Array of entity IDs to highlight
@@ -128,7 +124,6 @@ export function utilHighlightEntities(context: Context, entityIDs: EntityID[], h
 
 
 /**
- * utilIsColorValid
  * Returns whether value looks like a valid color we can display.
  * OSM only supports hex or named colors.
  * @param value - The color value to validate
@@ -149,7 +144,6 @@ export function utilIsColorValid(value: string): boolean {
 
 
 /**
- * utilSetTransform
  * Applies a CSS transformation to the given element.
  * @param element - The HTML element to transform
  * @param x - X translation in pixels
@@ -166,7 +160,6 @@ export function utilSetTransform(element: HTMLElement, x: number, y: number, sca
 
 
 /**
- * utilFunctor
  * A functor is just a way of turning anything into a function.
  * This is particularly useful in places where D3 wants a function to be.
  * If passed a function, it returns that function.
@@ -180,7 +173,6 @@ export function utilFunctor<T>(value: T | (() => T)): () => T {
 
 
 /**
- * utilNoAuto
  * Sets common attributes on `<input>` or `<textarea>` elements to avoid autocomplete and other annoyances.
  * @param selection - A D3 selection to an `<input>` or `<textarea>`
  * @returns Same selection but with the attributes set

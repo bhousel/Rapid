@@ -295,7 +295,6 @@ export function uiPaneHelp(context) {
 
 
   /**
-   * renderContent
    * All panes have a `renderContent` function that will render this pane's
    * content into the given parent selection.
    * (this is the render function)
@@ -377,7 +376,6 @@ export function uiPaneHelp(context) {
 
 
   /**
-   * clickChapter
    */
   function clickChapter(d, i) {
     if (!_selection) return;  // called too early

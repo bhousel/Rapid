@@ -14,7 +14,6 @@ interface ConnectionPoint {
 
 
 /**
- * actionRapidAcceptFeature
  * Accepts a feature from an external graph (AI suggestions) into the main graph.
  * Handles nodes, ways, and relations, including connection points to existing ways.
  *

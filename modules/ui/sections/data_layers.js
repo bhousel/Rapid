@@ -43,7 +43,6 @@ export function uiSectionDataLayers(context) {
 
 
   /*
-   * toggleAllLayers
    * @param  {Event} e? - triggering event (if any)
    */
   function toggleAllLayers(e) {
@@ -71,7 +70,6 @@ export function uiSectionDataLayers(context) {
 
 
   /*
-   * toggleLayerKey
    * Just wraps calls to `toggleLayer`, cancelling the key event
    * @param  {Event}  e? - triggering event (if any)
    */
@@ -82,7 +80,6 @@ export function uiSectionDataLayers(context) {
 
 
   /*
-   * renderIfVisible
    * This calls render on the Disclosure commponent.
    * It skips actual rendering if the disclosure is closed
    */
@@ -92,7 +89,6 @@ export function uiSectionDataLayers(context) {
 
 
   /*
-   * render
    * Render the data layer list and the checkboxes below it
    */
   function render(selection) {
@@ -376,7 +372,6 @@ export function uiSectionDataLayers(context) {
 
 
   /*
-   * mapRouletteIDsChanged
    * @param  d3_event - change event, if called from a change handler
    */
   function mapRouletteIDsChanged(d3_event) {
@@ -448,7 +443,6 @@ export function uiSectionDataLayers(context) {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   function _setupKeybinding() {

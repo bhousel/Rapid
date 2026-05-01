@@ -39,7 +39,6 @@ export interface OsmRelationProps extends OsmEntityProps {
 
 
 /**
- * OsmRelation
  * @see https://wiki.openstreetmap.org/wiki/Relation
  *
  * Properties you can access:
@@ -74,7 +73,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * members
    * get/set the members property
    * @readonly
    */
@@ -83,7 +81,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * asGeoJSON
    * Returns a GeoJSON representation of the OsmRelation.
    * Relations are represented by either:
    *  a Feature with MultiPolygon geometry, or
@@ -140,7 +137,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * asJXON
    * Returns a JXON representation of the OsmRelation.
    * For OSM Entities, this is used to prepare an OSM changeset XML.
    * @param changesetID - optional changeset ID to include in the output
@@ -173,7 +169,6 @@ export class OsmRelation extends OsmEntity {
 
 
   /**
-   * copy
    * Makes a (mostly) deep copy of an OSM Entity.
    * Copied entities will start out with a fresh `id` and cleared out metadata.
    * This is like the sort of copy you would want when copy-pasting a feature.
@@ -204,7 +199,6 @@ export class OsmRelation extends OsmEntity {
 
 
   /**
-   * geometry
    * Returns 'area' if this Relation is a multipolygon, or 'relation' otherwise.
    * @param graph - the Graph that holds the topology needed
    * @return 'area' or 'relation'
@@ -216,7 +210,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * isDegenerate
    * A relation is "degenerate" it has no members.
    * @return `true` if the relation is degenerate, `false` if not.
    */
@@ -225,7 +218,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * indexedMembers
    * Return an array of members, each extended with an `index` property whose value
    * is the member index.
    * @return An Array of members, including an `index` property
@@ -239,7 +231,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * memberByRole
    * Return the first member with the given role. A copy of the member object
    * is returned, extended with an `index` property whose value is the member index.
    * @param role - The role to search for
@@ -254,7 +245,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * membersByRole
    * Same as `memberByRole`, but returns all members with the given role.
    * @param role - The role to search for
    * @return An Array of members, including an `index` property
@@ -270,7 +260,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * memberById
    * Return the first member with the given id. A copy of the member object
    * is returned, extended with an `index` property whose value is the member index.
    * @param id - The id to search for
@@ -285,7 +274,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * memberByIdAndRole
    * Return the first member with the given id and role. A copy of the member object
    * is returned, extended with an `index` property whose value is the member index.
    * @param id - The id to search for
@@ -301,7 +289,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * addMember
    * Inserts a member into the members list at the given index.
    * If index is undefined, the member will be added to the end of the members list.
    * @param member - the member to add
@@ -315,7 +302,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * updateMember
    * Replaces the member which is currently at the given index with the given member.
    * @param member - the member to add
    * @param index - the index to replace
@@ -328,7 +314,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * removeMember
    * Removes the member at the given index.
    * @param index - the index to remove
    * @return A new Relation copied from this Relation, but with the updated members list
@@ -340,7 +325,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * removeMembersWithID
    * Removes any members from the member list with the given id.
    * @param id - the id to search for
    * @return A new Relation copied from this Relation, but with the updated members list
@@ -351,7 +335,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * moveMember
    * Moves a members from one index in the members list to another.
    * @param fromIndex - the index to move it from
    * @param toIndex - the index to move it to
@@ -364,7 +347,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * replaceMember
    * Wherever a member appears with id `needle.id`, replace it with a member
    * with id `replacement.id`, type `replacement.type`, and the original role,
    * By default, adding a duplicate member (by id and role) is prevented.
@@ -390,7 +372,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * isMultipolygon
    * Returns whether this relation is an OSM multipolygon, given the tags present.
    * @return `true` if the relation is a multipolygon, `false` if not.
    */
@@ -399,7 +380,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * isComplete
    * Returns whether this relation's members all exist in the given graph.
    * Because OSM Relations are downloaded lazily, the members may not all exist in the graph
    *  until the relation has been fully downloaded.
@@ -416,7 +396,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * hasFromViaTo
    * Returns whether this relation has members with 'from', 'via', and 'to' roles.
    * These roles are required for `restriction` or `manoeuvre` relations.
    * @return `true` if the all members are present in the graph, `false` if not
@@ -430,7 +409,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * isConnectivity
    * Returns whether this relation is a 'connectivity' relation, given the tags present.
    * @return `true` if the relation is a connectivity relation, `false` if not.
    */
@@ -439,7 +417,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * isRestriction
    * Returns whether this relation is a 'restriction' relation, given the tags present.
    * @return `true` if the relation is a restriction relation, `false` if not.
    */
@@ -448,7 +425,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * isValidRestriction
    * Returns whether this relation is a valid 'restriction' relation, given the tags present.
    * Valid restrictions have a 'restriction' type and an appropriate amount of 'from', 'via', 'to' members.
    * @return `true` if the relation is a valid restriction relation, `false` if not.
@@ -473,7 +449,6 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * multipolygon
    * Returns an array `[A0, ... An]`, each `Ai` being an array of node arrays `[Nds0, ... Ndsm]`,
    * where `Nds0` is an outer ring and subsequent `Ndsi's` (if any i > 0) being inner rings.
    *

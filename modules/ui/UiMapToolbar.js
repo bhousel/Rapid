@@ -6,7 +6,6 @@ import {
 
 
 /**
- * UiMapToolbar
  * This component creates the toolbar section at the top of the map.
  *
  * @example
@@ -49,7 +48,6 @@ export class UiMapToolbar {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into

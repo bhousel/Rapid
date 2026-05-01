@@ -4,7 +4,6 @@ export type DateLike = Date | number | string;
 
 
 /**
- * utilDate
  * Accepts a date, a numeric timestamp, or a string that looks like a Date.
  * This does a bit of work to try to treat strings as ISO dates.
  * (Without it, string dates might be interpreted in the time zone of the user).
@@ -42,7 +41,6 @@ export function utilDate(val: Nullable<DateLike>): Date | null {
 
 
 /**
- * utilDateString
  * Returns a date string as ISO short format, for example 'YYYY-MM-DD'.
  * Accepts a date, a numeric timestamp, or a string that looks like a Date.
  *

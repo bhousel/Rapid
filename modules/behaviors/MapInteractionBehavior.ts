@@ -84,7 +84,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -110,7 +109,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -136,7 +134,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
@@ -204,7 +201,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _click
    * Handler for click events, used to support double-click to zoom/unzoom.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -250,7 +246,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
    * @param  e - A Pixi FederatedPointerEvent
@@ -304,7 +299,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -393,7 +387,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerup
    * Handler for pointerup events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -422,7 +415,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointercancel
    * Handler for pointercancel events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -486,7 +478,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _getDistanceBetweenTouches
    * Calculates the distance between two touch points.
    * @return  The distance between the two touch points.
    */
@@ -503,7 +494,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _wheel
    * Handler for wheel events.
    * @param  e  A DOM WheelEvent (with custom properties)
    */
@@ -557,7 +547,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _updatePinchState
    * Updates the pinch state by recalculating the scale change.
    */
   _updatePinchState(): void {
@@ -574,7 +563,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _resetTouchStates
    * Resets the touch-related states to their initial values.
    */
   _resetTouchStates(): void {
@@ -586,7 +574,6 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
 
   /**
-   * _isPaneOpen
    * Checks if any of the specified panes within the '.map-panes' container are open.
    * @return  True if any of the specified panes are open, otherwise false.
    */

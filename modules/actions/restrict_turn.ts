@@ -6,7 +6,6 @@ import type { Turn } from '../lib/intersection.ts';
 
 
 /**
- * actionRestrictTurn
  * Creates a turn restriction relation.
  *
  * `turn` must be an object conforming to `Turn`

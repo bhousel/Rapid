@@ -5,7 +5,6 @@ import { uiTooltip } from './tooltip.js';
 
 
 /**
- * UiVersionInfo
  * This component adds a link that shows the current version of Rapid
  *  and links to the Rapid changelog.
  * It will also display a "new version" badge (gift icon) when the user has
@@ -52,7 +51,6 @@ export class UiVersionInfo {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into

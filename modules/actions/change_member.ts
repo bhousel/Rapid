@@ -4,7 +4,6 @@ import type { OsmRelation, OsmRelationMember } from '../data/OsmRelation.ts';
 
 
 /**
- * actionChangeMember
  * Updates a member in a relation at the specified index.
  * @param relationID - The ID of the relation to modify
  * @param member - The new member data

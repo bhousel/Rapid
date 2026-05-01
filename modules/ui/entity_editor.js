@@ -50,7 +50,6 @@ export function uiEntityEditor(context) {
 
 
   /**
-   * entityEditor
    * (This is the render function)
    */
   function entityEditor(selection) {

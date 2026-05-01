@@ -7,7 +7,6 @@ import type { PixiScene } from './PixiScene.ts';
 
 
 /**
- * PixiLayerMapUI
  * This class contains any UI elements to be 'drawn over' the map.
  * Some of these containers will contain data managed by other layers.
  *
@@ -62,7 +61,6 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset(): void {
@@ -131,7 +129,6 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * This layer should always be enabled - it contains important UI stuff
    */
   get enabled(): boolean {
@@ -143,7 +140,6 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
 
   /**
-   * geolocationData
    * see:  https://developer.mozilla.org/en-US/docs/Web/API/GeolocationPosition
    */
   get geolocationData(): GeolocationCoordinates | null {
@@ -156,7 +152,6 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
 
   /**
-   * lassoData
    * Pass an array of coordinate data that grows at the user draws the lasso
    */
   get lassoData(): Vec2[] | null {
@@ -169,7 +164,6 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any of the child containers for UI that should float over the map.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -195,7 +189,6 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   }
 
   /**
-   * renderLasso
    * Render the lasso polygon
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -251,7 +244,6 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
 
   /**
-   * renderGeolocation
    * Render the geoloation data
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering

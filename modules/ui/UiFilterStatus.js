@@ -5,7 +5,6 @@ import { uiTooltip } from './tooltip.js';
 
 
 /**
- * UiFilterStatus
  * This component adds the filter status control to the footer.
  * (was named "feature_info")
  */
@@ -40,7 +39,6 @@ export class UiFilterStatus {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -109,7 +107,6 @@ export class UiFilterStatus {
 
 
   /**
-   * click
    * When clicking on a status chip, toggle the Map Data pane.
    * @param  {Event} e? - triggering event (if any)
    */

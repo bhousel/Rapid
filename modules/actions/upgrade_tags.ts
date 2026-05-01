@@ -4,7 +4,6 @@ import type { OsmTags } from '../data/types.ts';
 
 
 /**
- * actionUpgradeTags
  * This action works specifically to perform tag upgrades as directed by
  *  rules found in the id-tagging-schema `deprecated.json` file.
  * see: https://github.com/openstreetmap/id-tagging-schema/blob/main/data/deprecated.json

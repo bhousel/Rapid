@@ -6,7 +6,6 @@ import type { Turn } from '../lib/intersection.ts';
 
 
 /**
- * actionUnrestrictTurn
  * Deletes a turn restriction relation.
  *
  * `turn` must be a Turn object with a `restrictionID` property.

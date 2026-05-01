@@ -16,7 +16,6 @@ export interface GeoJSONProps extends AbstractDataProps {
 
 
 /**
- * GeoJSON
  * This is a wrapper for any kind of arbitrary GeoJSON data.
  * Important:  pass the raw GeoJSON source as a `geojson` property.
  *
@@ -53,7 +52,6 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
   }
 
   /**
-   * updateGeometry
    * Forces a recomputation of the internal geometry data.
    * @returns this same data element
    */
@@ -63,7 +61,6 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
   }
 
   /**
-   * asGeoJSON
    * We expect to find the original GeoJSON source in a `geojson` property.
    * @returns GeoJSON representation of this data element
    */
@@ -83,7 +80,6 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
   }
 
   /**
-   * serviceID
    * GeoJSON may be associated with a 'serviceID' string.
    * For example 'keepright', 'maproulette', 'mapillary', etc.
    * @readonly
@@ -93,7 +89,6 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
   }
 
   /**
-   * properties
    * Get the real GeoJSON properties.
    * @readonly
    */

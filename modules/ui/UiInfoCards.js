@@ -8,7 +8,6 @@ import { utilCmd } from '../util/cmd.ts';
 
 
 /**
- * UiInfoCards
  * This component acts as the container for the information cards.
  * "Cards" are user interface elements that can float on top of the map
  * and provide extra information about the map or the selection.
@@ -56,7 +55,6 @@ export class UiInfoCards {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -85,7 +83,6 @@ export class UiInfoCards {
 
 
   /**
-   * toggle
    * Toggles all info cards on/off
    * @param  {Event} e? - triggering event (if any)
    */
@@ -122,7 +119,6 @@ export class UiInfoCards {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

@@ -7,7 +7,6 @@ import type { PixiScene } from './PixiScene.ts';
 
 
 /**
- * PixiLayerRapidOverlay
  * This class contains any overlay vectors that should be 'drawn over' the map, usually at low zooms.
  * The data for these are scraped from the RapidSystem's datasets, specifically the 'overlay' field.
  * @class
@@ -31,7 +30,6 @@ export class PixiLayerRapidOverlay extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset(): void {
@@ -60,7 +58,6 @@ export class PixiLayerRapidOverlay extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render the GeoJSON custom data
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
@@ -96,7 +93,6 @@ return; // not yet
 
 
   /**
-   * renderPoints
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
    * @param  zoom     -  Effective zoom level to use for rendering
@@ -124,7 +120,6 @@ return; // not yet
 
 
   /**
-   * hasData
    * Return true if there is any overlay endpoint URLs defined in the rapid datasets.
    * @return  `true` if there is a vector tile template or geojson to display
    */

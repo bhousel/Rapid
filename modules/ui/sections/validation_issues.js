@@ -9,7 +9,6 @@ const MAX_ISSUES = 1000;
 
 
 /**
- * uiSectionValidateIssues
  * @param  {Context}  context - Global shared application context
  * @param  {string}   severity - String 'error', 'warning', or 'suggestion'
  */

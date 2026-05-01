@@ -33,7 +33,6 @@ export interface MergeRemoteChangesAction extends Action {
 
 
 /**
- * actionMergeRemoteChanges
  * Merges remote changes from the OSM API with local edits.
  * Handles conflicts in location, tags, nodes, and members.
  * Uses diff3 algorithm for tag merging when possible.

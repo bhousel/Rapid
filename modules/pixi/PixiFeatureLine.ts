@@ -17,7 +17,6 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 
 
 /**
- * PixiFeatureLine
  *
  * Properties you can access:
  *   `geom`       PixiGeometryPart() class containing all the information about the geometry
@@ -65,7 +64,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * destroy
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
@@ -86,7 +84,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * update
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
    */
@@ -259,7 +256,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * updateGraphic
    */
   updateGraphic(which: 'casing' | 'stroke', graphic: PIXI.Graphics, points: Vec2[], zoom: number, isWireframe: boolean): void {
     const style = this._style;
@@ -317,7 +313,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * updateHalo
    * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
    */
   updateHalo(): void {

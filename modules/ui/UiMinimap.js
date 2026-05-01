@@ -12,7 +12,6 @@ const MAX_K = geoZoomToScale(MAX_Z);
 
 
 /**
- * UiMinimap
  */
 export class UiMinimap {
 
@@ -68,7 +67,6 @@ export class UiMinimap {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -130,7 +128,6 @@ export class UiMinimap {
 
 
   /**
-   * _update
    * Call this whenever something about the minimap needs to change
    */
   _update() {
@@ -146,7 +143,6 @@ export class UiMinimap {
 
 
   /**
-   * _zoomEnded
    * d3-zoom callback for when a zoom/pan starts
    */
   _zoomStarted() {
@@ -160,7 +156,6 @@ export class UiMinimap {
 
 
   /**
-   * _zoomed
    * d3-zoom callback that receives zoom/pan events
    * @param  d3_event   A d3-zoom event, transform contains details about what changed
    */
@@ -201,7 +196,6 @@ export class UiMinimap {
 
 
   /**
-   * _zoomEnded
    * d3-zoom callback for when the zoom/pan ends
    */
   _zoomEnded() {
@@ -220,7 +214,6 @@ export class UiMinimap {
 
 
   /**
-   * _updateTransform
    * Update the minimap viewport and d3-zoom transform
    */
   _updateTransform() {
@@ -259,7 +252,6 @@ export class UiMinimap {
 
 
   /**
-   * _updateBoundingBox
    * Recalculates the position and size of the bounding box rectangle on the minimap
    */
   _updateBoundingBox() {
@@ -338,7 +330,6 @@ export class UiMinimap {
 
 
   /**
-   * toggle
    * Toggles the minimap on/off
    * @param  {Event} e? - triggering event (if any)
    */
@@ -381,7 +372,6 @@ export class UiMinimap {
 
 
   /**
-   * _clear
    * Removes resources used by the minimap when it goes invisible
    */
   _clear() {
@@ -392,7 +382,6 @@ export class UiMinimap {
 
 
   /**
-   * _draw
    * Draw the minimap
    */
   _draw() {
@@ -419,7 +408,6 @@ export class UiMinimap {
 
 
   /**
-   * initAsync
    * Setup the Pixi environment for the minimap
    * @return {Promise} Promise resolved when this component has completed initialization
    */
@@ -486,7 +474,6 @@ export class UiMinimap {
 
 
   /**
-   * _onGfxStatusChange
    * Callback function called when the GraphicsSystem loses/restores context
    * @param  {string}  status - one of 'contextlost' or 'contextrestored'
    */
@@ -498,7 +485,6 @@ export class UiMinimap {
 
 
   /**
-   * _resetAsync
    * Replace the Minimap after a context loss
    * @return {Promise} Promise resolved when this component has completed reset and init
    */
@@ -529,7 +515,6 @@ export class UiMinimap {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

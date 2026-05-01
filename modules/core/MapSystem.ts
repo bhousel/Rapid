@@ -74,7 +74,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -205,7 +204,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -215,7 +213,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -225,7 +222,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param  $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -281,7 +277,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding(): void {
@@ -312,7 +307,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param  currParams - The current hash parameters
    * @param  prevParams - The previous hash parameters
@@ -396,7 +390,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * _updateHash
    * Push changes in map state to the urlhash.
    * This gets called on 'draw', so fairly frequently
    */
@@ -452,7 +445,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * centerPoint
    * Returns the [x,y] pixel at the center of the viewport
    * @return  [x,y] pixel at the center of the viewport
    */
@@ -462,7 +454,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * centerLoc
    * Returns the current [lon,lat] location at the center of the viewport
    * @return  [lon,lat] location at the center of the viewport
    */
@@ -472,7 +463,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * mouse
    * Gets the current [x,y] pixel location of the pointer
    * (or center of map if there is no readily available pointer coordinate)
    * @return  [x,y] pixel location of pointer (or center of the map)
@@ -484,7 +474,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * mouseLoc
    * Gets the current [lon,lat] location of the pointer
    * (or center of map if there is no readily available pointer coordinate)
    * @return  [lon,lat] location of pointer (or center of the map)
@@ -495,7 +484,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * transform
    * Set/Get the map transform
    * IF setting, will schedule an update of map transform.
    * All convenience methods for adjusting the map go through here.
@@ -518,7 +506,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * setTransformAsync
    * Newer Promise-returning version of `transform()`
    * @param   t2        Transform Object with `x`,`y`,`z`,`r` properties.
    * @param   duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
@@ -534,7 +521,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * setMapParams
    * Set loc, zoom, and rotation at the same time.
    * @param  loc2      [lon,lat] to set the center to
    * @param  z2        Number to set the zoom to
@@ -577,7 +563,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * setMapParamsAsync
    * Promise-returning version of `setMapParams()`
    * @param  loc2      [lon,lat] to set the center to
    * @param  z2        Number to set the zoom to
@@ -619,7 +604,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * center
    * Set/Get the map center
    * @param  loc2      [lon,lat] to set the center to
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
@@ -635,7 +619,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * zoom
    * Set/Get the map zoom
    * @param  z2        Number to set the zoom to
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
@@ -651,7 +634,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * pan
    * Pan the map by given pixel amount
    * @param  delta     [dx,dy] amount to pan the map
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
@@ -665,7 +647,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * fitEntities
    * Adjust the map to fit to see the given entity or entities
    * @param  entities  Entity or Array of entities to fit in the map view
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
@@ -690,7 +671,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * selectEntityID
    * Selects an entity by ID, loading it first if needed
    * @param  entityID  - entityID to select
    * @param  fitEntity - Whether to force fit the map view to show the entity
@@ -741,7 +721,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * selectNoteID
    * Selects a note by ID, loading it first if needed
    * @param  noteID  - noteID to select
    */
@@ -789,7 +768,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * effectiveZoom
    * The "effective" zoom can be more useful for controlling the experience of the user.
    * This zoom is adjusted by latitude.
    * You can think of it as "what the zoom would be if we were editing at the equator"
@@ -812,7 +790,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * extent
    * Set/Get the map extent
    * @param  extent  Extent Object to fit the map to
    * @return map extent -or- this
@@ -827,7 +804,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * trimmedExtent
    * Set/Get the map extent, but include some padding for header, footer, etc.
    * @param  extent  Extent Object to fit the map to
    * @return map extent -or- this
@@ -854,7 +830,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * extentZoom
    * Returns the maximum zoom that will fit the given extent in the map viewport.
    * @param  extent      Extent Object to fit
    * @param  dimensions  [width, height] to fit it in (defaults to viewport)
@@ -882,7 +857,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * trimmedExtentZoom
    * Returns the maximum zoom that will fit the given extent in the map viewport,
    *   but zoomed out slightly to account for header, footer, etc.
    * @param  extent  Extent Object to fit
@@ -903,7 +877,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * highlightEdits
    * set/get whether to show edited features in a special style
    */
   get highlightEdits(): boolean {
@@ -922,7 +895,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * areaFillMode
    * set/get the area fill mode - one of 'full', 'partial' (default), or 'wireframe'
    */
   get areaFillMode(): AreaFillMode {
@@ -951,7 +923,6 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * wireframeMode
    * set/get whether the area fill mode is set to 'wireframe'
    */
   get wireframeMode(): boolean {

@@ -99,7 +99,6 @@ export class UiSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -202,7 +201,6 @@ export class UiSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -255,7 +253,6 @@ export class UiSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -272,7 +269,6 @@ export class UiSystem extends AbstractSystem {
 
 
   /**
-   * render
    * Renders the Rapid user interface into the main container.
    * Note that most `render` functions accept a parent selection,
    *  this one doesn't need it - `$container` is always the parent.
@@ -313,7 +309,6 @@ export class UiSystem extends AbstractSystem {
 
 
   /*
-   * resize
    * Handler for resize events on the window.
    * Note that this can just be called with no event to recheck the dimensions.
    * @param  e - the resize event (if any)
@@ -381,7 +376,6 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
 
   /**
-   * checkOverflow
    * Call checkOverflow when resizing or whenever the contents change.
    * I think this was to make button labels in the top bar disappear
    * when more buttons are added than the screen has available width
@@ -414,7 +408,6 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
 
   /**
-   * togglePanes
    * If no `$showpane` is passed, all panes are hidden.
    * @param  $showpane - A d3-selection to the pane to show
    */
@@ -475,7 +468,6 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
 
   /*
-   * showEditMenu
    * This shows the contextual edit menu, called by the select behavior when the
    *  user right clicks, or long presses, or presses the menu key.
    * @param  anchorPoint - `[x,y]` screen coordinate where the menu should be anchored
@@ -518,7 +510,6 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
 
   /*
-   * redrawEditMenu
    * This just redraws the edit menu in place if it is already showing, used in
    * situations where its available operations may have changed, such as Rapid#1311
    */
@@ -543,7 +534,6 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
 
   /*
-   * closeEditMenu
    * Remove any existing menu
    */
   closeEditMenu(): void {
@@ -569,7 +559,6 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
 
   /*
-   * closeMapRouletteMenu
    * Remove any existing menu
    */
   closeMapRouletteMenu(): void {
@@ -578,7 +567,6 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
 
   /**
-   * _checkEnvironment
    * This adjusts the favicon and document title if we detect a development or staging environment.
    * called by `initAsync()`
    */
@@ -609,7 +597,6 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
 
   /**
-   * _copyRect
    * ClientRects are immutable, so copy them to an Object in case we need to trim the height/width.
    * @param   src -  rectangle (or something that looks like one)
    * @returns the copied properties

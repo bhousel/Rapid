@@ -36,7 +36,6 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -46,7 +45,6 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -56,7 +54,6 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -67,7 +64,6 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
-   * itemsForSearchQuery
    * Search for Wikidata items matching the query
    * @param query - string to search for
    * @param callback - errback-style callback function to call with results
@@ -106,7 +102,6 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
-   * itemsByTitle
    * Given a Wikipedia language and article title,
    *  retrieve an array of corresponding Wikidata entities.
    * @param lang - language code
@@ -145,7 +140,6 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
-   * languagesToQuery
    */
   languagesToQuery(): string[] {
     const l10n = this.context.systems.l10n;
@@ -161,7 +155,6 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
-   * entityByQID
    * @param qid - qid to query
    * @param callback - errback-style callback function to call with results
    */
@@ -204,7 +197,6 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
-   * getDocs
    * Pass `params` object of the form:
    * {
    *   qid: 'string'      // brand wikidata  (e.g. 'Q37158')

@@ -2,7 +2,6 @@ import { selection, select } from 'd3-selection';
 
 
 /**
- * UiAttribution
  * The Attribution compnoent shows attribution for the imagery layers.
  */
 export class UiAttribution {
@@ -31,7 +30,6 @@ export class UiAttribution {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into

@@ -5,7 +5,6 @@ import * as Polyclip from 'polyclip-ts';
 
 
 /**
- * UiCurtain
  */
 export class UiCurtain {
 
@@ -40,7 +39,6 @@ export class UiCurtain {
 
 
   /**
-   * enable
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -89,7 +87,6 @@ export class UiCurtain {
 
 
   /**
-   * disable
    * Removes all curtain data and unregisters event handlers
    */
   disable() {
@@ -112,7 +109,6 @@ export class UiCurtain {
 
 
   /**
-   * resize
    * Recalculate the dimensions of container and map rectangles and redraw everything
    */
   resize() {
@@ -168,7 +164,6 @@ export class UiCurtain {
 
 
   /**
-   * redraw
    */
   redraw() {
     if (this._inTransition) return;
@@ -178,7 +173,6 @@ export class UiCurtain {
 
 
   /**
-   * redrawDarkness
    * Recalculates the curtain path and the `_revealPolygon` hole being revealed.
    *
    * This is only done one time, unless there is a revealExtent that needs
@@ -332,7 +326,6 @@ export class UiCurtain {
 
 
   /**
-   * redrawTooltip
    * Recalculates the tooltip contents and placement.
    * Contents are only updated once, but placement recalculates whenever this is called.
    */
@@ -483,7 +476,6 @@ export class UiCurtain {
 
 
   /**
-   * _copyRect
    * ClientRects are immutable, so copy them to an Object in case we need to pad/trim them.
    * @param   {DOMRect}  src - rectangle (or something that looks like one)
    * @returns {Object}  Object containing the copied properties

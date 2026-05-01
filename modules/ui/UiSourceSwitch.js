@@ -2,7 +2,6 @@ import { selection } from 'd3-selection';
 
 
 /**
- * UiSourceSwitch
  * This component adds the source switcher control to the footer.
  */
 export class UiSourceSwitch {
@@ -28,7 +27,6 @@ export class UiSourceSwitch {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -73,7 +71,6 @@ export class UiSourceSwitch {
 
 
   /**
-   * toggle
    * Toggles between live and dev database
    * @param  {Event} e? - triggering event (if any)
    */

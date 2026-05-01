@@ -94,7 +94,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * enabled
    * Whether the events are enabled
    * @readonly
    */
@@ -104,7 +103,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -139,7 +137,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -172,7 +169,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * setCursor
    * Sets the cursor to the given style.
    * Pixi EventSystem uses the CSS cursor styles, but also allows for custom cursors in the EventSystem
    * see: https://pixijs.download/release/docs/PIXI.EventSystem.html#setCursor
@@ -227,7 +223,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * _observeModifierKeys
    * For pointer and keyboard events that contain properties about the modifier keys,
    *   this code checks those properties and updates the `modifierKeys` set.
    * It's possible to miss a modifier key if it changed when the window was out of focus
@@ -265,7 +260,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * _observeCoordinate
    * Gather the coordinate data from the event.
    * @param x - The x coordinate
    * @param y - The y coordinate
@@ -285,7 +279,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * _checkButtons
    * On Mac, consider a control-left-click as a right-click - Rapid#920
    * https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
    * https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
@@ -304,7 +297,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window.
    * @param e - A DOM KeyboardEvent
    */
@@ -314,7 +306,6 @@ export class PixiEvents extends EventEmitter {
   }
 
   /**
-   * _keyup
    * Handler for keyup events on the window.
    * @param e - A DOM KeyboardEvent
    */
@@ -324,7 +315,6 @@ export class PixiEvents extends EventEmitter {
   }
 
   /**
-   * _pointerover
    * Handler for pointerover events on the canvas.
    * @param e - A DOM PointerEvent
    */
@@ -338,7 +328,6 @@ export class PixiEvents extends EventEmitter {
   }
 
   /**
-   * _pointerout
    * Handler for pointerout events on the canvas.
    * @param e - A DOM PointerEvent
    */
@@ -352,7 +341,6 @@ export class PixiEvents extends EventEmitter {
   }
 
   /**
-   * _pointerdown
    * Handler for pointerdown events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
@@ -364,7 +352,6 @@ export class PixiEvents extends EventEmitter {
   }
 
   /**
-   * _pointermove
    * Handler for pointermove events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
@@ -376,7 +363,6 @@ export class PixiEvents extends EventEmitter {
   }
 
   /**
-   * _pointerup
    * Handler for pointerup events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
@@ -388,7 +374,6 @@ export class PixiEvents extends EventEmitter {
   }
 
   /**
-   * _pointercancel
    * Handler for pointercancel events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
@@ -397,7 +382,6 @@ export class PixiEvents extends EventEmitter {
   }
 
   /**
-   * _click
    * Handler for click events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
@@ -409,7 +393,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * _wheel
    * Handler for wheel events on the supersurface.
    * @param e - A DOM WheelEvent
    */
@@ -481,7 +464,6 @@ export class PixiEvents extends EventEmitter {
 
 
   /**
-   * _normalizeWheelDelta
    * This code performs some adjustment of the wheel event delta values.
    * The values may be given in PIXEL, LINES, or PAGE and we want them in PIXEL.
    *

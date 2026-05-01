@@ -42,7 +42,6 @@ export class MapNudgeBehavior extends AbstractBehavior {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -61,7 +60,6 @@ export class MapNudgeBehavior extends AbstractBehavior {
 
 
   /**
-   * allow
    * This behavior doesn't start automatically!
    * You need to call `allow()` to actually enable nudging.
    * This is because: the "Add Line" "Add Area" buttons are in the top toolbar, and if
@@ -73,7 +71,6 @@ export class MapNudgeBehavior extends AbstractBehavior {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -91,7 +88,6 @@ export class MapNudgeBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -135,7 +131,6 @@ export class MapNudgeBehavior extends AbstractBehavior {
 
 
   /**
-   * _doNudge
    * Called by the `setInterval` handler to pan the map.
    */
   _doNudge(): void {

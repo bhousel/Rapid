@@ -5,7 +5,6 @@ import { uiTooltip } from './tooltip.js';
 
 
 /**
- * UiValidatorStatus
  * This component adds the validator status control to the footer.
  * (was named "issues_info")
  */
@@ -38,7 +37,6 @@ export class UiValidatorStatus {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -137,7 +135,6 @@ export class UiValidatorStatus {
 
 
   /**
-   * click
    * When clicking on a status chip, toggle the Issues pane.
    * @param  {Event} e? - triggering event (if any)
    */

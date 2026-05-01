@@ -7,7 +7,6 @@ import { utilCmd, utilDetect } from '../util/index.ts';
 
 
 /**
- * UiShortcuts
  * This is a UI component for displaying the keyboard shortcuts (when the user presses '?')
  * It is a modified `uiModal` component.
  * We load the data from 'shortcuts.json' to populate this screen.
@@ -63,7 +62,6 @@ export class UiShortcuts {
 
 
   /**
-   * render
    * Renders the content inside the modal.
    * Note that most `render` functions accept a parent selection,
    *  this one doesn't need it - `$modal` is always the parent.
@@ -295,7 +293,6 @@ export class UiShortcuts {
 
 
   /**
-   * show
    * Shows the shortcuts modal.
    * This will create the modal, then load the shortcuts data, then render()
    * For this kind of popup component, must first `show()` to create the modal.
@@ -326,7 +323,6 @@ export class UiShortcuts {
 
 
   /**
-   * hide
    * Hides the shortcuts modal.
    */
   hide() {
@@ -337,7 +333,6 @@ export class UiShortcuts {
 
 
   /**
-   * toggle
    * Toggle the shortcuts modal
    */
   toggle() {
@@ -356,7 +351,6 @@ export class UiShortcuts {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

@@ -6,7 +6,6 @@ import { uiTooltip } from '../tooltip.js';
 
 
 /**
- * UiBearingControl
  */
 export class UiBearingControl {
 
@@ -38,7 +37,6 @@ export class UiBearingControl {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -104,7 +102,6 @@ export class UiBearingControl {
 
 
   /**
-   * updateBearing
    * Updates the rotation of the compass pointer to match the rotation of the map.
    */
   updateBearing() {
@@ -130,7 +127,6 @@ export class UiBearingControl {
 
 
   /**
-   * resetBearing
    * @param  {Event} e? - triggering event (if any)
    */
   resetBearing(e) {

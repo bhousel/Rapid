@@ -32,7 +32,6 @@ type TransientCache = Map<string, Map<string, unknown>>;
 
 
 /**
- * OsmEntity
  * Here is where we put logic that is common to OSM data elements.
  * Aside from the `props`, OSM data elements all contain a special `tags` object.
  *
@@ -86,7 +85,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * destroy
    * Every data element should have a destroy function that frees all the resources
    * Do not use the data element after calling `destroy()`.
    */
@@ -96,7 +94,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * updateGeometry
    * OSM geometry can be complicated.
    * Nodes are easy because they represent a single coordinate.
    * But the other data types require topology information from a Graph.
@@ -112,7 +109,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * asGeoJSON
    * Returns a GeoJSON representation of this data element.
    * (For generic OsmEntity, this currently returns an unlocated Feature)
    * @param _graph - optional param, used only for some OSM Entities
@@ -128,7 +124,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * asJSON
    * Returns a JSON representation of this data element.
    * For OSM Entities, this is used to serialize the Entity into the backup history.
    * @returns JSON representation of this data element
@@ -138,7 +133,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * asJXON
    * Returns a JXON representation of the data element.
    * For OSM Entities, this is used to prepare an OSM changeset XML.
    * @param _changesetID - optional changeset ID to include in the output
@@ -149,7 +143,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * geometry
    * Returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type.
    * @param graph - the Graph that holds the topology needed
    * @returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type
@@ -159,7 +152,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * copy
    * Makes a (mostly) deep copy of an OSM Entity.
    * Copied entities will start out with a fresh `id` and cleared out metadata.
    * This is like the sort of copy you would want when copy-pasting a feature.
@@ -180,7 +172,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * transient
    * Stores a computed property for this Entity.
    * We're essentially implementing "memoization" for the provided function.
    * @param k - String cache key to lookup the computed value (e.g. 'extent')
@@ -204,7 +195,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * tags
    * Tags are the `key=value` pairs of strings that assign meaning to an OSM element.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Tag
    * @readonly
@@ -214,7 +204,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * visible
    * This is the OSM `visibility` attribute.
    * Objects with `visibility=false` are considered deleted.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Common_attributes
@@ -227,7 +216,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * version
    * This is the OSM `version` attribute, used for conflict detection.
    * When updating an OSM object, its version must match the value on the server,
    *  otherwise the editing API will raise a conflict.
@@ -289,7 +277,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
 
 
   /**
-   * osmId
    * This returns just the numeric part of the entityID.
    * @returns The numeric OSM ID as a string
    */
@@ -298,7 +285,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * isNew
    * By convention, negative numbers are used for new Entities, and positive numbers are used for existing entities.
    * @returns `true` if the Entity is new, `false` if the entity was downloaded from OSM.
    */
@@ -307,7 +293,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * mergeTags
    * This merges the given tags into this Entity's existing tags.
    * When tags have different values, it attempts to convert them into a multi valued tag
    *   such as `key=val1;val2`, without overflowing the tag character limit.
@@ -342,7 +327,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * hasParentRelations
    * Returns `true` if this Entity is a member of any parent Relations.
    * @param graph - the Graph that holds the topology needed
    * @returns `true` if this Entity has parent Relations, `false` if not
@@ -352,7 +336,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * hasNonGeometryTags
    * Returns `true` if this Entity has tags other than `area=yes/no`.
    * @returns `true` if this Entity has non-geometry tags, `false` if not
    */
@@ -364,7 +347,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * isInterestingTag
    * By convention, some tags are more for storing metadata and can be safely ignored.
    * (For example, `source`, `created_by`, etc).
    * Checks the 'uninteresting' ruleset from the 'osm' schema scope.
@@ -382,7 +364,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * hasInterestingTags
    * By convention, some tags are more for storing metadata and can be safely ignored.
    * (For example, `source`, `created_by`, etc).
    * @returns `true` if this Entity has "interesting" tags, `false` if not
@@ -395,7 +376,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * isHighwayIntersection
    * Is this Entity a highway intersection?
    * For most Entities this returns `false`, but is overridden in `OsmNode`.
    * @param _graph - the Graph that holds the topology needed
@@ -406,7 +386,6 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * isDegenerate
    * Each Entity has a way of checking whether it is degenerate (aka invalid) or not.
    * For generic Entities, this returns `true`, but should be overridden with proper logic in the derived classes.
    * @param _graph - the Graph that holds the topology needed

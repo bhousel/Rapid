@@ -37,7 +37,6 @@ export interface Segment {
 
 
 /**
- * OsmWay
  * @see https://wiki.openstreetmap.org/wiki/Way
  *
  * Properties you can access:
@@ -72,7 +71,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * nodes
    * get/set the nodes property
    * @readonly
    */
@@ -81,7 +79,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * asGeoJSON
    * Returns a GeoJSON representation of the OsmWay.
    * Ways are represented by a Feature with either LineString or a Polygon geometry.
    * @param graph - the Graph that holds the topology needed
@@ -124,7 +121,6 @@ export class OsmWay extends OsmEntity {
 
 
   /**
-   * asJXON
    * Returns a JXON representation of the OsmWay.
    * For OSM Entities, this is used to prepare an OSM changeset XML.
    * @param changesetID - optional changeset ID to include in the output
@@ -151,7 +147,6 @@ export class OsmWay extends OsmEntity {
 
 
   /**
-   * copy
    * Makes a (mostly) deep copy of an OSM Entity.
    * Copied entities will start out with a fresh `id` and cleared out metadata.
    * This is like the sort of copy you would want when copy-pasting a feature.
@@ -182,7 +177,6 @@ export class OsmWay extends OsmEntity {
 
 
   /**
-   * first
    * Returns the first nodeID in the node list.
    * @return The first nodeID in the node list, or `undefined` if no nodes.
    */
@@ -191,7 +185,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * last
    * Returns the last nodeID in the node list.
    * @return The last nodeID in the node list, or `undefined` if no nodes.
    */
@@ -200,7 +193,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * contains
    * Returns true if the node list contains the given nodeID.
    * @param nodeID - The nodeID to check
    * @return `true` if the nodeID is in the node list, `false` if not.
@@ -210,7 +202,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * affix
    * Returns 'prefix' or if the given nodeID is at the beginning the node list
    *  or 'suffix' if the given nodeID is at the end of the node list.
    * @param nodeID - The nodeID to check
@@ -222,7 +213,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * layer
    * Returns a numeric layer for this way, given the tags present.
    * '0' is considered "ground level", negative numbers are underground and positive numbers are aboveground.
    * The numbers are currently clamped in the range of [-10..10].
@@ -254,7 +244,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * impliedLineWidthMeters
    * Returns the approximate width of the line, given the tags present.
    * (This does not look for an actual `width` tag, it looks at other tags to imply a width.)
    * @return A number that can be used for the width, in meters
@@ -297,7 +286,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * isOneWay
    * Returns whether a line is oneway, given the tags present.
    * @return `true` if the tags suggest that this is a oneway, `false` if not.
    */
@@ -313,7 +301,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * isSided
    * Returns whether a line is sided, given the tags present.
    * For a sided way, the direction that the way is drawn is significant.
    * Conventionally, the right side is the 'inside'/'lower'.
@@ -339,7 +326,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * lanes
    * Returns lane information for the given way, given the tags present.
    * @return An object containing the lane details for this way
    */
@@ -348,7 +334,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * isClosed
    * A way is "closed" if the first and last nodeID is the same.
    * @return `true` if the way is closed, `false` if not
    */
@@ -357,7 +342,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * isConvex
    * Checks the node angles to determine if the way is a convex polygon or not.
    * @param graph - the Graph that holds the topology needed
    * @return `true` if the way is a convex polygon, `false` if concave polygon, `null` if unclosed or degenerate
@@ -388,7 +372,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * tagSuggestingArea
    * Returns an Object with the tag that implies that this way is an area (polygon).
    * Checks the preset-derived `areaKeys` lookup, plus `areakeys_force_true` and
    * `areakeys_force_false` rulesets that override the normal areaKeys lookups.
@@ -431,7 +414,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * isArea
    * Returns whether this way is a closed area (polygon), given the tags present.
    * @return `true` if the tags suggest that the way is an area, `false` if not.
    */
@@ -442,7 +424,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * isDegenerate
    * The way is "degenerate" if it is a line with <2 nodes or an area with <3 nodes.
    * @return `true` if the way is degenerate, `false` if not.
    */
@@ -451,7 +432,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * isAdjacent
    * Checks whether the given nodeIDs are adjacent in the node list.
    * @return `true` if the nodes are adjacent, `false` if not.
    */
@@ -466,7 +446,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * geometry
    * Returns 'area' if this way is an area (polygon), or 'line' if it is a line.
    * @param graph - the Graph that holds the topology needed
    * @return 'area' or 'line'
@@ -478,7 +457,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * segments
    * Returns an Array of Objects representing the segments between the nodes in this way
    * @param graph - the Graph that holds the topology needed
    * @return Array of segment data
@@ -510,7 +488,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * close
    * If this way is not closed, append the beginning node to the end of the nodelist to close it.
    * @return This Way, or a new Way that has a closed node list
    */
@@ -524,7 +501,6 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
-   * unclose
    * If this way is closed, remove any connector nodes from the end of the nodelist to unclose it.
    * @return This Way, or a new Way that has an unclosed node list
    */
@@ -547,7 +523,6 @@ export class OsmWay extends OsmEntity {
 
 
   /**
-   * addNode
    * Adds a nodeID in front of the node which is currently at position index.
    * If index is undefined, the node will be added to the end of the way for linear ways,
    *   or just before the final connecting node for circular ways.
@@ -605,7 +580,6 @@ export class OsmWay extends OsmEntity {
 
 
   /**
-   * updateNode
    * Replaces the node which is currently at the given index with the given nodeID.
    * Consecutive duplicates are eliminated including existing ones.
    * Circularity is preserved when updating a node.
@@ -657,7 +631,6 @@ export class OsmWay extends OsmEntity {
 
 
   /**
-   * replaceNode
    * Replaces each occurrence of nodeID needle with replacement.
    * Consecutive duplicates are eliminated including existing ones.
    * Circularity is preserved.
@@ -687,7 +660,6 @@ export class OsmWay extends OsmEntity {
 
 
   /**
-   * removeNode
    * Removes each occurrence of the given nodeID.
    * Consecutive duplicates are eliminated including existing ones.
    * Circularity is preserved.

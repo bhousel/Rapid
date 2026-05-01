@@ -110,7 +110,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -120,7 +119,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -130,7 +128,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -164,7 +161,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * getData
    * Get already loaded data that appears in the current map view
    * @param  template - template to get data for
    * @return Array of data
@@ -201,7 +197,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view
    * @param  template - template to load tiles for
    */
@@ -247,7 +242,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _getSourceAsync
    * Create a new cache to hold data for the given template
    * @param  template - A url template for fetching data (e.g. a z/x/y tileserver or .pmtiles)
    * @return Promise resolved to the source object once it is ready to use
@@ -293,7 +287,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _getZoomCache
    * Because vector tiled data can be different at different zooms,
    * the caches and indexes need to be setup "per-zoom".
    * This function will return the existing zoom cache, or create one if needed.
@@ -321,7 +314,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _loadTileAsync
    * @param  source
    * @param  tile
    * @return the fetch promise
@@ -384,7 +376,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _parseTileBuffer
    * Decode a raw MVT protobuf buffer into features and process them.
    * Used by the PMTiles path (standard MVT tiles are parsed on the worker).
    * @param  source
@@ -424,7 +415,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _processVTResults
    * Process pre-parsed MVT features: stringify properties, compute prophash,
    * split multi-geometries, create GeoJSONData, and cache/queue merges.
    * Both the worker-parsed path and the PMTiles path converge here.
@@ -504,7 +494,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _queueMerge
    * Mark this data as eligible for merging across given tile edge
    * @param  cache
    * @param  featureID
@@ -529,7 +518,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _processMergeQueue
    * Call this sometimes to merge polygons across tile edges
    */
   _processMergeQueue(source: VTSource): void {
@@ -556,7 +544,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _cacheFeatures
    * @param  cache
    * @param  features
    */
@@ -578,7 +565,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _uncacheFeatureIDs
    * @param  cache
    * @param  featureIDs
    */
@@ -595,7 +581,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _mergePolygons
    * Merge the given features across the given edge (defined by lowTile/highTile)
    * @param  cache
    * @param  prophash
@@ -701,7 +686,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _calcExtent
    * @param  geojson - a GeoJSONData Feature
    * @return the extent
    */
@@ -740,7 +724,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _dedupePoints
    * The union operation often leaves points which are essentially coincident
    * This will remove them in-place
    * @param  geojson - a GeoJSONData Feature
@@ -772,7 +755,6 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * _toSingleFeatures
    * Call this to convert a multi feature to an array of single features
    * (e.g. convert MultiPolygon to array of Polygons)
    * (If passed a single feature, this will just return the single feature in an array)

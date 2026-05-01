@@ -24,7 +24,6 @@ interface RapidData {
 
 
 /**
- * PixiLayerRapid
  * Renders suggested features supplied by Rapid datasets (MapWithAI, ESRI, Overture)
  * @class
  */
@@ -118,7 +117,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * supported
    * Whether the Layer's service exists
    */
   get supported(): boolean {
@@ -129,7 +127,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * Whether the user has chosen to see the Layer
    * Make sure to start the services first.
    */
@@ -165,7 +162,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset(): void {
@@ -186,7 +182,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -209,7 +204,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * renderDataset
    * Render any data we have, and schedule fetching more of it to cover the view.
    * @param dataset - Dataset Object
    * @param frame - Integer frame being rendered
@@ -341,7 +335,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * renderPolygons
    */
   renderPolygons(
     parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, zoom: number, data: RapidData): void {
@@ -387,7 +380,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * renderLines
    */
   renderLines(parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, zoom: number, data: RapidData): void {
     const color = new PIXI.Color(dataset.color);
@@ -445,7 +437,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * renderPoints
    */
   renderPoints(
     parentContainer: PIXI.Container,

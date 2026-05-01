@@ -108,7 +108,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * Draw a new line, or optionally continue an existing line.
    * @param  options - Optional options object
@@ -192,7 +191,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, cleaning up the draw state and reverting any incomplete work.
    * If the draw way is invalid or degenerate, rolls back to the state before drawing started.
    */
@@ -268,7 +266,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _refreshEntities
    * Confirms that the drawing entities all exist in the graph after any modifications.
    * Updates `selectedData` collection to include the draw way
    * Updates `drawing` class for items that need it
@@ -309,7 +306,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _getAnnotation
    * An annotation is a text associated with the edit, such as "Started a line".
    * @return String such as "Started a line", or undefined if the drawWay is incomplete
    */
@@ -329,7 +325,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _move
    * Move the draw node, or create one if needed.
    * @param eventData - Object containing data about the event and what was targeted
    */
@@ -395,7 +390,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _nudge
    * This event fires on map pans at the edge of the screen.
    * We want to move the drawing node opposite of the pixels panned to keep it in the same place.
    * @param nudge - [x,y] amount of map pan in pixels
@@ -430,7 +424,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _click
    * Process whatever the user clicked on.
    * @param eventData - Object containing data about the event and what was targeted
    */
@@ -502,7 +495,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _clickLoc
    * Clicked on nothing, create a node at given `loc`.
    */
   private _clickLoc(loc: Vec2): void {
@@ -568,7 +560,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _clickWay
    * Clicked on an target way, add a midpoint along the `edge` at given `loc`.
    */
   private _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
@@ -642,7 +633,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _clickNode
    * Clicked on a target node, include that node in the line we are drawing.
    */
   private _clickNode(loc: Vec2, targetNode: OsmNode): void {
@@ -722,7 +712,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _actionRemoveDrawNode
    * Creates an action that removes the draw node from the draw way.
    * This is used when we want to reuse an existing node as a vertex.
    * @param  drawWay - The way being drawn
@@ -738,7 +727,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _addDrawNode
    * Creates a new draw node and adds it to the draw way.
    * The draw node follows the pointer as the user moves it.
    * @param  loc - Optional location for the node; defaults to current mouse location
@@ -762,7 +750,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _finish
    * Done drawing, select the draw way or return to browse mode.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
@@ -785,7 +772,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _cancel
    * Cancel all drawing and return to browse mode.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
@@ -801,7 +787,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _takeSnapshot
    * To deal with undo/redo, we take snapshots of the drawing entityIDs after every commit, keyed to the stable graph.
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same line.
@@ -823,7 +808,6 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * _restoreSnapshot
    * This gets called after undo/redo/restore.
    * Here we attempt to restore the drawing entityIDs from a snapshot.
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
@@ -856,7 +840,6 @@ export class DrawLineMode extends AbstractMode {
   }
 
   /**
-   * _hover
    * Changes the cursor styling based on what geometry is hovered
    */
   private _hover(eventData: EventData): void {

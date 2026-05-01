@@ -15,7 +15,6 @@ export interface ReflectAction extends Action {
 
 
 /**
- * actionReflect
  * Reflects the given area around its axis of symmetry.
  *
  * @param   reflectIDs  - Array of EntityIDs to reflect

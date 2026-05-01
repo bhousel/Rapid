@@ -68,7 +68,6 @@ export interface Keybinding {
 
 
 /**
- * utilKeybinding
  * Creates a keybinding handler for keyboard shortcuts.
  * @param namespace - Unique namespace for event listeners
  * @returns A keybinding instance
@@ -78,7 +77,6 @@ export function utilKeybinding(namespace: string): Keybinding {
 
 
   /**
-   * testBindings
    * Test whether the given event matches any known keybinding.
    * IF so, it calls the bound callback function.
    * @param  evt          - the Event to test
@@ -118,7 +116,6 @@ export function utilKeybinding(namespace: string): Keybinding {
 
 
   /**
-   * testBinding
    * Test whether the given event matches the given binding.
    * @param  evt        - the Event to test
    * @param  check      - the keybinding to check

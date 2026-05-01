@@ -13,7 +13,6 @@ export interface ExtractAction extends Action {
 
 
 /**
- * actionExtract
  * Extracts a point of interest from a node, way, or relation.
  * For nodes, creates a replacement node and detaches the original.
  * For ways/relations, extracts tags to a new point at the centroid.

@@ -59,7 +59,6 @@ export function uiSectionOverlayList(context) {
 
 
   /*
-   * setTooltips
    */
   function setTooltips(selection) {
     selection.each((d, i, nodes) => {
@@ -142,7 +141,6 @@ export function uiSectionOverlayList(context) {
 
 
   /*
-   * onMapDraw
    * Redraw the list sometimes if the map has moved
    */
   function onMapDraw() {

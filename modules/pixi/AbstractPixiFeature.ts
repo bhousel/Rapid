@@ -125,7 +125,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * destroy
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
@@ -161,7 +160,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * update
    * Every Feature should have an `update()` function that redraws the Feature at the given viewport and zoom.
    * When the Feature is updated, its `dirty` flags should be set to `false`.
    * Override in a subclass with needed logic. It will be passed:
@@ -179,7 +177,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * updateHalo
    * Every Feature should have an `updateHalo()` function that redraws any hover or select styling.
    * Override in a subclass with needed logic.
    * @abstract
@@ -189,7 +186,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * featureID
    * Unique string to identify this render Feature.
    * @return This feature's unique id
    * @readonly
@@ -209,7 +205,6 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * parentContainer
    * @param val - container for the parent, this Feature's container will be added to it.
    */
   get parentContainer(): PIXI.Container | null {
@@ -226,7 +221,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * visible
    * Whether the Feature is currently visible
    * @return `true` if the feature is currently visible
    */
@@ -242,7 +236,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * dirty
    * Whether the Feature needs to be rebuilt
    * @return `true` if the feature needs to be rebuilt
    */
@@ -258,7 +251,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * allowInteraction
    * Whether the Feature is allowed to be interactive
    * @return `true` if the feature is currently interactive, `false` if not
    */
@@ -276,7 +268,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * style
    * @param props - Style properties object, see `Style.ts`
    */
   get style(): MinimalStyleProps | null {
@@ -290,7 +281,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * label
    * @param str - the label to use
    */
   get label(): string | null {
@@ -304,7 +294,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * data
    * Getter only, use `setData()` to change it.
    * (because we need to know an id/key to identify the data by, and these can be anything)
    * @readonly
@@ -314,7 +303,6 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * dataID
    * Getter only, use `setData()` to change it.
    * (because we need to know an id/key to identify the data by, and these can be anything)
    * @readonly
@@ -325,7 +313,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * setClass
    * Sets a pseudoclass.
    * Pseudoclasses are special values that can affecct the styling of a feature.
    * (They do the same thing that CSS classes do).
@@ -343,7 +330,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * unsetClass
    * Unsets a pseudoclass.
    * Pseudoclasses are special values that can affecct the styling of a feature.
    * (They do the same thing that CSS classes do).
@@ -361,7 +347,6 @@ export class AbstractPixiFeature {
 
 
   /**
-   * hasClass
    * @param classID - the class to check
    * @return `true` if the feature has this class, `false` if not
    */
@@ -370,7 +355,6 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * classes
    * Returns a read-only view of the feature's pseudoclasses
    */
   get classes(): ReadonlySet<ClassID> {
@@ -378,7 +362,6 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * setData
    * This binds the data element to the feature, also lets the layer know about it.
    * @param dataID - Identifer for this data element (e.g. 'n123')
    * @param data - data to bind to the feature (e.g. an OSM Node)
@@ -391,7 +374,6 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * setCoords
    * This sets the coordinate data to be rendered.
    * @param source - A GeometryPart, or something that can be turned into one.
    */
@@ -400,7 +382,6 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * addChildData
    * Adds a mapping from parent data to child data.
    * @param parentID - dataID of the parent (e.g. 'r123')
    * @param childID - dataID of the child (e.g. 'w123')
@@ -411,7 +392,6 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * clearChildData
    * Removes all child dataIDs for the given parent dataID
    * @param parentID - dataID of the parent (e.g. 'r123')
    */

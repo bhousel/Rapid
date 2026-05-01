@@ -7,7 +7,6 @@ import { uiTooltip } from './tooltip.js';
 
 
 /**
- * UiOvertureInspector
  * The OvertureInspector is a UI component for viewing Overture Entities in the sidebar.
  * Because Overture entities conform to a certain schema, we might at some point build a JSON-Schema-aware
  * version of this code that modifies the display of the data.
@@ -50,7 +49,6 @@ export class UiOvertureInspector {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders.)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -112,7 +110,6 @@ export class UiOvertureInspector {
 
 
   /**
-   * getBrightness
    * This is used to get the brightness of the given hex color.
    * (We use this to know whether text written over this color should be light or dark).
    * https://www.w3.org/TR/AERT#color-contrast
@@ -130,7 +127,6 @@ export class UiOvertureInspector {
 
 
   /**
-   * renderFeatureInfo
    * Renders the 'feature-info' section (the dataset name)
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this content should render itself into
    */
@@ -170,7 +166,6 @@ export class UiOvertureInspector {
 
 
   /**
-   * renderPropertyInfo
    * Renders the 'property-info' section
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this content should render itself into
    */
@@ -256,7 +251,6 @@ export class UiOvertureInspector {
 
 
   /**
-   * renderNotice
    * Renders the 'overture-inspector-notice' section
    * This section contains remarks about the data - license, usage, or other hints
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this content should render itself into

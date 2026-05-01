@@ -5,7 +5,6 @@ import type { Graph } from '../lib/Graph.ts';
 
 
 /**
- * actionDeleteMembers
  * Removes multiple members from a relation by their indexes.
  * @param relationID - The ID of the relation to modify
  * @param memberIndexes - Array of indexes of members to remove

@@ -109,7 +109,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -132,7 +131,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -162,7 +160,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -174,7 +171,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * keys
    */
   get keys(): string[] {
     return [...this._filters.keys()];
@@ -182,7 +178,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * hidden
    * @return Set of hidden FilterIDs
    */
   get hidden(): Set<FilterID> {
@@ -191,7 +186,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * isEnabled
    * @param filterID - FilterID to check
    * @return true/false
    */
@@ -202,7 +196,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * enable
    * Enables the given filter
    * @param filterID - FilterID to enable
    */
@@ -216,7 +209,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * enableAll
    * Enables all filters
    */
   enableAll(): void {
@@ -234,7 +226,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * disable
    * Disables the given filter
    * @param filterID - FilterID to disable
    */
@@ -248,7 +239,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * disableAll
    * Disables all filters
    */
   disableAll(): void {
@@ -266,7 +256,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * toggle
    * Toggles the given filter between enabled/disabled states
    * @param filterID - Filter ID to toggle
    */
@@ -318,7 +307,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * getStats
    * This returns stats about which filters are currently enabled,
    *  and how many entities in the scene are filtered.
    * @return  Result object
@@ -336,7 +324,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * clear
    * Clears the cache of entity matches for the given entities
    * @param entities - Entities to clear cache
    */
@@ -348,7 +335,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * clearEntity
    * Clears the cache of entity matches for a single entity
    * @param entity - Entity to clear
    */
@@ -359,7 +345,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * getMatches
    * Matches a single entity against the filters
    * @param entity - The Entity to test
    * @param graph - Graph
@@ -428,7 +413,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * getParents
    * Returns parentWays of vertexes or parentRelations of other geometry types
    * @param entity - The Entity to test
    * @param graph - Graph
@@ -459,7 +443,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * isHiddenPreset
    * Checks whether a given preset would be hidden by the current filtering rules
    * @param preset - The Preset to test
    * @param geometry - geometry of the Preset ('point', 'line', 'vertex', 'area', 'relation')
@@ -483,7 +466,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * isHiddenFeature
    * Checks whether a given Entity would be hidden by the current filtering rules.
    * Important note:  In OSM a feature can be several things, so there might be multiple matches.
    * We only consider a feature hidden of _all_ of the matched rules are hidden.
@@ -507,7 +489,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * isHiddenVertex
    * Checks whether a given child entity would be hidden by the current filtering rules
    * We only consider a child hidden of _all_ of the matched parent features are hidden.
    * @param entity - The Entity to test
@@ -533,7 +514,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * hasHiddenConnections
    * Checks whether a given entity is connected to a feature that is hidden
    * @param entity - The Entity to test
    * @param graph - Graph
@@ -563,7 +543,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * isHidden
    * Checks whether a given entity is hidden
    * @param entity - The Entity to test
    * @param graph - Graph
@@ -583,7 +562,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * filterScene
    * Returns a result Array containing the non-hidden entities.
    * This function also gathers the stats about how many entities are
    * being filtered by the enabled filter rules.
@@ -619,7 +597,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * forceVisible
    * Adds the given entityIDs to the `_forceVisible` Set
    * This is usually done temporarily so that users can see stuff as they edit
    * that might otherwise be hidden
@@ -646,7 +623,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -678,7 +654,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * _filterChanged
    * Called whenever the enabled/disabled filters change.
    * Used to push changes in state to the urlhash and the localStorage,
    *   then trigger a redraw, and emit a 'filterchange' event.

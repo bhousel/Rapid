@@ -6,7 +6,6 @@ import {
 
 
 /**
- * UiMapPanes
  * This component the map panes section for drawers like:
  *  Background, Map Data, Issues, Preferences, Help
  */
@@ -44,7 +43,6 @@ export class UiMapPanes {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into

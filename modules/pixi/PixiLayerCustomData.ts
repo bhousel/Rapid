@@ -18,7 +18,6 @@ const CUSTOM_COLOR = 0x00ffff;
 
 
 /**
- * PixiLayerCustomData
  * This class contains any custom data traces that should be 'drawn over' the map.
  * This data only comes from the 'load custom data' option in the map data sidebar.
  * @class
@@ -86,7 +85,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset() {
@@ -97,7 +95,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render the GeoJSONData custom data
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -202,7 +199,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * renderPolygons
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
@@ -260,7 +256,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * renderLines
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
@@ -360,7 +355,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * renderPoints
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
@@ -418,7 +412,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * hasData
    * Return true if there is custom data to display
    * @return `true` if there is a vector tile template or file data to display
    */
@@ -427,7 +420,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   }
 
   /**
-   * dataUsed
    * @return Array of single element for the data layer currently enabled
    */
   dataUsed(): string[] {
@@ -436,7 +428,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * fitZoom
    * Fits the map view to show the extent of the loaded file data
    */
   fitZoom(): void {
@@ -449,7 +440,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * getFileList
    * This returns any FileList which we have stored
    * @return Files, or null if none
    */
@@ -459,7 +449,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * setFileList
    * This sets a FileList which we got from either a drag-and-drop operation or a `<input 'type'='file'>` field.
    * It is Array-like, but we only look at the first one.
    *
@@ -487,7 +476,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * setUrl
    * This checks a url that we got from either the custom data screen or the `data=` or `gpx=` url parameter
    * It decides whether the url looks like a single file to load or a vector tile template url.
    * @param url - The URL to load
@@ -524,7 +512,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * _setUrlTemplate
    * A url template is something we can pass to the Vector Tile service. It can be:
    *   - Mapbox Vector Tiles (MVT) made available from a z/x/y tileserver
    *   - Protomaps .pmtiles single-file archive containing MVT
@@ -561,7 +548,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * _setFile
    * This function is either called from the `FileReader` onload callback, or the `fetch` then chain.
    * It can accept:
    *  - a `string` of text data, in which case it will be parsed according to the given extension.
@@ -618,7 +604,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * _getExtension
    * Return the extension at the end of a filename or url.
    * This only returns the extension if it one of the recognized file types:
    *   '.gpx', '.kml', '.json', '.geojson'
@@ -634,7 +619,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -662,7 +646,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * _updateHash
    * Push changes in custom data url to the urlhash
    */
   private _updateHash(): void {
@@ -685,7 +668,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * _parseAsWkt
    * creates WKT Polys from a raw string supplied by the `data` url param.
    *
    * @param wktString - the poly or multipoly string(s) in wkt format
@@ -713,7 +695,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * _clear
    * Clear state to prepare for new custom data
    */
   private _clear(): void {

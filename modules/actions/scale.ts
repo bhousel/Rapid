@@ -7,7 +7,6 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 /**
- * actionScale
  * Scales entities relative to a pivot location.
  *
  * @param   entityIDs    - Array of EntityIDs to scale

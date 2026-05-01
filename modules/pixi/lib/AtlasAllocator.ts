@@ -59,7 +59,6 @@ export class AtlasAllocator {
 
 
   /**
-   * allocate
    * Allocates the given asset, returning a `PIXI.Texture`, or throwing if it could not be done.
    * @param imageData - The asset to pack in the atlas, must be of type ImageData
    * @param textureOptions - optional options to pass to Pixi when creating the texture.
@@ -91,7 +90,6 @@ export class AtlasAllocator {
 
 
   /**
-   * free
    * Frees the texture and reclaims its space.
    * @param texture - The texture to free
    * @throws If the texture was not found, or some other issue prevents it from freeing.
@@ -130,7 +128,6 @@ export class AtlasAllocator {
 
 
   /**
-   * _allocateTexture
    * Allocates a texture from this allocator.
    * If its existing slab pool has enough space, the texture is issued from one.
    * Otherwise, a new slab is created and the texture is issued from it.
@@ -195,7 +192,6 @@ export class AtlasAllocator {
 
 
 /**
- * AtlasSource
  * An {@code AtlasSource} is used by {@link AtlasAllocator} to manage texture sources.
  * @public
  */
@@ -246,7 +242,6 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
 
 
   /**
-   * _getItemPixels
    * Returns padded pixel data for an atlas item.
    * Duplicates the 1px edge to avoid color bleeding into neighbor textures.
    * Shared by the GL/GPU upload handlers and the canvas blit path.
@@ -278,7 +273,6 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
 
 
   /**
-   * _blitItemToCanvas
    * Blit an item's pixels onto the backing canvas (canvas renderer only).
    * This is a no-op if the slab is not canvas-backed.
    * @param item - The atlas item to blit

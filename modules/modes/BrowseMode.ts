@@ -28,7 +28,6 @@ export class BrowseMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * @return `true` if mode could be entered, `false` if not
    */
@@ -70,7 +69,6 @@ export class BrowseMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, clearing operations and removing event listeners.
    */
   exit(): void {
@@ -89,7 +87,6 @@ export class BrowseMode extends AbstractMode {
 
 
   /**
-   * _hover
    * Changes the cursor styling based on what geometry is hovered
    */
   private _hover(eventData: EventData): void {

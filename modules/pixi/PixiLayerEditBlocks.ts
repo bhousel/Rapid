@@ -11,7 +11,6 @@ const MINZOOM = 4;
 
 
 /**
- * PixiLayerEditBlocks
  * @class
  */
 export class PixiLayerEditBlocks extends AbstractPixiLayer {
@@ -28,7 +27,6 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * This layer should always be enabled
    */
   get enabled(): boolean {
@@ -40,7 +38,6 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset(): void {
@@ -49,7 +46,6 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any edit blocking polygons that are visible in the viewport
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -98,7 +94,6 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
 
   /**
-   * renderEditBlocks
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering

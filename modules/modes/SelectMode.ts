@@ -47,7 +47,6 @@ export class SelectMode extends AbstractMode {
 
 
   /**
-   * enter
    * Expects a `selection` property in the options argument as a `Map<datumID, datum>`
    * @param  options - Optional options object
    * @return `true` if mode could be entered, `false` it not
@@ -212,7 +211,6 @@ export class SelectMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, clearing selection state and hiding sidebar.
    */
   exit(): void {

@@ -5,7 +5,6 @@ import type { Graph } from '../lib/Graph.ts';
 
 
 /**
- * actionRevert
  * Reverts an entity to its base (original) state.
  * If the entity was created (doesn't exist in base) and is a node, deletes it.
  * Otherwise reverts the entity to its base state.

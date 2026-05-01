@@ -7,7 +7,6 @@ import { utilCmd } from '../../util/cmd.ts';
 
 
 /**
- * UiSaveTool
  * A toolbar section for the save button
  */
 export class UiSaveTool {
@@ -45,7 +44,6 @@ export class UiSaveTool {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -103,7 +101,6 @@ export class UiSaveTool {
 
 
   /**
-   * isSaving
    * Is the user currently already saving?
    * @return  {boolean}  `true` if saving, `false` if not
    */
@@ -114,7 +111,6 @@ export class UiSaveTool {
 
 
   /**
-   * isDisabled
    * The button is disabled when there are no user changes to save
    * @return  {boolean}  `true` if disabled, `false` if enabled
    */
@@ -126,7 +122,6 @@ export class UiSaveTool {
 
 
   /**
-   * choose
    * @param  {Event} e? - triggering event (if any)
    */
   choose(e) {
@@ -148,7 +143,6 @@ export class UiSaveTool {
 
 
   /**
-   * bgColor
    * Choose a background color that gets increasingly red to remind the use to save.
    */
   bgColor(numChanges) {

@@ -64,7 +64,6 @@ export function uiIntro(context, skipToRapid) {
 
 
   /**
-   * intro
    * Call this to start the intro walkthrough
    * @param  selection  D3-selection to render the walkthrough content into (the root container)
    */
@@ -94,7 +93,6 @@ export function uiIntro(context, skipToRapid) {
 
 
   /**
-   * _startIntro
    * After the walkthrough data has been loaded, this starts the walkthrough.
    * @param  selection  D3-selection to render the walkthrough content into (the root container)
    */
@@ -220,7 +218,6 @@ export function uiIntro(context, skipToRapid) {
 
 
   /**
-   * _enterChapter
    * Call this to enter a new chapter.
    * Either called explicitly or by clicking a button the chapter navigation bar.
    * @param  d3_event    If clicked on a button, the click event (not used)
@@ -240,7 +237,6 @@ export function uiIntro(context, skipToRapid) {
 
 
   /**
-   * _finish
    * Cleanup, restore state, and leave the walkthrough
    */
   function _finish() {

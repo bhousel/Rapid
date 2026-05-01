@@ -155,7 +155,6 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -189,7 +188,6 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -199,7 +197,6 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -209,7 +206,6 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * registerAsset
    * Add an AssetSource to the list of sources.
    * Other systems and services should call this to track any assets that they need to load.
    * @param assetID - asset identifier
@@ -225,7 +221,6 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * registerBundleAsset
    * Register a bundle - multiple files that are fetched together and returned as a combined object.
    * This is useful when logically related data is split across multiple files (e.g. id_tagging_schema).
    * @param assetID - bundle identifier
@@ -241,7 +236,6 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * getFileURL
    * Returns the URL for the given filename.
    *   If the given value is already a URL, it's returned
    *   If the given value is a relative path, return the real location of that file.
@@ -257,7 +251,6 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * getAssetURL
    * Returns the URL for the given asset key.
    * Checks the 'preferred' origin first, then falls back to the current origin ('latest' or 'local').
    * @param key - identifier for the asset, should be found in the asset map.
@@ -288,7 +281,6 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * loadAssetAsync
    * Returns a Promise to fetch the data identified by the assetID.
    * @param assetID - identifier for the data, should be found in the asset map.
    * @return Promise resolved with the data
@@ -329,7 +321,6 @@ export class AssetSystem extends AbstractSystem {
 
 
   /**
-   * loadBundleAssetAsync
    * Load all parts of a bundle asset in parallel and return a combined object.
    * The returned object has the `assetID` plus each `BundlePartID` as keys.
    * @param assetID - asset identifier for the bundle

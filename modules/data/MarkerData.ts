@@ -18,7 +18,6 @@ export interface MarkerProps extends AbstractDataProps {
 
 
 /**
- * MarkerData
  * This is a wrapper for any kind of arbitrary point data that appears on the map.
  * Markers are associated with a service where we fetched them from.
  * This used to be called "QAItem".
@@ -56,7 +55,6 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   }
 
   /**
-   * updateGeometry
    * Forces a recomputation of the internal geometry data.
    * @returns this same Marker
    */
@@ -66,7 +64,6 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   }
 
   /**
-   * asGeoJSON
    * Returns a GeoJSON representation of the Marker.
    * Markers are represented by a Feature with a Point geometry.
    * @returns GeoJSON representation of the Marker
@@ -91,7 +88,6 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   }
 
   /**
-   * loc
    * Markers should have a `loc` property to represent the location in WGS84 lat/lon
    * @readonly
    */
@@ -100,7 +96,6 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   }
 
   /**
-   * serviceID
    * Markers are usually associated with a 'serviceID' string.
    * For example 'keepright', 'maproulette', 'mapillary', etc.
    * @readonly
@@ -110,7 +105,6 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   }
 
   /**
-   * isNew
    * In the old QAItem class we had some OSM-like code to consider negative ids as new.
    * Instead we'll just set an isNew property for new markers.
    * @readonly

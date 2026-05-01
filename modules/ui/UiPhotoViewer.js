@@ -9,7 +9,6 @@ const [trimW, trimH] = [45, 105];  // trim amounts to allow for toolbars
 
 
 /**
- * UiPhotoViewer
  * The photo viewer is absolutely positioned in the `over-map` div (it floats over the map).
  * It creates a "nine slice" frame like below to allow for resize handles be placed around the edges:
  * (aside: we should extract this into its own component and use it other places
@@ -73,7 +72,6 @@ export class UiPhotoViewer extends EventEmitter {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -166,7 +164,6 @@ export class UiPhotoViewer extends EventEmitter {
 
 
   /*
-   * _buildResizer
    * Creates event handlers for the viewer cell identified by the key.
    * @param  {string}   k - cell key, for example 'top-left', 'top-right', etc.
    * @return {Function} the resizer pointerdown function to attach to the cell
@@ -176,7 +173,6 @@ export class UiPhotoViewer extends EventEmitter {
     let startX, startY, rectW, rectH;
 
     /*
-     * _pointerdown
      * Pointerdown event handler starts the resize.
      * @param  {PointerEvent}  e - the pointerdown event
      */
@@ -198,7 +194,6 @@ export class UiPhotoViewer extends EventEmitter {
     };
 
     /*
-     * _pointermove
      * Pointermove event handler continues the resize.
      * @param  {PointerEvent}  e - the pointermove event
      */
@@ -231,7 +226,6 @@ export class UiPhotoViewer extends EventEmitter {
     };
 
     /*
-     * _pointerup
      * Pointerup event handler completes the resize.
      * @param  {PointerEvent}  e - the pointerup (or pointercancel) event
      */
@@ -250,7 +244,6 @@ export class UiPhotoViewer extends EventEmitter {
 
 
   /*
-   * _onMapResize
    * Called when the main window or sidebar resizes,
    * to check whether the photo viewer still has the space it needs.
    */

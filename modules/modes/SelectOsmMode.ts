@@ -86,7 +86,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * @param  options - Optional options object
    * @return `true` if the mode can be entered, `false` if not
@@ -173,7 +172,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * exit
    */
   exit(): void {
     if (!this._active) return;
@@ -244,7 +242,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
@@ -386,7 +383,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _merge
    * If we have entities selected already, and we find new versions
    * of them loaded from the server, the `operations` offered on
    * the edit menu may be wrong and should be refreshed. Rapid#1311
@@ -411,7 +407,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _setupOperations
    *  Called whenever we have a need to reset the `operations` array.
    *  @param  entityIDs - the selected entityIDs
    */
@@ -456,7 +451,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _chooseParentWay
    *  When using keyboard navigation, try to stay with the previously focused parent way
    *  @param  entity - The entity we are checking for parent ways
    */
@@ -489,7 +483,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _firstVertex
    *  jump to the first vertex along a way
    */
   private _firstVertex(d3_event: Event): void {
@@ -514,7 +507,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _lastVertex
    *  jump to the first vertex along a way
    */
   private _lastVertex(d3_event: Event): void {
@@ -539,7 +531,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _previousVertex
    *  jump to the previous vertex
    */
   private _previousVertex(d3_event: Event): void {
@@ -578,7 +569,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _nextVertex
    *  jump to the next vertex
    */
   private _nextVertex(d3_event: Event): void {
@@ -617,7 +607,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _focusNextParent
    *  If the user is at a junction, focus on a different parent way
    */
   private _focusNextParent(d3_event: Event): void {
@@ -654,7 +643,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _selectParentWays
    * Select the parent ways of the currently selected nodes.
    * Triggered by Alt/Cmd/Ctrl + ArrowUp keyboard shortcut.
    */
@@ -682,7 +670,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _selectChildNodes
    * Select the child nodes of the currently selected ways.
    * Triggered by Alt/Cmd/Ctrl + ArrowDown keyboard shortcut.
    */
@@ -708,7 +695,6 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
-   * _hover
    * Changes the cursor styling based on what geometry is hovered
    */
   private _hover(eventData: EventData): void {

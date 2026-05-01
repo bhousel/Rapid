@@ -10,7 +10,6 @@ export interface CopyEntitiesAction extends Action {
 
 
 /**
- * actionCopyEntities
  * Creates copies of entities from one graph to another.
  * The copies mapping can be retrieved via the `copies()` method.
  *

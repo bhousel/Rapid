@@ -6,7 +6,6 @@ import { UiViewOn } from './UiViewOn.js';
 
 
 /**
- * UiInspector
  * The Inspector is a UI component for viewing/editing OSM Entities in the sidebar.
  * It consists of two divs that can slide side to side (only one will be visible at a time).
  * (The order may be swapped depending on `l10n.isRTL`)
@@ -74,7 +73,6 @@ export class UiInspector {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders.)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -194,7 +192,6 @@ export class UiInspector {
   }
 
   /**
-   * showPresetList
    * Show the preset list, optionally with given selected array, and optionally with a slide-in animation
    * @param  {Array}    selected? - optional Array of presets selected
    * @param  {boolean}  animate? - whether to animate the pane
@@ -228,7 +225,6 @@ export class UiInspector {
 
 
   /**
-   * showEntityEditor
    * Show the entity editor, optionally with the given presets, optionally with slide-in animation
    * @param  {Array}    presets? - optional Array of presets selected
    * @param  {boolean}  animate? - whether to animate the pane
@@ -264,7 +260,6 @@ export class UiInspector {
 
 
   /**
-   * setPreset
    * Choose the given preset
    * @param {Preset} preset - the Preset to choose
    */
@@ -285,7 +280,6 @@ export class UiInspector {
 
 
   /**
-   * _onMerge
    * If the inspector is showing `_entityIDs` already,
    * and we get new versions of them loaded from the server
    * refresh this component and its children. Rapid#1311

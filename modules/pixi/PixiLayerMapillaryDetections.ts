@@ -13,7 +13,6 @@ const SELECTED = 0xffee00;
 
 
 /**
- * PixiLayerMapillaryDetections
  * @class
  */
 export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
@@ -29,7 +28,6 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
 
   /**
-   * supported
    * Whether the Layer's service exists
    */
   get supported() {
@@ -38,7 +36,6 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
@@ -64,7 +61,6 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset() {
@@ -73,7 +69,6 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
 
   /**
-   * filterMarkers
    * @param  markers - all markers
    * @return markers with filtering applied
    */
@@ -98,7 +93,6 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
 
   /**
-   * renderMarkers
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
    * @param  zoom     -  Effective zoom level to use for rendering
@@ -162,7 +156,6 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering

@@ -92,7 +92,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * layerID
    * Unique string to identify this render Layer.
    * @return This layer's unique id
    * @readonly
@@ -102,7 +101,6 @@ export class AbstractPixiLayer {
   }
 
   /**
-   * supported
    * Is this Layer supported? (i.e. do we even show it in lists?)
    * Can be overridden in a subclass with additional logic.
    * @return `true` if the layer is supported
@@ -113,7 +111,6 @@ export class AbstractPixiLayer {
   }
 
   /**
-   * enabled
    * Whether the user has chosen to see the Layer.
    * Can be overridden in a subclass with additional logic.
    * @return `true` if the user has chosen to see the layer
@@ -130,7 +127,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    * Override in a subclass with needed logic.
    * @abstract
@@ -153,7 +149,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * render
    * Every Layer should have a render function that manages the Features in view.
    * Override in a subclass with needed logic. It will be passed:
    * @param frame - Integer frame being rendered
@@ -166,7 +161,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * cull
    * Make invisible any Features that were not seen during the current frame
    * @param frame - Integer frame being rendered
    */
@@ -187,7 +181,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * addFeature
    * Add a feature to the layer cache.
    * @param feature - A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
    */
@@ -197,7 +190,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * removeFeature
    * Remove a Feature from the layer cache.
    * @param feature - A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
    */
@@ -209,7 +201,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * retainFeature
    * Retain the feature for the given frame.
    * Features that are not retained may be automatically culled (made invisible) or removed.
    * @param feature - A Feature derived from `AbstractPixiFeature` (point, line, multipolygon)
@@ -227,7 +218,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * bindData
    * Adds (or replaces) a data binding from featureID to a dataID
    * @param featureID - featureID  (e.g. 'osm-w-123-fill')
    * @param dataID - dataID     (e.g. 'w-123')
@@ -247,7 +237,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * unbindData
    * Removes the data binding for a given featureID
    * @param featureID - featureID  (e.g. 'osm-w-123-fill')
    */
@@ -274,7 +263,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * addChildData
    * Adds a mapping from parent data to child data.
    * @param parentID - dataID of the parent (e.g. 'r123')
    * @param childIDs - dataIDs of the children to add (e.g. 'w123')
@@ -300,7 +288,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * removeChildData
    * Removes mapping from parent data to child data.
    * @param parentID - dataID of the parent (e.g. 'r123')
    * @param childIDs - dataIDs of the children to remove (e.g. 'w123')
@@ -329,7 +316,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * clearChildData
    * Removes all child dataIDs for the given parent dataID
    * @param parentID - dataID (e.g. 'r123')
    */
@@ -342,7 +328,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * getSelfAndDescendants
    * Recursively get a result `Set` including the given dataID and all dataIDs in the child hierarchy.
    * @param dataID - dataID (e.g. 'r123')
    * @param result - `Set` containing the results (e.g. ['r123','w123','n123'])
@@ -367,7 +352,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * getSelfAndAncestors
    * Recursively get a result `Set` including the given dataID and all dataIDs in the parent hierarchy
    * @param dataID - dataID (e.g. 'n123')
    * @param result - `Set` containing the results (e.g. ['n123','w123','r123'])
@@ -392,7 +376,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * getSelfAndSiblings
    * Get a result `Set` including the dataID and all sibling dataIDs in the parent-child hierarchy
    * @param dataID - `String` dataID (e.g. 'n123')
    * @param result - `Set` containing the results (e.g. ['n121','n122','n123','n124'])
@@ -418,7 +401,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * setClass
    * Sets a dataID as being classed a certain way (e.g. 'hover')
    * @param classID - classID to set (e.g. 'hover')
    * @param dataID - dataID (e.g. 'r123')
@@ -441,7 +423,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * unsetClass
    * Unsets a dataID from being classed a certain way (e.g. 'hover')
    * @param classID - classID to unset (e.g. 'hover')
    * @param dataID - dataID (e.g. 'r123')
@@ -466,7 +447,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * clearClass
    * Clear out all uses of the given classID.
    * @param classID - classID to clear (e.g. 'hover')
    */
@@ -479,7 +459,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * getDataWithClass
    * Returns the dataIDs that are currently classed with the given classID
    * @param classID - classID to check (e.g. 'hover')
    * @returns dataIDs the dataIDs that currently have this classID set
@@ -491,7 +470,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * syncFeatureClasses
    * This updates the feature's classes (e.g. 'select', 'hover', etc.) to match the Layer classes.
    *
    * Counterintuitively, the Layer needs to be the source of truth for these classes,
@@ -530,7 +508,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * dirtyLayer
    * Mark all features on this layer as `dirty`.
    * During the next "app" pass, dirty features will be rebuilt.
    */
@@ -541,7 +518,6 @@ export class AbstractPixiLayer {
   }
 
   /**
-   * dirtyFeatures
    * Mark specific features features as `dirty`
    * During the next "app" pass, dirty features will be rebuilt.
    * @param featureIDs - featureIDs to set dirty
@@ -556,7 +532,6 @@ export class AbstractPixiLayer {
   }
 
   /**
-   * dirtyData
    * Mark any features bound to a given dataID as `dirty`
    * During the next "app" pass, dirty features will be rebuilt.
    * @param dataIDs - dataIDs to set dirty

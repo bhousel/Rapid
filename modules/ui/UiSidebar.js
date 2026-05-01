@@ -23,7 +23,6 @@ const DEFAULT_WIDTH = 400;  // needs to match the flex-basis in our css file
 
 
 /**
- * UiSidebar
  * The Sidebar is positioned to the side of the map and can show various information.
  * It can appear either on the left or right side of the map (depending on `l10n.isRTL`)
  * While editing and interacting with the map, the sidebar will control which child
@@ -91,7 +90,6 @@ export class UiSidebar {
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     /**
-     * hover
      * Hovers over the given targets
      * This just wraps the internal `_hover` in a throttle to keep it from being called too frequently.
      * @param  {Object}  target - data element to target
@@ -110,7 +108,6 @@ export class UiSidebar {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -181,7 +178,6 @@ export class UiSidebar {
 
 
   /**
-   * _hoverchange
    * Respond to any change in hover
    * @param {Object}  eventData - data about what is being hovered
    */
@@ -235,7 +231,6 @@ export class UiSidebar {
 
 
   /**
-   * _hover
    * Hovers the given target data
    * @param  {Object}  target - data element to target
    */
@@ -335,7 +330,6 @@ export class UiSidebar {
 
 
   /**
-   * intersects
    * Test if the sidebar is covering up the given extent
    * @param  {Extent}   wgs84Extent - an Extent in lon/lat coordinates
    * @return {boolean}  `true` if the sidebar is intersecting the `Extent`, `false` if not
@@ -355,7 +349,6 @@ export class UiSidebar {
 
 
   /**
-   * showInspector
    * Selects the given ids - they are expected to be OSM IDs already loaded (in the Graph)
    * @param  {Array}    ids - ids to select (expected to be OSM IDs)
    * @param  {boolean}  newFeature - true if it's a new feature, passed to the inspector
@@ -395,7 +388,6 @@ export class UiSidebar {
 
 
   /**
-   * show
    * Shows some "custom" content in the sidebar
    * This is how almost all content renders to the sidebar
    * (except for the OSM editing "inspector", which is special)
@@ -429,7 +421,6 @@ export class UiSidebar {
 
 
   /**
-   * hide
    * Removes all content from the sidebar..
    * This resets the sidebar back to where it shows the featureList / search component.
    */
@@ -446,7 +437,6 @@ export class UiSidebar {
 
 
   /**
-   * showPresetList
    * Shows inspector open to Preset List
    */
   showPresetList(...args) {
@@ -455,7 +445,6 @@ export class UiSidebar {
 
 
   /**
-   * showEntityEditor
    * Shows inspector open to Entity Editor
    */
   showEntityEditor(...args) {
@@ -464,7 +453,6 @@ export class UiSidebar {
 
 
   /**
-   * expand
    * Expands the sidebar
    * @param  {boolean}  animate? - whether to animate the pane
    */
@@ -479,7 +467,6 @@ export class UiSidebar {
 
 
   /**
-   * collapse
    * Collapses the sidebar
    * @param  {boolean}  animate? - whether to animate the pane
    */
@@ -494,7 +481,6 @@ export class UiSidebar {
 
 
   /**
-   * toggle
    * Toggles the sidebar between expanded/collapsed states
    * @param  {boolean}  animate? - whether to animate the pane
    */
@@ -569,7 +555,6 @@ export class UiSidebar {
 
 
   /**
-   * reset
    * Clears out any custom data that might be stored in the sidebar or child components.
    */
   reset() {
@@ -591,7 +576,6 @@ export class UiSidebar {
 
 
   /**
-   * _pointerdown
    * Handler for pointerdown events on the resizer.
    * @param {PointerEvent}  e - the pointerdown event
    */
@@ -630,7 +614,6 @@ export class UiSidebar {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events
    * @param {PointerEvent}  e - the pointermove event
    */
@@ -661,7 +644,6 @@ export class UiSidebar {
 
 
   /**
-   * _pointerup
    * Handler for pointerup events
    * @param {PointerEvent}  e - the pointerup event
    */
@@ -709,7 +691,6 @@ export class UiSidebar {
 
 
   /**
-   * _eventCancel
    * Just cancels an event
    * @param  {Event} e? - triggering event (if any)
    */
@@ -719,7 +700,6 @@ export class UiSidebar {
 
 
   /**
-   * _storePreferences
    * Store the sidebar preferences
    */
   _storePreferences() {
@@ -736,7 +716,6 @@ export class UiSidebar {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

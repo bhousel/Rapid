@@ -3,7 +3,6 @@ import { selection } from 'd3-selection';
 
 
 /**
- * UiSpector
  * Spector.js is a WebGL debugging tool
  * This is just a wrapper for the Spector.js debugger
  * Is is only available on the development build of Rapid.
@@ -37,7 +36,6 @@ export class UiSpector {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -63,7 +61,6 @@ export class UiSpector {
 
 
   /**
-   * toggle
    * Toggles the Spector UI on/off
    * @param  {Event} e? - triggering event (if any)
    */
@@ -105,7 +102,6 @@ export class UiSpector {
 
 
   /**
-   * _initSpectorUI
    * This creates the Spector components and starts spying on the rendering canvas.
    * (We avoid doing this until something calls `toggle()` to try to show the UI)
    */
@@ -183,7 +179,6 @@ export class UiSpector {
 
 
   /**
-   * _reset
    */
   _reset() {
     this._spyCanvas = null;

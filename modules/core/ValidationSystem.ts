@@ -117,7 +117,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -185,7 +184,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -195,7 +193,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -224,7 +221,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * _parseHashParam
    * Converts hash parameters for severity overrides to regex matchers
    * @param val - The value retrieved, e.g. `crossing_ways/bridge*,crossing_ways/tunnel*`
    * @return Array of Objects like { type: RegExp, subtype: RegExp }
@@ -252,7 +248,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * resetIgnoredIssues
    * Clears out the `_ignoredIssueIDs` Set
    */
   resetIgnoredIssues(): void {
@@ -262,7 +257,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * revalidateUnsquare
    * Called whenever the user changes the unsquare threshold
    * It reruns just the "unsquare_way" validation on all buildings.
    */
@@ -294,7 +288,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * getIssues
    * Gets all issues that match the given options
    * This is called by many other places
    *
@@ -370,7 +363,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * getResolvedIssues
    * Gets the issues that have been fixed by the user.
    * Resolved issues are tracked in the `_resolvedIssueIDs` Set,
    *  and they should all be issues that exist in the base cache.
@@ -384,7 +376,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * focusIssue
    * Adjusts the map to focus on the given issue.
    * (requires the issue to have a reasonable extent defined)
    * @param issue - The Issue to focus on
@@ -413,7 +404,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * getIssuesBySeverity
    * Gets the issues then groups them by error/warning
    * (This just calls `getIssues`, then puts issues in groups)
    *
@@ -436,7 +426,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * getSeverityIcon
    * @param severity - one of 'error', 'warning', 'suggestion', or 'resolved'
    * @return The name of the icon to use
    */
@@ -452,7 +441,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * getSharedEntityIssues
    * Gets the issues that the given entityIDs have in common, matching the given options
    * (This just calls `getIssues`, then filters for the given entity IDs)
    * The issues are sorted for relevance
@@ -492,7 +480,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * getEntityIssues
    * This just calls `getSharedEntityIssues` for the given entityID
    *
    * @param entityID - The entityID to get issues for
@@ -505,7 +492,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * getValidatorIDs
    * @return An Array containing all available validator IDs
    */
   getValidatorIDs(): ValidatorID[] {
@@ -514,7 +500,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * isValidatorEnabled
    * @param validatorID - The validatorID (e.g. 'crossing_ways')
    * @return true/false
    */
@@ -524,7 +509,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * toggleValidator
    * Toggles a single validatorID, then reruns the validation
    * so that the user sees something happen in the UI.
    * @param validatorID - The validator ID to toggle (e.g. 'crossing_ways')
@@ -543,7 +527,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * disableValidators
    * Disables given validatorIDs, then reruns validation
    * so that the user sees something happen in the UI.
    * @param validatorID - Complete set of validatorIDs that should be disabled
@@ -558,7 +541,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * ignoreIssue
    * Don't show the given issue in lists
    * @param issueID - The issueID to ignore
    */
@@ -569,7 +551,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * validateAsync
    * Validates anything that has changed in the head graph since the last time it was run.
    * (head graph contains user's edits)
    * Returns a Promise fulfilled when the validation has completed and then emits a `validated` event.
@@ -634,7 +615,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * _validateBaseEntitiesAsync
    * Validates new entities being merged into the base graph.
    * (base graph contains original map state, before user's edits)
    * This may take time but happen in the background during browser idle time.
@@ -662,7 +642,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * _validateEntity
    * Runs all active validators against a single entity.
    * Some things to note:
    *  - Graph is passed in from whenever the validation was started.  Validators shouldn't use
@@ -728,7 +707,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * _updateResolvedIssues
    * Determine if any issues were resolved for the given entities.
    * This is called by `validateAsync()` after validation of the head graph
    *
@@ -759,7 +737,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * _validateEntitiesAsync
    * Schedule validation for many entities.
    * This may take time but happen in the background during browser idle time.
    * @param cache     - The cache to store results in (`_head` or `_base`)
@@ -813,7 +790,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * _revalidateProvisionalEntities
    * Sometimes a validator will return a "provisional" result.
    * In this situation, we'll need to revalidate the entity later.
    * This function waits a delay, then places them back into the validation queue.
@@ -833,7 +809,6 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
-   * _processQueue
    * Process the next chunk of deferred validation work
    * This may take time but happen in the background during browser idle time.
    * @param cache - The cache to process (`_head` or `_base`)

@@ -52,7 +52,6 @@ export interface MoveAction extends Action {
 
 
 /**
- * actionMove
  * Moves the specified entities by the given delta.
  *
  * @param   moveIDs   - Array of EntityIDs to move

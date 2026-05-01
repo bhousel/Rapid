@@ -34,7 +34,6 @@ export interface SplitAction extends Action {
 
 
 /**
- * actionSplit
  * Splits a way at the given node(s).
  * For closed ways, finds a partner node to split the area naturally.
  * Optionally, split only specific ways if multiple share the node.

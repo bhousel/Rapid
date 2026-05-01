@@ -6,7 +6,6 @@ import { utilDetect } from '../util/detect.ts';
 
 
 /**
- * UiProjectLinks
  * This component adds the validator status control to the footer.
  * (was named "issues_info")
  */
@@ -34,7 +33,6 @@ export class UiProjectLinks {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -81,7 +79,6 @@ export class UiProjectLinks {
 
 
   /*
-   * reportIssue
    * Opens GitHub to report a bug
    * @param  {Event} e? - triggering event (if any)
    */

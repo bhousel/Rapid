@@ -76,7 +76,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -86,7 +85,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -96,7 +94,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -109,7 +106,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * getCache
    * Get a cache identified by the given ID.
    * Create it if it doesn't exist yet.
    * @param datasetID - the cache to get (or create)
@@ -133,7 +129,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * clearCache
    * Clear (remove all items from) the given cache
    * @param datasetID - the cache to clear
    */
@@ -149,7 +144,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * addData
    * Insert data into the given cache.
    * (addData and replaceData are the same)
    * @param datasetID - the cache to insert into
@@ -161,7 +155,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * replaceData
    * Insert or update data in the cache
    * @param datasetID - the cache to insert into
    * @param items - items to replace
@@ -205,7 +198,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * removeData
    * Remove data from the cache.
    * Can pass either data or dataIDs for removal.
    * @param datasetID - the cache to remove from
@@ -230,7 +222,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * addTiles
    * Insert tiles into the cache. This is how we mark data as loaded.
    * @param datasetID - the cache to insert into
    * @param items - tiles to insert
@@ -269,7 +260,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * removeTiles
    * Remove tiles from the cache.
    * Can pass either tiles or tileIDs for removal.
    * @param datasetID - the cache to remove from
@@ -294,7 +284,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * getVisibleData
    * Get already loaded and cached data that appears in the current map view
    * @param datasetID - the cache to search
    * @return Array of boxes in the current map view
@@ -306,7 +295,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * getAllVisibleData
    * Get all visible data for all caches.
    * This would only really be used for debugging purposes, it might return a lot.
    * @return Array of boxes in the current map view
@@ -320,7 +308,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * getData
    * Return the requested data.
    * @param datasetID - the cache to search
    * @param dataID - the dataID to lookup
@@ -333,7 +320,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * hasData
    * Is the given dataID one we know about?
    * @param datasetID - the cache to search
    * @param dataID - the dataID to lookup
@@ -345,7 +331,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * getDataAtBox
    * Search for data within the given cache and search box.
    * @param datasetID - the cache to search
    * @param box - the search box (make sure to use world coordinates here)
@@ -357,7 +342,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * hasDataAtBox
    * Does data exist in the given search box?
    * @param datasetID - the cache to search
    * @param box - the search box (make sure to use world coordinates here)
@@ -369,7 +353,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * getDataAtLoc
    * Search for data at the given [lon,lat] coordinate.
    * @param datasetID - the cache to search
    * @param loc - the search location (WGS84 [lon,lat])
@@ -384,7 +367,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * hasDataAtLoc
    * Does data exist at the given [lon,lat] coordinate?
    * @param datasetID - the cache to search
    * @param loc - the search location (WGS84 [lon,lat])
@@ -399,7 +381,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * preventCoincidentLoc
    * This checks if the cache already has something at that location, and if so,
    *  moves the location down slightly to a location that doesn't conflict.
    * Used for Markers in situations where you don't want them covering each other.
@@ -429,7 +410,6 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * getTile
    * Return the requested tile.
    * @param datasetID - the cache to search
    * @param tileID - the tileID to lookup
@@ -441,7 +421,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * hasTile
    * Is the given tileID one we know about?
    * @param datasetID - the cache to search
    * @param tileID - the tileID to lookup
@@ -453,7 +432,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * hasTileAtBox
    * Does a tile exist in the given search box?
    * @param datasetID - the cache to search
    * @param box - the search box (make sure to use world coordinates here)
@@ -465,7 +443,6 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * hasTileAtLoc
    * Is a tile loaded at the given [lon,lat] coordinate?
    * @param datasetID - the cache to search
    * @param loc - the search location (WGS84 [lon,lat])

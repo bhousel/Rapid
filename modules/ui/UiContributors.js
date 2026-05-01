@@ -6,7 +6,6 @@ const MAXUSERS = 4;
 
 
 /**
- * UiContributors
  * This component adds the nearby contributors list to the footer.
  */
 export class UiContributors {
@@ -38,7 +37,6 @@ export class UiContributors {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into

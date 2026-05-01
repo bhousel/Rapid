@@ -27,7 +27,6 @@ interface TransformEase {
 
 
 /**
- * GraphicsSystem
  * The graphics system owns the Pixi environment.
  * This system implements a game loop and manages when rendering tasks happen.
  * (formerly named PixiRenderer)
@@ -172,7 +171,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -193,7 +191,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -218,7 +215,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * Note that calling `resetAsync` schedules an "immediate" redraw (on the next available tick).
    * @return  Promise resolved when this component has completed resetting
@@ -230,7 +226,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * _tick
    * Called once per frame by the SchedulerSystem's game loop.
    * We can use this to determine the true frame rate that we're running at,
    * and schedule work to happen at opportune times (within animation frame boundaries).
@@ -299,7 +294,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * deferredRedraw
    * Schedules an APP pass but does not reset the timer.
    * This is intended for most situations where new data is streaming in, but we can
    * allow the changes to batch up over several animation frames before rendering.
@@ -310,7 +304,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * immediateRedraw
    * Schedules an APP pass on the next available tick.
    * If there was a DRAW pending, cancel it.
    * This is intended for interactive situations where the user did a thing and we want
@@ -323,7 +316,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * setTransformAsync
    * Updates the viewport transform
    * @param   t           A Transform Object with `x, y, z, r` properties
    * @param   duration    Duration of the transition in milliseconds, defaults to 0ms (asap)
@@ -367,7 +359,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * _tform
    * On each tick, manage the scene's transform
    * The few things we do here involve:
    *  - if there is a transform ease in progress, compute the eased transform
@@ -487,7 +478,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * _app
    * The "Rapid" part of the drawing.
    * Where we set up the scene graph and tell Pixi what needs to be drawn.
    */
@@ -556,7 +546,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * _draw
    * The "Pixi" part of the drawing.
    * Where it converts Pixi geometries into WebGL instructions.
    */
@@ -608,7 +597,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * _renderDebug
    * Render some debug shapes (usually commented out)
    */
   _renderDebug(): void {
@@ -680,7 +668,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * _initPixiAsync
    * Initializes the Pixi Application
    * @return  Promise resolved when this Pixi has completed initialization
    */
@@ -741,7 +728,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * _afterPixiInit
    * Steps to run after Pixi has completed initialization.
    * Set up scene, events, textures, stage, etc.
    */
@@ -824,7 +810,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * isContextLost
    * Returns `true` if the WebGLContext is currently lost.
    * @return `true` if the WebGLContext is current lost
    */
@@ -833,7 +818,6 @@ export class GraphicsSystem extends AbstractSystem {
   }
 
   /**
-   * _handleGLContextLost
    * Handler for webglcontextlost events on the canvas.
    * @param  e  - The WebGLContextEvent
    */
@@ -875,7 +859,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * _handleGLContextRestored
    * Handler for webglcontextrestored events on the canvas.
    * @param  _e  - The WebGLContextEvent (unused)
    */
@@ -911,7 +894,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * _destroyPixi
    * After a WebGL context loss, replace the parts of Pixi that need replacing.
    * Basically we need to destroy the `PIXI.Application`
    *  then force`_initPixiAsync` and `_afterPixiInit` to run again.
@@ -953,7 +935,6 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * testContextLoss
    * For testing, attempt to lose the WebGL context and get it back.
    */
   testContextLoss(): void {

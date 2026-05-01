@@ -24,7 +24,6 @@ const MARKERSTYLE: Partial<MatchedStyle> = {
 
 
 /**
- * PixiLayerKartaPhotos
  * @class
  */
 export class PixiLayerKartaPhotos extends AbstractPixiLayer {
@@ -40,7 +39,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
-   * supported
    * Whether the Layer's service exists
    */
   get supported() {
@@ -49,7 +47,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
@@ -75,7 +72,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset() {
@@ -84,7 +80,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
-   * filterMarkers
    * @param markers - all markers
    * @return markers with filtering applied
    */
@@ -121,7 +116,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
-   * filterSequences
    * Each sequence is represented as a GeoJSONData LineString.
    * @param sequences - all sequences
    * @return sequences with filtering applied
@@ -161,7 +155,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
-   * renderMarkers
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering
@@ -267,7 +260,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering

@@ -44,7 +44,6 @@ interface SummaryEntry {
 
 
 /**
- *  Difference
  *  Difference represents the difference between two Graphs.
  *  It knows how to calculate the set of entities that were
  *  created, modified, or deleted, and also contains the logic
@@ -133,7 +132,6 @@ export class Difference {
 
 
   /**
-   * changes
    * @readonly
    * @return  The change details
    */
@@ -143,7 +141,6 @@ export class Difference {
 
 
   /**
-   * modified
    * @return  Array of Entities modified
    */
   modified(): OsmEntity[] {
@@ -158,7 +155,6 @@ export class Difference {
 
 
   /**
-   * created
    * @return  Array of Entities created
    */
   created(): OsmEntity[] {
@@ -173,7 +169,6 @@ export class Difference {
 
 
   /**
-   * deleted
    * @return  Array of Entities deleted
    */
   deleted(): OsmEntity[] {
@@ -188,7 +183,6 @@ export class Difference {
 
 
   /**
-   * summary
    * Generates a difference "summary" in a format like what is presented on the
    *  pre-save commit component, with list items like "created", "modified", "deleted".
    *
@@ -250,7 +244,6 @@ export class Difference {
 
 
   /**
-   * complete
    * Returns complete set of Entities affected by the changes in this difference.
    * This is used to know which Entities need redraw or revalidation.
    * Recurses up to include all ancestor Entities in the result, parentWays and parentRelations.

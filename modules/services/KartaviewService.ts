@@ -165,7 +165,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -178,7 +177,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -265,7 +263,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -289,7 +286,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * getImages
    * Get already loaded image data that appears in the current map view
    * @return  Array of image data
    */
@@ -300,7 +296,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * getSequences
    * Get already loaded sequence data that appears in the current map view
    * @return  Array of sequence data
    */
@@ -311,7 +306,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view
    */
   loadTiles(): void {
@@ -338,7 +332,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * showViewer
    * Shows the photo viewer, and hides all other photo viewers
    */
   showViewer(): void {
@@ -360,7 +353,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * hideViewer
    * Hides the photo viewer and clears the currently selected image
    */
   hideViewer(): void {
@@ -378,7 +370,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * selectImageAsync
    * Note:  most code should call `PhotoSystem.selectPhoto(layerID, photoID)` instead.
    * That will manage the state of what the user clicked on, and then call this function.
    * @param  imageID - the id of the image to select
@@ -427,7 +418,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _updatePhotoFooter
    * Update the photo attribution section of the image viewer
    * @param  imageID - the new imageID
    */
@@ -514,7 +504,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _maxPageAtZoom
    * How many pages of data should we fetch at different zooms?
    * The idea is that the user can zoom in more to see more images.
    * @param  z - zoom level
@@ -531,7 +520,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _loadNextTilePageAsync
    * Load the next page of image data for the given tile.
    * This uses `https://kartaview.org/1.0/list/nearby-photos/`
    * @param  tile - tile object
@@ -642,7 +630,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _loadImageAsync
    * Load a single image.
    * This uses `https://api.openstreetcam.org/2.0/photo/<imageID>`
    * If the image has not yet been fetched (for example if we are loading an image
@@ -712,7 +699,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _zoomPan
    * Handler for zoom/pan events in the viewer.
    * The user can drag and zoom in on the image.
    * @param  d3_event
@@ -729,7 +715,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _rotate
    * Rotate the sequence in the viewer.
    * The user can press buttons to rotate the image if it has been recorded sideways.
    * @param  deg - degrees to rotate
@@ -767,7 +752,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window, but only if the photo viewer is visible.
    * @param  e - A DOM KeyboardEvent
    */
@@ -797,7 +781,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _step
    * Step forward/backward along the sequence in the viewer.
    * @param  stepBy - number to step by, either +1 or -1
    */
@@ -823,7 +806,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _cacheImage
    * Store the given image in the caches
    * @param  source - the image properties
    * @return  The image
@@ -868,7 +850,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * _cacheSequence
    * Store the given sequence in the caches.
    * Sequence data is always derived from the image data.
    * @param  image - the image that belongs to this sequence

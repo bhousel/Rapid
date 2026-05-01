@@ -7,7 +7,6 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
 
 
 /**
- * Tree
  * A wrapper class around the `RBush` spatial index, for tracking the position of OSM Entities.
  * Internally RBush indexes rectangular bounding boxes.
  * The tree also must keep track of which Graph is considered "current", and will update the
@@ -46,7 +45,6 @@ export class Tree {
 
 
   /**
-   * _removeEntity
    * Remove an Entity from all internal indexes.
    * @param entityID - The entity ID to remove
    */
@@ -77,7 +75,6 @@ export class Tree {
 
 
   /**
-   * _loadEntities
    * Add or update multiple Entities in the internal indexes.
    * @param toUpdate - Entities to load into the tree
    */
@@ -127,7 +124,6 @@ export class Tree {
 
 
   /**
-   * _includeParents
    * When updating an Entity's position in the tree, we must also update
    * the positions of that Entity's parent ways and relations.
    *
@@ -162,7 +158,6 @@ export class Tree {
 
 
   /**
-   * _setCurrentGraph
    * This will change the "current" Graph of this tree, performing whatever
    * operations are needed to add/update/remove tracked entities.
    * @param graph - the Graph to set "current"
@@ -205,7 +200,6 @@ export class Tree {
 
 
   /**
-   * rebase
    * This is used to load new Entities into the tree, but without adjusting which Graph is current.
    * It's called when fetching new data from the OSM API, restoring saved history, etc.
    * @param entities - entities to load into the Tree
@@ -243,7 +237,6 @@ export class Tree {
 
 
   /**
-   * intersects
    * Returns a result of Entities that intersect the given map extent.
    * We first update the current graph if needed, to make sure the results are fresh.
    * @param extent - Extent to check (WGS84 for now)
@@ -260,7 +253,6 @@ export class Tree {
   }
 
   /**
-   * waySegments
    * Returns the result of Segments that intersect the given map extent.
    * We first update the current graph if needed, to make sure the results are fresh.
    * @param extent - Extent to check

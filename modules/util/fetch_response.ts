@@ -2,7 +2,6 @@ import { DOMParser } from '@xmldom/xmldom';
 import JSON5 from 'json5';
 
 /**
- * FetchError
  * Pack up the parts of the response that we may need later for error handling.
  */
 export class FetchError extends Error {
@@ -23,7 +22,6 @@ export class FetchError extends Error {
 
 
 /**
- * utilFetchResponse
  * Handle the response from a `fetch`.
  * d3-fetch previously did some of this for us, see https://github.com/d3/d3-fetch
  *

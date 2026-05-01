@@ -7,7 +7,6 @@ import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
- * actionMoveNode
  * Moves a node to a new location, with optional transition support.
  *
  * @param   nodeID  - EntityID of the node to move

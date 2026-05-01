@@ -239,7 +239,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -252,7 +251,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -299,7 +297,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -327,7 +324,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * imageURL
    * Returns the url to view an image on Mapillary
    * @param  imageID - the imageID to link to
    * @return  The url
@@ -352,7 +348,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * getImage
    * Return an image from the cache.
    * @param  imageID - imageID to get
    * @return  The image, or `undefined` if not found
@@ -364,7 +359,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * getSequence
    * Return a sequence from the cache.
    * @param  sequenceID - sequenceID to get
    * @return  The sequence, or `undefined` if not found
@@ -376,7 +370,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * getDetection
    * Return a detection from the cache.
    * @param  detectionID - detectionID to get
    * @return  The detection, or `undefined` if not found
@@ -388,7 +381,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * getData
    * Get already loaded data that appears in the current map view
    * @param  datasetID - one of 'images', 'signs', or 'detections'
    * @return  Array of Markers
@@ -411,7 +403,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * getSequences
    * Get already loaded sequence data that appears in the current map view
    * @return  Array of GeoJSONData sequences
    */
@@ -423,7 +414,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * getDetectionPresetID
    * Convert a detection type to a preset id.  This is just a big lookup for now.
    * @param  detectionType - the type of detection  (e.g. 'object--manhole')
    * @return  the presetID to use for this detection type (e.g. 'man_made/manhole')
@@ -479,7 +469,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view
    * @param  datasetID - one of 'images', 'signs', or 'detections'
    */
@@ -506,7 +495,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * filterViewer
    * Apply filters to the Mapillary viewer
    * The filters settings are stored in the PhotoSystem
    */
@@ -549,7 +537,6 @@ export class MapillaryService extends AbstractSystem {
   }
 
   /**
-   * _navigate
    * Move the viewer in the given navigation direction.
    * Silently catches errors when the end of a sequence is reached.
    * @param  dir - The navigation direction (Next or Prev)
@@ -563,7 +550,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * showViewer
    * Shows the photo viewer, and hides all other photo viewers
    */
   showViewer(): void {
@@ -587,7 +573,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * hideViewer
    * Hides the photo viewer and clears the currently selected image
    */
   hideViewer(): void {
@@ -610,7 +595,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * selectImageAsync
    * Note:  most code should call `PhotoSystem.selectPhoto(layerID, photoID)` instead.
    * PhotoSystem will manage the state of what the user clicked on, and then call this function.
    *
@@ -672,7 +656,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * selectDetectionAsync
    * Note:  most code should call `PhotoSystem.selectDetection(layerID, photoID)` instead.
    * PhotoSystem will manage the state of what the user clicked on, and then call this function.
    *
@@ -706,7 +689,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window, but only if the photo viewer is visible.
    * @param  e - A DOM KeyboardEvent
    */
@@ -738,7 +720,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _updatePhotoFooter
    * Update the photo attribution section of the image viewer
    * @param  imageID - the new imageID
    */
@@ -785,7 +766,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _shouldShowSegmentations
    * Determine whether segmentations should be shown in the mapillary viewer.
    * @return  `true` if they should be shown, `false` if not
    */
@@ -804,7 +784,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _clearSegmentations
    * Remove all segmentations (aka "tags") from Mapillary viewer.
    */
   _clearSegmentations(): void {
@@ -814,7 +793,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _showSegmentations
    * Segmentations are called "tags" in the Mapillary viewer.
    * Here we are create a tag for each segmentationID found in the current image.
    * @param  segmentationIDs - the segmentation ids to show
@@ -837,7 +815,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _makeTag
    * Segmentations are called "tags" in the Mapillary viewer.
    * Here we create a single tag for the given segmentation.
    * @param  segmentation - the segmentation to make a tag for
@@ -884,7 +861,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _loadTile
    * Load a vector tile of data for the given dataset.
    * This uses `https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=XXX`
    * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
@@ -947,7 +923,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _gotTile
    * Process pre-parsed vector tile features
    * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
    * @param  results - parsed MVT features from the worker
@@ -1004,7 +979,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _loadDetectionAsync
    * Get the details for a given detected feature (object or sign)
    * This uses `https://graph.mapillary.com/<map_feature_id>`
    * This API call gives us 2 things the tile API does not: `images` and `aligned_direction`
@@ -1060,7 +1034,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _loadImageSegmentationsAsync
    * Get all segmentation data for the given image.
    * It is nuts to me that we can not get the actual detected object ID from this API.
    * To workaround that limitation, we will just call the same api from `selectDetectionAsync` too.
@@ -1116,7 +1089,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _loadDetectionSegmentationsAsync
    * Get all segmentation data for the given detection.
    * Basically it's the same as `_loadImageSegmentationsAsync`, but using the detectionID instead.
    * because for some reason the API doesn't give the detectionID when called with the imageID.
@@ -1172,7 +1144,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _loadAssetsAsync
    * Load the Mapillary JS and CSS files into the document head
    * @return Promise resolved when both files have been loaded
    */
@@ -1227,7 +1198,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _initViewer
    * Initialize the embedded Mapillary JS photo viewer and wire up event listeners.
    */
   _initViewer(): void {
@@ -1309,7 +1279,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _cacheImage
    * Store the given image in the caches
    * @param  source - the image properties
    * @return  The image
@@ -1349,7 +1318,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _cacheDetection
    * Store the given detection in the caches
    * @param  source - the detection properties
    * @return  The detection
@@ -1414,7 +1382,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * _cacheSegmentation
    * Store the given segmentation in the caches
    * @param  source - the segmentation properties
    * @return  The segmentation data, or `null` if we are skipping it (see below)

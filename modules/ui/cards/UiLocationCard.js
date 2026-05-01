@@ -6,7 +6,6 @@ import { utilCmd } from '../../util/cmd.ts';
 
 
 /**
- * UiLocationCard
  */
 export class UiLocationCard extends AbstractUiCard {
 
@@ -43,7 +42,6 @@ export class UiLocationCard extends AbstractUiCard {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -127,7 +125,6 @@ export class UiLocationCard extends AbstractUiCard {
 
 
   /**
-   * updateLocation
    * Performs a reverse geolocation lookup to get the name of the place for the given loc
    * Then updates the `.location-info` div in the panel.
    * @param {Array<number>}  loc -  coordinates to lookup as [lon,lat]
@@ -156,7 +153,6 @@ export class UiLocationCard extends AbstractUiCard {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

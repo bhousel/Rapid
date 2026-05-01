@@ -6,7 +6,6 @@ import type { OsmRelation } from '../data/OsmRelation.ts';
 
 
 /**
- * actionDeleteMember
  * Removes a member from a relation at the specified index.
  * @param relationID - The ID of the relation to modify
  * @param index - The index of the member to remove

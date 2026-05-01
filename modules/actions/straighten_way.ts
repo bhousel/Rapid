@@ -9,7 +9,6 @@ import type { OsmWay } from '../data/OsmWay.ts';
 
 
 /**
- * actionStraightenWay
  * Straightens selected ways by aligning interior nodes along a line
  * between the first and last nodes. Removes nodes that become unnecessary.
  *

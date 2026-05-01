@@ -22,7 +22,6 @@ import type { OsmTags } from '../types.ts';
 
 
 /**
- * OsmXMLParser
  * This class contains the code for parsing OSM XML content.
  * @see https://wiki.openstreetmap.org/wiki/OSM_XML
  * Note that OSM XML data can contain slightly different syntax and attributes.
@@ -98,7 +97,6 @@ export class OsmXMLParser {
 
 
   /**
-   * reset
    * Call reset to clear the caches.
    */
   reset(): void {
@@ -107,7 +105,6 @@ export class OsmXMLParser {
 
 
   /**
-   * parse
    * Parse the given content and extract whatatever OSM data we find in it.
    * @param   content - the content to parse
    * @param   options - parsing options
@@ -224,7 +221,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseNode
    * Parse the given `<node>` element.
    * @param   xml - the DOM element
    * @param   id  - the OSM nodeID (e.g. 'n1')
@@ -249,7 +245,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseWay
    * Parse the given `<way>` element.
    * @param   xml - the DOM element
    * @param   id  - the OSM wayID (e.g. 'w1')
@@ -278,7 +273,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseRelation
    * Parse the given `<relation>` element.
    * @param   xml - the DOM element
    * @param   id  - the OSM relationID (e.g. 'r1')
@@ -316,7 +310,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseChangeset
    * Parse the given `<changeset>` element.
    * @param   xml - the DOM element
    * @param   id  - the OSM changesetID (e.g. 'c1')
@@ -346,7 +339,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseNote
    * Parse the given `<note>` element.
    * @param   xml - the DOM element
    * @return  Object of parsed properties
@@ -386,7 +378,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseComments
    * This parses 2 kinds of comments:
    *  - `parseNote()`: comments in a `<comments>` element
    *  - `parseChangeset()`: comments in a `<discussion>` element
@@ -431,7 +422,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseUser
    * Parse the given `<user>` element.
    * @param   xml - the DOM element
    * @return  Object of parsed properties
@@ -517,7 +507,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseUserBlock
    * Parse the given `<user_block>` element.
    * @param   xml - the DOM element
    * @return  Object of parsed properties
@@ -558,7 +547,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parsePreferences
    * Parse the given `<preferences>` element.
    * @param   xml - the DOM element
    * @return  Object of parsed properties
@@ -584,7 +572,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseApi
    * Parse the given `<api>` element.
    * @param   xml - the DOM element
    * @return  Object of parsed properties
@@ -602,7 +589,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parsePolicy
    * Parse the given `<policy>` element.
    * @param   xml - the DOM element
    * @return  Object of parsed properties
@@ -631,7 +617,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _parseBounds
    * Parse the given `<bounds>` element.
    * @param   xml - the DOM element
    * @return  Object of parsed properties
@@ -642,7 +627,6 @@ export class OsmXMLParser {
 
 
   /**
-   * _getTags
    * Several functions call this to gather tag data.
    * @param   xml - the containing DOM element
    * @return  Object of tag k-v pairs
@@ -670,7 +654,6 @@ export class OsmXMLParser {
 /* c8 ignore start */
 
 /**
- * getCleanAttributes
  * Attributes are stored as a `NamedNodeMap` which is not iterable in a modern way.
  * This returns the attributes as a normal JavaScript Object.
  * "clean" means we will attempt to unstringify the attribute values.
@@ -695,7 +678,6 @@ function getCleanAttributes(node: Element): Record<string, unknown> {
 
 
 /**
- * getChildNodes
  * ChildNodes are stored as a `NodeList` which is not iterable in a modern way.
  * This returns the childNodes as a normal JavaScript Array.
  * @see     https://developer.mozilla.org/en-US/docs/Web/API/NodeList
@@ -708,7 +690,6 @@ function getChildNodes(node: Node): Node[] {
 }
 
 /**
- * unstringify
  * All the source xml data arrives as strings.
  * This will attempt to clean it up and cast it to a better type if possible.
  * We aren't going to overthink this, just handle a few simple cases.

@@ -8,7 +8,6 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 /**
- * actionRotate
  * Rotates entities around a pivot point by a given angle.
  *
  * @param   entityIDs  - Array of EntityIDs to rotate

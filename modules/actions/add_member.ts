@@ -16,7 +16,6 @@ export interface InsertPair {
 
 
 /**
- * actionAddMember
  * Adds a member to a relation, with special handling for way members
  * to insert them in sensible positions based on how ways connect.
  *
@@ -221,5 +220,4 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
       return result;
     }
   }
-
 }

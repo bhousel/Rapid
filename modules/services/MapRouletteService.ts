@@ -143,7 +143,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -165,7 +164,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -175,7 +173,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -201,7 +198,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * challengeID
    * set/get the challengeIDs (as a string of comma-separated values)
    */
   get challengeIDs(): string {
@@ -227,7 +223,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * getData
    * Get already loaded data that appears in the current map view
    * @return Array of data
    */
@@ -247,7 +242,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * getTask
    * @param dataID
    * @return The task with that id, or `undefined` if not found
    */
@@ -258,7 +252,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * getChallenge
    * @param challengeID
    * @return The challenge with that id, or `undefined` if not found
    */
@@ -268,7 +261,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view
    */
   loadTiles(): void {
@@ -305,7 +297,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * loadTile
    * Load a single tile of data.
    * @param tile - Tile to load
    */
@@ -348,7 +339,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * loadChallenges
    * Schedule any data requests needed for challenges we are interested in
    */
   loadChallenges(): void {
@@ -406,7 +396,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * loadTaskDetailAsync
    * This loads the challenge instructions and adds it to an existing task.
    * @see https://maproulette.org/docs/swagger-ui/index.html#/Challenge/read
    * @param task
@@ -430,7 +419,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * loadTaskFeaturesAsync
    * This loads the task features geojson and adds it to an existing task.
    * Those properties are used to replace the Mustache tags in the challenge.instruction/.description.
    * @see https://maproulette.org/docs/swagger-ui/index.html#/Task/read
@@ -452,7 +440,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * postUpdate
    * @param task
    * @param callback
    */
@@ -530,7 +517,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * replaceItem
    * Replace a single item in the cache
    * @param item - item to replace
    * @return the item, or `null` if it couldn't be replaced
@@ -545,7 +531,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * removeItem
    * Remove a single item from the cache
    * @param item - item to remove
    */
@@ -558,7 +543,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * getClosed
    * Get details about all tasks closed in this session
    * @return Array of closed task entries
    */
@@ -568,7 +552,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * flyToNearbyTask
    * Initiates the process to find and fly to a nearby task based on the current task's challenge ID and task ID.
    * @param task - The current task containing task details.
    */
@@ -582,7 +565,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * getChallengeDetails
    * Retrieves challenge details from cache or API.
    * @param challengeID - The ID of the challenge.
    * @returns Promise resolving with challenge data.
@@ -601,7 +583,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * filterNearbyTasks
    * Fetches nearby tasks for a given challenge and task ID, and flies to the nearest task.
    * @param challengeID - The ID of the challenge.
    * @param taskID - The ID of the current task.
@@ -645,7 +626,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * selectAndDisplayTask
    * Selects a task and updates the sidebar reflect the selection
    * @param task - The task to be selected
    */
@@ -659,7 +639,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * itemURL
    * Returns the URL for user to visit for information about the task and challenge.
    * @param task
    * @return the url
@@ -671,7 +650,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * _cacheTask
    * Store the given task in the cache
    * @param props - the task properties
    * @return The task
@@ -710,7 +688,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -753,7 +730,6 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * _mapRouletteChanged
    * Push changes in MapRoulette state to the urlhash
    */
   _mapRouletteChanged(): void {

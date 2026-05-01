@@ -90,7 +90,6 @@ interface FieldStrings {
 
 
 /**
- * Field
  * A Field represents a user interface component that appears in the Rapid inspector.
  * Each field corresponds to one or more "keys" (OpenStreetMap tag keys).
  * The available fields are determined by the preset matched.
@@ -164,7 +163,6 @@ export class Field {
 
 
   /**
-   * reset
    * Resets all cached data.
    * This should happen whenever SchemaSystem merges in new data.
    * You must add the Field to the SchemaSystem and call `reset` before using the Field.
@@ -179,7 +177,6 @@ export class Field {
 
 
   /**
-   * setLocale
    * Changes the locale and re-localizes the strings.
    * This should happen whenever LocalizationSystem changes the locale.
    * Note that unlike with Presets and Categories, we don't need to index these strings,
@@ -231,7 +228,6 @@ export class Field {
 
 
   /**
-   * label
    * The label is the main display name of the Field, as shown in the user interface.
    * @return Localized name
    * @readonly
@@ -241,7 +237,6 @@ export class Field {
   }
 
   /**
-   * terms
    * Terms are related words used for seearching for this Field.
    * @return Localized search terms
    * @readonly
@@ -251,7 +246,6 @@ export class Field {
   }
 
   /**
-   * placeholder
    * A placeholder value appears in the field before the user enters a real value.
    * @return Localized placeholder
    * @readonly
@@ -261,7 +255,6 @@ export class Field {
   }
 
   /**
-   * isBuiltin
    * Is this one of the builtin objects?
    * We consider it "builtin" if it doesn't have a `assetID` (i.e. added via a merge).
    * (There are not builtin fields at this time, only the fallback presets are builtin).
@@ -273,7 +266,6 @@ export class Field {
 
 
   /**
-   * _resolveReference
    * Fields can inherit a property from another field.
    * If the property value contains a `{fieldID}` placeholder, return the other Field with that id.
    * @param prop - the property to lookup

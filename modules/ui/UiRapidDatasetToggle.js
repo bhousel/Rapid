@@ -9,7 +9,6 @@ import { utilCmd } from '../util/cmd.ts';
 
 
 /**
- * UiRapidDatasetToggle
  * This is the modal where the user can toggle on and off datasets.
  * It is shown by clicking the main "Rapid" button in the top menu.
  *
@@ -61,7 +60,6 @@ export class UiRapidDatasetToggle {
 
 
   /**
-   * show
    * This shows the datataset modal if it isn't already being shown.
    * For this kind of popup component, must first `show()` to create the modal.
    */
@@ -88,7 +86,6 @@ export class UiRapidDatasetToggle {
 
 
   /**
-   * render
    * Renders the content inside the modal.
    * Note that most `render` functions accept a parent selection,
    *  this one doesn't need it - `$modal` is always the parent.
@@ -237,7 +234,6 @@ export class UiRapidDatasetToggle {
 
 
   /**
-   * renderDatasets
    * Renders the list of datasets into the `.rapid-datasets-container` div.
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this component should render itself into
    */
@@ -395,7 +391,6 @@ export class UiRapidDatasetToggle {
 
 
   /**
-   * toggleRapid
    * Called when a user has clicked the checkbox to toggle all Rapid layers on/off.
    * @param  {Event}  e? - triggering event (if any)
    */
@@ -406,7 +401,6 @@ export class UiRapidDatasetToggle {
 
 
   /**
-   * toggleDataset
    * Called when a user has clicked the checkbox to toggle a dataset on/off.
    * @param  {Event}  e? - triggering event (if any)
    * @param  {*}      d - bound datum (the RapidDataset in this case)
@@ -421,7 +415,6 @@ export class UiRapidDatasetToggle {
 
 
   /**
-   * changeColor
    * Called when a user has selected a color with the colorpicker
    * @param  {string}  datasetID  - the datasetID to update
    * @param  {string}  color      - hexstring for the color e.g. '#da26d3'

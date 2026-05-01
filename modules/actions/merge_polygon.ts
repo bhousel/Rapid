@@ -26,7 +26,6 @@ interface MergePolygon extends Array<OsmRelationMember | OsmWay> {
 
 
 /**
- * actionMergePolygon
  * Merges multiple closed ways and/or multipolygon relations into a single
  * multipolygon relation, properly handling outer/inner roles based on containment.
  *

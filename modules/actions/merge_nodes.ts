@@ -8,7 +8,6 @@ import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
- * actionMergeNodes
  * Merges multiple nodes into a single location.
  * This is a combination of:
  * 1. move all the nodes to a common location

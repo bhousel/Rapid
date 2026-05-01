@@ -30,7 +30,6 @@ const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7,
 
 
 /**
- * PixiLayerStreetsidePhotos
  * @class
  */
 export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
@@ -55,7 +54,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset() {
@@ -64,7 +62,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * _dirtyCurrentPhoto
    * If we are interacting with the viewer (zooming / panning),
    * dirty the current photo so its view cone gets redrawn
    */
@@ -88,7 +85,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * supported
    * Whether the Layer's service exists
    */
   get supported() {
@@ -97,7 +93,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
@@ -123,7 +118,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * filterMarkers
    * @param markers - all markers
    * @return markers with filtering applied
    */
@@ -159,7 +153,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * filterSequences
    * @param sequences - all sequences
    * @return sequences with filtering applied
    */
@@ -196,7 +189,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * renderMarkers
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering
@@ -305,7 +297,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering

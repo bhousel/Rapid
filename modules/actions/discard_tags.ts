@@ -5,7 +5,6 @@ import type { OsmEntity, OsmTags } from '../data/types.ts';
 
 
 /**
- * actionDiscardTags
  * Removes specified tags from entities that were modified or created.
  * @param difference - The Difference object containing modified/created entities
  * @param discardTags - Object with tag keys to discard (values are ignored, just checking key existence)

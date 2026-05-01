@@ -7,7 +7,6 @@ import type { OsmNode } from '../data/OsmNode.ts';
 
 
 /**
- * actionDeleteNode
  * Deletes a node and removes it from all parent ways and relations.
  * If doDeleteDegenerate is true, also deletes any ways or relations that
  * become degenerate as a result.

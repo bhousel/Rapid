@@ -218,7 +218,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -238,7 +237,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -253,7 +251,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state.
    * Cancels all transient work (idle tasks, timers) but preserves
    * frame callbacks and the game loop — those are structural registrations.
@@ -282,7 +279,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * schedule
    * Queues a function to run at the end of a future frame within the
    * remaining frame budget.  Returns a Promise that resolves after the
    * task has executed.
@@ -314,7 +310,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * scheduleIdleTask
    * Convenience wrapper — equivalent to `schedule(fn, { priority: 'idle' })`.
    *
    * @param fn - The function to execute during idle time
@@ -326,7 +321,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * cancelAllIdleTasks
    * Cancels every outstanding queued task (urgent, normal, and idle)
    * and rejects their promises.  Useful during reset or teardown.
    */
@@ -342,7 +336,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * numPending
    * Total number of tasks waiting in all priority queues.
    * Useful for debugging and tests.
    * @readonly
@@ -353,7 +346,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * targetFrameTime
    * Target frame duration in milliseconds.  Tasks are drained at the end
    * of each frame only while `performance.now()` is below the deadline
    * (`frameStart + targetFrameTime`).  Defaults to ~16.7ms (60 fps).
@@ -379,7 +371,6 @@ export class SchedulerSystem extends AbstractSystem {
   // -------------------------------------------------------
 
   /**
-   * setTimeout
    * Schedules `fn` to run once after `ms` milliseconds.  When the timer
    * expires, the task enters the priority queue and runs at the next
    * frame's drain phase.
@@ -410,7 +401,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * setInterval
    * Schedules `fn` to run repeatedly every `ms` milliseconds.  Each tick
    * enters the priority queue rather than firing directly.
    *
@@ -442,7 +432,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * debounce
    * Resets a timer on each call.  When `ms` elapses without another call,
    * the task enters the priority queue.
    *
@@ -503,7 +492,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * throttle
    * Fires `fn` on the leading edge, then ignores calls for `ms`
    * milliseconds.  The last call during the window fires on the trailing
    * edge when the window expires.
@@ -550,7 +538,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * cancel
    * Cancels all pending work associated with `workID` — both the timer
    * entry (if any) and any queued tasks bearing that workID.
    *
@@ -573,7 +560,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * cancelAllTimers
    * Cancels every outstanding workID-keyed timer and removes their
    * queued tasks.  Called automatically by `resetAsync()`.
    */
@@ -592,7 +578,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * numTimers
    * Number of active workID-keyed timers.
    * Useful for debugging and tests.
    * @readonly
@@ -603,7 +588,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * scheduleTimeout
    * Managed wrapper around `setTimeout`.  Returns a cancel function.
    * The timeout is automatically cancelled on `resetAsync()`.
    *
@@ -633,7 +617,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * cancelAllTimeouts
    * Cancels every outstanding managed timeout.
    */
   cancelAllTimeouts(): void {
@@ -645,7 +628,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * numTimeouts
    * Number of active managed timeouts.
    * Useful for debugging and tests.
    * @readonly
@@ -656,7 +638,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * scheduleInterval
    * Managed wrapper around `setInterval`.  Returns a cancel function.
    * The interval is automatically cancelled on `resetAsync()`.
    *
@@ -676,7 +657,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * cancelAllIntervals
    * Cancels every outstanding managed interval.
    */
   cancelAllIntervals(): void {
@@ -688,7 +668,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * numIntervals
    * Number of active managed intervals.
    * Useful for debugging and tests.
    * @readonly
@@ -699,7 +678,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * deltaMS
    * Milliseconds elapsed since the previous frame.
    * Useful for frame-rate-independent calculations.
    * @readonly
@@ -710,7 +688,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * pressure
    * Current backpressure level.  The scheduler automatically adjusts
    * idle-queue draining based on this level and emits `'pressure'`
    * events when the level changes.
@@ -722,7 +699,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * metrics
    * Snapshot of the current frame timing metrics.
    * All time values are in milliseconds.
    * @readonly
@@ -740,7 +716,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * addFrameCallback
    * Registers a callback to run once per frame in the game loop.
    * The callback receives `deltaMS` — milliseconds since the previous frame.
    *
@@ -753,7 +728,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * removeFrameCallback
    * Unregisters a previously registered frame callback.
    *
    * @param id - The identifier passed to `addFrameCallback`
@@ -764,7 +738,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * numFrameCallbacks
    * Number of registered frame callbacks.
    * Useful for debugging and tests.
    * @readonly
@@ -775,7 +748,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _enqueue
    * Pushes a fire-and-forget task into the appropriate priority queue.
    * Used by the workID-based timer methods when a timer matures.
    * Unlike `schedule()`, this does not return a Promise.
@@ -804,7 +776,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _removeFromQueues
    * Removes all queued tasks matching `workID` from every priority queue
    * and rejects their promises.
    *
@@ -823,7 +794,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _throttleWindowExpired
    * Called when a throttle window timer fires.  If a trailing call was
    * recorded during the window, fire it and start a new window.
    * Otherwise, clean up the timer entry.
@@ -847,7 +817,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _startLoop
    * Starts the `requestAnimationFrame` game loop if it isn't already running.
    */
   private _startLoop(): void {
@@ -859,7 +828,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _stopLoop
    * Stops the `requestAnimationFrame` game loop.
    */
   private _stopLoop(): void {
@@ -871,7 +839,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _onFrame
    * The core game loop callback, driven by `requestAnimationFrame`.
    * Computes `deltaMS` from the browser-provided timestamp, calls
    * all registered frame callbacks, then drains queued tasks with
@@ -917,7 +884,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _drainQueues
    * Processes queued tasks in priority order within the frame budget.
    * Urgent tasks always drain (even if over budget).  Normal and idle
    * tasks only run while `performance.now()` is below the deadline.
@@ -952,7 +918,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _drainQueue
    * Runs tasks from a single queue until the queue is empty or the
    * deadline is exceeded.  Each task's promise is resolved on success
    * or rejected if the task function throws.
@@ -976,7 +941,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _updateMetrics
    * Called at the end of each frame to update the exponential moving
    * averages, the dropped-frame ring buffer, and the pressure level.
    *
@@ -1015,7 +979,6 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * _computePressure
    * Determines the pressure level from the dropped-frame ratio and
    * emits a `'pressure'` event if it changed.  Uses separate escalation
    * and recovery thresholds to prevent oscillation.

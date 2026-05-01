@@ -12,7 +12,6 @@ import { LANGUAGE_SUFFIX_REGEX } from './fields/localized.js';
 
 
 /**
- * UiField
  * Creates a new field, wraps the actual _internal implementation of that field
  */
 export class UiField {
@@ -201,7 +200,6 @@ export class UiField {
 
 
   /**
-   * render
    * @param  `$selection`  A d3-selection to a parent element that the field should render itself into
    */
   render($selection) {
@@ -391,7 +389,6 @@ export class UiField {
 
 
   /**
-   * isAllowed
    * An allowed field can appear in the UI or in the 'Add field' dropdown.
    * A non-allowed field is hidden from the user altogether
    * Some reasons why a field may be hidden:

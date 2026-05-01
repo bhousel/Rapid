@@ -4,7 +4,6 @@ import { utilFetchResponse } from '../util/fetch_response.ts';
 
 
 /**
- * UiDefs
  * A standalone `svg` and `defs` to contain the icon spritesheets for the user interface.
  * It is attached to the main rapid container so the icons can be used anywhere.
  *
@@ -42,7 +41,6 @@ export class UiDefs {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -87,7 +85,6 @@ export class UiDefs {
 
 
   /**
-   * _spritesheetLoaded
    * @param  {d3-selection}  $selection      - A d3-selection to a `g` element that the icons should render themselves into
    * @param  {string}        spritesheetID   - the spritesheet id to use
    * @param  {XMLDocument}   spritesheetSvg  - Document containing the fetched spritesheet

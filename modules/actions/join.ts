@@ -37,7 +37,6 @@ interface GroupedGeometries {
 
 
 /**
- * actionJoin
  * Joins ways at their shared end nodes.
  * Sided ways (coastlines, cliffs, kerbs) are processed first to establish order.
  * The oldest existing way is preserved, and others are merged into it.

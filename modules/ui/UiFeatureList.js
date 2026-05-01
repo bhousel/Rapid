@@ -9,7 +9,6 @@ import { utilCmd, utilHighlightEntities, utilIsColorValid, utilNoAuto } from '..
 
 
 /**
- * UiFeatureList
  * The feature list allows users to search for features and display the search results.
  *
  * @example
@@ -61,7 +60,6 @@ export class UiFeatureList {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -142,7 +140,6 @@ export class UiFeatureList {
 
 
   /*
-   * _drawList
    * redraw the results list
    */
   _drawList() {
@@ -241,7 +238,6 @@ export class UiFeatureList {
 
 
   /*
-   * _focusSearch
    * Handler for the ⌘F shortcut to focus the search input
    * @param {KeyboardEvent}  e? - the keypress event (if any)
    */
@@ -255,7 +251,6 @@ export class UiFeatureList {
 
 
   /*
-   * _keydown
    * Handler for keydown event - unfocus the search if user presses `Escape`
    * @param {KeyboardEvent}  e - the keydown event
    */
@@ -269,7 +264,6 @@ export class UiFeatureList {
 
 
   /*
-   * _keypress
    * Handler for keypress events
    * @param {KeyboardEvent}  e - the keypress event
    */
@@ -285,7 +279,6 @@ export class UiFeatureList {
 
 
   /*
-   * _input
    * Handler for input events - on typing redraw the list
    */
   _input() {
@@ -295,7 +288,6 @@ export class UiFeatureList {
 
 
   /*
-   * _clearSearch
    */
   _clearSearch() {
     if (!this.$search) return;  // called too early?
@@ -306,7 +298,6 @@ export class UiFeatureList {
 
 
   /*
-   * _getColor
    * If this entity has a color (e.g. a transit route)
    * @param   {Entity}  entity - The OSM Entity to check
    * @result  {string?}  The color string, if any
@@ -318,7 +309,6 @@ export class UiFeatureList {
 
 
   /*
-   * _mouseover
    * Handler for mouseover events on the list items
    * @param  {MouseEvent}  e - the mouseover event
    * @param  {Object}      d - data bound to the list item
@@ -330,7 +320,6 @@ export class UiFeatureList {
 
 
   /*
-   * _mouseout
    * Handler for mouseout events on the list items
    * @param  {MouseEvent}  e - the mouseout event
    * @param  {Object}      d - data bound to the list item
@@ -342,7 +331,6 @@ export class UiFeatureList {
 
 
   /*
-   * _click
    * Handler for click events on the list items,
    * may also be called by the keypress handler
    * @param  {Event}  e - the click or keypress event
@@ -368,7 +356,6 @@ export class UiFeatureList {
 
 
   /*
-   * _nominatimSearch
    * Search Nominatim, then display those results
    */
   _nominatimSearch() {
@@ -394,7 +381,6 @@ export class UiFeatureList {
 
 
   /*
-   * _getSearchResults
    * This does the search
    * @return {Array<Object>}  Array of search results
    */

@@ -67,7 +67,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -94,7 +93,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -144,7 +142,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -156,7 +153,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * addDatasets
    * Add datasets to the menu.  (Does not set their checked 'enabled' state)
    * @param datasetIDs - datasetIDs to add
    */
@@ -169,7 +165,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * removeDatasets
    * Remove datasets from the menu. (Also unchecks their 'enabled' state)
    * @param datasetIDs - datasetIDs to remove
    */
@@ -183,7 +178,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * enableDatasets
    * Checks the dataset as enabled. (Also ensures that the dataset is 'added' to the menu).
    * @param datasetIDs - datasetIDs to enable
    */
@@ -197,7 +191,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * disableDatasets
    * Unchecks the dataset as disabled. (Does not affect whether the dataset is 'added' to the menu)
    * @param datasetIDs - datasetIDs to disable
    */
@@ -210,7 +203,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * toggleDatasets
    * Toggles the given datasets enabled state, does not affect any other datasets.
    * @param datasetIDs - datasetIDs to toggle
    */
@@ -228,7 +220,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * datasets
    * @return The currently added datasets
    */
   get datasets(): Map<string, RapidDataset> {
@@ -243,7 +234,6 @@ export class RapidSystem extends AbstractSystem {
   }
 
   /**
-   * colors
    * @return Array of available colors for datasets
    */
   get colors(): readonly string[] {
@@ -251,7 +241,6 @@ export class RapidSystem extends AbstractSystem {
   }
 
   /**
-   * taskExtent
    * @return The current task extent, or null
    */
   get taskExtent(): Extent | null {
@@ -259,7 +248,6 @@ export class RapidSystem extends AbstractSystem {
   }
 
   /**
-   * isTaskRectangular
    * @return true if the task bounds form a rectangle
    */
   isTaskRectangular(): boolean {
@@ -268,7 +256,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * hadPoweruser
    * true if the user had poweruser mode at any point in their editing
    * @readonly
    */
@@ -278,7 +265,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * setTaskExtentByGpxData
    * @param gpxDomData - GPX DOM document
    */
   setTaskExtentByGpxData(gpxDomData: Document): void {
@@ -342,7 +328,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * _stablechange
    * This is called anytime the history changes, we recompute the accepted/ignored sets.
    * This can run on history change, undo, redo, or history restore.
    */
@@ -373,7 +358,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -401,7 +385,6 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * _datasetsChanged
    * Called whenever the datasets change.
    * This will update the urlhash, trigger a redraw, and emit a 'datasetchange' event.
    */

@@ -7,7 +7,6 @@ import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
 
 
 /**
- * GraphProps
  * Properties object for a Graph
  */
 export interface GraphProps {
@@ -19,7 +18,6 @@ export interface GraphProps {
 
 
 /**
- * GraphCache
  * Internal cache structure used to store entities and their relationships
  */
 export interface GraphCache {
@@ -33,7 +31,6 @@ export interface GraphCache {
 
 
 /**
- * Graph
  * A `Graph` is a special collection of OSM Entities.
  * Each graph contains a "base" state (uneditied) and "local" state (edited).
  * The graph also contains all the caches and methods needed to manage OSM topology.
@@ -121,7 +118,6 @@ export class Graph {
 
 
   /**
-   * destroy
    * Remove all saved state and free memory.
    * Do not use the Graph after calling `destroy()`.
    */
@@ -135,7 +131,6 @@ export class Graph {
 
 
   /**
-   * id
    * Unique string to identify this Graph.
    * @readonly
    */
@@ -144,7 +139,6 @@ export class Graph {
   }
 
   /**
-   * v
    * Internal version of the Graph, can be used to detect changes.
    * @readonly
    */
@@ -153,7 +147,6 @@ export class Graph {
   }
 
   /**
-   * key
    * The 'key' includes both the id and the version
    * @readonly
    */
@@ -162,7 +155,6 @@ export class Graph {
   }
 
   /**
-   * touch
    * Bump internal version number in place (typically, forcing a rerender)
    * Note that this version number always increases and is shared by all data elements.
    * We did it this way to avoid situations where you undo to a previous version
@@ -177,7 +169,6 @@ export class Graph {
 
 
   /**
-   * hasEntity
    * Gets an OsmEntity, searches the local cache first, then the base cache.
    * @param   entityID - The entityID to lookup
    * @return  OsmEntity from either local or base cache, or `undefined` if not found.
@@ -190,7 +181,6 @@ export class Graph {
 
 
   /**
-   * entity
    * Gets an OsmEntity, searches the local cache first, then the base cache.
    * (same as `hasEntity` but throws if not found)
    * @param   entityID - The entityID to lookup
@@ -207,7 +197,6 @@ export class Graph {
 
 
   /**
-   * parentWays
    * Makes an Array containing parent Ways for the given OsmEntity.
    * Makes a shallow copy (i.e. the Array is new, but the Entities in it are references)
    * @param   entity - The OsmEntity to get parentWays for
@@ -223,7 +212,6 @@ export class Graph {
 
 
   /**
-   * parentRelations
    * Makes an Array containing parent Relations for the given OsmEntity.
    * Makes a shallow copy (i.e. the Array is new, but the Entities in it are references)
    * @param   entity - The OsmEntity to get parentRelations for
@@ -239,7 +227,6 @@ export class Graph {
 
 
   /**
-   * childNodes
    * Makes an Array containing child Nodes for the given OsmEntity.
    * Makes a shallow copy (i.e. the Array is new, but the Entities in it are references)
    * @param   entity - The OsmEntity to get childNodes for
@@ -252,7 +239,6 @@ export class Graph {
 
 
   /**
-   * replace
    * Replace an OsmEntity in this Graph
    * @param   entities - entities to replace
    * @return  this Graph
@@ -277,7 +263,6 @@ export class Graph {
 
 
   /**
-   * remove
    * Remove an OsmEntity from this Graph
    * @param   entities - entities to remove
    * @return  this Graph
@@ -302,7 +287,6 @@ export class Graph {
 
 
   /**
-   * revert
    * Revert an OsmEntity back to whatever state it had in the base graph
    * @param   entityIDs - the entityIDs of the Entities to revert
    * @return  this Graph
@@ -326,7 +310,6 @@ export class Graph {
 
 
   /**
-   * commit
    * Updates any Entities affected by the work in progress
    * @return  this Graph
    */
@@ -345,7 +328,6 @@ export class Graph {
 
 
   /**
-   * snapshot
    * A Graph "snapshot" is a copy of the Graph that can be used to compute Differences.
    * It's just a copy with a special `id` and with no `previous`.
    * (The `previous = null` helps avoid leaking memory, we don't need to reference the previous Graph).
@@ -360,7 +342,6 @@ export class Graph {
 
 
   /**
-   * load
    * Loads new Entities into the local Graph, obliterating any existing Entities.
    * Used when restoring history or entering/leaving walkthrough.
    * This is just a shortcut for doing a bunch of `replace`/`remove` calls.
@@ -398,7 +379,6 @@ export class Graph {
 
 
   /**
-   * rebase
    * Loads new Entities into the base graph.
    * This is used to merge newly-downloaded data into an existing stack of edits.
    * To external observers, it should appear as if these Graphs always contained the newly downloaded data.
@@ -449,7 +429,6 @@ export class Graph {
 
 
   /**
-   * _updateCaches
    * Internal function, used to update internal caches after an OsmEntity update.
    * @param  previous  - The previous OsmEntity, may be undefined if new
    * @param  current   - The current OsmEntity, may be undefined if delete
@@ -506,7 +485,6 @@ export class Graph {
 
 
   /**
-   * _updateRebased
    * Internal function, used to update a graph following a `rebase` (base graph has changed).
    * Check local `parentWays` and `parentRels` caches and make sure they are consistent
    *  with the data in the base caches.
@@ -550,7 +528,6 @@ export class Graph {
 
 
   /**
-   * _updateGeometries
    * Internal function, used to update OsmEntity geometries affected by recent graph changes.
    * This needs to be called after all `_updateCaches` calls have finished.
    */
@@ -565,7 +542,6 @@ export class Graph {
 
 
   /**
-   * _nodesFirst
    * Internal function, compare function to sort nodes first.
    */
   _nodesFirst(a: OsmEntity, b: OsmEntity): number {

@@ -120,7 +120,6 @@ export class WaybackService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -188,7 +187,6 @@ export class WaybackService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -198,7 +196,6 @@ export class WaybackService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -218,7 +215,6 @@ export class WaybackService extends AbstractSystem {
 
 
   /**
-   * chooseClosestDate
    * This compares the requested date value against the supported dates in the Wayback archive and finds
    * the closest supported date without going over.  All dates are strings in YYYY-MM-DD format.
    * @param val - Requested date, as YYYY-MM-DD
@@ -241,7 +237,6 @@ export class WaybackService extends AbstractSystem {
 
 
   /**
-   * getLocalDatesAsync
    * Return a Promise to get the list of wayback imagery dates that appear changed in the current view.
    * @return Promise resolved with an `Array<releaseDate>` for the current view
    */
@@ -303,7 +298,6 @@ export class WaybackService extends AbstractSystem {
 
 
   /**
-   * checkTilemapsAsync
    * This is used to implement the change detector from the Wayback library.
    * @see https://github.com/lovexiaowei/wayback-core/blob/main/src/change-detector/index.ts
    *
@@ -371,7 +365,6 @@ export class WaybackService extends AbstractSystem {
 
 
   /**
-   * checkImagesAsync
    * This is used to implement the change detector from the Wayback library.
    * @see https://github.com/lovexiaowei/wayback-core/blob/main/src/change-detector/index.ts
    *
@@ -437,7 +430,6 @@ export class WaybackService extends AbstractSystem {
 
 
   /**
-   * getMetadataAsync
    * Get the metadata for the given tile and release date.
    * @param tile - the Tile to check
    * @param releaseDate - the releaseDate to check

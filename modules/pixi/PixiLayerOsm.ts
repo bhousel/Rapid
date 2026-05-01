@@ -62,7 +62,6 @@ interface MidpointData {
 
 
 /**
- * getzIndex
  * Returns z-index for highway tags (for drawing order)
  * @param tags - Entity tags
  * @returns z-index value
@@ -73,7 +72,6 @@ function getzIndex(tags: OsmTags): number {
 
 
 /**
- * hasWikidata
  * Checks if entity has any wikidata tags (deserves special styling)
  * @param entity - OSM entity to check
  * @returns true if entity has wikidata tags
@@ -91,7 +89,6 @@ function hasWikidata(entity: OsmEntity): boolean {
 
 
 /**
- * PixiLayerOsm
  * Renders OpenStreetMap entities (points, vertices, lines, polygons)
  * @class
  */
@@ -116,7 +113,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * supported
    * Whether the Layer's service exists
    */
   get supported(): boolean {
@@ -125,7 +121,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * enabled
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
@@ -151,7 +146,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset(): void {
@@ -183,7 +177,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -289,7 +282,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * renderPolygons
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering
@@ -448,7 +440,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * renderLines
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering
@@ -577,7 +568,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * renderVertices
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering
@@ -680,7 +670,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * renderPoints
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering
@@ -758,7 +747,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * renderMidpoints
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering

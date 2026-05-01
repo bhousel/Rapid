@@ -11,7 +11,6 @@ import type {
 
 
 /**
- * Geometry
  * Wrapper for both original and projected geometry data.
  * This class wraps `0..n` multiple GeometryPart elements in a collection.
  *
@@ -44,7 +43,6 @@ export class Geometry {
 
 
   /**
-   * destroy
    * Release memory.
    * Do not use the geometry after calling `destroy()`.
    */
@@ -55,7 +53,6 @@ export class Geometry {
 
 
   /**
-   * reset
    * Remove all stored data
    */
   reset(): void {
@@ -70,7 +67,6 @@ export class Geometry {
 
 
   /**
-   * clone
    * Returns a clone of this Geometry object
    * It clones both the calculated extents as well as the GeometryParts in the collection.
    * @return  A new Geometry
@@ -107,7 +103,6 @@ export class Geometry {
 
 
   /**
-   * setData
    * This method can accept all types of GeoJSON data.
    * It will automatically break multitypes and collections into parts
    *  and create separate GeometryPart elements for each part.
@@ -143,7 +138,6 @@ export class Geometry {
 
 
   /**
-   * _geojsonToParts
    * Break arbitrary GeoJSON into Geometry parts.
    * This will recurse down through the collection types if needed.
    * @param   geojson - source GeoJSON data

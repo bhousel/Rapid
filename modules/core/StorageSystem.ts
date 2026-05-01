@@ -68,7 +68,6 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -78,7 +77,6 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -88,7 +86,6 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -98,7 +95,6 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
-   * hasItem
    * @param k - String key to check for existance
    * @return `true` if the key is set, `false` if not
    */
@@ -108,7 +104,6 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
-   * getItem
    * @param k - String key to get the value for
    * @return The stored value, or `null` if not found
    */
@@ -118,7 +113,6 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
-   * setItem
    * @param k - String key to set the value for
    * @param v - String value to set
    * @return `true` if the write to `localStorage` succeeded, `false` if it failed
@@ -135,7 +129,6 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
-   * removeItem
    * @param k - String key to remove from storage
    */
   removeItem(k: string): void {
@@ -144,7 +137,6 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
-   * clear
    * Clears all values from the storage
    */
   clear(): void {

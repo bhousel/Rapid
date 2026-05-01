@@ -84,7 +84,6 @@ export class AbstractBehavior extends EventEmitter {
 
 
   /**
-   * enable
    * Every behavior should have an `enable` function
    * to setup whatever event handlers this behavior needs
    */
@@ -95,7 +94,6 @@ export class AbstractBehavior extends EventEmitter {
 
 
   /**
-   * disable
    * Every behavior should have a `disable` function
    * to teardown whatever event handlers this behavior needs
    */
@@ -106,7 +104,6 @@ export class AbstractBehavior extends EventEmitter {
 
 
   /**
-   * behaviorID
    * Unique string to identify this Behavior.
    * @return  The behavior identifier string (e.g. 'draw', 'hover')
    * @readonly
@@ -117,7 +114,6 @@ export class AbstractBehavior extends EventEmitter {
 
 
   /**
-   * enabled
    * Whether the behavior is enabled.
    * @return  `true` if enabled, `false` if not
    * @readonly
@@ -149,7 +145,6 @@ export class AbstractBehavior extends EventEmitter {
 //
 
   /**
-   * _getEventData
    * Returns an object containing the important details about this Pixi event.
    * @param  e - A Pixi FederatedEvent (or something that looks like one)
    * @return Object containing data about the event and what was targeted

@@ -103,7 +103,6 @@ class Label {
 
 
 /**
- * PixiLayerLabels
  * @class
  */
 export class PixiLayerLabels extends AbstractPixiLayer {
@@ -178,7 +177,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset() {
@@ -236,7 +234,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * resetFeature
    * Remove data from labeling caches for the given feature.
    * This will force the feature to be relabeled.
    * @param featureID - The feature ID to reset
@@ -297,7 +294,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render all the labels. This is a multi-step process:
    * - gather avoids - these are places in the scene that we don't want a label
    * - label placement - do the math of figuring out where labels should be
@@ -389,7 +385,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * getLabelSprite
    * @param str - String for the label
    * @param style - 'normal' or 'italic'
    */
@@ -432,7 +427,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * gatherAvoids
    * Gather the avoidable features, create boxes for them,
    *  and insert them into the placement Rbush.
    * If a new avoidance collides with an already placed label,
@@ -534,7 +528,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * _cacheBox
    * Add the given box to the caches.
    * The box should have `id` and `featureID` properties.
    * @param box - the box to cache
@@ -556,7 +549,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * labelPoints
    * This calculates the placement, but does not actually add the label to the scene.
    * @param features - The features to place point labels on
    */
@@ -595,7 +587,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * labelLines
    * Lines are labeled with `PIXI.SimpleRope` that run along the line.
    * This calculates the placement, but does not actually add the rope label to the scene.
    * @param features - The features to place point labels on
@@ -631,7 +622,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * labelPolygons
    * Polygons are labeled with `PIXI.SimpleRope` that run along the inside of the perimeter.
    * This calculates the placement, but does not actually add the rope label to the scene.
    * @param features - The features to place point labels on
@@ -674,7 +664,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * placeTextLabel
    * Text labels are used to label point features like map pins.
    * We generate several placement regions around the marker,
    *  try them until we find one that doesn't collide with something.
@@ -833,7 +822,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * placeRopeLabel
    * Rope labels are placed along a string of coordinates.
    * We generate chains of bounding boxes along the line,
    *  then add the labels in spaces along the line wherever they fit.
@@ -1033,7 +1021,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * renderObjects
    * This renders any of the Label objects in the view
    */
   renderObjects(): void {
@@ -1112,7 +1099,6 @@ const isCanvas = (renderer.type === PIXI.RendererType.CANVAS);
 
 
   /**
-   * renderDebug
    * This renders any of the debug sprites in the view
    */
   renderDebug(): void {

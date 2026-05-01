@@ -15,7 +15,6 @@ export interface Midpoint {
 
 
 /**
- * actionAddMidpoint
  * Adds a node at the midpoint of an edge (shared between ways).
  *
  * @param   midpoint  - Object with loc and edge properties

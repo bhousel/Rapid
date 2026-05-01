@@ -12,7 +12,6 @@ const ACCEPT_FEATURES_LIMIT = 50;
 
 
 /**
- * UiRapidInspector
  * The RapidInspector is a UI component for viewing/editing Rapid Entities in the sidebar.
  *
  * @example
@@ -72,7 +71,6 @@ export class UiRapidInspector {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders.)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -134,7 +132,6 @@ export class UiRapidInspector {
 
 
   /**
-   * isAcceptFeatureDisabled
    * The "Add Feature" button is disabled if the user has already added more than the
    *  ACCEPT_FEATURES_LIMIT - unless they are working on a task, or in poweruser mode.
    * @return {boolean}  `true` if Add Feature is disabled, `false` if enabled.
@@ -156,7 +153,6 @@ export class UiRapidInspector {
 
 
   /**
-   * acceptFeature
    * Called when the user presses Add Feature.
    * @param  {Event}  e?         - triggering event (if any)
    * @param  {Object} d?         - object bound to the selection (i.e. the command) (not used)
@@ -251,7 +247,6 @@ export class UiRapidInspector {
 
 
   /**
-   * ignoreFeature
    * Called when the user presses "Ignore Feature".
    * @param  {Event}  e? - triggering event (if any)
    * @param  {Object} d? - object bound to the selection (i.e. the command) (not used)
@@ -277,7 +272,6 @@ export class UiRapidInspector {
 
 
   /**
-   * getBrightness
    * This is used to get the brightness of the given hex color.
    * (We use this to know whether text written over this color should be light or dark).
    * https://www.w3.org/TR/AERT#color-contrast
@@ -295,7 +289,6 @@ export class UiRapidInspector {
 
 
   /**
-   * renderFeatureInfo
    * Renders the 'feature-info' section (the dataset name)
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this content should render itself into
    */
@@ -345,7 +338,6 @@ export class UiRapidInspector {
 
 
   /**
-   * renderTagInfo
    * Renders the 'tag-info' section
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this content should render itself into
    */
@@ -387,7 +379,6 @@ export class UiRapidInspector {
 
 
   /**
-   * renderChoices
    * Renders the 'rapid-inspector-choices' section
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this content should render itself into
    */
@@ -444,7 +435,6 @@ export class UiRapidInspector {
 
 
   /**
-   * renderNotice
    * Renders the 'rapid-inspector-notice' section
    * This section contains remarks about the data - license, usage, or other hints
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this content should render itself into
@@ -484,7 +474,6 @@ export class UiRapidInspector {
 
 
   /**
-   * renderChoice
    * Renders a choice - This should be called within a d3-selection.each
    * @param  {*}         d - bound datum
    * @param  {number}    i - iterator
@@ -586,7 +575,6 @@ export class UiRapidInspector {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   _setupKeybinding() {

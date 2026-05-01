@@ -4,7 +4,6 @@ import type { OsmNode, OsmTags, OsmWay } from '../data/types.ts';
 
 
 /**
- *  actionSyncCrossingTags
  *  This performs some basic crossing tag cleanups and upgrades, and keeps the
  *  crossing tags in sync between parent crossing ways and child crossing nodes.
  *
@@ -57,7 +56,6 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
 
   /**
-   * _isHighwayCrossingWay
    * Is the way tagged with something that would indicate that it is a crossing,
    *   for example `highway=footway`+`footway=crossing` ?
    * @param   tags - tags to check
@@ -74,7 +72,6 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
 
   /**
-   * _isCrossableWay
    * Is the way tagged with something that can have crossing nodes along it?
    * @param   tags - tags to check
    * @return  `true` if the way is tagged as a crossing
@@ -97,7 +94,6 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
 
   /**
-   * _isCrossingNode
    * Is the node tagged with something that would indicate that it is a crossing,
    *   for example `highway=crossing`
    * @param   tags - tags to check
@@ -111,7 +107,6 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
 
   /**
-   * syncParentToChildren
    * When modifying a way, make sure the parent and children have consistent crossing tags.
    *  - if the parent is a crossing, child nodes should have matching crossing tags.
    *  - if the parent is no longer a crossing, child nodes may need to have their crossing tags removed.
@@ -225,7 +220,6 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
 
   /**
-   * syncChildToParents
    * When modifying a crossing vertex, sync certain tags to any parent crossing ways.
    *  (and other children along those ways)
    * @param   child - The child Node with the tags that have changed.
@@ -295,7 +289,6 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
 
   /**
-   * cleanCrossingTags
    * Attempt to assign basic defaults to avoid tag mismatches / unnecessary validation warnings.
    * @param   t - the input tags to check
    * @return  updated tags to set

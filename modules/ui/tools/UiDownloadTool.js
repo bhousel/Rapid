@@ -8,7 +8,6 @@ import { uiTooltip } from '../tooltip.js';
 
 
 /**
- * UiDownloadTool
  * A toolbar section for the "Download OSC" button
  * This is an hidden/undocumented feature that only appears
  * if the url hash contains `&download_osc=true`
@@ -45,7 +44,6 @@ export class UiDownloadTool {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -87,7 +85,6 @@ export class UiDownloadTool {
 
 
   /**
-   * isDisabled
    * The button is disabled when there are no user changes to save
    * @return {boolean}  `true` if disabled, `false` if enabled
    */
@@ -99,7 +96,6 @@ export class UiDownloadTool {
 
 
   /**
-   * choose
    * @param  {Event} e? - triggering event (if any)
    */
   choose(e) {

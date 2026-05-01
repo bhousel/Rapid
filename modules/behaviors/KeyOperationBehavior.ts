@@ -37,7 +37,6 @@ export class KeyOperationBehavior extends AbstractBehavior {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -52,7 +51,6 @@ export class KeyOperationBehavior extends AbstractBehavior {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -67,7 +65,6 @@ export class KeyOperationBehavior extends AbstractBehavior {
 
 
   /**
-   * _keydown
    * Handles the keydown event
    * @param  e - A d3 keydown event
    */

@@ -18,7 +18,6 @@ interface GeometryGroups {
 
 
 /**
- * actionMerge
  * Merges point features onto a single way or area.
  *
  * @param   entityIDs  - Array of EntityIDs to merge

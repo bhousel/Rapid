@@ -203,7 +203,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -216,7 +215,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -293,7 +291,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -318,7 +315,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * getImages
    * Get already loaded image data that appears in the current map view
    * @return Array of image data
    */
@@ -329,7 +325,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * getSequences
    * Get already loaded sequence data that appears in the current map view
    * @return Array of sequence data
    */
@@ -340,7 +335,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view
    */
   loadTiles(): void {
@@ -373,7 +367,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * showViewer
    * Shows the photo viewer, and hides all other photo viewers
    */
   showViewer(): void {
@@ -395,7 +388,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * hideViewer
    * Hides the photo viewer and clears the currently selected image
    */
   hideViewer(): void {
@@ -413,7 +405,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * selectImageAsync
    * Note:  most code should call `PhotoSystem.selectPhoto(layerID, photoID)` instead.
    * That will manage the state of what the user clicked on, and then call this function.
    * @param imageID - the id of the image to select
@@ -500,7 +491,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _updatePhotoFooter
    * Update the photo attribution section of the image viewer
    * @param bubbleID - the new bubbleID
    */
@@ -599,7 +589,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _loadAssetsAsync
    * Load the Pannellum JS and CSS files into the document head
    * @return Promise resolved when both files have been loaded
    */
@@ -654,7 +643,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _initViewer
    * Initializes the Pannellum viewer
    */
   _initViewer(): void {
@@ -697,7 +685,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window, but only if the photo viewer is visible.
    * @param e - A DOM KeyboardEvent
    */
@@ -727,7 +714,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _step
    * Step to the next bubble in the sequence
    * @param stepBy - 1 to step forward, -1 to step backward
    */
@@ -808,7 +794,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _gotTile
    * Process the response from the tile fetch.
    * @param tile - Tile data
    * @param bubbles - Response data
@@ -872,7 +857,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _connectSequences
    * Call this sometimes to connect unattached bubbles into sequences.
    * Note that this algorithm has changed, as we seem to get different data.
    * The API we are using is undocumented :(
@@ -1026,7 +1010,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _fetchMetadataAsync
    * https://learn.microsoft.com/en-us/bingmaps/rest-services/imagery/get-imagery-metadata
    */
   _fetchMetadataAsync(tile: Tile): Promise<unknown> | void {
@@ -1048,7 +1031,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _loadTileAsync
    * bubbles:   undocumented / unsupported API?
    * see Rapid#1305, iD#10100
    */
@@ -1075,7 +1057,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _loadImageAsync
    * Loads a single image tile and draws it onto the corresponding face canvas.
    * @param imgInfo - Info about the image tile to load
    * @return Promise resolving with the load result status
@@ -1102,7 +1083,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _loadFaceAsync
    * Loads all image tiles for one cubemap face and assembles them into a data URL.
    * @param imageGroup - Array of image tile infos for a single face
    * @return Promise resolving when the face has been stitched
@@ -1120,7 +1100,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _loadFacesAsync
    * Loads all six cubemap faces in parallel.
    * @param faceGroup - Array of 6 face image groups
    * @return Promise resolving when all faces have been loaded
@@ -1132,7 +1111,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _setupCanvas
    * Called when setting up the viewer, creates 6 canvas elements to load image data into,
    * so that it can be stitched together into a photosphere.
    */
@@ -1159,7 +1137,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _qkToXY
    * Converts a quadkey string to pixel coordinates for canvas placement.
    * @param qk - Quadkey string (e.g. '0123')
    * @return [x, y] pixel coordinates
@@ -1179,7 +1156,6 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
-   * _getQuadKeys
    * Returns an ordered array of quadkey strings for tiling a cubemap face
    * at the current resolution. The number of tiles scales with resolution.
    * @return Array of quadkey strings

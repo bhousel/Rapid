@@ -6,7 +6,6 @@ import { uiModal } from './modal.js';
 
 
 /**
- * uiSplash
  * This is the screen we show to the users if:
  *   - They have never used Rapid before, or
  *   - We have an updated privacy policy to tell them about

@@ -29,7 +29,6 @@ export interface PixiGeometryPartScreenData {
 
 
 /**
- * PixiGeometryPart
  * Wrapper for projected geometry in screen coordinates used by Pixi.
  * This now wraps the core GeometryPart class that works in world coordinates,
  *  so these computations are relatively quick.
@@ -71,7 +70,6 @@ export class PixiGeometryPart {
 
 
   /**
-   * destroy
    * Release memory.
    * Do not use the geometry after calling `destroy()`.
    */
@@ -81,7 +79,6 @@ export class PixiGeometryPart {
 
 
   /**
-   * reset
    * Remove all stored data
    */
   reset(): void {
@@ -93,7 +90,6 @@ export class PixiGeometryPart {
 
 
   /**
-   * update
    * @param viewport - Pixi viewport to use for rendering
    */
   update(viewport: Viewport): void {
@@ -176,7 +172,6 @@ export class PixiGeometryPart {
 
 
   /**
-   * type
    * The original data format lives in the source GeometryPart, this is just a convenience getter.
    * @return One of 'Point', 'LineString', 'Polygon'
    * @readonly
@@ -187,7 +182,6 @@ export class PixiGeometryPart {
 
 
   /**
-   * setData
    * The source coordinate data must be passed as either:
    * - A GeometryPart (or something like one, with a `type` and `world` props)
    * - A GeoJSON singular geometry that can be turned into a GeometryPart.

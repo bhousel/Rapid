@@ -78,7 +78,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * enable
    * Bind event handlers
    */
   enable(): void {
@@ -108,7 +107,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * disable
    * Unbind event handlers
    */
   disable(): void {
@@ -140,7 +138,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
@@ -175,7 +172,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _keyup
    * Handler for keyup events on the window.
    * @param  e - A DOM KeyboardEvent
    */
@@ -190,7 +186,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerdown
    * Handler for pointerdown events.  Note that you can get multiples of these
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
    * @param  e - A Pixi FederatedPointerEvent
@@ -222,7 +217,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -250,7 +244,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointerup
    * Handler for pointerup events.
    * @param  e - A Pixi FederatedPointerEvent
    */
@@ -297,7 +290,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _pointercancel
    * Handler for pointercancel events.
    */
   _pointercancel(): void {
@@ -308,7 +300,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _spacebar
    * Handler for `keydown` events of the spacebar. We use these to simulate clicks.
    * Note that the spacebar will repeat, so we can get many of these.
    */
@@ -329,7 +320,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _doSelect
    * Once we have determined that the user has clicked, this is where we handle that click.
    */
   _doSelect(): void {
@@ -425,7 +415,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _cancelLongPress
    */
   _cancelLongPress(): void {
     const scheduler = this.context.systems.scheduler!;
@@ -437,7 +426,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _doLongPress
    * Called a short time after pointerdown.
    * If we're still down, treat it as a click + contextmenu.
    * @param  down - EventData Object for the original down event
@@ -453,7 +441,6 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
-   * _doDoubleClick
    * Once we have had two 'ups' in a row we need to see if anything special needs to be done to the entity being clicked on.
    * If it's a way or an area, we need to add a node wherever they clicked:
    * - If it's on a bare part of the way
@@ -499,7 +486,6 @@ export class SelectBehavior extends AbstractBehavior {
   }
 
   /**
-   * _doContextMenu
    * Once we have determined that the user wants the contextmenu, this is where we handle that.
    * We get into here from `_pointerup`, `_keydown`, or `_doLongPress`
    * Uses whatever is in `this.lastClick` as the target for the menu.

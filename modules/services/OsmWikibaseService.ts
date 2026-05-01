@@ -82,7 +82,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -92,7 +91,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -102,7 +100,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -119,7 +116,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * claimToValue
    * Get the best value for the property, or undefined if not found
    * @param entity - entity object from wikibase
    * @param property - string e.g. 'P4' for image
@@ -154,7 +150,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * monolingualClaimToValueObj
    * Convert monolingual property into a key-value object (language -> value)
    * @param entity - entity object from wikibase
    * @param property - string e.g. 'P31' for monolingual wiki page title
@@ -172,7 +167,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * toSitelink
    * Generate a sitelink for the given key/value pair
    * @param key
    * @param value
@@ -185,7 +179,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * getEntity
    * Pass params object of the form:
    * {
    *   key: 'string',
@@ -310,7 +303,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * getDocs
    * Pass params object of the form:
    * {
    *   key: 'string',     // required
@@ -423,7 +415,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * addLocale
    * Add a locale to the cache (for unit testing)
    * @param langCode
    * @param qid
@@ -434,7 +425,6 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
   /**
-   * _request
    * Perform a request
    * @param url - the URL to request
    * @param callback - errback-style callback function to call with results

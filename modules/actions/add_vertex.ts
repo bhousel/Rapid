@@ -4,7 +4,6 @@ import type { OsmWay } from '../data/OsmWay.ts';
 
 
 /**
- * actionAddVertex
  * Adds a node to a way at a specified index.
  *
  * @param   wayID   - EntityID of the way to modify

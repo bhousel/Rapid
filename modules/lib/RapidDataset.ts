@@ -58,7 +58,6 @@ export interface RapidDatasetProps {
 
 
 /**
- * RapidDataset
  * Represents an external dataset that can be loaded into Rapid.
  * Datasets come from various services (Esri, MapWithAI, Overture, etc.)
  * and contain features like buildings, roads, addresses, etc.
@@ -134,7 +133,6 @@ export class RapidDataset {
 
 
   /**
-   * getThumbnail
    * Choose a default thumbnail if we weren't supplied one.
    * @return URL for thumbnail image
    */
@@ -151,7 +149,6 @@ export class RapidDataset {
 
 
   /**
-   * getLabel
    * Attempt to localize the dataset name, fallback to 'label' or 'id'
    * @return Localized label string
    */
@@ -162,7 +159,6 @@ export class RapidDataset {
 
 
   /**
-   * getDescription
    * Attempt to localize the dataset description, fallback to empty string
    * @return Localized description string
    */

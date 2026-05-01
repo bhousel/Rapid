@@ -6,7 +6,6 @@ import { utilCmd } from '../../util/cmd.ts';
 
 
 /**
- * UiUndoRedoTool
  * A toolbar section for the undo/redo buttons
  */
 export class UiUndoRedoTool {
@@ -78,7 +77,6 @@ export class UiUndoRedoTool {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -145,7 +143,6 @@ export class UiUndoRedoTool {
 
 
   /**
-   * choose
    * @param  {Event}  e? - triggering event (if any)
    * @param  {Object} d? - object bound to the selection (i.e. the command)
    */

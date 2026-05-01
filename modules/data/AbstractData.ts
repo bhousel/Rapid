@@ -82,7 +82,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
 
 
   /**
-   * destroy
    * Every data element should have a destroy function that frees all the resources
    * Do not use the data element after calling `destroy()`.
    * @abstract
@@ -95,7 +94,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * update
    * Update the data element's properties and return a new data element.
    * Data elements are intended to be immutable.  To modify a data element,
    *  pass in the properties to change, and you'll get a new data element.
@@ -109,7 +107,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * updateGeometry
    * Forces a recomputation of the internal geometry data.
    * The Graph param is only needed for OSM data types that require a Graph to know their topology.
    * @param _graph - optional param, used only for some OSM Entities
@@ -121,7 +118,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * asGeoJSON
    * Returns a GeoJSON representation of this data element.
    * @param _graph - optional param, used only for some OSM Entities
    * @returns GeoJSON representation of the data element
@@ -132,7 +128,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * extent
    * Get an Extent (in WGS84 lon/lat) from this data elemenent's geometry.
    * Note that this may return `undefined` in situations where an Extent could not be determined.
    * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
@@ -143,7 +138,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * intersects
    * Test if this data element intersects the given other Extent
    * Note that this may return `false` in situations where an Extent could not be determined.
    * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
@@ -156,7 +150,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * touch
    * Bump internal version number in place (typically, forcing a rerender)
    * Note that this version number always increases and is shared by all data elements.
    * We did it this way to avoid situations where you undo to a previous version
@@ -170,7 +163,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * type
    * A string describing what kind of data element this is (e.g. 'node', 'way', 'relation')
    * The meaning of this type is data-dependant.  For OSM data it will be something like
    *  'node', 'way', 'relation', but for other data may be unset.
@@ -181,7 +173,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * dataID
    * Unique string to identify this data element
    * @readonly
    */
@@ -190,7 +181,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * v
    * Internal version of the data element, can be used to detect changes.
    * @readonly
    */
@@ -199,7 +189,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * key
    * The 'key' includes both the id and the version
    * @readonly
    */

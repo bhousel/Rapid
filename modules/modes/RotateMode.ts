@@ -50,7 +50,6 @@ export class RotateMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * @param  options - Optional options object
    * @return `true` if the mode can be entered, `false` if not
@@ -103,7 +102,6 @@ export class RotateMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, committing any pending rotate operation.
    * Removes event listeners and clears state.
    */
@@ -148,7 +146,6 @@ export class RotateMode extends AbstractMode {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
@@ -169,7 +166,6 @@ export class RotateMode extends AbstractMode {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events.
    * Converts pointer movement into rotation: moving left/right or up/down
    * rotates the shape clockwise or counterclockwise based on position relative to pivot.
@@ -233,7 +229,6 @@ export class RotateMode extends AbstractMode {
 
 
   /**
-   * _calcPivot
    * Calculate the location that the features should pivot around.
    * We simply average the centroids of all selected entities - this gives each
    * feature equal weight regardless of size/complexity, which is more intuitive
@@ -262,7 +257,6 @@ export class RotateMode extends AbstractMode {
 
 
   /**
-   * _finish
    * Return to select mode - `exit()` will finalize the work in progress.
    */
   private _finish(): void {
@@ -271,7 +265,6 @@ export class RotateMode extends AbstractMode {
 
 
   /**
-   * _cancel
    * Return to select mode without doing anything
    */
   private _cancel(): void {

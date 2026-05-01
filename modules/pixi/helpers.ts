@@ -30,7 +30,6 @@ export interface LineSegment {
 
 
 /**
- * lineToPolygon
  * Generates a polygon from a line. Intended for use to create custom hit areas for our ways.
  * @see https://jsfiddle.net/bigtimebuddy/xspmq8au/
  * @param   width  - Width of the polygon in pixels (deviation from either side of the line)
@@ -76,7 +75,6 @@ export function lineToPolygon(width: number, points: number[]): PIXI.Polygon {
 
 
 /**
- * lineToPoly
  * Use Pixi's built-in line builder to convert a line with some width into a polygon.
  * @see https://github.com/pixijs/pixijs/blob/dev/packages/graphics/src/utils/buildLine.ts
  * @param  flatPoints - Flat array of [x,y,x,y,...] points that make up the line
@@ -305,7 +303,6 @@ export function lineToPoly(flatPoints: number[], lineStyle: LineStyle = {}): Lin
 
 
 /**
- * getLineSegments
  * This walks a line and breaks it up into segments containing coordinates at given spacing that share a heading.
  * It is used to position oneway arrows, or sided markers, or cover a line in bounding boxes for labeling purposes.
  * For example:
@@ -383,7 +380,6 @@ if (isLimited && (span >= spacing * 100)) {
 
 
 /**
- * getDebugBBox
  * Returns a PIXI.Sprite that covers the given box, used for debugging.
  * @param   x      - left of the box
  * @param   y      - top of the box

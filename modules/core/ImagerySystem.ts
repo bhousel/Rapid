@@ -142,7 +142,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -188,7 +187,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -198,7 +196,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -208,7 +205,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * loadImageryAssetsAsync
    * @return Promise fulfilled when the imagery has been loaded
    */
   loadImageryAssetsAsync(): Promise<void> {
@@ -259,7 +255,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * resetAll
    * This puts the ImagerySystem internal data back to its initial state, i.e. no imagery.
    */
   resetAll(): void {
@@ -291,7 +286,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * sources
    * Returns an aggregate Map of all ImagerySource objects across all scopes.
    * Sources from later scopes override sources from earlier scopes with the same key.
    * @return  Aggregate map of all sources
@@ -309,7 +303,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * getScope
    * Get the scope data for a specific scope ID.
    * If the scope doesn't exist yet, it is created and cached automatically.
    * @param scopeID - ID of the scope to look up
@@ -326,7 +319,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * defaultAssetIDs
    * Returns the default assetIDs. These are the imagery assets that Rapid will load by default.
    * @return  Default assetIDs
    * @readonly
@@ -336,7 +328,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * loadedAssetIDs
    * Returns the loaded assetIDs, along with their version numbers if known.
    * @return  Loaded assetIDs
    * @readonly
@@ -346,7 +337,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * requestedAssetIDs
    * Allows user to request different imagery asset files than what Rapid uses by default.
    *
    * If set before init time, these assets will be loaded at init time when init calls `loadImageryAssetsAsync`.
@@ -384,7 +374,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * merge
    * Accepts imagery data contained in scope blocks:
    * ```
    * {
@@ -473,7 +462,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * source
    * Returns the ImagerySource with the given id.
    * @param sourceID - a source id
    * @return The ImagerySource, or `undefined` if not found
@@ -485,7 +473,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * imageryUsed
    * Called by the EditSystem to gather the sources being used to make an edit.
    * We return the English name of any active imagery layers, it will be included in the user's changeset.
    * @return Array of the names of imagery layers currently visible
@@ -512,7 +499,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * visibleSources
    * Returns array of known imagery sources that are valid at the given extent and zoom
    * @return Visible imagery sources
    */
@@ -556,7 +542,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * baseLayerSource
    * Gets or sets the base layer source.
    * @param source - optional ImagerySource to set as base layer
    * @return The current base layer source when getting, or `this` when setting
@@ -594,7 +579,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * chooseDefaultSource
    * When we haven't been told to use a specific background imagery,
    * this tries several options to pick an appropriate imagery to use.
    * @return The chosen default ImagerySource
@@ -620,7 +604,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * getSourceByID
    * Returns an ImagerySource for the given `sourceID`
    * @param sourceID - The sourceID to get
    * @return The `ImagerySource` with the given ID, or `undefined` if not found
@@ -634,7 +617,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * setSourceByID
    * Activates the base layer with the given `sourceID`
    * This function will correctly handle IDs like `EsriWayback_<DATE>`.
    * @param sourceID - The sourceID to activate
@@ -658,7 +640,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * showsLayer
    * Checks if the given source is currently being shown (as base or overlay)
    * @param source - The imagery source to check
    * @return `true` if the source is currently visible
@@ -671,7 +652,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * overlayLayerSources
    * Returns the current overlay imagery sources
    * @return Array of overlay ImagerySource objects
    */
@@ -681,7 +661,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * toggleOverlayLayer
    * Toggles an overlay layer on or off
    * @param source - The imagery source to toggle
    */
@@ -696,7 +675,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * enableOverlayLayers
    * This makes sure that only the overlays identified by `enableIDs` are in the list
    * ignoring the "locator overlay"
    * @param enableIDs - Iterable Set or Array of sourceIDs to enable
@@ -719,7 +697,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * nudge
    * Nudge offset, in delta pixels [dx,dy]
    * @param delta - pixels to nudge, as [dx, dy]
    * @param _zoom - the current zoom (unused, obtained from viewport)
@@ -734,7 +711,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * offset
    * Gets the current imagery offset in pixels [x, y]
    */
   get offset(): Vec2 {
@@ -742,7 +718,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * offset
    * Sets the imagery offset in pixels [x, y]
    */
   set offset([setX, setY]: Vec2) {
@@ -756,7 +731,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * brightness
    * Gets the current brightness value (default 1)
    */
   get brightness(): number {
@@ -764,7 +738,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * brightness
    * Sets the brightness value
    */
   set brightness(val: number) {
@@ -778,7 +751,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * contrast
    * Gets the current contrast value (default 1)
    */
   get contrast(): number {
@@ -786,7 +758,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * contrast
    * Sets the contrast value
    */
   set contrast(val: number) {
@@ -800,7 +771,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * saturation
    * Gets the current saturation value (default 1)
    */
   get saturation(): number {
@@ -808,7 +778,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * saturation
    * Sets the saturation value
    */
   set saturation(val: number) {
@@ -822,7 +791,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * sharpness
    * Gets the current sharpness value (default 1)
    */
   get sharpness(): number {
@@ -830,7 +798,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * sharpness
    * Sets the sharpness value
    */
   set sharpness(val: number) {
@@ -844,7 +811,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * numGridSplits
    * Gets the current number of grid splits (default 0)
    */
   get numGridSplits(): number {
@@ -852,7 +818,6 @@ export class ImagerySystem extends AbstractSystem {
   }
 
   /**
-   * numGridSplits
    * Sets the number of grid splits
    */
   set numGridSplits(val: number) {
@@ -863,7 +828,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * _rebuildIndex
    * Reset all sources and rebuild the whichPolygon spatial index.
    * This should be called after merging new imagery data.
    */
@@ -888,7 +852,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -946,7 +909,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * _imageryChanged
    * Called whenever the imagery changes.
    * This will update the urlhash, trigger a redraw, and emit an 'imagerychange' event.
    */
@@ -987,7 +949,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * _localeChanged
    * Call this whenever the locale changes.
    * It will lock in the new locale and relocalize all the imagery sources.
    * These are cached, so switching back to an already-seen locale should be fast.
@@ -1009,7 +970,6 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * _findSource
    * Searches across all scopes for an ImagerySource with the given key.
    * @param sourceKey - Lowercase source key to find
    * @return The ImagerySource, or `undefined` if not found in any scope

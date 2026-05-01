@@ -160,7 +160,6 @@ export function helpHtml(context, stringID, replacements) {
 
 
 /**
- * slugify
  * @param  text
  */
 function slugify(text) {
@@ -176,7 +175,6 @@ function slugify(text) {
 export let missingStrings = {};
 
 /**
- * _checkKey
  * Warn about any missing walkthrough names
  * @param  key
  * @param  text
@@ -192,7 +190,6 @@ function _checkKey(context, key, text) {
 }
 
 /**
- * localize
  * Localize the given walkthrough entity
  * @param  obj
  */
@@ -242,7 +239,6 @@ export function localize(context, obj) {
 
 
 /**
- * isMostlySquare
  * Used to detect squareness.. some duplicataion of code from actionOrthogonalize.
  * @param  points
  */
@@ -270,7 +266,6 @@ export function isMostlySquare(points) {
 
 
 /**
- * transitionTime
  * Take a bit more time if the locations are further apart
  * @param   loc1  `Array` [lon,lat]
  * @param   loc2  `Array` [lon,lat]
@@ -289,7 +284,6 @@ export function transitionTime(loc1, loc2) {
 
 
 /**
- * delayAsync
  * Wait for animations or other stuff to finish before continuing.
  * We have a bunch of animations that happen all throughout the app.
  * For example, to open preset picker or side panes.

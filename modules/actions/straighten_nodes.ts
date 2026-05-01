@@ -6,7 +6,6 @@ import type { OsmNode } from '../data/OsmNode.ts';
 
 
 /**
- * actionStraightenNodes
  * Aligns selected nodes along their common axis of symmetry.
  * Projects nodes onto the long axis of the smallest surrounding rectangle.
  *

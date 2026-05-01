@@ -10,7 +10,6 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 /**
- * actionCircularize
  * Circularizes a closed way to form a circle.
  *
  * @param   wayID       - EntityID of the way to circularize
@@ -257,7 +256,6 @@ export function actionCircularize(wayID: EntityID, viewport: Viewport, maxDegree
 
 
   /**
-   * _makeConvex
    * This makes the given way convex.
    * @param  graph  starting graph
    * @return ending graph

@@ -100,7 +100,6 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
-   * systemID
    * Unique string to identify this System.
    * @readonly
    */
@@ -110,7 +109,6 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
-   * serviceID
    * Because services also inherit from 'AbstractSystem',
    *  we will offer a convenience getter named `serviceID` too.
    * They all just return `id` anyway.
@@ -122,7 +120,6 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
-   * started
    * @readonly
    */
   get started(): boolean {
@@ -131,7 +128,6 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
-   * paused
    * @readonly
    */
   get paused(): boolean {
@@ -140,7 +136,6 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * Will return a rejected promise if any required system is not available.
    * @return  Promise resolved when this component has completed initialization
@@ -159,7 +154,6 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    * @abstract
@@ -173,7 +167,6 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state.
    * @return  Promise resolved when this component has completed resetting
    * @abstract
@@ -184,7 +177,6 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
-   * pause
    * Pauses this system using reference counting.
    * The meaning of "pause" / "resume" is dependent on the system - they may not be used at all.
    * It may be used to prevent network fetches, background work, or rendering.
@@ -218,7 +210,6 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
-   * _resume
    * Resumes (unpauses) this system by decrementing the pause count.
    * The meaning of "pause" / "resume" is dependent on the system - they may not be used at all.
    * It may be used to prevent network fetches, background work, or rendering.

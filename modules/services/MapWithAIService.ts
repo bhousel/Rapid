@@ -66,7 +66,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -89,7 +88,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -99,7 +97,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -124,7 +121,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * getAvailableDatasets
    * Called by `RapidSystem` to get the datasets that this service provides.
    * @return The datasets this service provides
    */
@@ -205,7 +201,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * getDataset
    * Get a dataset cache identified by the given datasetID.
    * Create it if it doesn't exist yet.
    * @param datasetID - the cache to get (or create)
@@ -233,7 +228,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * getData
    * Get already loaded data that appears in the current map view
    * @param datasetID - datasetID to get data for
    * @return Array of data (OSM Entities)
@@ -248,7 +242,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view
    * @param datasetID - datasetID to load tiles for
    */
@@ -277,7 +270,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * loadTile
    * Load a single tile of data
    * @param ds - the dataset info
    * @param tile - a tile object
@@ -319,7 +311,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * _gotTile
    * Process the parsed results from a tile fetch.
    * @param results - the parsed data from OsmXMLParser
    * @param ds - the dataset info
@@ -399,7 +390,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * graph
    * Returns the Graph for the given dataset.
    * @param datasetID - dataset to get the graph for
    * @return the dataset's Graph
@@ -411,7 +401,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * merge
    * Merge entities directly into a dataset's graph and tree.
    * Used to load the rapid_intro_graph.
    * @param datasetID - dataset to merge into
@@ -425,7 +414,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * _tileURL
    * Build the MapWithAI API URL for a given dataset and extent.
    * @param dataset - the dataset cache to build the URL for
    * @param extent - geographic extent of the tile
@@ -493,7 +481,6 @@ export class MapWithAIService extends AbstractSystem {
 
 
   /**
-   * _connectSplitWays
    * Call this sometimes to reassemble ways that were split by the server.
    * @param ds - the dataset info
    */

@@ -19,7 +19,6 @@ import type {
 
 
 /**
- * OsmJSONParser
  * This class contains the code for parsing an OSM JSON content.
  * @see https://wiki.openstreetmap.org/wiki/OSM_JSON
  * Note that OSM JSON data can contain slightly different syntax and attributes.
@@ -97,7 +96,6 @@ export class OsmJSONParser {
 
 
   /**
-   * reset
    * Call reset to clear the caches.
    */
   reset(): void {
@@ -106,7 +104,6 @@ export class OsmJSONParser {
 
 
   /**
-   * parse
    * Parse the given content and extract whatatever OSM data we find in it.
    * @param   content - the content to parse
    * @param   options - parsing options
@@ -296,7 +293,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseNode
    * Parse the given `node` object.
    * @param   obj - the source object
    * @param   id  - the OSM nodeID (e.g. 'n1')
@@ -320,7 +316,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseWay
    * Parse the given `way` object.
    * @param   obj - the source object
    * @param   id  - the OSM wayID (e.g. 'w1')
@@ -341,7 +336,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseRelation
    * Parse the given `relation` object.
    * @param   obj - the source object
    * @param   id  - the OSM relationID (e.g. 'r1')
@@ -368,7 +362,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseChangeset
    * Parse the given `changeset` object.
    * @param   obj - the source object
    * @param   id  - the OSM changesetID (e.g. 'c1')
@@ -392,7 +385,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseNote
    * Parse the given `note` object.
    * @param   obj - the source object
    * @return  Object of parsed properties
@@ -414,7 +406,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseComments
    * This parses comments found in notes and changesets under the `comments` Array property.
    * @param   comments - Array of source comments
    * @return  Array of parsed comments
@@ -431,7 +422,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseUser
    * Parse the given `user` object.
    * @param   obj - the source object
    * @param   id  - the user ID (e.g. 'user1')
@@ -450,7 +440,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseUserBlock
    * Parse the given `user_block` object.
    * @param   obj - the source object
    * @return  Object of parsed properties
@@ -468,7 +457,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parsePreferences
    * Parse the given `preferences` object.
    * @param   obj - the source object
    * @return  Object of parsed properties
@@ -484,7 +472,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseApi
    * Parse the given `api` object.
    * @param   obj - the source object
    * @return  Object of parsed properties
@@ -497,7 +484,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parsePolicy
    * Parse the given `policy` object.
    * @param   obj - the source object
    * @return  Object of parsed properties
@@ -526,7 +512,6 @@ export class OsmJSONParser {
 
 
   /**
-   * _parseBounds
    * Parse the given `bounds` object.
    * @param   obj - the source object
    * @return  Object of parsed properties
@@ -544,7 +529,6 @@ export class OsmJSONParser {
 /* c8 ignore start */
 
 /**
- * isObject
  * Is the given thing an Object?
  *
  * This is better than `typeof val === 'object'` because it returns
@@ -559,7 +543,6 @@ function isObject(val: unknown): val is Record<string, unknown> {
 
 
 /**
- * copyProps
  * Copies the properties from source to destination.
  * While doing so, try to stringify `id` properties and unstringify other properties.
  * @param   dst - the destination Object
@@ -580,7 +563,6 @@ function copyProps(dst: Record<string, any>, src: Record<string, any>): Record<s
 
 
 /**
- * unstringify
  * This will attempt to clean up and cast strings to a better type if possible.
  * We aren't going to overthink this, just handle a few simple cases.
  * @param   val - the source value

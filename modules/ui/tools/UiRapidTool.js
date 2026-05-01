@@ -7,7 +7,6 @@ import { utilCmd } from '../../util/cmd.ts';
 
 
 /**
- * UiRapidTool
  * A toolbar section for the Rapid features
  */
 export class UiRapidTool {
@@ -48,7 +47,6 @@ export class UiRapidTool {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -143,7 +141,6 @@ export class UiRapidTool {
 
 
   /**
-   * choose
    * @param  {Event}  e? - triggering event (if any)
    * @param  {Object} d? - object bound to the selection (i.e. the modal component)
    */
@@ -154,7 +151,6 @@ export class UiRapidTool {
 
 
   /**
-   * isLayerEnabled
    * @return  {boolean}  `true` if the Rapid layer is enabled, `false` if not
    */
   isLayerEnabled() {

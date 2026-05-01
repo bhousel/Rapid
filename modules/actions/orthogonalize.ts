@@ -26,7 +26,6 @@ interface Corner {
 
 
 /**
- * actionOrthogonalize
  * Attempts to orthogonalize a way by making its angles closer to 90°.
  * For ways with 3 nodes, adjusts only the corner vertex.
  * For larger polygons, iteratively adjusts vertices to achieve right angles.

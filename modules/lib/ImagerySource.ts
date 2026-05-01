@@ -15,7 +15,6 @@ const aesDecrypt = utilAesDecrypt as (cipherText: string | undefined, key?: numb
 export type ImageryType = 'tms' | 'wms' | 'bing' | 'wayback';
 
 /**
- * ImagerySourceStrings
  * Pre-localized strings for an ImagerySource.
  */
 interface ImagerySourceStrings {
@@ -98,7 +97,6 @@ export interface ImagerySourceProps {
 
 
 /**
- * ImagerySource
  * An Imagery Source maintains the state of a single tiled imagery source.
  *
  * Properties you can access:
@@ -163,7 +161,6 @@ export class ImagerySource {
 
 
   /**
-   * reset
    * Resets all cached data.
    * This should happen whenever ImagerySystem merges in new data.
    * You must add the ImagerySource to the ImagerySystem and call `reset` before using the ImagerySource.
@@ -178,7 +175,6 @@ export class ImagerySource {
 
 
   /**
-   * setLocale
    * Changes the locale and re-localizes the strings.
    * This should happen whenever LocalizationSystem changes the locale.
    * @param localeCode - the locale code to switch to (defaults to 'en-US')
@@ -206,7 +202,6 @@ export class ImagerySource {
 
 
   /**
-   * name
    * The name is the main display name of the ImagerySource, as shown in the user interface.
    * @return Localized name
    * @readonly
@@ -216,7 +211,6 @@ export class ImagerySource {
   }
 
   /**
-   * description
    * Provides additional descriptive text about the ImagerySource.
    * @return Localized description
    * @readonly
@@ -226,7 +220,6 @@ export class ImagerySource {
   }
 
   /**
-   * key
    * The `key` can be used to uniquely identify this imagery source.
    * It is usually just the `safeid`, but for 'wayback' it will also include the `date`.
    * @return The key
@@ -237,7 +230,6 @@ export class ImagerySource {
   }
 
   /**
-   * imageryUsed
    * Returns a string that can be used as the "imagery_used" changeset metadata.
    * @return The imagery used string
    * @readonly
@@ -247,7 +239,6 @@ export class ImagerySource {
   }
 
   /**
-   * template
    * Returns the imagery URL template
    * @return The imagery URL template
    * @readonly
@@ -257,7 +248,6 @@ export class ImagerySource {
   }
 
   /**
-   * area
    * Returns the area of this imagery extent.
    * This area is in steradians (square radians) which is unusual, but useful for comparing areas.
    * @see https://d3js.org/d3-geo/math#geoArea
@@ -271,7 +261,6 @@ export class ImagerySource {
   }
 
   /**
-   * isValidZoom
    * Is the imagery valid at the given zoom?
    * @return `true` if the imagery is valid at the given zoom, `false` if not
    */
@@ -282,7 +271,6 @@ export class ImagerySource {
   }
 
   /**
-   * isLocatorOverlay
    * Is this source the "mapbox locator overlay"?
    * @return `true` if the imagery is the locator overlay, `false` if not
    */
@@ -291,7 +279,6 @@ export class ImagerySource {
   }
 
   /**
-   * isBuiltin
    * Is this one of the builtin objects?
    * We consider it "builtin" if it doesn't have a `assetID` (i.e. added via a merge).
    * These include the 'none', 'custom' and possibly 'EsriWayback' sources.
@@ -303,7 +290,6 @@ export class ImagerySource {
 
 
   /**
-   * getMetadata
    * Calls the callback with an object containing metadata for this imagery source.
    * @param tile - The tile to get metadata for
    * @param callback - errback-style callback function to call with results
@@ -323,7 +309,6 @@ export class ImagerySource {
 
 
   /**
-   * nudge
    * Adjust the imagery offset, in pixels [dx,dy]
    * @param delta - pixels to nudge, as [dx, dy]
    * @param zoom - the current zoom
@@ -335,7 +320,6 @@ export class ImagerySource {
 
 
   /**
-   * url
    * Return the url to fetch the imagery for the given tile coordinate
    * @param coord - Tile coordinate as [x,y,z]
    * @return The url to fetch imagery (empty string if no imagery, for example 'none' source)
@@ -457,7 +441,6 @@ export class ImagerySource {
 
 
   /**
-   * _vintageRange
    * Helper function to format `start` and `end` dates as a range
    * @param vintage - A VintageRange object with `start`, `end` strings
    * @return The string as a range
@@ -477,7 +460,6 @@ export class ImagerySource {
 
 
 /**
- * ImagerySourceNone
  * A special imagery source for when the user has imagery disabled.
  */
 export class ImagerySourceNone extends ImagerySource {
@@ -495,7 +477,6 @@ export class ImagerySourceNone extends ImagerySource {
   }
 
   /**
-   * area
    * Returns -1 for ImagerySourceNone.
    * Because area is used for sorting the imagery sources, this returns -1 for sorting.
    * @return Always returns -1
@@ -506,7 +487,6 @@ export class ImagerySourceNone extends ImagerySource {
   }
 
   /**
-   * imageryUsed
    * Returns `null` for ImagerySourceNone.
    * @return Always returns `null`
    * @readonly
@@ -518,7 +498,6 @@ export class ImagerySourceNone extends ImagerySource {
 
 
 /**
- * ImagerySourceCustom
  * A special imagery source for when the user has custom imagery.
  * Overrides the imageryUsed method, also allows the url template to be changed.
  */
@@ -538,7 +517,6 @@ export class ImagerySourceCustom extends ImagerySource {
   }
 
   /**
-   * area
    * Returns -2 for ImagerySourceCustom.
    * Because area is used for sorting the imagery sources, this returns -1 for sorting.
    * @return Always returns -2
@@ -549,7 +527,6 @@ export class ImagerySourceCustom extends ImagerySource {
   }
 
   /**
-   * imageryUsed
    * Returns a string that can be used as the "imagery_used" changeset metadata.
    * For custom sources, it will look like "Custom (…)" with the url template string.
    * (but with sensitive details removed from the url template string).
@@ -591,7 +568,6 @@ export class ImagerySourceCustom extends ImagerySource {
 
 
 /**
- * ImagerySourceBing
  * A special imagery source for the Bing imagery source.
  * There should be more overrides in here, but they aren't currently working.
  *   https://docs.microsoft.com/en-us/bingmaps/rest-services/imagery/get-imagery-metadata
@@ -618,7 +594,6 @@ export class ImagerySourceBing extends ImagerySource {
 
 
 /**
- * ImagerySourceEsri
  * A special imagery source for the Esri imagery sources
  * Overrides the getMetadata function to get more imagery metadata.
  */
@@ -688,7 +663,6 @@ export class ImagerySourceEsri extends ImagerySource {
 
 
   /**
-   * getMetadata
    * Calls the callback with an object containing metadata for this imagery source.
    * @param tile - The tile to get metadata for
    * @param callback - errback-style callback function to call with results
@@ -821,7 +795,6 @@ export class ImagerySourceEsri extends ImagerySource {
 
 
 /**
- * ImagerySourceEsriWayback
  * A special imagery source that allows users to choose available dates in the Esri Wayback Archive.
  * Unlike other imagery sources, this source has a `date` setter and getter.
  * The actual date that the user wants to view is stored in `this.props.startDate` (and `this.props.endDate`)
@@ -838,7 +811,6 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
   }
 
   /**
-   * key
    * The `key` can be used to uniquely identify this imagery source.
    * It is usually just the `safeid`, but for 'wayback' it will also include the `date`.
    * @return The key
@@ -861,7 +833,6 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
   }
 
   /**
-   * imageryUsed
    * Returns a string that can be used as the "imagery_used" changeset metadata.
    * It is usually just the name, but for 'wayback', append the date if there is one, e.g. `Esri Wayback (2024-01-01)`
    * @return The imagery used string
@@ -877,7 +848,6 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
   }
 
   /**
-   * date
    * Wayback imagery has a `date` getter/setter.
    * Pick the closest supported date from the Wayback archive, without going over.
    * The date is stored in both `startDate` and `endDate` props.
@@ -896,7 +866,6 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
   }
 
   /**
-   * getMetadata
    * Calls the callback with an object containing metadata for this imagery source.
    * The Wayback service will get the metadata for the given tile.
    * @param tile - the tile to get metadata for

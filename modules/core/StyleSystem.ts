@@ -76,7 +76,6 @@ export interface MatchedStyle {
 
 
 /**
- * getTag
  * Returns the value of the tag, but ignores 'no' values.
  * @param tags - OSM tags object
  * @param key - Tag key to look up
@@ -205,7 +204,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -241,7 +239,6 @@ export class StyleSystem extends AbstractSystem {
   }
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -251,7 +248,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -261,7 +257,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * loadStyleAssetsAsync
    * @return Promise fulfilled when the style assets have been loaded
    */
   loadStyleAssetsAsync(): Promise<void> {
@@ -318,7 +313,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * resetAll
    * This puts the StyleSystem internal data back to its initial state, i.e. no styles.
    */
   resetAll(): void {
@@ -330,7 +324,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * defaultAssetIDs
    * Returns the default assetIDs. These are the style assets that Rapid will load by default.
    * @return  Default assetIDs
    * @readonly
@@ -340,7 +333,6 @@ export class StyleSystem extends AbstractSystem {
   }
 
   /**
-   * loadedAssetIDs
    * Returns the loaded assetIDs, along with their version numbers if known.
    * @return  Loaded assetIDs
    * @readonly
@@ -350,7 +342,6 @@ export class StyleSystem extends AbstractSystem {
   }
 
   /**
-   * requestedAssetIDs
    * Allows user to request different style asset files than what Rapid uses by default.
    *
    * If set before init time, these assets will be loaded at init time when init calls `loadStyleAssetsAsync`.
@@ -388,7 +379,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * merge
    * Accepts an object containing new style data in scoped format:
    * {
    *   assetID: '',       // A string asset identifier, e.g. 'rapid_style'
@@ -480,7 +470,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -502,7 +491,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * getScope
    * Get the scope data for a specific scope ID.
    * If the scope doesn't exist yet, it is created and cached automatically.
    * @param scopeID - ID of the scope to look up
@@ -519,7 +507,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * styleMatch
    * @param tags - OSM tags to match to a display style
    * @param geometry - Optional geometry type (if provided, will look up preset icon from SchemaSystem)
    * @param scopeID - Optional scope ID for scoped matching (defaults to 'osm')
@@ -616,7 +603,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * _hasLifecycleTag
    * Scan tags for lifecycle keywords in any of their various forms.
    * @param tags - OSM tags to scan
    * @param styleKey - The primary style key (e.g. 'highway'), if any
@@ -653,7 +639,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * _applyStructureOverrides
    * Apply casing/stroke overrides for bridges, tunnels, embankments, cuttings, and unpaved surfaces.
    * @param result - The result object to mutate
    * @param tags - OSM tags
@@ -709,7 +694,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * _applyLifecycleOverrides
    * Apply lifecycle overrides (dashed lines for abandoned, proposed, etc.).
    * @param result - The result object to mutate
    * @param scopeStyles - The scoped styles map to look up LIFECYCLE style from
@@ -731,7 +715,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * _validateFillPattern
    * Validate and clear invalid fill patterns.
    * @param result - The result object to validate
    * @param tags - OSM tags (to check for building exception)
@@ -748,7 +731,6 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
-   * _styleChanged
    * Called whenever the style changes.
    * Resolves `var()` references in styles and selectors, then dirties all features
    * so they get re-styled, triggers a redraw, and emits a 'stylechange' event.

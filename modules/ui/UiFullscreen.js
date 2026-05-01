@@ -2,7 +2,6 @@ import { utilCmd, utilDetect } from '../util/index.ts';
 
 
 /**
- * UiFullscreen
  * This component just adds fullscreen key bindings.
  */
 export class UiFullscreen {
@@ -26,7 +25,6 @@ export class UiFullscreen {
 
 
   /**
-   * render
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
@@ -59,7 +57,6 @@ export class UiFullscreen {
 
 
   /**
-   * isSupported
    * @return {boolean}  `true` if the container can be made fullscreen, `false` if not
    */
   isSupported() {
@@ -69,7 +66,6 @@ export class UiFullscreen {
 
 
   /**
-   * isFullscreen
    * @return {boolean}  `true` if the container is currently fullscreen, `false` if not
    */
   isFullscreen() {
@@ -79,7 +75,6 @@ export class UiFullscreen {
 
 
   /**
-   * requestFullscreen
    * @return {Promise}  Promise settled when the browser has entered fullscreen mode
    */
   requestFullscreen() {
@@ -90,7 +85,6 @@ export class UiFullscreen {
 
 
   /**
-   * exitFullscreen
    * @return {Promise}  Promise settled when the browser has left fullscreen mode
    */
   exitFullscreen() {

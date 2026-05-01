@@ -12,7 +12,6 @@ type JxonObject = Record<string, any>;
 
 
 /**
- * EmptyTree
  * Represents an empty XML node with null-like behavior.
  */
 class EmptyTree {
@@ -22,7 +21,6 @@ class EmptyTree {
 
 
 /**
- * JXON
  * Provides static methods for converting between XML and JavaScript objects.
  */
 export class JXON {

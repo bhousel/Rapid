@@ -11,7 +11,6 @@ import type { StyleProps } from '../lib/Style.ts';
 
 
 /**
- * PixiLayerDebug
  * @class
  */
 export class PixiLayerDebug extends AbstractPixiLayer {
@@ -28,7 +27,6 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
 
   /**
-   * reset
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   reset(): void {
@@ -41,7 +39,6 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
 
   /**
-   * render
    * Render any data we have for this layer
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering

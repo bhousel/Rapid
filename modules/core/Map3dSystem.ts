@@ -66,7 +66,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -95,7 +94,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -179,7 +177,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -190,7 +187,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * visible
    * For now, just store this state in the url hash
    * set/get whether the 3d viewer is visible
    */
@@ -232,7 +228,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * toggle
    * If visible, make invisible.  If invisible, make visible.
    * @param  e - triggering event (if any)
    */
@@ -243,7 +238,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   private _setupKeybinding(): void {
@@ -261,7 +255,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _loadMapLibreAsync
    * Load the MapLibre JS and CSS files into the document head
    * @return  Promise resolved when both files have been loaded
    */
@@ -315,7 +308,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * redraw
    * Redraw the 3d map
    */
   redraw(): void {
@@ -326,7 +318,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * deferredRedraw
    * Redraw after a delay.
    * Uses `throttle` to avoid performing redraws too frequently.
    */
@@ -341,7 +332,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * updateViewport
    * Adjust the 3d map to follow the main map, applying any zoom and rotation offsets.
    */
   updateViewport(): void {
@@ -368,7 +358,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -389,7 +378,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _map3dmoved
    * Respond to changes in the 3d map, for example if the user interacts with it.
    * Update zoom and bearing offsets from main map, and recenter the main map if needed.
    */
@@ -425,7 +413,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * updateData
    * Collect features in view, filter them according to what we want to show,
    * then update the data in the 3d map.
    */
@@ -468,7 +455,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _updateBuildingData
    */
   private _updateBuildingData(entities: OsmEntity[]): void {
     const context = this.context;
@@ -534,7 +520,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _updateAreaData
    */
   private _updateAreaData(entities: OsmEntity[]): void {
     const context = this.context;
@@ -584,7 +569,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _updateRoadData
    */
   private _updateRoadData(entities: OsmEntity[]): void {
     const context = this.context;
@@ -635,7 +619,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _getBuildingLayer
    * Returns a maplibre layer style specification that appropriately styles 3D buildings using
    * data-driven styling for selected features. Features with no height data are drawn as flat polygons.
    */
@@ -662,7 +645,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _getAreaLayer
    * Returns a maplibre layer style specification that appropriately styles areas.
    */
   private _getAreaLayer(): LayerSpecification {
@@ -681,7 +663,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _getRoadCasingLayer
    * Returns a maplibre layer style specification that widens the road casing to be just above the stroke.
    */
   private _getRoadCasingLayer(): LayerSpecification {
@@ -703,7 +684,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _getRoadSelectedLayer
    * Returns a maplibre layer style specification that appropriately styles a wide extra casing around any selected roads.
    * Also uses the same 'selected' color as the building layer.
    */
@@ -727,7 +707,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _getRoadStrokeLayer
    * Returns a maplibre layer style specification that appropriately styles the road stroke to be just thinner than the casing.
    * Also uses the same stroke color as the main OSM styling.
    */
@@ -759,7 +738,6 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * _getLineWidth
    * Returns a line width interpolator, to scale the line width based on zoom.
    * @param  baseWidth - the base width in pixels
    */

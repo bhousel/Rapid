@@ -70,7 +70,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * @return  `true` if mode could be entered, `false` it not
    */
@@ -130,7 +129,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, cleaning up event listeners and UI state.
    * If save was successful, leaves the success message in the sidebar.
    */
@@ -175,7 +173,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _cancel
    * Return to browse mode, canceling the save operation.
    */
   private _cancel(): void {
@@ -184,7 +181,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _progressChanged
    * Handler called when upload progress changes.
    * Updates the loading modal to show conflict resolution progress.
    * @param  num - Number of conflicts resolved so far
@@ -208,7 +204,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _resultConflicts
    * Handler called when upload results in conflicts with server data.
    * Displays the conflicts UI so the user can resolve them.
    * @param  conflicts - Array of conflict objects describing the conflicts
@@ -252,7 +247,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _resultErrors
    * Handler called when upload results in errors.
    * Displays an error dialog to the user.
    * @param  errors - Array of error objects with msg and details properties
@@ -275,7 +269,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _addErrors
    * Helper to render error messages into a D3 selection.
    * Creates expandable error items with details.
    * @param  $selection - The D3 selection to render errors into
@@ -334,7 +327,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _resultNoChanges
    * Handler called when there are no changes to upload.
    * Resets the editor and returns to browse mode.
    */
@@ -346,7 +338,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _resultSuccess
    * Handler called when upload succeeds.
    * Shows the success screen and resets after a delay.
    * @param  changeset - The changeset object that was successfully uploaded
@@ -373,7 +364,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _saveStarted
    * Handler called when save operation begins.
    * At this point, a changeset is inflight and we need to block the UI
    * by disabling keybindings and showing a loading indicator.
@@ -385,7 +375,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _saveEnded
    * Handler called when save operation ends (success or failure).
    * At this point, the changeset is no longer inflight and we can unblock the UI.
    * Note: This may occur after an error condition.
@@ -397,7 +386,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _showLoading
    * Block the UI by adding a spinner
    */
   private _showLoading(): void {
@@ -415,7 +403,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _hideLoading
    * Unlock the UI by removing the spinner
    */
   private _hideLoading(): void {
@@ -427,7 +414,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _keybindingOn
    * Enable keyboard shortcuts for the save mode (Escape to cancel).
    */
   private _keybindingOn(): void {
@@ -436,7 +422,6 @@ export class SaveMode extends AbstractMode {
 
 
   /**
-   * _keybindingOff
    * Disable keyboard shortcuts for the save mode.
    */
   private _keybindingOff(): void {

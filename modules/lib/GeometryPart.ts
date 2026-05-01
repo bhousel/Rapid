@@ -17,7 +17,6 @@ export type { SingularGeometry, SingularGeometryType };
 
 
 /**
- * GeometryPart
  * Wrapper for both original and projected geometry data.
  * This class deals with singular geometry elements only: 'Point', 'LineString', 'Polygon'
  *
@@ -57,7 +56,6 @@ export class GeometryPart {
 
 
   /**
-   * destroy
    * Release memory.
    * Do not use the geometry part after calling `destroy()`.
    */
@@ -68,7 +66,6 @@ export class GeometryPart {
 
 
   /**
-   * reset
    * Remove all stored data
    */
   reset(): void {
@@ -78,7 +75,6 @@ export class GeometryPart {
 
 
   /**
-   * clone
    * Returns a clone of this GeometryPart object
    * @return  A new GeometryPart
    */
@@ -109,7 +105,6 @@ export class GeometryPart {
 
 
   /**
-   * type
    * The original data format is GeoJSON, this is just a convenience getter.
    * @return  One of 'Point', 'LineString', 'Polygon'
    * @readonly
@@ -120,7 +115,6 @@ export class GeometryPart {
 
 
   /**
-   * setData
    * This setter accepts singular GeoJSON Geometries only:  'Point', 'LineString', and 'Polygon'
    * If there is any existing data, it is first removed.
    * @param  geojson - GeoJSON geometry data
@@ -156,7 +150,6 @@ export class GeometryPart {
 
 
   /**
-   * updateWorld
    * This projects original source data from WGS84 coordinates to World coordinates
    */
   updateWorld(): void {

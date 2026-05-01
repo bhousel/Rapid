@@ -59,7 +59,6 @@ export class NominatimService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -69,7 +68,6 @@ export class NominatimService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -79,7 +77,6 @@ export class NominatimService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -93,7 +90,6 @@ export class NominatimService extends AbstractSystem {
 
 
   /**
-   * countryCode
    * Get the country code for the given location.
    * @param loc - location to lookup [lon,lat]
    * @param callback - errback-style callback function to call with results
@@ -112,7 +108,6 @@ export class NominatimService extends AbstractSystem {
 
 
   /**
-   * reverse
    * Reverse Geocode:  Get the address for the given location.
    * @param loc - location to lookup [lon,lat]
    * @param callback - errback-style callback function to call with results
@@ -152,7 +147,6 @@ export class NominatimService extends AbstractSystem {
 
 
   /**
-   * search
    * Search nominatum for things with the given name
    * @param val - value to search for
    * @param callback - errback-style callback function to call with results

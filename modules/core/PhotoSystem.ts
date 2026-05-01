@@ -60,7 +60,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -88,7 +87,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -98,7 +96,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -108,7 +105,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * _hashChanged
    * Respond to any changes appearing in the url hash
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
@@ -184,7 +180,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * _layerChanged
    * Respond to any changes in the layers that are enabled
    */
   private _layerChanged(): void {
@@ -229,7 +224,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * _photoChanged
    * Called whenever the photo changes.
    * This will update the urlhash, trigger a redraw, and emit a 'photochange' event.
    */
@@ -283,7 +277,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * photosUsed
    * Called by the EditSystem to gather the sources being used to make an edit.
    * We can return the English names of:
    *  - current photo layer (if showing a photo)
@@ -315,7 +308,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * layerIDs
    * @return  All available layerIDs
    * @readonly
    */
@@ -324,7 +316,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * photoLayerIDs
    * @return  All available photo layerIDs
    * @readonly
    */
@@ -333,7 +324,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * LayerIDs
    * @return  All available detection layerIDs
    * @readonly
    */
@@ -342,7 +332,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * photoTypes
    * @return  All available photo types
    * @readonly
    */
@@ -351,7 +340,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * dateFilters
    * @return  All available date filters
    * @readonly
    */
@@ -360,7 +348,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * fromDate
    * @return  The from date filter value, as YYYY-MM-DD, or null if unset
    * @readonly
    */
@@ -369,7 +356,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * toDate
    * @return  The to date filter value, as YYYY-MM-DD, or null if unset
    * @readonly
    */
@@ -378,7 +364,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * usernames
    * @return  The usernames filter value, or null if unset
    * @readonly
    */
@@ -387,7 +372,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * currPhotoLayerID
    * @return  The current photo layerID
    * @readonly
    */
@@ -396,7 +380,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * currPhotoID
    * @return  The current photoID
    * @readonly
    */
@@ -405,7 +388,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * currLayerID
    * @return  The current detection layerID
    * @readonly
    */
@@ -414,7 +396,6 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
-   * currDetectionID
    * @return  The current detectionID
    * @readonly
    */
@@ -424,7 +405,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * selectPhoto
    * Pass falsy values to deselect the layer and photo.
    * @param layerID - The layerID to select
    * @param photoID - The photoID to select
@@ -476,7 +456,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * selectDetection
    * Pass falsy values to deselect the layer and detection.
    * @param layerID - The layerID to select
    * @param detectionID - The detectionID to select
@@ -575,7 +554,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * dateFilterValue
    * Gets a date filter value
    * @param val - 'fromDate' or 'toDate'
    * @return  The from date or to date value, or `null` if unset
@@ -588,7 +566,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * setDateFilter
    * Sets a date filter value
    * @param type - 'fromDate' or 'toDate'
    * @param val - the value to set it to, should be in YYYY-MM-DD format
@@ -625,7 +602,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * setUsernameFilter
    * Sets a username filter value
    * @param val - Username or Array or Set of usernames to filter by
    */
@@ -637,7 +613,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * togglePhotoType
    * Toggles a photo type display on/off
    * @param which - String phototype to toggle on/off ('flat', or 'panoramic')
    */
@@ -654,7 +629,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * isLayerEnabled
    * Is the given layerID enabled?
    * @param layerID - the layerID to check
    * @return  `true` if enabled, `false` if not
@@ -668,7 +642,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * showViewer
    * Show the photo viewer
    */
   showViewer(): void {
@@ -683,7 +656,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * hideViewer
    * Hide the photo viewer.  If the viewer was showing a photo, deselect the photo.
    */
   hideViewer(): void {
@@ -698,7 +670,6 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * isViewerShowing
    * @return  `true` if showing, `false` if not
    */
   isViewerShowing(): boolean {

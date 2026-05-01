@@ -33,7 +33,6 @@ export function uiPresetList(context) {
 
 
   /**
-   * presetList
    * (This is the render function)
    * @param  {d3-selection}  $selection  - parent selection to render into
    */
@@ -215,7 +214,6 @@ export function uiPresetList(context) {
 
 
   /**
-   * drawList
    * Draws the list of Presets/Categories.
    * The category items themselves may also contain sublists.
    * @param  {d3-selection}  $selection  - parent selection to render list items into (in this case, a `div.preset-list`)
@@ -260,7 +258,6 @@ export function uiPresetList(context) {
 
 
   /**
-   * itemKeydown
    * keydown handler for the preset list
    * This allows users to use keyboard navigation to focus different items and expand/contract Categories.
    * @param  {KeyboardEvent}   e - the keydown event

@@ -51,7 +51,6 @@ export class MoveMode extends AbstractMode {
 
 
   /**
-   * enter
    * Enters the mode.
    * @param  options - Optional options object
    * @return `true` if the mode can be entered, `false` if not
@@ -107,7 +106,6 @@ export class MoveMode extends AbstractMode {
 
 
   /**
-   * exit
    * Exits the mode, committing any pending move operation.
    * Removes event listeners and clears state.
    */
@@ -152,7 +150,6 @@ export class MoveMode extends AbstractMode {
 
 
   /**
-   * _keydown
    * Handler for keydown events on the window.
    * Handles Enter to finish, Escape/Delete to cancel, and R to switch to rotate mode.
    * @param  e - A DOM KeyboardEvent
@@ -174,7 +171,6 @@ export class MoveMode extends AbstractMode {
 
 
   /**
-   * _pointermove
    * Handler for pointermove events.
    * Calculates the delta from the start location and moves all selected entities.
    */
@@ -207,7 +203,6 @@ export class MoveMode extends AbstractMode {
 
 
   /**
-   * _finish
    * Return to select mode - `exit()` will finalize the work in progress.
    */
   private _finish(): void {
@@ -216,7 +211,6 @@ export class MoveMode extends AbstractMode {
 
 
   /**
-   * _cancel
    * Return to select mode without doing anything
    */
   private _cancel(): void {

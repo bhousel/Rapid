@@ -1,5 +1,4 @@
 /**
- * Iterable
  * For our purposes, we limit iterables to Arrays and Sets (no Maps, strings, etc.)
  * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_iterable_protocol
  */
@@ -13,7 +12,6 @@ export type OneOrMore<T> = T | Iterable<T>;
 
 
 /**
- * utilIterable
  * Converts a single or multiple values into something iterable
  * that can be iterated over with for..of
  *

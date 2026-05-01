@@ -160,7 +160,6 @@ const VAR_PATTERN = /^var\((.+)\)$/;
 
 
 /**
- * isVarRef
  * Tests whether a string is a `var(...)` reference.
  * @param str - The string to test
  * @return `true` if the string is a var() reference
@@ -171,7 +170,6 @@ export function isVarRef(str: string): boolean {
 
 
 /**
- * resolveVarRef
  * Resolves a `var(name1, name2, ...)` reference string against a variables Map.
  * Multiple names produce a flat union of all referenced arrays.
  *

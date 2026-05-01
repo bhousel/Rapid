@@ -39,7 +39,6 @@ export interface LangInfo {
 
 
 /**
- * langNamesInNativeLang
  * Returns all of the available languages, with info from CLDR
  * about their native language name and script.
  *  {
@@ -112,7 +111,6 @@ export async function langNamesInNativeLang(): Promise<Map<LangCode, LangInfo>> 
 
 
 /**
- * languageNamesInLanguageOf
  * Returns the language names for the given language code.
  * For example, if passed 'en':
  *  {
@@ -164,7 +162,6 @@ export async function languageNamesInLanguageOf(code: LangCode): Promise<Map<Lan
 
 
 /**
- * scriptNamesInLanguageOf
  * Returns the script names for the given language code.
  * For example, if passed 'en':
  *  {

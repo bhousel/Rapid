@@ -121,7 +121,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -152,7 +151,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -162,7 +160,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -173,7 +170,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * isSaving
    * @return `true` if a save operation is in progress, `false` otherwise
    */
   isSaving(): boolean {
@@ -182,7 +178,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * save
    * Begin the save process to upload changes to OSM
    * @param tryAgain - Whether this is a retry attempt after a conflict
    * @param checkConflicts - Whether to check for conflicts before uploading
@@ -234,7 +229,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _startConflictCheck
    * Start the conflict checking process before upload
    */
   private _startConflictCheck(): void {
@@ -279,7 +273,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _loadedSome
    * Errback-style callback that may be called multiple times.
    * Here we load a batch of remote entities into `remoteGraph`,
    * then expand the search set if needed and schedule more loading.
@@ -348,7 +341,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _detectConflicts
    * Test everything in `_toCheckIDs` for conflicts
    */
   private _detectConflicts(): void {
@@ -440,7 +432,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _tryUpload
    * This is called when we are ready to attempt a changeset upload.
    * If conflicts or errors exist, present them to the user instead.
    */
@@ -475,7 +466,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _uploadCallback
    * Callback for the changeset upload attempt
    */
   private _uploadCallback(err: any, updatedChangeset?: any): void {
@@ -502,7 +492,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _didResultInNoChanges
    * Called when there were no changes to upload
    */
   private _didResultInNoChanges(): void {
@@ -512,7 +501,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _didResultInErrors
    * Called when the upload failed due to errors
    */
   private _didResultInErrors(): void {
@@ -525,7 +513,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _didResultInConflicts
    * Called when the upload failed due to data conflicts
    */
   private _didResultInConflicts(): void {
@@ -536,7 +523,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _didResultInSuccess
    * Called when the upload completed successfully
    */
   private _didResultInSuccess(): void {
@@ -546,7 +532,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * _endSave
    * Called to clean up after a save attempt
    */
   private _endSave(): void {
@@ -556,7 +541,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * cancelConflictResolution
    * Cancel the conflict resolution process and revert changes
    */
   cancelConflictResolution(): void {
@@ -567,7 +551,6 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
-   * processResolvedConflicts
    * Process conflicts that have been resolved by the user and retry the upload
    */
   processResolvedConflicts(): void {

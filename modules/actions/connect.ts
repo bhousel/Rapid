@@ -11,7 +11,6 @@ import type { OsmWay } from '../data/OsmWay.ts';
 
 
 /**
- * actionConnect
  * Connects the ways at the given nodes.
  *
  * First choose a node to be the survivor, with preference given to an existing (not new) node.

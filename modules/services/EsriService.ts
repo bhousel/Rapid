@@ -134,7 +134,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
@@ -149,7 +148,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
@@ -159,7 +157,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
@@ -183,7 +180,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * getAvailableDatasets
    * Called by `RapidSystem` to get the datasets that this service provides.
    * @return The datasets this service provides
    */
@@ -227,7 +223,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * getData
    * Get already loaded data that appears in the current map view
    * @param datasetID - datasetID to get data for
    * @return Array of data (OSM Entities)
@@ -242,7 +237,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * graph
    * Returns the graph for the given datasetID
    * @param datasetID - datasetID to get data for
    * @return The graph holding the data, or `undefined` if not found
@@ -254,7 +248,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * getDataUsed
    * This returns the string to use for the changeset `data_used` tag.
    * For Rapid#1309 we need to change the "data used" string from
    * 'Google Buildings for <Country>' to 'Google Open Buildings'.
@@ -272,7 +265,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Schedule any data requests needed to cover the current map view
    * @param datasetID - datasetID to load tiles for
    * @throws Will throw if the datasetID is not found
@@ -329,7 +321,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * _loadDatasetsAsync
    * Loads all the available datasets from the Esri server
    * @return Promise resolved when all pages of datasets have been loaded
    */
@@ -363,7 +354,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * _parseDataset
    * Add this dataset to the list of available datasets
    * @param ds - the dataset metadata from ArcGIS
    */
@@ -393,7 +383,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * _loadDatasetLayerAsync
    * Each dataset has a schema (aka "tagmap") which is available behind the "layerUrl".
    * Before we can use the dataset we need to load this information.
    * @param ds - the dataset to load the schema information
@@ -436,7 +425,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * _searchURL
    * Returns the URL used to search ArcGIS for datasets.
    * @see https://developers.arcgis.com/rest/users-groups-and-items/search.htm
    * @param start - the starting page
@@ -462,7 +450,6 @@ export class EsriService extends AbstractSystem {
   }
 
   /**
-   * _layerURL
    * Returns the URL used to get available layers from a ArcGIS feature server.
    * @param featureServerURL - The feature server URL
    * @return The url to fetch the layers
@@ -477,7 +464,6 @@ export class EsriService extends AbstractSystem {
   }
 
   /**
-   * _tileURL
    * Returns the URL used to get available data on a given dataset and tile.
    * @param ds - the dataset to fetch data for
    * @param tile - the tile to fetch the data for
@@ -504,7 +490,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * _loadTilePage
    * Get available data for a given dataset from its feature server
    * @param ds - the dataset to fetch data for
    * @param tile - the tile to fetch the data for
@@ -554,7 +539,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * _parseTile
    * Parse the results from a tiled data fetch.
    * @param ds - the dataset we fetched
    * @param tile - the tile we fetched
@@ -578,7 +562,6 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * _parseFeature
    * Parse a single GeoJSON feature
    * @param ds - the dataset we fetched
    * @param feature - the GeoJSON feature that we fetched

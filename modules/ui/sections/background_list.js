@@ -237,7 +237,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * setTooltips
    */
   function setTooltips(selection) {
     selection.each((d, i, nodes) => {
@@ -265,7 +264,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * sortSources
    */
   function sortSources(a, b) {
     return _favoriteIDs.has(a.id) && !_favoriteIDs.has(b.id) ? -1
@@ -278,7 +276,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * drawListItems
    * @param selection - d3-selection to the background list `ul`
    */
   function drawListItems(selection) {
@@ -413,7 +410,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * chooseBackground
    * @param  d3_event          - change event, if called from a change handler (unused)
    * @param  sourceOrSourceID  - `string` or `ImagerySource` being chosen
    */
@@ -441,7 +437,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * customChanged
    * @param  data - Object containing settings for the custom imagery
    */
   function customChanged(d) {
@@ -457,7 +452,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * clickCustom
    * @param  d3_event - click event, if called by a click handler
    */
   function clickCustom(d3_event) {
@@ -467,7 +461,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * waybackDateChange
    * @param  d3_event - change event, if called from a change handler
    */
   function waybackDateChange(d3_event) {
@@ -482,7 +475,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * toggleFavorite
    * @param  d3_event - click event, if called from a click handler
    * @param  d        - ImagerySource being chosen
    */
@@ -519,7 +511,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * stepBackground
    * This is used to cycle through imagery sources in the list
    * @param step -  item to step to '1' or '-1'
    */
@@ -547,7 +538,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * swapBackground
    * Swap to last used background
    */
   function swapBackground() {
@@ -557,7 +547,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * nextBackground
    * Step to the next background in the list
    */
   function nextBackground() {
@@ -565,7 +554,6 @@ export function uiSectionBackgroundList(context) {
   }
 
   /*
-   * prevBackground
    * Step to the previous background in the list
    */
   function prevBackground() {
@@ -574,7 +562,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * refreshWaybackDates
    * Refresh the list locally-changed Wayback dates.
    * This is used as the source data for the dropdown.
    */
@@ -612,7 +599,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /*
-   * onMapDraw
    * Redraw the content sometimes after the map has moved.
    */
   function onMapDraw() {
@@ -631,7 +617,6 @@ export function uiSectionBackgroundList(context) {
 
 
   /**
-   * _setupKeybinding
    * This sets up the keybinding, replacing existing if needed
    */
   function _setupKeybinding() {

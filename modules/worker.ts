@@ -30,7 +30,6 @@ const activeControllers = new Map<number, AbortController>();
 
 
 /**
- * registerListener
  * Registers a named listener that the worker can execute.
  *
  * @param listenerID - Unique string identifying the listener

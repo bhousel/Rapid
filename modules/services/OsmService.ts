@@ -329,7 +329,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * initAsync
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
@@ -354,7 +353,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * startAsync
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
@@ -364,7 +362,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * resetAsync
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
@@ -401,7 +398,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * switchAsync
    * Switch connection and credentials, and reset
    * @return  Promise resolved when this component has completed resetting
    */
@@ -495,7 +491,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadFromAPI
    * Generic method to load data from the OSM API.
    * Can handle either auth or unauth calls.
    *
@@ -600,7 +595,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadEntityAsync
    * Load a single entity by id (ways and relations use the `/full` call to include
    * nodes and members).  Parent relations are not included, see `loadEntityRelationsAsync`.
    * GET /api/0.6/node/#id
@@ -630,7 +624,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadEntityVersionAsync
    * Load a single entity with a specific version
    * GET /api/0.6/[node|way|relation]/#id/#version
    * @param   entityID - the entityID to load
@@ -658,7 +651,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadEntityRelationsAsync
    * Load the parent relations of a single entity with the given id.
    * (i.e. relations in which the given entity is used).
    * GET /api/0.6/[node|way|relation]/#id/relations
@@ -686,7 +678,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadMultipleAsync
    * Load multiple elements in chunks.
    * Unlike `loadEntityAsync`, child nodes and members are not fetched automatically.
    * GET /api/0.6/[nodes|ways|relations]?#parameters
@@ -735,7 +726,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadUserAsync
    * Load a given user by id.
    * Note that this call requires an auth connection and will return a cached result if unauth.
    * GET /api/0.6/user/#id
@@ -779,7 +769,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadUsersAsync
    * Load multiple users in chunks.
    * Note that this call requires an auth connection and will return a cached result if unauth.
    * GET /api/0.6/users?users=#id1,#id2,...,#idn
@@ -832,7 +821,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * getUserDetailsAsync
    * Get the details of the logged-in user.
    * GET /api/0.6/user/details
    * @return  Promise resolved with the current logged in user's details
@@ -866,7 +854,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * getUserPreferencesAsync
    * Get the stored preferences for the logged in user.
    * GET /api/0.6/user/preferences
    * @return  Promise resolved with the current logged in user's preferences
@@ -903,7 +890,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * getUserChangesetsAsync
    * Get the previous changesets for the logged in user.
    * GET /api/0.6/changesets?user=#id
    * @return  Promise resolved with the current logged in user's previous changesets
@@ -938,7 +924,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * getCapabilitiesAsync
    * Fetch the API capabilities information.
    * GET /api/capabilities
    *
@@ -999,7 +984,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * reloadApiStatus
    * Calls `getCapabilitiesAsync` and emits an `apistatuschange` event if the returned
    * status differs from the cached status.
    *
@@ -1022,7 +1006,6 @@ export class OsmService extends AbstractSystem {
   }
 
   /**
-   * deferredReloadApiStatus
    * Uses `throttle` to checking the API status too frequently
    */
   deferredReloadApiStatus(): void {
@@ -1036,7 +1019,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * createChangeset
    * Create a new changeset on the OSM API, or reuse an existing open one.
    * PUT /api/0.6/changeset/create
    * @param  changeset - the changeset to create
@@ -1088,7 +1070,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * uploadChangeset
    * Upload entity changes (creates, updates, deletes) to an open changeset.
    * POST /api/0.6/changeset/#id/upload
    * @param  changeset - the open changeset to upload to
@@ -1142,7 +1123,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * closeChangeset
    * Close an open changeset on the OSM API.
    * PUT /api/0.6/changeset/#id/close
    * @param  changeset - the changeset to close
@@ -1189,7 +1169,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * sendChangeset
    * Convenience method that chains together create, upload, and close a changeset.
    * PUT /api/0.6/changeset/create
    * POST /api/0.6/changeset/#id/upload
@@ -1227,7 +1206,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadTiles
    * Load OSM entity data from the API in tiles covering the current viewport.
    * Aborts any in-flight requests for tiles no longer visible and issues new ones.
    * GET /api/0.6/map?bbox=
@@ -1266,7 +1244,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * setRateLimit
    * This will establish a rate limit for the given duration in seconds.
    * If a rate limit already exists, extend the time if needed.
    * @param  seconds - seconds to impose the rate limit (default 10 sec)
@@ -1301,7 +1278,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * getRateLimit
    * If there is currently a rate limit, return the information about it.
    * This will also cancel the rate limit if we detect that it has expired.
    * @return  rate limit info, or `null` if no current rate limit
@@ -1333,7 +1309,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadTile
    * Load a single data tile from the API.
    * Skips tiles that are already loaded, in-flight, or cover a blocked region.
    * GET /api/0.6/map?bbox=
@@ -1386,7 +1361,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * isDataLoaded
    * Is OSM data exist at the given [lon,lat] coordinate?
    * @param   loc - the search location (WGS84 [lon,lat])
    * @return  `true` if data exists there, `false` if not
@@ -1398,7 +1372,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadTileAtLoc
    * Queue loading the tile that covers the given `loc`
    * @param   loc - the search location (WGS84 [lon,lat])
    * @param   callback - errback-style callback function to call with results
@@ -1438,7 +1411,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadNotes
    * Schedule any data requests needed to cover the current map view
    * @param  noteOptions - note options
    */
@@ -1484,7 +1456,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadNotesTile
    * Load a single tile of note data.
    * GET /api/0.6/notes?bbox=
    * @param  tile - Tile data
@@ -1519,7 +1490,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * loadNoteAsync
    * Load a single note by id.
    * GET /api/0.6/notes/#id
    * @param   id - noteID to get
@@ -1558,7 +1528,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * postNoteCreate
    * Create a new note on the OSM API at the note's location.
    * POST /api/0.6/notes?params
    * @param  note - the note to create (must have `loc` and `newComment`)
@@ -1617,7 +1586,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * postNoteUpdate
    * Update an existing note by commenting, closing, or reopening it.
    * POST /api/0.6/notes/#id/comment?text=comment
    * POST /api/0.6/notes/#id/close?text=comment
@@ -1697,7 +1665,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * caches
    * Get or set the internal cached data (tiles, notes, users).
    * Used to save/restore state when entering/exiting the walkthrough,
    * and for testing purposes.
@@ -1743,7 +1710,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * logout
    * Log the current user out, clearing stored credentials and cached user data.
    * Emits an `authchange` event.
    * @return `this` for chaining
@@ -1770,7 +1736,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * authenticate
    * Initiate the OAuth2 authentication flow.
    * Opens a popup window for the user to authorize Rapid,
    * then reloads the API status and emits an `authchange` event on success.
@@ -1822,7 +1787,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * getNote
    * Get a note with given id from cache
    * @param   dataID
    * @return  the cached note
@@ -1834,7 +1798,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * replaceNote
    * Replace a single item in the cache
    * @param   item to replace
    * @return  the item, or `null` if it couldn't be replaced
@@ -1849,7 +1812,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * removeNote
    * Remove a single item from the cache
    * @param  item to remove
    */
@@ -1862,7 +1824,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * getClosedIDs
    * Get an array of noteIDs closed during this session.
    * Used to populate `closed:note` changeset tag
    * @return  Array of closed note ids
@@ -1885,7 +1846,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * _authInterceptor
    * Request interceptor that adds the OAuth2 Bearer token to OSM API requests.
    * Registered with NetworkSystem at init time so that all fetch paths
    * (including web workers) receive the correct Authorization header.
@@ -1912,7 +1872,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * _cacheNote
    * Store the given note in the caches
    * @param   source - the note properties
    * @return  The note
@@ -1948,7 +1907,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * _wrapcb
    * Wraps an API errback in additional guards:
    * - Logs out on 400/401/403 responses (credential issues)
    * - Raises an error if the connection was switched while the call was in-flight
