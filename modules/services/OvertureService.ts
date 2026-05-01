@@ -22,9 +22,8 @@ interface PMTilesCatalog {
 
 
 /**
- * `OvertureService`
- * This service connects to the 'official' sources of Overture PMTiles
- * by acting as a wrapper around the vector tile service
+ * `OvertureService` connects to the 'official' sources of Overture PMTiles
+ *  by acting as a wrapper around the vector tile service
  *
  * - Protomaps .pmtiles single-file archive containing MVT
  *    https://protomaps.com/docs/pmtiles

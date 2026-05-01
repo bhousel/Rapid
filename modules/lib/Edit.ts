@@ -3,7 +3,7 @@ import type { Graph } from './Graph.js';
 
 
 /**
- * Properties that define an Edit.
+ * Properties that define an `Edit`.
  */
 export interface EditProps {
   /** Human-readable description of the edit */
@@ -20,7 +20,7 @@ export interface EditProps {
 
 
 /**
- * `Edit` encapsulates the state of a single edit.
+ * An `Edit` encapsulates the state of a single edit.
  */
 export class Edit {
   annotation: string | undefined;

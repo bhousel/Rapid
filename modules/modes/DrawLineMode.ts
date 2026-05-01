@@ -18,9 +18,7 @@ import type { OsmTags } from '../data/types.ts';
 const DEBUG = false;
 
 
-/**
- * Options for entering DrawLineMode
- */
+/** Options for entering `DrawLineMode` */
 export interface DrawLineModeOptions {
   /** Node ID to continue from */
   continueNodeID?: EntityID;
@@ -39,8 +37,7 @@ interface DrawLineSnapshot {
 
 
 /**
- * `DrawLineMode`
- * In this mode, we are drawing a new line or continuing an existing line.
+ * In `DrawLineMode`, we are drawing a new line or continuing an existing line.
  */
 export class DrawLineMode extends AbstractMode {
   /** Default tags for new ways */

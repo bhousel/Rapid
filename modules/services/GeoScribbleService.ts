@@ -22,8 +22,7 @@ interface GeoScribbleCache {
 
 
 /**
- * `GeoScribbleService`
- * GeoScribble is a service that allows users to collaboratively draw on the map.
+ * `GeoScribbleService` allows users to collaboratively draw on the map.
  * This service connects to the GeoScribble API to fetch public 'scribbles'.
  * @see https://wiki.openstreetmap.org/wiki/GeoScribble
  * @see https://geoscribble.osmz.ru/docs

@@ -16,8 +16,7 @@ const DEBUG = false;
 
 
 /**
- * `SaveMode`
- * In this mode, the user is ready to upload their changes
+ * In `SaveMode`, the user is ready to upload their changes.
  */
 export class SaveMode extends AbstractMode {
   /** Keybinding handler for this mode */

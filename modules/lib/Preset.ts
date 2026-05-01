@@ -9,7 +9,7 @@ import type { OsmTags, TagKeyValueLookup } from '../data/types.ts';
 
 
 /**
- * Properties that define a Preset.
+ * Properties that define a `Preset`.
  * @see https://github.com/ideditor/schema-builder/blob/main/schemas/preset.json
  */
 export interface PresetProps {
@@ -62,7 +62,7 @@ export interface PresetProps {
 }
 
 
-/** Localized strings for a Preset */
+/** Localized strings for a `Preset` */
 interface PresetStrings {
   id: PresetID;
   type: string;
@@ -83,7 +83,7 @@ interface ResolvedFields {
 
 
 /**
- * A Preset represents a set of tags that identify a feature type on OpenStreetMap.
+ * A `Preset` represents a set of tags that identify a feature type on OpenStreetMap.
  * Every feature in Rapid is matched to a Preset based on its tags.
  * Users can pick from the available Presets in the Rapid editor.
  * See:  https://github.com/ideditor/schema-builder/blob/main/schemas/preset.json

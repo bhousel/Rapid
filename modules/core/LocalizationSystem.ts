@@ -59,7 +59,7 @@ export interface AppendFunction {
 
 
 /**
- * `LocalizationSystem` manages language and locale parameters including translated strings
+ * `LocalizationSystem` manages language and locale parameters including translated strings.
  *
  * Events available:
  *   `localechange`    Fires on any change in the current locale

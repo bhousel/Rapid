@@ -9,9 +9,7 @@ import type { OsmNode } from '../data/OsmNode.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
-/**
- * Options for entering MoveMode
- */
+/** Options for entering `MoveMode` */
 export interface MoveModeOptions {
   /** Selection object where keys are layerIDs and values are arrays of dataIDs */
   selection?: Record<string, EntityID[]>;
@@ -19,8 +17,7 @@ export interface MoveModeOptions {
 
 
 /**
- * `MoveMode`
- * In this mode, we are moving one or more map features
+ * In `MoveMode`, we are moving one or more map features.
  */
 export class MoveMode extends AbstractMode {
   /** Entity IDs being moved */

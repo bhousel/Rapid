@@ -7,7 +7,8 @@ import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { MarkerData } from '../data/MarkerData.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
-/** Options for entering DragNoteMode */
+
+/** Options for entering `DragNoteMode` */
 interface DragNoteModeOptions {
   /** The ID of the note to drag */
   noteID?: DataID;
@@ -15,8 +16,7 @@ interface DragNoteModeOptions {
 
 
 /**
- * `DragNoteMode`
- *  In this mode, the user has started dragging an OSM Note
+ *  In `DragNoteMode`, the user has started dragging an OSM Note
  */
 export class DragNoteMode extends AbstractMode {
   /** The note (MarkerData) being dragged, or null if not dragging */

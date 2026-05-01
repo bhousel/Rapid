@@ -20,7 +20,8 @@ type DOMRectData = Pick<DOMRectReadOnly, 'x' | 'y' | 'width' | 'height' | 'top' 
 
 
 /**
- * `UiSystem` maintains the user interface.
+ * `UiSystem` maintains Rapid's user interface, including the toolbars, inspector,
+ *  and the `.main-content` container where the map canvas lives.
  *
  * Events available:
  *   `uichange`  Fires on any change in the ui (such as resize)

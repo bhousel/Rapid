@@ -54,7 +54,7 @@ interface CategoryStrings {
 
 
 /**
- * A Category is a thematic collection of Presets.
+ * A `Category` is a thematic collection of Presets.
  * For example "Major Roads", "Barriers", "Buildings", "Golf Features"..
  * The Rapid user interface shows categories in the preset list as expandable folders.
  * See: https://github.com/ideditor/schema-builder/blob/main/schemas/preset_category.json

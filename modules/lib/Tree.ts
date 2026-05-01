@@ -7,7 +7,9 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
 
 
 /**
- * A wrapper class around the `RBush` spatial index, for tracking the position of OSM Entities.
+ * A `Tree` is a wrapper class around the `RBush` spatial index, for tracking the position of OSM Entities.
+ * Note this class now defers to the `SpatialSystem` - We should remove `Tree` at some point.
+ *
  * Internally RBush indexes rectangular bounding boxes.
  * The tree also must keep track of which Graph is considered "current", and will update the
  * positions of all it's tracked Entities automatically to match the current Graph.

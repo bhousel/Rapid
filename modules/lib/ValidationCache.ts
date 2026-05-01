@@ -21,8 +21,7 @@ export interface RecheckBox {
 
 
 /**
- * `ValidationCache`
- * Creates a cache to store validation state.
+ * A `ValidationCache` stores validation state.
  * We create 2 of these:
  *   `base` for validation on the base graph (unedited)
  *   `head` for validation on the head graph (user edits applied)

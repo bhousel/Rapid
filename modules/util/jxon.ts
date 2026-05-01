@@ -1,6 +1,5 @@
 /**
- * JXON - JavaScript XML Object Notation
- * Bidirectional conversion between XML and JavaScript objects.
+ * JavaScript XML Object Notation - bidirectional conversion between XML and JavaScript objects.
  * @see https://developer.mozilla.org/en-US/docs/JXON
  */
 

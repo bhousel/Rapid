@@ -27,7 +27,7 @@ const RAPID_COLORS: readonly string[] = [
 
 
 /**
- * `RapidSystem` maintains all the Rapid datasets
+ * `RapidSystem` maintains all the Rapid datasets.
  *
  * Events available:
  *  `datasetchange`   Fires when datasets are added/removed from the list

@@ -17,7 +17,7 @@ export type { SingularGeometry, SingularGeometryType };
 
 
 /**
- * Wrapper for both original and projected geometry data.
+ * A `GeometryPart` is a wrapper for both original and projected geometry data.
  * This class deals with singular geometry elements only: 'Point', 'LineString', 'Polygon'
  *
  * Previously this code lived in `PixiGeometry` where it applied only to rendered features,

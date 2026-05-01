@@ -33,3 +33,4 @@ Chronological one-liners. Details live in git history — these are just breadcr
 - **Scoped customization** (Feb 2026) — `_scopes: Map<ScopeID, ScopeData>` as sole source of truth in StyleSystem and SchemaSystem. `'*'` common scope for fallbacks.
 - **Dynamic styling fixes** (Feb 2026) — `dirtyScene()` before redraw, removed hardcoded marker styles, single `styleDefaults`.
 - **Services TS conversion** (Feb 2026) — All 19 service files converted. Generic `MarkerData<P>` / `GeoJSONData<P>` for typed props.
+- **JSDoc duplicate-title cleanup** (May 2026) — Removed 30 redundant first-line JSDoc titles that only repeated the documented class name, fixing IntelliSense noise in services, modes, and lib classes.

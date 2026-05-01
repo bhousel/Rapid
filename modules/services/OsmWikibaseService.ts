@@ -42,8 +42,7 @@ interface WikiInfo {
 
 
 /**
- * `OsmWikibaseService`
- * This service runs queries against OpenStreetMap's Wikibase API.
+ * `OsmWikibaseService` runs queries against OpenStreetMap's Wikibase API.
  * It is used to fetch tag documentation.
  * @see https://wiki.openstreetmap.org/wiki/Data_items
  */

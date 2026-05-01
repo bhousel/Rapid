@@ -5,12 +5,9 @@ import type { PropMatcherProps } from './PropMatcher.ts';
 import type { Variable } from './Variable.ts';
 
 /**
- * StyleSelector - Matching conditions for applying styles to features.
- *
- * A StyleSelector describes *when to apply a style*. It contains matching
- * conditions (geometry, tags) and references one or more Styles.
- *
- * Selectors can have a 'weight' property to control the order in which they apply.
+ * A `StyleSelector` describes *when to apply a style*.
+ * It contains matching conditions, references one or more `styleIDs`,
+ * and an optional 'weight' property to control the order in which they apply.
  *
  * @example
  * // Match highway=motorway
@@ -77,7 +74,9 @@ export interface FeatureMatchInfo {
 
 
 /**
- * StyleSelector - Determines when a style should be applied.
+ * A `StyleSelector` describes *when to apply a style*.
+ * It contains matching conditions, references one or more `styleIDs`,
+ * and an optional 'weight' property to control the order in which they apply.
  *
  * Properties you can access:
  *   `id`        Unique identifier for this selector

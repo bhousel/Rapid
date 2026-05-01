@@ -122,8 +122,7 @@ interface ImageLoadResult {
 
 
 /**
- * `StreetsideService`
- * This service loads streetside photos and coverage information from
+ * `StreetsideService` loads streetside photos and coverage information from
  * various Microsoft/VirtualEarth APIs.
  *
  * It also manages the embedded Pannellum panoramic photo viewer.

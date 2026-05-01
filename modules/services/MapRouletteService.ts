@@ -98,9 +98,8 @@ interface MapRouletteCache {
 
 
 /**
- * `MapRouletteService`
+ * `MapRouletteService` connects to the MapRoulette API to fetch about challenges and tasks.
  * MapRoulette is a microtask platform for performing tasks to improve OpenStreetMap.
- * This service connects to the MapRoulette API to fetch about challenges and tasks.
  * @see https://wiki.openstreetmap.org/wiki/MapRoulette
  * @see https://maproulette.org/docs/swagger-ui/index.html
  */

@@ -3,7 +3,7 @@ import { isVarRef, resolveVarRef } from './Variable.ts';
 import type { Variable } from './Variable.ts';
 
 /**
- * PropMatcher - A declarative property matcher for comparing object properties.
+ * A `PropMatcher` is set of rules for matching object properties.
  *
  * Used for matching OSM tags and other key-value properties against conditions.
  * Supports various comparison operators: equals, not equals, exists, regex, numeric comparisons, etc.
@@ -62,7 +62,7 @@ export type PropMatcherOp =
 
 
 /**
- * Properties for creating a PropMatcher.
+ * Properties for creating a `PropMatcher`.
  */
 export interface PropMatcherProps {
   /**
@@ -103,7 +103,9 @@ export interface PropMatcherProps {
 
 
 /**
- * PropMatcher - Declarative property matching for OSM tags and other key-value data.
+ * A `PropMatcher` is set of rules for matching object properties.
+ * Used for matching OSM tags and other key-value properties against conditions.
+ * Supports various comparison operators: equals, not equals, exists, regex, numeric comparisons, etc.
  *
  * Properties you can access:
  *   `key`   The property key to match

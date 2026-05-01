@@ -60,8 +60,7 @@ interface OsmoseIssueStrings {
 
 
 /**
- * `OsmoseService`
- * This service connects to the Osmose API to fetch detected QA issues.
+ * `OsmoseService` connects to the Osmose API to fetch detected QA issues.
  * @see https://wiki.openstreetmap.org/wiki/Osmose/api/0.3
  */
 export class OsmoseService extends AbstractSystem {

@@ -85,8 +85,7 @@ type TaginfoCallback = (err: string | null, data?: any[]) => void;
 
 
 /**
- * `TaginfoService`
- * This service runs queries against the OpenStreetMap Taginfo API.
+ * `TaginfoService` runs queries against the OpenStreetMap Taginfo API.
  * @see https://taginfo.openstreetmap.org/taginfo/apidoc
  */
 export class TaginfoService extends AbstractSystem {

@@ -1,9 +1,8 @@
 import type { ValidationIssue } from './ValidationIssue.ts';
 
 
-
 /**
- * Properties that define a ValidationFix.
+ * Properties that define a `ValidationFix`.
  */
 export interface ValidationFixProps {
   /** Display title for this fix */
@@ -20,8 +19,8 @@ export interface ValidationFixProps {
 
 
 /**
- * Represents a possible fix for a validation issue.
- * Each ValidationIssue can have multiple possible fixes that the user can choose from.
+ * A `ValidationFix` represents a possible fix for a validation issue.
+ * Each `ValidationIssue` can have multiple possible fixes that the user can choose from.
  */
 export class ValidationFix {
   /** Unique identifier for this fix (set by ValidationIssue.fixes()) */

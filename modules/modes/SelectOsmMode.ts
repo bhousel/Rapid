@@ -18,9 +18,7 @@ import type { OsmWay } from '../data/OsmWay.ts';
 import type { Keybinding } from '../util/keybinding.ts';
 
 
-/**
- * Options for entering SelectOsmMode
- */
+/** Options for entering `SelectOsmMode` */
 export interface SelectOsmModeOptions {
   /** Selection object where keys are layerIDs and values are arrays of dataIDs */
   selection?: Record<LayerID, EntityID[]>;
@@ -32,8 +30,7 @@ export interface SelectOsmModeOptions {
 
 
 /**
- * `SelectOsmMode`
- * In this mode, the user has selected one or more OSM features.
+ * In `SelectOsmMode`, the user has selected one or more OSM features.
  *
  * For a while we needed to keep the old `modeSelect` around, and we should
  * eventually have a common select mode for everything but this is just my

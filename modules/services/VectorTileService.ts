@@ -75,8 +75,7 @@ interface VTSource {
 
 
 /**
- * `VectorTileService`
- * This service can connect to sources of vector tile data.
+ * `VectorTileService` can connect to sources of vector tile data.
  *
  * - Mapbox Vector Tiles (MVT) made available from a z/x/y tileserver
  *     https://github.com/mapbox/vector-tile-spec

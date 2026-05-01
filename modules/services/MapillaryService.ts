@@ -182,8 +182,7 @@ export type MapillaryDetection = MarkerData<MapillaryDetectionProps>;
 
 
 /**
- * `MapillaryService`
- * This service loads photos, sequences, and detected items from the Mapillary API.
+ * `MapillaryService` loads photos, sequences, and detected items from the Mapillary API.
  * @see https://www.mapillary.com/developer/api-documentation
  *
  * It also manages the embedded Mapillary-JS photo viewer.

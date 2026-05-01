@@ -102,8 +102,7 @@ interface EsriField {
 
 
 /**
- * `EsriService`
- * This service connects to Esri's ArcGIS API to fetch data about Esri-hosted datasets.
+ * `EsriService` connects to Esri's ArcGIS API to fetch data about Esri-hosted datasets.
  *
  * @see https://openstreetmap.maps.arcgis.com/home/index.html
  * @see https://developers.arcgis.com/rest/

@@ -109,7 +109,7 @@ const PRESSURE_RECOVER = {
  * `SchedulerSystem` centralizes deferred and background work scheduling.
  *
  * **Game loop** — Owns the `requestAnimationFrame` loop.  Other systems
- * (notably GraphicsSystem) register frame callbacks that the scheduler
+ * (notably `GraphicsSystem`) register frame callbacks that the scheduler
  * calls each frame with the elapsed time (`deltaMS`).
  *
  * **Task scheduling** — Queued tasks are drained at the end of each frame

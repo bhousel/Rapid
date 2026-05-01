@@ -172,8 +172,7 @@ interface OsmAuthInstance {
 
 
 /**
- * `OsmService`
- * This service connects to the OpenStreetMap editing API to perform queries,
+ * `OsmService` connects to the OpenStreetMap editing API to perform queries,
  *  fetch data, upload changesets, and more.
  * @see https://wiki.openstreetmap.org/wiki/API
  *

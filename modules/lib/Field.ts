@@ -5,7 +5,7 @@ import type { LocationSet } from '@rapideditor/location-conflation';
 
 
 /**
- * Properties that define a Field.
+ * Properties that define a `Field`.
  * @see https://github.com/ideditor/schema-builder/blob/main/schemas/field.json
  */
 export interface FieldProps {
@@ -90,7 +90,7 @@ interface FieldStrings {
 
 
 /**
- * A Field represents a user interface component that appears in the Rapid inspector.
+ * A `Field` represents a user interface component that appears in the Rapid inspector.
  * Each field corresponds to one or more "keys" (OpenStreetMap tag keys).
  * The available fields are determined by the preset matched.
  * See:  https://github.com/ideditor/schema-builder/blob/main/schemas/field.json

@@ -27,8 +27,8 @@ interface TransformEase {
 
 
 /**
- * The graphics system owns the Pixi environment.
- * This system implements a game loop and manages when rendering tasks happen.
+ * `GraphicsSystem` owns the Pixi environment.
+ * This system hooks into the `SchedulerSystem`, which implements the game loop.
  * (formerly named PixiRenderer)
  *
  * Properties you can access:
@@ -129,7 +129,7 @@ export class GraphicsSystem extends AbstractSystem {
     this.on('resumed', () => { this.immediateRedraw(); });
 
     // Ensure Pixi's shared ticker doesn't run its own rAF loop.
-    // (The SchedulerSystem owns the game loop instead.)
+    // (Rapid's `SchedulerSystem` owns the game loop instead.)
     PIXI.Ticker.shared.autoStart = false;
     PIXI.Ticker.shared.stop();
 

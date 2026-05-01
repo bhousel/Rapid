@@ -44,7 +44,7 @@ interface SummaryEntry {
 
 
 /**
- *  Difference represents the difference between two Graphs.
+ *  `Difference` represents the difference between two Graphs.
  *  It knows how to calculate the set of entities that were
  *  created, modified, or deleted, and also contains the logic
  *  for recursively extending a difference to the complete set

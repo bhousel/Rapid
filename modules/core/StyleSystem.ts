@@ -20,7 +20,7 @@ export type StyleGroup =
   | 'viewfield' | 'lineMarker' | 'sidedMarker' | 'label';
 
 /**
- * Input format for data to merge into the StyleSystem.
+ * Input format for data to merge into the `StyleSystem`.
  */
 export interface StyleInput {
   /** An asset identifier, e.g. 'rapid_style' (required) */

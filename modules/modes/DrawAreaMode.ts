@@ -19,7 +19,7 @@ const DEBUG = false;
 
 
 /**
- * Snapshot for undo/redo state in DrawAreaMode
+ * Snapshot for undo/redo state in `DrawAreaMode`
  */
 interface DrawAreaSnapshot {
   drawWayID: EntityID;
@@ -28,8 +28,7 @@ interface DrawAreaSnapshot {
 }
 
 /**
- * `DrawAreaMode`
- * In this mode, we are drawing a new area.
+ * In `DrawAreaMode`, we are drawing a new area.
  */
 export class DrawAreaMode extends AbstractMode {
   defaultTags: OsmTags;

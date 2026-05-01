@@ -13,8 +13,7 @@ type WikidataCache = Map<string, Record<string, any>>;
 
 
 /**
- * `WikidataService`
- * This service runs queries against the Wikidata API.
+ * `WikidataService` runs queries against the Wikidata API.
  * @see https://www.mediawiki.org/wiki/API:Main_page
  */
 export class WikidataService extends AbstractSystem {

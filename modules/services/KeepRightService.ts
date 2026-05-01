@@ -109,8 +109,7 @@ interface KRData {
 
 
 /**
- * `KeepRightService`
- * This service connects to the KeepRight API to fetch detected QA issues.
+ * `KeepRightService` connects to the KeepRight API to fetch detected QA issues.
  * @see https://wiki.openstreetmap.org/wiki/Keep_Right
  * @see https://keepright.at/interfacing.php
  */

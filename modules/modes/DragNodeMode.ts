@@ -14,9 +14,7 @@ import type { OsmEntity, OsmWay } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
-/**
- * Options for entering DragNodeMode
- */
+/** Options for entering `DragNodeMode` */
 export interface DragNodeModeOptions {
   /** If set, reselect these IDs when finished dragging */
   reselectIDs?: EntityID[];
@@ -31,8 +29,7 @@ export interface DragNodeModeOptions {
 
 
 /**
- * `DragNodeMode`
- *  In this mode, the user has started dragging a point or vertex.
+ *  In `DragNodeMode` mode, the user has started dragging a point or vertex.
  */
 export class DragNodeMode extends AbstractMode {
   /** The node being dragged */

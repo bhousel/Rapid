@@ -98,10 +98,10 @@ const DEFAULT_MAX_INFLIGHT = 100;
  * fetch offloading, and concurrency limiting.
  *
  * **Inflight tracking** — All active requests live in one `Map`.
- * Cleanup happens in `.finally()`, so entries never leak (fixes #1451).
+ * Cleanup happens in `.finally()`, so entries never leak (fixes Rapid#1451).
  *
  * **Timeouts** — Every request is automatically aborted after a
- * configurable timeout (default 30s), solving #1487.
+ * configurable timeout (default 30s), solving Rapid#1487.
  *
  * **Worker offloading** — When WorkerSystem is available with a
  * configured `workerURL`, fetch + parse runs in a web worker, keeping

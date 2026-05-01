@@ -11,8 +11,8 @@ import type {
 
 
 /**
- * Wrapper for both original and projected geometry data.
- * This class wraps `0..n` multiple GeometryPart elements in a collection.
+ * A `Geometry` is a wrapper for both original and projected geometry data.
+ * This class wraps `0..n` multiple `GeometryPart` elements in a collection.
  *
  * The geometry data should be passed to `setData()` as a GeoJSON object.
  *

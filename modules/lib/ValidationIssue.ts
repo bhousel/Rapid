@@ -13,7 +13,7 @@ export type ValidationSeverity = 'warning' | 'error' | 'suggestion';
 
 
 /**
- * Properties that define a ValidationIssue.
+ * Properties that define a `ValidationIssue`.
  */
 export interface ValidationIssueProps {
   /** Name of rule that created the issue (e.g. 'missing_tag') */
@@ -42,7 +42,7 @@ export interface ValidationIssueProps {
 
 
 /**
- * Represents a validation problem detected in the map data.
+ * A `ValidationIssue` represents a potential problem detected in the map data.
  * Each issue has a type, severity, affected entities, and possible fixes.
  */
 export class ValidationIssue {

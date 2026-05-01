@@ -41,8 +41,7 @@ interface DatasetCache {
 
 
 /**
- * `MapWithAIService`
- * This service connects to the MapWithAI API to fetch data about Meta-hosted datasets.
+ * `MapWithAIService` connects to Meta's MapWithAI API to fetch data about Meta-hosted datasets.
  */
 export class MapWithAIService extends AbstractSystem {
   /** Tiler instance used to compute tile coverage for the current viewport */

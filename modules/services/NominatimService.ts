@@ -27,8 +27,7 @@ type NominatimCallback = (err: Error | string | null, result?: any) => void;
 
 
 /**
- * `NominatimService`
- * This service connects to the Nominatim API to perform geocoding queries.
+ * `NominatimService` connects to the Nominatim API to perform geocoding queries.
  * @see https://nominatim.org/release-docs/latest/api/Overview/
  */
 export class NominatimService extends AbstractSystem {

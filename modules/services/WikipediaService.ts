@@ -9,8 +9,7 @@ const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php?';
 
 
 /**
- * `WikipediaService`
- * This service runs queries against the Wikipedia API.
+ * `WikipediaService` runs queries against the Wikipedia API.
  * @see https://www.mediawiki.org/wiki/API:Main_page
  */
 export class WikipediaService extends AbstractSystem {

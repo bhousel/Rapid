@@ -8,6 +8,10 @@ Things that went wrong once and shouldn't go wrong again.
 - **Tiler method chaining** — `new Tiler().tileSize(512)` returns `number | Tiler`. Need `as Tiler` casts on the chain.
 - **`utilQsString`** requires 2 args `(obj, noencode: boolean)` — pass `false` for the second.
 - **`osmAuth()` types wrong upstream** — Declared as class constructor but is actually a factory function. Local interface workaround in OsmService.ts until upstream is fixed.
+- **JSDoc first-line duplication** — Two redundant patterns to watch for and avoid:
+  1. A line that is just the backticked class name: `` * `ClassName` ``
+  2. A `ClassName - description` prefix on the first line
+  Both clutter IntelliSense by repeating the symbol name that's already shown. Start the description directly on the first line instead.
 
 ## Testing
 

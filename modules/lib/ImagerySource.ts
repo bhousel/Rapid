@@ -36,7 +36,7 @@ export interface VintageRange {
 }
 
 /**
- * Properties that define an ImagerySource.
+ * Properties that define an `ImagerySource`.
  */
 export interface ImagerySourceProps {
   /** Unique identifier for this imagery source (required) */
@@ -97,7 +97,7 @@ export interface ImagerySourceProps {
 
 
 /**
- * An Imagery Source maintains the state of a single tiled imagery source.
+ * An `ImagerySource` maintains the state of a single tiled imagery source.
  *
  * Properties you can access:
  *   `id` (or `imageryID`)  Unique string to identify this Field.

@@ -5,10 +5,8 @@ import type { PropMatcherProps } from './PropMatcher.ts';
 import type { Variable } from './Variable.ts';
 
 /**
- * Ruleset - A collection of PropMatcher rules for classifying properties.
- *
- * A Ruleset groups related PropMatcher rules under a single identifier.
- * It's used by SchemaSystem to scope tag classification data (e.g. which
+ * A `Ruleset` is a group of related `PropMatcher` rules with include/exclude semantics.
+ * It's used by `SchemaSystem` to scope tag classification data (e.g. which
  * surfaces are "paved", which highways are "routable") per schema scope,
  * replacing module-level globals with scope-owned configuration.
  *
@@ -48,7 +46,7 @@ import type { Variable } from './Variable.ts';
 
 
 /**
- * Properties for creating a Ruleset.
+ * Properties for creating a `Ruleset`.
  */
 export interface RulesetProps {
   /** Unique identifier for this ruleset */
@@ -65,9 +63,8 @@ export interface RulesetProps {
 
 
 /**
- * Ruleset - A named collection of PropMatcher rules with include/exclude semantics.
- *
- * Matching logic: ANY include matches AND NO exclude matches.
+ * A `Ruleset` is a group of related `PropMatcher` rules with include/exclude semantics.
+ * Matching logic: ANY 'include' matches AND NO 'exclude' matches.
  *
  * Properties you can access:
  *   `id`        Unique identifier for this ruleset

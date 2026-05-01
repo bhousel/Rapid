@@ -7,7 +7,7 @@ const RAPID_MAGENTA = '#da26d3';
 
 
 /**
- * Properties that define a RapidDataset.
+ * Properties that define a `RapidDataset`.
  */
 export interface RapidDatasetProps {
   /** Unique identifier for this dataset */
@@ -58,7 +58,7 @@ export interface RapidDatasetProps {
 
 
 /**
- * Represents an external dataset that can be loaded into Rapid.
+ * A `RapidDataset` represents an external source of data that can be loaded into Rapid.
  * Datasets come from various services (Esri, MapWithAI, Overture, etc.)
  * and contain features like buildings, roads, addresses, etc.
  */

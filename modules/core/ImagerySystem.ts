@@ -49,7 +49,6 @@ export interface ImageryScope {
 
 /**
  * `ImagerySystem` maintains the state of the tiled background and overlay imagery.
- *
  * At init time, Rapid will load the imagery index and any custom imagery assets.
  *
  * **Scoped Architecture:**

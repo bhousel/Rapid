@@ -53,7 +53,7 @@ const DEFAULT_MAX_WORKERS = 2;
 
 
 /**
- * Manages the web worker pool and listener registry.
+ * `WorkerSystem` manages the web worker pool and listener function registry.
  *
  * Responsibilities:
  * - **Worker pool** — Spawns module-type workers lazily (on first task),

@@ -6,9 +6,8 @@ import type { Context } from '../Context.ts';
 import type { Variable } from './Variable.ts';
 
 /**
- * Style - Visual styling properties for map features.
- *
- * A Style describes *what something looks like*. It contains visual properties for:
+ * A `Style` describes *what a feature should look like*.
+ * It contains visual properties for:
  * - fill (areas)
  * - casing (line outline, draws below stroke)
  * - stroke (line)
@@ -17,7 +16,7 @@ import type { Variable } from './Variable.ts';
  * - line decorations (oneway arrows, sided markers)
  * - labels
  *
- * The Icon image typically comes from SchemaSystem presets, but can be overridden
+ * The Icon image typically comes from `SchemaSystem` presets, but can be overridden
  * in a style file. Other visual properties (color, size, opacity) come from styles.
  *
  * @example
@@ -47,7 +46,7 @@ import type { Variable } from './Variable.ts';
 
 
 /**
- * Properties for creating a Style.
+ * Properties for creating a `Style`.
  * All properties (except the id) are optional.
  * Any unassigned properties will be filled in with defaults.
  */
@@ -193,7 +192,7 @@ export const styleDefaults: MinimalStyleProps = {
 
 
 /**
- * Style - Describes visual appearance of map features.
+ * A `Style` describes *what a feature should look like*.
  *
  * Properties you can access:
  *   `id`          Unique identifier for this style

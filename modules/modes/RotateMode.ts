@@ -8,9 +8,7 @@ import type { OsmNode } from '../data/OsmNode.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
-/**
- * Options for entering RotateMode
- */
+/** Options for entering `RotateMode` */
 export interface RotateModeOptions {
   /** Selection object where keys are layerIDs and values are arrays of dataIDs */
   selection?: Record<string, EntityID[]>;
@@ -18,8 +16,7 @@ export interface RotateModeOptions {
 
 
 /**
- * `RotateMode`
- * In this mode, we are rotating one or more map features
+ * In `RotateMode`, we are rotating one or more map features.
  */
 export class RotateMode extends AbstractMode {
   /** Entity IDs being rotated */

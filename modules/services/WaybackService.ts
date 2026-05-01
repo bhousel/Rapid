@@ -67,8 +67,7 @@ interface WaybackCache {
 
 
 /**
- * `WaybackService`
- * This service runs queries against the ArcGIS Wayback imagery service.
+ * `WaybackService` runs queries against Esri's ArcGIS Wayback imagery service.
  * @see https://livingatlas.arcgis.com/wayback
  *
  * Collections are available to lookup the Wayback data by release number or by date.

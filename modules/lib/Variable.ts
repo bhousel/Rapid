@@ -9,7 +9,7 @@ export type VariableValue = string | number | string[] | number[];
 
 
 /**
- * Properties for creating a Variable.
+ * Properties for creating a `Variable`.
  */
 export interface VariableProps {
   /** Unique identifier for this variable */
@@ -24,9 +24,7 @@ export interface VariableProps {
 
 
 /**
- * Variable - A named value stored in a schema or style scope.
- *
- * Variables hold reusable data — typically lists of domain-specific strings
+ * A `Variable` holds reusable data - typically lists of domain-specific strings
  * (e.g. lifecycle prefixes, highway classification values) that are referenced
  * by multiple consumers.  Unlike Rulesets (which are matchers with include/exclude
  * semantics), Variables are just named data — "sometimes a list is just a list."

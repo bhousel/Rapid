@@ -14,9 +14,7 @@ import type { Context } from '../Context.ts';
 const DEBUG = false;
 
 
-/**
- * Options for entering SelectMode
- */
+/** Options for entering `SelectMode` */
 export interface SelectModeOptions {
   /** A Map of datumID -> datum for selected items */
   selection?: Map<DataID, AbstractData>;
@@ -24,8 +22,7 @@ export interface SelectModeOptions {
 
 
 /**
- * `SelectMode`
- * In this mode, the user has selected one or more things.
+ * In `SelectMode`, the user has selected one or more things.
  * - `selectedData` contains the information about what is selected.
  * - The sidebar shows something depending on what the selection contains.
  * - We also can set up the "operations" allowed (right click edit menu)
