@@ -1398,7 +1398,7 @@ export class MapillaryService extends AbstractSystem {
     let segmentation = cache.data.get(source.id);
     if (!segmentation) {
       // Convert encoded geometry into a polygon..
-      const decodedGeometry = globalThis.atob(source.geometry);
+      const decodedGeometry = atob(source.geometry);
       const arr = new Uint8Array(decodedGeometry.length);
       for (let i = 0; i < decodedGeometry.length; i++) {
         arr[i] = decodedGeometry.charCodeAt(i);

@@ -403,7 +403,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
           if (poiFeature.dirty) {
             // copy the polygon style, then apply customizations
-            const markerStyle = globalThis.structuredClone(feature.style) as MatchedStyle;  // clone the style
+            const markerStyle = structuredClone(feature.style) as MatchedStyle;  // clone the style
 
             if (hasWikidata(entity)) {
               markerStyle.marker.image = 'boldPin';

@@ -298,7 +298,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style: Partial<MatchedStyle> = globalThis.structuredClone(MARKERSTYLE);
+        const style: Partial<MatchedStyle> = structuredClone(MARKERSTYLE);
 
         if (feature.hasClass('selectphoto')) {  // selected photo style
           style.viewfield!.angles = [this._viewerBearing ?? (d.props.ca as number)];

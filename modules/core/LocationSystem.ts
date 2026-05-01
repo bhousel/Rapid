@@ -120,7 +120,7 @@ export class LocationSystem extends AbstractSystem {
       block.locationSetID = result.id;
 
       // Use the locationSet id (e.g. `+[Q7835]`) and copy block metadata into properties.
-      const feature = globalThis.structuredClone(result.feature);
+      const feature = structuredClone(result.feature);
       feature.id = result.id;
       feature.properties.id = result.id;
       Object.assign(feature.properties, block);

@@ -163,7 +163,7 @@ export class Category {
       throw new Error('Category missing id property');
     }
 
-    this.props = globalThis.structuredClone(props) as CategoryProps;
+    this.props = structuredClone(props) as CategoryProps;
     this.props.name ??= props.id;
     this.props.matchScore = -1;
     this.props.members ??= [];

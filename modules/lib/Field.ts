@@ -135,7 +135,7 @@ export class Field {
     this._currStrings = {} as FieldStrings;  // The current strings
 
     // Preserve properties and assign some defaults
-    this.props = globalThis.structuredClone(props) as FieldProps;
+    this.props = structuredClone(props) as FieldProps;
     this.props.autoSuggestions ??= true;
     this.props.caseSensitive ??= false;
     this.props.customValues ??= true;

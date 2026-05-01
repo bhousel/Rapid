@@ -1681,7 +1681,7 @@ export class OsmService extends AbstractSystem {
             target.note[id] = new MarkerData((source as any).note[id]);  // clone notes
           }
         } else {
-          target[k] = globalThis.structuredClone(v);  // clone anything else
+          target[k] = structuredClone(v);  // clone anything else
         }
       }
       return target;

@@ -307,7 +307,7 @@ export class NsiService extends AbstractSystem {
       if (!match) continue;  // Can't use any of these hits, try next tuple..
 
       const { itemID } = match;
-      const item: NsiItem = globalThis.structuredClone(match.item) as NsiItem;   // deep copy
+      const item: NsiItem = structuredClone(match.item) as NsiItem;   // deep copy
 
       // At this point we have matched a canonical item and can suggest tag upgrades..
       const tkv = item.tkv;

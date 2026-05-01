@@ -227,7 +227,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
       if (feature.dirty) {
         // Start with default style, and apply adjustments
-        const style: Partial<MatchedStyle> = globalThis.structuredClone(MARKERSTYLE);
+        const style: Partial<MatchedStyle> = structuredClone(MARKERSTYLE);
 
 // todo handle pano
         if (feature.hasClass('selectphoto')) {  // selected photo style

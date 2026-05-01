@@ -235,7 +235,7 @@ export class Style {
     }
 
     // Deep clone to avoid mutations
-    this.props = globalThis.structuredClone(props) as StyleProps;
+    this.props = structuredClone(props) as StyleProps;
     this.id = props.id;
     this._resolved = null;
     this._hasVarRefs = false;
@@ -366,7 +366,7 @@ export class Style {
    * @return A new Style with the new ID
    */
   clone(newID?: StyleID): Style {
-    const cloned = globalThis.structuredClone(this.props);
+    const cloned = structuredClone(this.props);
     if (newID) {
       cloned.id = newID;
     }
@@ -390,7 +390,7 @@ export class Style {
 
         // Lazy-clone on first var() hit
         if (!this._resolved) {
-          this._resolved = globalThis.structuredClone(this.props);
+          this._resolved = structuredClone(this.props);
           this._hasVarRefs = true;
         }
 
@@ -428,7 +428,7 @@ export class Style {
    * Convert to a JSON-serializable object.
    */
   toJSON(): StyleProps {
-    return globalThis.structuredClone(this.props);
+    return structuredClone(this.props);
   }
 
 }

@@ -64,7 +64,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
     if (otherOrContext instanceof AbstractData) {  // copy other
       const other = otherOrContext;
       this.context = other.context;
-      this.props = globalThis.structuredClone(other.props) as Partial<P>;
+      this.props = structuredClone(other.props) as Partial<P>;
       this.geoms = other.geoms.clone();
 
     } else {
@@ -74,7 +74,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
       this.geoms = new Geometry(context);
     }
 
-    Object.assign(this.props, globalThis.structuredClone(props));  // override with passed in props
+    Object.assign(this.props, structuredClone(props));  // override with passed in props
 
     // For consistency, offer a `this.id` property.
     this.id = this.props.id || '';

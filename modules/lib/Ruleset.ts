@@ -106,7 +106,7 @@ export class Ruleset {
     }
 
     // Deep clone to avoid mutations
-    this.props = globalThis.structuredClone(props) as RulesetProps;
+    this.props = structuredClone(props) as RulesetProps;
     this.props.include ??= [];
     this.props.exclude ??= [];
     this.id = props.id;
@@ -159,7 +159,7 @@ export class Ruleset {
    * @return A new Ruleset with copied properties
    */
   clone(newID?: RulesetID): Ruleset {
-    const cloned = globalThis.structuredClone(this.props);
+    const cloned = structuredClone(this.props);
     if (newID) {
       cloned.id = newID;
     }

@@ -90,7 +90,7 @@ export class GeometryPart {
         if (v instanceof Extent) {
           dst[k] = new Extent(v);
         } else {
-          dst[k] = globalThis.structuredClone(v);
+          dst[k] = structuredClone(v);
         }
       }
       if (obj === 'orig') {
@@ -127,7 +127,7 @@ export class GeometryPart {
     if (!(/^(Point|LineString|Polygon)$/.test(type ?? '')) || !coords) return;  // do nothing
 
     const orig: GeometryPartOrigData = {
-      geojson: globalThis.structuredClone(geojson) as SingularGeometry,
+      geojson: structuredClone(geojson) as SingularGeometry,
       coords: undefined as unknown as Vec2 | Vec2[] | Vec2[][],
       extent: undefined as unknown as Extent
     };

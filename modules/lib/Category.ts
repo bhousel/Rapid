@@ -98,7 +98,7 @@ export class Category {
     this._currStrings = {} as CategoryStrings;  // The current strings
 
     // Preserve properties and assign some defaults
-    this.props = globalThis.structuredClone(props) as CategoryProps;
+    this.props = structuredClone(props) as CategoryProps;
     this.props.name ??= props.id;  // default to id if not provided
     this.props.matchScore = -1;
     this.props.members ??= [];  // "members" here are presetIDs

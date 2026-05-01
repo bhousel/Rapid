@@ -105,7 +105,7 @@ export class Graph {
 
     } else {
       const props = propsOrEntities;
-      Object.assign(this.props, globalThis.structuredClone(props));  // override with passed in props
+      Object.assign(this.props, structuredClone(props));  // override with passed in props
     }
 
     if (!this.props.id) {  // no ID provided - generate one

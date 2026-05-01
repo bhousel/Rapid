@@ -114,7 +114,7 @@ export class StyleSelector {
     }
 
     // Deep clone to avoid mutations
-    this.props = globalThis.structuredClone(props) as StyleSelectorProps;
+    this.props = structuredClone(props) as StyleSelectorProps;
     this.id = props.id;
     this.styleIDs = props.styleIDs;
   }
@@ -217,7 +217,7 @@ export class StyleSelector {
    * @return A new StyleSelector with the new ID
    */
   clone(newID?: StyleSelectorID): StyleSelector {
-    const cloned = globalThis.structuredClone(this.props);
+    const cloned = structuredClone(this.props);
     if (newID) {
       cloned.id = newID;
     }
@@ -229,7 +229,7 @@ export class StyleSelector {
    * Convert to a JSON-serializable object.
    */
   toJSON(): StyleSelectorProps {
-    return globalThis.structuredClone(this.props);
+    return structuredClone(this.props);
   }
 
 

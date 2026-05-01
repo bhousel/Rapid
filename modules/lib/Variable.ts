@@ -82,7 +82,7 @@ export class Variable {
     }
 
     // Deep clone to avoid mutations
-    this.props = globalThis.structuredClone(props) as VariableProps;
+    this.props = structuredClone(props) as VariableProps;
     this.id = props.id;
     this._set = null;
   }
@@ -131,7 +131,7 @@ export class Variable {
    * Convert to a JSON-serializable object.
    */
   toJSON(): VariableProps {
-    return globalThis.structuredClone(this.props);
+    return structuredClone(this.props);
   }
 
 

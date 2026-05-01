@@ -131,7 +131,7 @@ export class ImagerySource {
     }
 
     // Preserve properties and assign some defaults
-    this.props = globalThis.structuredClone(props) as ImagerySourceProps;
+    this.props = structuredClone(props) as ImagerySourceProps;
     this.props.alpha ||= 1;
     this.props.best ||= false;
     this.props.overlay ||= false;

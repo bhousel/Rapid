@@ -136,7 +136,7 @@ export class Preset {
     this._resolved = { fields: null, moreFields: null };
 
     // Preserve properties and assign some defaults
-    this.props = globalThis.structuredClone(props) as PresetProps;
+    this.props = structuredClone(props) as PresetProps;
     this.props.aliases ??= [];
     this.props.fields ??= [];
     this.props.geometry ??= [];

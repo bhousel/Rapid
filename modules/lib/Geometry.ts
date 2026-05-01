@@ -83,7 +83,7 @@ export class Geometry {
           dst[k] = new Extent(v);
         /* c8 ignore start */
         } else {
-          dst[k] = globalThis.structuredClone(v);
+          dst[k] = structuredClone(v);
         /* c8 ignore end */
         }
       }
