@@ -176,6 +176,10 @@ export class Category {
 - Document properties in the interface (single source of truth)
 - Keep JSDoc block on constructor
 - Avoid duplicating property docs in the class body
+- **Don't repeat the symbol name as the first line of a doc comment** — it looks redundant in IntelliSense and adds no information. Start with a plain-English description of what the thing does instead.
+  - ❌ `/** BlahSystem — Manages Rapid's collection of Blahs */`
+  - ✅ `/** The \`BlahSystem\` manages Rapid's collection of Blahs. */`
+- **Wrap inline code examples in markdown code fences** (` ```ts ` or ` ```json `) so they render correctly in IntelliSense. Bare object/array literals in JSDoc prose appear as plain text without fencing.
 - **Never use JSDoc type annotations** in TypeScript files - use TypeScript types instead
   - ❌ `@param {string} name` → ✅ `@param name` with TypeScript parameter type
   - ❌ `@return {number}` → ✅ `@return` with TypeScript return type
