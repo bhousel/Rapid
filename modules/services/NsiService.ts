@@ -258,10 +258,12 @@ export class NsiService extends AbstractSystem {
    * Suggest tag upgrades.
    * This function will not modify the input tags, it makes a copy.
    * Returns a result about the suggested tags, and the item that matched:
+   * ```ts
    *  {
    *    'newTags': `Object` - The tags the the feature should have
    *    'matched': `Object` - The matched item
    *  }
+   * ```
    *
    * @param tags - Object containing the feature's OSM tags
    * @param loc - Location where this feature exists, as a [lon, lat]
@@ -630,10 +632,12 @@ export class NsiService extends AbstractSystem {
    *   "tiger:reviewed", "surface", "ref", etc.
    *
    * Returns a result `Object` containing kv pairs to test:
+   * ```ts
    * {
    *   'primary': Set(),
    *   'alternate': Set()
    * }
+   * ```
    *
    * @param tags - Object containing the feature's OSM tags
    * @return Object containing the primary and alternate key/value pairs to test
@@ -715,10 +719,12 @@ export class NsiService extends AbstractSystem {
    *  and fallback to alternate tags like `brand`, `brand:ru`, `alt_name`
    *
    * Returns a result `Object` containing namelike values to test:
+   * ```ts
    * {
    *   'primary': Set(),
    *   'alternate': Set()
    * }
+   * ```
    *
    * @param tags - Object containing the feature's OSM tags
    * @return Object containing the primary and alternate names to test

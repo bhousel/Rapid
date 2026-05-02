@@ -92,11 +92,13 @@ export class AssetSystem extends AbstractSystem {
    * A custom asset map may be provided by a separate asset management system.
    * (For example this may be provided by the Rails asset pipeline.)
    * This should be in the form of key-value replacement filenames like:
+   * ```ts
    * {
    *   'original1.json': 'replacement1.json',
    *   'original2.json': 'replacement2.json',
    *   …
    * }
+   * ```
    * (This must set before init, and should not be changed later)
    */
   fileReplacements: Record<string, string>;

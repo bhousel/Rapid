@@ -11,22 +11,28 @@ import type { OsmTags } from '../data/types.ts';
  * Some of the types of replacement rules found in the file:
  *
  *  - a basic replacement:
+ * ```json
  *  {
  *    "old":     { "building": "home" },
  *    "replace": { "building": "house" }
  *  }
+ * ```
  *
  *  - a '*' replacement:
+ * ```json
  *  {
  *    "old":     { "building": "entrance" },
  *    "replace": { "entrance": "*" }
  *  }
+ * ```
  *
  *  - a '$1' token replacement - these are called 'transfer values' in the code below
+ * ```json
  *   {
  *     "old":     { "building:min_height": "*" },
  *     "replace": { "min_height": "$1" }
  *   }
+ * ```
  *
  * @param   entityID     - EntityID of the entity to upgrade tags on
  * @param   oldTags      - Tags to match and remove

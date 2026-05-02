@@ -380,6 +380,7 @@ export class StyleSystem extends AbstractSystem {
 
   /**
    * Accepts an object containing new style data in scoped format:
+   * ```ts
    * {
    *   assetID: '',       // A string asset identifier, e.g. 'rapid_style'
    *   assetVersion: '',  // A string version specifier, e.g. '1.0.0'  (defaults to 'unknown' if not present)
@@ -389,6 +390,7 @@ export class StyleSystem extends AbstractSystem {
    *     selectors: { … }    // Object<SelectorID, Partial<StyleSelectorProps>>
    *   }]
    * }
+   * ```
    *
    * When merging:
    *  - Items are processed in the order they appear.

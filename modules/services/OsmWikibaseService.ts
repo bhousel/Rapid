@@ -179,11 +179,13 @@ export class OsmWikibaseService extends AbstractSystem {
 
   /**
    * Pass params object of the form:
+   * ```ts
    * {
    *   key: 'string',
    *   value: 'string',
    *   langCodes: ['string']
    * }
+   * ```
    * @param params
    * @param callback - errback-style callback function to call with results
    */
@@ -303,12 +305,15 @@ export class OsmWikibaseService extends AbstractSystem {
 
   /**
    * Pass params object of the form:
+   * ```ts
    * {
    *   key: 'string',     // required
    *   value: 'string'    // optional
    * }
+   * ```
    *
    * Get an result object used to display tag documentation
+   * ```ts
    * {
    *   title:        'string',
    *   description:  'string',
@@ -316,6 +321,7 @@ export class OsmWikibaseService extends AbstractSystem {
    *   imageURL:     'string',
    *   wiki:         { title: 'string', text: 'string', url: 'string' }
    * }
+   * ```
    * @param params
    * @param callback - errback-style callback function to call with results
    */

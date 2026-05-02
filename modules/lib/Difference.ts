@@ -191,6 +191,7 @@ export class Difference {
    *  but the summary difference presents it as only the way being modified.
    *
    * Returns a result about the Entities that changed:
+   * ```ts
    *  {
    *    entityID: {
    *      entity:      The OsmEntity that changed
@@ -198,6 +199,7 @@ export class Difference {
    *      changeType:  String, one of 'created', 'modified', or 'deleted'
    *    }
    *  }
+   * ```
    * @return  Returns a summary of changes
    */
   summary(): Map<EntityID, SummaryEntry> {

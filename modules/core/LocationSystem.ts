@@ -157,17 +157,21 @@ export class LocationSystem extends AbstractSystem {
 
   /**
    * Accepts an Array of Objects containing `locationSet` properties:
+   * ```ts
    * [
    *  { id: 'preset1', locationSet: {…} },
    *  { id: 'preset2', locationSet: {…} },
    *  …
    * ]
+   * ```
    * After validating, the Objects will be decorated with a `locationSetID` property:
+   * ```ts
    * [
    *  { id: 'preset1', locationSet: {…}, locationSetID: '+[Q2]' },
    *  { id: 'preset2', locationSet: {…}, locationSetID: '+[Q30]' },
    *  …
    * ]
+   * ```
    *
    * @param objects - Objects to check - they should have `locationSet` property
    * @return Promise resolved with the objects (this function used to be slow/async, now it's faster and sync)

@@ -292,12 +292,14 @@ export class ValidationSystem extends AbstractSystem {
    * This is called by many other places
    *
    * @param options - Object containing:
+   * ```ts
    *   {
    *     what: 'all',                  // 'all' or 'edited'
    *     where: 'all',                 // 'all' or 'visible'
    *     includeIgnored: false,        // true, false, or 'only'
    *     includeDisabledRules: false   // true, false, or 'only'
    *   }
+   * ```
    * @return An Array containing the issues
    */
   getIssues(options?: GetIssuesOptions): ValidationIssue[] {
@@ -409,11 +411,13 @@ export class ValidationSystem extends AbstractSystem {
    *
    * @param options - see `getIssues`
    * @return result like:
+   * ```ts
    *   {
    *     error:       Array<ValidationIssue>,
    *     warning:     Array<ValidationIssue>,
    *     suggestion:  Array<ValidationIssue>
    *   }
+   * ```
    */
   getIssuesBySeverity(options?: GetIssuesOptions): IssuesBySeverity {
     const groups = utilArrayGroupBy(this.getIssues(options), 'severity') as Record<ValidationSeverity, ValidationIssue[] | undefined>;

@@ -197,11 +197,14 @@ export class WikidataService extends AbstractSystem {
 
   /**
    * Pass `params` object of the form:
+   * ```ts
    * {
    *   qid: 'string'      // brand wikidata  (e.g. 'Q37158')
    * }
+   * ```
    *
    * Get an result object used to display tag documentation
+   * ```ts
    * {
    *   title:        'string',
    *   description:  'string',
@@ -209,6 +212,7 @@ export class WikidataService extends AbstractSystem {
    *   imageURL:     'string',
    *   wiki:         { title: 'string', text: 'string', url: 'string' }
    * }
+   * ```
    * @param params
    * @param callback - errback-style callback function to call with results
   */
