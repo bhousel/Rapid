@@ -306,10 +306,11 @@ export function lineToPoly(flatPoints: number[], lineStyle: LineStyle = {}): Lin
  * This walks a line and breaks it up into segments containing coordinates at given spacing that share a heading.
  * It is used to position oneway arrows, or sided markers, or cover a line in bounding boxes for labeling purposes.
  * For example:
- *
+ * ```
  *   a --- b       [{ coords: [>,>,>,>], angle: 0     },
  *         |   ->   { coords: [v,v],     angle: -PI/2 },
  *   d --- c        { coords: [<,<,<,<], angle: PI    }]
+ * ```
  *
  * @param   points    - Array of [x,y] coordinates that make up the line.
  * @param   spacing   - Distance between segments in pixels (arrows, sided arrows, etc)

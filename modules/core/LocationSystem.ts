@@ -23,11 +23,12 @@ interface BlockedRegion extends HasLocationSet {
  * `LocationSystem` maintains an internal index of all the boundaries/geofences.
  * It's used by presets, community index, background imagery, to know where in the world these things are valid.
  * These geofences should be defined by `locationSet` objects:
- *
+ * ```ts
  * let locationSet = {
  *   include: [ Array of locations ],
  *   exclude: [ Array of locations ]
  * };
+ * ```
  *
  * Most of the heavy lifting (resolving locations, validating locationSets, spatial indexing)
  * is delegated to the `LocationConflation` instance (`this._resolver`). This system is a thin
@@ -190,12 +191,14 @@ export class LocationSystem extends AbstractSystem {
    * Results include the area (in km²) to facilitate sorting.
    *
    * Map of valid locationSetIDs to areas (in km²)
+   * ```ts
    * {
    *   "+[Q2]": 511207893.3958111,
    *   "+[Q30]": 21817019.17,
    *   "+[new_jersey.geojson]": 22390.77,
    *   …
    * }
+   * ```
    *
    * @param loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
    * @return Result locationSetIDs valid at given location
