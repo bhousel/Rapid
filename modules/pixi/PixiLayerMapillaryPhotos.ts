@@ -13,10 +13,16 @@ import type { Viewport } from '@rapid-sdk/math';
 const MINZOOM = 12;
 const MAPILLARY_GREEN = 0x05cb63;
 const SELECTED = 0xffee00;
+const SHOW_WORLDCOORD_SEQUENCE_LINES = true;
 
 const LINESTYLE: Partial<MatchedStyle> = {
   casing: { opacity: 0 },  // disable
   stroke: { opacity: 0.7, width: 4, color: MAPILLARY_GREEN }
+};
+
+const WORLD_LINESTYLE: Partial<MatchedStyle> = {
+  casing: { opacity: 0 },  // disable
+  stroke: { opacity: 0.9, width: 2, color: 0xff00ff }
 };
 
 const MARKERSTYLE: Partial<MatchedStyle> = {
@@ -232,6 +238,8 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     // const showViewfields = (zoom >= MINVIEWFIELDZOOM);
 
     const parentContainer = this.scene.groups.get('streetview')!;
+    const worldParentContainer = this.scene.groups.get('streetview2')!;
+    const showWorldSequences = SHOW_WORLDCOORD_SEQUENCE_LINES;
     let sequences = mapillary.getSequences();
     let markers = mapillary.getData('images');
 
@@ -269,6 +277,28 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         this.syncFeatureClasses(feature);
         feature.update(viewport, zoom);
         this.retainFeature(feature, frame);
+
+        if (showWorldSequences) {
+          const worldFeatureID = `${this.layerID}-sequence-world-${dataID}-${i}`;
+          let worldFeature = this.features.get(worldFeatureID) as PixiFeatureLine | undefined;
+
+          if (!worldFeature) {
+            worldFeature = new PixiFeatureLine(this, worldFeatureID);
+            worldFeature.style = WORLD_LINESTYLE;
+            worldFeature.parentContainer = worldParentContainer;
+            worldFeature.container.zIndex = 9999;  // draw above everything
+            worldFeature.allowInteraction = false;
+          }
+
+          if (worldFeature.v !== version) {
+            worldFeature.v = version;
+            worldFeature.setWorldCoords(part);
+            worldFeature.setData(dataID, d);
+          }
+
+          worldFeature.update(viewport, zoom);
+          this.retainFeature(worldFeature, frame);
+        }
       }
     }
 

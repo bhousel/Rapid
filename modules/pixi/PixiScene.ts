@@ -130,6 +130,7 @@ export class PixiScene extends EventEmitter {
       'basemap',      // Editable basemap (OSM/Rapid)
       'points',       // Editable points (OSM/Rapid)
       'streetview',   // Streetview imagery, sequences
+      'streetview2',  // Experimental world-coordinate streetview sequences
       'qa',           // Q/A items, issues, notes
       'labels',       // Text labels
       'blocks',       // Blocked out regions
@@ -169,10 +170,30 @@ export class PixiScene extends EventEmitter {
    * @param zoom - Effective zoom level to use for rendering
    */
   render(frame: number, viewport: Viewport, zoom: number): void {
+    this._updateWorldCoordinateGroups(viewport);
+
     for (const layer of this.layers.values()) {
       layer.render(frame, viewport, zoom);
       layer.cull(frame);
     }
+  }
+
+
+  /**
+   * Updates experimental render groups that draw in local world coordinates.
+   * Child features subtract the top-left world coordinate from their geometry;
+   * this group scale converts those local world units back to screen pixels.
+   * @param viewport - Pixi viewport to use for rendering
+   */
+  private _updateWorldCoordinateGroups(viewport: Viewport): void {
+    const streetview = this.groups.get('streetview2');
+    if (!streetview) return;
+
+// test precision theory
+// const scale = Math.pow(2, viewport.transform.z);
+const scale = Math.pow(2, viewport.transform.z - 16);
+    streetview.position.set(0, 0);
+    streetview.scale.set(scale, scale);
   }
 
 

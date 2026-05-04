@@ -7,6 +7,7 @@ import { getLineSegments, lineToPoly, type LineToPolyResult } from './helpers.ts
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const ONEWAY_SPACING = 35;
@@ -36,6 +37,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
   /** Buffer polygon data for hit testing and halo */
   private _bufferdata: LineToPolyResult | null;
+  /** Experimental source geometry for world-coordinate line rendering */
+  private _worldSource: GeometryPart | null;
+  /** World-coordinate anchor used to keep Pixi vertex coordinates small */
+  private _worldAnchor: Vec2 | null;
 
   /**
    * @constructor
@@ -46,6 +51,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     super(layer, featureID);
 
     this._bufferdata = null;
+    this._worldSource = null;
+    this._worldAnchor = null;
 
     const casing = new PIXI.Graphics();
     casing.label = 'casing';
@@ -78,8 +85,21 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     this._bufferdata = null;
+    this._worldSource = null;
+    this._worldAnchor = null;
 
     super.destroy();
+  }
+
+
+  /**
+   * Sets world-coordinate line data for the experimental renderer.
+   * @param source - A GeometryPart containing projected world coordinates
+   */
+  setWorldCoords(source: GeometryPart): void {
+    this._worldSource = source;
+    this._worldAnchor = null;
+    this.geom.dirty = true;
   }
 
 
@@ -88,6 +108,11 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * @param zoom - Effective zoom to use for rendering
    */
   update(viewport: Viewport, zoom: number): void {
+    if (this._worldSource) {
+      this.updateWorld(viewport, zoom);
+      return;
+    }
+
     if (!this.dirty) return;  // nothing to do
 
     const map = this.context.systems.map;
@@ -256,6 +281,80 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
+   * Experimental line update path that draws directly from world coordinates.
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
+   */
+  updateWorld(viewport: Viewport, zoom: number): void {
+    const map = this.context.systems.map;
+    const isWireframe = !!map?.wireframeMode;
+    const container = this.container;
+    const source = this._worldSource;
+    const world = source?.world;
+
+    if (!world || source?.type !== 'LineString') {
+      this.lod = 0;
+      this.visible = false;
+      this.geom.dirty = false;
+      this._styleDirty = false;
+      return;
+    }
+
+    const points = world.coords as Vec2[];
+    if (!points.length) {
+      this.lod = 0;
+      this.visible = false;
+      this.geom.dirty = false;
+      this._styleDirty = false;
+      return;
+    }
+
+    const scale = Math.pow(2, viewport.transform.z);
+    const pxToWorld = 1 / scale;
+    const worldOrigin = viewport.screenToWorld([0, 0]);
+    const anchor = viewport.screenToWorld(viewport.center());
+
+    this._worldAnchor = anchor;
+    const REF_SCALE = Math.pow(2, 16);
+    container.position.set((anchor[0] - worldOrigin[0]) * REF_SCALE, (anchor[1] - worldOrigin[1]) * REF_SCALE);
+
+    const lineMarkers = container.getChildByLabel('lineMarkers');
+    if (lineMarkers) {
+      container.removeChild(lineMarkers);
+      lineMarkers.destroy({ children: true });
+    }
+
+    this.visible = true;
+    this.stroke!.renderable = true;
+
+    if (zoom < 16) {
+      this.lod = 1;
+      this.casing!.renderable = false;
+    } else {
+      this.lod = 2;
+      this.casing!.renderable = true;
+    }
+
+    this._bufferdata = null;
+    container.hitArea = null;
+
+    if (this.casing!.renderable) {
+      this.updateWorldGraphic('casing', this.casing!, points, anchor, zoom, isWireframe, pxToWorld);
+    } else {
+      this.casing!.clear();
+    }
+    if (this.stroke!.renderable) {
+      this.updateWorldGraphic('stroke', this.stroke!, points, anchor, zoom, isWireframe, pxToWorld);
+    } else {
+      this.stroke!.clear();
+    }
+
+    this.geom.dirty = false;
+    this._styleDirty = false;
+  }
+
+
+  /**
    */
   updateGraphic(which: 'casing' | 'stroke', graphic: PIXI.Graphics, points: Vec2[], zoom: number, isWireframe: boolean): void {
     const style = this._style;
@@ -301,6 +400,84 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     function drawLineFromPoints(points: Vec2[], graphics: PIXI.Graphics | DashLine): void {
+      points.forEach(([x, y], i) => {
+        if (i === 0) {
+          graphics.moveTo(x, y);
+        } else {
+          graphics.lineTo(x, y);
+        }
+      });
+    }
+  }
+
+
+  /**
+   * Draws an experimental world-coordinate line graphic.
+   * @param which - Style part to draw
+   * @param graphic - PIXI graphics object to update
+   * @param points - World-coordinate points
+   * @param anchor - World-coordinate feature anchor
+   * @param zoom - Effective zoom to use for rendering
+   * @param isWireframe - Whether wireframe mode is active
+   * @param pxToWorld - Conversion factor from pixels to world units
+   */
+  updateWorldGraphic(
+    which: 'casing' | 'stroke',
+    graphic: PIXI.Graphics,
+    points: Vec2[],
+    anchor: Vec2,
+    zoom: number,
+    isWireframe: boolean,
+    pxToWorld: number
+  ): void {
+    const style = this._style;
+    const partStyle = style[which];
+    if (!partStyle) return;
+
+    const minwidth = which === 'casing' ? 3 : 2;
+    let width = partStyle.width || 3;
+
+    // Apply effectiveZoom style adjustments
+    if (zoom < 16) {
+      width -= 4;
+    } else if (zoom < 17) {
+      width -= 2;
+    }
+    if (width < minwidth) {
+      width = minwidth;
+    }
+
+    if (isWireframe) {
+      width = 1;
+    }
+
+    let g: PIXI.Graphics | DashLine = graphic.clear();
+    if (partStyle?.opacity === 0) return;  // remove completely
+
+    const strokeStyle: StrokeStyleWithDash = {
+      color: partStyle.color,
+      width: width * pxToWorld,
+      alpha: partStyle.opacity ?? 1.0,
+      join: partStyle.join,
+      cap:  partStyle.cap,
+      dash: undefined as number[] | undefined
+    };
+
+// test precision theory
+const points_local = points.map(p => [(p[0] - anchor[0]) * 2 ** 16, (p[1] - anchor[1]) * 2 ** 16]) as Vec2[];
+strokeStyle.width = width * Math.pow(2, 16 - zoom);
+
+
+    if (partStyle.dash) {
+      strokeStyle.dash = partStyle.dash.map(dash => dash * pxToWorld);
+      g = new DashLine(this.gfx, graphic, strokeStyle);
+      drawLineFromWorldPoints(points_local, g);
+    } else {
+      drawLineFromWorldPoints(points_local, g as PIXI.Graphics);
+      (g as PIXI.Graphics).stroke(strokeStyle);
+    }
+
+    function drawLineFromWorldPoints(points: Vec2[], graphics: PIXI.Graphics | DashLine): void {
       points.forEach(([x, y], i) => {
         if (i === 0) {
           graphics.moveTo(x, y);
