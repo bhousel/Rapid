@@ -20,6 +20,7 @@ import { PixiLayerRapid } from './PixiLayerRapid.js';
 import { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.js';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
+import { REF_Z } from '../lib/worldScaled.ts';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
@@ -180,20 +181,24 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * Updates experimental render groups that draw in local world coordinates.
-   * Child features subtract the top-left world coordinate from their geometry;
-   * this group scale converts those local world units back to screen pixels.
+   * Updates the transform for groups that draw in scaled world coordinates (worldScaled, REF_Z=16).
+   *
+   * Features in these groups store vertex positions in worldScaled space (world × 2^REF_Z).
+   * The group scale `2^(z - REF_Z)` converts those local units back to screen pixels GPU-side,
+   * eliminating per-frame world→screen reprojection for every vertex.
+   *
+   * Each feature's container.position is set to `(anchor - worldOrigin) × 2^REF_Z` so that
+   * vertex coordinates remain small (anchor-relative) and float32-safe.
+   *
    * @param viewport - Pixi viewport to use for rendering
    */
   private _updateWorldCoordinateGroups(viewport: Viewport): void {
-    const streetview = this.groups.get('streetview2');
-    if (!streetview) return;
+    const streetview2 = this.groups.get('streetview2');
+    if (!streetview2) return;
 
-// test precision theory
-// const scale = Math.pow(2, viewport.transform.z);
-const scale = Math.pow(2, viewport.transform.z - 16);
-    streetview.position.set(0, 0);
-    streetview.scale.set(scale, scale);
+    const scale = Math.pow(2, viewport.transform.z - REF_Z);
+    streetview2.position.set(0, 0);
+    streetview2.scale.set(scale, scale);
   }
 
 
