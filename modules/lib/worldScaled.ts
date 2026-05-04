@@ -1,6 +1,7 @@
 import { Extent } from '@rapid-sdk/math';
 
 import type { GeometryPartWorldData, GeometryPartWorldScaledData, SSRData, Vec2 } from './types.ts';
+import type { BBox } from 'rbush';
 import type { Viewport } from '@rapid-sdk/math';
 
 
@@ -20,7 +21,7 @@ import type { Viewport } from '@rapid-sdk/math';
 export const REF_Z = 16;
 
 /** Multiplier from world (z0) to worldScaled (z16) space */
-const REF_SCALE = Math.pow(2, REF_Z);
+export const REF_SCALE = Math.pow(2, REF_Z);
 
 
 /**
@@ -54,6 +55,31 @@ export function scaledWorldToScreen(viewport: Viewport, coord: Vec2): Vec2 {
  */
 export function screenToScaledWorld(viewport: Viewport, screen: Vec2): Vec2 {
   return worldToScaled(viewport.screenToWorld(screen));
+}
+
+
+/**
+ * Converts a WGS84 [lon, lat] coordinate to worldScaled space.
+ */
+export function wgs84ToScaledWorld(viewport: Viewport, loc: Vec2): Vec2 {
+  const world = viewport.wgs84ToWorld(loc) as Vec2;
+  return [world[0] * REF_SCALE, world[1] * REF_SCALE];
+}
+
+
+/**
+ * Returns the viewport's currently visible extent in worldScaled coordinates as an RBush BBox.
+ * Use this when querying an rbush that stores bounding boxes in worldScaled space.
+ * @param viewport
+ */
+export function visibleScaledExtent(viewport: Viewport): BBox {
+  const e = viewport.visibleWorldExtent();
+  return {
+    minX: e.min[0] * REF_SCALE,
+    minY: e.min[1] * REF_SCALE,
+    maxX: e.max[0] * REF_SCALE,
+    maxY: e.max[1] * REF_SCALE
+  };
 }
 
 

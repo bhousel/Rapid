@@ -83,7 +83,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
         if (!part.world) continue;  // invalid?
 
         const extent = part.world.extent;
-        const poi = part.world.poi;  // Pole of Inaccessability
+        const poi = part.worldScaled?.poi;  // Pole of Inaccessability (worldScaled coordinates for rbush query)
         const outer = extent.polygon();
 
         // bounding box
