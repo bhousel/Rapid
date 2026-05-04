@@ -3,9 +3,11 @@ import { GlowFilter } from 'pixi-filters';
 
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
+import { scaledWorldToScreen } from '../lib/worldScaled.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 /* Intersection type that includes both Pixi Stroke and DashLineOptions  */
@@ -38,6 +40,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   private _viewfieldName: string | null;
   /** Set true to use a circular halo and hit area */
   private _isCircular: boolean;
+  /** Source geometry for the worldScaled render path */
+  private _worldSource: GeometryPart | null;
 
   /**
    * @constructor
@@ -51,6 +55,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this._viewfieldName = null;   // to watch for change in viewfield texture
 
     this._isCircular = false;   // set true to use a circular halo and hit area
+    this._worldSource = null;
 
     const marker = new PIXI.Sprite();
     marker.label = 'marker';
@@ -90,7 +95,19 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       this.viewfields = null;
     }
 
+    this._worldSource = null;
+
     super.destroy();
+  }
+
+
+  /**
+   * Sets the source GeometryPart for the worldScaled render path.
+   * @param source - A GeometryPart whose `worldScaled` data is populated
+   */
+  setWorldCoords(source: GeometryPart): void {
+    this._worldSource = source;
+    this.geom.dirty = true;
   }
 
 
@@ -99,12 +116,48 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * @param zoom - Effective zoom to use for rendering
    */
   update(viewport: Viewport, zoom: number): void {
+    if (this._worldSource) {
+      this.updateWorld(viewport, zoom);
+      return;
+    }
+
     if (!this.dirty) return;  // nothing to do
 
     this.updateGeometry(viewport, zoom);
     this.updateStyle(viewport, zoom);
     this.updateHitArea();
     this.updateHalo();
+  }
+
+
+  /**
+   * Point update path that positions from pre-scaled world coordinates (worldScaled, REF_Z=16).
+   * Skips `geom.update()` on the common path (style unchanged); only reprojects when style is dirty.
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
+   */
+  updateWorld(viewport: Viewport, zoom: number): void {
+    const worldScaled = this._worldSource?.worldScaled;
+    if (!worldScaled) {
+      this.visible = false;
+      this.geom.dirty = false;
+      this._styleDirty = false;
+      return;
+    }
+
+    // Position from worldScaled anchor — no full geometry reprojection needed.
+    const screenPos = scaledWorldToScreen(viewport, worldScaled.anchor) as Vec2;
+    this.container.position.set(screenPos[0], screenPos[1]);
+    this.container.zIndex = screenPos[1];
+
+    if (this._styleDirty) {
+      // updateStyle reads geom.screen for z-index; update geom so it has fresh screen coords.
+      this.geom.update(viewport);
+      this.updateStyle(viewport, zoom);
+    }
+    this.updateHitArea();
+    this.updateHalo();
+    this.geom.dirty = false;
   }
 
 

@@ -5,9 +5,11 @@ import { vecEqual, vecLength } from '@rapid-sdk/math';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { lineToPoly, type LineToPolyResult } from './helpers.ts';
+import { REF_Z, screenToScaledWorld } from '../lib/worldScaled.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;
@@ -59,6 +61,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   private _bufferdata: LineToPolyResult | null;
   /** Vertex count for Rapid#1636 workaround */
   private _vertexCount: number;
+  /** Source geometry for the worldScaled render path */
+  private _worldSource: GeometryPart | null;
 
   /**
    * @constructor
@@ -71,6 +75,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this._ssrdata = null;
     this._bufferdata = null;
     this._vertexCount = 0;  // we will watch these for Rapid#1636
+    this._worldSource = null;
 
     const lowRes = new PIXI.Sprite();
     lowRes.label = 'lowRes';
@@ -151,8 +156,19 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     this._ssrdata = null;
     this._bufferdata = null;
+    this._worldSource = null;
 
     super.destroy();
+  }
+
+
+  /**
+   * Sets the source GeometryPart for the worldScaled render path.
+   * @param source - A GeometryPart whose `worldScaled` data is populated
+   */
+  setWorldCoords(source: GeometryPart): void {
+    this._worldSource = source;
+    this.geom.dirty = true;
   }
 
 
@@ -161,6 +177,11 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @param zoom - Effective zoom to use for rendering
    */
   update(viewport: Viewport, zoom: number): void {
+    if (this._worldSource) {
+      this.updateWorld(viewport, zoom);
+      return;
+    }
+
     if (!this.dirty) return;  // nothing to do
 
     const context = this.context;
@@ -507,6 +528,112 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
     this._styleDirty = false;
 
     this.updateHalo();
+  }
+
+
+  /**
+   * Polygon update path that draws from pre-scaled world coordinates (worldScaled, REF_Z=16).
+   * The feature's container sits inside a group with scale `2^(zoom - REF_Z)`, so vertex
+   * coordinates in worldScaled space map directly to screen pixels without per-frame reprojection.
+   * @param viewport - Pixi viewport to use for rendering
+   * @param zoom - Effective zoom to use for rendering
+   */
+  updateWorld(viewport: Viewport, zoom: number): void {
+    const map = this.context.systems.map;
+    const isWireframe = !!map?.wireframeMode;
+    const container = this.container;
+    const source = this._worldSource;
+    const worldScaled = source?.worldScaled;
+
+    if (!worldScaled || source?.type !== 'Polygon') {
+      this.lod = 0;
+      this.visible = false;
+      this.geom.dirty = false;
+      this._styleDirty = false;
+      return;
+    }
+
+    const rings = worldScaled.coords as Vec2[][];
+    if (!rings.length || !rings[0].length) {
+      this.lod = 0;
+      this.visible = false;
+      this.geom.dirty = false;
+      this._styleDirty = false;
+      return;
+    }
+
+    // Position container anchor-relative in worldScaled space.
+    // The group's scale (2^(zoom - REF_Z)) converts these local units to screen pixels.
+    const anchor = worldScaled.anchor;
+    const scaledOrigin = screenToScaledWorld(viewport, [0, 0]);
+    container.position.set(anchor[0] - scaledOrigin[0], anchor[1] - scaledOrigin[1]);
+
+    this.lod = 2;
+    this.visible = true;
+    this.lowRes!.visible = false;
+    this.fill!.visible = !isWireframe;
+    this.mask!.visible = false;  // no partial fill on this path
+    this.strokes!.visible = true;
+
+    const style = this._style;
+    const color = style.fill?.color ?? 0xaaaaaa;
+    const opacity = style.fill?.opacity ?? 0.3;
+    const lineWidth = isWireframe ? 1 : style.fill?.width || 2;
+    const localWidth = lineWidth * Math.pow(2, REF_Z - zoom);
+
+    // STROKES
+    const strokes = this.strokes!;
+    strokes.removeChildren();
+    strokes.eventMode = this._classes.has('drawing') ? 'none' : 'static';
+
+    const strokeStyle: PIXI.StrokeStyle = {
+      alpha: 1,
+      alignment: 0.5,
+      color: color,
+      width: localWidth,
+      cap: 'butt',
+      join: 'miter'
+    };
+
+    for (let i = 0; i < rings.length; i++) {
+      const stroke = new PIXI.Graphics();
+      drawRingAnchorRelative(rings[i], anchor, stroke);
+      stroke.stroke(strokeStyle);
+      stroke.label = `stroke${i}`;
+      stroke.sortableChildren = false;
+      strokes.addChild(stroke);
+    }
+
+    // FILL (full fill only — no partial fill/mesh mask on this path)
+    if (this.fill!.visible && rings.length) {
+      this.fill!.eventMode = this._classes.has('drawing') ? 'none' : 'static';
+      this.fill!.clear();
+      const fillStyle: PIXI.FillStyle = { color, alpha: opacity };
+      for (let i = 0; i < rings.length; i++) {
+        drawRingAnchorRelative(rings[i], anchor, this.fill!);
+        if (i === 0) {
+          this.fill!.fill(fillStyle);
+        } else {
+          this.fill!.cut();
+        }
+      }
+    }
+
+    this._bufferdata = null;
+    container.hitArea = null;
+    this.geom.dirty = false;
+    this._styleDirty = false;
+    this.updateHalo();
+
+    function drawRingAnchorRelative(ring: Vec2[], anchor: Vec2, g: PIXI.Graphics): void {
+      ring.forEach(([x, y], i) => {
+        if (i === 0) {
+          g.moveTo(x - anchor[0], y - anchor[1]);
+        } else {
+          g.lineTo(x - anchor[0], y - anchor[1]);
+        }
+      });
+    }
   }
 
 
