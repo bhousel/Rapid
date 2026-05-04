@@ -65,6 +65,31 @@ export interface GeometryPartWorldData {
   ssr?: SSRData;
 }
 
+/**
+ * Scaled world coordinate data for GeometryPart (REF_Z=16 space).
+ * Coordinates are world × 2^16, range 0..16,777,216.
+ * Used by the Pixi render pipeline to avoid per-frame world→screen reprojection.
+ * The group transform `scale = 2^(zoom - 16)` converts these back to screen pixels GPU-side.
+ */
+export interface GeometryPartWorldScaledData {
+  /** Scaled coordinates: Vec2 for Point, Vec2[] for LineString, Vec2[][] for Polygon */
+  coords: Vec2 | Vec2[] | Vec2[][];
+  /** Scaled extent bounding box */
+  extent: Extent;
+  /** Pre-computed anchor = extent center, used for per-feature container positioning */
+  anchor: Vec2;
+  /** Outer ring only (LineString or Polygon outer), scaled */
+  outer?: Vec2[];
+  /** Convex hull, scaled */
+  hull?: Vec2[];
+  /** Centroid, scaled */
+  centroid?: Vec2;
+  /** Pole of inaccessibility (polygons), scaled */
+  poi?: Vec2;
+  /** SSR with scaled poly coords */
+  ssr?: SSRData;
+}
+
 /** Original extent data in WGS84 for Geometry */
 export interface GeometryOrigData {
   extent: Extent;

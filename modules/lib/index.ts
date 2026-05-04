@@ -9,6 +9,7 @@ export * from './Edit.ts';
 export * from './Field.ts';
 export * from './Geometry.ts';
 export * from './GeometryPart.ts';
+export * from './worldScaled.ts';
 export * from './Graph.ts';
 export * from './ImagerySource.ts';
 export * from './intersection.ts';
